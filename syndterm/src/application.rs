@@ -1,5 +1,4 @@
 use crate::{
-    args::Args,
     client::{query::user::UserSubscription, Client},
     command::Command,
     job::Jobs,

@@ -1,8 +1,8 @@
 use crossterm::event::EventStream;
-use ratatui::prelude::CrosstermBackend;
 use syndterm::{
     application::Application,
     args::{self, Args},
+    auth,
     client::Client,
     terminal::Terminal,
 };
@@ -36,12 +36,29 @@ fn init_tracing() {
 async fn main() {
     init_tracing();
 
-    let Args { endpoint } = args::parse();
+    let Args { endpoint, command } = args::parse();
+
+    if let Some(command) = command {
+        match command {
+            args::Command::Login(cmd) => auth::login(cmd).await,
+            args::Command::Logout => unimplemented!(),
+        }
+    }
+
+    let auth = {
+        match auth::authenticate_from_cache() {
+            Some(auth) => auth,
+            None => {
+                eprintln!("Please login (`synd login oauth`)");
+                std::process::exit(1);
+            }
+        }
+    };
 
     let app = {
         let terminal =
             Terminal::from_stdout(std::io::stdout()).expect("Failed to construct terminal");
-        let client = Client::new(endpoint).expect("Failed to construct client");
+        let client = Client::new(endpoint, auth).expect("Failed to construct client");
         Application::new(terminal, client)
     };
 

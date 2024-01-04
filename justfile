@@ -17,3 +17,9 @@ gen-gql:
     --output-directory syndterm/src/client \
     --response-derives "Debug" \
     syndterm/gql/query.gql
+
+  graphql-client generate \
+    --schema-path syndapi/src/client/github/schema.json \
+    --output-directory syndapi/src/client/github \
+    --response-derives "Debug" \
+    syndapi/src/client/github/query.gql

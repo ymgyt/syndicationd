@@ -41,7 +41,7 @@ pub struct SyndApi {}
 async fn main() {
     init_tracing();
 
-    let api = SyndApi::parse();
+    let _api = SyndApi::parse();
     let version = env!("CARGO_PKG_VERSION");
 
     info!(version, "Runinng...");

@@ -6,7 +6,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use tracing::error;
 use url::Url;
 
-use self::query::user::{UserSubscription, UserSubscriptionFeeds};
+use crate::{auth::Authentication, config};
+
+use self::query::user::UserSubscription;
 
 pub mod query;
 
@@ -17,16 +19,17 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(endpoint: Url) -> anyhow::Result<Self> {
-        let user_agent = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+    pub fn new(endpoint: Url, auth: Authentication) -> anyhow::Result<Self> {
         let mut headers = HeaderMap::new();
 
-        let mut token = HeaderValue::try_from(format!("foo"))?;
+        let mut token = HeaderValue::try_from(match auth {
+            Authentication::Github { access_token } => format!("github {access_token}"),
+        })?;
         token.set_sensitive(true);
         headers.insert(header::AUTHORIZATION, token);
 
         let client = reqwest::ClientBuilder::new()
-            .user_agent(user_agent)
+            .user_agent(config::USER_AGENT)
             .default_headers(headers)
             .timeout(Duration::from_secs(5))
             .connect_timeout(Duration::from_secs(5))

@@ -13,6 +13,9 @@ async-graphql-axum = { git = "https://github.com/async-graphql/async-graphql.git
 # TODO configure features
 axum = { version = "0.7.3" }
 clap = { workspace = true, features = ["derive"] }
+graphql_client = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
 synd = { path = "../synd" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }

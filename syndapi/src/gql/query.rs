@@ -1,5 +1,8 @@
 use async_graphql::{Context, Object};
 use synd;
+use tracing::info;
+
+use crate::principal::Principal;
 
 pub struct Subscription {}
 pub struct Feed(synd::Feed);
@@ -25,7 +28,9 @@ pub struct Query;
 
 #[Object]
 impl Query {
-    async fn subscription(&self, _ctx: &Context<'_>) -> Subscription {
+    async fn subscription(&self, ctx: &Context<'_>) -> Subscription {
+        let principal = ctx.data_unchecked::<Principal>();
+        info!("Query subscription {principal:?}");
         Subscription {}
     }
 }

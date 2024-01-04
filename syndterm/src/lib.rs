@@ -1,5 +1,6 @@
 pub mod application;
 pub mod args;
+pub mod auth;
 pub mod client;
 pub mod command;
 pub mod config;

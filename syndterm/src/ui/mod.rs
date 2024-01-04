@@ -63,6 +63,7 @@ pub fn render(frame: &mut Frame, cx: Context<'_>) {
 }
 
 /// Create centered Rect
+#[allow(dead_code)]
 fn centered(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     // get vertically centered rect
     let layout = Layout::default()
