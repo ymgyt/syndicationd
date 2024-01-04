@@ -3,7 +3,7 @@ use axum::{middleware, routing::get, Extension, Router};
 use tokio::net::TcpListener;
 use tracing::info;
 
-use crate::gql;
+use crate::{gql, persistence::Datastore};
 
 use self::auth::Authenticator;
 
@@ -22,7 +22,8 @@ pub async fn listen_and_serve() -> anyhow::Result<()> {
 
 /// Start api server
 pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
-    let schema = gql::schema().extension(Tracing).finish();
+    let datastore = Datastore::new()?;
+    let schema = gql::schema().data(datastore).extension(Tracing).finish();
 
     let authenticator = Authenticator::new()?;
 

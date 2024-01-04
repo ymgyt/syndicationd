@@ -6,7 +6,10 @@ use axum::{
 };
 use tracing::warn;
 
-use crate::{client::github::GithubClient, principal::Principal};
+use crate::{
+    client::github::GithubClient,
+    principal::{Principal, User},
+};
 
 #[derive(Clone)]
 pub struct Authenticator {
@@ -28,7 +31,7 @@ impl Authenticator {
                 // TODO: configure cache to reduce api call
 
                 match self.github.authenticate(access_token).await {
-                    Ok(email) => Ok(Principal::User { email }),
+                    Ok(email) => Ok(Principal::User(User::from_email(email))),
                     Err(err) => {
                         warn!("Failed to authenticate github {err}");
                         Err(())
