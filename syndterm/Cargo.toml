@@ -1,0 +1,19 @@
+[package]
+name = "syndterm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+crossterm = { version = "0.27.0", features = ["event-stream"] }
+futures-util = "0.3.30"
+graphql_client = { version ="0.13.0", default-features = false }
+ratatui = "0.25.0"
+reqwest = { version = "0.11.23",default-features = false,features = ["rustls-tls", "json"] }
+serde = { workspace = true, features = ["derive"] }
+synd = { path = "../synd" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
