@@ -1,0 +1,19 @@
+[package]
+name = "syndapi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+# To use axum 0.7
+async-graphql = { git = "https://github.com/async-graphql/async-graphql.git", branch = "master", features = [
+  "tracing",
+] }
+async-graphql-axum = { git = "https://github.com/async-graphql/async-graphql.git", branch = "master" }
+# TODO configure features
+axum = { version = "0.7.3" }
+clap = { workspace = true, features = ["derive"] }
+synd = { path = "../synd" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
