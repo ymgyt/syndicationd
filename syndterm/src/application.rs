@@ -12,6 +12,7 @@ use crate::{
 };
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
+use tracing::info;
 
 /// Cureent ui screen
 pub enum Screen {
@@ -122,6 +123,7 @@ impl Application {
     }
 
     fn apply(&mut self, command: Command) {
+        info!("Apply {command:?}");
         match command {
             Command::Quit => self.should_quit = true,
             Command::Authenticate(method) => self.authenticate(method),
@@ -194,6 +196,7 @@ impl Application {
     }
 }
 
+#[derive(Debug)]
 pub enum AuthenticateMethod {
     Github,
 }

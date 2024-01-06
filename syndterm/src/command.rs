@@ -4,6 +4,7 @@ use crate::{
     client::query::user::UserSubscription,
 };
 
+#[derive(Debug)]
 pub enum Command {
     Quit,
     Authenticate(AuthenticateMethod),

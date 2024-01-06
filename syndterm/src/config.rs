@@ -1,4 +1,9 @@
-use std::path::PathBuf;
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
+
+use directories::ProjectDirs;
 
 pub mod api {
     pub const ENDPOINT: &str = "http://localhost:5959/gql";
@@ -10,10 +15,18 @@ pub mod github {
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-pub fn cache_dir() -> PathBuf {
-    dirs::cache_dir()
-        .map(|path| path.join(APP_PATH))
-        .expect("Faled to get cache dire")
+pub fn cache_dir() -> &'static Path {
+    project_dirs().cache_dir()
 }
 
-const APP_PATH: &str = "syndicationd/syndterm";
+pub fn log_path() -> PathBuf {
+    project_dirs().data_dir().join("syndterm.log")
+}
+
+fn project_dirs() -> &'static ProjectDirs {
+    static PROJECT_DIRS: OnceLock<ProjectDirs> = OnceLock::new();
+
+    PROJECT_DIRS.get_or_init(|| {
+        ProjectDirs::from("io", "ymgyt", "syndterm").expect("Failed to get project dirs")
+    })
+}

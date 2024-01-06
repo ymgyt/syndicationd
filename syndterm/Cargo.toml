@@ -5,9 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
+clap = { workspace = true, features = ["derive", "string"] }
 crossterm = { version = "0.27.0", features = ["event-stream"] }
-dirs = "5.0.1"
+directories = "5.0.1"
 futures-util = "0.3.30"
 graphql_client = { workspace = true }
 http = "0.2"                                                                   # reqwest use 0.2
@@ -20,5 +20,6 @@ serde_json = "1.0.111"
 synd = { path = "../synd" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 tracing = { workspace = true }
+tracing-appender = "0.2.3"
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
