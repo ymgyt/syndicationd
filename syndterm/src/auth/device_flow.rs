@@ -9,7 +9,7 @@ pub struct DeviceAuthorizationRequest<'s> {
 }
 
 /// https://datatracker.ietf.org/doc/html/rfc8628#section-3.2
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct DeviceAuthorizationResponse {
     /// device verification code
     pub device_code: String,
@@ -88,6 +88,7 @@ pub enum DeviceAccessTokenErrorCode {
     UnauthorizedClient,
     UnsupportedGrantType,
     InvalidScope,
+    IncorrectDeviceCode,
 }
 
 impl DeviceAccessTokenErrorCode {

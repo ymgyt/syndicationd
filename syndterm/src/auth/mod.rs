@@ -1,48 +1,19 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info};
+use tracing::debug;
 
-use crate::{
-    args::{self, LoginCommand, LoginProtocol},
-    config,
-};
+use crate::config;
 
-mod device_flow;
-mod github;
+pub mod device_flow;
+pub mod github;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Authentication {
     Github { access_token: String },
 }
 
-pub async fn login(cmd: LoginCommand) {
-    let result = match cmd.protocol {
-        LoginProtocol::OAuth(oauth) => match oauth.authorization_server {
-            args::AuthorizationServer::Github => github::DeviceFlow::new()
-                .device_flow(std::io::stdout())
-                .await
-                .map(|res| Authentication::Github {
-                    access_token: res.access_token,
-                }),
-        },
-    };
-
-    let exit_code = match result.and_then(persist_authentication) {
-        Ok(_) => {
-            info!("Successfully logined");
-            0
-        }
-        Err(err) => {
-            error!("{err}");
-            1
-        }
-    };
-
-    std::process::exit(exit_code);
-}
-
-fn persist_authentication(auth: Authentication) -> anyhow::Result<()> {
+pub fn persist_authentication(auth: Authentication) -> anyhow::Result<()> {
     let auth_path = auth_file();
     if let Some(parent) = auth_path.parent() {
         std::fs::create_dir_all(parent)?;

@@ -6,13 +6,19 @@ use ratatui::{
     Frame,
 };
 
-use crate::application::State;
+use crate::application::{Screen, State};
+
+pub mod login;
 
 pub struct Context<'a> {
-    pub app_state: &'a State,
+    pub state: &'a mut State,
 }
 
-pub fn render(frame: &mut Frame, cx: Context<'_>) {
+pub fn render(frame: &mut Frame, mut cx: Context<'_>) {
+    match cx.state.screen {
+        Screen::Login => return login::render(frame.size(), frame, &mut cx),
+        Screen::Browse => {}
+    }
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -30,7 +36,7 @@ pub fn render(frame: &mut Frame, cx: Context<'_>) {
     };
 
     let list = {
-        let items = if let Some(ref sub) = cx.app_state.user_subscription {
+        let items = if let Some(ref sub) = cx.state.user_subscription {
             sub.feeds
                 .iter()
                 .map(|feed| feed.url.as_str())

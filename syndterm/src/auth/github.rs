@@ -35,11 +35,7 @@ impl DeviceFlow {
         }
     }
 
-    #[tracing::instrument(skip_all)]
-    pub async fn device_flow<W: Write>(
-        self,
-        writer: W,
-    ) -> anyhow::Result<DeviceAccessTokenResponse> {
+    pub async fn device_authorize_request(&self) -> anyhow::Result<DeviceAuthorizationResponse> {
         // https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
         let scope = "user:email";
 
@@ -57,23 +53,14 @@ impl DeviceFlow {
             .json::<DeviceAuthorizationResponse>()
             .await?;
 
-        debug!("{response:?}");
+        Ok(response)
+    }
 
-        let DeviceAuthorizationResponse {
-            device_code,
-            user_code,
-            verification_uri,
-            interval,
-            ..
-        } = response;
-
-        let mut writer = writer;
-        writeln!(&mut writer, "Open `{verification_uri}` on your browser")?;
-        writeln!(&mut writer, "Enter CODE: `{user_code}`")?;
-
-        // attempt to open input screen in the browser
-        open::that(verification_uri.to_string()).ok();
-
+    pub async fn pool_device_access_token(
+        &self,
+        device_code: String,
+        interval: Option<i64>,
+    ) -> anyhow::Result<DeviceAccessTokenResponse> {
         // poll to check if user authorized the device
         macro_rules! continue_or_abort {
             ( $response_bytes:ident ) => {{
@@ -123,5 +110,28 @@ impl DeviceFlow {
         };
 
         Ok(response)
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn device_flow<W: Write>(
+        self,
+        writer: W,
+    ) -> anyhow::Result<DeviceAccessTokenResponse> {
+        let DeviceAuthorizationResponse {
+            device_code,
+            user_code,
+            verification_uri,
+            interval,
+            ..
+        } = self.device_authorize_request().await?;
+
+        let mut writer = writer;
+        writeln!(&mut writer, "Open `{verification_uri}` on your browser")?;
+        writeln!(&mut writer, "Enter CODE: `{user_code}`")?;
+
+        // attempt to open input screen in the browser
+        open::that(verification_uri.to_string()).ok();
+
+        self.pool_device_access_token(device_code, interval).await
     }
 }

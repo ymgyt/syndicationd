@@ -1,7 +1,7 @@
 use std::{fmt::Debug, time::Duration};
 
 use graphql_client::{GraphQLQuery, Response};
-use reqwest::header::{self, HeaderMap, HeaderValue};
+use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::error;
 use url::Url;
@@ -15,27 +15,32 @@ pub mod query;
 #[derive(Clone)]
 pub struct Client {
     client: reqwest::Client,
+    credential: Option<HeaderValue>,
     endpoint: Url,
 }
 
 impl Client {
-    pub fn new(endpoint: Url, auth: Authentication) -> anyhow::Result<Self> {
-        let mut headers = HeaderMap::new();
-
-        let mut token = HeaderValue::try_from(match auth {
-            Authentication::Github { access_token } => format!("github {access_token}"),
-        })?;
-        token.set_sensitive(true);
-        headers.insert(header::AUTHORIZATION, token);
-
+    pub fn new(endpoint: Url) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .user_agent(config::USER_AGENT)
-            .default_headers(headers)
             .timeout(Duration::from_secs(5))
             .connect_timeout(Duration::from_secs(5))
             .build()?;
 
-        Ok(Self { client, endpoint })
+        Ok(Self {
+            client,
+            endpoint,
+            credential: None,
+        })
+    }
+
+    pub fn set_credential(&mut self, auth: Authentication) {
+        let mut token = HeaderValue::try_from(match auth {
+            Authentication::Github { access_token } => format!("github {access_token}"),
+        })
+        .unwrap();
+        token.set_sensitive(true);
+        self.credential = Some(token);
     }
 
     pub async fn fetch_subscription(&self) -> anyhow::Result<UserSubscription> {
@@ -53,6 +58,13 @@ impl Client {
         let res: Response<ResponseData> = self
             .client
             .post(self.endpoint.clone())
+            .header(
+                header::AUTHORIZATION,
+                self.credential
+                    .as_ref()
+                    .expect("Credential not configured. this is BUG")
+                    .clone(),
+            )
             .json(&body)
             .send()
             .await?
