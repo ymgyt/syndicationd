@@ -1,17 +1,23 @@
 use ratatui::{
     prelude::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget},
     Frame,
 };
 
-use crate::application::{Screen, State};
+use crate::{
+    application::{Screen, State},
+    ui::theme::Theme,
+};
 
 pub mod login;
+pub mod tabs;
+pub mod theme;
 
 pub struct Context<'a> {
     pub state: &'a mut State,
+    pub theme: &'a Theme,
 }
 
 pub fn render(frame: &mut Frame, mut cx: Context<'_>) {
@@ -19,21 +25,18 @@ pub fn render(frame: &mut Frame, mut cx: Context<'_>) {
         Screen::Login => return login::render(frame.size(), frame, &mut cx),
         Screen::Browse => {}
     }
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(1),
-            Constraint::Length(3),
-        ])
-        .split(frame.size());
+    let area = frame.size();
+    // Background
+    Block::new()
+        .style(cx.theme.background)
+        .render(area, frame.buffer_mut());
 
-    let title = {
-        let title_block = Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default());
-        Paragraph::new(Text::styled("Synd", Style::default().fg(Color::Green))).block(title_block)
-    };
+    let [tabs_area, list_area] = area.split(&Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(1),
+    ]));
+
+    cx.state.tabs.render(tabs_area, frame.buffer_mut(), &cx);
 
     let list = {
         let items = if let Some(ref sub) = cx.state.user_subscription {
@@ -55,17 +58,7 @@ pub fn render(frame: &mut Frame, mut cx: Context<'_>) {
         List::new(items)
     };
 
-    let prompt = {
-        let text = vec![Span::styled(
-            "Subscription | ",
-            Style::default().fg(Color::White),
-        )];
-        Paragraph::new(Line::from(text)).block(Block::default().borders(Borders::ALL))
-    };
-
-    frame.render_widget(title, chunks[0]);
-    frame.render_widget(list, chunks[1]);
-    frame.render_widget(prompt, chunks[2]);
+    frame.render_widget(list, list_area);
 }
 
 /// Create centered Rect

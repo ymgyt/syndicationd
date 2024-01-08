@@ -1,5 +1,5 @@
 use crate::{
-    application::AuthenticateMethod,
+    application::{AuthenticateMethod, Direction},
     auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
     client::query::user::UserSubscription,
 };
@@ -10,6 +10,7 @@ pub enum Command {
     Authenticate(AuthenticateMethod),
     DeviceAuthorizationFlow(DeviceAuthorizationResponse),
     CompleteDevieAuthorizationFlow(DeviceAccessTokenResponse),
+    MoveTabSelection(Direction),
     FetchSubscription,
     UpdateSubscription(UserSubscription),
 }

@@ -8,11 +8,19 @@ use crate::{
     command::Command,
     job::Jobs,
     terminal::Terminal,
-    ui::{self, login::LoginMethods},
+    ui::{self, login::LoginMethods, tabs::Tabs, theme::Theme},
 };
-use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures_util::{FutureExt, Stream, StreamExt};
-use tracing::info;
+use tracing::{debug, info};
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
 
 /// Cureent ui screen
 pub enum Screen {
@@ -36,6 +44,7 @@ pub struct LoginState {
 pub struct State {
     pub screen: Screen,
     pub login: LoginState,
+    pub tabs: Tabs,
     pub user_subscription: Option<UserSubscription>,
 }
 
@@ -44,6 +53,7 @@ pub struct Application {
     client: Client,
     jobs: Jobs,
     state: State,
+    theme: Theme,
     should_render: bool,
     should_quit: bool,
 }
@@ -56,6 +66,7 @@ impl Application {
                 login_methods: LoginMethods::new(),
                 auth_state: AuthenticateState::NotAuthenticated,
             },
+            tabs: Tabs::new(),
             user_subscription: None,
         };
 
@@ -64,6 +75,7 @@ impl Application {
             client,
             jobs: Jobs::new(),
             state,
+            theme: Theme::new(),
             should_quit: false,
             should_render: false,
         }
@@ -124,6 +136,7 @@ impl Application {
 
     fn apply(&mut self, command: Command) {
         info!("Apply {command:?}");
+
         match command {
             Command::Quit => self.should_quit = true,
             Command::Authenticate(method) => self.authenticate(method),
@@ -132,6 +145,10 @@ impl Application {
             }
             Command::CompleteDevieAuthorizationFlow(device_access_token) => {
                 self.complete_device_authroize_flow(device_access_token)
+            }
+            Command::MoveTabSelection(direction) => {
+                self.state.tabs.move_selection(direction);
+                self.should_render = true;
             }
             Command::FetchSubscription => self.fetch_subscription(),
             Command::UpdateSubscription(sub) => {
@@ -144,6 +161,7 @@ impl Application {
     fn render(&mut self) {
         let cx = ui::Context {
             state: &mut self.state,
+            theme: &self.theme,
         };
 
         self.terminal.render(|frame| ui::render(frame, cx)).unwrap();
@@ -158,6 +176,7 @@ impl Application {
                 ..
             }) => None,
             CrosstermEvent::Key(key) => {
+                debug!("{key:?}");
                 match self.state.screen {
                     Screen::Login => match key.code {
                         KeyCode::Enter => {
@@ -171,6 +190,12 @@ impl Application {
                     },
                     Screen::Browse => match key.code {
                         KeyCode::Char('r') => return Some(Command::FetchSubscription),
+                        KeyCode::Char('L') => {
+                            return Some(Command::MoveTabSelection(Direction::Right))
+                        }
+                        KeyCode::Char('H') => {
+                            return Some(Command::MoveTabSelection(Direction::Left))
+                        }
                         _ => {}
                     },
                 };
