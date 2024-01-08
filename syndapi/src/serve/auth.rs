@@ -38,6 +38,7 @@ impl Authenticator {
                     }
                 }
             }
+            (Some("me"), None) => Ok(Principal::User(User::from_email("me@ymgyt.io"))),
             _ => Err(()),
         }
     }

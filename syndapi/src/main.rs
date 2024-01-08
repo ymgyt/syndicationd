@@ -1,7 +1,10 @@
-use clap::Parser;
 use tracing::{error, info};
 
-use syndapi::serve::listen_and_serve;
+use syndapi::{
+    args::{self, KvsdOptions},
+    persistence::{kvsd::KvsdClient, Datastore},
+    serve::{auth::Authenticator, listen_and_serve, Dependency},
+};
 
 fn init_tracing() {
     use tracing_subscriber::{
@@ -27,26 +30,37 @@ fn init_tracing() {
         .init();
 }
 
-#[derive(Parser, Debug)]
-#[command(
-    version,
-    propagate_version = true,
-    disable_help_subcommand = true,
-    help_expected = true,
-    about = "xxx"
-)]
-pub struct SyndApi {}
+async fn dependency(kvsd: KvsdOptions) -> anyhow::Result<Dependency> {
+    let authenticator = Authenticator::new()?;
+    let datastore = {
+        let KvsdOptions {
+            host,
+            port,
+            username,
+            password,
+        } = kvsd;
+        let kvsd = KvsdClient::connect(host, port, username, password).await?;
+        Datastore::new(kvsd)?
+    };
+
+    Ok(Dependency {
+        datastore,
+        authenticator,
+    })
+}
 
 #[tokio::main]
 async fn main() {
+    let args = args::parse();
+
     init_tracing();
 
-    let _api = SyndApi::parse();
     let version = env!("CARGO_PKG_VERSION");
+    let dep = dependency(args.kvsd).await.unwrap();
 
     info!(version, "Runinng...");
 
-    if let Err(err) = listen_and_serve().await {
+    if let Err(err) = listen_and_serve(dep).await {
         error!("{err:?}");
         std::process::exit(1);
     }

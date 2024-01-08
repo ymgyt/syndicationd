@@ -14,6 +14,7 @@ async-graphql-axum = { git = "https://github.com/async-graphql/async-graphql.git
 axum = { version = "0.7.3" }
 clap = { workspace = true, features = ["derive"] }
 graphql_client = { workspace = true }
+kvsd = { version = "0.1.2" }
 reqwest = { workspace = true }
 serde = { workspace = true }
 synd = { path = "../synd" }

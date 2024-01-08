@@ -1,12 +1,14 @@
 mod query;
-
-use async_graphql::{EmptyMutation, EmptySubscription, Schema, SchemaBuilder};
 pub use query::Query;
 
-pub type SyndSchema = Schema<Query, EmptyMutation, EmptySubscription>;
+mod mutation;
+use async_graphql::{EmptySubscription, Schema, SchemaBuilder};
+pub use mutation::Mutation;
 
-pub fn schema() -> SchemaBuilder<Query, EmptyMutation, EmptySubscription> {
-    Schema::build(Query, EmptyMutation, EmptySubscription)
+pub type SyndSchema = Schema<Query, Mutation, EmptySubscription>;
+
+pub fn schema() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
+    Schema::build(Query, Mutation, EmptySubscription)
 }
 
 pub mod handler {

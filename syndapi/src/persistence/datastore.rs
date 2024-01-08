@@ -1,20 +1,38 @@
+use std::sync::RwLock;
+
 use synd::Feed;
 
-use super::DatastoreError;
+use super::{kvsd::KvsdClient, DatastoreError};
 
 pub type DatastoreResult<T> = std::result::Result<T, DatastoreError>;
 
-pub struct Datastore {}
+pub struct Datastore {
+    #[allow(dead_code)]
+    kvsd: KvsdClient,
+    // tmp
+    feeds: RwLock<Vec<Feed>>,
+}
 
 impl Datastore {
-    pub fn new() -> anyhow::Result<Self> {
-        Ok(Self {})
+    pub fn new(kvsd: KvsdClient) -> anyhow::Result<Self> {
+        Ok(Self {
+            kvsd,
+            feeds: RwLock::new(vec![Feed::new(
+                "https://this-week-in-rust.org/atom.xml".into(),
+            )]),
+        })
     }
 
-    pub async fn fetch_subscription_feeds(&self, user_id: &str) -> DatastoreResult<Vec<Feed>> {
-        Ok(vec![
-            synd::Feed::new(user_id.into()),
-            synd::Feed::new("bar".into()),
-        ])
+    pub async fn add_feed_to_subscription(
+        &self,
+        _user_id: &str,
+        url: String,
+    ) -> DatastoreResult<()> {
+        self.feeds.write().unwrap().push(Feed::new(url));
+        Ok(())
+    }
+
+    pub async fn fetch_subscription_feeds(&self, _user_id: &str) -> DatastoreResult<Vec<Feed>> {
+        Ok(self.feeds.read().unwrap().clone())
     }
 }

@@ -1,4 +1,7 @@
-use async_graphql::{Context, Object};
+use async_graphql::{
+    connection::{Connection, Edge},
+    Context, Object, Result,
+};
 use synd;
 use tracing::info;
 
@@ -18,14 +21,19 @@ impl Feed {
 
 #[Object]
 impl<'a> Subscription<'a> {
-    async fn feeds(&self, cx: &Context<'_>) -> Vec<Feed> {
+    async fn feeds(&self, cx: &Context<'_>) -> Result<Connection<usize, Feed>> {
         let d = cx.data_unchecked::<Datastore>();
-        d.fetch_subscription_feeds(self.user_id)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(Feed)
-            .collect()
+        let mut connection = Connection::new(false, false);
+        connection.edges.extend(
+            d.fetch_subscription_feeds(self.user_id)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(Feed)
+                .enumerate()
+                .map(|(idx, feed)| Edge::new(idx, feed)),
+        );
+        Ok(connection)
     }
 }
 
