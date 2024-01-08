@@ -4,7 +4,8 @@ pub mod user {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "User";
-    pub const QUERY : & str = "query User {\n  subscription {\n    feeds {\n      nodes {\n        url\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY: &str =
+        "mutation User($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input)\n}\n";
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -16,22 +17,18 @@ pub mod user {
     #[allow(dead_code)]
     type ID = String;
     #[derive(Serialize)]
-    pub struct Variables;
+    pub struct SubscribeFeedInput {
+        pub url: String,
+    }
+    #[derive(Serialize)]
+    pub struct Variables {
+        pub input: SubscribeFeedInput,
+    }
+    impl Variables {}
     #[derive(Deserialize, Debug)]
     pub struct ResponseData {
-        pub subscription: UserSubscription,
-    }
-    #[derive(Deserialize, Debug)]
-    pub struct UserSubscription {
-        pub feeds: UserSubscriptionFeeds,
-    }
-    #[derive(Deserialize, Debug)]
-    pub struct UserSubscriptionFeeds {
-        pub nodes: Vec<UserSubscriptionFeedsNodes>,
-    }
-    #[derive(Deserialize, Debug)]
-    pub struct UserSubscriptionFeedsNodes {
-        pub url: String,
+        #[serde(rename = "subscribeFeed")]
+        pub subscribe_feed: String,
     }
 }
 impl graphql_client::GraphQLQuery for User {

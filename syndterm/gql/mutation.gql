@@ -1,0 +1,3 @@
+mutation User($input: SubscribeFeedInput!) {
+  subscribeFeed(input: $input)
+}

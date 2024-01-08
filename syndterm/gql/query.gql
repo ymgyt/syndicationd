@@ -1,7 +1,9 @@
 query User {
   subscription {
     feeds {
-      url
+      nodes {
+        url
+      }
     }
   }
 }

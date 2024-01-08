@@ -6,10 +6,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use tracing::error;
 use url::Url;
 
-use crate::{auth::Authentication, config};
+use crate::{
+    auth::Authentication,
+    client::{mutation::user::SubscribeFeedInput, query::user::UserSubscription},
+    config,
+};
 
-use self::query::user::UserSubscription;
-
+pub mod mutation;
 pub mod query;
 
 #[derive(Clone)]
@@ -50,6 +53,15 @@ impl Client {
         Ok(res.subscription)
     }
 
+    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<()> {
+        let var = mutation::user::Variables {
+            input: SubscribeFeedInput { url },
+        };
+        let req = mutation::User::build_query(var);
+        let _res: mutation::user::ResponseData = self.request(&req).await?;
+        Ok(())
+    }
+
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>
     where
         Body: Serialize + ?Sized,
@@ -77,7 +89,7 @@ impl Client {
                 for err in errs {
                     error!("{err:?}");
                 }
-                Err(anyhow::anyhow!("failed to request github api"))
+                Err(anyhow::anyhow!("failed to request synd api"))
             }
             (Some(data), _) => Ok(data),
             _ => Err(anyhow::anyhow!("unexpected response",)),

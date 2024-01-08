@@ -6,6 +6,12 @@ use ratatui::{
 
 use crate::{application::Direction, ui::Context};
 
+#[derive(PartialEq, Eq, Debug)]
+pub enum Tab {
+    Feeds,
+    Subscription,
+}
+
 pub struct Tabs {
     pub selected: usize,
     pub tabs: Vec<&'static str>,
@@ -19,7 +25,15 @@ impl Tabs {
         }
     }
 
-    pub fn move_selection(&mut self, direction: Direction) {
+    pub fn current(&self) -> Tab {
+        match self.selected {
+            0 => Tab::Feeds,
+            1 => Tab::Subscription,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn move_selection(&mut self, direction: Direction) -> Tab {
         let selected = match direction {
             Direction::Left => {
                 if self.selected == 0 {
@@ -32,6 +46,7 @@ impl Tabs {
             _ => self.selected,
         };
         self.selected = selected;
+        self.current()
     }
 }
 

@@ -8,7 +8,14 @@ use crate::{
     command::Command,
     job::Jobs,
     terminal::Terminal,
-    ui::{self, login::LoginMethods, tabs::Tabs, theme::Theme},
+    ui::{
+        self,
+        login::LoginMethods,
+        prompt::Prompt,
+        subscription::Subscription,
+        tabs::{Tab, Tabs},
+        theme::Theme,
+    },
 };
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures_util::{FutureExt, Stream, StreamExt};
@@ -45,7 +52,8 @@ pub struct State {
     pub screen: Screen,
     pub login: LoginState,
     pub tabs: Tabs,
-    pub user_subscription: Option<UserSubscription>,
+    pub prompt: Prompt,
+    pub subscription: Subscription,
 }
 
 pub struct Application {
@@ -67,7 +75,8 @@ impl Application {
                 auth_state: AuthenticateState::NotAuthenticated,
             },
             tabs: Tabs::new(),
-            user_subscription: None,
+            subscription: Subscription::new(),
+            prompt: Prompt::new(),
         };
 
         Self {
@@ -137,23 +146,42 @@ impl Application {
     fn apply(&mut self, command: Command) {
         info!("Apply {command:?}");
 
-        match command {
-            Command::Quit => self.should_quit = true,
-            Command::Authenticate(method) => self.authenticate(method),
-            Command::DeviceAuthorizationFlow(device_authorization) => {
-                self.device_authorize_flow(device_authorization)
-            }
-            Command::CompleteDevieAuthorizationFlow(device_access_token) => {
-                self.complete_device_authroize_flow(device_access_token)
-            }
-            Command::MoveTabSelection(direction) => {
-                self.state.tabs.move_selection(direction);
-                self.should_render = true;
-            }
-            Command::FetchSubscription => self.fetch_subscription(),
-            Command::UpdateSubscription(sub) => {
-                self.state.user_subscription = Some(sub);
-                self.should_render = true;
+        let mut next = Some(command);
+
+        // how to handle command => command pattern ?
+        // should detect infinite loop ?
+        while let Some(command) = next.take() {
+            match command {
+                Command::Quit => self.should_quit = true,
+                Command::Authenticate(method) => self.authenticate(method),
+                Command::DeviceAuthorizationFlow(device_authorization) => {
+                    self.device_authorize_flow(device_authorization)
+                }
+                Command::CompleteDevieAuthorizationFlow(device_access_token) => {
+                    self.complete_device_authroize_flow(device_access_token)
+                }
+                Command::MoveTabSelection(direction) => {
+                    match self.state.tabs.move_selection(direction) {
+                        Tab::Subscription if !self.state.subscription.has_subscription() => {
+                            next = Some(Command::FetchSubscription);
+                        }
+                        _ => {}
+                    }
+                    self.should_render = true;
+                }
+                Command::PromptFeedSubscription => {
+                    self.prompt_feed_subscription();
+                    self.should_render = true;
+                }
+                Command::SubscribeFeed { url } => {
+                    self.subscribe_feed(url);
+                    self.should_render = true;
+                }
+                Command::FetchSubscription => self.fetch_subscription(),
+                Command::UpdateSubscription(sub) => {
+                    self.state.subscription.update_subscription(sub);
+                    self.should_render = true;
+                }
             }
         }
     }
@@ -190,11 +218,12 @@ impl Application {
                     },
                     Screen::Browse => match key.code {
                         KeyCode::Char('r') => return Some(Command::FetchSubscription),
-                        KeyCode::Char('L') => {
-                            return Some(Command::MoveTabSelection(Direction::Right))
-                        }
-                        KeyCode::Char('H') => {
+                        KeyCode::Tab => return Some(Command::MoveTabSelection(Direction::Right)),
+                        KeyCode::BackTab => {
                             return Some(Command::MoveTabSelection(Direction::Left))
+                        }
+                        KeyCode::Char('a') if self.state.tabs.current() == Tab::Subscription => {
+                            return Some(Command::PromptFeedSubscription)
                         }
                         _ => {}
                     },
@@ -219,6 +248,21 @@ impl Application {
         .boxed();
         self.jobs.futures.push(fut);
     }
+}
+
+impl Application {
+    fn prompt_feed_subscription(&mut self) {
+        let prompt = r#"URL: https://blog.ymgyt.io/atom.xml "#;
+        let modified = edit::edit(prompt).expect("Got user modified input");
+        debug!("Got user modified feed subscription: {modified}");
+        // TODO: more safely
+        let url = modified.trim_start_matches("URL:").trim().to_owned();
+
+        let fut = async move { Ok(Command::SubscribeFeed { url }) }.boxed();
+        self.jobs.futures.push(fut);
+    }
+
+    fn subscribe_feed(&mut self, url: String) {}
 }
 
 #[derive(Debug)]

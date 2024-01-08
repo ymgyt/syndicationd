@@ -11,6 +11,8 @@ pub enum Command {
     DeviceAuthorizationFlow(DeviceAuthorizationResponse),
     CompleteDevieAuthorizationFlow(DeviceAccessTokenResponse),
     MoveTabSelection(Direction),
+    PromptFeedSubscription,
+    SubscribeFeed { url: String },
     FetchSubscription,
     UpdateSubscription(UserSubscription),
 }
