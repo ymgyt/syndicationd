@@ -8,13 +8,14 @@ pub type DatastoreResult<T> = std::result::Result<T, DatastoreError>;
 
 pub struct Datastore {
     #[allow(dead_code)]
-    kvsd: KvsdClient,
+    // use dummy for dev
+    kvsd: Option<KvsdClient>,
     // tmp
     feeds: RwLock<Vec<Feed>>,
 }
 
 impl Datastore {
-    pub fn new(kvsd: KvsdClient) -> anyhow::Result<Self> {
+    pub fn new(kvsd: Option<KvsdClient>) -> anyhow::Result<Self> {
         Ok(Self {
             kvsd,
             feeds: RwLock::new(vec![Feed::new(

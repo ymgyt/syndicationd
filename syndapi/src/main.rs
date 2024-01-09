@@ -39,7 +39,9 @@ async fn dependency(kvsd: KvsdOptions) -> anyhow::Result<Dependency> {
             username,
             password,
         } = kvsd;
-        let kvsd = KvsdClient::connect(host, port, username, password).await?;
+        let kvsd = KvsdClient::connect(host, port, username, password)
+            .await
+            .ok();
         Datastore::new(kvsd)?
     };
 
