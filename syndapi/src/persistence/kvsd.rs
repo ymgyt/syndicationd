@@ -2,6 +2,7 @@ use kvsd::client::tcp::Client;
 use tokio::net::TcpStream;
 
 pub struct KvsdClient {
+    #[allow(dead_code)]
     client: Client<TcpStream>,
 }
 

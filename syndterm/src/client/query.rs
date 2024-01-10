@@ -1,10 +1,10 @@
 #![allow(clippy::all, warnings)]
-pub struct User;
-pub mod user {
+pub struct Subscription;
+pub mod subscription {
     #![allow(dead_code)]
     use std::result::Result;
-    pub const OPERATION_NAME: &str = "User";
-    pub const QUERY : & str = "query User {\n  subscription {\n    feeds {\n      nodes {\n        url\n      }\n    }\n  }\n}\n" ;
+    pub const OPERATION_NAME: &str = "Subscription";
+    pub const QUERY : & str = "query Subscription {\n  output: subscription {\n    feeds {\n      nodes {\n        url\n      }\n    }\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -19,29 +19,29 @@ pub mod user {
     pub struct Variables;
     #[derive(Deserialize, Debug)]
     pub struct ResponseData {
-        pub subscription: UserSubscription,
+        pub output: SubscriptionOutput,
     }
     #[derive(Deserialize, Debug)]
-    pub struct UserSubscription {
-        pub feeds: UserSubscriptionFeeds,
+    pub struct SubscriptionOutput {
+        pub feeds: SubscriptionOutputFeeds,
     }
     #[derive(Deserialize, Debug)]
-    pub struct UserSubscriptionFeeds {
-        pub nodes: Vec<UserSubscriptionFeedsNodes>,
+    pub struct SubscriptionOutputFeeds {
+        pub nodes: Vec<SubscriptionOutputFeedsNodes>,
     }
     #[derive(Deserialize, Debug)]
-    pub struct UserSubscriptionFeedsNodes {
+    pub struct SubscriptionOutputFeedsNodes {
         pub url: String,
     }
 }
-impl graphql_client::GraphQLQuery for User {
-    type Variables = user::Variables;
-    type ResponseData = user::ResponseData;
+impl graphql_client::GraphQLQuery for Subscription {
+    type Variables = subscription::Variables;
+    type ResponseData = subscription::ResponseData;
     fn build_query(variables: Self::Variables) -> ::graphql_client::QueryBody<Self::Variables> {
         graphql_client::QueryBody {
             variables,
-            query: user::QUERY,
-            operation_name: user::OPERATION_NAME,
+            query: subscription::QUERY,
+            operation_name: subscription::OPERATION_NAME,
         }
     }
 }

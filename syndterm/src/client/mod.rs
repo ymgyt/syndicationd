@@ -7,7 +7,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use tracing::error;
 use url::Url;
 
-use crate::{auth::Authentication, client::query::user::UserSubscription, config};
+use crate::{auth::Authentication, config};
+
+use self::query::subscription::SubscriptionOutput;
 
 pub mod mutation;
 pub mod query;
@@ -43,11 +45,11 @@ impl Client {
         self.credential = Some(token);
     }
 
-    pub async fn fetch_subscription(&self) -> anyhow::Result<UserSubscription> {
-        let var = query::user::Variables {};
-        let req = query::User::build_query(var);
-        let res: query::user::ResponseData = self.request(&req).await?;
-        Ok(res.subscription)
+    pub async fn fetch_subscription(&self) -> anyhow::Result<SubscriptionOutput> {
+        let var = query::subscription::Variables {};
+        let req = query::Subscription::build_query(var);
+        let res: query::subscription::ResponseData = self.request(&req).await?;
+        Ok(res.output)
     }
 
     pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<String> {

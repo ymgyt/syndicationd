@@ -4,7 +4,7 @@ use crate::{
         device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
         Authentication,
     },
-    client::{query::user::UserSubscription, Client},
+    client::Client,
     command::Command,
     job::Jobs,
     terminal::Terminal,
@@ -17,7 +17,7 @@ use crate::{
         theme::Theme,
     },
 };
-use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
 use tracing::{debug, info};
 

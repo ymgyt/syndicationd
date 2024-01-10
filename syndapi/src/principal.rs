@@ -11,6 +11,7 @@ pub enum Principal {
 #[derive(Clone, Debug)]
 pub struct User {
     id: String,
+    #[allow(dead_code)]
     email: String,
 }
 

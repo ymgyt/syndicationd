@@ -1,5 +1,5 @@
-query User {
-  subscription {
+query Subscription {
+  output: subscription {
     feeds {
       nodes {
         url

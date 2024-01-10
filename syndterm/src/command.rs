@@ -1,7 +1,7 @@
 use crate::{
     application::{AuthenticateMethod, Direction},
     auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
-    client::query::user::UserSubscription,
+    client::query::subscription::SubscriptionOutput,
 };
 
 #[derive(Debug)]
@@ -15,6 +15,6 @@ pub enum Command {
     SubscribeFeed { url: String },
     CompleteSubscribeFeed { url: String },
     FetchSubscription,
-    UpdateSubscription(UserSubscription),
+    UpdateSubscription(SubscriptionOutput),
     HandleError { message: String },
 }
