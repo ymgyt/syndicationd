@@ -1,3 +1,16 @@
-mutation User($input: SubscribeFeedInput!) {
-  subscribeFeed(input: $input)
+mutation SubscribeFeed($input: SubscribeFeedInput!) {
+  subscribeFeed(input: $input) {
+    __typename
+    ... on SubscribeFeedSuccess {
+      url
+      status {
+        code
+      }
+    }
+    ... on SubscribeFeedError {
+      status {
+        code
+      }
+    }
+  }
 }

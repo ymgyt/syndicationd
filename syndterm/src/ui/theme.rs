@@ -6,6 +6,11 @@ pub struct Theme {
     pub tabs: Style,
     pub tabs_selected: Style,
     pub prompt: Prompt,
+    pub error: Error,
+}
+
+pub struct Error {
+    pub message: Style,
 }
 
 pub struct Prompt {
@@ -31,6 +36,9 @@ impl Theme {
                 key: Style::new().fg(DDARK_BLUE).bg(DARK_GRAY),
                 key_desc: Style::new().fg(DARK_GRAY).bg(DDARK_BLUE),
                 background: Style::new().bg(DDARK_BLUE),
+            },
+            error: Error {
+                message: Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
             },
         }
     }

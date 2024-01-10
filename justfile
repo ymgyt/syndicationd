@@ -16,6 +16,7 @@ update-gql-schema:
   graphql-client introspect-schema http://localhost:5959/gql \
     --header 'authorization: me' out> syndterm/gql/schema.json
 
+
 gen-gql:
   graphql-client generate \
     --schema-path syndterm/gql/schema.json \

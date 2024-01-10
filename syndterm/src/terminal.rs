@@ -46,8 +46,9 @@ impl Terminal {
     }
 
     fn reset_backend() -> Result<()> {
-        terminal::disable_raw_mode()?;
+        // order is matter, Leave then disable raw mode
         crossterm::execute!(io::stdout(), LeaveAlternateScreen,)?;
+        terminal::disable_raw_mode()?;
         Ok(())
     }
 

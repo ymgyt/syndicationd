@@ -54,12 +54,18 @@ pub mod subscribe_feed {
 
     pub struct SubscribeFeedSuccess {
         pub status: ResponseStatus,
+        /// Subscribed url
+        pub url: String,
     }
 
     #[Object]
     impl SubscribeFeedSuccess {
         pub async fn status(&self) -> ResponseStatus {
             self.status.clone()
+        }
+
+        pub async fn url(&self) -> String {
+            self.url.clone()
         }
     }
 
@@ -94,12 +100,13 @@ impl Mutation {
 
         let datastore = cx.data_unchecked::<Datastore>();
         datastore
-            .add_feed_to_subscription(user.id(), input.url)
+            .add_feed_to_subscription(user.id(), input.url.clone())
             .await?;
 
         Ok(subscribe_feed::SubscribeFeedResponse::Success(
             subscribe_feed::SubscribeFeedSuccess {
                 status: ResponseStatus::ok(),
+                url: input.url,
             },
         ))
     }

@@ -135,6 +135,7 @@ impl Application {
             if self.should_render {
                 self.render();
                 self.should_render = false;
+                self.state.prompt.clear_error_message();
             }
 
             if self.should_quit {
@@ -180,6 +181,14 @@ impl Application {
                 Command::FetchSubscription => self.fetch_subscription(),
                 Command::UpdateSubscription(sub) => {
                     self.state.subscription.update_subscription(sub);
+                    self.should_render = true;
+                }
+                Command::CompleteSubscribeFeed { url } => {
+                    self.state.subscription.add_new_feed(url);
+                    self.should_render = true;
+                }
+                Command::HandleError { message } => {
+                    self.state.prompt.set_error_message(message);
                     self.should_render = true;
                 }
             }
@@ -262,7 +271,18 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
-    fn subscribe_feed(&mut self, url: String) {}
+    fn subscribe_feed(&mut self, url: String) {
+        let client = self.client.clone();
+        let fut = async move {
+            // TODO: error handling
+            let subscribed_url = client.subscribe_feed(url).await.unwrap();
+            Ok(Command::CompleteSubscribeFeed {
+                url: subscribed_url,
+            })
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
 }
 
 #[derive(Debug)]

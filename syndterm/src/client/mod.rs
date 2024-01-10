@@ -1,16 +1,13 @@
 use std::{fmt::Debug, time::Duration};
 
+use anyhow::anyhow;
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
 use tracing::error;
 use url::Url;
 
-use crate::{
-    auth::Authentication,
-    client::{mutation::user::SubscribeFeedInput, query::user::UserSubscription},
-    config,
-};
+use crate::{auth::Authentication, client::query::user::UserSubscription, config};
 
 pub mod mutation;
 pub mod query;
@@ -53,13 +50,21 @@ impl Client {
         Ok(res.subscription)
     }
 
-    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<()> {
-        let var = mutation::user::Variables {
-            input: SubscribeFeedInput { url },
+    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<String> {
+        let var = mutation::subscribe_feed::Variables {
+            input: mutation::subscribe_feed::SubscribeFeedInput { url },
         };
-        let req = mutation::User::build_query(var);
-        let _res: mutation::user::ResponseData = self.request(&req).await?;
-        Ok(())
+        let req = mutation::SubscribeFeed::build_query(var);
+        let res: mutation::subscribe_feed::ResponseData = self.request(&req).await?;
+
+        match res.subscribe_feed {
+            mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
+                Ok(success.url)
+            }
+            mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedError(err) => {
+                Err(anyhow!("Failed to mutate subscribe_feed {err:?}"))
+            }
+        }
     }
 
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>

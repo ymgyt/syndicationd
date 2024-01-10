@@ -5,7 +5,10 @@ use ratatui::{
     widgets::{Clear, List, ListItem, Widget},
 };
 
-use crate::{client::query::user::UserSubscription, ui::Context};
+use crate::{
+    client::query::user::{UserSubscription, UserSubscriptionFeedsNodes},
+    ui::Context,
+};
 
 pub struct Subscription {
     subscription: Option<UserSubscription>,
@@ -22,6 +25,13 @@ impl Subscription {
 
     pub fn update_subscription(&mut self, subscription: UserSubscription) {
         self.subscription = Some(subscription);
+    }
+
+    pub fn add_new_feed(&mut self, url: String) {
+        let Some(sub) = self.subscription.as_mut() else {
+            return;
+        };
+        sub.feeds.nodes.push(UserSubscriptionFeedsNodes { url });
     }
 }
 

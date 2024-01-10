@@ -13,6 +13,8 @@ pub enum Command {
     MoveTabSelection(Direction),
     PromptFeedSubscription,
     SubscribeFeed { url: String },
+    CompleteSubscribeFeed { url: String },
     FetchSubscription,
     UpdateSubscription(UserSubscription),
+    HandleError { message: String },
 }
