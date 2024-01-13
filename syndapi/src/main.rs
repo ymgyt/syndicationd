@@ -1,16 +1,13 @@
 use tracing::{error, info};
 
-use syndapi::{
-    args::{self, KvsdOptions},
-    persistence::{kvsd::KvsdClient, Datastore},
-    serve::{auth::Authenticator, listen_and_serve, Dependency},
-};
+use syndapi::{args, dependency::Dependency, serve::listen_and_serve};
 
 fn init_tracing() {
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
     };
 
+    // TODO: use support_color
     let color = true;
 
     Registry::default()
@@ -30,27 +27,6 @@ fn init_tracing() {
         .init();
 }
 
-async fn dependency(kvsd: KvsdOptions) -> anyhow::Result<Dependency> {
-    let authenticator = Authenticator::new()?;
-    let datastore = {
-        let KvsdOptions {
-            host,
-            port,
-            username,
-            password,
-        } = kvsd;
-        let kvsd = KvsdClient::connect(host, port, username, password)
-            .await
-            .ok();
-        Datastore::new(kvsd)?
-    };
-
-    Ok(Dependency {
-        datastore,
-        authenticator,
-    })
-}
-
 #[tokio::main]
 async fn main() {
     let args = args::parse();
@@ -58,7 +34,7 @@ async fn main() {
     init_tracing();
 
     let version = env!("CARGO_PKG_VERSION");
-    let dep = dependency(args.kvsd).await.unwrap();
+    let dep = Dependency::new(args.kvsd).await.unwrap();
 
     info!(version, "Runinng...");
 

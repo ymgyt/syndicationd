@@ -1,3 +1,5 @@
+use synd::types::FeedMeta;
+
 use crate::{
     application::{AuthenticateMethod, Direction},
     auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
@@ -13,7 +15,7 @@ pub enum Command {
     MoveTabSelection(Direction),
     PromptFeedSubscription,
     SubscribeFeed { url: String },
-    CompleteSubscribeFeed { url: String },
+    CompleteSubscribeFeed { feed: FeedMeta },
     FetchSubscription,
     UpdateSubscription(SubscriptionOutput),
     HandleError { message: String },

@@ -1,37 +1,39 @@
 use ratatui::{
     prelude::{Buffer, Margin, Rect},
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Clear, List, ListItem, Widget},
 };
+use synd::types::FeedMeta;
 
-use crate::{
-    client::query::subscription::{SubscriptionOutput, SubscriptionOutputFeedsNodes},
-    ui::Context,
-};
+use crate::{client::query::subscription::SubscriptionOutput, ui::Context};
 
 pub struct Subscription {
-    subscription: Option<SubscriptionOutput>,
+    feed_metas: Vec<FeedMeta>,
 }
 
 impl Subscription {
     pub fn new() -> Self {
-        Self { subscription: None }
+        Self {
+            feed_metas: Vec::new(),
+        }
     }
 
     pub fn has_subscription(&self) -> bool {
-        self.subscription.is_some()
+        !self.feed_metas.is_empty()
     }
 
     pub fn update_subscription(&mut self, subscription: SubscriptionOutput) {
-        self.subscription = Some(subscription);
+        let feed_metas = subscription
+            .feeds
+            .nodes
+            .into_iter()
+            .map(|node| FeedMeta::new(node.title, node.url));
+        self.feed_metas = feed_metas.collect();
     }
 
-    pub fn add_new_feed(&mut self, url: String) {
-        let Some(sub) = self.subscription.as_mut() else {
-            return;
-        };
-        sub.feeds.nodes.push(SubscriptionOutputFeedsNodes { url });
+    pub fn add_new_feed(&mut self, feed: FeedMeta) {
+        self.feed_metas.push(feed)
     }
 }
 
@@ -43,22 +45,16 @@ impl Subscription {
         });
         Clear.render(area, buf);
         let list = {
-            let items = if let Some(ref sub) = self.subscription {
-                sub.feeds
-                    .nodes
-                    .iter()
-                    .map(|feed| feed.url.as_str())
-                    .map(|url| {
-                        Line::from(Span::styled(
-                            format!("Url: {url}"),
-                            Style::default().fg(Color::Green),
-                        ))
-                    })
-                    .map(ListItem::new)
-                    .collect()
-            } else {
-                vec![]
-            };
+            let items = self
+                .feed_metas
+                .iter()
+                .map(|feed| {
+                    Line::from(vec![
+                        Span::styled(format!("Title: {}", &feed.title), Style::default()),
+                        Span::styled(format!("Url: {}", &feed.url), Style::default()),
+                    ])
+                })
+                .map(ListItem::new);
 
             List::new(items)
         };

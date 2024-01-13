@@ -1,35 +1,32 @@
+use std::sync::Arc;
+
 use async_graphql::{
     connection::{Connection, Edge},
     Context, Object, Result,
 };
-use synd;
-use tracing::info;
 
-use crate::{persistence::Datastore, principal::Principal};
+use crate::{gql::object::FeedMeta, persistence::Datastore, principal::Principal};
 
 pub struct Subscription<'a> {
     user_id: &'a str,
 }
-pub struct Feed(synd::Feed);
 
-#[Object]
-impl Feed {
-    async fn url(&self) -> String {
-        self.0.url.clone()
-    }
+pub struct Resolver {
+    pub datastore: Arc<dyn Datastore>,
 }
 
 #[Object]
 impl<'a> Subscription<'a> {
-    async fn feeds(&self, cx: &Context<'_>) -> Result<Connection<usize, Feed>> {
-        let d = cx.data_unchecked::<Datastore>();
+    async fn feeds(&self, cx: &Context<'_>) -> Result<Connection<usize, FeedMeta>> {
+        let r = cx.data_unchecked::<Resolver>();
         let mut connection = Connection::new(false, false);
         connection.edges.extend(
-            d.fetch_subscription_feeds(self.user_id)
+            r.datastore
+                .fetch_subscription_feeds(self.user_id)
                 .await
                 .unwrap()
                 .into_iter()
-                .map(Feed)
+                .map(FeedMeta::from)
                 .enumerate()
                 .map(|(idx, feed)| Edge::new(idx, feed)),
         );
@@ -43,7 +40,6 @@ pub struct Query;
 impl Query {
     async fn subscription<'cx>(&self, cx: &Context<'cx>) -> Subscription<'cx> {
         let Principal::User(user) = cx.data_unchecked::<Principal>();
-        info!("Query subscription {user:?}");
 
         Subscription { user_id: user.id() }
     }

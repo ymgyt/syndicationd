@@ -1,4 +1,4 @@
-use async_graphql::extensions::Tracing;
+use async_graphql::{extensions::Tracing, EmptySubscription, Schema};
 use axum::{
     middleware,
     routing::{get, post},
@@ -7,24 +7,24 @@ use axum::{
 use tokio::net::TcpListener;
 use tracing::info;
 
-use crate::{gql, persistence::Datastore};
-
-use self::auth::Authenticator;
+use crate::{
+    config,
+    dependency::Dependency,
+    gql::{self, Mutation, Query},
+};
 
 pub mod auth;
 mod probe;
 
-pub struct Dependency {
-    pub datastore: Datastore,
-    pub authenticator: Authenticator,
-}
+pub mod layer;
 
 /// Bind tcp listener and serve.
 pub async fn listen_and_serve(dep: Dependency) -> anyhow::Result<()> {
-    let addr = "0.0.0.0:5959";
+    // should 127.0.0.1?
+    let addr = ("0.0.0.0", config::PORT);
     let listener = TcpListener::bind(addr).await?;
 
-    info!(addr, "Listening...");
+    info!(ip = addr.0, port = addr.1, "Listening...");
 
     serve(listener, dep).await
 }
@@ -32,20 +32,27 @@ pub async fn listen_and_serve(dep: Dependency) -> anyhow::Result<()> {
 /// Start api server
 pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()> {
     let Dependency {
-        datastore,
+        make_usecase,
         authenticator,
+        authorizer,
+        resolver,
     } = dep;
 
-    let schema = gql::schema().data(datastore).extension(Tracing).finish();
+    let schema = Schema::build(Query, Mutation, EmptySubscription)
+        .data(make_usecase)
+        .data(authorizer)
+        .data(resolver)
+        .extension(Tracing)
+        .finish();
 
     let service = Router::new()
-        .route("/gql", post(gql::handler::graphql))
+        .route("/graphql", post(gql::handler::graphql))
         .layer(Extension(schema))
         .route_layer(middleware::from_fn_with_state(
             authenticator,
             auth::authenticate,
         ))
-        .route("/gql", get(gql::handler::graphiql))
+        .route("/graphql", get(gql::handler::graphiql))
         .route("/healthcheck", get(probe::healthcheck));
 
     // TODO: graceful shutdown

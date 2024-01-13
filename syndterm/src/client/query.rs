@@ -4,7 +4,7 @@ pub mod subscription {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "Subscription";
-    pub const QUERY : & str = "query Subscription {\n  output: subscription {\n    feeds {\n      nodes {\n        url\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY : & str = "query Subscription {\n  output: subscription {\n    feeds {\n      nodes {\n        url\n        title\n      }\n    }\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -32,6 +32,7 @@ pub mod subscription {
     #[derive(Deserialize, Debug)]
     pub struct SubscriptionOutputFeedsNodes {
         pub url: String,
+        pub title: String,
     }
 }
 impl graphql_client::GraphQLQuery for Subscription {

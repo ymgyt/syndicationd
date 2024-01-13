@@ -1,15 +1,13 @@
 mod query;
-pub use query::Query;
+pub use query::{Query, Resolver};
 
 mod mutation;
-use async_graphql::{EmptySubscription, Schema, SchemaBuilder};
+use async_graphql::{EmptySubscription, Schema};
 pub use mutation::Mutation;
 
-pub type SyndSchema = Schema<Query, Mutation, EmptySubscription>;
+pub mod object;
 
-pub fn schema() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
-    Schema::build(Query, Mutation, EmptySubscription)
-}
+pub type SyndSchema = Schema<Query, Mutation, EmptySubscription>;
 
 pub mod handler {
     use async_graphql::http::GraphiQLSource;
@@ -21,7 +19,7 @@ pub mod handler {
     use super::SyndSchema;
 
     pub async fn graphiql() -> impl IntoResponse {
-        axum::response::Html(GraphiQLSource::build().endpoint("/gql").finish())
+        axum::response::Html(GraphiQLSource::build().endpoint("/graphql").finish())
     }
 
     pub async fn graphql(

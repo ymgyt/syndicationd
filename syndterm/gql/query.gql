@@ -3,6 +3,7 @@ query Subscription {
     feeds {
       nodes {
         url
+        title
       }
     }
   }

@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      url\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        title,\n        url,\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -18,6 +18,7 @@ pub mod subscribe_feed {
     #[derive(Debug)]
     pub enum ResponseCode {
         OK,
+        UNAUTHORIZED,
         INTERNAL_ERROR,
         Other(String),
     }
@@ -25,6 +26,7 @@ pub mod subscribe_feed {
         fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
             ser.serialize_str(match *self {
                 ResponseCode::OK => "OK",
+                ResponseCode::UNAUTHORIZED => "UNAUTHORIZED",
                 ResponseCode::INTERNAL_ERROR => "INTERNAL_ERROR",
                 ResponseCode::Other(ref s) => &s,
             })
@@ -35,6 +37,7 @@ pub mod subscribe_feed {
             let s: String = ::serde::Deserialize::deserialize(deserializer)?;
             match s.as_str() {
                 "OK" => Ok(ResponseCode::OK),
+                "UNAUTHORIZED" => Ok(ResponseCode::UNAUTHORIZED),
                 "INTERNAL_ERROR" => Ok(ResponseCode::INTERNAL_ERROR),
                 _ => Ok(ResponseCode::Other(s)),
             }
@@ -62,8 +65,13 @@ pub mod subscribe_feed {
     }
     #[derive(Deserialize, Debug)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccess {
-        pub url: String,
+        pub feed: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed,
         pub status: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus,
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed {
+        pub title: String,
+        pub url: String,
     }
     #[derive(Deserialize, Debug)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus {

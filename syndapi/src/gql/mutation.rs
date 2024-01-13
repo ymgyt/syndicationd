@@ -1,11 +1,21 @@
 use async_graphql::{Context, Enum, InputObject, Interface, Object, SimpleObject, Union};
 
-use crate::{persistence::Datastore, principal::Principal};
+use crate::{
+    gql::object::FeedMeta,
+    principal::Principal,
+    usecase::{
+        authorize::Authorizer,
+        subscribe_feed::{SubscribeFeed, SubscribeFeedInput, SubscribeFeedOutput},
+        Input, MakeUsecase, Output, Usecase,
+    },
+};
 
 #[derive(Enum, PartialEq, Eq, Clone, Copy)]
 pub enum ResponseCode {
     /// Operation success
     Ok,
+    /// Principal does not have enough permissions
+    Unauthorized,
     /// Something went wrong
     InternalError,
 }
@@ -19,6 +29,12 @@ impl ResponseStatus {
     fn ok() -> Self {
         ResponseStatus {
             code: ResponseCode::Ok,
+        }
+    }
+
+    fn unauthorized() -> Self {
+        ResponseStatus {
+            code: ResponseCode::Unauthorized,
         }
     }
 }
@@ -39,6 +55,8 @@ enum ErrorResponse {
 }
 
 pub mod subscribe_feed {
+    use crate::gql::object::FeedMeta;
+
     use super::*;
 
     #[derive(InputObject)]
@@ -55,7 +73,7 @@ pub mod subscribe_feed {
     pub struct SubscribeFeedSuccess {
         pub status: ResponseStatus,
         /// Subscribed url
-        pub url: String,
+        pub feed: FeedMeta,
     }
 
     #[Object]
@@ -64,8 +82,8 @@ pub mod subscribe_feed {
             self.status.clone()
         }
 
-        pub async fn url(&self) -> String {
-            self.url.clone()
+        pub async fn feed(&self) -> &FeedMeta {
+            &self.feed
         }
     }
 
@@ -85,6 +103,15 @@ pub mod subscribe_feed {
             self.message.clone()
         }
     }
+
+    impl From<ResponseStatus> for SubscribeFeedResponse {
+        fn from(status: ResponseStatus) -> Self {
+            SubscribeFeedResponse::Error(SubscribeFeedError {
+                status,
+                message: "Unauthorized".into(),
+            })
+        }
+    }
 }
 
 pub struct Mutation;
@@ -96,18 +123,39 @@ impl Mutation {
         cx: &Context<'_>,
         input: subscribe_feed::SubscribeFeedInput,
     ) -> async_graphql::Result<subscribe_feed::SubscribeFeedResponse> {
-        let Principal::User(user) = cx.data_unchecked::<Principal>();
+        let input = SubscribeFeedInput { url: input.url };
+        let (principal, usecase) = authorize!(
+            cx,
+            SubscribeFeed,
+            &input,
+            subscribe_feed::SubscribeFeedResponse
+        );
 
-        let datastore = cx.data_unchecked::<Datastore>();
-        datastore
-            .add_feed_to_subscription(user.id(), input.url.clone())
-            .await?;
+        let Output {
+            output: SubscribeFeedOutput { feed },
+        } = usecase.usecase(Input { principal, input }).await?;
 
         Ok(subscribe_feed::SubscribeFeedResponse::Success(
             subscribe_feed::SubscribeFeedSuccess {
                 status: ResponseStatus::ok(),
-                url: input.url,
+                feed: FeedMeta::from(feed),
             },
         ))
     }
 }
+
+// Extract usecase and exec authorization
+macro_rules! authorize {
+    ($cx:ident, $usecase:ty, $input:expr, $response:ty) => {{
+        let uc = $cx.data_unchecked::<MakeUsecase>().make::<$usecase>();
+        let principal = $cx.data_unchecked::<Principal>().clone();
+        let authorizer = $cx.data_unchecked::<Authorizer>();
+
+        match authorizer.authorize(principal, &uc, $input).await {
+            Ok(authorized_principal) => (authorized_principal, uc),
+            Err(_unauthorized) => return Ok(<$response>::from(ResponseStatus::unauthorized())),
+        }
+    }};
+}
+
+pub(super) use authorize;

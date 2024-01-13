@@ -8,6 +8,14 @@ pub enum Principal {
     User(User),
 }
 
+impl Principal {
+    pub fn user_id(&self) -> Option<&str> {
+        match self {
+            Principal::User(User { id, .. }) => Some(id.as_str()),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct User {
     id: String,

@@ -183,8 +183,8 @@ impl Application {
                     self.state.subscription.update_subscription(sub);
                     self.should_render = true;
                 }
-                Command::CompleteSubscribeFeed { url } => {
-                    self.state.subscription.add_new_feed(url);
+                Command::CompleteSubscribeFeed { feed } => {
+                    self.state.subscription.add_new_feed(feed);
                     self.should_render = true;
                 }
                 Command::HandleError { message } => {
@@ -275,10 +275,8 @@ impl Application {
         let client = self.client.clone();
         let fut = async move {
             // TODO: error handling
-            let subscribed_url = client.subscribe_feed(url).await.unwrap();
-            Ok(Command::CompleteSubscribeFeed {
-                url: subscribed_url,
-            })
+            let feed = client.subscribe_feed(url).await.unwrap();
+            Ok(Command::CompleteSubscribeFeed { feed })
         }
         .boxed();
         self.jobs.futures.push(fut);

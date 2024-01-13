@@ -2,7 +2,10 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
   subscribeFeed(input: $input) {
     __typename
     ... on SubscribeFeedSuccess {
-      url
+      feed {
+        title,
+        url,
+      }
       status {
         code
       }

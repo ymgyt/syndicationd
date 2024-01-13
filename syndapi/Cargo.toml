@@ -10,9 +10,11 @@ async-graphql = { git = "https://github.com/async-graphql/async-graphql.git", br
   "tracing",
 ] }
 async-graphql-axum = { git = "https://github.com/async-graphql/async-graphql.git", branch = "master" }
+async-trait = { workspace = true }
 # TODO configure features
 axum = { version = "0.7.3" }
 clap = { workspace = true, features = ["derive"] }
+either = "1.9.0"
 graphql_client = { workspace = true }
 kvsd = { version = "0.1.2" }
 reqwest = { workspace = true }

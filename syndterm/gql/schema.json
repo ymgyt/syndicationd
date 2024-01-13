@@ -90,12 +90,28 @@
                   "ofType": null
                 }
               }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "title",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
             }
           ],
           "inputFields": null,
           "interfaces": [],
           "kind": "OBJECT",
-          "name": "Feed",
+          "name": "FeedMeta",
           "possibleTypes": null
         },
         {
@@ -135,7 +151,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "FeedEdge",
+                      "name": "FeedMetaEdge",
                       "ofType": null
                     }
                   }
@@ -159,7 +175,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "Feed",
+                      "name": "FeedMeta",
                       "ofType": null
                     }
                   }
@@ -170,7 +186,7 @@
           "inputFields": null,
           "interfaces": [],
           "kind": "OBJECT",
-          "name": "FeedConnection",
+          "name": "FeedMetaConnection",
           "possibleTypes": null
         },
         {
@@ -188,7 +204,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "Feed",
+                  "name": "FeedMeta",
                   "ofType": null
                 }
               }
@@ -213,7 +229,7 @@
           "inputFields": null,
           "interfaces": [],
           "kind": "OBJECT",
-          "name": "FeedEdge",
+          "name": "FeedMetaEdge",
           "possibleTypes": null
         },
         {
@@ -393,6 +409,12 @@
             },
             {
               "deprecationReason": null,
+              "description": "Principal does not have enough permissions",
+              "isDeprecated": false,
+              "name": "UNAUTHORIZED"
+            },
+            {
+              "deprecationReason": null,
               "description": "Something went wrong",
               "isDeprecated": false,
               "name": "INTERNAL_ERROR"
@@ -556,13 +578,13 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "url",
+              "name": "feed",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
+                  "kind": "OBJECT",
+                  "name": "FeedMeta",
                   "ofType": null
                 }
               }
@@ -589,7 +611,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "FeedConnection",
+                  "name": "FeedMetaConnection",
                   "ofType": null
                 }
               }

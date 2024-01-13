@@ -13,7 +13,7 @@ fmt-toml:
   taplo fmt **.toml
 
 update-gql-schema:
-  graphql-client introspect-schema http://localhost:5959/gql \
+  graphql-client introspect-schema http://localhost:5959/graphql \
     --header 'authorization: me' out> syndterm/gql/schema.json
 
 
