@@ -2289,6 +2289,7 @@ dependencies = [
  "kvsd",
  "reqwest",
  "serde",
+ "serde_json",
  "synd",
  "thiserror",
  "tokio",

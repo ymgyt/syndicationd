@@ -1,8 +1,10 @@
 use tracing::{error, info};
 
 use syndapi::{args, dependency::Dependency, serve::listen_and_serve};
+use tracing_subscriber::Layer;
 
 fn init_tracing() {
+    use syndapi::serve::layer::audit;
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
     };
@@ -17,13 +19,14 @@ fn init_tracing() {
                 .with_timer(fmt::time::UtcTime::rfc_3339())
                 .with_file(false)
                 .with_line_number(false)
-                .with_target(true),
+                .with_target(true)
+                .with_filter(
+                    EnvFilter::try_from_default_env()
+                        .or_else(|_| EnvFilter::try_new("info"))
+                        .unwrap(),
+                ),
         )
-        .with(
-            EnvFilter::try_from_default_env()
-                .or_else(|_| EnvFilter::try_new("info"))
-                .unwrap(),
-        )
+        .with(audit::layer())
         .init();
 }
 

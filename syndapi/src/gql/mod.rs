@@ -13,8 +13,9 @@ pub mod handler {
     use async_graphql::http::GraphiQLSource;
     use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
     use axum::{response::IntoResponse, Extension};
+    use tracing::Instrument;
 
-    use crate::principal::Principal;
+    use crate::{audit_span, principal::Principal};
 
     use super::SyndSchema;
 
@@ -29,6 +30,6 @@ pub mod handler {
     ) -> GraphQLResponse {
         // Inject authentication
         let req = req.into_inner().data(principal);
-        schema.execute(req).await.into()
+        schema.execute(req).instrument(audit_span!()).await.into()
     }
 }
