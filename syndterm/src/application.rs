@@ -204,6 +204,7 @@ impl Application {
         self.terminal.render(|frame| ui::render(frame, cx)).unwrap();
     }
 
+    #[allow(clippy::single_match)]
     fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) -> Option<Command> {
         match event.unwrap() {
             CrosstermEvent::Resize(_, _) => None,

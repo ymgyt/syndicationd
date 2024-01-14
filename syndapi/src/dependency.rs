@@ -20,17 +20,15 @@ pub struct Dependency {
 
 impl Dependency {
     pub async fn new(kvsd: KvsdOptions) -> anyhow::Result<Self> {
-        let _datastore = {
-            let KvsdOptions {
-                host,
-                port,
-                username,
-                password,
-            } = kvsd;
-            let _kvsd = KvsdClient::connect(host, port, username, password)
-                .await
-                .ok();
-        };
+        let KvsdOptions {
+            host,
+            port,
+            username,
+            password,
+        } = kvsd;
+        let _kvsd = KvsdClient::connect(host, port, username, password)
+            .await
+            .ok();
 
         let datastore = Arc::new(MemoryDatastore::new());
         let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);

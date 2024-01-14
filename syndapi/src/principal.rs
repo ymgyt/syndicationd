@@ -36,7 +36,7 @@ impl User {
     }
 
     pub fn id(&self) -> &str {
-        &self.id.as_str()
+        self.id.as_str()
     }
 }
 
