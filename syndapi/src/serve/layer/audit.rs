@@ -36,11 +36,11 @@ mod macros {
 pub struct Audit;
 
 impl Audit {
-    pub const TARGET: &'static str = "audit";
+    pub const TARGET: &'static str = "__audit";
     pub const SPAN_ROOT_NAME: &'static str = "audit.root";
     pub const EVENT_NAME: &'static str = "audit.event";
 
-    const EMIT_TARGET: &'static str = "audit.emit";
+    const EMIT_TARGET: &'static str = "audit";
     const EMIT_EVENT_NAME: &'static str = "audit";
 
     pub const USER_ID: &'static str = "user_id";
