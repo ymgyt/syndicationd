@@ -6,10 +6,8 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 # To use axum 0.7
-async-graphql = { git = "https://github.com/async-graphql/async-graphql.git", branch = "master", features = [
-  "tracing",
-] }
-async-graphql-axum = { git = "https://github.com/async-graphql/async-graphql.git", branch = "master" }
+async-graphql = { version = "7.0",  features = ["tracing"] }
+async-graphql-axum = { version = "7.0" }
 async-trait = { workspace = true }
 # TODO configure features
 axum = { version = "0.7.3" }
