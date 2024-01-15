@@ -5,6 +5,7 @@ members = ["synd", "syndapi", "syndterm"]
 [workspace.package]
 edition = "2021"
 authors = ["ymgyt"]
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 async-trait = { version = "0.1.77" }
