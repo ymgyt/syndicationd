@@ -1,5 +1,7 @@
 # Syndicationd
 
+[![CI](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml)
+
 Syndicationd is a terminal feed viewer.
 
 ## Development
