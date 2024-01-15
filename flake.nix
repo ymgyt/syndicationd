@@ -63,7 +63,7 @@
         });
 
         checks = {
-          inherit syndterm;
+          inherit syndterm syndapi;
 
           clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
