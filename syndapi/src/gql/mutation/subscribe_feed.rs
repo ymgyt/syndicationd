@@ -11,6 +11,7 @@ pub struct SubscribeFeedInput {
     pub url: String,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Union)]
 pub enum SubscribeFeedResponse {
     Success(SubscribeFeedSuccess),
