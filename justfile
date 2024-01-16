@@ -5,6 +5,10 @@ kvsd_user := "synduser"
 default:
   just --list
 
+# Run check
+check:
+  nix flake check --all-systems
+
 # Format files
 fmt: fmt-toml
 
