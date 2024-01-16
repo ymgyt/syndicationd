@@ -111,9 +111,6 @@
 
         devShells.ci = craneLib.devShell {
           packages = ci_packages;
-          shellHook = ''
-          exec nu
-          '';
         };
       });
 }
