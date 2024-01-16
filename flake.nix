@@ -78,6 +78,19 @@
 
           fmt = craneLib.cargoFmt commonArgs;
         };
+
+        ci_packages = with pkgs; [
+          just
+        ];
+
+        dev_packages = with pkgs; [
+          cargo-nextest
+          graphql-client
+          nixfmt
+          rust-analyzer
+          nushell
+        ] ++ ci_packages;
+
       in {
         inherit checks;
 
@@ -90,20 +103,14 @@
         };
 
         devShells.default = craneLib.devShell {
-          packages = with pkgs; [
-            # cargo and rustc provided by default
-            just
-            cargo-nextest
-            graphql-client
-            nixfmt
-            rust-analyzer
-            nushell
-          ];
-
+          packages = dev_packages;
           shellHook = ''
-            # Use nushell as default shell
-            exec nu
+          exec nu
           '';
+        };
+
+        devShells.ci = craneLib.devShell {
+          packages = ci_packages;
         };
       });
 }
