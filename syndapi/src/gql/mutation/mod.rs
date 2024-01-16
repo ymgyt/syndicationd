@@ -1,14 +1,12 @@
-use async_graphql::{Context, Enum, InputObject, Interface, Object, SimpleObject, Union};
+use async_graphql::{Context, Enum, Interface, Object, SimpleObject};
 
 use crate::{
     gql::object::FeedMeta,
     principal::Principal,
-    usecase::{
-        authorize::Authorizer,
-        subscribe_feed::{SubscribeFeed, SubscribeFeedInput, SubscribeFeedOutput},
-        Input, MakeUsecase, Output, Usecase,
-    },
+    usecase::{self, authorize::Authorizer, Input, MakeUsecase, Output, Usecase},
 };
+
+pub mod subscribe_feed;
 
 #[derive(Enum, PartialEq, Eq, Clone, Copy)]
 pub enum ResponseCode {
@@ -54,66 +52,6 @@ enum ErrorResponse {
     SubscribeFeed(subscribe_feed::SubscribeFeedError),
 }
 
-pub mod subscribe_feed {
-    use crate::gql::object::FeedMeta;
-
-    use super::*;
-
-    #[derive(InputObject)]
-    pub struct SubscribeFeedInput {
-        pub url: String,
-    }
-
-    #[derive(Union)]
-    pub enum SubscribeFeedResponse {
-        Success(SubscribeFeedSuccess),
-        Error(SubscribeFeedError),
-    }
-
-    pub struct SubscribeFeedSuccess {
-        pub status: ResponseStatus,
-        /// Subscribed url
-        pub feed: FeedMeta,
-    }
-
-    #[Object]
-    impl SubscribeFeedSuccess {
-        pub async fn status(&self) -> ResponseStatus {
-            self.status.clone()
-        }
-
-        pub async fn feed(&self) -> &FeedMeta {
-            &self.feed
-        }
-    }
-
-    pub struct SubscribeFeedError {
-        pub status: ResponseStatus,
-        pub message: String,
-    }
-
-    #[Object]
-    impl SubscribeFeedError {
-        pub async fn status(&self) -> ResponseStatus {
-            self.status.clone()
-        }
-
-        /// Error message
-        pub async fn message(&self) -> String {
-            self.message.clone()
-        }
-    }
-
-    impl From<ResponseStatus> for SubscribeFeedResponse {
-        fn from(status: ResponseStatus) -> Self {
-            SubscribeFeedResponse::Error(SubscribeFeedError {
-                status,
-                message: "Unauthorized".into(),
-            })
-        }
-    }
-}
-
 pub struct Mutation;
 
 #[Object]
@@ -123,16 +61,16 @@ impl Mutation {
         cx: &Context<'_>,
         input: subscribe_feed::SubscribeFeedInput,
     ) -> async_graphql::Result<subscribe_feed::SubscribeFeedResponse> {
-        let input = SubscribeFeedInput { url: input.url };
+        let input = usecase::SubscribeFeedInput { url: input.url };
         let (principal, usecase) = authorize!(
             cx,
-            SubscribeFeed,
+            usecase::SubscribeFeed,
             &input,
             subscribe_feed::SubscribeFeedResponse
         );
 
         let Output {
-            output: SubscribeFeedOutput { feed },
+            output: usecase::SubscribeFeedOutput { feed },
         } = usecase.usecase(Input { principal, input }).await?;
 
         Ok(subscribe_feed::SubscribeFeedResponse::Success(

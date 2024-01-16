@@ -1,4 +1,5 @@
-pub mod subscribe_feed;
+mod subscribe_feed;
+pub use subscribe_feed::{SubscribeFeed, SubscribeFeedInput, SubscribeFeedOutput};
 
 use std::{future::Future, sync::Arc};
 
