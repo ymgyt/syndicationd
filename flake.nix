@@ -81,6 +81,7 @@
 
         ci_packages = with pkgs; [
           just
+          nushell # just set nu as shell
         ];
 
         dev_packages = with pkgs; [
@@ -88,7 +89,6 @@
           graphql-client
           nixfmt
           rust-analyzer
-          nushell
         ] ++ ci_packages;
 
       in {
@@ -111,6 +111,9 @@
 
         devShells.ci = craneLib.devShell {
           packages = ci_packages;
+          shellHook = ''
+          exec nu
+          '';
         };
       });
 }
