@@ -14,5 +14,5 @@ jobs:
       with:
         name: syndicationd
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: nix develop -c just check
+    - run: nix develop .#ci --command just check
 
