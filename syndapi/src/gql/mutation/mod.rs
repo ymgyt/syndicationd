@@ -1,7 +1,7 @@
 use async_graphql::{Context, Enum, Interface, Object, SimpleObject};
 
 use crate::{
-    gql::object::FeedMeta,
+    gql::object::Feed,
     principal::Principal,
     usecase::{self, authorize::Authorizer, Input, MakeUsecase, Output, Usecase},
 };
@@ -76,7 +76,7 @@ impl Mutation {
         Ok(subscribe_feed::SubscribeFeedResponse::Success(
             subscribe_feed::SubscribeFeedSuccess {
                 status: ResponseStatus::ok(),
-                feed: FeedMeta::from(feed),
+                feed: Feed::from(feed),
             },
         ))
     }

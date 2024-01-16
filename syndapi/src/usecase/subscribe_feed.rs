@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synd::{feed::parser::FetchFeed, types::FeedMeta};
+use synd::{feed::parser::FetchFeed, types::Feed};
 
 use crate::{
     audit,
@@ -22,7 +22,7 @@ pub struct SubscribeFeedInput {
 }
 
 pub struct SubscribeFeedOutput {
-    pub feed: FeedMeta,
+    pub feed: Feed,
 }
 
 impl Usecase for SubscribeFeed {
@@ -72,7 +72,7 @@ impl Usecase for SubscribeFeed {
         );
 
         Ok(Output {
-            output: SubscribeFeedOutput { feed: feed.meta() },
+            output: SubscribeFeedOutput { feed },
         })
     }
 }

@@ -1,11 +1,23 @@
+use feed_rs::model as feedrs;
+
+pub use feedrs::FeedType;
+
 #[derive(Debug, Clone)]
 pub struct Feed {
     url: String,
     #[allow(dead_code)]
-    feed: feed_rs::model::Feed,
+    feed: feedrs::Feed,
 }
 
 impl Feed {
+    pub fn r#type(&self) -> FeedType {
+        self.feed.feed_type.clone()
+    }
+
+    pub fn url(&self) -> &str {
+        self.url.as_str()
+    }
+
     pub fn meta(&self) -> FeedMeta {
         FeedMeta::new(self.title().into(), self.url.clone())
     }

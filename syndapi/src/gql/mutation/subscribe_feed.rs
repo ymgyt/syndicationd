@@ -1,9 +1,13 @@
 use async_graphql::{InputObject, Object, Union};
 
-use crate::gql::{mutation::ResponseStatus, object::FeedMeta};
+use crate::gql::{
+    mutation::ResponseStatus,
+    object::{self},
+};
 
 #[derive(InputObject)]
 pub struct SubscribeFeedInput {
+    /// Feed url to subscribe
     pub url: String,
 }
 
@@ -15,8 +19,8 @@ pub enum SubscribeFeedResponse {
 
 pub struct SubscribeFeedSuccess {
     pub status: ResponseStatus,
-    /// Subscribed url
-    pub feed: FeedMeta,
+    /// Subscribed feed
+    pub feed: object::Feed,
 }
 
 #[Object]
@@ -25,7 +29,7 @@ impl SubscribeFeedSuccess {
         self.status.clone()
     }
 
-    pub async fn feed(&self) -> &FeedMeta {
+    pub async fn feed(&self) -> &object::Feed {
         &self.feed
     }
 }
