@@ -1,2 +1,27 @@
+[language-server.rust-analyzer.config]
+inlayHints.chainingHints.enable = true
+inlayHints.bindingModeHints.enable = false
+inlayHints.closingBraceHints.minLines = 20
+inlayHints.closureCaptureHints.enable = true
+inlayHints.closureReturnTypeHints.enable = "with_block"
+inlayHints.discriminantHints.enable = "fieldless"
+inlayHints.lifetimeElisionHints.enable = "skip_trivial"
+inlayHints.typeHints.hideClosureInitialization = false
+
+completion.autoimport.enable = true
+# fill_arguments | add_parentheses | none
+completion.callable.snippets = "none"
+completion.fullFunctionSignatures.enable = true
+
+imports.group.enable = true
+imports.granularity.enforce = true
+imports.granularity.group = "crate"
+imports.prefix = "crate"
+imports.preferPrelude = false
+
+lens.enable = false
+
+hover.actions.enable = false
+
 [language-server.rust-analyzer.config.cargo]
 features = []
