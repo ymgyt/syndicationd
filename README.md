@@ -12,9 +12,6 @@ nix develop
 
 # Run check
 nix flake check
-
-# Cachix `syndicationd` binary cache avaiable
-cachix use syndicationd
 ```
 
 ## License
