@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
-use synd::types::FeedMeta;
+use crate::persistence;
 
 use super::DatastoreError;
 
@@ -8,12 +10,27 @@ pub type DatastoreResult<T> = std::result::Result<T, DatastoreError>;
 
 #[async_trait]
 pub trait Datastore: Send + Sync {
-    async fn add_feed_to_subscription(
+    async fn put_feed_subscription(
         &self,
-        _user_id: &str,
-        title: String,
-        url: String,
+        feed: persistence::types::FeedSubscription,
     ) -> DatastoreResult<()>;
 
-    async fn fetch_subscription_feeds(&self, _user_id: &str) -> DatastoreResult<Vec<FeedMeta>>;
+    async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> DatastoreResult<Vec<String>>;
+}
+
+#[async_trait]
+impl<T> Datastore for Arc<T>
+where
+    T: Datastore,
+{
+    async fn put_feed_subscription(
+        &self,
+        feed: persistence::types::FeedSubscription,
+    ) -> DatastoreResult<()> {
+        self.put_feed_subscription(feed).await
+    }
+
+    async fn fetch_subscribed_feed_urls(&self, user_id: &str) -> DatastoreResult<Vec<String>> {
+        self.fetch_subscribed_feed_urls(user_id).await
+    }
 }

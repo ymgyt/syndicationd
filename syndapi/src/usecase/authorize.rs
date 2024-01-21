@@ -22,6 +22,7 @@ impl<T> Deref for Authorized<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct Unauthorized;
 
 pub struct Authorizer {}

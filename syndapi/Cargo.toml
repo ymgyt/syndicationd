@@ -14,7 +14,8 @@ async-trait = { workspace = true }
 # TODO configure features
 axum = { version = "0.7.3" }
 clap = { workspace = true, features = ["derive"] }
-either = "1.9.0"
+chrono = { workspace = true }
+feed-rs = { workspace = true }
 graphql_client = { workspace = true }
 kvsd = { version = "0.1.2" }
 reqwest = { workspace = true }
@@ -25,3 +26,8 @@ thiserror = "1.0.56"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# handson
+[features]
+
+foo = []

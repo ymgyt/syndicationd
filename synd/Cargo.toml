@@ -10,7 +10,9 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+chrono = { workspace = true }
 feed-rs = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 thiserror = "1.0.56"
+tokio = { workspace = true }

@@ -4,9 +4,8 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Clear, List, ListItem, Widget},
 };
-use synd::types::FeedMeta;
 
-use crate::{client::query::subscription::SubscriptionOutput, ui::Context};
+use crate::{client::query::subscription::SubscriptionOutput, types::FeedMeta, ui::Context};
 
 pub struct Subscription {
     feed_metas: Vec<FeedMeta>,
@@ -50,8 +49,8 @@ impl Subscription {
                 .iter()
                 .map(|feed| {
                     Line::from(vec![
-                        Span::styled(format!("Title: {}", &feed.title), Style::default()),
-                        Span::styled(format!("Url: {}", &feed.url), Style::default()),
+                        Span::styled(format!("Title: {}", &feed.title()), Style::default()),
+                        Span::styled(format!("Url: {}", &feed.url()), Style::default()),
                     ])
                 })
                 .map(ListItem::new);

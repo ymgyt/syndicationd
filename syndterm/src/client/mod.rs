@@ -4,11 +4,10 @@ use anyhow::anyhow;
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
-use synd::types::FeedMeta;
 use tracing::error;
 use url::Url;
 
-use crate::{auth::Authentication, config};
+use crate::{auth::Authentication, config, types};
 
 use self::query::subscription::SubscriptionOutput;
 
@@ -53,7 +52,7 @@ impl Client {
         Ok(res.output)
     }
 
-    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<FeedMeta> {
+    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<types::FeedMeta> {
         let var = mutation::subscribe_feed::Variables {
             input: mutation::subscribe_feed::SubscribeFeedInput { url },
         };
@@ -62,7 +61,7 @@ impl Client {
 
         match res.subscribe_feed {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
-                Ok(FeedMeta::new(success.feed.title, success.feed.url))
+                Ok(types::FeedMeta::new(success.feed.title, success.feed.url))
             }
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedError(err) => {
                 Err(anyhow!("Failed to mutate subscribe_feed {err:?}"))

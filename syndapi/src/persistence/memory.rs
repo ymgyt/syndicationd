@@ -1,38 +1,41 @@
 use std::sync::RwLock;
 
 use async_trait::async_trait;
-use synd::types::FeedMeta;
 
-use super::{datastore::DatastoreResult, Datastore};
+use crate::persistence::{
+    self,
+    datastore::{Datastore, DatastoreResult},
+};
 
 pub struct MemoryDatastore {
-    feeds: RwLock<Vec<FeedMeta>>,
+    feeds: RwLock<Vec<persistence::types::FeedSubscription>>,
 }
 
 impl MemoryDatastore {
     pub fn new() -> Self {
         Self {
-            feeds: RwLock::new(vec![FeedMeta::new(
-                "This week in Rust".into(),
-                "https://this-week-in-rust.org/atom.xml".into(),
-            )]),
+            feeds: RwLock::new(vec![]),
         }
     }
 }
 
 #[async_trait]
 impl Datastore for MemoryDatastore {
-    async fn add_feed_to_subscription(
+    async fn put_feed_subscription(
         &self,
-        _user_id: &str,
-        title: String,
-        url: String,
+        feed: persistence::types::FeedSubscription,
     ) -> DatastoreResult<()> {
-        self.feeds.write().unwrap().push(FeedMeta::new(title, url));
+        self.feeds.write().unwrap().push(feed);
         Ok(())
     }
 
-    async fn fetch_subscription_feeds(&self, _user_id: &str) -> DatastoreResult<Vec<FeedMeta>> {
-        Ok(self.feeds.read().unwrap().clone())
+    async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> DatastoreResult<Vec<String>> {
+        Ok(self
+            .feeds
+            .read()
+            .unwrap()
+            .iter()
+            .map(|feed| feed.url.clone())
+            .collect())
     }
 }

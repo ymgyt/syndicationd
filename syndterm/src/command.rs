@@ -1,9 +1,8 @@
-use synd::types::FeedMeta;
-
 use crate::{
     application::{AuthenticateMethod, Direction},
     auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
     client::query::subscription::SubscriptionOutput,
+    types::FeedMeta,
 };
 
 #[derive(Debug)]

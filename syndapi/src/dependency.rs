@@ -8,13 +8,12 @@ use crate::{
     gql::Resolver,
     persistence::{kvsd::KvsdClient, memory::MemoryDatastore},
     serve::auth::Authenticator,
-    usecase::{authorize::Authorizer, MakeUsecase},
+    usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
 
 pub struct Dependency {
-    pub make_usecase: MakeUsecase,
     pub authenticator: Authenticator,
-    pub authorizer: Authorizer,
+    pub runtime: Runtime,
     pub resolver: Resolver,
 }
 
@@ -43,12 +42,14 @@ impl Dependency {
         };
 
         let authenticator = Authenticator::new()?;
+
         let authorizer = Authorizer::new();
+
+        let runtime = Runtime::new(make_usecase, authorizer);
 
         Ok(Dependency {
             authenticator,
-            make_usecase,
-            authorizer,
+            runtime,
             resolver,
         })
     }

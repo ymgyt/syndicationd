@@ -1,14 +1,23 @@
 use async_graphql::{InputObject, Object, Union};
 
-use crate::gql::{
-    mutation::ResponseStatus,
-    object::{self},
+use crate::{
+    gql::{
+        mutation::ResponseStatus,
+        object::{self, Feed},
+    },
+    usecase,
 };
 
 #[derive(InputObject)]
 pub struct SubscribeFeedInput {
     /// Feed url to subscribe
     pub url: String,
+}
+
+impl From<SubscribeFeedInput> for usecase::SubscribeFeedInput {
+    fn from(value: SubscribeFeedInput) -> Self {
+        usecase::SubscribeFeedInput { url: value.url }
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -57,6 +66,15 @@ impl From<ResponseStatus> for SubscribeFeedResponse {
         SubscribeFeedResponse::Error(SubscribeFeedError {
             status,
             message: "Unauthorized".into(),
+        })
+    }
+}
+
+impl From<usecase::Output<usecase::SubscribeFeedOutput>> for SubscribeFeedResponse {
+    fn from(output: usecase::Output<usecase::SubscribeFeedOutput>) -> Self {
+        SubscribeFeedResponse::Success(SubscribeFeedSuccess {
+            status: ResponseStatus::ok(),
+            feed: Feed::from(output.output.feed),
         })
     }
 }

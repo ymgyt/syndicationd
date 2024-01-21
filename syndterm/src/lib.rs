@@ -8,4 +8,5 @@ pub mod command;
 pub mod config;
 pub mod job;
 pub mod terminal;
+pub mod types;
 pub mod ui;

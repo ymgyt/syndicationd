@@ -5,31 +5,49 @@ use async_graphql::{
     Context, Object, Result,
 };
 
-use crate::{gql::object::FeedMeta, persistence::Datastore, principal::Principal};
+use crate::{
+    gql::{object, run_usecase},
+    persistence::Datastore,
+    usecase::{
+        FetchSubscribedFeeds, FetchSubscribedFeedsInput, FetchSubscribedFeedsOutput, Output,
+    },
+};
 
-pub struct Subscription<'a> {
-    user_id: &'a str,
-}
+pub struct Subscription;
 
 pub struct Resolver {
     pub datastore: Arc<dyn Datastore>,
 }
 
 #[Object]
-impl<'a> Subscription<'a> {
-    async fn feeds(&self, cx: &Context<'_>) -> Result<Connection<usize, FeedMeta>> {
-        let r = cx.data_unchecked::<Resolver>();
-        let mut connection = Connection::new(false, false);
-        connection.edges.extend(
-            r.datastore
-                .fetch_subscription_feeds(self.user_id)
-                .await
-                .unwrap()
-                .into_iter()
-                .map(FeedMeta::from)
-                .enumerate()
-                .map(|(idx, feed)| Edge::new(idx, feed)),
-        );
+impl Subscription {
+    async fn feeds(
+        &self,
+        ctx: &Context<'_>,
+        after: Option<String>,
+        #[graphql(default = 20)] first: Option<i32>,
+    ) -> Result<Connection<String, object::Feed>> {
+        let first = first.unwrap_or(10) as usize;
+        let has_prev = after.is_some();
+        let input = FetchSubscribedFeedsInput {
+            after,
+            first: first + 1,
+        };
+        let Output {
+            output: FetchSubscribedFeedsOutput { feeds },
+        } = run_usecase!(FetchSubscribedFeeds, ctx, input)?;
+
+        let has_next = feeds.len() > first;
+        let mut connection = Connection::new(has_prev, has_next);
+
+        let edges = feeds
+            .into_iter()
+            .map(|feed| (feed.url().to_owned(), feed))
+            .map(|(cursor, feed)| (cursor, object::Feed::from(feed)))
+            .map(|(cursor, feed)| Edge::new(cursor, feed));
+
+        connection.edges.extend(edges);
+
         Ok(connection)
     }
 }
@@ -38,9 +56,7 @@ pub struct Query;
 
 #[Object]
 impl Query {
-    async fn subscription<'cx>(&self, cx: &Context<'cx>) -> Subscription<'cx> {
-        let Principal::User(user) = cx.data_unchecked::<Principal>();
-
-        Subscription { user_id: user.id() }
+    async fn subscription<'cx>(&self, _ctx: &Context<'cx>) -> Subscription {
+        Subscription {}
     }
 }

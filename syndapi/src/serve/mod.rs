@@ -32,15 +32,13 @@ pub async fn listen_and_serve(dep: Dependency) -> anyhow::Result<()> {
 /// Start api server
 pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()> {
     let Dependency {
-        make_usecase,
         authenticator,
-        authorizer,
+        runtime,
         resolver,
     } = dep;
 
     let schema = Schema::build(Query, Mutation, EmptySubscription)
-        .data(make_usecase)
-        .data(authorizer)
+        .data(runtime)
         .data(resolver)
         .extension(Tracing)
         .finish();

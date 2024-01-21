@@ -20,10 +20,13 @@ pub enum ParserError {
 
 #[async_trait]
 pub trait FetchFeed: Send + Sync {
-    async fn fetch(&self, url: String) -> ParseResult<Feed>;
+    async fn fetch_feed(&self, url: String) -> ParseResult<Feed>;
+    /// Fetch feeds by spawing tasks
+    async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>>;
 }
 
 /// Feed Process entry point
+#[derive(Clone)]
 pub struct FeedService {
     http: reqwest::Client,
     buff_limit: usize,
@@ -31,7 +34,7 @@ pub struct FeedService {
 
 #[async_trait]
 impl FetchFeed for FeedService {
-    async fn fetch(&self, url: String) -> ParseResult<Feed> {
+    async fn fetch_feed(&self, url: String) -> ParseResult<Feed> {
         use futures::StreamExt;
         let mut stream = self
             .http
@@ -54,6 +57,26 @@ impl FetchFeed for FeedService {
         }
 
         self.parse(url, buff.as_slice())
+    }
+
+    async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>> {
+        // Order is matter, so we could not use tokio JoinSet or futures FuturesUnordered
+        // should use FuturesOrders ?
+        let mut handles = Vec::with_capacity(urls.len());
+        for url in urls {
+            let this = self.clone();
+            let url = url.clone();
+            handles.push(tokio::task::spawn(
+                async move { this.fetch_feed(url).await },
+            ));
+        }
+
+        let mut feeds = Vec::with_capacity(handles.len());
+        for handle in handles {
+            feeds.push(handle.await.expect("tokio spawn join error")?);
+        }
+
+        Ok(feeds)
     }
 }
 

@@ -4,7 +4,7 @@ use synd::{feed::parser::FetchFeed, types::Feed};
 
 use crate::{
     audit,
-    persistence::Datastore,
+    persistence::{self, Datastore},
     principal::Principal,
     serve::layer::audit::Audit,
     usecase::{Input, Output},
@@ -57,12 +57,15 @@ impl Usecase for SubscribeFeed {
     ) -> Result<Output<Self::Output>, super::Error<Self::Error>> {
         let feed = self
             .fetch_feed
-            .fetch(url.clone())
+            .fetch_feed(url.clone())
             .await
             .map_err(|err| super::Error::Usecase(anyhow::Error::from(err)))?;
 
         self.datastore
-            .add_feed_to_subscription(principal.user_id().unwrap(), feed.title().to_owned(), url)
+            .put_feed_subscription(persistence::types::FeedSubscription {
+                user_id: principal.user_id().unwrap().to_owned(),
+                url: feed.url().to_owned(),
+            })
             .await?;
 
         audit!(

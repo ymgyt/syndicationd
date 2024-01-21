@@ -53,9 +53,8 @@
           cargoExtraArgs = "--package ${syndtermCrate.pname}";
         });
 
-        syndapiCrate = craneLib.crateNameFromCargoToml {
-          cargoToml = ./syndapi/Cargo.toml;
-        };
+        syndapiCrate =
+          craneLib.crateNameFromCargoToml { cargoToml = ./syndapi/Cargo.toml; };
         syndapi = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
           inherit (syndapiCrate) pname version;
@@ -84,12 +83,8 @@
           nushell # just set nu as shell
         ];
 
-        dev_packages = with pkgs; [
-          cargo-nextest
-          graphql-client
-          nixfmt
-          rust-analyzer
-        ] ++ ci_packages;
+        dev_packages = with pkgs;
+          [ cargo-nextest graphql-client nixfmt rust-analyzer ] ++ ci_packages;
 
       in {
         inherit checks;
@@ -98,19 +93,15 @@
         packages.syndterm = syndterm;
         packages.syndapi = syndapi;
 
-        apps.default = flake-utils.lib.mkApp {
-          drv = syndterm;
-        };
+        apps.default = flake-utils.lib.mkApp { drv = syndterm; };
 
         devShells.default = craneLib.devShell {
           packages = dev_packages;
           shellHook = ''
-          exec nu
+            exec nu
           '';
         };
 
-        devShells.ci = craneLib.devShell {
-          packages = ci_packages;
-        };
+        devShells.ci = craneLib.devShell { packages = ci_packages; };
       });
 }

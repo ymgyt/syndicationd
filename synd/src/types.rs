@@ -1,6 +1,9 @@
+use chrono::{DateTime, Utc};
 use feed_rs::model as feedrs;
 
 pub use feedrs::FeedType;
+
+pub type Time = DateTime<Utc>;
 
 #[derive(Debug, Clone)]
 pub struct Feed {
@@ -18,16 +21,27 @@ impl Feed {
         self.url.as_str()
     }
 
-    pub fn meta(&self) -> FeedMeta {
-        FeedMeta::new(self.title().into(), self.url.clone())
+    pub fn title(&self) -> Option<&str> {
+        self.feed.title.as_ref().map(|text| text.content.as_str())
     }
 
-    pub fn title(&self) -> &str {
+    pub fn updated(&self) -> Option<Time> {
+        self.feed.updated.clone()
+    }
+
+    pub fn authors(&self) -> impl Iterator<Item = &str> {
+        self.feed.authors.iter().map(|person| person.name.as_str())
+    }
+
+    pub fn description(&self) -> Option<&str> {
         self.feed
-            .title
+            .description
             .as_ref()
             .map(|text| text.content.as_str())
-            .unwrap_or("???")
+    }
+
+    pub fn links(&self) -> impl Iterator<Item = &feedrs::Link> {
+        self.feed.links.iter()
     }
 }
 
@@ -37,17 +51,5 @@ impl From<(String, feed_rs::model::Feed)> for Feed {
             url: feed.0,
             feed: feed.1,
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FeedMeta {
-    pub title: String,
-    pub url: String,
-}
-
-impl FeedMeta {
-    pub fn new(title: String, url: String) -> Self {
-        Self { title, url }
     }
 }
