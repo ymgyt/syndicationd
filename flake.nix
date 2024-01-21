@@ -104,4 +104,11 @@
 
         devShells.ci = craneLib.devShell { packages = ci_packages; };
       });
+
+  nixConfig = {
+    extra-substituters = [ "https://syndicationd.cachix.org" ];
+    extra-trusted-public-keys = [
+      "syndicationd.cachix.org-1:qeH9C3xDqR831xEuDcfhGEUslMMjGroPPMOwiZfyiJQ="
+    ];
+  };
 }
