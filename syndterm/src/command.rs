@@ -15,7 +15,7 @@ pub enum Command {
     PromptFeedSubscription,
     SubscribeFeed { url: String },
     CompleteSubscribeFeed { feed: FeedMeta },
-    FetchSubscription,
+    FetchSubscription { after: Option<String>, first: i64 },
     UpdateSubscription(SubscriptionOutput),
     HandleError { message: String },
 }

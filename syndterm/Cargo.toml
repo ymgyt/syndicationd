@@ -9,6 +9,7 @@ license.workspace = true
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"] }
 crossterm = { version = "0.27.0", features = ["event-stream"] }
+chrono = { workspace = true }
 directories = "5.0.1"
 edit = "0.1.5"
 futures-util = "0.3.30"

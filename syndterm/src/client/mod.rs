@@ -11,6 +11,8 @@ use crate::{auth::Authentication, config, types};
 
 use self::query::subscription::SubscriptionOutput;
 
+mod scalar;
+pub use scalar::*;
 pub mod mutation;
 pub mod query;
 
@@ -45,8 +47,12 @@ impl Client {
         self.credential = Some(token);
     }
 
-    pub async fn fetch_subscription(&self) -> anyhow::Result<SubscriptionOutput> {
-        let var = query::subscription::Variables {};
+    pub async fn fetch_subscription(
+        &self,
+        after: Option<String>,
+        first: Option<i64>,
+    ) -> anyhow::Result<SubscriptionOutput> {
+        let var = query::subscription::Variables { after, first };
         let req = query::Subscription::build_query(var);
         let res: query::subscription::ResponseData = self.request(&req).await?;
         Ok(res.output)
@@ -61,7 +67,7 @@ impl Client {
 
         match res.subscribe_feed {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
-                Ok(types::FeedMeta::new(success.feed.title, success.feed.url))
+                Ok(types::FeedMeta::from(success.feed))
             }
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedError(err) => {
                 Err(anyhow!("Failed to mutate subscribe_feed {err:?}"))

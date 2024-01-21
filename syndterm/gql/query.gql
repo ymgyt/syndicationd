@@ -1,10 +1,32 @@
-query Subscription {
+query Subscription($after: String, $first: Int) {
   output: subscription {
-    feeds {
+    feeds(after: $after, first: $first) {
       nodes {
-        url
-        title
+        ...FeedMeta
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
       }
     }
   }
+}
+
+fragment FeedMeta on Feed {
+  id
+  title
+  url
+  updated
+  links {
+    nodes {
+      ...Link
+    }
+  }
+}
+
+fragment Link on Link {
+  href
+  rel
+  mediaType
+  title  
 }

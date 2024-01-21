@@ -5,10 +5,10 @@ use ratatui::{
     widgets::{Clear, List, ListItem, Widget},
 };
 
-use crate::{client::query::subscription::SubscriptionOutput, types::FeedMeta, ui::Context};
+use crate::{client::query::subscription::SubscriptionOutput, types, ui::Context};
 
 pub struct Subscription {
-    feed_metas: Vec<FeedMeta>,
+    feed_metas: Vec<types::FeedMeta>,
 }
 
 impl Subscription {
@@ -27,11 +27,11 @@ impl Subscription {
             .feeds
             .nodes
             .into_iter()
-            .map(|node| FeedMeta::new(node.title, node.url));
+            .map(types::FeedMeta::from);
         self.feed_metas = feed_metas.collect();
     }
 
-    pub fn add_new_feed(&mut self, feed: FeedMeta) {
+    pub fn add_new_feed(&mut self, feed: types::FeedMeta) {
         self.feed_metas.push(feed)
     }
 }
@@ -48,9 +48,23 @@ impl Subscription {
                 .feed_metas
                 .iter()
                 .map(|feed| {
+                    tracing::info!("{feed:?}");
                     Line::from(vec![
-                        Span::styled(format!("Title: {}", &feed.title()), Style::default()),
-                        Span::styled(format!("Url: {}", &feed.url()), Style::default()),
+                        Span::styled(feed.title.as_deref().unwrap_or("???"), Style::default()),
+                        Span::styled(
+                            format!(
+                                " | {}",
+                                feed.updated
+                                    .as_ref()
+                                    .map(|t| t.naive_local().to_string())
+                                    .unwrap_or("???".into())
+                            ),
+                            Style::default(),
+                        ),
+                        Span::styled(
+                            format!(" | {}", feed.site_link().unwrap_or("???")),
+                            Style::default(),
+                        ),
                     ])
                 })
                 .map(ListItem::new);

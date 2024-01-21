@@ -3,10 +3,8 @@ use std::sync::Arc;
 use synd::{feed::parser::FetchFeed, types::Feed};
 
 use crate::{
-    audit,
     persistence::{self, Datastore},
     principal::Principal,
-    serve::layer::audit::Audit,
     usecase::{Input, Output},
 };
 
@@ -67,12 +65,6 @@ impl Usecase for SubscribeFeed {
                 url: feed.url().to_owned(),
             })
             .await?;
-
-        audit!(
-            { Audit::USER_ID } = principal.user_id().unwrap(),
-            { Audit::OPERATION } = "subscribe_feed",
-            { Audit::RESULT } = "success",
-        );
 
         Ok(Output {
             output: SubscribeFeedOutput { feed },

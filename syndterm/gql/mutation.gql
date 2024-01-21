@@ -3,8 +3,7 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
     __typename
     ... on SubscribeFeedSuccess {
       feed {
-        title,
-        url,
+        ...FeedMeta
       }
       status {
         code
@@ -16,4 +15,23 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
       }
     }
   }
+}
+
+fragment FeedMeta on Feed {
+  id
+  title
+  url
+  updated
+  links {
+    nodes {
+      ...Link
+    }
+  }
+}
+
+fragment Link on Link {
+  href
+  rel
+  mediaType
+  title  
 }

@@ -164,7 +164,10 @@ impl Application {
                 Command::MoveTabSelection(direction) => {
                     match self.state.tabs.move_selection(direction) {
                         Tab::Subscription if !self.state.subscription.has_subscription() => {
-                            next = Some(Command::FetchSubscription);
+                            next = Some(Command::FetchSubscription {
+                                after: None,
+                                first: 2,
+                            });
                         }
                         _ => {}
                     }
@@ -178,7 +181,9 @@ impl Application {
                     self.subscribe_feed(url);
                     self.should_render = true;
                 }
-                Command::FetchSubscription => self.fetch_subscription(),
+                Command::FetchSubscription { after, first } => {
+                    self.fetch_subscription(after, first)
+                }
                 Command::UpdateSubscription(sub) => {
                     self.state.subscription.update_subscription(sub);
                     self.should_render = true;
@@ -227,7 +232,6 @@ impl Application {
                         _ => {}
                     },
                     Screen::Browse => match key.code {
-                        KeyCode::Char('r') => return Some(Command::FetchSubscription),
                         KeyCode::Tab => return Some(Command::MoveTabSelection(Direction::Right)),
                         KeyCode::BackTab => {
                             return Some(Command::MoveTabSelection(Direction::Left))
@@ -249,10 +253,11 @@ impl Application {
 }
 
 impl Application {
-    fn fetch_subscription(&mut self) {
+    fn fetch_subscription(&mut self, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let fut = async move {
-            let sub = client.fetch_subscription().await.unwrap();
+            // TODO: handling
+            let sub = client.fetch_subscription(after, Some(first)).await.unwrap();
             Ok(Command::UpdateSubscription(sub))
         }
         .boxed();

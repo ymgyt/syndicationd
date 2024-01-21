@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        title,\n        url,\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -15,6 +15,7 @@ pub mod subscribe_feed {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
+    type Rfc3339Time = crate::client::scalar::Rfc3339Time;
     #[derive(Debug)]
     pub enum ResponseCode {
         OK,
@@ -53,6 +54,27 @@ pub mod subscribe_feed {
     }
     impl Variables {}
     #[derive(Deserialize, Debug)]
+    pub struct FeedMeta {
+        pub id: ID,
+        pub title: Option<String>,
+        pub url: String,
+        pub updated: Option<Rfc3339Time>,
+        pub links: FeedMetaLinks,
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct FeedMetaLinks {
+        pub nodes: Vec<FeedMetaLinksNodes>,
+    }
+    pub type FeedMetaLinksNodes = Link;
+    #[derive(Deserialize, Debug)]
+    pub struct Link {
+        pub href: String,
+        pub rel: Option<String>,
+        #[serde(rename = "mediaType")]
+        pub media_type: Option<String>,
+        pub title: Option<String>,
+    }
+    #[derive(Deserialize, Debug)]
     pub struct ResponseData {
         #[serde(rename = "subscribeFeed")]
         pub subscribe_feed: SubscribeFeedSubscribeFeed,
@@ -68,11 +90,7 @@ pub mod subscribe_feed {
         pub feed: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed,
         pub status: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus,
     }
-    #[derive(Deserialize, Debug)]
-    pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed {
-        pub title: String,
-        pub url: String,
-    }
+    pub type SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed = FeedMeta;
     #[derive(Deserialize, Debug)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus {
         pub code: ResponseCode,

@@ -26,12 +26,14 @@ gen-gql:
     --schema-path syndterm/gql/schema.json \
     --output-directory syndterm/src/client \
     --response-derives "Debug" \
+    --custom-scalars-module "crate::client::scalar" \
     syndterm/gql/query.gql
 
   graphql-client generate \
     --schema-path syndterm/gql/schema.json \
     --output-directory syndterm/src/client \
     --response-derives "Debug" \
+    --custom-scalars-module "crate::client::scalar" \
     syndterm/gql/mutation.gql
 
   graphql-client generate \
