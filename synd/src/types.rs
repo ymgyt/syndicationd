@@ -26,7 +26,7 @@ impl Feed {
     }
 
     pub fn updated(&self) -> Option<Time> {
-        self.feed.updated.clone()
+        self.feed.updated
     }
 
     pub fn authors(&self) -> impl Iterator<Item = &str> {

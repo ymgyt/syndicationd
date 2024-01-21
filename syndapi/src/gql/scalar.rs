@@ -14,7 +14,7 @@ impl ScalarType for Rfc3339Time {
         chrono::DateTime::parse_from_rfc3339(&value)
             .map(|t| t.with_timezone(&Utc))
             .map(Rfc3339Time)
-            .map_err(|err| InputValueError::custom(err))
+            .map_err(InputValueError::custom)
     }
 
     fn to_value(&self) -> async_graphql::Value {

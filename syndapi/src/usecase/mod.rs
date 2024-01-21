@@ -105,7 +105,7 @@ impl Runtime {
         let input = input.into();
 
         {
-            let user_id = principal.user_id().unwrap_or("?".into());
+            let user_id = principal.user_id().unwrap_or("?");
             audit!(
                 { Audit::USER_ID } = user_id,
                 { Audit::OPERATION } = uc.audit_operation(),
