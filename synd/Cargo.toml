@@ -16,3 +16,4 @@ futures = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 thiserror = "1.0.56"
 tokio = { workspace = true }
+tracing = { workspace = true }

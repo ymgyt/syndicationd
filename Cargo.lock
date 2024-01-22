@@ -2193,6 +2193,7 @@ dependencies = [
  "reqwest",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

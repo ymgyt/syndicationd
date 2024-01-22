@@ -53,11 +53,15 @@ impl Usecase for SubscribeFeed {
             ..
         }: Input<Self::Input>,
     ) -> Result<Output<Self::Output>, super::Error<Self::Error>> {
+        tracing::debug!("Subscribe feed: {url}");
+
         let feed = self
             .fetch_feed
             .fetch_feed(url.clone())
             .await
             .map_err(|err| super::Error::Usecase(anyhow::Error::from(err)))?;
+
+        tracing::debug!("{:#?}", feed.without_entries());
 
         self.datastore
             .put_feed_subscription(persistence::types::FeedSubscription {
