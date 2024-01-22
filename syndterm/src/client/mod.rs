@@ -27,8 +27,8 @@ impl Client {
     pub fn new(endpoint: Url) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .user_agent(config::USER_AGENT)
-            .timeout(Duration::from_secs(5))
-            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
+            .connect_timeout(Duration::from_secs(10))
             .build()?;
 
         Ok(Self {
