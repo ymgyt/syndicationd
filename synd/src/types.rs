@@ -43,6 +43,31 @@ impl Feed {
     pub fn links(&self) -> impl Iterator<Item = &feedrs::Link> {
         self.feed.links.iter()
     }
+
+    /// Return website link to which feed syndicate
+    pub fn website_url(&self) -> Option<&str> {
+        match self.feed.feed_type {
+            // find rel == alternate link
+            FeedType::Atom => self
+                .feed
+                .links
+                .iter()
+                .find(|link| link.rel.as_deref() == Some("alternate"))
+                .map(|link| link.href.as_str()),
+
+            // TODO
+            FeedType::JSON => todo!(),
+
+            // TODO
+            FeedType::RSS0 => todo!(),
+
+            // use first one
+            FeedType::RSS1 | FeedType::RSS2 => {
+                assert!(self.feed.links.len() < 2);
+                self.feed.links.first().map(|link| link.href.as_str())
+            }
+        }
+    }
 }
 
 impl From<(String, feed_rs::model::Feed)> for Feed {

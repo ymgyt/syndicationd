@@ -102,6 +102,10 @@ impl Feed {
         c
     }
 
+    async fn website_url(&self) -> Option<&str> {
+        self.0.website_url()
+    }
+
     // TODO: entries
     // TODO: category
 }

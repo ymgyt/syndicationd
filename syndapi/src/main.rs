@@ -40,6 +40,7 @@ async fn main() {
     let dep = Dependency::new(args.kvsd).await.unwrap();
 
     info!(version, "Runinng...");
+    tracing::debug!("Debug");
 
     if let Err(err) = listen_and_serve(dep).await {
         error!("{err:?}");

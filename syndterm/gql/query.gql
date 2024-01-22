@@ -17,6 +17,7 @@ fragment FeedMeta on Feed {
   title
   url
   updated
+  websiteUrl
   links {
     nodes {
       ...Link

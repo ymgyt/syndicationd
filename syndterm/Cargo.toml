@@ -17,7 +17,6 @@ graphql_client = { workspace = true }
 http = "0.2"                                                                   # reqwest use 0.2
 http-serde-ext = "0.1"
 open = "5.0.1"
-palette = "0.7.3"
 # Use latest api
 ratatui = { git = "https://github.com/ratatui-org/ratatui.git", branch = "main"}
 reqwest = { workspace = true }

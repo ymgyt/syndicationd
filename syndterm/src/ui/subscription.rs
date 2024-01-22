@@ -1,8 +1,8 @@
 use ratatui::{
-    prelude::{Buffer, Margin, Rect},
+    prelude::{Buffer, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{Clear, List, ListItem, Widget},
+    widgets::{List, ListItem, Widget},
 };
 
 use crate::{client::query::subscription::SubscriptionOutput, types, ui::Context};
@@ -38,11 +38,6 @@ impl Subscription {
 
 impl Subscription {
     pub fn render(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
-        let area = area.inner(&Margin {
-            vertical: 1,
-            horizontal: 2,
-        });
-        Clear.render(area, buf);
         let list = {
             let items = self
                 .feed_metas
@@ -62,7 +57,7 @@ impl Subscription {
                             Style::default(),
                         ),
                         Span::styled(
-                            format!(" | {}", feed.site_link().unwrap_or("???")),
+                            format!(" | {}", feed.website_url.as_deref().unwrap_or("???")),
                             Style::default(),
                         ),
                     ])
