@@ -1,6 +1,9 @@
 mod subscribe_feed;
 pub use subscribe_feed::{SubscribeFeed, SubscribeFeedInput, SubscribeFeedOutput};
 
+mod unsubscribe_feed;
+pub use unsubscribe_feed::{UnsubscribeFeed, UnsubscribeFeedInput, UnsubscribeFeedOutput};
+
 mod fetch_subscribed_feeds;
 pub use fetch_subscribed_feeds::{
     FetchSubscribedFeeds, FetchSubscribedFeedsInput, FetchSubscribedFeedsOutput,

@@ -149,6 +149,9 @@ impl Application {
         while let Some(command) = next.take() {
             match command {
                 Command::Quit => self.should_quit = true,
+                Command::ResizeTerminal { .. } => {
+                    self.should_render = true;
+                }
                 Command::Authenticate(method) => self.authenticate(method),
                 Command::DeviceAuthorizationFlow(device_authorization) => {
                     self.device_authorize_flow(device_authorization)
@@ -176,8 +179,16 @@ impl Application {
                     self.prompt_feed_subscription();
                     self.should_render = true;
                 }
+                Command::PromptFeedUnsubscription => {
+                    self.prompt_feed_unsubscription();
+                    self.should_render = true;
+                }
                 Command::SubscribeFeed { url } => {
                     self.subscribe_feed(url);
+                    self.should_render = true;
+                }
+                Command::UnsubscribeFeed { url } => {
+                    self.unsubscribe_feed(url);
                     self.should_render = true;
                 }
                 Command::FetchSubscription { after, first } => {
@@ -188,8 +199,15 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed } => {
-                    self.state.subscription.add_new_feed(feed);
+                    self.state.subscription.add_subscribed_feed(feed);
                     self.should_render = true;
+                }
+                Command::CompleteUnsubscribeFeed { url } => {
+                    self.state.subscription.remove_unsubscribed_feed(url);
+                    self.should_render = true;
+                }
+                Command::OpenFeed => {
+                    self.open_feed();
                 }
                 Command::HandleError { message } => {
                     self.state.prompt.set_error_message(message);
@@ -211,8 +229,9 @@ impl Application {
     #[allow(clippy::single_match)]
     fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) -> Option<Command> {
         match event.unwrap() {
-            CrosstermEvent::Resize(_, _) => None,
-            // Ignore release events
+            CrosstermEvent::Resize(columns, rows) => {
+                Some(Command::ResizeTerminal { columns, rows })
+            }
             CrosstermEvent::Key(KeyEvent {
                 kind: KeyEventKind::Release,
                 ..
@@ -239,12 +258,16 @@ impl Application {
                             Tab::Feeds => {}
                             Tab::Subscription => match key.code {
                                 KeyCode::Char('a') => return Some(Command::PromptFeedSubscription),
+                                KeyCode::Char('d') => {
+                                    return Some(Command::PromptFeedUnsubscription)
+                                }
                                 KeyCode::Char('j') => {
                                     return Some(Command::MoveSubscribedFeed(Direction::Down));
                                 }
                                 KeyCode::Char('k') => {
                                     return Some(Command::MoveSubscribedFeed(Direction::Up));
                                 }
+                                KeyCode::Enter => return Some(Command::OpenFeed),
                                 _ => {}
                             },
                         },
@@ -285,6 +308,20 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
+    fn prompt_feed_unsubscription(&mut self) {
+        // TODO: prompt deletion confirm
+        let Some(url) = self
+            .state
+            .subscription
+            .selected_feed_url()
+            .map(ToOwned::to_owned)
+        else {
+            return;
+        };
+        let fut = async move { Ok(Command::UnsubscribeFeed { url }) }.boxed();
+        self.jobs.futures.push(fut);
+    }
+
     fn subscribe_feed(&mut self, url: String) {
         let client = self.client.clone();
         let fut = async move {
@@ -294,6 +331,26 @@ impl Application {
         }
         .boxed();
         self.jobs.futures.push(fut);
+    }
+
+    fn unsubscribe_feed(&mut self, url: String) {
+        let client = self.client.clone();
+        let fut = async move {
+            // TODO: error handling
+            client.unsubscribe_feed(url.clone()).await.unwrap();
+            Ok(Command::CompleteUnsubscribeFeed { url })
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
+}
+
+impl Application {
+    fn open_feed(&mut self) {
+        let Some(feed_website_url) = self.state.subscription.selected_feed_url() else {
+            return;
+        };
+        open::that(feed_website_url).ok();
     }
 }
 

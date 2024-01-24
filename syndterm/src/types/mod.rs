@@ -62,6 +62,14 @@ impl From<mutation::subscribe_feed::EntryMeta> for EntryMeta {
     }
 }
 
+impl EntryMeta {
+    pub fn summary_text(&self, width: usize) -> Option<String> {
+        self.summary
+            .as_deref()
+            .map(|summary| html2text::from_read(summary.as_bytes(), width))
+    }
+}
+
 #[derive(Debug)]
 pub struct FeedMeta {
     pub title: Option<String>,

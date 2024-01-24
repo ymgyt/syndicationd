@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 5) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -127,6 +127,98 @@ impl graphql_client::GraphQLQuery for SubscribeFeed {
             variables,
             query: subscribe_feed::QUERY,
             operation_name: subscribe_feed::OPERATION_NAME,
+        }
+    }
+}
+pub struct UnsubscribeFeed;
+pub mod unsubscribe_feed {
+    #![allow(dead_code)]
+    use std::result::Result;
+    pub const OPERATION_NAME: &str = "UnsubscribeFeed";
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    use super::*;
+    use serde::{Deserialize, Serialize};
+    #[allow(dead_code)]
+    type Boolean = bool;
+    #[allow(dead_code)]
+    type Float = f64;
+    #[allow(dead_code)]
+    type Int = i64;
+    #[allow(dead_code)]
+    type ID = String;
+    #[derive(Debug)]
+    pub enum ResponseCode {
+        OK,
+        UNAUTHORIZED,
+        INTERNAL_ERROR,
+        Other(String),
+    }
+    impl ::serde::Serialize for ResponseCode {
+        fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            ser.serialize_str(match *self {
+                ResponseCode::OK => "OK",
+                ResponseCode::UNAUTHORIZED => "UNAUTHORIZED",
+                ResponseCode::INTERNAL_ERROR => "INTERNAL_ERROR",
+                ResponseCode::Other(ref s) => &s,
+            })
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ResponseCode {
+        fn deserialize<D: ::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let s: String = ::serde::Deserialize::deserialize(deserializer)?;
+            match s.as_str() {
+                "OK" => Ok(ResponseCode::OK),
+                "UNAUTHORIZED" => Ok(ResponseCode::UNAUTHORIZED),
+                "INTERNAL_ERROR" => Ok(ResponseCode::INTERNAL_ERROR),
+                _ => Ok(ResponseCode::Other(s)),
+            }
+        }
+    }
+    #[derive(Serialize)]
+    pub struct UnsubscribeFeedInput {
+        pub url: String,
+    }
+    #[derive(Serialize)]
+    pub struct Variables {
+        pub input: UnsubscribeFeedInput,
+    }
+    impl Variables {}
+    #[derive(Deserialize, Debug)]
+    pub struct ResponseData {
+        #[serde(rename = "unsubscribeFeed")]
+        pub unsubscribe_feed: UnsubscribeFeedUnsubscribeFeed,
+    }
+    #[derive(Deserialize, Debug)]
+    #[serde(tag = "__typename")]
+    pub enum UnsubscribeFeedUnsubscribeFeed {
+        UnsubscribeFeedSuccess(UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccess),
+        UnsubscribeFeedError(UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedError),
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccess {
+        pub status: UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccessStatus,
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccessStatus {
+        pub code: ResponseCode,
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedError {
+        pub status: UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedErrorStatus,
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedErrorStatus {
+        pub code: ResponseCode,
+    }
+}
+impl graphql_client::GraphQLQuery for UnsubscribeFeed {
+    type Variables = unsubscribe_feed::Variables;
+    type ResponseData = unsubscribe_feed::ResponseData;
+    fn build_query(variables: Self::Variables) -> ::graphql_client::QueryBody<Self::Variables> {
+        graphql_client::QueryBody {
+            variables,
+            query: unsubscribe_feed::QUERY,
+            operation_name: unsubscribe_feed::OPERATION_NAME,
         }
     }
 }

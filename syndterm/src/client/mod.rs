@@ -75,6 +75,23 @@ impl Client {
         }
     }
 
+    pub async fn unsubscribe_feed(&self, url: String) -> anyhow::Result<()> {
+        let var = mutation::unsubscribe_feed::Variables {
+            input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
+        };
+        let req = mutation::UnsubscribeFeed::build_query(var);
+        let res: mutation::unsubscribe_feed::ResponseData = self.request(&req).await?;
+
+        match res.unsubscribe_feed {
+            mutation::unsubscribe_feed::UnsubscribeFeedUnsubscribeFeed::UnsubscribeFeedSuccess(
+                _,
+            ) => Ok(()),
+            mutation::unsubscribe_feed::UnsubscribeFeedUnsubscribeFeed::UnsubscribeFeedError(
+                err,
+            ) => Err(anyhow!("Failed to mutate unsubscribe_feed {err:?}")),
+        }
+    }
+
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>
     where
         Body: Serialize + ?Sized,

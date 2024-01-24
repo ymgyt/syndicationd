@@ -42,6 +42,18 @@ impl Datastore for MemoryDatastore {
         Ok(())
     }
 
+    async fn delete_feed_subscription(
+        &self,
+        feed: persistence::types::FeedSubscription,
+    ) -> DatastoreResult<()> {
+        let to_delete = feed.url;
+        self.feeds
+            .write()
+            .unwrap()
+            .retain(|sub| sub.url != to_delete);
+        Ok(())
+    }
+
     async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> DatastoreResult<Vec<String>> {
         Ok(self
             .feeds

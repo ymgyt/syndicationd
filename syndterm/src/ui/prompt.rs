@@ -6,6 +6,8 @@ use ratatui::{
 
 use crate::ui::Context;
 
+use super::tabs::Tab;
+
 pub struct Prompt {
     error_message: Option<String>,
 }
@@ -36,13 +38,20 @@ impl Prompt {
                 .wrap(Wrap { trim: true })
                 .style(cx.theme.prompt.background)
         } else {
-            let keys = [
-                ("q", "Quit"),
-                ("Tab", "Next Tab"),
-                ("a", "Add Subscription"),
-            ];
+            let keys = [("q", "Quit"), ("Tab", "Next Tab"), ("j/k", "Up/Down")];
+            let per_screen_keys = match cx.state.tabs.current() {
+                Tab::Subscription => [
+                    ("a", "Subscribe"),
+                    ("d", "Unsubscribe"),
+                    ("Enter", "Open Feed"),
+                ]
+                .iter(),
+                Tab::Feeds => [].iter(),
+            };
+
             let spans = keys
                 .iter()
+                .chain(per_screen_keys)
                 .flat_map(|(key, desc)| {
                     let key = Span::styled(format!(" {} ", key), cx.theme.prompt.key);
                     let desc = Span::styled(format!(" {} ", desc), cx.theme.prompt.key_desc);

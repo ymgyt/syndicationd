@@ -19,7 +19,7 @@ fragment FeedMeta on Feed {
   updated
   websiteUrl
   description
-  entries(first: 5) {
+  entries(first: 10) {
     nodes {
       ...EntryMeta
     }

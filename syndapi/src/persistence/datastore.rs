@@ -15,6 +15,11 @@ pub trait Datastore: Send + Sync {
         feed: persistence::types::FeedSubscription,
     ) -> DatastoreResult<()>;
 
+    async fn delete_feed_subscription(
+        &self,
+        feed: persistence::types::FeedSubscription,
+    ) -> DatastoreResult<()>;
+
     async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> DatastoreResult<Vec<String>>;
 }
 
@@ -28,6 +33,13 @@ where
         feed: persistence::types::FeedSubscription,
     ) -> DatastoreResult<()> {
         self.put_feed_subscription(feed).await
+    }
+
+    async fn delete_feed_subscription(
+        &self,
+        feed: persistence::types::FeedSubscription,
+    ) -> DatastoreResult<()> {
+        self.delete_feed_subscription(feed).await
     }
 
     async fn fetch_subscribed_feed_urls(&self, user_id: &str) -> DatastoreResult<Vec<String>> {

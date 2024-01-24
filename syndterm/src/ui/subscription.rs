@@ -1,9 +1,10 @@
 use ratatui::{
-    prelude::{Buffer, Constraint, Layout, Margin, Rect},
-    text::{Line, Span},
+    prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
+    text::Span,
     widgets::{
-        Block, BorderType, Borders, Cell, HighlightSpacing, List, ListItem, Padding, Row,
-        StatefulWidget, Table, TableState, Widget,
+        block::{Position, Title},
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Row, StatefulWidget, Table,
+        TableState, Widget,
     },
 };
 use unicode_segmentation::UnicodeSegmentation;
@@ -32,6 +33,12 @@ impl Subscription {
         !self.feed_metas.is_empty()
     }
 
+    pub fn selected_feed_url(&self) -> Option<&str> {
+        self.feed_metas
+            .get(self.selected_feed_meta_index)
+            .map(|feed_meta| feed_meta.url.as_str())
+    }
+
     pub fn update_subscription(&mut self, subscription: SubscriptionOutput) {
         let feed_metas = subscription
             .feeds
@@ -41,8 +48,13 @@ impl Subscription {
         self.feed_metas = feed_metas.collect();
     }
 
-    pub fn add_new_feed(&mut self, feed: types::FeedMeta) {
+    pub fn add_subscribed_feed(&mut self, feed: types::FeedMeta) {
         self.feed_metas.insert(0, feed)
+    }
+
+    pub fn remove_unsubscribed_feed(&mut self, url: String) {
+        self.feed_metas.retain(|feed_meta| feed_meta.url != url);
+        self.move_selection(Direction::Up);
     }
 
     pub fn move_selection(&mut self, direction: Direction) {
@@ -82,61 +94,6 @@ impl Subscription {
             .highlight_spacing(HighlightSpacing::WhenSelected);
 
         StatefulWidget::render(feeds, area, buf, &mut feeds_state);
-    }
-
-    fn render_feed_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let block = Block::new()
-            .padding(Padding {
-                left: 1,
-                right: 1,
-                top: 1,
-                bottom: 1,
-            })
-            .borders(Borders::TOP)
-            .border_type(BorderType::Thick);
-
-        let inner = block.inner(area);
-        Widget::render(block, area, buf);
-
-        let Some(feed) = self.feed_metas.get(self.selected_feed_meta_index) else {
-            return;
-        };
-
-        let title_width = feed
-            .entries
-            .iter()
-            .filter_map(|entry| entry.title.as_deref())
-            .map(|title| title.graphemes(true).count())
-            .max()
-            .unwrap_or(0);
-
-        let entry = |entry: &EntryMeta| {
-            let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let published = entry
-                .published
-                .as_ref()
-                .map(|t| t.local_ymd())
-                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
-            let summary = entry.summary.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-
-            Row::new([
-                Cell::new(Span::from(format!("{published}"))),
-                Cell::new(Span::from(format!("{title}"))),
-                Cell::new(Span::from(format!("{summary}"))),
-            ])
-        };
-
-        let widths = [
-            Constraint::Length(10),
-            Constraint::Length(title_width as u16),
-            Constraint::Max(200),
-        ];
-        let rows = feed.entries.iter().map(entry);
-        let table = Table::new(rows, widths)
-            .column_spacing(2)
-            .style(cx.theme.subscription.background);
-
-        Widget::render(table, inner, buf);
     }
 
     fn feed_rows<'a>(
@@ -183,5 +140,72 @@ impl Subscription {
         };
 
         (header, constraints, self.feed_metas.iter().map(row))
+    }
+
+    fn render_feed_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+        let block = Block::new()
+            .padding(Padding {
+                left: 1,
+                right: 1,
+                top: 1,
+                bottom: 1,
+            })
+            .title(
+                Title::from("Latest 10 entries")
+                    .position(Position::Top)
+                    .alignment(Alignment::Center),
+            )
+            .borders(Borders::TOP)
+            .border_type(BorderType::Thick);
+
+        let inner = block.inner(area);
+        Widget::render(block, area, buf);
+
+        let Some(feed) = self.feed_metas.get(self.selected_feed_meta_index) else {
+            return;
+        };
+
+        let title_width = feed
+            .entries
+            .iter()
+            .filter_map(|entry| entry.title.as_deref())
+            .map(|title| title.graphemes(true).count())
+            .max()
+            .unwrap_or(0);
+
+        let entry = |entry: &EntryMeta| {
+            let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
+            let published = entry
+                .published
+                .as_ref()
+                .map(|t| t.local_ymd())
+                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
+            let summary = entry.summary_text(100).unwrap_or(ui::UNKNOWN_SYMBOL.into());
+
+            Row::new([
+                Cell::new(Span::from(published)),
+                Cell::new(Span::from(title.to_string())),
+                Cell::new(Span::from(summary)),
+            ])
+        };
+
+        let header = Row::new([
+            Cell::new(Span::from("Published")),
+            Cell::new(Span::from("Entry")),
+            Cell::new(Span::from("Summary")),
+        ]);
+
+        let widths = [
+            Constraint::Length(10),
+            Constraint::Length(title_width as u16),
+            Constraint::Max(200),
+        ];
+        let rows = feed.entries.iter().map(entry);
+        let table = Table::new(rows, widths)
+            .header(header.style(cx.theme.subscription.header))
+            .column_spacing(2)
+            .style(cx.theme.subscription.background);
+
+        Widget::render(table, inner, buf);
     }
 }
