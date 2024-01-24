@@ -14,7 +14,20 @@ pub struct MemoryDatastore {
 impl MemoryDatastore {
     pub fn new() -> Self {
         Self {
-            feeds: RwLock::new(vec![]),
+            feeds: RwLock::new(vec![
+                persistence::types::FeedSubscription {
+                    user_id: "me".into(),
+                    url: "https://blog.ymgyt.io/atom.xml".into(),
+                },
+                persistence::types::FeedSubscription {
+                    user_id: "me".into(),
+                    url: "https://this-week-in-rust.org/atom.xml".into(),
+                },
+                persistence::types::FeedSubscription {
+                    user_id: "me".into(),
+                    url: "https://buttondown.email/o11y.news/rss".into(),
+                },
+            ]),
         }
     }
 }

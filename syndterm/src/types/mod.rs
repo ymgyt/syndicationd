@@ -1,7 +1,9 @@
 use chrono::DateTime;
-use synd::types::Time;
 
 use crate::client::{mutation, query};
+
+mod time;
+pub use time::{Time, TimeExt};
 
 #[derive(Debug)]
 pub struct Link {
@@ -34,6 +36,33 @@ impl From<mutation::subscribe_feed::Link> for Link {
 }
 
 #[derive(Debug)]
+pub struct EntryMeta {
+    pub title: Option<String>,
+    pub published: Option<Time>,
+    pub summary: Option<String>,
+}
+
+impl From<query::subscription::EntryMeta> for EntryMeta {
+    fn from(e: query::subscription::EntryMeta) -> Self {
+        Self {
+            title: e.title,
+            published: e.published.map(parse_time),
+            summary: e.summary,
+        }
+    }
+}
+
+impl From<mutation::subscribe_feed::EntryMeta> for EntryMeta {
+    fn from(e: mutation::subscribe_feed::EntryMeta) -> Self {
+        Self {
+            title: e.title,
+            published: e.published.map(parse_time),
+            summary: e.summary,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct FeedMeta {
     pub title: Option<String>,
     pub url: String,
@@ -41,6 +70,7 @@ pub struct FeedMeta {
     pub links: Vec<Link>,
     pub website_url: Option<String>,
     pub description: Option<String>,
+    pub entries: Vec<EntryMeta>,
 }
 
 impl From<query::subscription::FeedMeta> for FeedMeta {
@@ -52,6 +82,7 @@ impl From<query::subscription::FeedMeta> for FeedMeta {
             links: f.links.nodes.into_iter().map(From::from).collect(),
             website_url: f.website_url,
             description: f.description,
+            entries: f.entries.nodes.into_iter().map(From::from).collect(),
         }
     }
 }
@@ -65,6 +96,7 @@ impl From<mutation::subscribe_feed::FeedMeta> for FeedMeta {
             links: f.links.nodes.into_iter().map(From::from).collect(),
             website_url: f.website_url,
             description: f.description,
+            entries: f.entries.nodes.into_iter().map(From::from).collect(),
         }
     }
 }

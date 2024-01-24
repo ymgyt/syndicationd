@@ -5,6 +5,27 @@ pub use feedrs::FeedType;
 
 pub type Time = DateTime<Utc>;
 
+pub struct EntryRef<'a> {
+    entry: &'a feedrs::Entry,
+}
+
+impl<'a> EntryRef<'a> {
+    pub fn title(&self) -> Option<&str> {
+        self.entry.title.as_ref().map(|text| text.content.as_str())
+    }
+
+    pub fn published(&self) -> Option<Time> {
+        self.entry.published
+    }
+
+    pub fn summary(&self) -> Option<&str> {
+        self.entry
+            .summary
+            .as_ref()
+            .map(|text| text.content.as_str())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Feed {
     url: String,
@@ -27,6 +48,10 @@ impl Feed {
 
     pub fn updated(&self) -> Option<Time> {
         self.feed.updated
+    }
+
+    pub fn entry_refs(&self) -> impl Iterator<Item = EntryRef> {
+        self.feed.entries.iter().map(|entry| EntryRef { entry })
     }
 
     pub fn authors(&self) -> impl Iterator<Item = &str> {

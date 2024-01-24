@@ -19,11 +19,22 @@ fragment FeedMeta on Feed {
   updated
   websiteUrl
   description
+  entries(first: 5) {
+    nodes {
+      ...EntryMeta
+    }
+  }
   links {
     nodes {
       ...Link
     }
   }
+}
+
+fragment EntryMeta on Entry {
+    title,
+    published,
+    summary,
 }
 
 fragment Link on Link {

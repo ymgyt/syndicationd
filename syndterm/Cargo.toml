@@ -28,3 +28,4 @@ tracing = { workspace = true }
 tracing-appender = "0.2.3"
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
+unicode-segmentation = "1.10.1"

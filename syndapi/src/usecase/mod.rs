@@ -5,6 +5,7 @@ mod fetch_subscribed_feeds;
 pub use fetch_subscribed_feeds::{
     FetchSubscribedFeeds, FetchSubscribedFeedsInput, FetchSubscribedFeedsOutput,
 };
+use tracing::error;
 
 pub mod authorize;
 use std::{future::Future, sync::Arc};
@@ -53,7 +54,7 @@ pub enum Error<T> {
 pub trait Usecase {
     type Input;
     type Output;
-    type Error;
+    type Error: std::fmt::Debug;
 
     fn new(make: &MakeUsecase) -> Self;
 
@@ -130,6 +131,7 @@ impl Runtime {
             Err(err) => {
                 // TODO: match or method
                 audit!({ Audit::RESULT } = "error");
+                error!("{err:?}");
                 Err(err)
             }
         }

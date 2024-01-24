@@ -32,6 +32,26 @@ impl From<feedrs::Link> for Link {
     }
 }
 
+pub struct Entry<'a>(types::EntryRef<'a>);
+
+#[Object]
+impl<'a> Entry<'a> {
+    /// Entry title
+    async fn title(&self) -> Option<&str> {
+        self.0.title()
+    }
+
+    /// The time at which the entry published
+    async fn published(&self) -> Option<scalar::Rfc3339Time> {
+        self.0.published().map(Into::into)
+    }
+
+    /// Entry summary
+    async fn summary(&self) -> Option<&str> {
+        self.0.summary()
+    }
+}
+
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "synd::types::FeedType")]
 pub enum FeedType {
@@ -69,6 +89,30 @@ impl Feed {
     /// The time at which the feed was last modified
     async fn updated(&self) -> Option<scalar::Rfc3339Time> {
         self.0.updated().map(Into::into)
+    }
+
+    /// Feed entries
+    async fn entries(
+        &self,
+        #[graphql(default = 5)] first: Option<i32>,
+    ) -> Connection<usize, Entry<'_>> {
+        let first = first.unwrap_or(5).max(0) as usize;
+        let entries = self
+            .0
+            .entry_refs()
+            .map(Entry)
+            .take(first)
+            .collect::<Vec<_>>();
+
+        let mut c = Connection::new(false, entries.len() > first);
+        c.edges.extend(
+            entries
+                .into_iter()
+                .enumerate()
+                .map(|(idx, entry)| Edge::new(idx, entry)),
+        );
+
+        c
     }
 
     /// Feed authors

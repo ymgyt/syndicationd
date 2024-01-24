@@ -1,13 +1,17 @@
 use ratatui::{
-    prelude::{Buffer, Constraint, Margin, Rect},
-    text::Span,
-    widgets::{Cell, HighlightSpacing, Row, StatefulWidget, Table, TableState},
+    prelude::{Buffer, Constraint, Layout, Margin, Rect},
+    text::{Line, Span},
+    widgets::{
+        Block, BorderType, Borders, Cell, HighlightSpacing, List, ListItem, Padding, Row,
+        StatefulWidget, Table, TableState, Widget,
+    },
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     application::Direction,
     client::query::subscription::SubscriptionOutput,
-    types::{self, FeedMeta},
+    types::{self, EntryMeta, FeedMeta, TimeExt},
     ui::{self, Context},
 };
 
@@ -49,6 +53,14 @@ impl Subscription {
 
 impl Subscription {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+        let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
+        let [feeds_area, feed_entries_area] = area.split(&vertical);
+
+        self.render_feeds(feeds_area, buf, cx);
+        self.render_feed_entries(feed_entries_area, buf, cx);
+    }
+
+    fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         // padding
         let area = area.inner(&Margin {
             vertical: 1,
@@ -59,7 +71,7 @@ impl Subscription {
             .with_offset(0)
             .with_selected(self.selected_feed_meta_index);
 
-        let (header, widths, rows) = self.rows(cx);
+        let (header, widths, rows) = self.feed_rows(cx);
 
         let feeds = Table::new(rows, widths)
             .header(header.style(cx.theme.subscription.header))
@@ -69,10 +81,65 @@ impl Subscription {
             .highlight_style(cx.theme.subscription.selected_feed)
             .highlight_spacing(HighlightSpacing::WhenSelected);
 
-        feeds.render(area, buf, &mut feeds_state);
+        StatefulWidget::render(feeds, area, buf, &mut feeds_state);
     }
 
-    fn rows<'a>(
+    fn render_feed_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+        let block = Block::new()
+            .padding(Padding {
+                left: 1,
+                right: 1,
+                top: 1,
+                bottom: 1,
+            })
+            .borders(Borders::TOP)
+            .border_type(BorderType::Thick);
+
+        let inner = block.inner(area);
+        Widget::render(block, area, buf);
+
+        let Some(feed) = self.feed_metas.get(self.selected_feed_meta_index) else {
+            return;
+        };
+
+        let title_width = feed
+            .entries
+            .iter()
+            .filter_map(|entry| entry.title.as_deref())
+            .map(|title| title.graphemes(true).count())
+            .max()
+            .unwrap_or(0);
+
+        let entry = |entry: &EntryMeta| {
+            let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
+            let published = entry
+                .published
+                .as_ref()
+                .map(|t| t.local_ymd())
+                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
+            let summary = entry.summary.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
+
+            Row::new([
+                Cell::new(Span::from(format!("{published}"))),
+                Cell::new(Span::from(format!("{title}"))),
+                Cell::new(Span::from(format!("{summary}"))),
+            ])
+        };
+
+        let widths = [
+            Constraint::Length(10),
+            Constraint::Length(title_width as u16),
+            Constraint::Max(200),
+        ];
+        let rows = feed.entries.iter().map(entry);
+        let table = Table::new(rows, widths)
+            .column_spacing(2)
+            .style(cx.theme.subscription.background);
+
+        Widget::render(table, inner, buf);
+    }
+
+    fn feed_rows<'a>(
         &'a self,
         _cx: &'a Context<'_>,
     ) -> (
@@ -99,7 +166,7 @@ impl Subscription {
             let updated = feed_meta
                 .updated
                 .as_ref()
-                .map(|t| t.naive_local().format("%Y-%m-%d").to_string())
+                .map(|t| t.local_ymd())
                 .unwrap_or(ui::UNKNOWN_SYMBOL.to_string());
             let desc = feed_meta.description.as_deref().unwrap_or("");
             let website_url = feed_meta
