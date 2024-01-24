@@ -34,18 +34,7 @@ impl Tabs {
     }
 
     pub fn move_selection(&mut self, direction: Direction) -> Tab {
-        let selected = match direction {
-            Direction::Left => {
-                if self.selected == 0 {
-                    self.tabs.len() - 1
-                } else {
-                    self.selected - 1
-                }
-            }
-            Direction::Right => (self.selected + 1) % self.tabs.len(),
-            _ => self.selected,
-        };
-        self.selected = selected;
+        self.selected = direction.apply(self.selected, self.tabs.len(), true);
         self.current()
     }
 }

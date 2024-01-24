@@ -21,13 +21,8 @@ use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind}
 use futures_util::{FutureExt, Stream, StreamExt};
 use tracing::{debug, info};
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
+mod direction;
+pub use direction::Direction;
 
 /// Cureent ui screen
 pub enum Screen {
@@ -173,6 +168,10 @@ impl Application {
                     }
                     self.should_render = true;
                 }
+                Command::MoveSubscribedFeed(direction) => {
+                    self.state.subscription.move_selection(direction);
+                    self.should_render = true;
+                }
                 Command::PromptFeedSubscription => {
                     self.prompt_feed_subscription();
                     self.should_render = true;
@@ -236,10 +235,19 @@ impl Application {
                         KeyCode::BackTab => {
                             return Some(Command::MoveTabSelection(Direction::Left))
                         }
-                        KeyCode::Char('a') if self.state.tabs.current() == Tab::Subscription => {
-                            return Some(Command::PromptFeedSubscription)
-                        }
-                        _ => {}
+                        _ => match self.state.tabs.current() {
+                            Tab::Feeds => {}
+                            Tab::Subscription => match key.code {
+                                KeyCode::Char('a') => return Some(Command::PromptFeedSubscription),
+                                KeyCode::Char('j') => {
+                                    return Some(Command::MoveSubscribedFeed(Direction::Down));
+                                }
+                                KeyCode::Char('k') => {
+                                    return Some(Command::MoveSubscribedFeed(Direction::Up));
+                                }
+                                _ => {}
+                            },
+                        },
                     },
                 };
                 match key.code {

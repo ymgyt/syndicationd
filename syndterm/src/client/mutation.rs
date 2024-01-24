@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  authors {\n    nodes\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -61,7 +61,13 @@ pub mod subscribe_feed {
         pub updated: Option<Rfc3339Time>,
         #[serde(rename = "websiteUrl")]
         pub website_url: Option<String>,
+        pub description: Option<String>,
+        pub authors: FeedMetaAuthors,
         pub links: FeedMetaLinks,
+    }
+    #[derive(Deserialize, Debug)]
+    pub struct FeedMetaAuthors {
+        pub nodes: Vec<String>,
     }
     #[derive(Deserialize, Debug)]
     pub struct FeedMetaLinks {

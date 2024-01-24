@@ -5,18 +5,25 @@ pub struct Theme {
     pub application_title: Style,
     pub tabs: Style,
     pub tabs_selected: Style,
-    pub prompt: Prompt,
-    pub error: Error,
+    pub prompt: PromptTheme,
+    pub subscription: SubscriptionTheme,
+    pub error: ErrorTheme,
 }
 
-pub struct Error {
+pub struct ErrorTheme {
     pub message: Style,
 }
 
-pub struct Prompt {
+pub struct PromptTheme {
     pub key: Style,
     pub key_desc: Style,
     pub background: Style,
+}
+
+pub struct SubscriptionTheme {
+    pub background: Style,
+    pub header: Style,
+    pub selected_feed: Style,
 }
 
 impl Theme {
@@ -32,12 +39,17 @@ impl Theme {
                 .fg(WHITE)
                 .bg(DARK_BLUE)
                 .add_modifier(Modifier::BOLD),
-            prompt: Prompt {
+            prompt: PromptTheme {
                 key: Style::new().fg(DDARK_BLUE).bg(DARK_GRAY),
                 key_desc: Style::new().fg(DARK_GRAY).bg(DDARK_BLUE),
                 background: Style::new().bg(DDARK_BLUE),
             },
-            error: Error {
+            subscription: SubscriptionTheme {
+                background: Style::new().bg(DARK_BLUE),
+                header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                selected_feed: Style::new().add_modifier(Modifier::BOLD),
+            },
+            error: ErrorTheme {
                 message: Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
             },
         }

@@ -43,14 +43,14 @@ gen-gql:
     syndapi/src/client/github/query.gql
 
 # Run kvsd
-run-kvsd:
+kvsd:
   ~/.cargo/bin/kvsd server --disable-tls --config dev/kvsd_config.yaml --username {{kvsd_user}}
 
 # Run api
-run-api:
+api:
   cd syndapi; cargo run -- \
     --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret
 
 # Run term
-run-term:
+term:
   cd syndterm; cargo run -- --log /tmp/syndterm.log

@@ -40,6 +40,7 @@ pub struct FeedMeta {
     pub updated: Option<Time>,
     pub links: Vec<Link>,
     pub website_url: Option<String>,
+    pub description: Option<String>,
 }
 
 impl From<query::subscription::FeedMeta> for FeedMeta {
@@ -50,6 +51,7 @@ impl From<query::subscription::FeedMeta> for FeedMeta {
             updated: f.updated.map(parse_time),
             links: f.links.nodes.into_iter().map(From::from).collect(),
             website_url: f.website_url,
+            description: f.description,
         }
     }
 }
@@ -62,6 +64,7 @@ impl From<mutation::subscribe_feed::FeedMeta> for FeedMeta {
             updated: f.updated.map(parse_time),
             links: f.links.nodes.into_iter().map(From::from).collect(),
             website_url: f.website_url,
+            description: f.description,
         }
     }
 }

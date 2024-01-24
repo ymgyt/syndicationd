@@ -15,6 +15,8 @@ pub mod subscription;
 pub mod tabs;
 pub mod theme;
 
+pub const UNKNOWN_SYMBOL: &str = "???";
+
 pub struct Context<'a> {
     pub state: &'a mut State,
     pub theme: &'a Theme,
