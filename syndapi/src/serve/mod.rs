@@ -11,6 +11,7 @@ use crate::{
     config,
     dependency::Dependency,
     gql::{self, Mutation, Query},
+    serve::layer::trace,
 };
 
 pub mod auth;
@@ -48,6 +49,10 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
             authenticator,
             auth::authenticate,
         ))
+        .layer(
+            // applied top to bottom
+            tower::ServiceBuilder::new().layer(trace::layer()),
+        )
         .route("/graphql", get(gql::handler::graphiql))
         .route("/healthcheck", get(probe::healthcheck));
 

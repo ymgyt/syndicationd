@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 # To use axum 0.7
-async-graphql = { version = "7.0",  features = ["tracing"] }
+async-graphql = { version = "7.0", features = ["tracing"] }
 async-graphql-axum = { version = "7.0" }
 async-trait = { workspace = true }
 # TODO configure features
@@ -26,6 +26,15 @@ thiserror = "1.0.56"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+tower = { version = "0.4.13", default_features = false, features = [
+  "timeout",
+  "limit",
+  "buffer",
+  "tracing",
+] }
+tower-http = { version = "0.5.1", default_features = false, features = [
+  "trace",
+] }
 
 # handson
 [features]
