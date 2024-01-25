@@ -48,7 +48,7 @@ kvsd:
 
 # Run api
 api:
-  cd syndapi; cargo run -- \
+  cd syndapi; RUST_LOG="syndapi=info,synd::feed::cache=debug,info" cargo run -- \
     --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret
 
 # Run term

@@ -27,13 +27,9 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tower = { version = "0.4.13", default_features = false, features = [
-  "timeout",
-  "limit",
-  "buffer",
-  "tracing",
 ] }
 tower-http = { version = "0.5.1", default_features = false, features = [
-  "trace",
+  "trace","sensitive-headers","timeout","cors","limit"
 ] }
 
 # handson

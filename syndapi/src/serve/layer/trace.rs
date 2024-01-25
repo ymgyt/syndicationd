@@ -15,6 +15,23 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
     }
 }
 
-pub fn layer() -> tower_http::trace::TraceLayer<HttpMakeClassifier, MakeSpan> {
-    tower_http::trace::TraceLayer::new_for_http().make_span_with(MakeSpan)
+#[derive(Clone)]
+pub struct OnRequest;
+
+impl<B> tower_http::trace::OnRequest<B> for OnRequest {
+    fn on_request(&mut self, _request: &axum::http::Request<B>, _span: &tracing::Span) {
+        // do nothing
+    }
+}
+
+pub fn layer() -> tower_http::trace::TraceLayer<
+    HttpMakeClassifier,
+    MakeSpan,
+    OnRequest,
+    tower_http::trace::DefaultOnResponse,
+> {
+    tower_http::trace::TraceLayer::new_for_http()
+        .make_span_with(MakeSpan)
+        .on_request(OnRequest)
+        .on_response(tower_http::trace::DefaultOnResponse::default().level(Level::INFO))
 }

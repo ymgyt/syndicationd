@@ -1,10 +1,17 @@
+use std::time::Duration;
+
 use async_graphql::{extensions::Tracing, EmptySubscription, Schema};
 use axum::{
+    http::header::AUTHORIZATION,
     middleware,
     routing::{get, post},
     Extension, Router,
 };
 use tokio::net::TcpListener;
+use tower_http::{
+    cors::CorsLayer, limit::RequestBodyLimitLayer, sensitive_headers::SetSensitiveHeadersLayer,
+    timeout::TimeoutLayer,
+};
 use tracing::info;
 
 use crate::{
@@ -51,7 +58,14 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
         ))
         .layer(
             // applied top to bottom
-            tower::ServiceBuilder::new().layer(trace::layer()),
+            tower::ServiceBuilder::new()
+                .layer(SetSensitiveHeadersLayer::new(std::iter::once(
+                    AUTHORIZATION,
+                )))
+                .layer(RequestBodyLimitLayer::new(2048))
+                .layer(trace::layer())
+                .layer(TimeoutLayer::new(Duration::from_secs(15)))
+                .layer(CorsLayer::new()),
         )
         .route("/graphql", get(gql::handler::graphiql))
         .route("/healthcheck", get(probe::healthcheck));
