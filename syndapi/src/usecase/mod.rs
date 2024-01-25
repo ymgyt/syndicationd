@@ -13,7 +13,7 @@ use tracing::error;
 pub mod authorize;
 use std::{future::Future, sync::Arc};
 
-use synd::feed::parser::FetchFeed;
+use synd::feed::cache::FetchCachedFeed;
 
 use crate::{
     audit,
@@ -26,7 +26,7 @@ use self::authorize::{Authorized, Authorizer, Unauthorized};
 
 pub struct MakeUsecase {
     pub datastore: Arc<dyn Datastore>,
-    pub fetch_feed: Arc<dyn FetchFeed>,
+    pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
 impl MakeUsecase {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synd::{feed::parser::FetchFeed, types::Feed};
+use synd::{feed::cache::FetchCachedFeed, types::Feed};
 
 use crate::{
     persistence::{self, Datastore},
@@ -12,7 +12,7 @@ use super::{authorize::Unauthorized, Usecase};
 
 pub struct SubscribeFeed {
     pub datastore: Arc<dyn Datastore>,
-    pub fetch_feed: Arc<dyn FetchFeed>,
+    pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
 pub struct SubscribeFeedInput {
@@ -20,7 +20,7 @@ pub struct SubscribeFeedInput {
 }
 
 pub struct SubscribeFeedOutput {
-    pub feed: Feed,
+    pub feed: Arc<Feed>,
 }
 
 impl Usecase for SubscribeFeed {

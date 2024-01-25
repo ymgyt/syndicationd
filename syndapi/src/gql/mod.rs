@@ -1,5 +1,5 @@
 mod query;
-pub use query::{Query, Resolver};
+pub use query::Query;
 
 mod mutation;
 use async_graphql::{EmptySubscription, Schema};

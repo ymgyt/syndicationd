@@ -24,6 +24,26 @@ impl<'a> EntryRef<'a> {
             .as_ref()
             .map(|text| text.content.as_str())
     }
+
+    /// Return approximate entry bytes size
+    pub fn approximate_size(&self) -> usize {
+        let content_size = self
+            .entry
+            .content
+            .as_ref()
+            .and_then(|content| content.body.as_deref())
+            .map(|body| body.len())
+            .unwrap_or(0);
+
+        let summary_size = self
+            .entry
+            .summary
+            .as_ref()
+            .map(|summary| summary.content.len())
+            .unwrap_or(0);
+
+        content_size + summary_size
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +99,13 @@ impl Feed {
         let mut clone = self.clone();
         clone.feed.entries.clear();
         clone
+    }
+
+    /// Return approximate Feed byte size
+    pub fn approximate_size(&self) -> usize {
+        self.entry_refs()
+            .map(|entry| entry.approximate_size())
+            .sum()
     }
 }
 

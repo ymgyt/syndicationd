@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use async_graphql::{
     connection::{Connection, Edge},
     Context, Object, Result,
@@ -7,17 +5,12 @@ use async_graphql::{
 
 use crate::{
     gql::{object, run_usecase},
-    persistence::Datastore,
     usecase::{
         FetchSubscribedFeeds, FetchSubscribedFeedsInput, FetchSubscribedFeedsOutput, Output,
     },
 };
 
 pub struct Subscription;
-
-pub struct Resolver {
-    pub datastore: Arc<dyn Datastore>,
-}
 
 #[Object]
 impl Subscription {

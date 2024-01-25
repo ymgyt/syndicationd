@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synd::{feed::parser::FetchFeed, types};
+use synd::{feed::cache::FetchCachedFeed, types};
 
 use crate::{
     persistence::Datastore,
@@ -10,7 +10,7 @@ use crate::{
 
 pub struct FetchSubscribedFeeds {
     pub datastore: Arc<dyn Datastore>,
-    pub fetch_feed: Arc<dyn FetchFeed>,
+    pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
 pub struct FetchSubscribedFeedsInput {
@@ -20,7 +20,7 @@ pub struct FetchSubscribedFeedsInput {
 
 #[derive(Default)]
 pub struct FetchSubscribedFeedsOutput {
-    pub feeds: Vec<types::Feed>,
+    pub feeds: Vec<Arc<types::Feed>>,
 }
 
 impl Usecase for FetchSubscribedFeeds {
@@ -73,12 +73,16 @@ impl Usecase for FetchSubscribedFeeds {
         };
 
         // fetch feeds
-        // TODO: ignore invalid feed
-        let feeds = self
-            .fetch_feed
-            .fetch_feeds_parallel(urls)
-            .await
-            .map_err(|err| Error::Usecase(anyhow::Error::from(err)))?;
+        let feeds = self.fetch_feed.fetch_feeds_parallel(urls).await;
+
+        // TODO: return failed feeds
+        let (feeds, errors): (Vec<_>, Vec<_>) = feeds.into_iter().partition(|r| r.is_ok());
+
+        if !errors.is_empty() {
+            tracing::error!("{errors:?}");
+        }
+
+        let feeds = feeds.into_iter().map(|r| r.unwrap()).collect();
 
         Ok(Output {
             output: FetchSubscribedFeedsOutput { feeds },

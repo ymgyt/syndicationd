@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 feed-rs = { workspace = true }
 futures = { workspace = true }
+moka = { workspace = true, features = ["future"] }
 reqwest = { workspace = true, features = ["stream"] }
 thiserror = "1.0.56"
 tokio = { workspace = true }

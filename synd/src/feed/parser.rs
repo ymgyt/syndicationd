@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use feed_rs::parser::Parser;
@@ -23,6 +23,20 @@ pub trait FetchFeed: Send + Sync {
     async fn fetch_feed(&self, url: String) -> ParseResult<Feed>;
     /// Fetch feeds by spawing tasks
     async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>>;
+}
+
+#[async_trait]
+impl<T> FetchFeed for Arc<T>
+where
+    T: FetchFeed,
+{
+    async fn fetch_feed(&self, url: String) -> ParseResult<Feed> {
+        self.fetch_feed(url).await
+    }
+    /// Fetch feeds by spawing tasks
+    async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>> {
+        self.fetch_feeds_parallel(urls).await
+    }
 }
 
 /// Feed Process entry point

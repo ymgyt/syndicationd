@@ -34,12 +34,10 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
     let Dependency {
         authenticator,
         runtime,
-        resolver,
     } = dep;
 
     let schema = Schema::build(Query, Mutation, EmptySubscription)
         .data(runtime)
-        .data(resolver)
         .extension(Tracing)
         .finish();
 

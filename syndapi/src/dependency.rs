@@ -1,11 +1,13 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use synd::feed::parser::FeedService;
+use synd::feed::{
+    cache::{CacheConfig, CacheLayer},
+    parser::FeedService,
+};
 
 use crate::{
     args::KvsdOptions,
     config,
-    gql::Resolver,
     persistence::{kvsd::KvsdClient, memory::MemoryDatastore},
     serve::auth::Authenticator,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
@@ -14,7 +16,6 @@ use crate::{
 pub struct Dependency {
     pub authenticator: Authenticator,
     pub runtime: Runtime,
-    pub resolver: Resolver,
 }
 
 impl Dependency {
@@ -29,16 +30,19 @@ impl Dependency {
             .await
             .ok();
 
-        let datastore = Arc::new(MemoryDatastore::new());
+        let datastore = MemoryDatastore::new();
+
         let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
+        let cache_feed_service = CacheLayer::with(
+            feed_service,
+            CacheConfig::default()
+                .with_max_cache_size(100 * 1024 * 1024)
+                .with_time_to_live(Duration::from_secs(60 * 60 * 3)),
+        );
 
         let make_usecase = MakeUsecase {
-            datastore: datastore.clone(),
-            fetch_feed: Arc::new(feed_service),
-        };
-
-        let resolver = Resolver {
-            datastore: datastore.clone(),
+            datastore: Arc::new(datastore),
+            fetch_feed: Arc::new(cache_feed_service),
         };
 
         let authenticator = Authenticator::new()?;
@@ -50,7 +54,6 @@ impl Dependency {
         Ok(Dependency {
             authenticator,
             runtime,
-            resolver,
         })
     }
 }

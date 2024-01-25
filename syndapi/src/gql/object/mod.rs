@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_graphql::{
     connection::{Connection, Edge},
     Enum, Object, SimpleObject, ID,
@@ -62,7 +64,7 @@ pub enum FeedType {
     JSON,
 }
 
-pub struct Feed(types::Feed);
+pub struct Feed(Arc<types::Feed>);
 
 #[Object]
 impl Feed {
@@ -154,8 +156,8 @@ impl Feed {
     // TODO: category
 }
 
-impl From<types::Feed> for Feed {
-    fn from(value: types::Feed) -> Self {
+impl From<Arc<types::Feed>> for Feed {
+    fn from(value: Arc<types::Feed>) -> Self {
         Self(value)
     }
 }
