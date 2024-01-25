@@ -2,15 +2,16 @@ use std::time::Duration;
 
 use async_graphql::{extensions::Tracing, EmptySubscription, Schema};
 use axum::{
-    http::header::AUTHORIZATION,
+    error_handling::HandleErrorLayer,
+    http::{header::AUTHORIZATION, StatusCode},
     middleware,
     routing::{get, post},
-    Extension, Router,
+    BoxError, Extension, Router,
 };
 use tokio::net::TcpListener;
+use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::{
     cors::CorsLayer, limit::RequestBodyLimitLayer, sensitive_headers::SetSensitiveHeadersLayer,
-    timeout::TimeoutLayer,
 };
 use tracing::info;
 
@@ -56,21 +57,36 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
             authenticator,
             auth::authenticate,
         ))
+        .route("/graphql", get(gql::handler::graphiql))
         .layer(
-            // applied top to bottom
-            tower::ServiceBuilder::new()
+            ServiceBuilder::new()
                 .layer(SetSensitiveHeadersLayer::new(std::iter::once(
                     AUTHORIZATION,
                 )))
-                .layer(RequestBodyLimitLayer::new(2048))
                 .layer(trace::layer())
-                .layer(TimeoutLayer::new(Duration::from_secs(15)))
+                .layer(HandleErrorLayer::new(handle_middleware_error))
+                .layer(TimeoutLayer::new(Duration::from_secs(20)))
+                .layer(ConcurrencyLimitLayer::new(100))
+                .layer(RequestBodyLimitLayer::new(2048))
                 .layer(CorsLayer::new()),
         )
-        .route("/graphql", get(gql::handler::graphiql))
         .route("/healthcheck", get(probe::healthcheck));
 
     // TODO: graceful shutdown
     axum::serve(listener, service).await?;
     Ok(())
+}
+
+async fn handle_middleware_error(err: BoxError) -> (StatusCode, String) {
+    if err.is::<tower::timeout::error::Elapsed>() {
+        (
+            StatusCode::REQUEST_TIMEOUT,
+            "Request took too long".to_string(),
+        )
+    } else {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Unhandled internal error: {err}"),
+        )
+    }
 }

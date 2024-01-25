@@ -12,7 +12,7 @@ async-graphql = { version = "7.0", features = ["tracing"] }
 async-graphql-axum = { version = "7.0" }
 async-trait = { workspace = true }
 # TODO configure features
-axum = { version = "0.7.3" }
+axum = { version = "0.7.4" }
 clap = { workspace = true, features = ["derive"] }
 chrono = { workspace = true }
 feed-rs = { workspace = true }
@@ -27,9 +27,11 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tower = { version = "0.4.13", default_features = false, features = [
+"limit","timeout"
+
 ] }
 tower-http = { version = "0.5.1", default_features = false, features = [
-  "trace","sensitive-headers","timeout","cors","limit"
+  "trace","sensitive-headers","cors","limit"
 ] }
 
 # handson
