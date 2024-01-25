@@ -33,6 +33,12 @@ impl Subscription {
         !self.feed_metas.is_empty()
     }
 
+    pub fn selected_feed_website_url(&self) -> Option<&str> {
+        self.feed_metas
+            .get(self.selected_feed_meta_index)
+            .and_then(|feed_meta| feed_meta.website_url.as_deref())
+    }
+
     pub fn selected_feed_url(&self) -> Option<&str> {
         self.feed_metas
             .get(self.selected_feed_meta_index)

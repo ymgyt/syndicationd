@@ -347,7 +347,7 @@ impl Application {
 
 impl Application {
     fn open_feed(&mut self) {
-        let Some(feed_website_url) = self.state.subscription.selected_feed_url() else {
+        let Some(feed_website_url) = self.state.subscription.selected_feed_website_url() else {
             return;
         };
         open::that(feed_website_url).ok();
