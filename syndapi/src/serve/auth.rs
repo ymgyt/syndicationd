@@ -1,9 +1,6 @@
-use axum::{
-    extract::{Request, State},
-    http::{self, StatusCode},
-    middleware::Next,
-    response::Response,
-};
+use std::time::Duration;
+
+use moka::future::Cache;
 use tracing::warn;
 
 use crate::{
@@ -14,60 +11,48 @@ use crate::{
 #[derive(Clone)]
 pub struct Authenticator {
     github: GithubClient,
+    cache: Cache<String, Principal>,
 }
 
 impl Authenticator {
     pub fn new() -> anyhow::Result<Self> {
+        let cache = Cache::builder()
+            .max_capacity(1024 * 1024)
+            .time_to_live(Duration::from_secs(60 * 60))
+            .build();
+
         Ok(Self {
             github: GithubClient::new()?,
+            cache,
         })
     }
 
     /// Authenticate from given token
-    async fn authenticate(&self, token: &str) -> Result<Principal, ()> {
+    pub async fn authenticate(&self, token: impl AsRef<str>) -> Result<Principal, ()> {
+        let token = token.as_ref();
         let mut split = token.splitn(2, ' ');
         match (split.next(), split.next()) {
             (Some("github"), Some(access_token)) => {
-                // TODO: configure cache to reduce api call
+                if let Some(principal) = self.cache.get(token).await {
+                    tracing::info!("Principal cache hit");
+                    return Ok(principal);
+                }
 
                 match self.github.authenticate(access_token).await {
-                    Ok(email) => Ok(Principal::User(User::from_email(email))),
+                    Ok(email) => {
+                        let principal = Principal::User(User::from_email(email));
+
+                        self.cache.insert(token.to_owned(), principal.clone()).await;
+
+                        Ok(principal)
+                    }
                     Err(err) => {
                         warn!("Failed to authenticate github {err}");
                         Err(())
                     }
                 }
             }
-            // TODO: remove
-            (Some("me"), None) => Ok(Principal::User(User::from_email("me@ymgyt.io"))),
             _ => Err(()),
         }
     }
-}
-
-/// Check authorization header and inject Authentication
-pub async fn authenticate(
-    State(authenticator): State<Authenticator>,
-    mut req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    let header = req
-        .headers()
-        .get(http::header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok());
-
-    let Some(token) = header else {
-        return Err(StatusCode::UNAUTHORIZED);
-    };
-    let principal = match authenticator.authenticate(token).await {
-        Ok(principal) => principal,
-        Err(_) => {
-            warn!("Invalid token");
-            return Err(StatusCode::UNAUTHORIZED);
-        }
-    };
-
-    req.extensions_mut().insert(principal);
-
-    Ok(next.run(req).await)
 }

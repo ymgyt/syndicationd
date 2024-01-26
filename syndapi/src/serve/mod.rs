@@ -4,7 +4,6 @@ use async_graphql::{extensions::Tracing, EmptySubscription, Schema};
 use axum::{
     error_handling::HandleErrorLayer,
     http::{header::AUTHORIZATION, StatusCode},
-    middleware,
     routing::{get, post},
     BoxError, Extension, Router,
 };
@@ -19,7 +18,7 @@ use crate::{
     config,
     dependency::Dependency,
     gql::{self, Mutation, Query},
-    serve::layer::trace,
+    serve::layer::{authenticate, trace},
 };
 
 pub mod auth;
@@ -53,11 +52,8 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))
         .layer(Extension(schema))
-        .route_layer(middleware::from_fn_with_state(
-            authenticator,
-            auth::authenticate,
-        ))
         .route("/graphql", get(gql::handler::graphiql))
+        .layer(authenticate::AuthenticateLayer::new(authenticator))
         .layer(
             ServiceBuilder::new()
                 .layer(SetSensitiveHeadersLayer::new(std::iter::once(

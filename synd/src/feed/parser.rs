@@ -49,7 +49,7 @@ pub struct FeedService {
 #[async_trait]
 impl FetchFeed for FeedService {
     async fn fetch_feed(&self, url: String) -> ParseResult<Feed> {
-        use futures::StreamExt;
+        use futures_util::StreamExt;
         let mut stream = self
             .http
             .get(&url)
