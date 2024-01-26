@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use async_graphql::{
     connection::{Connection, Edge},
@@ -34,10 +34,10 @@ impl From<feedrs::Link> for Link {
     }
 }
 
-pub struct Entry<'a>(types::EntryRef<'a>);
+pub struct Entry(types::Entry);
 
 #[Object]
-impl<'a> Entry<'a> {
+impl Entry {
     /// Entry title
     async fn title(&self) -> Option<&str> {
         self.0.title()
@@ -51,6 +51,12 @@ impl<'a> Entry<'a> {
     /// Entry summary
     async fn summary(&self) -> Option<&str> {
         self.0.summary()
+    }
+}
+
+impl From<types::Entry> for Entry {
+    fn from(value: types::Entry) -> Self {
+        Self(value)
     }
 }
 
@@ -70,39 +76,39 @@ pub struct Feed(Arc<types::Feed>);
 impl Feed {
     /// Feed Id
     async fn id(&self) -> ID {
-        FeedIdV1::new(self.0.url()).into()
+        FeedIdV1::new(self.0.meta().url()).into()
     }
 
     /// Undering feed specification
     async fn r#type(&self) -> FeedType {
-        self.0.r#type().into()
+        self.0.meta().r#type().into()
     }
 
     /// Feed title
     async fn title(&self) -> Option<&str> {
-        self.0.title()
+        self.0.meta().title()
     }
 
     /// Feed URL
     async fn url(&self) -> &str {
-        self.0.url()
+        self.0.meta().url()
     }
 
     /// The time at which the feed was last modified
     async fn updated(&self) -> Option<scalar::Rfc3339Time> {
-        self.0.updated().map(Into::into)
+        self.0.meta().updated().map(Into::into)
     }
 
     /// Feed entries
     async fn entries(
         &self,
         #[graphql(default = 5)] first: Option<i32>,
-    ) -> Connection<usize, Entry<'_>> {
+    ) -> Connection<usize, Entry> {
         let first = first.unwrap_or(5).max(0) as usize;
         let entries = self
             .0
-            .entry_refs()
-            .map(Entry)
+            .entries()
+            .map(|entry| Entry(entry.clone()))
             .take(first)
             .collect::<Vec<_>>();
 
@@ -122,6 +128,7 @@ impl Feed {
         let mut c = Connection::new(false, false);
         c.edges.extend(
             self.0
+                .meta()
                 .authors()
                 .enumerate()
                 .map(|(idx, author)| Edge::new(idx, author.to_owned())),
@@ -132,13 +139,14 @@ impl Feed {
 
     /// Description of feed
     async fn description(&self) -> Option<&str> {
-        self.0.description()
+        self.0.meta().description()
     }
 
     async fn links(&self) -> Connection<usize, Link> {
         let mut c = Connection::new(false, false);
         c.edges.extend(
             self.0
+                .meta()
                 .links()
                 .map(|link| Link::from(link.clone()))
                 .enumerate()
@@ -149,15 +157,44 @@ impl Feed {
     }
 
     async fn website_url(&self) -> Option<&str> {
-        self.0.website_url()
+        self.0.meta().website_url()
     }
-
-    // TODO: entries
-    // TODO: category
 }
 
 impl From<Arc<types::Feed>> for Feed {
     fn from(value: Arc<types::Feed>) -> Self {
         Self(value)
+    }
+}
+
+pub(super) struct FeedMeta<'a>(Cow<'a, types::FeedMeta>);
+
+#[Object]
+impl<'a> FeedMeta<'a> {
+    async fn title(&self) -> Option<&str> {
+        self.0.title()
+    }
+}
+
+impl From<types::FeedMeta> for FeedMeta<'static> {
+    fn from(value: types::FeedMeta) -> Self {
+        Self(Cow::Owned(value))
+    }
+}
+
+/// Entry with feed metadata
+pub(super) struct FeedEntry<'a> {
+    pub feed: FeedMeta<'a>,
+    pub entry: Entry,
+}
+
+#[Object]
+impl<'a> FeedEntry<'a> {
+    async fn feed(&self) -> &FeedMeta<'a> {
+        &self.feed
+    }
+
+    async fn entry(&self) -> &Entry {
+        &self.entry
     }
 }

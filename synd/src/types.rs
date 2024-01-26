@@ -1,34 +1,61 @@
+use std::{borrow::Cow, fmt::Display};
+
 use chrono::{DateTime, Utc};
 use feed_rs::model as feedrs;
 
 pub use feedrs::FeedType;
 
 pub type Time = DateTime<Utc>;
+pub type FeedUrl = String;
 
-pub struct EntryRef<'a> {
-    entry: &'a feedrs::Entry,
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct EntryId<'a>(Cow<'a, str>);
+
+impl<'a, T> From<T> for EntryId<'a>
+where
+    T: Into<Cow<'a, str>>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
 }
 
-impl<'a> EntryRef<'a> {
+impl<'a> Display for EntryId<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0.as_ref())
+    }
+}
+
+pub type Entries = Vec<Entry>;
+
+#[derive(Debug, Clone)]
+pub struct Entry(feedrs::Entry);
+
+impl Entry {
+    pub fn id(&self) -> EntryId<'static> {
+        EntryId(Cow::Owned(self.0.id.to_owned()))
+    }
+
+    pub fn id_ref(&self) -> EntryId<'_> {
+        EntryId(Cow::Borrowed(self.0.id.as_str()))
+    }
+
     pub fn title(&self) -> Option<&str> {
-        self.entry.title.as_ref().map(|text| text.content.as_str())
+        self.0.title.as_ref().map(|text| text.content.as_str())
     }
 
     pub fn published(&self) -> Option<Time> {
-        self.entry.published
+        self.0.published
     }
 
     pub fn summary(&self) -> Option<&str> {
-        self.entry
-            .summary
-            .as_ref()
-            .map(|text| text.content.as_str())
+        self.0.summary.as_ref().map(|text| text.content.as_str())
     }
 
     /// Return approximate entry bytes size
     pub fn approximate_size(&self) -> usize {
         let content_size = self
-            .entry
+            .0
             .content
             .as_ref()
             .and_then(|content| content.body.as_deref())
@@ -36,7 +63,7 @@ impl<'a> EntryRef<'a> {
             .unwrap_or(0);
 
         let summary_size = self
-            .entry
+            .0
             .summary
             .as_ref()
             .map(|summary| summary.content.len())
@@ -47,13 +74,14 @@ impl<'a> EntryRef<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Feed {
-    url: String,
-    #[allow(dead_code)]
+pub struct FeedMeta {
+    url: FeedUrl,
+    // TODO: extrace feedrs data
+    // no entries
     feed: feedrs::Feed,
 }
 
-impl Feed {
+impl FeedMeta {
     pub fn r#type(&self) -> FeedType {
         self.feed.feed_type.clone()
     }
@@ -68,10 +96,6 @@ impl Feed {
 
     pub fn updated(&self) -> Option<Time> {
         self.feed.updated
-    }
-
-    pub fn entry_refs(&self) -> impl Iterator<Item = EntryRef> {
-        self.feed.entries.iter().map(|entry| EntryRef { entry })
     }
 
     pub fn authors(&self) -> impl Iterator<Item = &str> {
@@ -93,28 +117,40 @@ impl Feed {
     pub fn website_url(&self) -> Option<&str> {
         link::find_website_url(self.r#type(), &self.feed.links)
     }
+}
 
-    // for debug
-    pub fn without_entries(&self) -> Self {
-        let mut clone = self.clone();
-        clone.feed.entries.clear();
-        clone
+#[derive(Debug, Clone)]
+pub struct Feed {
+    meta: FeedMeta,
+    entries: Entries,
+}
+
+impl Feed {
+    pub fn parts(self) -> (FeedMeta, Entries) {
+        (self.meta, self.entries)
+    }
+
+    pub fn meta(&self) -> &FeedMeta {
+        &self.meta
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.iter()
     }
 
     /// Return approximate Feed byte size
     pub fn approximate_size(&self) -> usize {
-        self.entry_refs()
-            .map(|entry| entry.approximate_size())
-            .sum()
+        self.entries().map(|entry| entry.approximate_size()).sum()
     }
 }
 
-impl From<(String, feed_rs::model::Feed)> for Feed {
-    fn from(feed: (String, feed_rs::model::Feed)) -> Self {
-        Feed {
-            url: feed.0,
-            feed: feed.1,
-        }
+impl From<(FeedUrl, feed_rs::model::Feed)> for Feed {
+    fn from((url, mut feed): (FeedUrl, feedrs::Feed)) -> Self {
+        let entries = std::mem::replace(&mut feed.entries, Vec::new());
+        let entries = entries.into_iter().map(Entry).collect();
+
+        let meta = FeedMeta { url, feed };
+        Feed { meta, entries }
     }
 }
 

@@ -8,6 +8,10 @@ mod fetch_subscribed_feeds;
 pub use fetch_subscribed_feeds::{
     FetchSubscribedFeeds, FetchSubscribedFeedsInput, FetchSubscribedFeedsOutput,
 };
+
+mod fetch_entries;
+pub use fetch_entries::{FetchEntries, FetchEntriesInput, FetchEntriesOutput};
+
 use tracing::error;
 
 pub mod authorize;

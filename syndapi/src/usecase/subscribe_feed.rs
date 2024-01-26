@@ -61,12 +61,12 @@ impl Usecase for SubscribeFeed {
             .await
             .map_err(|err| super::Error::Usecase(anyhow::Error::from(err)))?;
 
-        tracing::debug!("{:#?}", feed.without_entries());
+        tracing::debug!("{:#?}", feed.meta());
 
         self.datastore
             .put_feed_subscription(persistence::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
-                url: feed.url().to_owned(),
+                url: feed.meta().url().to_owned(),
             })
             .await?;
 

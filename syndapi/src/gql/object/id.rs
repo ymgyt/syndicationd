@@ -1,3 +1,8 @@
+use std::convert::Infallible;
+
+use async_graphql::connection::CursorType;
+use synd::types;
+
 pub enum Id {
     V1(IdV1),
 }
@@ -18,5 +23,26 @@ impl FeedIdV1 {
 impl From<FeedIdV1> for async_graphql::ID {
     fn from(v: FeedIdV1) -> Self {
         Self(v.0)
+    }
+}
+
+pub(in crate::gql) struct EntryId<'a>(types::EntryId<'a>);
+
+impl<'a> CursorType for EntryId<'a> {
+    type Error = Infallible;
+
+    fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
+        let s = s.to_string();
+        Ok(EntryId(s.into()))
+    }
+
+    fn encode_cursor(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl<'a> From<types::EntryId<'a>> for EntryId<'a> {
+    fn from(value: types::EntryId<'a>) -> Self {
+        Self(value)
     }
 }

@@ -3,7 +3,6 @@ use std::{fmt::Debug, time::Duration};
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
-use tracing::error;
 
 use crate::{client::github::query, config};
 
