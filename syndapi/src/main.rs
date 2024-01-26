@@ -9,17 +9,22 @@ fn init_tracing() {
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
     };
 
-    // TODO: use support_color
-    let color = true;
+    let color = {
+        use supports_color::Stream;
+        supports_color::on(Stream::Stdout).is_some()
+    };
+
+    let show_src = false;
+    let show_target = !show_src;
 
     Registry::default()
         .with(
             fmt::Layer::new()
                 .with_ansi(color)
                 .with_timer(fmt::time::UtcTime::rfc_3339())
-                .with_file(false)
-                .with_line_number(false)
-                .with_target(true)
+                .with_file(show_src)
+                .with_line_number(show_src)
+                .with_target(show_target)
                 .with_filter(
                     EnvFilter::try_from_default_env()
                         .or_else(|_| EnvFilter::try_new("info"))

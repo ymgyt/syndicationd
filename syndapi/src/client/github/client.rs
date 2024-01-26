@@ -59,10 +59,7 @@ impl GithubClient {
 
         match (res.data, res.errors) {
             (_, Some(errs)) if !errs.is_empty() => {
-                for err in errs {
-                    error!("{err:?}");
-                }
-                Err(anyhow::anyhow!("failed to request github api"))
+                Err(anyhow::anyhow!("failed to request github api: {errs:?}"))
             }
             (Some(data), _) => Ok(data),
             _ => Err(anyhow::anyhow!("unexpected response",)),
