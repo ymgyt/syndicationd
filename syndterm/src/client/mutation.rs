@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -54,7 +54,7 @@ pub mod subscribe_feed {
     }
     impl Variables {}
     #[derive(Deserialize, Debug)]
-    pub struct FeedMeta {
+    pub struct Feed {
         pub id: ID,
         pub title: Option<String>,
         pub url: String,
@@ -62,19 +62,19 @@ pub mod subscribe_feed {
         #[serde(rename = "websiteUrl")]
         pub website_url: Option<String>,
         pub description: Option<String>,
-        pub entries: FeedMetaEntries,
-        pub links: FeedMetaLinks,
+        pub entries: FeedEntries,
+        pub links: FeedLinks,
     }
     #[derive(Deserialize, Debug)]
-    pub struct FeedMetaEntries {
-        pub nodes: Vec<FeedMetaEntriesNodes>,
+    pub struct FeedEntries {
+        pub nodes: Vec<FeedEntriesNodes>,
     }
-    pub type FeedMetaEntriesNodes = EntryMeta;
+    pub type FeedEntriesNodes = EntryMeta;
     #[derive(Deserialize, Debug)]
-    pub struct FeedMetaLinks {
-        pub nodes: Vec<FeedMetaLinksNodes>,
+    pub struct FeedLinks {
+        pub nodes: Vec<FeedLinksNodes>,
     }
-    pub type FeedMetaLinksNodes = Link;
+    pub type FeedLinksNodes = Link;
     #[derive(Deserialize, Debug)]
     pub struct EntryMeta {
         pub title: Option<String>,
@@ -105,7 +105,7 @@ pub mod subscribe_feed {
         pub feed: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed,
         pub status: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus,
     }
-    pub type SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed = FeedMeta;
+    pub type SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed = Feed;
     #[derive(Deserialize, Debug)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus {
         pub code: ResponseCode,
@@ -135,7 +135,7 @@ pub mod unsubscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "UnsubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...FeedMeta\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment FeedMeta on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]

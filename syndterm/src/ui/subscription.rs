@@ -3,22 +3,22 @@ use ratatui::{
     text::Span,
     widgets::{
         block::{Position, Title},
-        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Row, StatefulWidget, Table,
-        TableState, Widget,
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Row, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
 };
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    application::Direction,
+    application::{Direction, IndexOutOfRange},
     client::query::subscription::SubscriptionOutput,
-    types::{self, EntryMeta, FeedMeta, TimeExt},
+    types::{self, EntryMeta, Feed, TimeExt},
     ui::{self, Context},
 };
 
 pub struct Subscription {
     selected_feed_meta_index: usize,
-    feed_metas: Vec<types::FeedMeta>,
+    feed_metas: Vec<types::Feed>,
 }
 
 impl Subscription {
@@ -46,15 +46,11 @@ impl Subscription {
     }
 
     pub fn update_subscription(&mut self, subscription: SubscriptionOutput) {
-        let feed_metas = subscription
-            .feeds
-            .nodes
-            .into_iter()
-            .map(types::FeedMeta::from);
+        let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
         self.feed_metas = feed_metas.collect();
     }
 
-    pub fn add_subscribed_feed(&mut self, feed: types::FeedMeta) {
+    pub fn add_subscribed_feed(&mut self, feed: types::Feed) {
         self.feed_metas.insert(0, feed)
     }
 
@@ -64,8 +60,11 @@ impl Subscription {
     }
 
     pub fn move_selection(&mut self, direction: Direction) {
-        self.selected_feed_meta_index =
-            direction.apply(self.selected_feed_meta_index, self.feed_metas.len(), false);
+        self.selected_feed_meta_index = direction.apply(
+            self.selected_feed_meta_index,
+            self.feed_metas.len(),
+            IndexOutOfRange::Wrapping,
+        );
     }
 }
 
@@ -80,7 +79,7 @@ impl Subscription {
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         // padding
-        let area = area.inner(&Margin {
+        let feeds_area = area.inner(&Margin {
             vertical: 1,
             horizontal: 1,
         });
@@ -95,11 +94,28 @@ impl Subscription {
             .header(header.style(cx.theme.subscription.header))
             .column_spacing(2)
             .style(cx.theme.subscription.background)
-            .highlight_symbol(">> ")
+            .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
             .highlight_style(cx.theme.subscription.selected_feed)
             .highlight_spacing(HighlightSpacing::WhenSelected);
 
-        StatefulWidget::render(feeds, area, buf, &mut feeds_state);
+        StatefulWidget::render(feeds, feeds_area, buf, &mut feeds_state);
+
+        let scrollbar_area = Rect {
+            y: area.y + 2, // table header
+            height: area.height - 3,
+            ..area
+        };
+
+        let mut scrollbar_state = ScrollbarState::default()
+            .content_length(self.feed_metas.len())
+            .position(self.selected_feed_meta_index);
+        Scrollbar::default()
+            .orientation(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .track_symbol(None)
+            .thumb_symbol("▐")
+            .render(scrollbar_area, buf, &mut scrollbar_state);
     }
 
     fn feed_rows<'a>(
@@ -124,13 +140,13 @@ impl Subscription {
             Constraint::Max(100),
         ];
 
-        let row = |feed_meta: &'a FeedMeta| {
+        let row = |feed_meta: &'a Feed| {
             let title = feed_meta.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let updated = feed_meta
                 .updated
                 .as_ref()
                 .map(|t| t.local_ymd())
-                .unwrap_or(ui::UNKNOWN_SYMBOL.to_string());
+                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
             let desc = feed_meta.description.as_deref().unwrap_or("");
             let website_url = feed_meta
                 .website_url

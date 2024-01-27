@@ -52,6 +52,10 @@ impl Entry {
         self.0.summary.as_ref().map(|text| text.content.as_str())
     }
 
+    pub fn website_url(&self, feed_type: FeedType) -> Option<&str> {
+        link::find_website_url(feed_type, &self.0.links)
+    }
+
     /// Return approximate entry bytes size
     pub fn approximate_size(&self) -> usize {
         let content_size = self
@@ -119,6 +123,18 @@ impl FeedMeta {
     }
 }
 
+impl<'a> From<&'a FeedMeta> for Cow<'a, FeedMeta> {
+    fn from(value: &'a FeedMeta) -> Self {
+        Cow::Borrowed(value)
+    }
+}
+
+impl From<FeedMeta> for Cow<'static, FeedMeta> {
+    fn from(value: FeedMeta) -> Self {
+        Cow::Owned(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Feed {
     meta: FeedMeta,
@@ -146,7 +162,7 @@ impl Feed {
 
 impl From<(FeedUrl, feed_rs::model::Feed)> for Feed {
     fn from((url, mut feed): (FeedUrl, feedrs::Feed)) -> Self {
-        let entries = std::mem::replace(&mut feed.entries, Vec::new());
+        let entries = std::mem::take(&mut feed.entries);
         let entries = entries.into_iter().map(Entry).collect();
 
         let meta = FeedMeta { url, feed };

@@ -1,11 +1,13 @@
 use std::time::Duration;
 
+use futures_util::future::BoxFuture;
 use moka::future::Cache;
 use tracing::warn;
 
 use crate::{
     client::github::GithubClient,
     principal::{Principal, User},
+    serve::layer::authenticate::v2::Authenticate,
 };
 
 #[derive(Clone)]
@@ -28,7 +30,10 @@ impl Authenticator {
     }
 
     /// Authenticate from given token
-    pub async fn authenticate(&self, token: impl AsRef<str>) -> Result<Principal, ()> {
+    pub async fn authenticate<S>(&self, token: S) -> Result<Principal, ()>
+    where
+        S: AsRef<str>,
+    {
         let token = token.as_ref();
         let mut split = token.splitn(2, ' ');
         match (split.next(), split.next()) {
@@ -54,5 +59,19 @@ impl Authenticator {
             }
             _ => Err(()),
         }
+    }
+}
+
+impl Authenticate for Authenticator {
+    type Output = BoxFuture<'static, Result<Principal, ()>>;
+
+    fn authenticate(&self, token: Option<String>) -> Self::Output {
+        let this = self.clone();
+        Box::pin(async move {
+            match token {
+                Some(token) => Authenticator::authenticate(&this, token).await,
+                None => Err(()),
+            }
+        })
     }
 }

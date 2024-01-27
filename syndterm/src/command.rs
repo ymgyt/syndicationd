@@ -1,27 +1,38 @@
 use crate::{
     application::{AuthenticateMethod, Direction},
     auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
-    client::query::subscription::SubscriptionOutput,
-    types::FeedMeta,
+    client::{payload, query::subscription::SubscriptionOutput},
+    types::Feed,
 };
 
 #[derive(Debug)]
 pub enum Command {
     Quit,
     ResizeTerminal { columns: u16, rows: u16 },
+
     Authenticate(AuthenticateMethod),
     DeviceAuthorizationFlow(DeviceAuthorizationResponse),
     CompleteDevieAuthorizationFlow(DeviceAccessTokenResponse),
+
     MoveTabSelection(Direction),
+
+    // Subscription
     MoveSubscribedFeed(Direction),
     PromptFeedSubscription,
     PromptFeedUnsubscription,
     SubscribeFeed { url: String },
     UnsubscribeFeed { url: String },
-    CompleteSubscribeFeed { feed: FeedMeta },
+    CompleteSubscribeFeed { feed: Feed },
     CompleteUnsubscribeFeed { url: String },
     FetchSubscription { after: Option<String>, first: i64 },
     UpdateSubscription(SubscriptionOutput),
     OpenFeed,
+
+    // Entries
+    FetchEntries { after: Option<String>, first: i64 },
+    UpdateEntries(payload::FetchEntriesPayload),
+    MoveEntry(Direction),
+    OpenEntry,
+
     HandleError { message: String },
 }

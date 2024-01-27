@@ -3,7 +3,7 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
     __typename
     ... on SubscribeFeedSuccess {
       feed {
-        ...FeedMeta
+        ...Feed
       }
       status {
         code
@@ -33,7 +33,7 @@ mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
   }
 }
 
-fragment FeedMeta on Feed {
+fragment Feed on Feed {
   id
   title
   url

@@ -24,4 +24,4 @@ lens.enable = false
 hover.actions.enable = false
 
 [language-server.rust-analyzer.config.cargo]
-features = []
+features = ["auth_static_fut", "introspection"]

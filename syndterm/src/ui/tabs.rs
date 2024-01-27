@@ -4,7 +4,10 @@ use ratatui::{
     widgets::{Paragraph, Tabs as TuiTabs, Widget},
 };
 
-use crate::{application::Direction, ui::Context};
+use crate::{
+    application::{Direction, IndexOutOfRange},
+    ui::Context,
+};
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Tab {
@@ -34,7 +37,7 @@ impl Tabs {
     }
 
     pub fn move_selection(&mut self, direction: Direction) -> Tab {
-        self.selected = direction.apply(self.selected, self.tabs.len(), true);
+        self.selected = direction.apply(self.selected, self.tabs.len(), IndexOutOfRange::Wrapping);
         self.current()
     }
 }

@@ -9,6 +9,7 @@ use crate::{
     ui::{tabs::Tab, theme::Theme},
 };
 
+pub mod entries;
 pub mod login;
 pub mod prompt;
 pub mod subscription;
@@ -16,6 +17,7 @@ pub mod tabs;
 pub mod theme;
 
 pub const UNKNOWN_SYMBOL: &str = "???";
+pub const TABLE_HIGHLIGHT_SYMBOL: &str = ">> ";
 
 pub struct Context<'a> {
     pub state: &'a mut State,
@@ -35,7 +37,7 @@ pub fn render(frame: &mut Frame, mut cx: Context<'_>) {
 
     let [tabs_area, content_area, prompt_area] = area.split(&Layout::vertical([
         Constraint::Length(1),
-        Constraint::Min(1),
+        Constraint::Min(0),
         Constraint::Length(1),
     ]));
 
@@ -46,7 +48,10 @@ pub fn render(frame: &mut Frame, mut cx: Context<'_>) {
             .state
             .subscription
             .render(content_area, frame.buffer_mut(), &cx),
-        Tab::Feeds => {}
+        Tab::Feeds => cx
+            .state
+            .entries
+            .render(content_area, frame.buffer_mut(), &cx),
     };
 
     cx.state.prompt.render(prompt_area, frame.buffer_mut(), &cx);

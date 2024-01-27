@@ -5,7 +5,7 @@ use async_graphql::{
 
 use crate::{
     gql::{
-        object::{self, id, FeedEntry},
+        object::{self, id, Entry},
         run_usecase,
     },
     usecase::{
@@ -18,6 +18,7 @@ struct Subscription;
 
 #[Object]
 impl Subscription {
+    /// Return Subscribed feeds
     async fn feeds(
         &self,
         cx: &Context<'_>,
@@ -39,6 +40,7 @@ impl Subscription {
 
         let edges = feeds
             .into_iter()
+            .take(first)
             .map(|feed| (feed.meta().url().to_owned(), feed))
             .map(|(cursor, feed)| (cursor, object::Feed::from(feed)))
             .map(|(cursor, feed)| Edge::new(cursor, feed));
@@ -47,19 +49,14 @@ impl Subscription {
 
         Ok(connection)
     }
-}
 
-struct Feeds;
-
-#[Object]
-impl Feeds {
-    /// Return Latest Feed entries
+    /// Return subscribed latest entries order by published time.
     async fn entries<'cx>(
         &self,
         cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<id::EntryId, FeedEntry<'cx>>> {
+    ) -> Result<Connection<id::EntryId, Entry<'cx>>> {
         let first = first.unwrap_or(20).min(200) as usize;
         let has_prev = after.is_some();
         let input = FetchEntriesInput {
@@ -73,19 +70,18 @@ impl Feeds {
         let has_next = entries.len() > first;
         let mut connection = Connection::new(has_prev, has_next);
 
-        let edges = entries.into_iter().map(move |(entry, feed_url)| {
-            let meta = feeds
-                .get(&feed_url)
-                .expect("FeedMeta not found. this is a bug")
-                .clone();
-            let cursor = entry.id().into();
-            let node = FeedEntry {
-                feed: meta.into(),
-                entry: entry.into(),
-            };
-
-            Edge::new(cursor, node)
-        });
+        let edges = entries
+            .into_iter()
+            .take(first)
+            .map(move |(entry, feed_url)| {
+                let meta = feeds
+                    .get(&feed_url)
+                    .expect("FeedMeta not found. this is a bug")
+                    .clone();
+                let cursor = entry.id().into();
+                let node = Entry::new(meta, entry);
+                Edge::new(cursor, node)
+            });
 
         connection.edges.extend(edges);
 
@@ -99,9 +95,5 @@ pub struct Query;
 impl Query {
     async fn subscription(&self) -> Subscription {
         Subscription {}
-    }
-
-    async fn feeds(&self) -> Feeds {
-        Feeds {}
     }
 }

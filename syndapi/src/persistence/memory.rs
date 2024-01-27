@@ -11,23 +11,32 @@ pub struct MemoryDatastore {
     feeds: RwLock<Vec<persistence::types::FeedSubscription>>,
 }
 
+const TEST_DATA: &[&str] = &[
+    "https://blog.m-ou.se/index.xml",
+    "https://keens.github.io/index.xml",
+    "https://without.boats/index.xml",
+    "https://blog.rust-lang.org/feed.xml",
+    "https://blog.ymgyt.io/atom.xml",
+    "https://this-week-in-rust.org/atom.xml",
+    "https://blog.orhun.dev/rss.xml",
+    "https://buttondown.email/o11y.news/rss",
+    "https://fasterthanli.me/index.xml",
+    "https://docs.aws.amazon.com/eks/latest/userguide/doc-history.rss",
+    "https://kubernetes.io/feed.xml",
+];
+
 impl MemoryDatastore {
     pub fn new() -> Self {
         Self {
-            feeds: RwLock::new(vec![
-                persistence::types::FeedSubscription {
-                    user_id: "me".into(),
-                    url: "https://blog.ymgyt.io/atom.xml".into(),
-                },
-                persistence::types::FeedSubscription {
-                    user_id: "me".into(),
-                    url: "https://this-week-in-rust.org/atom.xml".into(),
-                },
-                persistence::types::FeedSubscription {
-                    user_id: "me".into(),
-                    url: "https://buttondown.email/o11y.news/rss".into(),
-                },
-            ]),
+            feeds: RwLock::new(
+                TEST_DATA
+                    .into_iter()
+                    .map(|feed| persistence::types::FeedSubscription {
+                        user_id: "me".into(),
+                        url: feed.to_string(),
+                    })
+                    .collect(),
+            ),
         }
     }
 }

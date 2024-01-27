@@ -7,6 +7,7 @@ pub struct Theme {
     pub tabs_selected: Style,
     pub prompt: PromptTheme,
     pub subscription: SubscriptionTheme,
+    pub entries: EntriesTheme,
     pub error: ErrorTheme,
 }
 
@@ -24,6 +25,12 @@ pub struct SubscriptionTheme {
     pub background: Style,
     pub header: Style,
     pub selected_feed: Style,
+}
+
+pub struct EntriesTheme {
+    pub background: Style,
+    pub header: Style,
+    pub selected_entry: Style,
 }
 
 impl Theme {
@@ -48,6 +55,11 @@ impl Theme {
                 background: Style::new().bg(DARK_BLUE),
                 header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
                 selected_feed: Style::new().add_modifier(Modifier::BOLD),
+            },
+            entries: EntriesTheme {
+                background: Style::new().bg(DARK_BLUE),
+                header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                selected_entry: Style::new().add_modifier(Modifier::BOLD),
             },
             error: ErrorTheme {
                 message: Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),

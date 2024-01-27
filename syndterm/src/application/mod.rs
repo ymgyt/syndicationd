@@ -10,6 +10,7 @@ use crate::{
     terminal::Terminal,
     ui::{
         self,
+        entries::Entries,
         login::LoginMethods,
         prompt::Prompt,
         subscription::Subscription,
@@ -19,10 +20,9 @@ use crate::{
 };
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
-use tracing::{debug, info};
 
 mod direction;
-pub use direction::Direction;
+pub use direction::{Direction, IndexOutOfRange};
 
 /// Cureent ui screen
 pub enum Screen {
@@ -49,6 +49,7 @@ pub struct State {
     pub tabs: Tabs,
     pub prompt: Prompt,
     pub subscription: Subscription,
+    pub entries: Entries,
 }
 
 pub struct Application {
@@ -71,6 +72,7 @@ impl Application {
             },
             tabs: Tabs::new(),
             subscription: Subscription::new(),
+            entries: Entries::new(),
             prompt: Prompt::new(),
         };
 
@@ -89,7 +91,19 @@ impl Application {
         self.client.set_credential(auth);
         self.state.login.auth_state = AuthenticateState::Authenticated;
         self.state.screen = Screen::Browse;
+        self.initial_fetch();
         self.should_render = true;
+    }
+
+    fn initial_fetch(&mut self) {
+        let fut = async {
+            Ok(Command::FetchEntries {
+                after: None,
+                first: 50,
+            })
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
     }
 
     pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
@@ -140,7 +154,7 @@ impl Application {
     }
 
     fn apply(&mut self, command: Command) {
-        info!("Apply {command:?}");
+        tracing::debug!("Apply {command:?}");
 
         let mut next = Some(command);
 
@@ -164,7 +178,7 @@ impl Application {
                         Tab::Subscription if !self.state.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
-                                first: 2,
+                                first: 50,
                             });
                         }
                         _ => {}
@@ -209,6 +223,20 @@ impl Application {
                 Command::OpenFeed => {
                     self.open_feed();
                 }
+                Command::FetchEntries { after, first } => {
+                    self.fetch_entries(after, first);
+                }
+                Command::UpdateEntries(payload) => {
+                    self.state.entries.update_entries(payload);
+                    self.should_render = true;
+                }
+                Command::MoveEntry(direction) => {
+                    self.state.entries.move_selection(direction);
+                    self.should_render = true;
+                }
+                Command::OpenEntry => {
+                    self.open_entry();
+                }
                 Command::HandleError { message } => {
                     self.state.prompt.set_error_message(message);
                     self.should_render = true;
@@ -237,7 +265,7 @@ impl Application {
                 ..
             }) => None,
             CrosstermEvent::Key(key) => {
-                debug!("{key:?}");
+                tracing::debug!("{key:?}");
                 match self.state.screen {
                     Screen::Login => match key.code {
                         KeyCode::Enter => {
@@ -255,7 +283,16 @@ impl Application {
                             return Some(Command::MoveTabSelection(Direction::Left))
                         }
                         _ => match self.state.tabs.current() {
-                            Tab::Feeds => {}
+                            Tab::Feeds => match key.code {
+                                KeyCode::Char('j') => {
+                                    return Some(Command::MoveEntry(Direction::Down))
+                                }
+                                KeyCode::Char('k') => {
+                                    return Some(Command::MoveEntry(Direction::Up))
+                                }
+                                KeyCode::Enter => return Some(Command::OpenEntry),
+                                _ => {}
+                            },
                             Tab::Subscription => match key.code {
                                 KeyCode::Char('a') => return Some(Command::PromptFeedSubscription),
                                 KeyCode::Char('d') => {
@@ -300,7 +337,7 @@ impl Application {
     fn prompt_feed_subscription(&mut self) {
         let prompt = r#"URL: https://blog.ymgyt.io/atom.xml "#;
         let modified = edit::edit(prompt).expect("Got user modified input");
-        debug!("Got user modified feed subscription: {modified}");
+        tracing::debug!("Got user modified feed subscription: {modified}");
         // TODO: more safely
         let url = modified.trim_start_matches("URL:").trim().to_owned();
 
@@ -351,6 +388,29 @@ impl Application {
             return;
         };
         open::that(feed_website_url).ok();
+    }
+
+    fn open_entry(&mut self) {
+        let Some(entry_website_url) = self.state.entries.selected_entry_website_url() else {
+            return;
+        };
+        open::that(entry_website_url).ok();
+    }
+}
+
+impl Application {
+    fn fetch_entries(&mut self, after: Option<String>, first: i64) {
+        let client = self.client.clone();
+        let fut = async move {
+            match client.fetch_entries(after, first).await {
+                Ok(payload) => Ok(Command::UpdateEntries(payload)),
+                Err(err) => Ok(Command::HandleError {
+                    message: format!("{err}"),
+                }),
+            }
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
     }
 }
 

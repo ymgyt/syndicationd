@@ -1,3 +1,6 @@
+pub mod v2;
+// testing v2 impl...
+/*
 use std::task::{Context, Poll};
 
 use axum::http::{self, StatusCode};
@@ -6,6 +9,7 @@ use futures_util::future::BoxFuture;
 use tower::{Layer, Service};
 
 use crate::serve::auth::Authenticator;
+
 
 #[derive(Clone)]
 pub struct AuthenticateLayer {
@@ -70,7 +74,7 @@ where
         let token = token.to_owned();
 
         Box::pin(async move {
-            let principal = match authenticator.authenticate(token).await {
+            let principal = match authenticator.authenticate(Some(token)).await {
                 Ok(principal) => principal,
                 Err(_) => {
                     tracing::warn!("Invalid token");
@@ -84,3 +88,4 @@ where
         })
     }
 }
+*/

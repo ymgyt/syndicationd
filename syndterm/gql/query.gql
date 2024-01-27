@@ -2,17 +2,16 @@ query Subscription($after: String, $first: Int) {
   output: subscription {
     feeds(after: $after, first: $first) {
       nodes {
-        ...FeedMeta
+        ...Feed
       }
       pageInfo {
-        hasNextPage
-        endCursor
+        ...PageInfo
       }
     }
   }
 }
 
-fragment FeedMeta on Feed {
+fragment Feed on Feed {
   id
   title
   url
@@ -42,4 +41,36 @@ fragment Link on Link {
   rel
   mediaType
   title  
+}
+
+query Entries($after: String, $first: Int!) {
+  output: subscription {
+    entries(after: $after, first: $first) {
+      nodes {
+        ...Entry
+      }
+      pageInfo {
+        ...PageInfo
+      }
+    }
+  }
+}
+
+fragment Entry on Entry {
+  title
+  published
+  summary
+  websiteUrl
+  feed {
+    ...FeedMeta
+  }
+}
+
+fragment FeedMeta on FeedMeta {
+  title
+}
+
+fragment PageInfo on PageInfo {
+  hasNextPage
+  endCursor
 }

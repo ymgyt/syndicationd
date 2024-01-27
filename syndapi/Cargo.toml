@@ -19,25 +19,31 @@ feed-rs = { workspace = true }
 futures-util = { workspace = true }
 graphql_client = { workspace = true }
 kvsd = { version = "0.1.2" }
-moka = { workspace = true, features = ["future"]}
+moka = { workspace = true, features = ["future"] }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = "1.0.111"
-supports-color = { version = "2.1.0"}
+supports-color = { version = "2.1.0" }
 synd = { path = "../synd" }
 thiserror = "1.0.56"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tower = { version = "0.4.13", default_features = false, features = [
-"limit","timeout"
+  "limit",
+  "timeout",
 
 ] }
 tower-http = { version = "0.5.1", default_features = false, features = [
-  "trace","sensitive-headers","cors","limit"
+  "trace",
+  "sensitive-headers",
+  "cors",
+  "limit",
 ] }
+pin-project = "1.1.4"
 
-# handson
 [features]
 
-foo = []
+# Enable graphql introspection
+introspection = []
+auth_static_fut = []

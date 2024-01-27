@@ -10,8 +10,3 @@ pub mod principal;
 pub mod serve;
 pub mod service;
 pub mod usecase;
-
-#[cfg(feature = "foo")]
-mod hello {
-    pub fn hello() {}
-}

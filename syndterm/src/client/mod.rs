@@ -14,6 +14,7 @@ use self::query::subscription::SubscriptionOutput;
 mod scalar;
 pub use scalar::*;
 pub mod mutation;
+pub mod payload;
 pub mod query;
 
 #[derive(Clone)]
@@ -58,7 +59,7 @@ impl Client {
         Ok(res.output)
     }
 
-    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<types::FeedMeta> {
+    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<types::Feed> {
         let var = mutation::subscribe_feed::Variables {
             input: mutation::subscribe_feed::SubscribeFeedInput { url },
         };
@@ -67,7 +68,7 @@ impl Client {
 
         match res.subscribe_feed {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
-                Ok(types::FeedMeta::from(success.feed))
+                Ok(types::Feed::from(success.feed))
             }
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedError(err) => {
                 Err(anyhow!("Failed to mutate subscribe_feed {err:?}"))
@@ -90,6 +91,18 @@ impl Client {
                 err,
             ) => Err(anyhow!("Failed to mutate unsubscribe_feed {err:?}")),
         }
+    }
+
+    pub async fn fetch_entries(
+        &self,
+        after: Option<String>,
+        first: i64,
+    ) -> anyhow::Result<payload::FetchEntriesPayload> {
+        let var = query::entries::Variables { after, first };
+        let req = query::Entries::build_query(var);
+        let res: query::entries::ResponseData = self.request(&req).await?;
+
+        Ok(res.output.into())
     }
 
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>

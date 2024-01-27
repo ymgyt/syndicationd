@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use async_graphql::{
-    connection::{Connection, Edge},
+    connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
     Enum, Object, SimpleObject, ID,
 };
 use feed_rs::model as feedrs;
@@ -34,29 +34,44 @@ impl From<feedrs::Link> for Link {
     }
 }
 
-pub struct Entry(types::Entry);
+pub struct Entry<'a> {
+    meta: Cow<'a, types::FeedMeta>,
+    entry: types::Entry,
+}
 
 #[Object]
-impl Entry {
+impl<'a> Entry<'a> {
+    /// Feed of this entry
+    async fn feed(&'a self) -> FeedMeta<'a> {
+        self.meta.as_ref().into()
+    }
     /// Entry title
     async fn title(&self) -> Option<&str> {
-        self.0.title()
+        self.entry.title()
     }
 
     /// The time at which the entry published
     async fn published(&self) -> Option<scalar::Rfc3339Time> {
-        self.0.published().map(Into::into)
+        self.entry.published().map(Into::into)
     }
 
     /// Entry summary
     async fn summary(&self) -> Option<&str> {
-        self.0.summary()
+        self.entry.summary()
+    }
+
+    /// Link to websiteurl at which this entry is published
+    async fn website_url(&self) -> Option<&str> {
+        self.entry.website_url(self.meta.r#type())
     }
 }
 
-impl From<types::Entry> for Entry {
-    fn from(value: types::Entry) -> Self {
-        Self(value)
+impl<'a> Entry<'a> {
+    pub fn new(meta: impl Into<Cow<'a, types::FeedMeta>>, entry: types::Entry) -> Self {
+        Self {
+            meta: meta.into(),
+            entry,
+        }
     }
 }
 
@@ -103,12 +118,20 @@ impl Feed {
     async fn entries(
         &self,
         #[graphql(default = 5)] first: Option<i32>,
-    ) -> Connection<usize, Entry> {
+    ) -> Connection<
+        usize,
+        Entry,
+        EmptyFields,
+        EmptyFields,
+        FeedEntryConnectionName,
+        FeedEntryEdgeName,
+    > {
         let first = first.unwrap_or(5).max(0) as usize;
+        let meta = self.0.meta();
         let entries = self
             .0
             .entries()
-            .map(|entry| Entry(entry.clone()))
+            .map(|entry| Entry::new(meta, entry.clone()))
             .take(first)
             .collect::<Vec<_>>();
 
@@ -161,6 +184,22 @@ impl Feed {
     }
 }
 
+pub struct FeedEntryConnectionName;
+
+impl ConnectionNameType for FeedEntryConnectionName {
+    fn type_name<T: async_graphql::OutputType>() -> String {
+        "FeedEntryConnection".into()
+    }
+}
+
+pub struct FeedEntryEdgeName;
+
+impl EdgeNameType for FeedEntryEdgeName {
+    fn type_name<T: async_graphql::OutputType>() -> String {
+        "FeedEntryEdge".into()
+    }
+}
+
 impl From<Arc<types::Feed>> for Feed {
     fn from(value: Arc<types::Feed>) -> Self {
         Self(value)
@@ -182,19 +221,8 @@ impl From<types::FeedMeta> for FeedMeta<'static> {
     }
 }
 
-/// Entry with feed metadata
-pub(super) struct FeedEntry<'a> {
-    pub feed: FeedMeta<'a>,
-    pub entry: Entry,
-}
-
-#[Object]
-impl<'a> FeedEntry<'a> {
-    async fn feed(&self) -> &FeedMeta<'a> {
-        &self.feed
-    }
-
-    async fn entry(&self) -> &Entry {
-        &self.entry
+impl<'a> From<&'a types::FeedMeta> for FeedMeta<'a> {
+    fn from(value: &'a types::FeedMeta) -> Self {
+        Self(Cow::Borrowed(value))
     }
 }

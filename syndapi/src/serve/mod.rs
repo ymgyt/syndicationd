@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use async_graphql::{extensions::Tracing, EmptySubscription, Schema};
 use axum::{
     error_handling::HandleErrorLayer,
     http::{header::AUTHORIZATION, StatusCode},
@@ -17,7 +16,7 @@ use tracing::info;
 use crate::{
     config,
     dependency::Dependency,
-    gql::{self, Mutation, Query},
+    gql,
     serve::layer::{authenticate, trace},
 };
 
@@ -44,15 +43,12 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
         runtime,
     } = dep;
 
-    let schema = Schema::build(Query, Mutation, EmptySubscription)
-        .data(runtime)
-        .extension(Tracing)
-        .finish();
+    let schema = gql::schema_builder().data(runtime).finish();
 
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))
         .layer(Extension(schema))
-        .layer(authenticate::AuthenticateLayer::new(authenticator))
+        .layer(authenticate::v2::AuthenticateLayer::new(authenticator))
         .route("/graphql", get(gql::handler::graphiql))
         .layer(
             ServiceBuilder::new()
