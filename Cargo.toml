@@ -4,7 +4,6 @@ members = ["synd", "syndapi", "syndterm"]
 
 [workspace.package]
 description = "terminal feed viewer"
-version = "0.1.0"
 edition = "2021"
 authors = ["ymgyt"]
 categories = ["command-line-utilities"]
