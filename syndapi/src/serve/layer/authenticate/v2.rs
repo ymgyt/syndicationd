@@ -70,12 +70,10 @@ where
                     self.set(AuthenticateFuture::ServiceCall { service_fut });
                     self.poll(cx)
                 }
-                Poll::Ready(Err(_)) => {
-                    return Poll::Ready(Ok(StatusCode::UNAUTHORIZED.into_response()))
-                }
-                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(_)) => Poll::Ready(Ok(StatusCode::UNAUTHORIZED.into_response())),
+                Poll::Pending => Poll::Pending,
             },
-            AuthFutureProj::ServiceCall { service_fut } => return service_fut.poll(cx),
+            AuthFutureProj::ServiceCall { service_fut } => service_fut.poll(cx),
         }
     }
 }

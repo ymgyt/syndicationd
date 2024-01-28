@@ -119,7 +119,7 @@ impl FeedService {
             Ok(feed) => Ok(Feed::from((url, feed))),
             // TODO: handle error
             Err(err) => Err(ParserError::Parse {
-                url: url.into(),
+                url,
                 source: anyhow::Error::from(err),
             }),
         }

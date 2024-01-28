@@ -37,7 +37,7 @@ impl MemoryDatastore {
         Self {
             feeds: RwLock::new(
                 TEST_DATA
-                    .into_iter()
+                    .iter()
                     .map(|feed| persistence::types::FeedSubscription {
                         user_id: "me".into(),
                         url: feed.to_string(),
