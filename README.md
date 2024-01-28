@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml)
 
-![Demo](.demo.gif)
+![Demo](./demo.gif)
 
 Syndicationd is a terminal feed viewer.
 
