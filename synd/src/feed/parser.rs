@@ -14,6 +14,8 @@ pub enum ParserError {
     #[error("response size limit exceeded")]
     ResponseLimitExceed,
 
+    #[error("parse error url: {url} {source}")]
+    Parse { url: String, source: anyhow::Error },
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -116,7 +118,10 @@ impl FeedService {
         match parser.parse(source) {
             Ok(feed) => Ok(Feed::from((url, feed))),
             // TODO: handle error
-            Err(err) => Err(ParserError::Other(err.into())),
+            Err(err) => Err(ParserError::Parse {
+                url: url.into(),
+                source: anyhow::Error::from(err),
+            }),
         }
     }
 

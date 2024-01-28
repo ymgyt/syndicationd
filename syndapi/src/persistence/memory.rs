@@ -12,6 +12,9 @@ pub struct MemoryDatastore {
 }
 
 const TEST_DATA: &[&str] = &[
+    "https://seanmonstar.com/rss",
+    "https://thesquareplanet.com/blog/feed.xml",
+    "https://thiscute.world/en/index.xml",
     "https://blog.m-ou.se/index.xml",
     "https://keens.github.io/index.xml",
     "https://without.boats/index.xml",
@@ -23,6 +26,10 @@ const TEST_DATA: &[&str] = &[
     "https://fasterthanli.me/index.xml",
     "https://docs.aws.amazon.com/eks/latest/userguide/doc-history.rss",
     "https://kubernetes.io/feed.xml",
+    "https://blog.guillaume-gomez.fr/atom",
+    "https://sgued.fr/blog/atom.xml",
+    "https://thiscute.world/en/index.xml",
+    "https://blog-dry.com/feed",
 ];
 
 impl MemoryDatastore {

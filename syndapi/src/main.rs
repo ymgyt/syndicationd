@@ -14,7 +14,7 @@ fn init_tracing() {
         supports_color::on(Stream::Stdout).is_some()
     };
 
-    let show_src = false;
+    let show_src = true;
     let show_target = !show_src;
 
     Registry::default()

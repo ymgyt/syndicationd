@@ -99,7 +99,7 @@ impl Application {
         let fut = async {
             Ok(Command::FetchEntries {
                 after: None,
-                first: 50,
+                first: 200,
             })
         }
         .boxed();
