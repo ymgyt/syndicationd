@@ -1,9 +1,11 @@
 [package]
 name = "syndterm"
-version = "0.1.0"
+version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+categories.workspace = true
+repository.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
@@ -14,7 +16,8 @@ directories = "5.0.1"
 edit = "0.1.5"
 futures-util = "0.3.30"
 graphql_client = { workspace = true }
-http = "0.2"                                                    # reqwest use 0.2
+# reqwest use 0.2
+http = "0.2"
 http-serde-ext = "0.1"
 html2text = { version = "0.12" }
 open = "5.0.1"

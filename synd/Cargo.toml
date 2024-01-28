@@ -1,11 +1,12 @@
 [package]
 name = "synd"
-version = "0.1.0"
+description = "Library to handle syndication spec"
+version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+categories.workspace = true
+repository.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }

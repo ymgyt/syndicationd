@@ -3,9 +3,14 @@ resolver = "2"
 members = ["synd", "syndapi", "syndterm"]
 
 [workspace.package]
+description = "terminal feed viewer"
+version = "0.1.0"
 edition = "2021"
 authors = ["ymgyt"]
+categories = ["command-line-utilities"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/ymgyt/syndicationd"
+readme = "README"
 
 [workspace.dependencies]
 async-trait = { version = "0.1.77" }
