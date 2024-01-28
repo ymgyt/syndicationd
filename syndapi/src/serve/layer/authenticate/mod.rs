@@ -1,29 +1,99 @@
-pub mod v2;
-// testing v2 impl...
-/*
-use std::task::{Context, Poll};
+use std::{
+    convert::Infallible,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use axum::http::{self, StatusCode};
-use axum::response::IntoResponse;
-use futures_util::future::BoxFuture;
+use axum::{
+    extract::Request,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use pin_project::pin_project;
 use tower::{Layer, Service};
 
-use crate::serve::auth::Authenticator;
+use crate::principal::Principal;
 
+pub trait Authenticate {
+    // how to implementor fill this associate type
+    // need impl trait in associate type ?
+    // https://github.com/rust-lang/rust/issues/63063
+    type Output: Future<Output = Result<Principal, ()>>;
 
-#[derive(Clone)]
-pub struct AuthenticateLayer {
-    authenticator: Authenticator,
+    fn authenticate(&self, token: Option<String>) -> Self::Output;
 }
 
-impl AuthenticateLayer {
-    pub fn new(authenticator: Authenticator) -> Self {
+#[pin_project(project = AuthFutureProj)]
+pub enum AuthenticateFuture<AuthFut, S, F> {
+    Authenticate {
+        req: Option<Request>,
+        #[pin]
+        auth_fut: AuthFut,
+        inner: S,
+    },
+    ServiceCall {
+        #[pin]
+        service_fut: F,
+    },
+}
+
+impl<AuthFut, S, F> AuthenticateFuture<AuthFut, S, F> {
+    fn new(req: Request, auth_fut: AuthFut, inner: S) -> Self {
+        AuthenticateFuture::Authenticate {
+            req: Some(req),
+            auth_fut,
+            inner,
+        }
+    }
+}
+
+impl<AuthFut, S> Future for AuthenticateFuture<AuthFut, S, S::Future>
+where
+    AuthFut: Future<Output = Result<Principal, ()>>,
+    S: Service<Request, Response = Response, Error = Infallible>,
+{
+    type Output = Result<Response, Infallible>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.as_mut().project() {
+            AuthFutureProj::Authenticate {
+                req,
+                auth_fut,
+                inner,
+            } => match auth_fut.poll(cx) {
+                Poll::Ready(Ok(principal)) => {
+                    let mut req = req.take().unwrap();
+                    req.extensions_mut().insert(principal);
+                    let service_fut = inner.call(req);
+
+                    self.set(AuthenticateFuture::ServiceCall { service_fut });
+                    self.poll(cx)
+                }
+                Poll::Ready(Err(_)) => Poll::Ready(Ok(StatusCode::UNAUTHORIZED.into_response())),
+                Poll::Pending => Poll::Pending,
+            },
+            AuthFutureProj::ServiceCall { service_fut } => service_fut.poll(cx),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct AuthenticateLayer<A> {
+    authenticator: A,
+}
+
+impl<A> AuthenticateLayer<A> {
+    pub fn new(authenticator: A) -> Self {
         Self { authenticator }
     }
 }
 
-impl<S> Layer<S> for AuthenticateLayer {
-    type Service = AuthenticateService<S>;
+impl<S, A> Layer<S> for AuthenticateLayer<A>
+where
+    A: Authenticate + Clone,
+{
+    type Service = AuthenticateService<S, A>;
 
     fn layer(&self, inner: S) -> Self::Service {
         AuthenticateService {
@@ -34,58 +104,37 @@ impl<S> Layer<S> for AuthenticateLayer {
 }
 
 #[derive(Clone)]
-pub struct AuthenticateService<S> {
-    authenticator: Authenticator,
+pub struct AuthenticateService<S, A> {
     inner: S,
+    authenticator: A,
 }
 
-impl<S> Service<axum::extract::Request> for AuthenticateService<S>
+impl<S, A> Service<Request> for AuthenticateService<S, A>
 where
-    S: Service<axum::extract::Request, Response = axum::response::Response>
-        + Send
-        + 'static
-        + Clone,
-    S::Future: Send + 'static,
+    S: Service<Request, Response = Response, Error = Infallible> + Clone,
+    A: Authenticate,
 {
-    type Response = S::Response;
+    type Response = Response;
+    type Error = Infallible;
+    type Future = AuthenticateFuture<A::Output, S, S::Future>;
 
-    type Error = S::Error;
-
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, mut request: axum::extract::Request) -> Self::Future {
-        let header = request
+    fn call(&mut self, req: Request) -> Self::Future {
+        let token = req
             .headers()
-            .get(http::header::AUTHORIZATION)
-            .and_then(|header| header.to_str().ok());
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|header| header.to_str().ok())
+            .map(ToOwned::to_owned);
 
-        let Some(token) = header else {
-            return Box::pin(async { Ok(StatusCode::UNAUTHORIZED.into_response()) });
-        };
+        let auth_fut = self.authenticator.authenticate(token);
+        let inner = self.inner.clone();
 
-        let Self {
-            authenticator,
-            mut inner,
-        } = self.clone();
-        let token = token.to_owned();
-
-        Box::pin(async move {
-            let principal = match authenticator.authenticate(Some(token)).await {
-                Ok(principal) => principal,
-                Err(_) => {
-                    tracing::warn!("Invalid token");
-                    return Ok(StatusCode::UNAUTHORIZED.into_response());
-                }
-            };
-
-            request.extensions_mut().insert(principal);
-
-            inner.call(request).await
-        })
+        AuthenticateFuture::new(req, auth_fut, inner)
     }
 }
-*/

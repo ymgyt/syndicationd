@@ -48,7 +48,7 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))
         .layer(Extension(schema))
-        .layer(authenticate::v2::AuthenticateLayer::new(authenticator))
+        .layer(authenticate::AuthenticateLayer::new(authenticator))
         .route("/graphql", get(gql::handler::graphiql))
         .layer(
             ServiceBuilder::new()

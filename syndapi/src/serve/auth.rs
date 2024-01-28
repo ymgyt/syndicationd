@@ -7,7 +7,7 @@ use tracing::warn;
 use crate::{
     client::github::GithubClient,
     principal::{Principal, User},
-    serve::layer::authenticate::v2::Authenticate,
+    serve::layer::authenticate::Authenticate,
 };
 
 #[derive(Clone)]
