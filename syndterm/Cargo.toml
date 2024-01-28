@@ -7,6 +7,10 @@ license.workspace = true
 categories.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "synd"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"] }
@@ -27,13 +31,24 @@ reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0.111"
 synd = { path = "../synd" }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
+tokio = { workspace = true, features = [
+  "macros",
+  "rt-multi-thread",
+  "sync",
+  "time",
+] }
 tracing = { workspace = true }
 tracing-appender = "0.2.3"
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 unicode-segmentation = "1.10.1"
 
-[[bin]]
-name = "synd"
-path = "src/main.rs"
+[features]
+# Integration test
+integration = []
+
+[dev-dependencies]
+serial_test = { version = "3.0.0", default_features = false, features = [
+  "async",
+  "file_locks",
+] }

@@ -1,24 +1,32 @@
 use anyhow::Result;
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
-use ratatui::{backend::CrosstermBackend, Frame};
+use ratatui::Frame;
 use std::io;
 
-type TerminalBackend = ratatui::Terminal<CrosstermBackend<io::Stdout>>;
+#[cfg(not(feature = "integration"))]
+mod backend;
+#[cfg(not(feature = "integration"))]
+pub use backend::{new_backend, TerminalBackend};
+
+#[cfg(feature = "integration")]
+mod integration_backend;
+#[cfg(feature = "integration")]
+pub use integration_backend::{new_backend, Buffer, TerminalBackend};
 
 /// Provide terminal manipulation operations.
 pub struct Terminal {
-    backend: TerminalBackend,
+    backend: ratatui::Terminal<TerminalBackend>,
 }
 
 impl Terminal {
-    pub fn new(backend: TerminalBackend) -> Self {
-        Self { backend }
+    /// Construct Terminal with default backend
+    pub fn new() -> anyhow::Result<Self> {
+        let backend = new_backend();
+        Ok(Terminal::with(ratatui::Terminal::new(backend)?))
     }
 
-    /// Construct Terminal from stdout
-    pub fn from_stdout(out: io::Stdout) -> Result<Self> {
-        let backend = CrosstermBackend::new(out);
-        Ok(Terminal::new(ratatui::Terminal::new(backend)?))
+    pub fn with(backend: ratatui::Terminal<TerminalBackend>) -> Self {
+        Self { backend }
     }
 
     /// Initialize terminal
@@ -58,5 +66,10 @@ impl Terminal {
     {
         self.backend.draw(f)?;
         Ok(())
+    }
+
+    #[cfg(feature = "integration")]
+    pub fn assert_buffer(&self, expected: &Buffer) {
+        self.backend.backend().assert_buffer(expected)
     }
 }

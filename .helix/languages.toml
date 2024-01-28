@@ -24,4 +24,8 @@ lens.enable = false
 hover.actions.enable = false
 
 [language-server.rust-analyzer.config.cargo]
-features = ["auth_static_fut", "introspection"]
+features = ["introspection", "integration"]
+
+[language-server.rust-analyzer.config.check]
+command = "clippy"
+features = "all"

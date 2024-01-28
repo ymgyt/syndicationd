@@ -1,3 +1,9 @@
+use std::{pin::Pin, time::Duration};
+
+use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
+use futures_util::{FutureExt, Stream, StreamExt};
+use tokio::time::{Instant, Sleep};
+
 use crate::{
     auth::{
         self,
@@ -18,8 +24,6 @@ use crate::{
         theme::Theme,
     },
 };
-use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
-use futures_util::{FutureExt, Stream, StreamExt};
 
 mod direction;
 pub use direction::{Direction, IndexOutOfRange};
@@ -58,8 +62,15 @@ pub struct Application {
     jobs: Jobs,
     state: State,
     theme: Theme,
+    idle_timer: Pin<Box<Sleep>>,
+
     should_render: bool,
     should_quit: bool,
+}
+
+#[derive(PartialEq, Eq)]
+pub enum EventLoopControlFlow {
+    Quit,
 }
 
 impl Application {
@@ -82,6 +93,7 @@ impl Application {
             jobs: Jobs::new(),
             state,
             theme: Theme::new(),
+            idle_timer: Box::pin(tokio::time::sleep(Duration::from_millis(250))),
             should_quit: false,
             should_render: false,
         }
@@ -112,8 +124,6 @@ impl Application {
     {
         self.terminal.init()?;
 
-        self.render();
-
         self.event_loop(input).await;
 
         self.terminal.exit()?;
@@ -122,6 +132,19 @@ impl Application {
     }
 
     async fn event_loop<S>(&mut self, input: &mut S)
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        self.render();
+
+        loop {
+            if self.event_loop_until_idle(input).await == EventLoopControlFlow::Quit {
+                break;
+            }
+        }
+    }
+
+    pub async fn event_loop_until_idle<S>(&mut self, input: &mut S) -> EventLoopControlFlow
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
@@ -134,6 +157,9 @@ impl Application {
                 }
                 Some(command) = self.jobs.futures.next() => {
                     Some(command.unwrap())
+                }
+                _ = &mut self.idle_timer => {
+                    Some(Command::Idle)
                 }
             };
 
@@ -148,11 +174,12 @@ impl Application {
             }
 
             if self.should_quit {
-                break;
+                break EventLoopControlFlow::Quit;
             }
         }
     }
 
+    #[tracing::instrument(skip_all,fields(%command))]
     fn apply(&mut self, command: Command) {
         tracing::debug!("Apply {command:?}");
 
@@ -165,6 +192,9 @@ impl Application {
                 Command::Quit => self.should_quit = true,
                 Command::ResizeTerminal { .. } => {
                     self.should_render = true;
+                }
+                Command::Idle => {
+                    self.handle_idle();
                 }
                 Command::Authenticate(method) => self.authenticate(method),
                 Command::DeviceAuthorizationFlow(device_authorization) => {
@@ -429,6 +459,7 @@ impl Application {
                         .device_authorize_request()
                         .await
                         .unwrap();
+
                     Ok(Command::DeviceAuthorizationFlow(res))
                 }
                 .boxed();
@@ -470,5 +501,31 @@ impl Application {
         auth::persist_authentication(auth.clone()).ok();
 
         self.set_auth(auth);
+    }
+}
+
+impl Application {
+    fn handle_idle(&mut self) {
+        self.reset_idle_timer();
+
+        #[cfg(feature = "integration")]
+        {
+            self.should_render = true;
+            self.should_quit = true;
+        }
+    }
+
+    fn reset_idle_timer(&mut self) {
+        // https://github.com/tokio-rs/tokio/blob/e53b92a9939565edb33575fff296804279e5e419/tokio/src/time/instant.rs#L62
+        self.idle_timer
+            .as_mut()
+            .reset(Instant::now() + Duration::from_secs(86400 * 365 * 30));
+    }
+}
+
+#[cfg(feature = "integration")]
+impl Application {
+    pub fn assert_buffer(&self, expected: &ratatui::buffer::Buffer) {
+        self.terminal.assert_buffer(expected)
     }
 }

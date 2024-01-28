@@ -17,6 +17,9 @@ fmt: fmt-toml
 fmt-toml:
   taplo fmt **.toml
 
+# Run integration test
+integration:
+  RUST_LOG="syndterm,integration=debug" cargo nextest run --package syndterm --features integration --test integration --no-capture 
 
 update-gql-schema:
   @graphql-client introspect-schema http://localhost:5959/graphql \

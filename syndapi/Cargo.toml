@@ -49,4 +49,3 @@ pin-project = "1.1.4"
 
 # Enable graphql introspection
 introspection = []
-auth_static_fut = []

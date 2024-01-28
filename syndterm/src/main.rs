@@ -54,8 +54,7 @@ async fn main() {
     let _guard = init_tracing(log).unwrap();
 
     let mut app = {
-        let terminal =
-            Terminal::from_stdout(std::io::stdout()).expect("Failed to construct terminal");
+        let terminal = Terminal::new().expect("Failed to construct terminal");
         let client = Client::new(endpoint).expect("Failed to construct client");
         Application::new(terminal, client)
     };
