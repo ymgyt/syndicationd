@@ -28,7 +28,7 @@ mod test {
 
         // login
         let expected = Buffer::with_lines(vec![
-            "X                                                                               ",
+            "                                                                                ",
             "                                                                                ",
             "                                                                                ",
             "                                                                                ",

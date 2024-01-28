@@ -66,12 +66,13 @@
 
           clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
+            cargoExtraArgs = "--features integration";
             cargoClippyExtraArgs = "--workspace -- --deny warnings";
           });
 
           nextest = craneLib.cargoNextest (commonArgs // {
             inherit cargoArtifacts;
-
+            cargoExtraArgs = "--features integration";
             CARGO_PROFILE = "";
           });
 
