@@ -1,12 +1,12 @@
 use tracing::{error, info};
 
 use syndapi::{args, dependency::Dependency, serve::listen_and_serve};
-use tracing_subscriber::Layer;
 
 fn init_tracing() {
     use syndapi::serve::layer::audit;
     use tracing_subscriber::{
-        filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
+        filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
+        Registry,
     };
 
     let color = {
@@ -28,7 +28,8 @@ fn init_tracing() {
                 .with_filter(
                     EnvFilter::try_from_default_env()
                         .or_else(|_| EnvFilter::try_new("info"))
-                        .unwrap(),
+                        .unwrap()
+                        .add_directive(audit::Audit::directive()),
                 ),
         )
         .with(audit::layer())

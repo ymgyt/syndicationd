@@ -5,7 +5,7 @@ use tracing::{
     Event, Level, Metadata, Subscriber,
 };
 use tracing_subscriber::{
-    filter::Filtered,
+    filter::{Directive, Filtered},
     layer::{self, Context},
     registry::LookupSpan,
     Layer,
@@ -47,6 +47,12 @@ impl Audit {
     pub const USER_ID: &'static str = "enduser.id";
     pub const OPERATION: &'static str = "operation";
     pub const RESULT: &'static str = "result";
+
+    pub fn directive() -> Directive {
+        let directive = format!("{emit}=info", emit = Self::EMIT_TARGET);
+
+        directive.parse().expect("Invalid directive")
+    }
 }
 
 /// Create AuditLayer
