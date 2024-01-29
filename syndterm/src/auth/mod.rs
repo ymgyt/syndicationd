@@ -32,8 +32,7 @@ fn auth_file() -> PathBuf {
 }
 
 pub fn authenticate_from_cache() -> Option<Authentication> {
-    match std::fs::File::open(auth_file()) {
-        Ok(f) => serde_json::from_reader(&f).ok(),
-        Err(_) => None,
-    }
+    std::fs::File::open(auth_file())
+        .ok()
+        .and_then(|f| serde_json::from_reader(f).ok())
 }

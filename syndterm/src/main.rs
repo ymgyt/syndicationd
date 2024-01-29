@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use crossterm::event::EventStream;
 use syndterm::{
     application::Application,
-    args::{self, Args},
     auth,
+    cli::{self, Args},
     client::Client,
     terminal::Terminal,
 };
@@ -49,9 +49,19 @@ fn init_tracing(log_path: PathBuf) -> anyhow::Result<WorkerGuard> {
 
 #[tokio::main]
 async fn main() {
-    let Args { endpoint, log } = args::parse();
+    let Args {
+        endpoint,
+        log,
+        command,
+    } = cli::parse();
 
     let _guard = init_tracing(log).unwrap();
+
+    #[allow(clippy::single_match)]
+    match command {
+        Some(cli::Command::Clear(clear)) => clear.run().await,
+        None => {}
+    }
 
     let mut app = {
         let terminal = Terminal::new().expect("Failed to construct terminal");
