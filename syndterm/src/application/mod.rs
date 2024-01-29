@@ -2,13 +2,14 @@ use std::{pin::Pin, time::Duration};
 
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
+use ratatui::widgets::Widget;
 use tokio::time::{Instant, Sleep};
 
 use crate::{
     auth::{
         self,
         device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
-        Authentication,
+        Credential,
     },
     client::Client,
     command::Command,
@@ -16,11 +17,7 @@ use crate::{
     terminal::Terminal,
     ui::{
         self,
-        entries::Entries,
-        login::LoginMethods,
-        prompt::Prompt,
-        subscription::Subscription,
-        tabs::{Tab, Tabs},
+        components::{authentication::Authentication, root::Root, tabs::Tab, Components},
         theme::Theme,
     },
 };
@@ -28,39 +25,11 @@ use crate::{
 mod direction;
 pub use direction::{Direction, IndexOutOfRange};
 
-/// Cureent ui screen
-pub enum Screen {
-    Login,
-    Browse,
-}
-
-/// Handle user authentication
-#[derive(PartialEq, Eq)]
-pub enum AuthenticateState {
-    NotAuthenticated,
-    DeviceFlow(DeviceAuthorizationResponse),
-    Authenticated,
-}
-
-pub struct LoginState {
-    pub login_methods: LoginMethods,
-    pub auth_state: AuthenticateState,
-}
-
-pub struct State {
-    pub screen: Screen,
-    pub login: LoginState,
-    pub tabs: Tabs,
-    pub prompt: Prompt,
-    pub subscription: Subscription,
-    pub entries: Entries,
-}
-
 pub struct Application {
     terminal: Terminal,
     client: Client,
     jobs: Jobs,
-    state: State,
+    components: Components,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
 
@@ -75,23 +44,11 @@ pub enum EventLoopControlFlow {
 
 impl Application {
     pub fn new(terminal: Terminal, client: Client) -> Self {
-        let state = State {
-            screen: Screen::Login,
-            login: LoginState {
-                login_methods: LoginMethods::new(),
-                auth_state: AuthenticateState::NotAuthenticated,
-            },
-            tabs: Tabs::new(),
-            subscription: Subscription::new(),
-            entries: Entries::new(),
-            prompt: Prompt::new(),
-        };
-
         Self {
             terminal,
             client,
+            components: Components::new(),
             jobs: Jobs::new(),
-            state,
             theme: Theme::new(),
             idle_timer: Box::pin(tokio::time::sleep(Duration::from_millis(250))),
             should_quit: false,
@@ -99,10 +56,9 @@ impl Application {
         }
     }
 
-    pub fn set_auth(&mut self, auth: Authentication) {
-        self.client.set_credential(auth);
-        self.state.login.auth_state = AuthenticateState::Authenticated;
-        self.state.screen = Screen::Browse;
+    pub fn set_credential(&mut self, cred: Credential) {
+        self.client.set_credential(cred);
+        self.components.auth.authenticated();
         self.initial_fetch();
         self.should_render = true;
     }
@@ -170,7 +126,7 @@ impl Application {
             if self.should_render {
                 self.render();
                 self.should_render = false;
-                self.state.prompt.clear_error_message();
+                self.components.prompt.clear_error_message();
             }
 
             if self.should_quit {
@@ -204,8 +160,8 @@ impl Application {
                     self.complete_device_authroize_flow(device_access_token)
                 }
                 Command::MoveTabSelection(direction) => {
-                    match self.state.tabs.move_selection(direction) {
-                        Tab::Subscription if !self.state.subscription.has_subscription() => {
+                    match self.components.tabs.move_selection(direction) {
+                        Tab::Subscription if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
                                 first: 50,
@@ -216,7 +172,7 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::MoveSubscribedFeed(direction) => {
-                    self.state.subscription.move_selection(direction);
+                    self.components.subscription.move_selection(direction);
                     self.should_render = true;
                 }
                 Command::PromptFeedSubscription => {
@@ -239,15 +195,15 @@ impl Application {
                     self.fetch_subscription(after, first)
                 }
                 Command::UpdateSubscription(sub) => {
-                    self.state.subscription.update_subscription(sub);
+                    self.components.subscription.update_subscription(sub);
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed } => {
-                    self.state.subscription.add_subscribed_feed(feed);
+                    self.components.subscription.add_subscribed_feed(feed);
                     self.should_render = true;
                 }
                 Command::CompleteUnsubscribeFeed { url } => {
-                    self.state.subscription.remove_unsubscribed_feed(url);
+                    self.components.subscription.remove_unsubscribed_feed(url);
                     self.should_render = true;
                 }
                 Command::OpenFeed => {
@@ -257,18 +213,18 @@ impl Application {
                     self.fetch_entries(after, first);
                 }
                 Command::UpdateEntries(payload) => {
-                    self.state.entries.update_entries(payload);
+                    self.components.entries.update_entries(payload);
                     self.should_render = true;
                 }
                 Command::MoveEntry(direction) => {
-                    self.state.entries.move_selection(direction);
+                    self.components.entries.move_selection(direction);
                     self.should_render = true;
                 }
                 Command::OpenEntry => {
                     self.open_entry();
                 }
                 Command::HandleError { message } => {
-                    self.state.prompt.set_error_message(message);
+                    self.components.prompt.set_error_message(message);
                     self.should_render = true;
                 }
             }
@@ -276,12 +232,11 @@ impl Application {
     }
 
     fn render(&mut self) {
-        let cx = ui::Context {
-            state: &mut self.state,
-            theme: &self.theme,
-        };
+        let cx = ui::Context { theme: &self.theme };
+        let root = Root::new(&self.components, cx);
 
-        self.terminal.render(|frame| ui::render(frame, cx)).unwrap();
+        self.terminal
+            .render(|frame| Widget::render(root, frame.size(), frame.buffer_mut()));
     }
 
     #[allow(clippy::single_match)]
@@ -312,7 +267,7 @@ impl Application {
                         KeyCode::BackTab => {
                             return Some(Command::MoveTabSelection(Direction::Left))
                         }
-                        _ => match self.state.tabs.current() {
+                        _ => match self.state.components.tabs.current() {
                             Tab::Feeds => match key.code {
                                 KeyCode::Char('j') => {
                                     return Some(Command::MoveEntry(Direction::Down))
@@ -379,6 +334,7 @@ impl Application {
         // TODO: prompt deletion confirm
         let Some(url) = self
             .state
+            .components
             .subscription
             .selected_feed_url()
             .map(ToOwned::to_owned)
@@ -414,14 +370,20 @@ impl Application {
 
 impl Application {
     fn open_feed(&mut self) {
-        let Some(feed_website_url) = self.state.subscription.selected_feed_website_url() else {
+        let Some(feed_website_url) = self
+            .state
+            .components
+            .subscription
+            .selected_feed_website_url()
+        else {
             return;
         };
         open::that(feed_website_url).ok();
     }
 
     fn open_entry(&mut self) {
-        let Some(entry_website_url) = self.state.entries.selected_entry_website_url() else {
+        let Some(entry_website_url) = self.state.components.entries.selected_entry_website_url()
+        else {
             return;
         };
         open::that(entry_website_url).ok();
@@ -442,11 +404,6 @@ impl Application {
         .boxed();
         self.jobs.futures.push(fut);
     }
-}
-
-#[derive(Debug)]
-pub enum AuthenticateMethod {
-    Github,
 }
 
 impl Application {
@@ -498,9 +455,9 @@ impl Application {
         };
 
         // TODO: handle error
-        auth::persist_authentication(auth.clone()).ok();
+        auth::persist_credential(auth.clone()).ok();
 
-        self.set_auth(auth);
+        self.set_credential(auth);
     }
 }
 

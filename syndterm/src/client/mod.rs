@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tracing::error;
 use url::Url;
 
-use crate::{auth::Authentication, config, types};
+use crate::{auth::Credential, config, types};
 
 use self::query::subscription::SubscriptionOutput;
 
@@ -39,9 +39,9 @@ impl Client {
         })
     }
 
-    pub fn set_credential(&mut self, auth: Authentication) {
+    pub fn set_credential(&mut self, auth: Credential) {
         let mut token = HeaderValue::try_from(match auth {
-            Authentication::Github { access_token } => format!("github {access_token}"),
+            Credential::Github { access_token } => format!("github {access_token}"),
         })
         .unwrap();
         token.set_sensitive(true);

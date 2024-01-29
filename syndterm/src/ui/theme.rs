@@ -3,12 +3,17 @@ use ratatui::style::{Color, Modifier, Style};
 pub struct Theme {
     pub background: Style,
     pub application_title: Style,
+    pub login: LoginTheme,
     pub tabs: Style,
     pub tabs_selected: Style,
     pub prompt: PromptTheme,
     pub subscription: SubscriptionTheme,
     pub entries: EntriesTheme,
     pub error: ErrorTheme,
+}
+
+pub struct LoginTheme {
+    login: Style,
 }
 
 pub struct ErrorTheme {
@@ -41,6 +46,9 @@ impl Theme {
                 .fg(WHITE)
                 .bg(DARK_BLUE)
                 .add_modifier(Modifier::BOLD),
+            login: LoginTheme {
+                login: Style::new().add_modifier(Modifier::BOLD),
+            },
             tabs: Style::new().fg(MID_GRAY).bg(DARK_BLUE),
             tabs_selected: Style::new()
                 .fg(WHITE)

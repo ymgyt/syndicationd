@@ -39,7 +39,7 @@ impl Prompt {
                 .style(cx.theme.prompt.background)
         } else {
             let keys = [("q", "Quit"), ("Tab", "Next Tab"), ("j/k", "Up/Down")];
-            let per_screen_keys = match cx.state.tabs.current() {
+            let per_screen_keys = match cx.state.components.tabs.current() {
                 Tab::Subscription => [
                     ("a", "Subscribe"),
                     ("d", "Unsubscribe"),

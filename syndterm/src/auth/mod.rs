@@ -8,31 +8,36 @@ use crate::config;
 pub mod device_flow;
 pub mod github;
 
+#[derive(Debug, Clone, Copy)]
+pub enum AuthenticationProvider {
+    Github,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
-pub enum Authentication {
+pub enum Credential {
     Github { access_token: String },
 }
 
-pub fn persist_authentication(auth: Authentication) -> anyhow::Result<()> {
-    let auth_path = auth_file();
-    if let Some(parent) = auth_path.parent() {
+pub fn persist_credential(cred: Credential) -> anyhow::Result<()> {
+    let cred_path = cred_file();
+    if let Some(parent) = cred_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let mut auth_file = std::fs::File::create(&auth_path)?;
+    let mut cred_file = std::fs::File::create(&cred_path)?;
 
-    debug!(path = ?auth_path.display(), "Create auth cache file");
+    debug!(path = ?cred_path.display(), "Create credential cache file");
 
-    serde_json::to_writer(&mut auth_file, &auth)?;
+    serde_json::to_writer(&mut cred_file, &cred)?;
 
     Ok(())
 }
 
-fn auth_file() -> PathBuf {
-    config::cache_dir().join("auth.json")
+fn cred_file() -> PathBuf {
+    config::cache_dir().join("credential.json")
 }
 
-pub fn authenticate_from_cache() -> Option<Authentication> {
-    std::fs::File::open(auth_file())
+pub fn credential_from_cache() -> Option<Credential> {
+    std::fs::File::open(cred_file())
         .ok()
         .and_then(|f| serde_json::from_reader(f).ok())
 }

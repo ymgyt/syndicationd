@@ -69,9 +69,9 @@ async fn main() {
         Application::new(terminal, client)
     };
 
-    if let Some(auth) = auth::authenticate_from_cache() {
+    if let Some(auth) = auth::credential_from_cache() {
         info!("Use authentication cache");
-        app.set_auth(auth);
+        app.set_credential(auth);
     }
 
     info!("Running...");

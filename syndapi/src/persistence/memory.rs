@@ -13,7 +13,7 @@ pub struct MemoryDatastore {
 
 const TEST_DATA: &[&str] = &[
     "https://seanmonstar.com/rss",
-    "https://thesquareplanet.com/blog/feed.xml",
+    "https://thesquareplanet.com/feed.xml",
     "https://thiscute.world/en/index.xml",
     "https://blog.m-ou.se/index.xml",
     "https://keens.github.io/index.xml",
