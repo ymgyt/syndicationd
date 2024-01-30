@@ -9,7 +9,7 @@ use crate::{
     auth::{
         self,
         device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
-        Credential,
+        AuthenticationProvider, Credential,
     },
     client::Client,
     command::Command,
@@ -17,13 +17,18 @@ use crate::{
     terminal::Terminal,
     ui::{
         self,
-        components::{authentication::Authentication, root::Root, tabs::Tab, Components},
+        components::{authentication::AuthenticateState, root::Root, tabs::Tab, Components},
         theme::Theme,
     },
 };
 
 mod direction;
 pub use direction::{Direction, IndexOutOfRange};
+
+enum Screen {
+    Login,
+    Browse,
+}
 
 pub struct Application {
     terminal: Terminal,
@@ -33,6 +38,7 @@ pub struct Application {
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
 
+    screen: Screen,
     should_render: bool,
     should_quit: bool,
 }
@@ -51,6 +57,7 @@ impl Application {
             jobs: Jobs::new(),
             theme: Theme::new(),
             idle_timer: Box::pin(tokio::time::sleep(Duration::from_millis(250))),
+            screen: Screen::Login,
             should_quit: false,
             should_render: false,
         }
@@ -60,6 +67,7 @@ impl Application {
         self.client.set_credential(cred);
         self.components.auth.authenticated();
         self.initial_fetch();
+        self.screen = Screen::Browse;
         self.should_render = true;
     }
 
@@ -236,7 +244,8 @@ impl Application {
         let root = Root::new(&self.components, cx);
 
         self.terminal
-            .render(|frame| Widget::render(root, frame.size(), frame.buffer_mut()));
+            .render(|frame| Widget::render(root, frame.size(), frame.buffer_mut()))
+            .expect("Failed to render");
     }
 
     #[allow(clippy::single_match)]
@@ -251,12 +260,13 @@ impl Application {
             }) => None,
             CrosstermEvent::Key(key) => {
                 tracing::debug!("{key:?}");
-                match self.state.screen {
+                match self.screen {
                     Screen::Login => match key.code {
                         KeyCode::Enter => {
-                            if self.state.login.auth_state == AuthenticateState::NotAuthenticated {
+                            if self.components.auth.state() == &AuthenticateState::NotAuthenticated
+                            {
                                 return Some(Command::Authenticate(
-                                    self.state.login.login_methods.selected_method(),
+                                    self.components.auth.selected_provider(),
                                 ));
                             };
                         }
@@ -267,7 +277,7 @@ impl Application {
                         KeyCode::BackTab => {
                             return Some(Command::MoveTabSelection(Direction::Left))
                         }
-                        _ => match self.state.components.tabs.current() {
+                        _ => match self.components.tabs.current() {
                             Tab::Feeds => match key.code {
                                 KeyCode::Char('j') => {
                                     return Some(Command::MoveEntry(Direction::Down))
@@ -333,7 +343,6 @@ impl Application {
     fn prompt_feed_unsubscription(&mut self) {
         // TODO: prompt deletion confirm
         let Some(url) = self
-            .state
             .components
             .subscription
             .selected_feed_url()
@@ -370,11 +379,7 @@ impl Application {
 
 impl Application {
     fn open_feed(&mut self) {
-        let Some(feed_website_url) = self
-            .state
-            .components
-            .subscription
-            .selected_feed_website_url()
+        let Some(feed_website_url) = self.components.subscription.selected_feed_website_url()
         else {
             return;
         };
@@ -382,8 +387,7 @@ impl Application {
     }
 
     fn open_entry(&mut self) {
-        let Some(entry_website_url) = self.state.components.entries.selected_entry_website_url()
-        else {
+        let Some(entry_website_url) = self.components.entries.selected_entry_website_url() else {
             return;
         };
         open::that(entry_website_url).ok();
@@ -407,9 +411,9 @@ impl Application {
 }
 
 impl Application {
-    fn authenticate(&mut self, method: AuthenticateMethod) {
-        match method {
-            AuthenticateMethod::Github => {
+    fn authenticate(&mut self, provider: AuthenticationProvider) {
+        match provider {
+            AuthenticationProvider::Github => {
                 let fut = async move {
                     // TODO: error handling
                     let res = auth::github::DeviceFlow::new()
@@ -426,7 +430,9 @@ impl Application {
     }
 
     fn device_authorize_flow(&mut self, device_authorization: DeviceAuthorizationResponse) {
-        self.state.login.auth_state = AuthenticateState::DeviceFlow(device_authorization.clone());
+        self.components
+            .auth
+            .set_device_authorization_response(device_authorization.clone());
         self.should_render = true;
 
         // attempt to open input screen in the browser
@@ -450,7 +456,7 @@ impl Application {
     }
 
     fn complete_device_authroize_flow(&mut self, device_access_token: DeviceAccessTokenResponse) {
-        let auth = Authentication::Github {
+        let auth = Credential::Github {
             access_token: device_access_token.access_token,
         };
 

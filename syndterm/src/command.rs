@@ -1,8 +1,11 @@
 use std::fmt::Display;
 
 use crate::{
-    application::{AuthenticateMethod, Direction},
-    auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
+    application::Direction,
+    auth::{
+        device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
+        AuthenticationProvider,
+    },
     client::{payload, query::subscription::SubscriptionOutput},
     types::Feed,
 };
@@ -13,7 +16,7 @@ pub enum Command {
     ResizeTerminal { columns: u16, rows: u16 },
     Idle,
 
-    Authenticate(AuthenticateMethod),
+    Authenticate(AuthenticationProvider),
     DeviceAuthorizationFlow(DeviceAuthorizationResponse),
     CompleteDevieAuthorizationFlow(DeviceAccessTokenResponse),
 

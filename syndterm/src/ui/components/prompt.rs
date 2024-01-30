@@ -29,7 +29,7 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Tab) {
         // If has error message, render it
         let paragraph = if let Some(error_message) = self.error_message.as_ref() {
             let line = Line::styled(error_message, cx.theme.error.message);
@@ -39,7 +39,7 @@ impl Prompt {
                 .style(cx.theme.prompt.background)
         } else {
             let keys = [("q", "Quit"), ("Tab", "Next Tab"), ("j/k", "Up/Down")];
-            let per_screen_keys = match cx.state.components.tabs.current() {
+            let per_screen_keys = match tab {
                 Tab::Subscription => [
                     ("a", "Subscribe"),
                     ("d", "Unsubscribe"),

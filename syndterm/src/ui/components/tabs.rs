@@ -52,7 +52,7 @@ impl Tabs {
         TuiTabs::new(self.tabs.clone())
             .style(cx.theme.tabs)
             .divider("")
-            .select(cx.state.components.tabs.selected)
+            .select(self.selected)
             .highlight_style(cx.theme.tabs_selected)
             .render(tabs, buf);
     }

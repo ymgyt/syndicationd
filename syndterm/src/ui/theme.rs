@@ -13,7 +13,8 @@ pub struct Theme {
 }
 
 pub struct LoginTheme {
-    login: Style,
+    pub title: Style,
+    pub selected_auth_provider_item: Style,
 }
 
 pub struct ErrorTheme {
@@ -47,7 +48,8 @@ impl Theme {
                 .bg(DARK_BLUE)
                 .add_modifier(Modifier::BOLD),
             login: LoginTheme {
-                login: Style::new().add_modifier(Modifier::BOLD),
+                title: Style::new().add_modifier(Modifier::BOLD),
+                selected_auth_provider_item: Style::new().add_modifier(Modifier::BOLD),
             },
             tabs: Style::new().fg(MID_GRAY).bg(DARK_BLUE),
             tabs_selected: Style::new()

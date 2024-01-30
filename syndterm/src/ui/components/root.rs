@@ -34,7 +34,9 @@ impl<'a> Root<'a> {
             Tab::Feeds => self.components.entries.render(content_area, buf, cx),
         };
 
-        self.components.prompt.render(prompt_area, buf, cx);
+        self.components
+            .prompt
+            .render(prompt_area, buf, cx, self.components.tabs.current());
     }
 }
 
