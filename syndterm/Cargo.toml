@@ -52,3 +52,4 @@ serial_test = { version = "3.0.0", default_features = false, features = [
   "async",
   "file_locks",
 ] }
+tokio-stream = "0.1.14"

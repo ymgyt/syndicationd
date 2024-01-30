@@ -30,6 +30,23 @@ enum Screen {
     Browse,
 }
 
+#[derive(PartialEq, Eq)]
+pub enum EventLoopControlFlow {
+    Quit,
+}
+
+pub struct Config {
+    pub idle_timer_interval: Duration,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            idle_timer_interval: Duration::from_secs(250),
+        }
+    }
+}
+
 pub struct Application {
     terminal: Terminal,
     client: Client,
@@ -37,27 +54,28 @@ pub struct Application {
     components: Components,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
+    config: Config,
 
     screen: Screen,
     should_render: bool,
     should_quit: bool,
 }
 
-#[derive(PartialEq, Eq)]
-pub enum EventLoopControlFlow {
-    Quit,
-}
-
 impl Application {
     pub fn new(terminal: Terminal, client: Client) -> Self {
+        Application::with(terminal, client, Config::default())
+    }
+
+    pub fn with(terminal: Terminal, client: Client, config: Config) -> Self {
         Self {
             terminal,
             client,
             components: Components::new(),
             jobs: Jobs::new(),
             theme: Theme::new(),
-            idle_timer: Box::pin(tokio::time::sleep(Duration::from_millis(250))),
+            idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
+            config,
             should_quit: false,
             should_render: false,
         }
@@ -138,6 +156,7 @@ impl Application {
             }
 
             if self.should_quit {
+                self.should_quit = false; // for testing
                 break EventLoopControlFlow::Quit;
             }
         }
@@ -145,8 +164,6 @@ impl Application {
 
     #[tracing::instrument(skip_all,fields(%command))]
     fn apply(&mut self, command: Command) {
-        tracing::debug!("Apply {command:?}");
-
         let mut next = Some(command);
 
         // how to handle command => command pattern ?
@@ -259,7 +276,9 @@ impl Application {
                 ..
             }) => None,
             CrosstermEvent::Key(key) => {
-                tracing::debug!("{key:?}");
+                self.reset_idle_timer();
+
+                tracing::debug!("Handle key event: {key:?}");
                 match self.screen {
                     Screen::Login => match key.code {
                         KeyCode::Enter => {
@@ -411,7 +430,9 @@ impl Application {
 }
 
 impl Application {
+    #[tracing::instrument(skip(self))]
     fn authenticate(&mut self, provider: AuthenticationProvider) {
+        tracing::info!("Start authenticate");
         match provider {
             AuthenticationProvider::Github => {
                 let fut = async move {
@@ -469,20 +490,27 @@ impl Application {
 
 impl Application {
     fn handle_idle(&mut self) {
-        self.reset_idle_timer();
+        self.clear_idle_timer();
 
         #[cfg(feature = "integration")]
         {
+            tracing::debug!("Quit for idle");
             self.should_render = true;
             self.should_quit = true;
         }
     }
 
-    fn reset_idle_timer(&mut self) {
+    fn clear_idle_timer(&mut self) {
         // https://github.com/tokio-rs/tokio/blob/e53b92a9939565edb33575fff296804279e5e419/tokio/src/time/instant.rs#L62
         self.idle_timer
             .as_mut()
             .reset(Instant::now() + Duration::from_secs(86400 * 365 * 30));
+    }
+
+    fn reset_idle_timer(&mut self) {
+        self.idle_timer
+            .as_mut()
+            .reset(Instant::now() + self.config.idle_timer_interval);
     }
 }
 

@@ -2,33 +2,47 @@
 mod test {
     mod helper;
 
+    use std::time::Duration;
+
     use crossterm::event::{Event, KeyCode, KeyEvent};
-    use futures_util::stream;
     use ratatui::{
         prelude::Buffer,
         style::{Modifier, Style},
     };
     use serial_test::file_serial;
-    use syndterm::{application::Application, client::Client, ui::theme::Theme};
+    use syndterm::{
+        application::{Application, Config},
+        client::Client,
+        ui::theme::Theme,
+    };
+    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tracing::Level;
 
     #[tokio::test(flavor = "multi_thread")]
     #[file_serial(a)]
     async fn hello_world() -> anyhow::Result<()> {
         // TODO: wrap once
-        tracing_subscriber::fmt::init();
+        tracing_subscriber::fmt()
+            .with_max_level(Level::DEBUG)
+            .with_line_number(true)
+            .with_file(true)
+            .init();
 
         tracing::info!("TEST hello_world run");
 
         let endpoint = "http://localhost:5960".parse().unwrap();
         let terminal = helper::new_test_terminal();
         let client = Client::new(endpoint).unwrap();
-        let mut application = Application::new(terminal, client);
-        let _event = Event::Key(KeyEvent::from(KeyCode::Char('j')));
+        let config = Config {
+            idle_timer_interval: Duration::from_millis(2000),
+        };
         // or mpsc and tokio_stream ReceiverStream
-        let mut event_stream = stream::iter(vec![]);
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut event_stream = UnboundedReceiverStream::new(rx);
         let theme = Theme::new();
         let bg = theme.background.bg.unwrap_or_default();
 
+        let mut application = Application::with(terminal, client, config);
         application.event_loop_until_idle(&mut event_stream).await;
 
         // login
@@ -73,6 +87,13 @@ mod test {
         }
 
         application.assert_buffer(&expected);
+
+        tracing::info!("Login assertion OK");
+
+        // push enter => start auth flow
+        let event = Event::Key(KeyEvent::from(KeyCode::Enter));
+        tx.send(Ok(event)).unwrap();
+        application.event_loop_until_idle(&mut event_stream).await;
 
         Ok(())
     }

@@ -35,7 +35,10 @@ impl DeviceFlow {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn device_authorize_request(&self) -> anyhow::Result<DeviceAuthorizationResponse> {
+        tracing::debug!("Sending request");
+
         // https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
         let scope = "user:email";
 
@@ -52,6 +55,8 @@ impl DeviceFlow {
             .error_for_status()?
             .json::<DeviceAuthorizationResponse>()
             .await?;
+
+        tracing::debug!("Got response");
 
         Ok(response)
     }

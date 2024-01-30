@@ -2643,6 +2643,7 @@ dependencies = [
  "serial_test",
  "synd",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
