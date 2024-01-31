@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synd::{feed::cache::FetchCachedFeed, types};
+use synd_feed::{feed::cache::FetchCachedFeed, types};
 
 use crate::{
     persistence::Datastore,

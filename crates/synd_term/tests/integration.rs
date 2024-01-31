@@ -10,7 +10,7 @@ mod test {
         style::{Modifier, Style},
     };
     use serial_test::file_serial;
-    use syndterm::{
+    use synd_term::{
         application::{Application, Config},
         client::Client,
         ui::theme::Theme,

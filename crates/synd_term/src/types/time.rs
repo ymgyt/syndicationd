@@ -1,4 +1,4 @@
-pub type Time = synd::types::Time;
+pub type Time = synd_feed::types::Time;
 
 pub trait TimeExt {
     fn local_ymd(&self) -> String;

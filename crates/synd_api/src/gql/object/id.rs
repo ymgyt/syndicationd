@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use async_graphql::connection::CursorType;
-use synd::types;
+use synd_feed::types;
 
 pub enum Id {
     V1(IdV1),

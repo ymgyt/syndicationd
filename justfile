@@ -13,39 +13,42 @@ check:
 # Format files
 fmt: fmt-toml
 
+lint:
+  cargo clippy
+
 # Format toml files
 fmt-toml:
   taplo fmt **.toml
 
 # Run integration test
 integration:
-  RUST_LOG="syndterm,integration=debug" cargo nextest run --package syndterm --features integration --test integration --no-capture 
+  RUST_LOG="synd_term,integration=debug" cargo nextest run --package syndterm --features integration --test integration --no-capture 
 
 update-gql-schema:
   @graphql-client introspect-schema http://localhost:5959/graphql \
-    --header 'authorization: github {{github_pat}}' out> syndterm/gql/schema.json
+    --header 'authorization: github {{github_pat}}' out> crates/synd_term/gql/schema.json
 
 
 gen-gql:
   graphql-client generate \
-    --schema-path syndterm/gql/schema.json \
-    --output-directory syndterm/src/client \
+    --schema-path crates/syndterm/gql/schema.json \
+    --output-directory crates/syndterm/src/client \
     --response-derives "Debug" \
     --custom-scalars-module "crate::client::scalar" \
-    syndterm/gql/query.gql
+    crates/syndterm/gql/query.gql
 
   graphql-client generate \
-    --schema-path syndterm/gql/schema.json \
-    --output-directory syndterm/src/client \
+    --schema-path crates/syndterm/gql/schema.json \
+    --output-directory crates/syndterm/src/client \
     --response-derives "Debug" \
     --custom-scalars-module "crate::client::scalar" \
-    syndterm/gql/mutation.gql
+    crates/syndterm/gql/mutation.gql
 
   graphql-client generate \
-    --schema-path syndapi/src/client/github/schema.json \
-    --output-directory syndapi/src/client/github \
+    --schema-path crates/synd_api/src/client/github/schema.json \
+    --output-directory crates/synd_api/src/client/github \
     --response-derives "Debug" \
-    syndapi/src/client/github/query.gql
+    crates/synd_api/src/client/github/query.gql
 
 # Run kvsd
 kvsd:
@@ -53,9 +56,9 @@ kvsd:
 
 # Run api
 api:
-  cd syndapi; RUST_LOG="info" cargo run --features "introspection" -- \
+  cd crates/synd_api; RUST_LOG="info" cargo run --features "introspection" -- \
     --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret
 
 # Run term
 term:
-  cd syndterm; cargo run -- --log /tmp/syndterm.log
+  cd crates/synd_term; cargo run -- --log /tmp/syndterm.log

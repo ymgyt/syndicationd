@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
-use synd::{
+use synd_feed::{
     feed::{cache::FetchCachedFeed, parser::ParserError},
     types::{self, EntryId},
 };

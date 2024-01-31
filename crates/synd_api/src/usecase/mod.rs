@@ -17,7 +17,7 @@ use tracing::error;
 pub mod authorize;
 use std::{future::Future, sync::Arc};
 
-use synd::feed::cache::FetchCachedFeed;
+use synd_feed::feed::cache::FetchCachedFeed;
 
 use crate::{
     audit,

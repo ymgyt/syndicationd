@@ -44,26 +44,26 @@
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        syndtermCrate = craneLib.crateNameFromCargoToml {
-          cargoToml = ./crates/syndterm/Cargo.toml;
+        syndTermCrate = craneLib.crateNameFromCargoToml {
+          cargoToml = ./crates/synd_term/Cargo.toml;
         };
-        syndterm = craneLib.buildPackage (commonArgs // {
+        syndTerm = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
-          inherit (syndtermCrate) pname version;
-          cargoExtraArgs = "--package ${syndtermCrate.pname}";
+          inherit (syndTermCrate) pname version;
+          cargoExtraArgs = "--package ${syndTermCrate.pname}";
         });
 
-        syndapiCrate = craneLib.crateNameFromCargoToml {
-          cargoToml = ./crates/syndapi/Cargo.toml;
+        syndApiCrate = craneLib.crateNameFromCargoToml {
+          cargoToml = ./crates/synd_api/Cargo.toml;
         };
-        syndapi = craneLib.buildPackage (commonArgs // {
+        syndApi = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
-          inherit (syndapiCrate) pname version;
-          cargoExtraArgs = "--package ${syndapiCrate.pname}";
+          inherit (syndApiCrate) pname version;
+          cargoExtraArgs = "--package ${syndApiCrate.pname}";
         });
 
         checks = {
-          inherit syndterm syndapi;
+          inherit syndTerm syndApi;
 
           clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
@@ -93,11 +93,11 @@
       in {
         inherit checks;
 
-        packages.default = self.packages."${system}".syndterm;
-        packages.syndterm = syndterm;
-        packages.syndapi = syndapi;
+        packages.default = self.packages."${system}".synd;
+        packages.synd = syndTerm;
+        packages.synd_api = syndApi;
 
-        apps.default = flake-utils.lib.mkApp { drv = syndterm; };
+        apps.default = flake-utils.lib.mkApp { drv = syndTerm; };
 
         devShells.default = craneLib.devShell {
           packages = dev_packages;

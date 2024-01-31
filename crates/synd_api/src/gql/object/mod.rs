@@ -5,7 +5,7 @@ use async_graphql::{
     Enum, Object, SimpleObject, ID,
 };
 use feed_rs::model as feedrs;
-use synd::types;
+use synd_feed::types;
 
 use crate::gql::scalar;
 
@@ -76,7 +76,7 @@ impl<'a> Entry<'a> {
 }
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "synd::types::FeedType")]
+#[graphql(remote = "synd_feed::types::FeedType")]
 pub enum FeedType {
     Atom,
     RSS1,

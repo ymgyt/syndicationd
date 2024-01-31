@@ -1,5 +1,5 @@
 [package]
-name = "synd"
+name = "synd_feed"
 version = "0.1.0"
 description = "Library to handle syndication spec"
 authors.workspace = true

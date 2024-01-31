@@ -1,9 +1,9 @@
 use tracing::{error, info};
 
-use syndapi::{args, dependency::Dependency, serve::listen_and_serve};
+use synd_api::{args, dependency::Dependency, serve::listen_and_serve};
 
 fn init_tracing() {
-    use syndapi::serve::layer::audit;
+    use synd_api::serve::layer::audit;
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
         Registry,

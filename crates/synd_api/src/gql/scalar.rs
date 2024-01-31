@@ -2,7 +2,7 @@ use async_graphql::{InputValueError, Scalar, ScalarType, Value};
 use chrono::Utc;
 
 /// RFC3339 Time
-pub struct Rfc3339Time(synd::types::Time);
+pub struct Rfc3339Time(synd_feed::types::Time);
 
 #[Scalar]
 impl ScalarType for Rfc3339Time {
@@ -22,8 +22,8 @@ impl ScalarType for Rfc3339Time {
     }
 }
 
-impl From<synd::types::Time> for Rfc3339Time {
-    fn from(value: synd::types::Time) -> Self {
+impl From<synd_feed::types::Time> for Rfc3339Time {
+    fn from(value: synd_feed::types::Time) -> Self {
         Self(value)
     }
 }

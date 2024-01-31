@@ -10,7 +10,7 @@ mod clear;
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, about = "xxx")]
 pub struct Args {
-    /// syndapi endpoint
+    /// synd_api endpoint
     #[arg(long, default_value = config::api::ENDPOINT)]
     pub endpoint: Url,
     /// Log file path

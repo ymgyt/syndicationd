@@ -1,5 +1,5 @@
 use ratatui::backend::TestBackend;
-use syndterm::terminal::Terminal;
+use synd_term::terminal::Terminal;
 
 pub fn new_test_terminal() -> Terminal {
     let backend = TestBackend::new(80, 20);

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crossterm::event::EventStream;
-use syndterm::{
+use synd_term::{
     application::Application,
     auth,
     cli::{self, Args},

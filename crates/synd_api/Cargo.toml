@@ -1,5 +1,5 @@
 [package]
-name = "syndapi"
+name = "synd_api"
 version = "0.1.0"
 description = "syndicationd backend api"
 authors.workspace = true
@@ -27,7 +27,7 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = "1.0.111"
 supports-color = { version = "2.1.0" }
-synd = { path = "../synd" }
+synd_feed = { path = "../synd_feed", version = "0.1.0" }
 thiserror = "1.0.56"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing = { workspace = true }

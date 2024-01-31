@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use synd::feed::{
+use synd_feed::feed::{
     cache::{CacheConfig, CacheLayer},
     parser::FeedService,
 };
