@@ -75,8 +75,9 @@
             inherit cargoArtifacts;
             # currently disable integration test in flake
             # we could not do network call
-            # cargoExtraArgs = "--features integration";
+            # cargoExtraArgs = "--features integration --no-capture";
             CARGO_PROFILE = "";
+            RUST_LOG = "synd_term,integration=debug";
           });
 
           fmt = craneLib.cargoFmt commonArgs;
