@@ -20,11 +20,11 @@ lint:
 
 # Format toml files
 fmt-toml:
-  taplo fmt **.toml
+  taplo fmt --config taplo.toml **.toml
 
 # Run integration test
 integration:
-  RUST_LOG="synd_term,integration=debug" cargo nextest run --package syndterm --features integration --test integration --no-capture 
+  RUST_LOG="synd_term,integration=debug" cargo nextest run --package synd_term --features integration --test integration --no-capture 
 
 update-gql-schema:
   @graphql-client introspect-schema http://localhost:5959/graphql \

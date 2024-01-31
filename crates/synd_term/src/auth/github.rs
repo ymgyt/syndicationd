@@ -13,9 +13,11 @@ use crate::{
 };
 
 /// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
+#[derive(Clone)]
 pub struct DeviceFlow {
     client: Client,
     client_id: &'static str,
+    endpoint: Option<&'static str>,
 }
 
 impl DeviceFlow {
@@ -32,6 +34,14 @@ impl DeviceFlow {
         Self {
             client,
             client_id: config::github::CLIENT_ID,
+            endpoint: None,
+        }
+    }
+
+    pub fn with_endpoint(self, endpoint: &'static str) -> Self {
+        Self {
+            endpoint: Some(endpoint),
+            ..self
         }
     }
 
@@ -44,11 +54,11 @@ impl DeviceFlow {
 
         let response = self
             .client
-            .post(Self::DEVICE_AUTHORIZATION_ENDPOINT)
+            .post(self.endpoint.unwrap_or(Self::DEVICE_AUTHORIZATION_ENDPOINT))
             .header(http::header::ACCEPT, "application/json")
             .form(&DeviceAuthorizationRequest {
-                client_id: self.client_id,
-                scope,
+                client_id: self.client_id.into(),
+                scope: scope.into(),
             })
             .send()
             .await?

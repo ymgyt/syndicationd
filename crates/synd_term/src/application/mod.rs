@@ -9,6 +9,7 @@ use crate::{
     auth::{
         self,
         device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
+        github::DeviceFlow,
         AuthenticationProvider, Credential,
     },
     client::Client,
@@ -37,12 +38,14 @@ pub enum EventLoopControlFlow {
 
 pub struct Config {
     pub idle_timer_interval: Duration,
+    pub github_device_flow: DeviceFlow,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             idle_timer_interval: Duration::from_secs(250),
+            github_device_flow: DeviceFlow::new(),
         }
     }
 }
@@ -435,12 +438,10 @@ impl Application {
         tracing::info!("Start authenticate");
         match provider {
             AuthenticationProvider::Github => {
+                let device_flow = self.config.github_device_flow.clone();
                 let fut = async move {
                     // TODO: error handling
-                    let res = auth::github::DeviceFlow::new()
-                        .device_authorize_request()
-                        .await
-                        .unwrap();
+                    let res = device_flow.device_authorize_request().await.unwrap();
 
                     Ok(Command::DeviceAuthorizationFlow(res))
                 }

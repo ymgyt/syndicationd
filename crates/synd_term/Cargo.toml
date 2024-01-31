@@ -44,4 +44,5 @@ integration = []
 
 [dev-dependencies]
 serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }
+synd_test    = { path = "../synd_test" }
 tokio-stream = "0.1.14"

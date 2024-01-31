@@ -12,29 +12,38 @@ mod test {
     use serial_test::file_serial;
     use synd_term::{
         application::{Application, Config},
+        auth::github::DeviceFlow,
         client::Client,
         ui::theme::Theme,
     };
+    use tokio::net::TcpListener;
     use tokio_stream::wrappers::UnboundedReceiverStream;
-    use tracing::Level;
+    use tracing_subscriber::EnvFilter;
 
     #[tokio::test(flavor = "multi_thread")]
     #[file_serial(a)]
     async fn hello_world() -> anyhow::Result<()> {
         // TODO: wrap once
         tracing_subscriber::fmt()
-            .with_max_level(Level::DEBUG)
+            .with_env_filter(EnvFilter::from_default_env())
             .with_line_number(true)
             .with_file(true)
+            .with_target(false)
             .init();
 
         tracing::info!("TEST hello_world run");
+
+        let oauth_addr = ("127.0.0.1", 6000);
+        let oauth_listener = TcpListener::bind(oauth_addr).await?;
+        tokio::spawn(synd_test::oauth::serve(oauth_listener));
 
         let endpoint = "http://localhost:5960".parse().unwrap();
         let terminal = helper::new_test_terminal();
         let client = Client::new(endpoint).unwrap();
         let config = Config {
             idle_timer_interval: Duration::from_millis(2000),
+            github_device_flow: DeviceFlow::new()
+                .with_endpoint("http://localhost:6000/github/login/device/code"),
         };
         // or mpsc and tokio_stream ReceiverStream
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();

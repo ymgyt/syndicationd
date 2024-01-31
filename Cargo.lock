@@ -2642,6 +2642,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "synd_feed",
+ "synd_test",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -2654,6 +2655,12 @@ dependencies = [
 [[package]]
 name = "synd_test"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "synd_term",
+ "tokio",
+]
 
 [[package]]
 name = "system-configuration"

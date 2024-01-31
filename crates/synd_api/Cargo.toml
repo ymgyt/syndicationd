@@ -15,7 +15,7 @@ async-graphql      = { version = "7.0", features = ["tracing"] }
 async-graphql-axum = { version = "7.0" }
 async-trait        = { workspace = true }
 # TODO configure features
-axum               = { version = "0.7.4" }
+axum               = { workspace = true }
 chrono             = { workspace = true }
 clap               = { workspace = true, features = ["derive"] }
 feed-rs            = { workspace = true }

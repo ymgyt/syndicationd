@@ -1,15 +1,17 @@
+use std::borrow::Cow;
+
 use http::Uri;
 use serde::{Deserialize, Serialize};
 
 /// https://datatracker.ietf.org/doc/html/rfc8628#section-3.1
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DeviceAuthorizationRequest<'s> {
-    pub client_id: &'s str,
-    pub scope: &'s str,
+    pub client_id: Cow<'s, str>,
+    pub scope: Cow<'s, str>,
 }
 
 /// https://datatracker.ietf.org/doc/html/rfc8628#section-3.2
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceAuthorizationResponse {
     /// device verification code
     pub device_code: String,
