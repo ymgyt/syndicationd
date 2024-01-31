@@ -1,49 +1,40 @@
 [package]
-name = "synd_api"
-version = "0.1.0"
-description = "syndicationd backend api"
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
+authors.workspace    = true
 categories.workspace = true
+description          = "syndicationd backend api"
+edition.workspace    = true
+license.workspace    = true
+name                 = "synd_api"
 repository.workspace = true
+version              = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
 # To use axum 0.7
-async-graphql = { version = "7.0", features = ["tracing"] }
+async-graphql      = { version = "7.0", features = ["tracing"] }
 async-graphql-axum = { version = "7.0" }
-async-trait = { workspace = true }
+async-trait        = { workspace = true }
 # TODO configure features
-axum = { version = "0.7.4" }
-clap = { workspace = true, features = ["derive"] }
-chrono = { workspace = true }
-feed-rs = { workspace = true }
-futures-util = { workspace = true }
-graphql_client = { workspace = true }
-kvsd = { version = "0.1.2" }
-moka = { workspace = true, features = ["future"] }
-reqwest = { workspace = true }
-serde = { workspace = true }
-serde_json = "1.0.111"
-supports-color = { version = "2.1.0" }
-synd_feed = { path = "../synd_feed", version = "0.1.0" }
-thiserror = "1.0.56"
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tracing = { workspace = true }
+axum               = { version = "0.7.4" }
+chrono             = { workspace = true }
+clap               = { workspace = true, features = ["derive"] }
+feed-rs            = { workspace = true }
+futures-util       = { workspace = true }
+graphql_client     = { workspace = true }
+kvsd               = { version = "0.1.2" }
+moka               = { workspace = true, features = ["future"] }
+pin-project        = "1.1.4"
+reqwest            = { workspace = true }
+serde              = { workspace = true }
+serde_json         = "1.0.111"
+supports-color     = { version = "2.1.0" }
+synd_feed          = { path = "../synd_feed", version = "0.1.0" }
+thiserror          = "1.0.56"
+tokio              = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tower              = { version = "0.4.13", default_features = false, features = ["limit", "timeout"] }
+tower-http         = { version = "0.5.1", default_features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
+tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
-tower = { version = "0.4.13", default_features = false, features = [
-  "limit",
-  "timeout",
-
-] }
-tower-http = { version = "0.5.1", default_features = false, features = [
-  "trace",
-  "sensitive-headers",
-  "cors",
-  "limit",
-] }
-pin-project = "1.1.4"
 
 [features]
 

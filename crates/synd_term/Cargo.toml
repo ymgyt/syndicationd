@@ -1,55 +1,47 @@
 [package]
-name = "synd_term"
-version = "0.1.0"
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
+authors.workspace    = true
 categories.workspace = true
+edition.workspace    = true
+license.workspace    = true
+name                 = "synd_term"
 repository.workspace = true
+version              = "0.1.0"
 
 [[bin]]
 name = "synd"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = { workspace = true }
-clap = { workspace = true, features = ["derive", "string"] }
-crossterm = { version = "0.27.0", features = ["event-stream"] }
-chrono = { workspace = true }
-directories = "5.0.1"
-edit = "0.1.5"
-futures-util = "0.3.30"
+anyhow         = { workspace = true }
+chrono         = { workspace = true }
+clap           = { workspace = true, features = ["derive", "string"] }
+crossterm      = { version = "0.27.0", features = ["event-stream"] }
+directories    = "5.0.1"
+edit           = "0.1.5"
+futures-util   = "0.3.30"
 graphql_client = { workspace = true }
 # reqwest use 0.2
-http = "0.2"
+html2text      = { version = "0.12" }
+http           = "0.2"
 http-serde-ext = "0.1"
-html2text = { version = "0.12" }
-open = "5.0.1"
+open           = "5.0.1"
 # Use latest api
-ratatui = { git = "https://github.com/ratatui-org/ratatui.git", branch = "main" }
-reqwest = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = "1.0.111"
-synd_feed = { path = "../synd_feed", version = "0.1.0" }
-tokio = { workspace = true, features = [
-  "macros",
-  "rt-multi-thread",
-  "sync",
-  "time",
-] }
-tracing = { workspace = true }
-tracing-appender = "0.2.3"
-tracing-subscriber = { workspace = true }
-url = { workspace = true }
+ratatui              = { git = "https://github.com/ratatui-org/ratatui.git", branch = "main" }
+reqwest              = { workspace = true }
+serde                = { workspace = true, features = ["derive"] }
+serde_json           = "1.0.111"
+synd_feed            = { path = "../synd_feed", version = "0.1.0" }
+tokio                = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+tracing              = { workspace = true }
+tracing-appender     = "0.2.3"
+tracing-subscriber   = { workspace = true }
 unicode-segmentation = "1.10.1"
+url                  = { workspace = true }
 
 [features]
 # Integration test
 integration = []
 
 [dev-dependencies]
-serial_test = { version = "3.0.0", default_features = false, features = [
-  "async",
-  "file_locks",
-] }
+serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }
 tokio-stream = "0.1.14"

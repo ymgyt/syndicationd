@@ -1,29 +1,26 @@
 [workspace]
+members  = ["crates/*"]
 resolver = "2"
-members = ["crates/*"]
 
 [workspace.package]
+authors     = ["ymgyt"]
+categories  = ["command-line-utilities"]
 description = "terminal feed viewer"
-edition = "2021"
-authors = ["ymgyt"]
-categories = ["command-line-utilities"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/ymgyt/syndicationd"
-readme = "README"
+edition     = "2021"
+license     = "MIT OR Apache-2.0"
+readme      = "README"
+repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
-async-trait = { version = "0.1.77" }
 anyhow = { version = "1" }
-clap = { version = "4.4" }
+async-trait = { version = "0.1.77" }
 chrono = { version = "0.4.31" }
+clap = { version = "4.4" }
 feed-rs = { version = "1.4" }
 futures-util = { version = "0.3.30" }
 graphql_client = { version = "0.13.0", default-features = false }
 moka = { version = "0.12.4", features = ["future"] }
-reqwest = { version = "0.11.23", default-features = false, features = [
-  "rustls-tls",
-  "json",
-] }
+reqwest = { version = "0.11.23", default-features = false, features = ["rustls-tls", "json"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.35" }
 tracing = { version = "0.1.40" }

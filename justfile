@@ -2,6 +2,8 @@ set shell := ["nu", "-c"]
 kvsd_user := "synduser"
 github_pat := env_var_or_default("GH_PAT", "")
 
+alias format := fmt
+
 # List recipe
 default:
   just --list
