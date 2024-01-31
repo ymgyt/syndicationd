@@ -45,7 +45,7 @@
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
         syndtermCrate = craneLib.crateNameFromCargoToml {
-          cargoToml = ./syndterm/Cargo.toml;
+          cargoToml = ./crates/syndterm/Cargo.toml;
         };
         syndterm = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
@@ -53,8 +53,9 @@
           cargoExtraArgs = "--package ${syndtermCrate.pname}";
         });
 
-        syndapiCrate =
-          craneLib.crateNameFromCargoToml { cargoToml = ./syndapi/Cargo.toml; };
+        syndapiCrate = craneLib.crateNameFromCargoToml {
+          cargoToml = ./crates/syndapi/Cargo.toml;
+        };
         syndapi = craneLib.buildPackage (commonArgs // {
           inherit cargoArtifacts;
           inherit (syndapiCrate) pname version;
@@ -72,7 +73,9 @@
 
           nextest = craneLib.cargoNextest (commonArgs // {
             inherit cargoArtifacts;
-            cargoExtraArgs = "--features integration";
+            # currently disable integration test in flake
+            # we could not do network call
+            # cargoExtraArgs = "--features integration";
             CARGO_PROFILE = "";
           });
 

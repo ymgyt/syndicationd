@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["synd", "syndapi", "syndterm"]
+members = ["crates/*"]
 
 [workspace.package]
 description = "terminal feed viewer"
