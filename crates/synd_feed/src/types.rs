@@ -33,7 +33,7 @@ pub struct Entry(feedrs::Entry);
 
 impl Entry {
     pub fn id(&self) -> EntryId<'static> {
-        EntryId(Cow::Owned(self.0.id.to_owned()))
+        EntryId(Cow::Owned(self.0.id.clone()))
     }
 
     pub fn id_ref(&self) -> EntryId<'_> {
@@ -52,7 +52,7 @@ impl Entry {
         self.0.summary.as_ref().map(|text| text.content.as_str())
     }
 
-    pub fn website_url(&self, feed_type: FeedType) -> Option<&str> {
+    pub fn website_url(&self, feed_type: &FeedType) -> Option<&str> {
         link::find_website_url(feed_type, &self.0.links)
     }
 
@@ -63,15 +63,13 @@ impl Entry {
             .content
             .as_ref()
             .and_then(|content| content.body.as_deref())
-            .map(|body| body.len())
-            .unwrap_or(0);
+            .map_or(0, str::len);
 
         let summary_size = self
             .0
             .summary
             .as_ref()
-            .map(|summary| summary.content.len())
-            .unwrap_or(0);
+            .map_or(0, |summary| summary.content.len());
 
         content_size + summary_size
     }
@@ -86,8 +84,8 @@ pub struct FeedMeta {
 }
 
 impl FeedMeta {
-    pub fn r#type(&self) -> FeedType {
-        self.feed.feed_type.clone()
+    pub fn r#type(&self) -> &FeedType {
+        &self.feed.feed_type
     }
 
     pub fn url(&self) -> &str {
@@ -156,7 +154,7 @@ impl Feed {
 
     /// Return approximate Feed byte size
     pub fn approximate_size(&self) -> usize {
-        self.entries().map(|entry| entry.approximate_size()).sum()
+        self.entries().map(Entry::approximate_size).sum()
     }
 }
 
@@ -174,7 +172,7 @@ mod link {
     use feed_rs::model::{FeedType, Link};
 
     pub fn find_website_url<'a>(
-        feed_type: FeedType,
+        feed_type: &FeedType,
         links: impl IntoIterator<Item = &'a Link>,
     ) -> Option<&'a str> {
         let mut links = links.into_iter();
@@ -223,11 +221,11 @@ mod link {
             ];
 
             assert_eq!(
-                find_website_url(FeedType::RSS1, &links),
+                find_website_url(&FeedType::RSS1, &links),
                 Some("https://syndicationd.ymgyt.io/")
             );
             assert_eq!(
-                find_website_url(FeedType::RSS2, &links),
+                find_website_url(&FeedType::RSS2, &links),
                 Some("https://syndicationd.ymgyt.io/")
             );
         }
@@ -254,7 +252,7 @@ mod link {
             ];
 
             assert_eq!(
-                find_website_url(FeedType::Atom, &links),
+                find_website_url(&FeedType::Atom, &links),
                 Some("https://syndicationd.ymgyt.io/")
             );
         }

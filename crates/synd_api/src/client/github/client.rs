@@ -14,7 +14,7 @@ pub struct GithubClient {
 impl GithubClient {
     const ENDPOINT: &'static str = "https://api.github.com/graphql";
 
-    /// Construct GithubClient.
+    /// Construct `GithubClient`.
     pub fn new() -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .user_agent(config::USER_AGENT)
@@ -27,10 +27,11 @@ impl GithubClient {
 
     pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<String> {
         let variables = query::authenticate::Variables {};
-        let req = query::Authenticate::build_query(variables);
-        let res: query::authenticate::ResponseData = self.request(access_token, &req).await?;
+        let request = query::Authenticate::build_query(variables);
+        let response: query::authenticate::ResponseData =
+            self.request(access_token, &request).await?;
 
-        Ok(res.viewer.email)
+        Ok(response.viewer.email)
     }
 
     async fn request<Body, ResponseData>(
@@ -42,7 +43,7 @@ impl GithubClient {
         Body: Serialize + ?Sized,
         ResponseData: DeserializeOwned + Debug,
     {
-        let mut auth_header = HeaderValue::try_from(format!("bearer {}", access_token))?;
+        let mut auth_header = HeaderValue::try_from(format!("bearer {access_token}"))?;
         auth_header.set_sensitive(true);
 
         let res: Response<ResponseData> = self

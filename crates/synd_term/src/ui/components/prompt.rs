@@ -29,7 +29,7 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Tab) {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
         // If has error message, render it
         let paragraph = if let Some(error_message) = self.error_message.as_ref() {
             let line = Line::styled(error_message, cx.theme.error.message);
@@ -53,8 +53,8 @@ impl Prompt {
                 .iter()
                 .chain(per_screen_keys)
                 .flat_map(|(key, desc)| {
-                    let key = Span::styled(format!(" {} ", key), cx.theme.prompt.key);
-                    let desc = Span::styled(format!(" {} ", desc), cx.theme.prompt.key_desc);
+                    let key = Span::styled(format!(" {key} "), cx.theme.prompt.key);
+                    let desc = Span::styled(format!(" {desc} "), cx.theme.prompt.key_desc);
                     [key, desc]
                 })
                 .collect::<Vec<_>>();
@@ -63,6 +63,6 @@ impl Prompt {
                 .style(cx.theme.prompt.background)
         };
 
-        paragraph.render(area, buf)
+        paragraph.render(area, buf);
     }
 }

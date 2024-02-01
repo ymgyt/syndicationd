@@ -8,6 +8,7 @@ use crate::{
     types,
 };
 
+#[derive(Clone, Copy)]
 pub struct CacheConfig {
     max_cache_size: u64,
     time_to_live: Duration,
@@ -24,6 +25,7 @@ impl Default for CacheConfig {
 }
 
 impl CacheConfig {
+    #[must_use]
     pub fn with_max_cache_size(self, max_cache_size: u64) -> Self {
         Self {
             max_cache_size,
@@ -31,6 +33,7 @@ impl CacheConfig {
         }
     }
 
+    #[must_use]
     pub fn with_time_to_live(self, time_to_live: Duration) -> Self {
         Self {
             time_to_live,
@@ -54,12 +57,12 @@ pub struct CacheLayer<S> {
     cache: Cache<String, Arc<types::Feed>>,
 }
 impl<S> CacheLayer<S> {
-    /// Construct CacheLayer with default config
+    /// Construct `CacheLayer` with default config
     pub fn new(service: S) -> Self {
         Self::with(service, CacheConfig::default())
     }
 
-    /// Construct CacheLayer with given config
+    /// Construct `CacheLayer` with given config
     pub fn with(service: S, config: CacheConfig) -> Self {
         let CacheConfig {
             max_cache_size,

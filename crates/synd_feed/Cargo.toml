@@ -1,12 +1,15 @@
 [package]
 authors.workspace    = true
 categories.workspace = true
-description          = "Library to handle syndication spec"
 edition.workspace    = true
+keywords.workspace   = true
 license.workspace    = true
-name                 = "synd_feed"
+readme.workspace     = true
 repository.workspace = true
-version              = "0.1.0"
+
+description = "Library to handle syndication spec"
+name        = "synd_feed"
+version     = "0.1.0"
 
 [dependencies]
 anyhow       = { workspace = true }
@@ -19,3 +22,6 @@ reqwest      = { workspace = true, features = ["stream"] }
 thiserror    = "1.0.56"
 tokio        = { workspace = true }
 tracing      = { workspace = true }
+
+[lints]
+workspace = true

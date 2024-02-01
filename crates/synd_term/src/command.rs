@@ -46,7 +46,7 @@ impl Display for Command {
         match self {
             Command::UpdateSubscription(_) => f.write_str("UpdateSubscription"),
             Command::UpdateEntries(_) => f.write_str("UpdateEntries"),
-            cmd => write!(f, "{:?}", cmd),
+            cmd => write!(f, "{cmd:?}"),
         }
     }
 }

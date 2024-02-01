@@ -76,13 +76,13 @@ impl Usecase for FetchSubscribedFeeds {
         let feeds = self.fetch_feed.fetch_feeds_parallel(urls).await;
 
         // TODO: return failed feeds
-        let (feeds, errors): (Vec<_>, Vec<_>) = feeds.into_iter().partition(|r| r.is_ok());
+        let (feeds, errors): (Vec<_>, Vec<_>) = feeds.into_iter().partition(Result::is_ok);
 
         if !errors.is_empty() {
             tracing::error!("{errors:?}");
         }
 
-        let feeds = feeds.into_iter().map(|r| r.unwrap()).collect();
+        let feeds = feeds.into_iter().map(Result::unwrap).collect();
 
         Ok(Output {
             output: FetchSubscribedFeedsOutput { feeds },

@@ -51,15 +51,15 @@ impl Subscription {
     }
 
     pub fn add_subscribed_feed(&mut self, feed: types::Feed) {
-        self.feed_metas.insert(0, feed)
+        self.feed_metas.insert(0, feed);
     }
 
-    pub fn remove_unsubscribed_feed(&mut self, url: String) {
+    pub fn remove_unsubscribed_feed(&mut self, url: &str) {
         self.feed_metas.retain(|feed_meta| feed_meta.url != url);
-        self.move_selection(Direction::Up);
+        self.move_selection(&Direction::Up);
     }
 
-    pub fn move_selection(&mut self, direction: Direction) {
+    pub fn move_selection(&mut self, direction: &Direction) {
         self.selected_feed_meta_index = direction.apply(
             self.selected_feed_meta_index,
             self.feed_metas.len(),
@@ -145,8 +145,7 @@ impl Subscription {
             let updated = feed_meta
                 .updated
                 .as_ref()
-                .map(|t| t.local_ymd())
-                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
+                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
             let desc = feed_meta.description.as_deref().unwrap_or("");
             let website_url = feed_meta
                 .website_url
@@ -200,8 +199,7 @@ impl Subscription {
             let published = entry
                 .published
                 .as_ref()
-                .map(|t| t.local_ymd())
-                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
+                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
             let summary = entry.summary_text(100).unwrap_or(ui::UNKNOWN_SYMBOL.into());
 
             Row::new([
@@ -219,7 +217,7 @@ impl Subscription {
 
         let widths = [
             Constraint::Length(10),
-            Constraint::Length(title_width as u16),
+            Constraint::Length(title_width.try_into().unwrap_or(100)),
             Constraint::Max(200),
         ];
         let rows = feed.entries.iter().map(entry);

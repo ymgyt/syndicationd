@@ -59,7 +59,7 @@ async fn main() {
 
     #[allow(clippy::single_match)]
     match command {
-        Some(cli::Command::Clear(clear)) => clear.run().await,
+        Some(cli::Command::Clear(clear)) => clear.run(),
         None => {}
     }
 

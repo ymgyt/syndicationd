@@ -11,7 +11,7 @@ use crate::device_flow::{
 
 const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-/// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
+/// <https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow>
 #[derive(Clone)]
 pub struct DeviceFlow {
     client: Client,
@@ -37,6 +37,7 @@ impl DeviceFlow {
         }
     }
 
+    #[must_use]
     pub fn with_endpoint(self, endpoint: &'static str) -> Self {
         Self {
             endpoint: Some(endpoint),
@@ -110,14 +111,15 @@ impl DeviceFlow {
             match response.status() {
                 StatusCode::OK => {
                     let full = response.bytes().await?;
-                    match serde_json::from_slice::<DeviceAccessTokenResponse>(&full) {
-                        Ok(response) => break response,
-                        Err(_) => continue_or_abort!(full),
+                    if let Ok(response) = serde_json::from_slice::<DeviceAccessTokenResponse>(&full)
+                    {
+                        break response;
                     }
+                    continue_or_abort!(full);
                 }
                 StatusCode::BAD_REQUEST => {
                     let full = response.bytes().await?;
-                    continue_or_abort!(full)
+                    continue_or_abort!(full);
                 }
                 other => {
                     let error_msg = response.text().await.unwrap_or_default();

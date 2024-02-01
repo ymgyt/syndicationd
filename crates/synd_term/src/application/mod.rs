@@ -142,7 +142,7 @@ impl Application {
                 Some(command) = self.jobs.futures.next() => {
                     Some(command.unwrap())
                 }
-                _ = &mut self.idle_timer => {
+                () = &mut self.idle_timer => {
                     Some(Command::Idle)
                 }
             };
@@ -181,13 +181,13 @@ impl Application {
                 }
                 Command::Authenticate(method) => self.authenticate(method),
                 Command::DeviceAuthorizationFlow(device_authorization) => {
-                    self.device_authorize_flow(device_authorization)
+                    self.device_authorize_flow(device_authorization);
                 }
                 Command::CompleteDevieAuthorizationFlow(device_access_token) => {
-                    self.complete_device_authroize_flow(device_access_token)
+                    self.complete_device_authroize_flow(device_access_token);
                 }
                 Command::MoveTabSelection(direction) => {
-                    match self.components.tabs.move_selection(direction) {
+                    match self.components.tabs.move_selection(&direction) {
                         Tab::Subscription if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
@@ -199,7 +199,7 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::MoveSubscribedFeed(direction) => {
-                    self.components.subscription.move_selection(direction);
+                    self.components.subscription.move_selection(&direction);
                     self.should_render = true;
                 }
                 Command::PromptFeedSubscription => {
@@ -219,7 +219,7 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::FetchSubscription { after, first } => {
-                    self.fetch_subscription(after, first)
+                    self.fetch_subscription(after, first);
                 }
                 Command::UpdateSubscription(sub) => {
                     self.components.subscription.update_subscription(sub);
@@ -230,7 +230,7 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::CompleteUnsubscribeFeed { url } => {
-                    self.components.subscription.remove_unsubscribed_feed(url);
+                    self.components.subscription.remove_unsubscribed_feed(&url);
                     self.should_render = true;
                 }
                 Command::OpenFeed => {
@@ -244,7 +244,7 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::MoveEntry(direction) => {
-                    self.components.entries.move_selection(direction);
+                    self.components.entries.move_selection(&direction);
                     self.should_render = true;
                 }
                 Command::OpenEntry => {
@@ -351,7 +351,7 @@ impl Application {
 
 impl Application {
     fn prompt_feed_subscription(&mut self) {
-        let prompt = r#"URL: https://blog.ymgyt.io/atom.xml "#;
+        let prompt = r"URL: https://blog.ymgyt.io/atom.xml";
         let modified = edit::edit(prompt).expect("Got user modified input");
         tracing::debug!("Got user modified feed subscription: {modified}");
         // TODO: more safely
@@ -483,7 +483,7 @@ impl Application {
         };
 
         // TODO: handle error
-        auth::persist_credential(auth.clone()).ok();
+        auth::persist_credential(&auth).ok();
 
         self.set_credential(auth);
     }
@@ -518,6 +518,6 @@ impl Application {
 #[cfg(feature = "integration")]
 impl Application {
     pub fn assert_buffer(&self, expected: &ratatui::buffer::Buffer) {
-        self.terminal.assert_buffer(expected)
+        self.terminal.assert_buffer(expected);
     }
 }

@@ -41,7 +41,7 @@ impl MemoryDatastore {
                     .iter()
                     .map(|feed| persistence::types::FeedSubscription {
                         user_id: "me".into(),
-                        url: feed.to_string(),
+                        url: (*feed).to_string(),
                     })
                     .collect(),
             ),

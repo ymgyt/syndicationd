@@ -36,7 +36,7 @@ impl<'a> Root<'a> {
 
         self.components
             .prompt
-            .render(prompt_area, buf, cx, self.components.tabs.current());
+            .render(prompt_area, buf, cx, &self.components.tabs.current());
     }
 }
 
@@ -48,9 +48,9 @@ impl<'a> Widget for Root<'a> {
             .render(area, buf);
 
         if self.components.auth.should_render() {
-            self.components.auth.render(area, buf, &self.cx)
+            self.components.auth.render(area, buf, &self.cx);
         } else {
-            self.render_browse(area, buf)
+            self.render_browse(area, buf);
         }
     }
 }

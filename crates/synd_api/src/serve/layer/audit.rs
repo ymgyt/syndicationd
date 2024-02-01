@@ -48,6 +48,8 @@ impl Audit {
     pub const OPERATION: &'static str = "operation";
     pub const RESULT: &'static str = "result";
 
+    /// # Panics
+    /// panic when directive is invalid
     pub fn directive() -> Directive {
         let directive = format!("{emit}=info", emit = Self::EMIT_TARGET);
 
@@ -55,7 +57,7 @@ impl Audit {
     }
 }
 
-/// Create AuditLayer
+/// Create `AuditLayer`
 pub fn layer<S>() -> impl Layer<S>
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
@@ -72,18 +74,18 @@ impl AuditFilter {
         Self {}
     }
 
-    fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
+    fn is_enabled(meta: &Metadata<'_>) -> bool {
         meta.target() == Audit::TARGET
     }
 }
 
 impl<S> layer::Filter<S> for AuditFilter {
     fn enabled(&self, meta: &Metadata<'_>, _cx: &Context<'_, S>) -> bool {
-        self.is_enabled(meta)
+        Self::is_enabled(meta)
     }
 
     fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
-        if self.is_enabled(meta) {
+        if Self::is_enabled(meta) {
             Interest::always()
         } else {
             Interest::never()
@@ -138,7 +140,7 @@ impl<S> Layer<S> for AuditLayer
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    /// If new span is audit root span, create AuditContext and insert to extensions.
+    /// If new span is audit root span, create `AuditContext` and insert to extensions.
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
         if attrs.metadata().name() != Audit::SPAN_ROOT_NAME {
             return;

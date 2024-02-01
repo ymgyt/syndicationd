@@ -10,8 +10,9 @@ use crate::config;
 pub struct ClearCommand {}
 
 impl ClearCommand {
-    pub async fn run(self) {
-        let exit_code = if let Err(err) = self.clear().await {
+    #[allow(clippy::unused_self)]
+    pub fn run(self) {
+        let exit_code = if let Err(err) = Self::clear() {
             tracing::error!("{err}");
             1
         } else {
@@ -21,11 +22,11 @@ impl ClearCommand {
         std::process::exit(exit_code);
     }
 
-    async fn clear(self) -> anyhow::Result<()> {
+    fn clear() -> anyhow::Result<()> {
         // remove cache
         let cache_dir = config::cache_dir();
         match std::fs::remove_dir_all(cache_dir) {
-            Ok(_) => {
+            Ok(()) => {
                 tracing::info!("Clear {}", cache_dir.display());
             }
             Err(err) => match err.kind() {
@@ -40,7 +41,7 @@ impl ClearCommand {
         // remove log
         let log_file = config::log_path();
         match std::fs::remove_file(&log_file) {
-            Ok(_) => {
+            Ok(()) => {
                 tracing::info!("Clear {}", log_file.display());
             }
             Err(err) => match err.kind() {

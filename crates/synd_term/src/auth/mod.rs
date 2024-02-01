@@ -15,7 +15,7 @@ pub enum Credential {
     Github { access_token: String },
 }
 
-pub fn persist_credential(cred: Credential) -> anyhow::Result<()> {
+pub fn persist_credential(cred: &Credential) -> anyhow::Result<()> {
     let cred_path = cred_file();
     if let Some(parent) = cred_path.parent() {
         std::fs::create_dir_all(parent)?;

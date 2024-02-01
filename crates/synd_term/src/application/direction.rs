@@ -6,19 +6,22 @@ pub enum Direction {
     Right,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum IndexOutOfRange {
     Wrapping,
     Saturating,
 }
 
 impl Direction {
+    #[allow(
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap
+    )]
     pub fn apply(&self, index: usize, len: usize, out: IndexOutOfRange) -> usize {
         let diff = match self {
-            Direction::Up => -1,
-            Direction::Down => 1,
-            Direction::Left => -1,
-            Direction::Right => 1,
+            Direction::Up | Direction::Left => -1,
+            Direction::Down | Direction::Right => 1,
         };
 
         let index = index as i64;

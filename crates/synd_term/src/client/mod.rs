@@ -54,19 +54,19 @@ impl Client {
         first: Option<i64>,
     ) -> anyhow::Result<SubscriptionOutput> {
         let var = query::subscription::Variables { after, first };
-        let req = query::Subscription::build_query(var);
-        let res: query::subscription::ResponseData = self.request(&req).await?;
-        Ok(res.output)
+        let request = query::Subscription::build_query(var);
+        let response: query::subscription::ResponseData = self.request(&request).await?;
+        Ok(response.output)
     }
 
     pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<types::Feed> {
         let var = mutation::subscribe_feed::Variables {
             input: mutation::subscribe_feed::SubscribeFeedInput { url },
         };
-        let req = mutation::SubscribeFeed::build_query(var);
-        let res: mutation::subscribe_feed::ResponseData = self.request(&req).await?;
+        let request = mutation::SubscribeFeed::build_query(var);
+        let response: mutation::subscribe_feed::ResponseData = self.request(&request).await?;
 
-        match res.subscribe_feed {
+        match response.subscribe_feed {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
                 Ok(types::Feed::from(success.feed))
             }
@@ -80,10 +80,10 @@ impl Client {
         let var = mutation::unsubscribe_feed::Variables {
             input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
         };
-        let req = mutation::UnsubscribeFeed::build_query(var);
-        let res: mutation::unsubscribe_feed::ResponseData = self.request(&req).await?;
+        let request = mutation::UnsubscribeFeed::build_query(var);
+        let response: mutation::unsubscribe_feed::ResponseData = self.request(&request).await?;
 
-        match res.unsubscribe_feed {
+        match response.unsubscribe_feed {
             mutation::unsubscribe_feed::UnsubscribeFeedUnsubscribeFeed::UnsubscribeFeedSuccess(
                 _,
             ) => Ok(()),
@@ -99,10 +99,10 @@ impl Client {
         first: i64,
     ) -> anyhow::Result<payload::FetchEntriesPayload> {
         let var = query::entries::Variables { after, first };
-        let req = query::Entries::build_query(var);
-        let res: query::entries::ResponseData = self.request(&req).await?;
+        let request = query::Entries::build_query(var);
+        let response: query::entries::ResponseData = self.request(&request).await?;
 
-        Ok(res.output.into())
+        Ok(response.output.into())
     }
 
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>

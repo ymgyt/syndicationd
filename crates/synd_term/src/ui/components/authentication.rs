@@ -67,7 +67,7 @@ impl Authentication {
     pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         match self.state {
             AuthenticateState::NotAuthenticated => self.render_login(area, buf, cx),
-            AuthenticateState::DeviceFlow(ref res) => self.render_device_flow(area, buf, cx, res),
+            AuthenticateState::DeviceFlow(ref res) => Self::render_device_flow(area, buf, cx, res),
             AuthenticateState::Authenticated => unreachable!(),
         }
     }
@@ -104,7 +104,6 @@ impl Authentication {
     }
 
     fn render_device_flow(
-        &self,
         area: Rect,
         buf: &mut Buffer,
         cx: &Context<'_>,

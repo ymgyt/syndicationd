@@ -113,7 +113,7 @@ impl FeedService {
         S: std::io::Read,
     {
         let url = url.into();
-        let parser = self.build_parser(&url);
+        let parser = Self::build_parser(&url);
 
         match parser.parse(source) {
             Ok(feed) => Ok(Feed::from((url, feed))),
@@ -125,7 +125,7 @@ impl FeedService {
         }
     }
 
-    fn build_parser(&self, base_uri: impl AsRef<str>) -> Parser {
+    fn build_parser(base_uri: impl AsRef<str>) -> Parser {
         feed_rs::parser::Builder::new()
             .base_uri(Some(base_uri))
             .build()

@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 
 pub mod github;
 
-/// https://datatracker.ietf.org/doc/html/rfc8628#section-3.1
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeviceAuthorizationRequest<'s> {
     pub client_id: Cow<'s, str>,
     pub scope: Cow<'s, str>,
 }
 
-/// https://datatracker.ietf.org/doc/html/rfc8628#section-3.2
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceAuthorizationResponse {
     /// device verification code
@@ -57,7 +57,7 @@ impl<'s> DeviceAccessTokenRequest<'s> {
 }
 
 /// Successful Response
-/// https://datatracker.ietf.org/doc/html/rfc6749#section-5.1
+/// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>
 #[derive(Deserialize, Debug)]
 pub struct DeviceAccessTokenResponse {
     /// the access token issued by the authorization server
@@ -67,7 +67,7 @@ pub struct DeviceAccessTokenResponse {
     pub expires_in: Option<i64>,
 }
 
-/// https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+/// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
 #[derive(Deserialize, Debug)]
 pub struct DeviceAccessTokenErrorResponse {
     pub error: DeviceAccessTokenErrorCode,
@@ -96,9 +96,9 @@ pub enum DeviceAccessTokenErrorCode {
 }
 
 impl DeviceAccessTokenErrorCode {
-    ///  The "authorization_pending" and "slow_down" error codes define particularly unique behavior, as they indicate that the OAuth client should continue to poll the token endpoint by repeating the token request (implementing the precise behavior defined above)
+    ///  The `authorization_pending` and `slow_down` error codes define particularly unique behavior, as they indicate that the OAuth client should continue to poll the token endpoint by repeating the token request (implementing the precise behavior defined above)
     pub fn should_continue_to_poll(&self) -> bool {
-        use DeviceAccessTokenErrorCode::*;
+        use DeviceAccessTokenErrorCode::{AuthorizationPending, SlowDown};
         *self == AuthorizationPending || *self == SlowDown
     }
 }

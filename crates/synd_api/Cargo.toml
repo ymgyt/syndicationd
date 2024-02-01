@@ -1,12 +1,15 @@
 [package]
 authors.workspace    = true
 categories.workspace = true
-description          = "syndicationd backend api"
 edition.workspace    = true
+keywords.workspace   = true
 license.workspace    = true
-name                 = "synd_api"
+readme.workspace     = true
 repository.workspace = true
-version              = "0.1.0"
+
+description = "syndicationd backend api"
+name        = "synd_api"
+version     = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
@@ -40,3 +43,6 @@ tracing-subscriber = { workspace = true }
 
 # Enable graphql introspection
 introspection = []
+
+[lints]
+workspace = true

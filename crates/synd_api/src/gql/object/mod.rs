@@ -96,7 +96,7 @@ impl Feed {
 
     /// Undering feed specification
     async fn r#type(&self) -> FeedType {
-        self.0.meta().r#type().into()
+        self.0.meta().r#type().clone().into()
     }
 
     /// Feed title
@@ -115,6 +115,7 @@ impl Feed {
     }
 
     /// Feed entries
+    #[allow(clippy::cast_sign_loss)]
     async fn entries(
         &self,
         #[graphql(default = 5)] first: Option<i32>,
@@ -126,6 +127,7 @@ impl Feed {
         FeedEntryConnectionName,
         FeedEntryEdgeName,
     > {
+        #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(5).max(0) as usize;
         let meta = self.0.meta();
         let entries = self

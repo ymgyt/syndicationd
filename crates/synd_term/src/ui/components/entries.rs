@@ -30,10 +30,10 @@ impl Entries {
     }
 
     pub fn update_entries(&mut self, payload: payload::FetchEntriesPayload) {
-        self.entries.extend(payload.entries)
+        self.entries.extend(payload.entries);
     }
 
-    pub fn move_selection(&mut self, direction: Direction) {
+    pub fn move_selection(&mut self, direction: &Direction) {
         self.selected_entry_index = direction.apply(
             self.selected_entry_index,
             self.entries.len(),
@@ -116,7 +116,9 @@ impl Entries {
             .map(|title| title.graphemes(true).count())
             .max()
             .unwrap_or(10)
-            .max(60) as u16;
+            .max(60)
+            .try_into()
+            .unwrap_or(200);
 
         let header = Row::new([
             Cell::from("Published"),
@@ -135,8 +137,7 @@ impl Entries {
             let published = entry
                 .published
                 .as_ref()
-                .map(|t| t.local_ymd())
-                .unwrap_or_else(|| ui::UNKNOWN_SYMBOL.to_string());
+                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
 
             let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
 

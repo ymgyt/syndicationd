@@ -25,6 +25,7 @@ impl Subscription {
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, object::Feed>> {
+        #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(10).min(100) as usize;
         let has_prev = after.is_some();
         let input = FetchSubscribedFeedsInput {
@@ -57,6 +58,7 @@ impl Subscription {
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<id::EntryId, Entry<'cx>>> {
+        #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(20).min(200) as usize;
         let has_prev = after.is_some();
         let input = FetchEntriesInput {

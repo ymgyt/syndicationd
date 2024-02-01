@@ -30,7 +30,7 @@ impl User {
 
         email.hash(&mut s);
         let id = s.finish();
-        let id = format!("{:016x}", id);
+        let id = format!("{id:016x}");
 
         User { id, email }
     }

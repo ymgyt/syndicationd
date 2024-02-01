@@ -7,6 +7,7 @@ authors     = ["ymgyt"]
 categories  = ["command-line-utilities"]
 description = "terminal feed viewer"
 edition     = "2021"
+keywords    = ["feed", "rss", "atom", "tui"]
 license     = "MIT OR Apache-2.0"
 readme      = "README"
 repository  = "https://github.com/ymgyt/syndicationd"
@@ -29,3 +30,23 @@ tokio              = { version = "1.35" }
 tracing            = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+
+# cargo
+cargo_common_metadata   = "warn"
+multiple_crate_versions = "allow"
+negative_feature_names  = "warn"
+redundant_feature_names = "warn"
+wildcard_dependencies   = "warn"
+
+# pedantic
+pedantic = "warn"
+
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"
