@@ -9,7 +9,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v22
       with:
-        gihtub_access_token: ${{ secrets.GITHUB_TOKEN }}
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
     - uses: cachix/cachix-action@v14
       with:
         name: syndicationd
