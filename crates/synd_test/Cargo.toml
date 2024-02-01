@@ -10,7 +10,9 @@ repository.workspace  = true
 version               = "0.1.0"
 
 [dependencies]
-anyhow    = { workspace = true }
-axum      = { workspace = true }
-synd_term = { path = "../synd_term" }
-tokio     = { workspace = true, features = ["rt-multi-thread", "net"] }
+synd_authn = { path = "../synd_authn" }
+synd_term  = { path = "../synd_term" }
+
+anyhow = { workspace = true }
+axum   = { workspace = true }
+tokio  = { workspace = true, features = ["rt-multi-thread", "net"] }

@@ -2605,6 +2605,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "synd_authn"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "http 0.2.11",
+ "http-serde-ext",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "synd_feed"
 version = "0.1.0"
 dependencies = [
@@ -2633,14 +2647,13 @@ dependencies = [
  "futures-util",
  "graphql_client",
  "html2text",
- "http 0.2.11",
- "http-serde-ext",
  "open",
  "ratatui",
  "reqwest",
  "serde",
  "serde_json",
  "serial_test",
+ "synd_authn",
  "synd_feed",
  "synd_test",
  "tokio",
@@ -2658,6 +2671,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "synd_authn",
  "synd_term",
  "tokio",
 ]

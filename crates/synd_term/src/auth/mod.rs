@@ -5,9 +5,6 @@ use tracing::debug;
 
 use crate::config;
 
-pub mod device_flow;
-pub mod github;
-
 #[derive(Debug, Clone, Copy)]
 pub enum AuthenticationProvider {
     Github,

@@ -1,11 +1,9 @@
 use std::fmt::Display;
+use synd_authn::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
 
 use crate::{
     application::Direction,
-    auth::{
-        device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
-        AuthenticationProvider,
-    },
+    auth::AuthenticationProvider,
     client::{payload, query::subscription::SubscriptionOutput},
     types::Feed,
 };

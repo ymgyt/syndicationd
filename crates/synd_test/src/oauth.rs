@@ -1,5 +1,5 @@
 use axum::{http::StatusCode, routing::post, Form, Json, Router};
-use synd_term::auth::device_flow::{DeviceAuthorizationRequest, DeviceAuthorizationResponse};
+use synd_authn::device_flow::{DeviceAuthorizationRequest, DeviceAuthorizationResponse};
 use tokio::net::TcpListener;
 
 async fn device_authorization(

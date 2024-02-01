@@ -7,9 +7,10 @@ use ratatui::{
         Widget,
     },
 };
+use synd_authn::device_flow::DeviceAuthorizationResponse;
 
 use crate::{
-    auth::{device_flow::DeviceAuthorizationResponse, AuthenticationProvider},
+    auth::AuthenticationProvider,
     ui::{self, extension::RectExt, Context},
 };
 

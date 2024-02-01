@@ -3,17 +3,16 @@ use std::{pin::Pin, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
 use ratatui::widgets::Widget;
+use synd_authn::device_flow::{
+    github::DeviceFlow, DeviceAccessTokenResponse, DeviceAuthorizationResponse,
+};
 use tokio::time::{Instant, Sleep};
 
 use crate::{
-    auth::{
-        self,
-        device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse},
-        github::DeviceFlow,
-        AuthenticationProvider, Credential,
-    },
+    auth::{self, AuthenticationProvider, Credential},
     client::Client,
     command::Command,
+    config,
     job::Jobs,
     terminal::Terminal,
     ui::{
@@ -45,7 +44,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             idle_timer_interval: Duration::from_secs(250),
-            github_device_flow: DeviceFlow::new(),
+            github_device_flow: DeviceFlow::new(config::github::CLIENT_ID),
         }
     }
 }
@@ -460,9 +459,10 @@ impl Application {
         // attempt to open input screen in the browser
         open::that(device_authorization.verification_uri.to_string()).ok();
 
+        let device_flow = self.config.github_device_flow.clone();
         let fut = async move {
             // TODO: error handling
-            let res = auth::github::DeviceFlow::new()
+            let res = device_flow
                 .pool_device_access_token(
                     device_authorization.device_code,
                     device_authorization.interval,

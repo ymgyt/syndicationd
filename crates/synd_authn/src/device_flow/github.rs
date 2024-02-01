@@ -1,22 +1,21 @@
-use std::{io::Write, time::Duration};
+use std::{borrow::Cow, future::Future, time::Duration};
 
-use http::StatusCode;
+use http::{StatusCode, Uri};
 use reqwest::Client;
 use tracing::debug;
 
-use crate::{
-    auth::device_flow::{
-        DeviceAccessTokenErrorResponse, DeviceAccessTokenRequest, DeviceAccessTokenResponse,
-        DeviceAuthorizationRequest, DeviceAuthorizationResponse,
-    },
-    config,
+use crate::device_flow::{
+    DeviceAccessTokenErrorResponse, DeviceAccessTokenRequest, DeviceAccessTokenResponse,
+    DeviceAuthorizationRequest, DeviceAuthorizationResponse,
 };
+
+const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 /// https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow
 #[derive(Clone)]
 pub struct DeviceFlow {
     client: Client,
-    client_id: &'static str,
+    client_id: Cow<'static, str>,
     endpoint: Option<&'static str>,
 }
 
@@ -24,16 +23,16 @@ impl DeviceFlow {
     const DEVICE_AUTHORIZATION_ENDPOINT: &'static str = "https://github.com/login/device/code";
     const TOKEN_ENDPOINT: &'static str = "https://github.com/login/oauth/access_token";
 
-    pub fn new() -> Self {
+    pub fn new(client_id: impl Into<Cow<'static, str>>) -> Self {
         let client = reqwest::ClientBuilder::new()
-            .user_agent(config::USER_AGENT)
+            .user_agent(USER_AGENT)
             .timeout(Duration::from_secs(5))
             .build()
             .unwrap();
 
         Self {
             client,
-            client_id: config::github::CLIENT_ID,
+            client_id: client_id.into(),
             endpoint: None,
         }
     }
@@ -57,7 +56,7 @@ impl DeviceFlow {
             .post(self.endpoint.unwrap_or(Self::DEVICE_AUTHORIZATION_ENDPOINT))
             .header(http::header::ACCEPT, "application/json")
             .form(&DeviceAuthorizationRequest {
-                client_id: self.client_id.into(),
+                client_id: self.client_id.clone(),
                 scope: scope.into(),
             })
             .send()
@@ -99,7 +98,10 @@ impl DeviceFlow {
                 .client
                 .post(Self::TOKEN_ENDPOINT)
                 .header(http::header::ACCEPT, "application/json")
-                .form(&DeviceAccessTokenRequest::new(&device_code, self.client_id))
+                .form(&DeviceAccessTokenRequest::new(
+                    &device_code,
+                    self.client_id.as_ref(),
+                ))
                 .send()
                 .await?;
 
@@ -128,10 +130,11 @@ impl DeviceFlow {
     }
 
     #[tracing::instrument(skip_all)]
-    pub async fn device_flow<W: Write>(
-        self,
-        writer: W,
-    ) -> anyhow::Result<DeviceAccessTokenResponse> {
+    pub async fn device_flow<F, Fut>(self, callback: F) -> anyhow::Result<DeviceAccessTokenResponse>
+    where
+        F: FnOnce(Uri, String) -> Fut,
+        Fut: Future<Output = ()>,
+    {
         let DeviceAuthorizationResponse {
             device_code,
             user_code,
@@ -140,12 +143,7 @@ impl DeviceFlow {
             ..
         } = self.device_authorize_request().await?;
 
-        let mut writer = writer;
-        writeln!(&mut writer, "Open `{verification_uri}` on your browser")?;
-        writeln!(&mut writer, "Enter CODE: `{user_code}`")?;
-
-        // attempt to open input screen in the browser
-        open::that(verification_uri.to_string()).ok();
+        callback(verification_uri, user_code).await;
 
         self.pool_device_access_token(device_code, interval).await
     }

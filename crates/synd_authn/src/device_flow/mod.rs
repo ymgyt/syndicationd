@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use http::Uri;
 use serde::{Deserialize, Serialize};
 
+pub mod github;
+
 /// https://datatracker.ietf.org/doc/html/rfc8628#section-3.1
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DeviceAuthorizationRequest<'s> {
@@ -39,13 +41,13 @@ pub struct DeviceAccessTokenRequest<'s> {
     grant_type: &'static str,
     /// The device verification code, "device_code" from the device authorization response
     device_code: &'s str,
-    client_id: &'static str,
+    client_id: &'s str,
 }
 
 impl<'s> DeviceAccessTokenRequest<'s> {
     const GRANT_TYPE: &'static str = "urn:ietf:params:oauth:grant-type:device_code";
 
-    pub fn new(device_code: &'s str, client_id: &'static str) -> Self {
+    pub fn new(device_code: &'s str, client_id: &'s str) -> Self {
         Self {
             grant_type: Self::GRANT_TYPE,
             device_code,

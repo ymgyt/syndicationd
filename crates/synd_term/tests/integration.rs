@@ -10,9 +10,9 @@ mod test {
         style::{Modifier, Style},
     };
     use serial_test::file_serial;
+    use synd_authn::device_flow::github::DeviceFlow;
     use synd_term::{
         application::{Application, Config},
-        auth::github::DeviceFlow,
         client::Client,
         ui::theme::Theme,
     };
@@ -42,7 +42,7 @@ mod test {
         let client = Client::new(endpoint).unwrap();
         let config = Config {
             idle_timer_interval: Duration::from_millis(2000),
-            github_device_flow: DeviceFlow::new()
+            github_device_flow: DeviceFlow::new("dummy")
                 .with_endpoint("http://localhost:6000/github/login/device/code"),
         };
         // or mpsc and tokio_stream ReceiverStream
