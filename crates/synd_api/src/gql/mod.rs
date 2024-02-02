@@ -16,9 +16,10 @@ pub mod handler {
     use async_graphql::http::GraphiQLSource;
     use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
     use axum::{response::IntoResponse, Extension};
+    use synd_o11y::audit_span;
     use tracing::Instrument;
 
-    use crate::{audit_span, principal::Principal};
+    use crate::principal::Principal;
 
     use super::SyndSchema;
 

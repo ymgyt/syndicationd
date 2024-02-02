@@ -3,7 +3,7 @@ use tracing::{error, info};
 use synd_api::{args, dependency::Dependency, serve::listen_and_serve};
 
 fn init_tracing() {
-    use synd_api::serve::layer::audit;
+    use synd_o11y::tracing_subscriber::audit;
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
         Registry,

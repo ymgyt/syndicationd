@@ -17,8 +17,8 @@ mod macros {
     macro_rules! audit_span {
         () => {
             ::tracing::info_span!(
-                target: $crate::serve::layer::audit::Audit::TARGET,
-                $crate::serve::layer::audit::Audit::SPAN_ROOT_NAME)
+                target: $crate::tracing_subscriber::audit::Audit::TARGET,
+                $crate::tracing_subscriber::audit::Audit::SPAN_ROOT_NAME)
         };
     }
 
@@ -26,8 +26,8 @@ mod macros {
     macro_rules! audit {
         ($($arg:tt)*) => {
             ::tracing::event!(
-                name: $crate::serve::layer::audit::Audit::EVENT_NAME,
-                target: $crate::serve::layer::audit::Audit::TARGET,
+                name: $crate::tracing_subscriber::audit::Audit::EVENT_NAME,
+                target: $crate::tracing_subscriber::audit::Audit::TARGET,
                 ::tracing::Level::TRACE, $($arg)*)
         };
     }
@@ -233,7 +233,7 @@ mod tests {
     mod usecase_authorize_scenario {
         use tracing::info_span;
 
-        use crate::{audit, audit_span, serve::layer::audit::Audit};
+        use crate::{audit, audit_span, tracing_subscriber::audit::Audit};
 
         pub fn root() {
             let span = audit_span!();
@@ -293,9 +293,7 @@ mod tests {
     #[test]
     fn no_audit_span() {
         let on_event = |event: &Event<'_>| {
-            if event.metadata().name() == Audit::EMIT_EVENT_NAME {
-                panic!("should not called");
-            }
+            assert_eq!(event.metadata().name(), Audit::EMIT_EVENT_NAME);
         };
         let test_layer = TestLayer { on_event };
         let subscriber = tracing_subscriber::registry()

@@ -12,12 +12,12 @@ name        = "synd_api"
 version     = "0.1.0"
 
 [dependencies]
-anyhow = { workspace = true }
-# To use axum 0.7
+synd_o11y = { path = "../synd_o11y" }
+
+anyhow             = { workspace = true }
 async-graphql      = { version = "7.0", features = ["tracing"] }
 async-graphql-axum = { version = "7.0" }
 async-trait        = { workspace = true }
-# TODO configure features
 axum               = { workspace = true }
 chrono             = { workspace = true }
 clap               = { workspace = true, features = ["derive"] }

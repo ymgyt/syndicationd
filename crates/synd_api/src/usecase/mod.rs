@@ -18,12 +18,11 @@ pub mod authorize;
 use std::{future::Future, sync::Arc};
 
 use synd_feed::feed::cache::FetchCachedFeed;
+use synd_o11y::{audit, tracing_subscriber::audit::Audit};
 
 use crate::{
-    audit,
     persistence::{Datastore, DatastoreError},
     principal::Principal,
-    serve::layer::audit::Audit,
 };
 
 use self::authorize::{Authorized, Authorizer, Unauthorized};

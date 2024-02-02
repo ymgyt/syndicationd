@@ -13,7 +13,6 @@ version = "0.1.0"
 
 [dependencies]
 synd_authn = { path = "../synd_authn" }
-synd_term  = { path = "../synd_term" }
 
 anyhow = { workspace = true }
 axum   = { workspace = true }

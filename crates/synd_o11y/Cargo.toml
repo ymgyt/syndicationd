@@ -1,0 +1,21 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+edition.workspace    = true
+keywords.workspace   = true
+license.workspace    = true
+readme.workspace     = true
+repository.workspace = true
+
+description = "syndicationd lib for tracing and opentelemetry ecosystem"
+name        = "synd_o11y"
+version     = "0.1.0"
+
+[dependencies]
+opentelemetry-appender-tracing = "0.2.0"
+opentelemetry_sdk              = { workspace = true, features = ["logs"] }
+tracing                        = { workspace = true }
+tracing-subscriber             = { workspace = true }
+
+[lints]
+workspace = true
