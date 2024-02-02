@@ -1,6 +1,10 @@
 set shell := ["nu", "-c"]
+
 kvsd_user := "synduser"
 github_pat := env_var_or_default("GH_PAT", "")
+otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
+
 
 alias format := fmt
 
@@ -58,9 +62,18 @@ kvsd:
 
 # Run api
 api:
-  cd crates/synd_api; RUST_LOG="info" cargo run --features "introspection" -- \
+  cd crates/synd_api; \
+    RUST_LOG="info,synd_api=debug" \
+    OTEL_EXPORTER_OTLP_ENDPOINT={{otlp_endpoint}} \
+    cargo run --features "introspection" -- \
     --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret
 
 # Run term
 term:
   cd crates/synd_term; cargo run -- --log /tmp/syndterm.log
+
+# Run opentelemetry-collector-contrib
+#  LOKI_ENDPOINT={{loki_endpoint}} \
+@otelcol:
+  LOKI_ENDPOINT={{loki_endpoint}} \
+  otelcontribcol --config=file:./dev/otelcol-config.yaml

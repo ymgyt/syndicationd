@@ -1,0 +1,32 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:4317
+
+processors:
+  resource/loki:
+    attributes:
+      - action: insert
+        key: loki.resource.labels
+        value: service.namespace,service.name,service.version
+
+exporters:
+  loki:
+    endpoint: ${env:LOKI_ENDPOINT}
+    default_labels_enabled:
+      exporter: false
+      job: false
+      instance: false
+      level: false
+      
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [resource/loki]
+      exporters: [debug,loki]
+    

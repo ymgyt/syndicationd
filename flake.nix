@@ -89,7 +89,13 @@
         ];
 
         dev_packages = with pkgs;
-          [ cargo-nextest graphql-client nixfmt rust-analyzer ] ++ ci_packages;
+          [
+            cargo-nextest
+            graphql-client
+            nixfmt
+            rust-analyzer
+            opentelemetry-collector-contrib
+          ] ++ ci_packages;
 
       in {
         inherit checks;
