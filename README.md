@@ -13,7 +13,7 @@ Syndicationd is a terminal feed viewer.
 nix develop
 
 # Run check
-nix flake check
+just check
 ```
 
 ## License
