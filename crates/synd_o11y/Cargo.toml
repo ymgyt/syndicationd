@@ -20,6 +20,7 @@ opentelemetry-http                 = { workspace = true }
 opentelemetry-otlp                 = { version = "0.14.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic"] }
 opentelemetry-semantic-conventions = { workspace = true }
 opentelemetry_sdk                  = { workspace = true, features = ["logs", "rt-tokio"] }
+rand                               = { workspace = true }
 reqwest                            = { workspace = true }
 tracing                            = { workspace = true }
 tracing-opentelemetry              = { workspace = true }

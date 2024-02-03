@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
-use synd_o11y::opentelemetry::{extension::*, KeyValue};
+use synd_o11y::opentelemetry::extension::*;
 use tracing::{error, Span};
 use url::Url;
 
@@ -124,13 +124,10 @@ impl Client {
             .json(&body)
             .build()?;
 
-        // TODO: use trace_id
-        let request_id = Self::request_id();
-
         synd_o11y::opentelemetry::http::inject_with_baggage(
             &Span::current().context(),
             request.headers_mut(),
-            std::iter::once(KeyValue::new("request.id", request_id)),
+            std::iter::once(synd_o11y::request_id_key_value()),
         );
 
         let response: Response<ResponseData> = self
@@ -151,11 +148,5 @@ impl Client {
             (Some(data), _) => Ok(data),
             _ => Err(anyhow::anyhow!("unexpected response",)),
         }
-    }
-
-    fn request_id() -> String {
-        // https://stackoverflow.com/questions/54275459/how-do-i-create-a-random-string-by-sampling-from-alphanumeric-characters
-        use rand::distributions::{Alphanumeric, DistString};
-        Alphanumeric.sample_string(&mut rand::thread_rng(), 10)
     }
 }
