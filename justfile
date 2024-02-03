@@ -14,7 +14,7 @@ default:
 
 # Run check
 check:
-  nix flake check --all-systems
+  nix flake check --all-systems --accept-flake-config
 
 # Format files
 fmt: fmt-toml
