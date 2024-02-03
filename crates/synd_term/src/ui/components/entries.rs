@@ -89,6 +89,8 @@ impl Entries {
             ..area
         };
 
+        // https://github.com/ratatui-org/ratatui/pull/911
+        // passing None to track_symbol cause incorrect rendering
         let mut scrollbar_state = ScrollbarState::default()
             .content_length(self.entries.len())
             .position(self.selected_entry_index);
@@ -96,7 +98,7 @@ impl Entries {
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(None)
             .end_symbol(None)
-            .track_symbol(None)
+            .track_symbol(Some(" "))
             .thumb_symbol("▐")
             .render(scrollbar_area, buf, &mut scrollbar_state);
     }
