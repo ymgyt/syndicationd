@@ -24,13 +24,16 @@ graphql_client                     = { version = "0.13.0", default-features = fa
 http                               = { version = "0.2" }                                                                                                   # request use 0.2
 moka                               = { version = "0.12.4", features = ["future"] }
 opentelemetry                      = { version = "0.21.0" }
+opentelemetry-http                 = { version = "0.10.0" }
 opentelemetry-semantic-conventions = { version = "0.13.0" }
 opentelemetry_sdk                  = { version = "0.21.2" }
+rand                               = { version = "0.8.5" }
 reqwest                            = { version = "0.11.23", default-features = false, features = ["rustls-tls", "json"] }
 serde                              = { version = "1", features = ["derive"] }
 serde_json                         = { version = "1.0.111" }
 tokio                              = { version = "1.35" }
 tracing                            = { version = "0.1.40" }
+tracing-opentelemetry              = { version = "0.22.0" }
 tracing-subscriber                 = { version = "0.3.18", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                                = { version = "2.5.0" }
 

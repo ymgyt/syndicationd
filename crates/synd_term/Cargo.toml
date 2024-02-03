@@ -18,6 +18,7 @@ path = "src/main.rs"
 [dependencies]
 synd_authn = { path = "../synd_authn", version = "0.1.0" }
 synd_feed  = { path = "../synd_feed", version = "0.1.0" }
+synd_o11y  = { path = "../synd_o11y", version = "0.1.0" }
 
 anyhow               = { workspace = true }
 chrono               = { workspace = true }
@@ -29,6 +30,7 @@ futures-util         = "0.3.30"
 graphql_client       = { workspace = true }
 html2text            = { version = "0.12" }
 open                 = "5.0.1"
+rand                 = { workspace = true }
 ratatui              = { git = "https://github.com/ratatui-org/ratatui.git", branch = "main" }
 reqwest              = { workspace = true }
 serde                = { workspace = true, features = ["derive"] }

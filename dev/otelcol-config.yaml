@@ -10,6 +10,9 @@ processors:
       - action: insert
         key: loki.resource.labels
         value: service.namespace,service.name,service.version
+      - action: insert
+        key: loki.format
+        value: logfmt # logfmt | json   raw
 
 exporters:
   loki:

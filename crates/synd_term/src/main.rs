@@ -12,6 +12,7 @@ use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
 
 fn init_tracing(log_path: PathBuf) -> anyhow::Result<WorkerGuard> {
+    use synd_o11y::opentelemetry::init_propagation;
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
     };
@@ -44,6 +45,10 @@ fn init_tracing(log_path: PathBuf) -> anyhow::Result<WorkerGuard> {
                 .unwrap(),
         )
         .try_init()?;
+
+    // Set text map progator globally
+    init_propagation();
+
     Ok(guard)
 }
 

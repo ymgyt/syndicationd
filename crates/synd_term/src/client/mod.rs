@@ -4,7 +4,8 @@ use anyhow::anyhow;
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
-use tracing::error;
+use synd_o11y::opentelemetry::{extension::*, KeyValue};
+use tracing::{error, Span};
 use url::Url;
 
 use crate::{auth::Credential, config, types};
@@ -110,7 +111,7 @@ impl Client {
         Body: Serialize + ?Sized,
         ResponseData: DeserializeOwned + Debug,
     {
-        let res: Response<ResponseData> = self
+        let mut request = self
             .client
             .post(self.endpoint.clone())
             .header(
@@ -121,13 +122,26 @@ impl Client {
                     .clone(),
             )
             .json(&body)
-            .send()
+            .build()?;
+
+        // TODO: use trace_id
+        let request_id = Self::request_id();
+
+        synd_o11y::opentelemetry::http::inject_with_baggage(
+            &Span::current().context(),
+            request.headers_mut(),
+            std::iter::once(KeyValue::new("request.id", request_id)),
+        );
+
+        let response: Response<ResponseData> = self
+            .client
+            .execute(request)
             .await?
             .error_for_status()?
             .json()
             .await?;
 
-        match (res.data, res.errors) {
+        match (response.data, response.errors) {
             (_, Some(errs)) if !errs.is_empty() => {
                 for err in errs {
                     error!("{err:?}");
@@ -137,5 +151,11 @@ impl Client {
             (Some(data), _) => Ok(data),
             _ => Err(anyhow::anyhow!("unexpected response",)),
         }
+    }
+
+    fn request_id() -> String {
+        // https://stackoverflow.com/questions/54275459/how-do-i-create-a-random-string-by-sampling-from-alphanumeric-characters
+        use rand::distributions::{Alphanumeric, DistString};
+        Alphanumeric.sample_string(&mut rand::thread_rng(), 10)
     }
 }

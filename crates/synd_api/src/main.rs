@@ -3,7 +3,10 @@ use tracing::{error, info};
 use synd_api::{args, config, dependency::Dependency, serve::listen_and_serve};
 
 fn init_tracing() {
-    use synd_o11y::tracing_subscriber::{audit, otel_log};
+    use synd_o11y::{
+        opentelemetry::init_propagation,
+        tracing_subscriber::{audit, otel_log},
+    };
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
         Registry,
@@ -43,6 +46,9 @@ fn init_tracing() {
         )
         .with(audit::layer())
         .init();
+
+    // Set text map propagator globally
+    init_propagation();
 }
 
 #[tokio::main]

@@ -12,13 +12,17 @@ name        = "synd_o11y"
 version     = "0.1.0"
 
 [dependencies]
-# disable logs_level_enabled which affect global filitering
+axum                               = { workspace = true }
+http                               = { workspace = true }
 opentelemetry                      = { workspace = true }
-opentelemetry-appender-tracing     = { version = "0.2.0", default-features = false }
+opentelemetry-appender-tracing     = { version = "0.2.0", default-features = false }                                                         # disable logs_level_enabled which affect global filtering
+opentelemetry-http                 = { workspace = true }
 opentelemetry-otlp                 = { version = "0.14.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic"] }
 opentelemetry-semantic-conventions = { workspace = true }
 opentelemetry_sdk                  = { workspace = true, features = ["logs", "rt-tokio"] }
+reqwest                            = { workspace = true }
 tracing                            = { workspace = true }
+tracing-opentelemetry              = { workspace = true }
 tracing-subscriber                 = { workspace = true }
 
 [lints]
