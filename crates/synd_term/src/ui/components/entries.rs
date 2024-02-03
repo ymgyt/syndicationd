@@ -118,7 +118,7 @@ impl Entries {
             .unwrap_or(10)
             .max(60)
             .try_into()
-            .unwrap_or(200);
+            .unwrap_or(60);
 
         let header = Row::new([
             Cell::from("Published"),
@@ -128,7 +128,7 @@ impl Entries {
 
         let constraints = [
             Constraint::Length(10),
-            Constraint::Percentage(70),
+            Constraint::Min(70),
             Constraint::Length(title_width),
         ];
 
