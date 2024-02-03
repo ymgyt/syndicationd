@@ -2,7 +2,7 @@ use std::{pin::Pin, time::Duration};
 
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
-use ratatui::widgets::Widget;
+use ratatui::{style::palette::tailwind, widgets::Widget};
 use synd_authn::device_flow::{
     github::DeviceFlow, DeviceAccessTokenResponse, DeviceAuthorizationResponse,
 };
@@ -74,7 +74,7 @@ impl Application {
             client,
             components: Components::new(),
             jobs: Jobs::new(),
-            theme: Theme::new(),
+            theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
             config,
