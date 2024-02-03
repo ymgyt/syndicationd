@@ -76,7 +76,6 @@ term:
   cd crates/synd_term; cargo run -- --log /tmp/syndterm.log
 
 # Run opentelemetry-collector-contrib
-#  LOKI_ENDPOINT={{loki_endpoint}} \
 @otelcol:
   LOKI_ENDPOINT={{loki_endpoint}} \
   otelcontribcol --config=file:./dev/otelcol-config.yaml

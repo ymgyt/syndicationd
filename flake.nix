@@ -24,7 +24,6 @@
         pkgs = import nixpkgs { inherit system overlays; };
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
           file = ./rust-toolchain.toml;
-          # sha256 = pkgs.lib.fakeSha256;
           sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
         };
 
