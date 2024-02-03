@@ -26,6 +26,9 @@ lint:
 fmt-toml:
   taplo fmt --config taplo.toml **.toml
 
+test:
+  cargo nextest run
+
 # Run integration test
 integration:
   RUST_LOG="synd_term,integration=debug" cargo nextest run --package synd_term --features integration --test integration --no-capture 
