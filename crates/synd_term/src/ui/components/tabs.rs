@@ -45,7 +45,7 @@ impl Tabs {
 impl Tabs {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(25)]);
-        let [title, tabs] = area.split(&horizontal);
+        let [title, tabs] = horizontal.areas(area);
 
         Paragraph::new(Span::styled("Syndicationd", cx.theme.application_title)).render(title, buf);
 

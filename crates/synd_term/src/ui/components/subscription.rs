@@ -71,7 +71,7 @@ impl Subscription {
 impl Subscription {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
-        let [feeds_area, feed_entries_area] = area.split(&vertical);
+        let [feeds_area, feed_entries_area] = vertical.areas(area);
 
         self.render_feeds(feeds_area, buf, cx);
         self.render_feed_entries(feed_entries_area, buf, cx);

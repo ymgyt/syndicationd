@@ -54,7 +54,7 @@ impl Entries {
 impl Entries {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
-        let [entries_area, summary_area] = area.split(&vertical);
+        let [entries_area, summary_area] = vertical.areas(area);
 
         self.render_entries(entries_area, buf, cx);
         self.render_summary(summary_area, buf, cx);

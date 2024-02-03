@@ -21,11 +21,12 @@ impl<'a> Root<'a> {
     fn render_browse(&self, area: Rect, buf: &mut Buffer) {
         let cx = &self.cx;
 
-        let [tabs_area, content_area, prompt_area] = area.split(&Layout::vertical([
+        let layout = Layout::vertical([
             Constraint::Length(1),
             Constraint::Min(0),
             Constraint::Length(1),
-        ]));
+        ]);
+        let [tabs_area, content_area, prompt_area] = layout.areas(area);
 
         self.components.tabs.render(tabs_area, buf, cx);
 

@@ -76,7 +76,7 @@ impl Authentication {
         let area = area.centered(40, 50);
 
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]);
-        let [title_area, methods_area] = area.split(&vertical);
+        let [title_area, methods_area] = vertical.areas(area);
 
         let title = Paragraph::new(Span::styled("Login", cx.theme.login.title))
             .alignment(Alignment::Center)
@@ -113,7 +113,7 @@ impl Authentication {
 
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]);
 
-        let [title_area, device_flow_area] = area.split(&vertical);
+        let [title_area, device_flow_area] = vertical.areas(area);
 
         let title = Paragraph::new(Text::from("Login"))
             .alignment(Alignment::Center)
