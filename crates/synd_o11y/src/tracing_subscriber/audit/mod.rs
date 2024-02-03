@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn no_audit_span() {
         let on_event = |event: &Event<'_>| {
-            assert_eq!(event.metadata().name(), Audit::EMIT_EVENT_NAME);
+            assert_ne!(event.metadata().name(), Audit::EMIT_EVENT_NAME);
         };
         let test_layer = TestLayer { on_event };
         let subscriber = tracing_subscriber::registry()
