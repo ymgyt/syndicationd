@@ -72,11 +72,9 @@
 
           nextest = craneLib.cargoNextest (commonArgs // {
             inherit cargoArtifacts;
-            # currently disable integration test in flake
-            # we could not do network call
-            # cargoExtraArgs = "--features integration --no-capture";
+            cargoExtraArgs = "--features integration --no-capture";
             CARGO_PROFILE = "";
-            RUST_LOG = "synd_term,integration=debug";
+            RUST_LOG = "synd,integration=debug";
           });
 
           fmt = craneLib.cargoFmt commonArgs;
