@@ -7,6 +7,7 @@ use synd_term::{
     cli::{self, Args},
     client::Client,
     terminal::Terminal,
+    ui::theme::Theme,
 };
 use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
@@ -58,6 +59,7 @@ async fn main() {
         endpoint,
         log,
         command,
+        palette,
     } = cli::parse();
 
     let _guard = init_tracing(log).unwrap();
@@ -71,7 +73,7 @@ async fn main() {
     let mut app = {
         let terminal = Terminal::new().expect("Failed to construct terminal");
         let client = Client::new(endpoint).expect("Failed to construct client");
-        Application::new(terminal, client)
+        Application::new(terminal, client).with_theme(Theme::with_palette(&palette.into()))
     };
 
     if let Some(auth) = auth::credential_from_cache() {

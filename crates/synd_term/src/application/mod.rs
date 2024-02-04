@@ -83,6 +83,11 @@ impl Application {
         }
     }
 
+    #[must_use]
+    pub fn with_theme(self, theme: Theme) -> Self {
+        Self { theme, ..self }
+    }
+
     pub fn set_credential(&mut self, cred: Credential) {
         self.client.set_credential(cred);
         self.components.auth.authenticated();

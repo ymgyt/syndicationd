@@ -38,6 +38,7 @@ pub mod handler {
     }
 }
 
+#[must_use]
 pub fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
     #[cfg(feature = "introspection")]
     let schema = Schema::build(Query, Mutation, EmptySubscription);

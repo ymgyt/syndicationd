@@ -20,6 +20,7 @@ pub struct KvsdOptions {
     pub password: String,
 }
 
+#[must_use]
 pub fn parse() -> Args {
     Args::parse()
 }

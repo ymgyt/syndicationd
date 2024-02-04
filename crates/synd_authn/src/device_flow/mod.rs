@@ -47,6 +47,7 @@ pub struct DeviceAccessTokenRequest<'s> {
 impl<'s> DeviceAccessTokenRequest<'s> {
     const GRANT_TYPE: &'static str = "urn:ietf:params:oauth:grant-type:device_code";
 
+    #[must_use]
     pub fn new(device_code: &'s str, client_id: &'s str) -> Self {
         Self {
             grant_type: Self::GRANT_TYPE,

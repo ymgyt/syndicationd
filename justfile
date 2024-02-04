@@ -72,8 +72,8 @@ api:
     --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret
 
 # Run term
-term:
-  cd crates/synd_term; cargo run -- --log /tmp/syndterm.log
+term *flags:
+  cd crates/synd_term; cargo run -- --log /tmp/syndterm.log {{flags}}
 
 # Run opentelemetry-collector-contrib
 @otelcol:

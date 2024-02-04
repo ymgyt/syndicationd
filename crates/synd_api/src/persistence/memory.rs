@@ -34,6 +34,7 @@ const TEST_DATA: &[&str] = &[
 ];
 
 impl MemoryDatastore {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             feeds: RwLock::new(
