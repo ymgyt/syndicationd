@@ -15,7 +15,7 @@ pub mod authenticate {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct Variables;
     #[derive(Deserialize, Debug)]
     pub struct ResponseData {

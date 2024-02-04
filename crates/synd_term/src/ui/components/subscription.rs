@@ -136,10 +136,10 @@ impl Subscription {
         ]);
 
         let constraints = [
-            Constraint::Max(20),
+            Constraint::Fill(1),
             Constraint::Length(10),
-            Constraint::Max(40),
-            Constraint::Max(100),
+            Constraint::Fill(1),
+            Constraint::Fill(2),
         ];
 
         let row = |feed_meta: &'a Feed| {

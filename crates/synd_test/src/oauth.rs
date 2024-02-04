@@ -1,10 +1,17 @@
+use std::time::Duration;
+
 use axum::{http::StatusCode, routing::post, Form, Json, Router};
-use synd_authn::device_flow::{DeviceAuthorizationRequest, DeviceAuthorizationResponse};
+use synd_authn::device_flow::{
+    DeviceAccessTokenRequest, DeviceAccessTokenResponse, DeviceAuthorizationRequest,
+    DeviceAuthorizationResponse,
+};
 use tokio::net::TcpListener;
 
 async fn device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
 ) -> Result<Json<DeviceAuthorizationResponse>, StatusCode> {
+    tracing::debug!(%scope, "Handle device authorization request");
+
     if scope != "user:email" {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -20,8 +27,34 @@ async fn device_authorization(
     Ok(Json(res))
 }
 
+async fn device_access_token(
+    Form(DeviceAccessTokenRequest { device_code, .. }): Form<DeviceAccessTokenRequest<'static>>,
+) -> Result<Json<DeviceAccessTokenResponse>, StatusCode> {
+    tracing::debug!("Handle device access token request");
+
+    if device_code != "DC001" {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    // mock user input duration
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let res = DeviceAccessTokenResponse {
+        access_token: "dummy".into(),
+        token_type: String::new(),
+        expires_in: None,
+    };
+
+    Ok(Json(res))
+}
+
 pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
-    let router = Router::new().route("/github/login/device/code", post(device_authorization));
+    let case_1 = Router::new()
+        .route("/github/login/device/code", post(device_authorization))
+        .route(
+            "/github/login/oauth/access_token",
+            post(device_access_token),
+        );
+    let router = Router::new().nest("/case1", case_1);
 
     axum::serve(listener, router).await?;
 

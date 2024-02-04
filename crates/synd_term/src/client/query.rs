@@ -16,7 +16,7 @@ pub mod subscription {
     #[allow(dead_code)]
     type ID = String;
     type Rfc3339Time = crate::client::scalar::Rfc3339Time;
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct Variables {
         pub after: Option<String>,
         pub first: Option<Int>,
@@ -110,7 +110,7 @@ pub mod entries {
     #[allow(dead_code)]
     type ID = String;
     type Rfc3339Time = crate::client::scalar::Rfc3339Time;
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct Variables {
         pub after: Option<String>,
         pub first: Int,

@@ -35,13 +35,13 @@ pub struct DeviceAuthorizationResponse {
     pub interval: Option<i64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DeviceAccessTokenRequest<'s> {
     /// Value MUST be set to "urn:ietf:params:oauth:grant-type:device_code"
-    grant_type: &'static str,
+    grant_type: Cow<'static, str>,
     /// The device verification code, "device_code" from the device authorization response
-    device_code: &'s str,
-    client_id: &'s str,
+    pub device_code: Cow<'s, str>,
+    pub client_id: Cow<'s, str>,
 }
 
 impl<'s> DeviceAccessTokenRequest<'s> {
@@ -50,16 +50,16 @@ impl<'s> DeviceAccessTokenRequest<'s> {
     #[must_use]
     pub fn new(device_code: &'s str, client_id: &'s str) -> Self {
         Self {
-            grant_type: Self::GRANT_TYPE,
-            device_code,
-            client_id,
+            grant_type: Self::GRANT_TYPE.into(),
+            device_code: device_code.into(),
+            client_id: client_id.into(),
         }
     }
 }
 
 /// Successful Response
 /// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DeviceAccessTokenResponse {
     /// the access token issued by the authorization server
     pub access_token: String,

@@ -44,11 +44,11 @@ pub mod subscribe_feed {
             }
         }
     }
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct SubscribeFeedInput {
         pub url: String,
     }
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct Variables {
         pub input: SubscribeFeedInput,
     }
@@ -174,11 +174,11 @@ pub mod unsubscribe_feed {
             }
         }
     }
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct UnsubscribeFeedInput {
         pub url: String,
     }
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     pub struct Variables {
         pub input: UnsubscribeFeedInput,
     }

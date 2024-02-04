@@ -11,15 +11,15 @@ use synd_term::{
 };
 use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::fmt::writer::BoxMakeWriter;
 
-fn init_tracing(log_path: PathBuf) -> anyhow::Result<WorkerGuard> {
+fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>> {
     use synd_o11y::opentelemetry::init_propagation;
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
     };
 
-    // Open log file
-    let (log, guard) = {
+    let (writer, guard) = if let Some(log_path) = log_path {
         if let Some(parent) = log_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -27,7 +27,10 @@ fn init_tracing(log_path: PathBuf) -> anyhow::Result<WorkerGuard> {
             .append(true)
             .create(true)
             .open(log_path)?;
-        tracing_appender::non_blocking(log)
+        let (non_blocking, guard) = tracing_appender::non_blocking(log);
+        (BoxMakeWriter::new(non_blocking), Some(guard))
+    } else {
+        (BoxMakeWriter::new(std::io::stdout), None)
     };
 
     Registry::default()
@@ -38,7 +41,7 @@ fn init_tracing(log_path: PathBuf) -> anyhow::Result<WorkerGuard> {
                 .with_file(false)
                 .with_line_number(false)
                 .with_target(true)
-                .with_writer(log),
+                .with_writer(writer),
         )
         .with(
             EnvFilter::try_from_default_env()
@@ -62,6 +65,7 @@ async fn main() {
         palette,
     } = cli::parse();
 
+    let log = if command.is_some() { None } else { Some(log) };
     let _guard = init_tracing(log).unwrap();
 
     #[allow(clippy::single_match)]

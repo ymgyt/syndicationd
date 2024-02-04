@@ -19,6 +19,9 @@ impl Direction {
         clippy::cast_possible_wrap
     )]
     pub fn apply(&self, index: usize, len: usize, out: IndexOutOfRange) -> usize {
+        if len == 0 {
+            return index;
+        }
         let diff = match self {
             Direction::Up | Direction::Left => -1,
             Direction::Down | Direction::Right => 1,

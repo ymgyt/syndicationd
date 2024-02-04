@@ -7,6 +7,7 @@ loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
 
 
 alias format := fmt
+alias integration := integration-test
 
 # List recipe
 default:
@@ -30,8 +31,8 @@ test:
   cargo nextest run
 
 # Run integration test
-integration:
-  RUST_LOG="synd_term,integration=debug" cargo nextest run --package synd_term --features integration --test integration --no-capture 
+integration-test:
+  RUST_LOG="synd,integration=debug" cargo nextest run --package synd_term --features integration --test integration --no-capture 
 
 update-gql-schema:
   @graphql-client introspect-schema http://localhost:5959/graphql \
@@ -40,22 +41,25 @@ update-gql-schema:
 
 gen-gql:
   graphql-client generate \
-    --schema-path crates/syndterm/gql/schema.json \
-    --output-directory crates/syndterm/src/client \
+    --schema-path crates/synd_term/gql/schema.json \
+    --output-directory crates/synd_term/src/client \
+    --variables-derives "Debug" \
     --response-derives "Debug" \
     --custom-scalars-module "crate::client::scalar" \
-    crates/syndterm/gql/query.gql
+    crates/synd_term/gql/query.gql
 
   graphql-client generate \
-    --schema-path crates/syndterm/gql/schema.json \
-    --output-directory crates/syndterm/src/client \
+    --schema-path crates/synd_term/gql/schema.json \
+    --output-directory crates/synd_term/src/client \
+    --variables-derives "Debug" \
     --response-derives "Debug" \
     --custom-scalars-module "crate::client::scalar" \
-    crates/syndterm/gql/mutation.gql
+    crates/synd_term/gql/mutation.gql
 
   graphql-client generate \
     --schema-path crates/synd_api/src/client/github/schema.json \
     --output-directory crates/synd_api/src/client/github \
+    --variables-derives "Debug" \
     --response-derives "Debug" \
     crates/synd_api/src/client/github/query.gql
 

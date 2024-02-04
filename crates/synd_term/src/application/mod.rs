@@ -9,10 +9,11 @@ use synd_authn::device_flow::{
 use tokio::time::{Instant, Sleep};
 
 use crate::{
-    auth::{self, AuthenticationProvider, Credential},
+    auth::{AuthenticationProvider, Credential},
     client::Client,
     command::Command,
     config,
+    interact::Interactor,
     job::Jobs,
     terminal::Terminal,
     ui::{
@@ -54,6 +55,7 @@ pub struct Application {
     client: Client,
     jobs: Jobs,
     components: Components,
+    interactor: Interactor,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
@@ -72,8 +74,9 @@ impl Application {
         Self {
             terminal,
             client,
-            components: Components::new(),
             jobs: Jobs::new(),
+            components: Components::new(),
+            interactor: Interactor::new(),
             theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
@@ -94,6 +97,7 @@ impl Application {
         self.initial_fetch();
         self.screen = Screen::Browse;
         self.should_render = true;
+        self.reset_idle_timer();
     }
 
     fn initial_fetch(&mut self) {
@@ -345,9 +349,12 @@ impl Application {
     fn fetch_subscription(&mut self, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let fut = async move {
-            // TODO: handling
-            let sub = client.fetch_subscription(after, Some(first)).await.unwrap();
-            Ok(Command::UpdateSubscription(sub))
+            match client.fetch_subscription(after, Some(first)).await {
+                Ok(sub) => Ok(Command::UpdateSubscription(sub)),
+                Err(err) => Ok(Command::HandleError {
+                    message: format!("{err}"),
+                }),
+            }
         }
         .boxed();
         self.jobs.futures.push(fut);
@@ -444,10 +451,12 @@ impl Application {
             AuthenticationProvider::Github => {
                 let device_flow = self.config.github_device_flow.clone();
                 let fut = async move {
-                    // TODO: error handling
-                    let res = device_flow.device_authorize_request().await.unwrap();
-
-                    Ok(Command::DeviceAuthorizationFlow(res))
+                    match device_flow.device_authorize_request().await {
+                        Ok(res) => Ok(Command::DeviceAuthorizationFlow(res)),
+                        Err(err) => Ok(Command::HandleError {
+                            message: format!("{err}"),
+                        }),
+                    }
                 }
                 .boxed();
                 self.jobs.futures.push(fut);
@@ -461,25 +470,27 @@ impl Application {
             .set_device_authorization_response(device_authorization.clone());
         self.should_render = true;
 
-        // attempt to open input screen in the browser
-        open::that(device_authorization.verification_uri.to_string()).ok();
+        // try to open input screen in the browser
+        self.interactor
+            .open_browser(device_authorization.verification_uri.to_string());
 
         let device_flow = self.config.github_device_flow.clone();
         let fut = async move {
-            // TODO: error handling
-            let res = device_flow
+            match device_flow
                 .pool_device_access_token(
                     device_authorization.device_code,
                     device_authorization.interval,
                 )
                 .await
-                .unwrap();
-            Ok(Command::CompleteDevieAuthorizationFlow(res))
+            {
+                Ok(res) => Ok(Command::CompleteDevieAuthorizationFlow(res)),
+                Err(err) => Ok(Command::HandleError {
+                    message: format!("{err}"),
+                }),
+            }
         }
         .boxed();
         self.jobs.futures.push(fut);
-        // open verification uri
-        // prompt user to enter user_code
     }
 
     fn complete_device_authroize_flow(&mut self, device_access_token: DeviceAccessTokenResponse) {
@@ -487,8 +498,13 @@ impl Application {
             access_token: device_access_token.access_token,
         };
 
-        // TODO: handle error
-        auth::persist_credential(&auth).ok();
+        // should test with tmp file?
+        #[cfg(not(feature = "integration"))]
+        {
+            if let Err(err) = crate::auth::persist_credential(&auth) {
+                tracing::warn!("Failed to save credential cache: {err}");
+            }
+        }
 
         self.set_credential(auth);
     }
@@ -513,7 +529,7 @@ impl Application {
             .reset(Instant::now() + Duration::from_secs(86400 * 365 * 30));
     }
 
-    fn reset_idle_timer(&mut self) {
+    pub fn reset_idle_timer(&mut self) {
         self.idle_timer
             .as_mut()
             .reset(Instant::now() + self.config.idle_timer_interval);

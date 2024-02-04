@@ -49,6 +49,7 @@ impl Client {
         self.credential = Some(token);
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn fetch_subscription(
         &self,
         after: Option<String>,
@@ -60,6 +61,7 @@ impl Client {
         Ok(response.output)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<types::Feed> {
         let var = mutation::subscribe_feed::Variables {
             input: mutation::subscribe_feed::SubscribeFeedInput { url },
@@ -77,6 +79,7 @@ impl Client {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn unsubscribe_feed(&self, url: String) -> anyhow::Result<()> {
         let var = mutation::unsubscribe_feed::Variables {
             input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
@@ -94,6 +97,7 @@ impl Client {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn fetch_entries(
         &self,
         after: Option<String>,
@@ -108,7 +112,7 @@ impl Client {
 
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>
     where
-        Body: Serialize + ?Sized,
+        Body: Serialize + Debug + ?Sized,
         ResponseData: DeserializeOwned + Debug,
     {
         let mut request = self
@@ -118,10 +122,10 @@ impl Client {
                 header::AUTHORIZATION,
                 self.credential
                     .as_ref()
-                    .expect("Credential not configured. this is BUG")
+                    .expect("Credential not configured. this is a BUG")
                     .clone(),
             )
-            .json(&body)
+            .json(body)
             .build()?;
 
         synd_o11y::opentelemetry::http::inject_with_baggage(
@@ -129,6 +133,8 @@ impl Client {
             request.headers_mut(),
             std::iter::once(synd_o11y::request_id_key_value()),
         );
+
+        tracing::debug!(url = request.url().as_str(), "Send request");
 
         let response: Response<ResponseData> = self
             .client

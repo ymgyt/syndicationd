@@ -32,21 +32,21 @@ impl Prompt {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
         // If has error message, render it
         let paragraph = if let Some(error_message) = self.error_message.as_ref() {
-            let line = Line::styled(error_message, cx.theme.error.message);
+            let line = Line::from(error_message.clone());
             Paragraph::new(line)
                 .alignment(Alignment::Left)
                 .wrap(Wrap { trim: true })
-                .style(cx.theme.prompt.background)
+                .style(cx.theme.error.message)
         } else {
             let keys = [("q", "Quit"), ("Tab", "Next Tab"), ("j/k", "Up/Down")];
             let per_screen_keys = match tab {
                 Tab::Subscription => [
                     ("a", "Subscribe"),
                     ("d", "Unsubscribe"),
-                    ("Enter", "Open Feed"),
+                    ("Ent", "Open Feed"),
                 ]
                 .iter(),
-                Tab::Feeds => [].iter(),
+                Tab::Feeds => [("Ent", "Open Entry")].iter(),
             };
 
             let spans = keys

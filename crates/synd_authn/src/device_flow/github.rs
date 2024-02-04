@@ -16,7 +16,8 @@ const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VE
 pub struct DeviceFlow {
     client: Client,
     client_id: Cow<'static, str>,
-    endpoint: Option<&'static str>,
+    device_authorization_endpoint: Option<&'static str>,
+    token_endpoint: Option<&'static str>,
 }
 
 impl DeviceFlow {
@@ -33,14 +34,23 @@ impl DeviceFlow {
         Self {
             client,
             client_id: client_id.into(),
-            endpoint: None,
+            device_authorization_endpoint: None,
+            token_endpoint: None,
         }
     }
 
     #[must_use]
-    pub fn with_endpoint(self, endpoint: &'static str) -> Self {
+    pub fn with_device_authorization_endpoint(self, endpoint: &'static str) -> Self {
         Self {
-            endpoint: Some(endpoint),
+            device_authorization_endpoint: Some(endpoint),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_token_endpoint(self, endpoint: &'static str) -> Self {
+        Self {
+            token_endpoint: Some(endpoint),
             ..self
         }
     }
@@ -54,7 +64,10 @@ impl DeviceFlow {
 
         let response = self
             .client
-            .post(self.endpoint.unwrap_or(Self::DEVICE_AUTHORIZATION_ENDPOINT))
+            .post(
+                self.device_authorization_endpoint
+                    .unwrap_or(Self::DEVICE_AUTHORIZATION_ENDPOINT),
+            )
             .header(http::header::ACCEPT, "application/json")
             .form(&DeviceAuthorizationRequest {
                 client_id: self.client_id.clone(),
@@ -97,7 +110,7 @@ impl DeviceFlow {
         let response = loop {
             let response = self
                 .client
-                .post(Self::TOKEN_ENDPOINT)
+                .post(self.token_endpoint.unwrap_or(Self::TOKEN_ENDPOINT))
                 .header(http::header::ACCEPT, "application/json")
                 .form(&DeviceAccessTokenRequest::new(
                     &device_code,

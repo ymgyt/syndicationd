@@ -78,9 +78,7 @@ impl Authentication {
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]);
         let [title_area, methods_area] = vertical.areas(area);
 
-        let title = Paragraph::new(Span::styled("Login", cx.theme.login.title))
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::BOTTOM));
+        let title = Self::login_title(cx);
 
         let methods = {
             let items = self
@@ -115,10 +113,7 @@ impl Authentication {
 
         let [title_area, device_flow_area] = vertical.areas(area);
 
-        let title = Paragraph::new(Text::from("Login"))
-            .alignment(Alignment::Center)
-            .style(cx.theme.login.title)
-            .block(Block::default().borders(Borders::BOTTOM));
+        let title = Self::login_title(cx);
 
         let device_flow = Paragraph::new(vec![
             Line::from("Open the following URL and Enter the code"),
@@ -141,5 +136,11 @@ impl Authentication {
 
         Widget::render(title, title_area, buf);
         Widget::render(device_flow, device_flow_area, buf);
+    }
+
+    fn login_title(cx: &Context<'_>) -> Paragraph<'static> {
+        Paragraph::new(Span::styled("Login", cx.theme.login.title))
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::BOTTOM))
     }
 }

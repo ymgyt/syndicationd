@@ -94,6 +94,7 @@
             nixfmt
             rust-analyzer
             opentelemetry-collector-contrib
+            git-cliff
           ] ++ ci_packages;
 
       in {

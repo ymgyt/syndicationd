@@ -1,3 +1,9 @@
+use crate::{
+    application::{Direction, IndexOutOfRange},
+    client::payload,
+    types::{self, TimeExt},
+    ui::{self, Context},
+};
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
     text::{Span, Text},
@@ -6,14 +12,6 @@ use ratatui::{
         Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Scrollbar, ScrollbarOrientation,
         ScrollbarState, StatefulWidget, Table, TableState, Widget, Wrap,
     },
-};
-use unicode_segmentation::UnicodeSegmentation;
-
-use crate::{
-    application::{Direction, IndexOutOfRange},
-    client::payload,
-    types::{self, TimeExt},
-    ui::{self, Context},
 };
 
 pub struct Entries {
@@ -111,17 +109,6 @@ impl Entries {
         impl IntoIterator<Item = Constraint>,
         impl IntoIterator<Item = Row<'a>>,
     ) {
-        let title_width = self
-            .entries
-            .iter()
-            .filter_map(|entry| entry.title.as_deref())
-            .map(|title| title.graphemes(true).count())
-            .max()
-            .unwrap_or(10)
-            .max(60)
-            .try_into()
-            .unwrap_or(60);
-
         let header = Row::new([
             Cell::from("Published"),
             Cell::from("Title"),
@@ -130,8 +117,8 @@ impl Entries {
 
         let constraints = [
             Constraint::Length(10),
-            Constraint::Min(70),
-            Constraint::Length(title_width),
+            Constraint::Fill(2),
+            Constraint::Fill(1),
         ];
 
         let row = |entry: &'a types::Entry| {

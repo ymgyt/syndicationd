@@ -52,7 +52,7 @@ impl Authenticator {
                         Ok(principal)
                     }
                     Err(err) => {
-                        warn!("Failed to authenticate github {err}");
+                        warn!("Failed to authenticate github: {err}");
                         Err(())
                     }
                 }

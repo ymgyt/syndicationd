@@ -6,6 +6,7 @@ pub mod cli;
 pub mod client;
 pub mod command;
 pub mod config;
+pub mod interact;
 pub mod job;
 pub mod terminal;
 pub mod types;
