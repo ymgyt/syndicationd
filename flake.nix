@@ -38,7 +38,8 @@
           pname = "syndicationd-workspace";
           version = "0.1";
 
-          builtInputs = [ ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ ];
+          builtInputs = [ ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;

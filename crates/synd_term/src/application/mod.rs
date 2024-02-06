@@ -9,7 +9,6 @@ use synd_authn::device_flow::{
 use tokio::time::{Instant, Sleep};
 
 use crate::{
-    application::in_flight::{InFlight, RequestId},
     auth::{AuthenticationProvider, Credential},
     client::Client,
     command::Command,
@@ -28,7 +27,7 @@ mod direction;
 pub use direction::{Direction, IndexOutOfRange};
 
 mod in_flight;
-pub use in_flight::RequestSequence;
+pub use in_flight::{InFlight, RequestId, RequestSequence};
 
 enum Screen {
     Login,
@@ -42,6 +41,7 @@ pub enum EventLoopControlFlow {
 
 pub struct Config {
     pub idle_timer_interval: Duration,
+    pub throbber_timer_interval: Duration,
     pub github_device_flow: DeviceFlow,
 }
 
@@ -49,6 +49,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             idle_timer_interval: Duration::from_secs(250),
+            throbber_timer_interval: Duration::from_millis(250),
             github_device_flow: DeviceFlow::new(config::github::CLIENT_ID),
         }
     }
@@ -82,7 +83,7 @@ impl Application {
             jobs: Jobs::new(),
             components: Components::new(),
             interactor: Interactor::new(),
-            in_flight: InFlight::new(),
+            in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
@@ -157,6 +158,9 @@ impl Application {
                 Some(command) = self.jobs.futures.next() => {
                     Some(command.unwrap())
                 }
+                ()  = self.in_flight.throbber_timer() => {
+                    Some(Command::RenderThrobber)
+                }
                 () = &mut self.idle_timer => {
                     Some(Command::Idle)
                 }
@@ -189,6 +193,11 @@ impl Application {
             match command {
                 Command::Quit => self.should_quit = true,
                 Command::ResizeTerminal { .. } => {
+                    self.should_render = true;
+                }
+                Command::RenderThrobber => {
+                    self.in_flight.reset_throbber_timer();
+                    self.in_flight.inc_throbber_step();
                     self.should_render = true;
                 }
                 Command::Idle => {
@@ -236,8 +245,14 @@ impl Application {
                 Command::FetchSubscription { after, first } => {
                     self.fetch_subscription(after, first);
                 }
-                Command::UpdateSubscription(sub) => {
-                    self.components.subscription.update_subscription(sub);
+                Command::UpdateSubscription {
+                    subscription,
+                    request_seq,
+                } => {
+                    self.in_flight.remove(request_seq);
+                    self.components
+                        .subscription
+                        .update_subscription(subscription);
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed } => {
@@ -284,7 +299,10 @@ impl Application {
     }
 
     fn render(&mut self) {
-        let cx = ui::Context { theme: &self.theme };
+        let cx = ui::Context {
+            theme: &self.theme,
+            in_flight: &self.in_flight,
+        };
         let root = Root::new(&self.components, cx);
 
         self.terminal
@@ -367,7 +385,10 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {
             match client.fetch_subscription(after, Some(first)).await {
-                Ok(sub) => Ok(Command::UpdateSubscription(sub)),
+                Ok(subscription) => Ok(Command::UpdateSubscription {
+                    subscription,
+                    request_seq,
+                }),
                 Err(err) => Ok(Command::HandleError {
                     message: format!("{err}"),
                     request_seq: Some(request_seq),

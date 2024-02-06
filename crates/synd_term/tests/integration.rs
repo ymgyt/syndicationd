@@ -42,6 +42,7 @@ mod test {
         let client = Client::new(endpoint).unwrap();
         let config = Config {
             idle_timer_interval: Duration::from_millis(1000),
+            throbber_timer_interval: Duration::from_secs(3600), // disable throbber
             github_device_flow: DeviceFlow::new("dummy")
                 .with_device_authorization_endpoint(
                     "http://localhost:6000/case1/github/login/device/code",
