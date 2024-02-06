@@ -1,31 +1,32 @@
 [language-server.rust-analyzer.config]
-inlayHints.chainingHints.enable = true
-inlayHints.bindingModeHints.enable = false
-inlayHints.closingBraceHints.minLines = 20
-inlayHints.closureCaptureHints.enable = true
-inlayHints.closureReturnTypeHints.enable = "with_block"
-inlayHints.discriminantHints.enable = "fieldless"
-inlayHints.lifetimeElisionHints.enable = "skip_trivial"
+inlayHints.bindingModeHints.enable             = false
+inlayHints.chainingHints.enable                = true
+inlayHints.closingBraceHints.minLines          = 20
+inlayHints.closureCaptureHints.enable          = true
+inlayHints.closureReturnTypeHints.enable       = "with_block"
+inlayHints.discriminantHints.enable            = "fieldless"
+inlayHints.lifetimeElisionHints.enable         = "skip_trivial"
 inlayHints.typeHints.hideClosureInitialization = false
 
 completion.autoimport.enable = true
 # fill_arguments | add_parentheses | none
-completion.callable.snippets = "none"
+completion.callable.snippets             = "none"
 completion.fullFunctionSignatures.enable = true
 
-imports.group.enable = true
 imports.granularity.enforce = true
-imports.granularity.group = "crate"
-imports.prefix = "crate"
-imports.preferPrelude = false
+imports.granularity.group   = "crate"
+imports.group.enable        = true
+imports.preferPrelude       = false
+imports.prefix              = "crate"
 
 lens.enable = false
 
+diagnostics.disabled = ["inactive-code"]
 hover.actions.enable = false
 
 [language-server.rust-analyzer.config.cargo]
 features = ["introspection", "integration"]
 
 [language-server.rust-analyzer.config.check]
-command = "clippy"
+command  = "clippy"
 features = "all"
