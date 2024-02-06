@@ -9,6 +9,7 @@ use synd_authn::device_flow::{
 use tokio::time::{Instant, Sleep};
 
 use crate::{
+    application::in_flight::{InFlight, RequestId},
     auth::{AuthenticationProvider, Credential},
     client::Client,
     command::Command,
@@ -25,6 +26,9 @@ use crate::{
 
 mod direction;
 pub use direction::{Direction, IndexOutOfRange};
+
+mod in_flight;
+pub use in_flight::RequestSequence;
 
 enum Screen {
     Login,
@@ -56,6 +60,7 @@ pub struct Application {
     jobs: Jobs,
     components: Components,
     interactor: Interactor,
+    in_flight: InFlight,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
@@ -77,6 +82,7 @@ impl Application {
             jobs: Jobs::new(),
             components: Components::new(),
             interactor: Interactor::new(),
+            in_flight: InFlight::new(),
             theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
@@ -248,7 +254,11 @@ impl Application {
                 Command::FetchEntries { after, first } => {
                     self.fetch_entries(after, first);
                 }
-                Command::UpdateEntries(payload) => {
+                Command::UpdateEntries {
+                    payload,
+                    request_seq,
+                } => {
+                    self.in_flight.remove(request_seq);
                     self.components.entries.update_entries(payload);
                     self.should_render = true;
                 }
@@ -259,7 +269,13 @@ impl Application {
                 Command::OpenEntry => {
                     self.open_entry();
                 }
-                Command::HandleError { message } => {
+                Command::HandleError {
+                    message,
+                    request_seq,
+                } => {
+                    if let Some(request_seq) = request_seq {
+                        self.in_flight.remove(request_seq);
+                    }
                     self.components.prompt.set_error_message(message);
                     self.should_render = true;
                 }
@@ -348,11 +364,13 @@ impl Application {
 impl Application {
     fn fetch_subscription(&mut self, after: Option<String>, first: i64) {
         let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {
             match client.fetch_subscription(after, Some(first)).await {
                 Ok(sub) => Ok(Command::UpdateSubscription(sub)),
                 Err(err) => Ok(Command::HandleError {
                     message: format!("{err}"),
+                    request_seq: Some(request_seq),
                 }),
             }
         }
@@ -430,11 +448,16 @@ impl Application {
 impl Application {
     fn fetch_entries(&mut self, after: Option<String>, first: i64) {
         let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::FetchEntries);
         let fut = async move {
             match client.fetch_entries(after, first).await {
-                Ok(payload) => Ok(Command::UpdateEntries(payload)),
+                Ok(payload) => Ok(Command::UpdateEntries {
+                    payload,
+                    request_seq,
+                }),
                 Err(err) => Ok(Command::HandleError {
                     message: format!("{err}"),
+                    request_seq: Some(request_seq),
                 }),
             }
         }
@@ -455,6 +478,7 @@ impl Application {
                         Ok(res) => Ok(Command::DeviceAuthorizationFlow(res)),
                         Err(err) => Ok(Command::HandleError {
                             message: format!("{err}"),
+                            request_seq: None,
                         }),
                     }
                 }
@@ -486,6 +510,7 @@ impl Application {
                 Ok(res) => Ok(Command::CompleteDevieAuthorizationFlow(res)),
                 Err(err) => Ok(Command::HandleError {
                     message: format!("{err}"),
+                    request_seq: None,
                 }),
             }
         }
