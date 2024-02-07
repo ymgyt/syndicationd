@@ -8,12 +8,12 @@ use synd_feed::{
 
 use crate::{
     principal::Principal,
-    repository::Datastore,
+    repository::SubscriptionRepository,
     usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
 };
 
 pub struct FetchEntries {
-    pub datastore: Arc<dyn Datastore>,
+    pub datastore: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 

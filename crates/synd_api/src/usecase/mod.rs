@@ -22,13 +22,13 @@ use synd_o11y::{audit, tracing_subscriber::audit::Audit};
 
 use crate::{
     principal::Principal,
-    repository::{Datastore, DatastoreError},
+    repository::{RepositoryError, SubscriptionRepository},
 };
 
 use self::authorize::{Authorized, Authorizer, Unauthorized};
 
 pub struct MakeUsecase {
-    pub datastore: Arc<dyn Datastore>,
+    pub datastore: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
@@ -54,7 +54,7 @@ pub enum Error<T> {
     #[error("unauthorized error")]
     Unauthorized(Unauthorized),
     #[error("datastore error")]
-    Datastore(#[from] DatastoreError),
+    Datastore(#[from] RepositoryError),
 }
 
 pub trait Usecase {

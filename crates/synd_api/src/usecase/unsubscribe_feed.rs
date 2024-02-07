@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use crate::{
     principal::Principal,
-    repository::{self, Datastore},
+    repository::{self, SubscriptionRepository},
     usecase::{Input, Output},
 };
 
 use super::{authorize::Unauthorized, Usecase};
 
 pub struct UnsubscribeFeed {
-    pub datastore: Arc<dyn Datastore>,
+    pub datastore: Arc<dyn SubscriptionRepository>,
 }
 
 pub struct UnsubscribeFeedInput {

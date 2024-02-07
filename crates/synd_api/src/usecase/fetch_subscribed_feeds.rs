@@ -4,12 +4,12 @@ use synd_feed::{feed::cache::FetchCachedFeed, types};
 
 use crate::{
     principal::Principal,
-    repository::Datastore,
+    repository::SubscriptionRepository,
     usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
 };
 
 pub struct FetchSubscribedFeeds {
-    pub datastore: Arc<dyn Datastore>,
+    pub datastore: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 

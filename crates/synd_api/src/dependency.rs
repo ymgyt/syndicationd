@@ -8,7 +8,7 @@ use synd_feed::feed::{
 use crate::{
     args::KvsdOptions,
     config,
-    repository::{kvsd::KvsdClient, memory::MemoryDatastore},
+    repository::{kvsd::KvsdClient, memory::MemoryRepository},
     serve::auth::Authenticator,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
@@ -30,7 +30,7 @@ impl Dependency {
             .await
             .ok();
 
-        let datastore = MemoryDatastore::new();
+        let datastore = MemoryRepository::new();
 
         let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
         let cache_feed_service = CacheLayer::with(

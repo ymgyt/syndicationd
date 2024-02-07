@@ -4,10 +4,10 @@ use async_trait::async_trait;
 
 use crate::repository::{
     self,
-    datastore::{Datastore, DatastoreResult},
+    subscription::{RepositoryResult, SubscriptionRepository},
 };
 
-pub struct MemoryDatastore {
+pub struct MemoryRepository {
     feeds: RwLock<Vec<repository::types::FeedSubscription>>,
 }
 
@@ -33,7 +33,7 @@ const TEST_DATA: &[&str] = &[
     "https://blog-dry.com/feed",
 ];
 
-impl MemoryDatastore {
+impl MemoryRepository {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -51,11 +51,11 @@ impl MemoryDatastore {
 }
 
 #[async_trait]
-impl Datastore for MemoryDatastore {
+impl SubscriptionRepository for MemoryRepository {
     async fn put_feed_subscription(
         &self,
         feed: repository::types::FeedSubscription,
-    ) -> DatastoreResult<()> {
+    ) -> RepositoryResult<()> {
         self.feeds.write().unwrap().push(feed);
         Ok(())
     }
@@ -63,7 +63,7 @@ impl Datastore for MemoryDatastore {
     async fn delete_feed_subscription(
         &self,
         feed: repository::types::FeedSubscription,
-    ) -> DatastoreResult<()> {
+    ) -> RepositoryResult<()> {
         let to_delete = feed.url;
         self.feeds
             .write()
@@ -72,7 +72,7 @@ impl Datastore for MemoryDatastore {
         Ok(())
     }
 
-    async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> DatastoreResult<Vec<String>> {
+    async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> RepositoryResult<Vec<String>> {
         Ok(self
             .feeds
             .read()
