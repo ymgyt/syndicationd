@@ -38,8 +38,10 @@
           pname = "syndicationd-workspace";
           version = "0.1";
 
-          builtInputs = [ ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ pkgs.libiconv ];
+          builtInputs = [ ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.libiconv
+            pkgs.darwin.apple_sdk.frameworks.Security
+          ];
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -94,7 +96,11 @@
             rust-analyzer
             opentelemetry-collector-contrib
             git-cliff
-          ] ++ ci_packages;
+          ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.libiconv
+            pkgs.darwin.apple_sdk.frameworks.Security
+            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+          ];
 
       in {
         inherit checks;
