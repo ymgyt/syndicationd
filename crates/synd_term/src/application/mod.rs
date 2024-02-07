@@ -108,6 +108,7 @@ impl Application {
     }
 
     fn initial_fetch(&mut self) {
+        tracing::info!("Initial fetch");
         let fut = async {
             Ok(Command::FetchEntries {
                 after: None,
@@ -467,6 +468,7 @@ impl Application {
 }
 
 impl Application {
+    #[tracing::instrument(skip(self))]
     fn fetch_entries(&mut self, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
@@ -568,7 +570,7 @@ impl Application {
         }
     }
 
-    fn clear_idle_timer(&mut self) {
+    pub fn clear_idle_timer(&mut self) {
         // https://github.com/tokio-rs/tokio/blob/e53b92a9939565edb33575fff296804279e5e419/tokio/src/time/instant.rs#L62
         self.idle_timer
             .as_mut()

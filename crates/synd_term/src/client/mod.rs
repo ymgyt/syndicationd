@@ -103,13 +103,18 @@ impl Client {
         after: Option<String>,
         first: i64,
     ) -> anyhow::Result<payload::FetchEntriesPayload> {
+        tracing::debug!("Fetch entries...");
+
         let var = query::entries::Variables { after, first };
         let request = query::Entries::build_query(var);
         let response: query::entries::ResponseData = self.request(&request).await?;
 
+        tracing::debug!("Got response");
+
         Ok(response.output.into())
     }
 
+    #[tracing::instrument(skip_all, err(Display))]
     async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>
     where
         Body: Serialize + Debug + ?Sized,
