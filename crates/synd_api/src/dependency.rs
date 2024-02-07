@@ -8,7 +8,7 @@ use synd_feed::feed::{
 use crate::{
     args::KvsdOptions,
     config,
-    persistence::{kvsd::KvsdClient, memory::MemoryDatastore},
+    repository::{kvsd::KvsdClient, memory::MemoryDatastore},
     serve::auth::Authenticator,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };

@@ -7,8 +7,8 @@ use synd_feed::{
 };
 
 use crate::{
-    persistence::Datastore,
     principal::Principal,
+    repository::Datastore,
     usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
 };
 

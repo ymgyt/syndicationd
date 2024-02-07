@@ -3,8 +3,8 @@ use std::sync::Arc;
 use synd_feed::{feed::cache::FetchCachedFeed, types::Feed};
 
 use crate::{
-    persistence::{self, Datastore},
     principal::Principal,
+    repository::{self, Datastore},
     usecase::{Input, Output},
 };
 
@@ -64,7 +64,7 @@ impl Usecase for SubscribeFeed {
         tracing::debug!("{:#?}", feed.meta());
 
         self.datastore
-            .put_feed_subscription(persistence::types::FeedSubscription {
+            .put_feed_subscription(repository::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url: feed.meta().url().to_owned(),
             })

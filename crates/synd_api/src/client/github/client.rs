@@ -9,6 +9,7 @@ use crate::{client::github::query, config};
 #[derive(Clone)]
 pub struct GithubClient {
     client: reqwest::Client,
+    endpoint: Option<&'static str>,
 }
 
 impl GithubClient {
@@ -22,7 +23,18 @@ impl GithubClient {
             .connect_timeout(Duration::from_secs(10))
             .build()?;
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            endpoint: None,
+        })
+    }
+
+    #[must_use]
+    pub fn with_endpoint(self, endpoint: &'static str) -> Self {
+        Self {
+            endpoint: Some(endpoint),
+            ..self
+        }
     }
 
     pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<String> {
@@ -48,7 +60,7 @@ impl GithubClient {
 
         let res: Response<ResponseData> = self
             .client
-            .post(Self::ENDPOINT)
+            .post(self.endpoint.unwrap_or(Self::ENDPOINT))
             .header(header::AUTHORIZATION, auth_header)
             .json(&body)
             .send()

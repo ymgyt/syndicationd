@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    persistence::{self, Datastore},
     principal::Principal,
+    repository::{self, Datastore},
     usecase::{Input, Output},
 };
 
@@ -50,7 +50,7 @@ impl Usecase for UnsubscribeFeed {
         tracing::debug!("Unsubscribe feed: {url}");
 
         self.datastore
-            .delete_feed_subscription(persistence::types::FeedSubscription {
+            .delete_feed_subscription(repository::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url,
             })

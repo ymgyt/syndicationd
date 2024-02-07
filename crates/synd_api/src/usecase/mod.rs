@@ -21,8 +21,8 @@ use synd_feed::feed::cache::FetchCachedFeed;
 use synd_o11y::{audit, tracing_subscriber::audit::Audit};
 
 use crate::{
-    persistence::{Datastore, DatastoreError},
     principal::Principal,
+    repository::{Datastore, DatastoreError},
 };
 
 use self::authorize::{Authorized, Authorizer, Unauthorized};

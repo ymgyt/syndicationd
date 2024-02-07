@@ -2,13 +2,13 @@ use std::sync::RwLock;
 
 use async_trait::async_trait;
 
-use crate::persistence::{
+use crate::repository::{
     self,
     datastore::{Datastore, DatastoreResult},
 };
 
 pub struct MemoryDatastore {
-    feeds: RwLock<Vec<persistence::types::FeedSubscription>>,
+    feeds: RwLock<Vec<repository::types::FeedSubscription>>,
 }
 
 const TEST_DATA: &[&str] = &[
@@ -40,7 +40,7 @@ impl MemoryDatastore {
             feeds: RwLock::new(
                 TEST_DATA
                     .iter()
-                    .map(|feed| persistence::types::FeedSubscription {
+                    .map(|feed| repository::types::FeedSubscription {
                         user_id: "me".into(),
                         url: (*feed).to_string(),
                     })
@@ -54,7 +54,7 @@ impl MemoryDatastore {
 impl Datastore for MemoryDatastore {
     async fn put_feed_subscription(
         &self,
-        feed: persistence::types::FeedSubscription,
+        feed: repository::types::FeedSubscription,
     ) -> DatastoreResult<()> {
         self.feeds.write().unwrap().push(feed);
         Ok(())
@@ -62,7 +62,7 @@ impl Datastore for MemoryDatastore {
 
     async fn delete_feed_subscription(
         &self,
-        feed: persistence::types::FeedSubscription,
+        feed: repository::types::FeedSubscription,
     ) -> DatastoreResult<()> {
         let to_delete = feed.url;
         self.feeds

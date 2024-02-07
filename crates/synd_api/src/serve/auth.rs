@@ -29,6 +29,11 @@ impl Authenticator {
         })
     }
 
+    #[must_use]
+    pub fn with_client(self, github: GithubClient) -> Self {
+        Self { github, ..self }
+    }
+
     /// Authenticate from given token
     pub async fn authenticate<S>(&self, token: S) -> Result<Principal, ()>
     where

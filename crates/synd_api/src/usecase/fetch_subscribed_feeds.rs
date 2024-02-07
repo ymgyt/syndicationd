@@ -3,8 +3,8 @@ use std::sync::Arc;
 use synd_feed::{feed::cache::FetchCachedFeed, types};
 
 use crate::{
-    persistence::Datastore,
     principal::Principal,
+    repository::Datastore,
     usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
 };
 

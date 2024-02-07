@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::persistence;
+use crate::repository;
 
 use super::DatastoreError;
 
@@ -12,12 +12,12 @@ pub type DatastoreResult<T> = std::result::Result<T, DatastoreError>;
 pub trait Datastore: Send + Sync {
     async fn put_feed_subscription(
         &self,
-        feed: persistence::types::FeedSubscription,
+        feed: repository::types::FeedSubscription,
     ) -> DatastoreResult<()>;
 
     async fn delete_feed_subscription(
         &self,
-        feed: persistence::types::FeedSubscription,
+        feed: repository::types::FeedSubscription,
     ) -> DatastoreResult<()>;
 
     async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> DatastoreResult<Vec<String>>;
@@ -30,14 +30,14 @@ where
 {
     async fn put_feed_subscription(
         &self,
-        feed: persistence::types::FeedSubscription,
+        feed: repository::types::FeedSubscription,
     ) -> DatastoreResult<()> {
         self.put_feed_subscription(feed).await
     }
 
     async fn delete_feed_subscription(
         &self,
-        feed: persistence::types::FeedSubscription,
+        feed: repository::types::FeedSubscription,
     ) -> DatastoreResult<()> {
         self.delete_feed_subscription(feed).await
     }
