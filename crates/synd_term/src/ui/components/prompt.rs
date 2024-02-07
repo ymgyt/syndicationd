@@ -70,7 +70,7 @@ impl Prompt {
                     RequestId::FetchSubscription => "Fetch subscription...",
                 };
                 let horizontal = Layout::horizontal([
-                    Constraint::Length(label.len() as _ + 1),
+                    Constraint::Length(label.len() as u16 + 1),
                     Constraint::Fill(1),
                 ]);
                 let [in_flight_area, area] = horizontal.areas(area);
