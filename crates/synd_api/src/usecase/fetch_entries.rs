@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub struct FetchEntries {
-    pub datastore: Arc<dyn SubscriptionRepository>,
+    pub repository: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
@@ -37,7 +37,7 @@ impl Usecase for FetchEntries {
 
     fn new(make: &MakeUsecase) -> Self {
         Self {
-            datastore: make.datastore.clone(),
+            repository: make.subscription_repo.clone(),
             fetch_feed: make.fetch_feed.clone(),
         }
     }
@@ -61,7 +61,7 @@ impl Usecase for FetchEntries {
             .user_id()
             .expect("user id not found. this isa bug");
 
-        let urls = self.datastore.fetch_subscribed_feed_urls(user_id).await?;
+        let urls = self.repository.fetch_subscribed_feed_urls(user_id).await?;
 
         let mut feed_metas = HashMap::new();
         let mut entries = Vec::with_capacity(urls.len() * 2);

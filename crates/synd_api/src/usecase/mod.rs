@@ -28,7 +28,7 @@ use crate::{
 use self::authorize::{Authorized, Authorizer, Unauthorized};
 
 pub struct MakeUsecase {
-    pub datastore: Arc<dyn SubscriptionRepository>,
+    pub subscription_repo: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
@@ -53,8 +53,8 @@ pub enum Error<T> {
     Usecase(T),
     #[error("unauthorized error")]
     Unauthorized(Unauthorized),
-    #[error("datastore error")]
-    Datastore(#[from] RepositoryError),
+    #[error("repository error")]
+    Repository(#[from] RepositoryError),
 }
 
 pub trait Usecase {

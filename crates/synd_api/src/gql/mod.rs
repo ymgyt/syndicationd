@@ -62,7 +62,7 @@ where
         async_graphql::Error::new(format!("{self}")).extend_with(|_, ext| match self {
             usecase::Error::Usecase(_) => ext.set("code", "TODO"),
             usecase::Error::Unauthorized(_) => ext.set("code", "UNAUTHORIZED"),
-            usecase::Error::Datastore(_) => ext.set("code", "INTERNAL"),
+            usecase::Error::Repository(_) => ext.set("code", "INTERNAL"),
         })
     }
 }

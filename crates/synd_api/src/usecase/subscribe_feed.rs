@@ -11,7 +11,7 @@ use crate::{
 use super::{authorize::Unauthorized, Usecase};
 
 pub struct SubscribeFeed {
-    pub datastore: Arc<dyn SubscriptionRepository>,
+    pub repository: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
@@ -32,7 +32,7 @@ impl Usecase for SubscribeFeed {
 
     fn new(make: &super::MakeUsecase) -> Self {
         Self {
-            datastore: make.datastore.clone(),
+            repository: make.subscription_repo.clone(),
             fetch_feed: make.fetch_feed.clone(),
         }
     }
@@ -63,7 +63,7 @@ impl Usecase for SubscribeFeed {
 
         tracing::debug!("{:#?}", feed.meta());
 
-        self.datastore
+        self.repository
             .put_feed_subscription(repository::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url: feed.meta().url().to_owned(),

@@ -9,7 +9,7 @@ use crate::{
 use super::{authorize::Unauthorized, Usecase};
 
 pub struct UnsubscribeFeed {
-    pub datastore: Arc<dyn SubscriptionRepository>,
+    pub repository: Arc<dyn SubscriptionRepository>,
 }
 
 pub struct UnsubscribeFeedInput {
@@ -27,7 +27,7 @@ impl Usecase for UnsubscribeFeed {
 
     fn new(make: &super::MakeUsecase) -> Self {
         Self {
-            datastore: make.datastore.clone(),
+            repository: make.subscription_repo.clone(),
         }
     }
 
@@ -49,7 +49,7 @@ impl Usecase for UnsubscribeFeed {
     ) -> Result<Output<Self::Output>, super::Error<Self::Error>> {
         tracing::debug!("Unsubscribe feed: {url}");
 
-        self.datastore
+        self.repository
             .delete_feed_subscription(repository::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url,

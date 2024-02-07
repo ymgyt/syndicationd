@@ -30,7 +30,7 @@ impl Dependency {
             .await
             .ok();
 
-        let datastore = MemoryRepository::new();
+        let repository = MemoryRepository::new();
 
         let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
         let cache_feed_service = CacheLayer::with(
@@ -41,7 +41,7 @@ impl Dependency {
         );
 
         let make_usecase = MakeUsecase {
-            datastore: Arc::new(datastore),
+            subscription_repo: Arc::new(repository),
             fetch_feed: Arc::new(cache_feed_service),
         };
 

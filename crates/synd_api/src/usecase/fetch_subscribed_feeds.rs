@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub struct FetchSubscribedFeeds {
-    pub datastore: Arc<dyn SubscriptionRepository>,
+    pub repository: Arc<dyn SubscriptionRepository>,
     pub fetch_feed: Arc<dyn FetchCachedFeed>,
 }
 
@@ -32,7 +32,7 @@ impl Usecase for FetchSubscribedFeeds {
 
     fn new(make: &MakeUsecase) -> Self {
         Self {
-            datastore: make.datastore.clone(),
+            repository: make.subscription_repo.clone(),
             fetch_feed: make.fetch_feed.clone(),
         }
     }
@@ -54,8 +54,8 @@ impl Usecase for FetchSubscribedFeeds {
     ) -> Result<Output<Self::Output>, Error<Self::Error>> {
         let user_id = principal.user_id().unwrap();
 
-        // fetch all urls from datastore
-        let urls = self.datastore.fetch_subscribed_feed_urls(user_id).await?;
+        // fetch all urls from repository
+        let urls = self.repository.fetch_subscribed_feed_urls(user_id).await?;
 
         // paginate
         let urls = {
