@@ -49,8 +49,10 @@ url                  = { workspace = true }
 integration = []
 
 [dev-dependencies]
+synd_api  = { path = "../synd_api" }
+synd_test = { path = "../synd_test" }
+
 serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }
-synd_test    = { path = "../synd_test" }
 tokio-stream = "0.1.14"
 
 [lints]

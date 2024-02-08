@@ -2923,6 +2923,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "synd_api",
  "synd_authn",
  "synd_feed",
  "synd_o11y",
