@@ -40,7 +40,7 @@ impl Usecase for SubscribeFeed {
     async fn authorize(
         &self,
         principal: Principal,
-        _input: &SubscribeFeedInput,
+        _: &SubscribeFeedInput,
     ) -> Result<Principal, Unauthorized> {
         Ok(principal)
     }

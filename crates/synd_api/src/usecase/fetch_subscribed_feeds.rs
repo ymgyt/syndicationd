@@ -40,7 +40,7 @@ impl Usecase for FetchSubscribedFeeds {
     async fn authorize(
         &self,
         principal: Principal,
-        _input: &Self::Input,
+        _: &Self::Input,
     ) -> Result<Principal, Unauthorized> {
         Ok(principal)
     }

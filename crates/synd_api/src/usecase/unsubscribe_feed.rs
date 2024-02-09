@@ -34,7 +34,7 @@ impl Usecase for UnsubscribeFeed {
     async fn authorize(
         &self,
         principal: Principal,
-        _input: &UnsubscribeFeedInput,
+        _: &UnsubscribeFeedInput,
     ) -> Result<Principal, Unauthorized> {
         Ok(principal)
     }

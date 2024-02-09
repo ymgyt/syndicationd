@@ -142,7 +142,7 @@ impl<'a> StatefulWidget for Throbber<'a> {
     }
 }
 
-#[allow(clippy::module_inception)]
+#[allow(clippy::module_inception, clippy::doc_link_with_quotes)]
 pub mod throbber {
     /// A set of symbols to be rendered by throbber.
     #[derive(Debug, Clone)]
