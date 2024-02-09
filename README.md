@@ -4,7 +4,7 @@
 
 ![Demo](./demo.gif)
 
-Syndicationd is a terminal feed viewer.
+Syndicationd is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
 ## Development
 
