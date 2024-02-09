@@ -24,7 +24,7 @@
         pkgs = import nixpkgs { inherit system overlays; };
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
           file = ./rust-toolchain.toml;
-          sha256 = "sha256-SXRtAuO4IqNOQq+nLbrsDFbVk+3aVA8NNpSZsKlVH/8=";
+          sha256 = "sha256-e4mlaJehWBymYxJGgnbuCObVlqMlQSilZ8FljG9zPHY=";
         };
 
         craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
@@ -94,7 +94,8 @@
             cargo-nextest
             graphql-client
             nixfmt
-            rust-analyzer
+            # Failed to run proc-macro server from path /nix/store/z1vlkv6nccjd523iwp5p6pdkr2abm9jq-rust-1.76.0/libexec/rust-analyzer-proc-macro-srv,
+            # rust-analyzer
             opentelemetry-collector-contrib
             git-cliff
           ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ ];
