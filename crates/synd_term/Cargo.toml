@@ -52,7 +52,9 @@ integration = []
 synd_api  = { path = "../synd_api" }
 synd_test = { path = "../synd_test" }
 
+kvsd         = { workspace = true }
 serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }
+tempdir      = "0.3.7"
 tokio-stream = "0.1.14"
 
 [lints]

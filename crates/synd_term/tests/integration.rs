@@ -33,6 +33,8 @@ mod test {
 
         tracing::info!("TEST hello_world run");
 
+        let _kvsd_client = helper::run_kvsd().await?;
+
         let mock_port = 6000;
         let oauth_addr = ("127.0.0.1", mock_port);
         let oauth_listener = TcpListener::bind(oauth_addr).await?;

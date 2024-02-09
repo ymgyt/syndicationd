@@ -13,15 +13,17 @@ readme      = "README"
 repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
-anyhow                             = { version = "1" }
-async-trait                        = { version = "0.1.77" }
-axum                               = { version = "0.7.4" }
-chrono                             = { version = "0.4.31" }
-clap                               = { version = "4.4" }
-feed-rs                            = { version = "1.4" }
-futures-util                       = { version = "0.3.30" }
-graphql_client                     = { version = "0.13.0", default-features = false }
-http                               = { version = "0.2" }                                                                                                   # request use 0.2
+anyhow         = { version = "1" }
+async-trait    = { version = "0.1.77" }
+axum           = { version = "0.7.4" }
+chrono         = { version = "0.4.31" }
+clap           = { version = "4.4" }
+feed-rs        = { version = "1.4" }
+futures-util   = { version = "0.3.30" }
+graphql_client = { version = "0.13.0", default-features = false }
+http           = { version = "0.2" }                              # request use 0.2
+kvsd           = { version = "0.1.2", default-features = false }
+# kvsd                               = { path = "../kvsd" }
 moka                               = { version = "0.12.4", features = ["future"] }
 opentelemetry                      = { version = "0.21.0" }
 opentelemetry-http                 = { version = "0.10.0" }
