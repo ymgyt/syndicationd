@@ -1,3 +1,5 @@
+use std::{io::ErrorKind, time::Duration};
+
 use async_trait::async_trait;
 use futures_util::TryFutureExt;
 use kvsd::{
@@ -29,11 +31,30 @@ impl KvsdClient {
         port: u16,
         username: String,
         password: String,
+        timeout: Duration,
     ) -> anyhow::Result<Self> {
-        kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(host, port)
-            .and_then(|client| client.authenticate(username, password))
-            .await
-            .map(Self::new)
+        let handshake = async {
+            let mut retry = 0;
+            loop {
+                match kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(&host, port)
+                    .and_then(|client| client.authenticate(&username, &password))
+                    .await
+                    .map(Self::new)
+                {
+                    Ok(client) => break Ok(client),
+                    Err(kvsd::KvsdError::Io(io)) if io.kind() == ErrorKind::ConnectionRefused => {
+                        tracing::info!(retry, "Kvsd connection refused");
+                    }
+                    err => break err,
+                }
+                retry += 1;
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        };
+
+        tokio::time::timeout(timeout, handshake)
+            .await?
+            .inspect(|_| tracing::info!("Kvsd handshake successfully completed"))
             .map_err(Into::into)
     }
 

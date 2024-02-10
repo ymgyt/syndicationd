@@ -68,9 +68,7 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
 #[tokio::main]
 async fn main() {
     let args = args::parse();
-
     let _guard = init_tracing();
-
     let dep = Dependency::new(args.kvsd).await.unwrap();
     let shutdown = Shutdown::watch_signal();
 

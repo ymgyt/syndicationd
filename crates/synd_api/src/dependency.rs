@@ -8,7 +8,7 @@ use synd_feed::feed::{
 use crate::{
     args::KvsdOptions,
     config,
-    repository::{kvsd::KvsdClient, memory::MemoryRepository},
+    repository::kvsd::KvsdClient,
     serve::auth::Authenticator,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
@@ -26,11 +26,8 @@ impl Dependency {
             username,
             password,
         } = kvsd;
-        let _kvsd = KvsdClient::connect(host, port, username, password)
-            .await
-            .ok();
-
-        let repository = MemoryRepository::new();
+        let kvsd =
+            KvsdClient::connect(host, port, username, password, Duration::from_secs(10)).await?;
 
         let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
         let cache_feed_service = CacheLayer::with(
@@ -41,7 +38,7 @@ impl Dependency {
         );
 
         let make_usecase = MakeUsecase {
-            subscription_repo: Arc::new(repository),
+            subscription_repo: Arc::new(kvsd),
             fetch_feed: Arc::new(cache_feed_service),
         };
 
