@@ -44,13 +44,13 @@ impl Prompt {
     fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
         let keys = [("q", "Quit"), ("Tab", "Next Tab"), ("j/k", "Up/Down")];
         let per_screen_keys = match tab {
-            Tab::Subscription => [
+            Tab::Feeds => [
                 ("a", "Subscribe"),
                 ("d", "Unsubscribe"),
                 ("Ent", "Open Feed"),
             ]
             .iter(),
-            Tab::Feeds => [("Ent", "Open Entry")].iter(),
+            Tab::Entries => [("Ent", "Open Entry")].iter(),
         };
 
         let spans = keys

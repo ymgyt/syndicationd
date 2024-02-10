@@ -11,8 +11,8 @@ use crate::{
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Tab {
+    Entries,
     Feeds,
-    Subscription,
 }
 
 pub struct Tabs {
@@ -24,14 +24,14 @@ impl Tabs {
     pub fn new() -> Self {
         Self {
             selected: 0,
-            tabs: vec!["Feeds", "Subscription"],
+            tabs: vec!["Entries", "Feeds"],
         }
     }
 
     pub fn current(&self) -> Tab {
         match self.selected {
-            0 => Tab::Feeds,
-            1 => Tab::Subscription,
+            0 => Tab::Entries,
+            1 => Tab::Feeds,
             _ => unreachable!(),
         }
     }
@@ -49,8 +49,8 @@ impl Tabs {
             width: area.width - 6,
             ..area
         };
-        // left padding * 2 + len("feeds" + "subscriptions") = 25
-        let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(25)]);
+        // left padding * 2 + len("Entries" + "Feeds") = 20
+        let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(20)]);
         let [title, tabs] = horizontal.areas(area);
 
         Paragraph::new(Span::styled("Syndicationd", cx.theme.application_title)).render(title, buf);

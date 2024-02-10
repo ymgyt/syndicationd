@@ -213,7 +213,7 @@ impl Application {
                 }
                 Command::MoveTabSelection(direction) => {
                     match self.components.tabs.move_selection(&direction) {
-                        Tab::Subscription if !self.components.subscription.has_subscription() => {
+                        Tab::Feeds if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
                                 first: 50,
@@ -343,7 +343,7 @@ impl Application {
                             return Some(Command::MoveTabSelection(Direction::Left))
                         }
                         _ => match self.components.tabs.current() {
-                            Tab::Feeds => match key.code {
+                            Tab::Entries => match key.code {
                                 KeyCode::Char('j') => {
                                     return Some(Command::MoveEntry(Direction::Down))
                                 }
@@ -353,7 +353,7 @@ impl Application {
                                 KeyCode::Enter => return Some(Command::OpenEntry),
                                 _ => {}
                             },
-                            Tab::Subscription => match key.code {
+                            Tab::Feeds => match key.code {
                                 KeyCode::Char('a') => return Some(Command::PromptFeedSubscription),
                                 KeyCode::Char('d') => {
                                     return Some(Command::PromptFeedUnsubscription)

@@ -31,8 +31,8 @@ impl<'a> Root<'a> {
         self.components.tabs.render(tabs_area, buf, cx);
 
         match self.components.tabs.current() {
-            Tab::Subscription => self.components.subscription.render(content_area, buf, cx),
-            Tab::Feeds => self.components.entries.render(content_area, buf, cx),
+            Tab::Feeds => self.components.subscription.render(content_area, buf, cx),
+            Tab::Entries => self.components.entries.render(content_area, buf, cx),
         };
 
         self.components

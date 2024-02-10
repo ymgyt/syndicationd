@@ -175,7 +175,7 @@ mod test {
 
         #[rustfmt::skip]
         let mut expected = Buffer::with_lines(vec![
-            "    Syndicationd                                         Feeds    Subscription  ",
+            "    Syndicationd                                              Entries    Feeds  ",
             "                                                                                ",
             "    Published   Title                                      Feed                 ",
             "                                                                                ",
@@ -207,16 +207,16 @@ mod test {
             for x in 4..16 {
                 expected.get_mut(x, 0).set_style(theme.application_title);
             }
-            // feeds tab left padding
-            for x in 53..57 {
+            // Entries tab left padding
+            for x in 58..62 {
                 expected.get_mut(x, 0).set_style(theme.tabs);
             }
-            // selected feeds tab
-            for x in 57..62 {
+            // selected entries tab
+            for x in 62..69 {
                 expected.get_mut(x, 0).set_style(theme.tabs_selected);
             }
             // left padding and subscription
-            for x in 62..78 {
+            for x in 69..78 {
                 expected.get_mut(x, 0).set_style(theme.tabs);
             }
         }
