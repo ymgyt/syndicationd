@@ -1,5 +1,8 @@
 use anyhow::Result;
-use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::{
+    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
 use ratatui::Frame;
 use std::io;
 
@@ -36,7 +39,7 @@ impl Terminal {
 
         let panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |panic| {
-            Self::reset_backend().expect("Failed to reset terminal");
+            Self::restore_backend().expect("Failed to reset terminal");
             panic_hook(panic);
         }));
 
@@ -47,15 +50,15 @@ impl Terminal {
     }
 
     /// Reset terminal
-    pub fn exit(&mut self) -> Result<()> {
-        Self::reset_backend()?;
+    pub fn restore(&mut self) -> Result<()> {
+        Self::restore_backend()?;
         self.backend.show_cursor()?;
         Ok(())
     }
 
-    fn reset_backend() -> Result<()> {
-        crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
+    fn restore_backend() -> Result<()> {
         terminal::disable_raw_mode()?;
+        io::stdout().execute(LeaveAlternateScreen)?;
         Ok(())
     }
 

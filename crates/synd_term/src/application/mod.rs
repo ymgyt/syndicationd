@@ -127,7 +127,7 @@ impl Application {
 
         self.event_loop(input).await;
 
-        self.terminal.exit()?;
+        self.terminal.restore()?;
 
         Ok(())
     }
