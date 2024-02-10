@@ -1,8 +1,15 @@
-use std::future::pending;
+use std::{future::pending, sync::Arc, time::Duration};
 
-use kvsd::client::Api;
+use futures_util::TryFutureExt;
 use ratatui::backend::TestBackend;
-use synd_api::{client::github::GithubClient, serve::auth::Authenticator};
+use synd_api::{
+    client::github::GithubClient,
+    dependency::Dependency,
+    repository::kvsd::KvsdClient,
+    serve::auth::Authenticator,
+    usecase::{authorize::Authorizer, MakeUsecase, Runtime},
+};
+use synd_feed::feed::{cache::CacheLayer, parser::FeedService};
 use synd_term::terminal::Terminal;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -12,24 +19,32 @@ pub fn new_test_terminal() -> Terminal {
     Terminal::with(terminal)
 }
 
-// Dependency
-// * serve
-//   * tcp listener
-//   * dependency
-//     * authenticator
-//       * github client
-//         * github endpoint
-//     * usecase runtime
-//       * make usecase
-//         * datastore
-//         * fetch cached feed
-//       * authorizer
-#[allow(unused)]
-pub fn serve_api(mock_port: u16) -> anyhow::Result<()> {
+pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
     let github_endpoint: &'static str =
         format!("http://localhost:{mock_port}/github/graphql").leak();
     let github_client = GithubClient::new()?.with_endpoint(github_endpoint);
     let authenticator = Authenticator::new()?.with_client(github_client);
+
+    let kvsd_client = run_kvsd().await.map(KvsdClient::new)?;
+    let feed_service = FeedService::new("synd_term_test", 1024 * 1024);
+    let feed_service = CacheLayer::new(feed_service);
+    let make_usecase = MakeUsecase {
+        subscription_repo: Arc::new(kvsd_client),
+        fetch_feed: Arc::new(feed_service),
+    };
+    let authorizer = Authorizer::new();
+    let runtime = Runtime::new(make_usecase, authorizer);
+    let dep = Dependency {
+        authenticator,
+        runtime,
+    };
+    let listener = TcpListener::bind(("localhost", api_port)).await?;
+
+    tokio::spawn(synd_api::serve::serve(
+        listener,
+        dep,
+        std::future::pending::<()>(),
+    ));
 
     Ok(())
 }
@@ -57,17 +72,19 @@ pub async fn run_kvsd() -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> 
 
     let _server_handler = tokio::spawn(initializer.run_kvsd(pending::<()>()));
 
-    // TODO: retry
-    let mut client = kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
-        .await
-        .unwrap()
-        .authenticate("test", "test")
-        .await
-        .unwrap();
+    let handshake = async {
+        loop {
+            match kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
+                .and_then(|client| client.authenticate("test", "test"))
+                .await
+            {
+                Ok(client) => break client,
+                Err(_) => tokio::time::sleep(Duration::from_millis(500)).await,
+            }
+        }
+    };
 
-    // Ping
-    let ping_duration = client.ping().await.unwrap();
-    assert!(ping_duration.num_nanoseconds().unwrap() > 0);
+    let client = tokio::time::timeout(Duration::from_secs(5), handshake).await?;
 
     Ok(client)
 }

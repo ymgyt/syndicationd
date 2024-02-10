@@ -24,6 +24,7 @@ clap               = { workspace = true, features = ["derive"] }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
+headers            = { workspace = true }
 kvsd               = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
 pin-project        = "1.1.4"

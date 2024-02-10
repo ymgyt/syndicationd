@@ -10,7 +10,9 @@ mod test {
         style::{Modifier, Style},
     };
     use serial_test::file_serial;
+
     use synd_authn::device_flow::github::DeviceFlow;
+
     use synd_term::{
         application::{Application, Config},
         client::Client,
@@ -33,14 +35,16 @@ mod test {
 
         tracing::info!("TEST hello_world run");
 
-        let _kvsd_client = helper::run_kvsd().await?;
-
         let mock_port = 6000;
+        let api_port = 6001;
         let oauth_addr = ("127.0.0.1", mock_port);
         let oauth_listener = TcpListener::bind(oauth_addr).await?;
-        tokio::spawn(synd_test::oauth::serve(oauth_listener));
+        tokio::spawn(synd_test::mock::serve(oauth_listener));
+        helper::serve_api(mock_port, api_port).await?;
 
-        let endpoint = "http://localhost:5961/graphql".parse().unwrap();
+        let endpoint = format!("http://localhost:{api_port}/graphql")
+            .parse()
+            .unwrap();
         let terminal = helper::new_test_terminal();
         let client = Client::new(endpoint).unwrap();
         let config = Config {

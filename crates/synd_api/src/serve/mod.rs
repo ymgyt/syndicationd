@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post},
     BoxError, Extension, Router,
 };
+use futures_util::Future;
 use tokio::net::TcpListener;
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::{
@@ -26,18 +27,24 @@ mod probe;
 pub mod layer;
 
 /// Bind tcp listener and serve.
-pub async fn listen_and_serve(dep: Dependency) -> anyhow::Result<()> {
+pub async fn listen_and_serve<Fut>(dep: Dependency, shutdown: Fut) -> anyhow::Result<()>
+where
+    Fut: Future<Output = ()> + Send + 'static,
+{
     // should 127.0.0.1?
     let addr = ("0.0.0.0", config::PORT);
     let listener = TcpListener::bind(addr).await?;
 
     info!(ip = addr.0, port = addr.1, "Listening...");
 
-    serve(listener, dep).await
+    serve(listener, dep, shutdown).await
 }
 
 /// Start api server
-pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()> {
+pub async fn serve<Fut>(listener: TcpListener, dep: Dependency, shutdown: Fut) -> anyhow::Result<()>
+where
+    Fut: Future<Output = ()> + Send + 'static,
+{
     let Dependency {
         authenticator,
         runtime,
@@ -64,8 +71,12 @@ pub async fn serve(listener: TcpListener, dep: Dependency) -> anyhow::Result<()>
         )
         .route("/healthcheck", get(probe::healthcheck));
 
-    // TODO: graceful shutdown
-    axum::serve(listener, service).await?;
+    axum::serve(listener, service)
+        .with_graceful_shutdown(shutdown)
+        .await?;
+
+    tracing::info!("Shutdown complete");
+
     Ok(())
 }
 

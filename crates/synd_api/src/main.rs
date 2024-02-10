@@ -1,7 +1,7 @@
 use synd_o11y::{opentelemetry::OpenTelemetryGuard, tracing_subscriber::otel_metrics};
 use tracing::{error, info};
 
-use synd_api::{args, config, dependency::Dependency, serve::listen_and_serve};
+use synd_api::{args, config, dependency::Dependency, serve::listen_and_serve, shutdown::Shutdown};
 
 fn init_tracing() -> Option<OpenTelemetryGuard> {
     use synd_o11y::{
@@ -72,10 +72,11 @@ async fn main() {
     let _guard = init_tracing();
 
     let dep = Dependency::new(args.kvsd).await.unwrap();
+    let shutdown = Shutdown::watch_signal();
 
     info!(version = config::VERSION, "Runinng...");
 
-    if let Err(err) = listen_and_serve(dep).await {
+    if let Err(err) = listen_and_serve(dep, shutdown.notify()).await {
         error!("{err:?}");
         std::process::exit(1);
     }

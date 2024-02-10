@@ -9,4 +9,5 @@ pub mod principal;
 pub mod repository;
 pub mod serve;
 pub mod service;
+pub mod shutdown;
 pub mod usecase;

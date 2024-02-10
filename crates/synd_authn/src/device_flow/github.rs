@@ -119,8 +119,6 @@ impl DeviceFlow {
                 .send()
                 .await?;
 
-            debug!("{:?}", response.status());
-
             match response.status() {
                 StatusCode::OK => {
                     let full = response.bytes().await?;

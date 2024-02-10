@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures_util::TryFutureExt;
 use kvsd::{
     client::{tcp::Client, Api},
     Key, Value,
@@ -17,20 +18,23 @@ pub struct KvsdClient {
 }
 
 impl KvsdClient {
+    pub fn new(client: Client<TcpStream>) -> Self {
+        Self {
+            client: Mutex::new(client),
+        }
+    }
+
     pub async fn connect(
         host: impl AsRef<str>,
         port: u16,
         username: String,
         password: String,
     ) -> anyhow::Result<Self> {
-        let client =
-            kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(host, port).await?;
-
-        let client = client.authenticate(username, password).await?;
-
-        Ok(Self {
-            client: Mutex::new(client),
-        })
+        kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(host, port)
+            .and_then(|client| client.authenticate(username, password))
+            .await
+            .map(Self::new)
+            .map_err(Into::into)
     }
 
     async fn get<'a, T>(

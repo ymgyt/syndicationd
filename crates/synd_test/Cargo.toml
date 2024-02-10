@@ -14,10 +14,12 @@ version = "0.1.0"
 [dependencies]
 synd_authn = { path = "../synd_authn" }
 
-anyhow  = { workspace = true }
-axum    = { workspace = true }
-tokio   = { workspace = true, features = ["rt-multi-thread", "net", "time"] }
-tracing = { workspace = true }
+anyhow     = { workspace = true }
+axum       = { workspace = true }
+headers    = { workspace = true }
+serde_json = { workspace = true }
+tokio      = { workspace = true, features = ["rt-multi-thread", "net", "time"] }
+tracing    = { workspace = true }
 
 [lints]
 workspace = true

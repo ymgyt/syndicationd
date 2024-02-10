@@ -1,6 +1,11 @@
 use std::time::Duration;
 
-use axum::{http::StatusCode, routing::post, Form, Json, Router};
+use axum::{
+    http::{HeaderMap, StatusCode},
+    routing::post,
+    Form, Json, Router,
+};
+use headers::{authorization::Bearer, Authorization, Header};
 use synd_authn::device_flow::{
     DeviceAccessTokenRequest, DeviceAccessTokenResponse, DeviceAuthorizationRequest,
     DeviceAuthorizationResponse,
@@ -39,12 +44,34 @@ async fn device_access_token(
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let res = DeviceAccessTokenResponse {
-        access_token: "dummy".into(),
+        access_token: "gh_dummy_access_token".into(),
         token_type: String::new(),
         expires_in: None,
     };
 
     Ok(Json(res))
+}
+
+async fn github_graphql_viewer(
+    headers: HeaderMap,
+    query: String,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let auth = headers.get(Authorization::<Bearer>::name()).unwrap();
+    let auth = Authorization::<Bearer>::decode(&mut std::iter::once(auth)).unwrap();
+    let token = auth.token();
+
+    tracing::info!("Got token: `{token}` query: {query}");
+
+    let dummy_email = "ymgyt@ymgyt.io";
+
+    let response = serde_json::json!({
+        "data": {
+            "viewer": {
+                "email": dummy_email
+            }
+        }
+    });
+    Ok(Json(response))
 }
 
 pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
@@ -54,7 +81,9 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
             "/github/login/oauth/access_token",
             post(device_access_token),
         );
-    let router = Router::new().nest("/case1", case_1);
+    let router = Router::new()
+        .nest("/case1", case_1)
+        .route("/github/graphql", post(github_graphql_viewer));
 
     axum::serve(listener, router).await?;
 

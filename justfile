@@ -32,7 +32,7 @@ test:
 
 # Run integration test
 integration-test:
-  RUST_LOG="synd,integration,kvsd=debug" cargo nextest run --package synd_term --features integration --test integration --no-capture 
+  RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd_term --features integration --test integration --no-capture 
 
 update-gql-schema:
   @graphql-client introspect-schema http://localhost:5959/graphql \

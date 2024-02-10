@@ -22,8 +22,6 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
             %request_id,
         );
 
-        tracing::info!("Request headers: {:#?}", request.headers());
-
         span.set_parent(cx);
         span
     }
