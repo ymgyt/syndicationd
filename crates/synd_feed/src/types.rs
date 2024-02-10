@@ -26,8 +26,6 @@ impl<'a> Display for EntryId<'a> {
     }
 }
 
-pub type Entries = Vec<Entry>;
-
 #[derive(Debug, Clone)]
 pub struct Entry(feedrs::Entry);
 
@@ -136,11 +134,11 @@ impl From<FeedMeta> for Cow<'static, FeedMeta> {
 #[derive(Debug, Clone)]
 pub struct Feed {
     meta: FeedMeta,
-    entries: Entries,
+    entries: Vec<Entry>,
 }
 
 impl Feed {
-    pub fn parts(self) -> (FeedMeta, Entries) {
+    pub fn parts(self) -> (FeedMeta, Vec<Entry>) {
         (self.meta, self.entries)
     }
 

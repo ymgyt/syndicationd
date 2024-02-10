@@ -31,6 +31,10 @@ impl Entries {
         self.entries.extend(payload.entries);
     }
 
+    pub fn remove_unsubscribed_entries(&mut self, url: &str) {
+        self.entries.retain(|entry| entry.feed_url != url);
+    }
+
     pub fn move_selection(&mut self, direction: &Direction) {
         self.selected_entry_index = direction.apply(
             self.selected_entry_index,

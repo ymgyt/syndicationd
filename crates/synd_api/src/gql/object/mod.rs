@@ -212,8 +212,14 @@ pub(super) struct FeedMeta<'a>(Cow<'a, types::FeedMeta>);
 
 #[Object]
 impl<'a> FeedMeta<'a> {
+    /// Title of the feed
     async fn title(&self) -> Option<&str> {
         self.0.title()
+    }
+
+    /// Url of the feed
+    async fn url(&self) -> &str {
+        self.0.url()
     }
 }
 

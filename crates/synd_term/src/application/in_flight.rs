@@ -14,6 +14,7 @@ pub enum RequestId {
     FetchEntries,
     FetchSubscription,
     SubscribeFeed,
+    UnsubscribeFeed,
 }
 
 /// Mangae in flight requests state

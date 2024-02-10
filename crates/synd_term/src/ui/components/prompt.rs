@@ -69,6 +69,7 @@ impl Prompt {
                     RequestId::FetchEntries => "Fetch entries...",
                     RequestId::FetchSubscription => "Fetch subscription...",
                     RequestId::SubscribeFeed => "Subscribe feed...",
+                    RequestId::UnsubscribeFeed => "Unsubscribe feed...",
                 };
                 let horizontal = Layout::horizontal([
                     Constraint::Length(label.len() as u16 + 1),

@@ -34,11 +34,12 @@ test:
 integration-test:
   RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd_term --features integration --test integration --no-capture 
 
+# Update synd_api graphql schema
 update-gql-schema:
   @graphql-client introspect-schema http://localhost:5959/graphql \
     --header 'authorization: github {{github_pat}}' out> crates/synd_term/gql/schema.json
 
-
+# Generate graphql code
 gen-gql:
   graphql-client generate \
     --schema-path crates/synd_term/gql/schema.json \

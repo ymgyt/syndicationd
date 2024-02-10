@@ -68,6 +68,7 @@ fragment Entry on Entry {
 
 fragment FeedMeta on FeedMeta {
   title
+  url
 }
 
 fragment PageInfo on PageInfo {

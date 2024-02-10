@@ -261,8 +261,10 @@ impl Application {
                     self.components.subscription.add_subscribed_feed(feed);
                     self.should_render = true;
                 }
-                Command::CompleteUnsubscribeFeed { url } => {
+                Command::CompleteUnsubscribeFeed { url, request_seq } => {
+                    self.in_flight.remove(request_seq);
                     self.components.subscription.remove_unsubscribed_feed(&url);
+                    self.components.entries.remove_unsubscribed_entries(&url);
                     self.should_render = true;
                 }
                 Command::OpenFeed => {
@@ -458,10 +460,15 @@ impl Application {
 
     fn unsubscribe_feed(&mut self, url: String) {
         let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::UnsubscribeFeed);
         let fut = async move {
-            // TODO: error handling
-            client.unsubscribe_feed(url.clone()).await.unwrap();
-            Ok(Command::CompleteUnsubscribeFeed { url })
+            match client.unsubscribe_feed(url.clone()).await {
+                Ok(()) => Ok(Command::CompleteUnsubscribeFeed { url, request_seq }),
+                Err(err) => Ok(Command::HandleError {
+                    message: format!("{err}"),
+                    request_seq: Some(request_seq),
+                }),
+            }
         }
         .boxed();
         self.jobs.futures.push(fut);

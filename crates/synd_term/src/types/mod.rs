@@ -119,6 +119,7 @@ pub struct Entry {
     pub website_url: Option<String>,
     pub summary: Option<String>,
     pub feed_title: Option<String>,
+    pub feed_url: String,
 }
 
 impl Entry {
@@ -136,6 +137,7 @@ impl From<query::entries::Entry> for Entry {
             published: v.published.map(parse_time),
             website_url: v.website_url,
             feed_title: v.feed.title,
+            feed_url: v.feed.url,
             summary: v.summary,
         }
     }

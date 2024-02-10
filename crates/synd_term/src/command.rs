@@ -40,6 +40,7 @@ pub enum Command {
     },
     CompleteUnsubscribeFeed {
         url: String,
+        request_seq: RequestSequence,
     },
     FetchSubscription {
         after: Option<String>,
