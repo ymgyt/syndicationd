@@ -14,7 +14,7 @@ version     = "0.1.0"
 [dependencies]
 anyhow         = { workspace = true }
 http           = { workspace = true }
-http-serde-ext = "0.1"
+http-serde-ext = "1.0"
 reqwest        = { workspace = true }
 serde          = { workspace = true, features = ["derive"] }
 serde_json     = { workspace = true }
