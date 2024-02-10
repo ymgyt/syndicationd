@@ -18,51 +18,55 @@ use crate::{
 
 pub struct Subscription {
     selected_feed_meta_index: usize,
-    feed_metas: Vec<types::Feed>,
+    feeds: Vec<types::Feed>,
 }
 
 impl Subscription {
     pub fn new() -> Self {
         Self {
             selected_feed_meta_index: 0,
-            feed_metas: Vec::new(),
+            feeds: Vec::new(),
         }
     }
 
     pub fn has_subscription(&self) -> bool {
-        !self.feed_metas.is_empty()
+        !self.feeds.is_empty()
+    }
+
+    pub fn is_already_subscribed(&self, url: &str) -> bool {
+        self.feeds.iter().any(|feed| feed.url == url)
     }
 
     pub fn selected_feed_website_url(&self) -> Option<&str> {
-        self.feed_metas
+        self.feeds
             .get(self.selected_feed_meta_index)
             .and_then(|feed_meta| feed_meta.website_url.as_deref())
     }
 
     pub fn selected_feed_url(&self) -> Option<&str> {
-        self.feed_metas
+        self.feeds
             .get(self.selected_feed_meta_index)
             .map(|feed_meta| feed_meta.url.as_str())
     }
 
     pub fn update_subscription(&mut self, subscription: SubscriptionOutput) {
         let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
-        self.feed_metas = feed_metas.collect();
+        self.feeds = feed_metas.collect();
     }
 
     pub fn add_subscribed_feed(&mut self, feed: types::Feed) {
-        self.feed_metas.insert(0, feed);
+        self.feeds.insert(0, feed);
     }
 
     pub fn remove_unsubscribed_feed(&mut self, url: &str) {
-        self.feed_metas.retain(|feed_meta| feed_meta.url != url);
+        self.feeds.retain(|feed_meta| feed_meta.url != url);
         self.move_selection(&Direction::Up);
     }
 
     pub fn move_selection(&mut self, direction: &Direction) {
         self.selected_feed_meta_index = direction.apply(
             self.selected_feed_meta_index,
-            self.feed_metas.len(),
+            self.feeds.len(),
             IndexOutOfRange::Wrapping,
         );
     }
@@ -109,7 +113,7 @@ impl Subscription {
         // https://github.com/ratatui-org/ratatui/pull/911
         // passing None to track_symbol cause incorrect rendering
         let mut scrollbar_state = ScrollbarState::default()
-            .content_length(self.feed_metas.len())
+            .content_length(self.feeds.len())
             .position(self.selected_feed_meta_index);
         Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
@@ -162,7 +166,7 @@ impl Subscription {
             ])
         };
 
-        (header, constraints, self.feed_metas.iter().map(row))
+        (header, constraints, self.feeds.iter().map(row))
     }
 
     fn render_feed_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -184,7 +188,7 @@ impl Subscription {
         let inner = block.inner(area);
         Widget::render(block, area, buf);
 
-        let Some(feed) = self.feed_metas.get(self.selected_feed_meta_index) else {
+        let Some(feed) = self.feeds.get(self.selected_feed_meta_index) else {
             return;
         };
 

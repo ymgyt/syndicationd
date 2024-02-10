@@ -13,6 +13,7 @@ pub type RequestSequence = u64;
 pub enum RequestId {
     FetchEntries,
     FetchSubscription,
+    SubscribeFeed,
 }
 
 /// Mangae in flight requests state

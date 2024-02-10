@@ -32,7 +32,7 @@ impl Terminal {
     /// Initialize terminal
     pub fn init(&mut self) -> Result<()> {
         terminal::enable_raw_mode()?;
-        crossterm::execute!(io::stdout(), EnterAlternateScreen,)?;
+        crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
 
         let panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |panic| {
@@ -54,8 +54,7 @@ impl Terminal {
     }
 
     fn reset_backend() -> Result<()> {
-        // order is matter, Leave then disable raw mode
-        crossterm::execute!(io::stdout(), LeaveAlternateScreen,)?;
+        crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
         terminal::disable_raw_mode()?;
         Ok(())
     }

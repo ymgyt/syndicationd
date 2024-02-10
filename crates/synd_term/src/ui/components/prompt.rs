@@ -68,6 +68,7 @@ impl Prompt {
                 let label = match in_flight {
                     RequestId::FetchEntries => "Fetch entries...",
                     RequestId::FetchSubscription => "Fetch subscription...",
+                    RequestId::SubscribeFeed => "Subscribe feed...",
                 };
                 let horizontal = Layout::horizontal([
                     Constraint::Length(label.len() as u16 + 1),

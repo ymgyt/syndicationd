@@ -256,7 +256,8 @@ impl Application {
                         .update_subscription(subscription);
                     self.should_render = true;
                 }
-                Command::CompleteSubscribeFeed { feed } => {
+                Command::CompleteSubscribeFeed { feed, request_seq } => {
+                    self.in_flight.remove(request_seq);
                     self.components.subscription.add_subscribed_feed(feed);
                     self.should_render = true;
                 }
@@ -429,14 +430,30 @@ impl Application {
     }
 
     fn subscribe_feed(&mut self, url: String) {
-        let client = self.client.clone();
-        let fut = async move {
-            // TODO: error handling
-            let feed = client.subscribe_feed(url).await.unwrap();
-            Ok(Command::CompleteSubscribeFeed { feed })
+        // Check for the duplicate subscription
+        if self.components.subscription.is_already_subscribed(&url) {
+            let message = format!("{url} already subscribed");
+            let fut = std::future::ready(Ok(Command::HandleError {
+                message,
+                request_seq: None,
+            }))
+            .boxed();
+            self.jobs.futures.push(fut);
+        } else {
+            let client = self.client.clone();
+            let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
+            let fut = async move {
+                match client.subscribe_feed(url).await {
+                    Ok(feed) => Ok(Command::CompleteSubscribeFeed { feed, request_seq }),
+                    Err(err) => Ok(Command::HandleError {
+                        message: format!("{err}"),
+                        request_seq: Some(request_seq),
+                    }),
+                }
+            }
+            .boxed();
+            self.jobs.futures.push(fut);
         }
-        .boxed();
-        self.jobs.futures.push(fut);
     }
 
     fn unsubscribe_feed(&mut self, url: String) {

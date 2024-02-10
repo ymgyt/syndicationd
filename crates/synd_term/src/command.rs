@@ -36,6 +36,7 @@ pub enum Command {
     },
     CompleteSubscribeFeed {
         feed: Feed,
+        request_seq: RequestSequence,
     },
     CompleteUnsubscribeFeed {
         url: String,
