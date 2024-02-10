@@ -61,7 +61,7 @@ impl Usecase for SubscribeFeed {
             .await
             .map_err(|err| super::Error::Usecase(anyhow::Error::from(err)))?;
 
-        tracing::debug!("{:#?}", feed.meta());
+        tracing::debug!("{:?}", feed.meta());
 
         self.repository
             .put_feed_subscription(repository::types::FeedSubscription {

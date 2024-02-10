@@ -65,7 +65,8 @@ gen-gql:
 
 # Run kvsd
 kvsd:
-  ~/.cargo/bin/kvsd server --disable-tls --config dev/kvsd_config.yaml --username {{kvsd_user}}
+  cd ../kvsd; \
+  KVSD_LOG=info cargo run server --disable-tls --config ../syndicationd/.dev/kvsd_config.yaml --username {{kvsd_user}} --kvsd-dir ../syndicationd/.kvsd
 
 # Run api
 api:
@@ -82,4 +83,8 @@ term *flags:
 # Run opentelemetry-collector-contrib
 @otelcol:
   LOKI_ENDPOINT={{loki_endpoint}} \
-  otelcontribcol --config=file:./dev/otelcol-config.yaml
+  otelcontribcol --config=file:.dev/otelcol-config.yaml
+
+# Run backends
+backend: 
+  zellij action new-tab --layout .dev/backend_layout.kdl

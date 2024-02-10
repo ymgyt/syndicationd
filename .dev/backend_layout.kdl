@@ -1,0 +1,20 @@
+layout {
+	pane_template name="just" {
+		command "just"
+	}
+
+	pane size=1 borderless=true {
+		plugin location="zellij:tab-bar"
+	}
+	pane split_direction="horizontal" {
+		just {
+			args "api"
+		}
+		just {
+			args "kvsd"
+		}
+	}
+	pane size=2 borderless=true {
+		plugin location="zellij:status-bar"
+	}
+}
