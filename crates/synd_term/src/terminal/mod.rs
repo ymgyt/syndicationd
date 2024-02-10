@@ -68,6 +68,10 @@ impl Terminal {
         Ok(())
     }
 
+    pub fn force_redraw(&mut self) {
+        self.backend.clear().unwrap();
+    }
+
     #[cfg(feature = "integration")]
     pub fn assert_buffer(&self, expected: &Buffer) {
         self.backend.backend().assert_buffer(expected);

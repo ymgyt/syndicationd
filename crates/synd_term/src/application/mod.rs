@@ -403,11 +403,12 @@ impl Application {
 
 impl Application {
     fn prompt_feed_subscription(&mut self) {
-        let prompt = r"URL: https://blog.ymgyt.io/atom.xml";
-        let modified = edit::edit(prompt).expect("Got user modified input");
-        tracing::debug!("Got user modified feed subscription: {modified}");
-        // TODO: more safely
-        let url = modified.trim_start_matches("URL:").trim().to_owned();
+        let prompt = "URL: ";
+        let input = self.interactor.open_editor(prompt);
+        tracing::debug!("Got user modified feed subscription: {input}");
+        // the terminal state becomes strange after editing in the editor
+        self.terminal.force_redraw();
+        let url = input.trim_start_matches("URL:").trim().to_owned();
 
         let fut = async move { Ok(Command::SubscribeFeed { url }) }.boxed();
         self.jobs.futures.push(fut);

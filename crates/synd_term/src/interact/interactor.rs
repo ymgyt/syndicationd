@@ -9,4 +9,8 @@ impl Interactor {
         // try to open input screen in the browser
         open::that(url).ok();
     }
+
+    pub fn open_editor<S: AsRef<[u8]>>(&self, initial_content: S) -> String {
+        edit::edit(initial_content).expect("Got user modified input")
+    }
 }
