@@ -42,7 +42,7 @@ mod test {
         tokio::spawn(synd_test::mock::serve(oauth_listener));
         helper::serve_api(mock_port, api_port).await?;
 
-        let endpoint = format!("http://localhost:{api_port}/graphql")
+        let endpoint = format!("https://localhost:{api_port}/graphql")
             .parse()
             .unwrap();
         let terminal = helper::new_test_terminal();
@@ -51,9 +51,9 @@ mod test {
             idle_timer_interval: Duration::from_millis(1000),
             throbber_timer_interval: Duration::from_secs(3600), // disable throbber
             github_device_flow: DeviceFlow::new("dummy")
-                .with_device_authorization_endpoint(
-                    "http://localhost:6000/case1/github/login/device/code",
-                )
+                .with_device_authorization_endpoint(format!(
+                    "http://localhost:{mock_port}/case1/github/login/device/code",
+                ))
                 .with_token_endpoint("http://localhost:6000/case1/github/login/oauth/access_token"),
         };
         // or mpsc and tokio_stream ReceiverStream

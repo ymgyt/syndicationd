@@ -16,8 +16,8 @@ const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VE
 pub struct DeviceFlow {
     client: Client,
     client_id: Cow<'static, str>,
-    device_authorization_endpoint: Option<&'static str>,
-    token_endpoint: Option<&'static str>,
+    device_authorization_endpoint: Option<Cow<'static, str>>,
+    token_endpoint: Option<Cow<'static, str>>,
 }
 
 impl DeviceFlow {
@@ -40,17 +40,20 @@ impl DeviceFlow {
     }
 
     #[must_use]
-    pub fn with_device_authorization_endpoint(self, endpoint: &'static str) -> Self {
+    pub fn with_device_authorization_endpoint(
+        self,
+        endpoint: impl Into<Cow<'static, str>>,
+    ) -> Self {
         Self {
-            device_authorization_endpoint: Some(endpoint),
+            device_authorization_endpoint: Some(endpoint.into()),
             ..self
         }
     }
 
     #[must_use]
-    pub fn with_token_endpoint(self, endpoint: &'static str) -> Self {
+    pub fn with_token_endpoint(self, endpoint: impl Into<Cow<'static, str>>) -> Self {
         Self {
-            token_endpoint: Some(endpoint),
+            token_endpoint: Some(endpoint.into()),
             ..self
         }
     }
@@ -66,6 +69,7 @@ impl DeviceFlow {
             .client
             .post(
                 self.device_authorization_endpoint
+                    .as_deref()
                     .unwrap_or(Self::DEVICE_AUTHORIZATION_ENDPOINT),
             )
             .header(http::header::ACCEPT, "application/json")
@@ -110,7 +114,11 @@ impl DeviceFlow {
         let response = loop {
             let response = self
                 .client
-                .post(self.token_endpoint.unwrap_or(Self::TOKEN_ENDPOINT))
+                .post(
+                    self.token_endpoint
+                        .as_deref()
+                        .unwrap_or(Self::TOKEN_ENDPOINT),
+                )
                 .header(http::header::ACCEPT, "application/json")
                 .form(&DeviceAccessTokenRequest::new(
                     &device_code,
