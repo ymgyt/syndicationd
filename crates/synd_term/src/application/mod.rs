@@ -39,6 +39,12 @@ pub enum EventLoopControlFlow {
     Quit,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListAction {
+    Append,
+    Replace,
+}
+
 pub struct Config {
     pub idle_timer_interval: Duration,
     pub throbber_timer_interval: Duration,
@@ -112,7 +118,7 @@ impl Application {
         let fut = async {
             Ok(Command::FetchEntries {
                 after: None,
-                first: 200,
+                first: config::INITIAL_ENTRY_TO_FETCH,
             })
         }
         .boxed();
@@ -259,6 +265,7 @@ impl Application {
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
                     self.in_flight.remove(request_seq);
                     self.components.subscription.add_subscribed_feed(feed);
+                    self.fetch_entries(ListAction::Replace, None, config::INITIAL_ENTRY_TO_FETCH);
                     self.should_render = true;
                 }
                 Command::CompleteUnsubscribeFeed { url, request_seq } => {
@@ -271,14 +278,15 @@ impl Application {
                     self.open_feed();
                 }
                 Command::FetchEntries { after, first } => {
-                    self.fetch_entries(after, first);
+                    self.fetch_entries(ListAction::Append, after, first);
                 }
                 Command::UpdateEntries {
+                    action,
                     payload,
                     request_seq,
                 } => {
                     self.in_flight.remove(request_seq);
-                    self.components.entries.update_entries(payload);
+                    self.components.entries.update_entries(action, payload);
                     self.should_render = true;
                 }
                 Command::MoveEntry(direction) => {
@@ -481,25 +489,26 @@ impl Application {
         else {
             return;
         };
-        open::that(feed_website_url).ok();
+        self.interactor.open_browser(feed_website_url);
     }
 
     fn open_entry(&mut self) {
         let Some(entry_website_url) = self.components.entries.selected_entry_website_url() else {
             return;
         };
-        open::that(entry_website_url).ok();
+        self.interactor.open_browser(entry_website_url);
     }
 }
 
 impl Application {
     #[tracing::instrument(skip(self))]
-    fn fetch_entries(&mut self, after: Option<String>, first: i64) {
+    fn fetch_entries(&mut self, action: ListAction, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
         let fut = async move {
             match client.fetch_entries(after, first).await {
                 Ok(payload) => Ok(Command::UpdateEntries {
+                    action,
                     payload,
                     request_seq,
                 }),

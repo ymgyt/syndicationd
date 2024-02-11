@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 pub struct Interactor {}
 
 impl Interactor {
@@ -5,7 +7,7 @@ impl Interactor {
         Self {}
     }
 
-    pub fn open_browser(&self, url: String) {
+    pub fn open_browser<S: AsRef<OsStr>>(&self, url: S) {
         // try to open input screen in the browser
         open::that(url).ok();
     }

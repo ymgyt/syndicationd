@@ -1,5 +1,5 @@
 use crate::{
-    application::{Direction, IndexOutOfRange},
+    application::{Direction, IndexOutOfRange, ListAction},
     client::payload,
     types::{self, TimeExt},
     ui::{self, Context},
@@ -27,8 +27,11 @@ impl Entries {
         }
     }
 
-    pub fn update_entries(&mut self, payload: payload::FetchEntriesPayload) {
-        self.entries.extend(payload.entries);
+    pub fn update_entries(&mut self, action: ListAction, payload: payload::FetchEntriesPayload) {
+        match action {
+            ListAction::Append => self.entries.extend(payload.entries),
+            ListAction::Replace => self.entries = payload.entries,
+        }
     }
 
     pub fn remove_unsubscribed_entries(&mut self, url: &str) {

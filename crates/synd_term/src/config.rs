@@ -15,6 +15,9 @@ pub mod github {
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
+/// Number of entries to fetch
+pub const INITIAL_ENTRY_TO_FETCH: i64 = 200;
+
 pub fn cache_dir() -> &'static Path {
     project_dirs().cache_dir()
 }

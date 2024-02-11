@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+
 pub type Interactor = TestInteractor;
 
 pub struct TestInteractor;
@@ -8,7 +10,7 @@ impl TestInteractor {
     }
 
     #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
-    pub fn open_browser(&self, _url: String) {
+    pub fn open_browser<S: AsRef<OsStr>>(&self, _url: S) {
         // do nothing
     }
 

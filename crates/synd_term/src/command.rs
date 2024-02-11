@@ -2,7 +2,7 @@ use std::fmt::Display;
 use synd_authn::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
 
 use crate::{
-    application::{Direction, RequestSequence},
+    application::{Direction, ListAction, RequestSequence},
     auth::AuthenticationProvider,
     client::{payload, query::subscription::SubscriptionOutput},
     types::Feed,
@@ -58,6 +58,7 @@ pub enum Command {
         first: i64,
     },
     UpdateEntries {
+        action: ListAction,
         payload: payload::FetchEntriesPayload,
         request_seq: RequestSequence,
     },
