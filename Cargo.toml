@@ -23,7 +23,7 @@ feed-rs        = { version = "1.4" }
 futures-util   = { version = "0.3.30" }
 graphql_client = { version = "0.13.0", default-features = false }
 headers        = { version = "0.4.0" }
-http           = { version = "0.2" }                              # request use 0.2
+http           = { version = "0.2" }                              # request use 1.0
 kvsd           = { version = "0.1.2", default-features = false }
 thiserror      = { version = "1.0.56" }
 # kvsd                               = { path = "../kvsd" }
