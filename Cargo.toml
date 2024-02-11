@@ -18,7 +18,7 @@ async-trait    = { version = "0.1.77" }
 axum           = { version = "0.7.4" }
 axum-server    = { version = "0.6.0", features = ["tls-rustls"] }
 chrono         = { version = "0.4.31" }
-clap           = { version = "4.4" }
+clap           = { version = "4.5" }
 feed-rs        = { version = "1.4" }
 futures-util   = { version = "0.3.30" }
 graphql_client = { version = "0.13.0", default-features = false }
