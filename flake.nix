@@ -28,7 +28,15 @@
         };
 
         craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
-        src = craneLib.cleanCargoSource (craneLib.path ./.);
+
+        src = pkgs.lib.cleanSourceWith {
+          src = ./.; # The original, unfiltered source
+          filter = path: type:
+            # Load self signed certs to test
+            (pkgs.lib.hasSuffix ".pem" path) ||
+            # Default filter from crane (allow .rs files)
+            (craneLib.filterCargoSources path type);
+        };
 
         commonArgs = {
           inherit src;
