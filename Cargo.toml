@@ -33,7 +33,7 @@ opentelemetry-http                 = { version = "0.10.0" }
 opentelemetry-semantic-conventions = { version = "0.13.0" }
 opentelemetry_sdk                  = { version = "0.21.2" }
 rand                               = { version = "0.8.5" }
-reqwest                            = { version = "0.11.23", default-features = false, features = ["rustls-tls", "json"] }
+reqwest                            = { version = "0.11.24", default-features = false, features = ["rustls-tls", "json"] }
 serde                              = { version = "1", features = ["derive"] }
 serde_json                         = { version = "1.0.111" }
 tokio                              = { version = "1.35" }
