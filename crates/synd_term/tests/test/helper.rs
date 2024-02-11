@@ -39,10 +39,12 @@ pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
     let tls_config = RustlsConfig::from_pem_file(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
+            .join("..")
             .join(".dev")
             .join("self_signed_certs")
             .join("certificate.pem"),
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
             .join("..")
             .join(".dev")
             .join("self_signed_certs")
