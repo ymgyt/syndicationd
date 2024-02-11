@@ -8,6 +8,7 @@ use synd_api::{
     dependency::Dependency,
     repository::kvsd::KvsdClient,
     serve::auth::Authenticator,
+    shutdown::Shutdown,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
 use synd_feed::feed::{cache::CacheLayer, parser::FeedService};
@@ -58,7 +59,7 @@ pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
     tokio::spawn(synd_api::serve::serve(
         listener,
         dep,
-        std::future::pending::<()>(),
+        Shutdown::watch_signal(),
     ));
 
     Ok(())

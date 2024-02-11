@@ -6,7 +6,6 @@ use axum::{
     routing::{get, post},
     BoxError, Extension, Router,
 };
-use futures_util::Future;
 use tokio::net::TcpListener;
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::{
@@ -19,6 +18,7 @@ use crate::{
     dependency::Dependency,
     gql,
     serve::layer::{authenticate, trace},
+    shutdown::Shutdown,
 };
 
 pub mod auth;
@@ -27,10 +27,7 @@ mod probe;
 pub mod layer;
 
 /// Bind tcp listener and serve.
-pub async fn listen_and_serve<Fut>(dep: Dependency, shutdown: Fut) -> anyhow::Result<()>
-where
-    Fut: Future<Output = ()> + Send + 'static,
-{
+pub async fn listen_and_serve(dep: Dependency, shutdown: Shutdown) -> anyhow::Result<()> {
     // should 127.0.0.1?
     let addr = ("0.0.0.0", config::PORT);
     let listener = TcpListener::bind(addr).await?;
@@ -41,10 +38,11 @@ where
 }
 
 /// Start api server
-pub async fn serve<Fut>(listener: TcpListener, dep: Dependency, shutdown: Fut) -> anyhow::Result<()>
-where
-    Fut: Future<Output = ()> + Send + 'static,
-{
+pub async fn serve(
+    listener: TcpListener,
+    dep: Dependency,
+    shutdown: Shutdown,
+) -> anyhow::Result<()> {
     let Dependency {
         authenticator,
         runtime,
@@ -73,6 +71,7 @@ where
         .route("/healthcheck", get(probe::healthcheck));
 
     axum_server::from_tcp_rustls(listener.into_std()?, tls_config)
+        .handle(shutdown.into_handle())
         .serve(service.into_make_service())
         .await?;
 

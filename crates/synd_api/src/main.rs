@@ -77,7 +77,7 @@ async fn run(Args { kvsd, tls }: Args, shutdown: Shutdown) -> anyhow::Result<()>
 
     info!(version = config::VERSION, "Runinng...");
 
-    listen_and_serve(dep, shutdown.notify()).await
+    listen_and_serve(dep, shutdown).await
 }
 
 #[tokio::main]
