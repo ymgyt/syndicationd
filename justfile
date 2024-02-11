@@ -70,12 +70,12 @@ kvsd:
   KVSD_LOG=info cargo run server --disable-tls --config ../syndicationd/.dev/kvsd_config.yaml --username {{kvsd_user}} --kvsd-dir ../syndicationd/.kvsd
 
 # Run api
-api:
+api *flags:
   cd crates/synd_api; \
     RUST_LOG="info,synd_api=debug" \
     OTEL_EXPORTER_OTLP_ENDPOINT={{otlp_endpoint}} \
     cargo run --features "introspection" -- \
-    --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret
+    --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret {{flags}}
 
 # Run term
 term *flags:
