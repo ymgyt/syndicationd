@@ -1,5 +1,6 @@
-use std::{future::pending, sync::Arc, time::Duration};
+use std::{future::pending, path::PathBuf, sync::Arc, time::Duration};
 
+use axum_server::tls_rustls::RustlsConfig;
 use futures_util::TryFutureExt;
 use ratatui::backend::TestBackend;
 use synd_api::{
@@ -34,9 +35,23 @@ pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
     };
     let authorizer = Authorizer::new();
     let runtime = Runtime::new(make_usecase, authorizer);
+    let tls_config = RustlsConfig::from_pem_file(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(".dev")
+            .join("self_signed_certs")
+            .join("certificate.pem"),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(".dev")
+            .join("self_signed_certs")
+            .join("private_key.pem"),
+    )
+    .await?;
     let dep = Dependency {
         authenticator,
         runtime,
+        tls_config,
     };
     let listener = TcpListener::bind(("localhost", api_port)).await?;
 

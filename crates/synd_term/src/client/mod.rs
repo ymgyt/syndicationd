@@ -31,6 +31,8 @@ impl Client {
             .user_agent(config::USER_AGENT)
             .timeout(Duration::from_secs(10))
             .connect_timeout(Duration::from_secs(10))
+            // this client specifically targets the syndicationd api, so accepts self signed certificates
+            .danger_accept_invalid_certs(true)
             .build()?;
 
         Ok(Self {

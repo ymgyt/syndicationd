@@ -16,6 +16,7 @@ repository  = "https://github.com/ymgyt/syndicationd"
 anyhow         = { version = "1" }
 async-trait    = { version = "0.1.77" }
 axum           = { version = "0.7.4" }
+axum-server    = { version = "0.6.0", features = ["tls-rustls"] }
 chrono         = { version = "0.4.31" }
 clap           = { version = "4.4" }
 feed-rs        = { version = "1.4" }
@@ -24,6 +25,7 @@ graphql_client = { version = "0.13.0", default-features = false }
 headers        = { version = "0.4.0" }
 http           = { version = "0.2" }                              # request use 0.2
 kvsd           = { version = "0.1.2", default-features = false }
+thiserror      = { version = "1.0.56" }
 # kvsd                               = { path = "../kvsd" }
 moka                               = { version = "0.12.4", features = ["future"] }
 opentelemetry                      = { version = "0.21.0" }

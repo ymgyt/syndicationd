@@ -1,7 +1,14 @@
 use synd_o11y::{opentelemetry::OpenTelemetryGuard, tracing_subscriber::otel_metrics};
 use tracing::{error, info};
 
-use synd_api::{args, config, dependency::Dependency, serve::listen_and_serve, shutdown::Shutdown};
+use synd_api::{
+    args::{self, Args},
+    config,
+    dependency::Dependency,
+    repository::kvsd::ConnectKvsdFailed,
+    serve::listen_and_serve,
+    shutdown::Shutdown,
+};
 
 fn init_tracing() -> Option<OpenTelemetryGuard> {
     use synd_o11y::{
@@ -65,17 +72,26 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
     guard
 }
 
+async fn run(Args { kvsd, tls }: Args, shutdown: Shutdown) -> anyhow::Result<()> {
+    let dep = Dependency::new(kvsd, tls).await?;
+
+    info!(version = config::VERSION, "Runinng...");
+
+    listen_and_serve(dep, shutdown.notify()).await
+}
+
 #[tokio::main]
 async fn main() {
     let args = args::parse();
     let _guard = init_tracing();
-    let dep = Dependency::new(args.kvsd).await.unwrap();
     let shutdown = Shutdown::watch_signal();
 
-    info!(version = config::VERSION, "Runinng...");
-
-    if let Err(err) = listen_and_serve(dep, shutdown.notify()).await {
-        error!("{err:?}");
+    if let Err(err) = run(args, shutdown).await {
+        if let Some(err) = err.downcast_ref::<ConnectKvsdFailed>() {
+            error!("{err}: make sure kvsd is running");
+        } else {
+            error!("{err:?}");
+        }
         std::process::exit(1);
     }
 }

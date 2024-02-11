@@ -6,7 +6,7 @@ use std::{
 use directories::ProjectDirs;
 
 pub mod api {
-    pub const ENDPOINT: &str = "http://localhost:5959/graphql";
+    pub const ENDPOINT: &str = "https://localhost:5959/graphql";
 }
 
 pub mod github {

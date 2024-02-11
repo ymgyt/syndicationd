@@ -1,5 +1,6 @@
 use std::{io::ErrorKind, time::Duration};
 
+use anyhow::Context;
 use async_trait::async_trait;
 use futures_util::TryFutureExt;
 use kvsd::{
@@ -7,12 +8,17 @@ use kvsd::{
     Key, Value,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::{net::TcpStream, sync::MutexGuard};
 
 use crate::repository::{
     self, subscription::RepositoryResult, RepositoryError, SubscriptionRepository,
 };
+
+#[derive(Error, Debug)]
+#[error("connect kvsd failed")]
+pub struct ConnectKvsdFailed;
 
 pub struct KvsdClient {
     #[allow(dead_code)]
@@ -48,14 +54,16 @@ impl KvsdClient {
                     err => break err,
                 }
                 retry += 1;
-                tokio::time::sleep(Duration::from_millis(500)).await;
+                tokio::time::sleep(Duration::from_millis(1000)).await;
             }
         };
 
         tokio::time::timeout(timeout, handshake)
-            .await?
+            .await
+            .map_err(anyhow::Error::from)
+            .context(ConnectKvsdFailed)?
+            .map_err(anyhow::Error::from)
             .inspect(|_| tracing::info!("Kvsd handshake successfully completed"))
-            .map_err(Into::into)
     }
 
     async fn get<'a, T>(

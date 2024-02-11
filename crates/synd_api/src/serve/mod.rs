@@ -48,6 +48,7 @@ where
     let Dependency {
         authenticator,
         runtime,
+        tls_config,
     } = dep;
 
     let schema = gql::schema_builder().data(runtime).finish();
@@ -71,8 +72,8 @@ where
         )
         .route("/healthcheck", get(probe::healthcheck));
 
-    axum::serve(listener, service)
-        .with_graceful_shutdown(shutdown)
+    axum_server::from_tcp_rustls(listener.into_std()?, tls_config)
+        .serve(service.into_make_service())
         .await?;
 
     tracing::info!("Shutdown complete");

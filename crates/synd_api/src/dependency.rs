@@ -1,12 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
+use anyhow::Context;
+use axum_server::tls_rustls::RustlsConfig;
 use synd_feed::feed::{
     cache::{CacheConfig, CacheLayer},
     parser::FeedService,
 };
 
 use crate::{
-    args::KvsdOptions,
+    args::{KvsdOptions, TlsOptions},
     config,
     repository::kvsd::KvsdClient,
     serve::auth::Authenticator,
@@ -16,10 +18,11 @@ use crate::{
 pub struct Dependency {
     pub authenticator: Authenticator,
     pub runtime: Runtime,
+    pub tls_config: RustlsConfig,
 }
 
 impl Dependency {
-    pub async fn new(kvsd: KvsdOptions) -> anyhow::Result<Self> {
+    pub async fn new(kvsd: KvsdOptions, tls: TlsOptions) -> anyhow::Result<Self> {
         let KvsdOptions {
             host,
             port,
@@ -48,9 +51,14 @@ impl Dependency {
 
         let runtime = Runtime::new(make_usecase, authorizer);
 
+        let tls_config = RustlsConfig::from_pem_file(&tls.certificate, &tls.private_key)
+            .await
+            .with_context(|| format!("tls options: {tls:?}"))?;
+
         Ok(Dependency {
             authenticator,
             runtime,
+            tls_config,
         })
     }
 }
