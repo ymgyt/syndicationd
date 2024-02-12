@@ -11,7 +11,7 @@ mod test {
     };
     use serial_test::file_serial;
 
-    use synd_authn::device_flow::github::DeviceFlow;
+    use synd_auth::device_flow::github::DeviceFlow;
 
     use synd_term::{
         application::{Application, Config},

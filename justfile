@@ -6,7 +6,7 @@ otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
 
 term_dir := "crates/synd_term"
-authn_dir := "crates/synd_authn"
+auth_dir := "crates/synd_auth"
 
 alias format := fmt
 alias integration := integration-test
@@ -105,12 +105,12 @@ changelog: changelog-term
 changelog-term:
   git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
 
-changelog-authn:
-  git cliff --include-path "{{authn_dir}}/**" out> {{authn_dir}}/CHANGELOG.md
+changelog-auth:
+  git cliff --include-path "{{auth_dir}}/**" --include-path "crates/authn/*" out> {{auth_dir}}/CHANGELOG.md
 
-# Release synd_authn
-release-authn *flags:
-  cargo release --package synd-authn {{flags}}
+# Release synd_auth
+release-auth *flags:
+  cargo release --package synd-auth {{flags}}
 
 # Release synd_term
 release-term *flags:

@@ -2973,7 +2973,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd-authn"
+name = "synd-auth"
 version = "0.1.1"
 dependencies = [
  "anyhow",
@@ -3043,7 +3043,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "synd-api",
- "synd-authn",
+ "synd-auth",
  "synd-feed",
  "synd-o11y",
  "synd-test",
@@ -3065,7 +3065,7 @@ dependencies = [
  "axum 0.7.4",
  "headers",
  "serde_json",
- "synd-authn",
+ "synd-auth",
  "tokio",
  "tracing",
 ]

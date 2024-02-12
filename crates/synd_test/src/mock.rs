@@ -6,7 +6,7 @@ use axum::{
     Form, Json, Router,
 };
 use headers::{authorization::Bearer, Authorization, Header};
-use synd_authn::device_flow::{
+use synd_auth::device_flow::{
     DeviceAccessTokenRequest, DeviceAccessTokenResponse, DeviceAuthorizationRequest,
     DeviceAuthorizationResponse,
 };

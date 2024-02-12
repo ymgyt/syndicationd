@@ -7,7 +7,7 @@ license.workspace    = true
 repository.workspace = true
 
 description = "syndicationd authentication lib"
-name        = "synd-authn"
+name        = "synd-auth"
 readme      = "README.md"
 version     = "0.1.1"
 

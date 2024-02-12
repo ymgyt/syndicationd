@@ -3,7 +3,7 @@ use std::{pin::Pin, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
 use ratatui::{style::palette::tailwind, widgets::Widget};
-use synd_authn::device_flow::{
+use synd_auth::device_flow::{
     github::DeviceFlow, DeviceAccessTokenResponse, DeviceAuthorizationResponse,
 };
 use tokio::time::{Instant, Sleep};

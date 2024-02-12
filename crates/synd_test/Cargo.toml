@@ -12,7 +12,7 @@ publish = false
 version = "0.1.0"
 
 [dependencies]
-synd-authn = { path = "../synd_authn" }
+synd-auth = { path = "../synd_auth" }
 
 anyhow     = { workspace = true }
 axum       = { workspace = true }

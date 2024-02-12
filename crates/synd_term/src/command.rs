@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use synd_authn::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
+use synd_auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
 
 use crate::{
     application::{Direction, ListAction, RequestSequence},
