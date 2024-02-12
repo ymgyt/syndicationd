@@ -5,6 +5,7 @@ github_pat := env_var_or_default("GH_PAT", "")
 otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
 
+term_dir := "crates/synd_term"
 
 alias format := fmt
 alias integration := integration-test
@@ -94,5 +95,14 @@ backend:
   zellij action new-tab --layout .dev/backend_layout.kdl
 
 # Generate CHANGELOG
-changelog:
-  git cliff out> CHANGELOG.md
+changelog: changelog-term
+
+# Generate synd_term CHANGELOG
+# todo use GIT_CLIFF__CHANGELOG__TAG_PATTERN="" 
+changelog-term:
+  git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
+
+
+release-term *flags:
+  cargo release --package synd_term {{flags}}
+  

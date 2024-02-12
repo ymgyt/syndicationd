@@ -20,9 +20,9 @@ body = """
     ## [unreleased]
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | upper_first }}
+    ### {{ group | striptags | upper_first }}
     {% for commit in commits %}
-        - {{ commit.message | upper_first }} by @{{ commit.author.name}} 
+        - {{ commit.message | upper_first }} by @{{ commit.author.name}} ([{{ commit.id | truncate(length=8, end="") }}]({{ commit.id }}))
     {%- endfor %}
 {% endfor %}\n
 """
@@ -48,9 +48,10 @@ commit_preprocessors = [
   # { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))"}, # replace issue numbers
 ]
 # regex for parsing and grouping commits
+# comment like <!-- 0 --> for force order 
 commit_parsers = [
-  { message = "^feat", group = "Features" },
-  { message = "^fix", group = "Bug Fixes" },
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
   { message = "^doc", group = "Documentation" },
   { message = "^perf", group = "Performance" },
   { message = "^refactor", group = "Refactor" },
