@@ -20,17 +20,16 @@ synd-auth = { path = "../synd_auth", version = "0.1.2" }
 synd-feed = { path = "../synd_feed", version = "0.1.1" }
 synd-o11y = { path = "../synd_o11y", version = "0.1.1" }
 
-anyhow         = { workspace = true }
-chrono         = { workspace = true }
-clap           = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help"] }
-crossterm      = { version = "0.27.0", features = ["event-stream"] }
-directories    = "5.0.1"
-edit           = "0.1.5"
-futures-util   = "0.3.30"
-graphql_client = { workspace = true }
-html2text      = { version = "0.12" }
-open           = "5.0.1"
-# ratatui              = { git = "https://github.com/ratatui-org/ratatui.git", branch = "main" }
+anyhow               = { workspace = true }
+chrono               = { workspace = true }
+clap                 = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help"] }
+crossterm            = { version = "0.27.0", features = ["event-stream"] }
+directories          = "5.0.1"
+edit                 = "0.1.5"
+futures-util         = "0.3.30"
+graphql_client       = { workspace = true }
+html2text            = { version = "0.12" }
+open                 = "5.0.1"
 ratatui              = { version = "0.26.0" }
 reqwest              = { workspace = true }
 serde                = { workspace = true, features = ["derive"] }
