@@ -18,7 +18,7 @@ path = "src/main.rs"
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.1.2" }
 synd-feed = { path = "../synd_feed", version = "0.1.1" }
-synd-o11y = { path = "../synd_o11y", version = "0.1.0" }
+synd-o11y = { path = "../synd_o11y", version = "0.1.1" }
 
 anyhow         = { workspace = true }
 chrono         = { workspace = true }
