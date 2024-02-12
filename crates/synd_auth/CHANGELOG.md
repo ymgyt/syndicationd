@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.1]
+## [unreleased]
 
 ### Features
 
@@ -13,7 +13,10 @@ All notable changes to this project will be documented in this file.
 
 - Update changelog by @ymgyt ([55ee02cc](55ee02cc2d1e6c31bada610ea0b6e00a7b035753))
 - Release by @ymgyt ([da25a6e1](da25a6e1f8e15a34e94e8cc88d5eec68262b76b0))
-- Use hyphen as package name instead of underscore by @ymgyt ([7da73d16](7da73d16f68b10e42b238fab75517e486c39181c))
+- Use hyphen as package name instead of underscore by @ymgyt ([0a8ed059](0a8ed05997790f9f05c932c92fa2b2b2d74065a9))
+- Add README by @ymgyt ([80a20bdd](80a20bddaaa8a20904a0d4bd92a6643f2c8fce03))
+- Release by @ymgyt ([e853cdbd](e853cdbd1d4ce7f3cf22234e80e91088c9f1dcf7))
+- Rename synd-authn to synt-auth to publish as a new crate by @ymgyt ([59ae4ffa](59ae4ffa51f5323fa4a3aae5e30e950b15730519))
 
 ### Refactor
 

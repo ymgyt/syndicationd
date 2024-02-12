@@ -106,7 +106,7 @@ changelog-term:
   git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
 
 changelog-auth:
-  git cliff --include-path "{{auth_dir}}/**" --include-path "crates/authn/*" out> {{auth_dir}}/CHANGELOG.md
+  git cliff --include-path "{{auth_dir}}/**" --include-path "crates/synd_authn/*" out> {{auth_dir}}/CHANGELOG.md
 
 # Release synd_auth
 release-auth *flags:
