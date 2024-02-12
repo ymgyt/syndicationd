@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Format toml by [@ymgyt](https://github.com/ymgyt) ([36677745](https://github.com/ymgyt/syndicationd/commit/3667774506106fe0f38d77efac9f4b27c70090aa))
 - Configure release flow by [@ymgyt](https://github.com/ymgyt) ([855d1063](https://github.com/ymgyt/syndicationd/commit/855d1063f5b476433fe0a7ab352b72d63a749e2e))
 - Use hyphen as package name instead of underscore by [@ymgyt](https://github.com/ymgyt) ([0a8ed059](https://github.com/ymgyt/syndicationd/commit/0a8ed05997790f9f05c932c92fa2b2b2d74065a9))
+- Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([ea469bfe](https://github.com/ymgyt/syndicationd/commit/ea469bfefec9adf294667f4131538d496a6b017d))
 
 ### Refactor
 
