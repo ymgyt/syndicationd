@@ -6,6 +6,7 @@ otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
 
 term_dir := "crates/synd_term"
+authn_dir := "crates/synd_authn"
 
 alias format := fmt
 alias integration := integration-test
@@ -21,6 +22,7 @@ check:
 # Format files
 fmt: fmt-toml
 
+# Run linter
 lint:
   cargo clippy
 
@@ -28,6 +30,7 @@ lint:
 fmt-toml:
   taplo fmt --config taplo.toml **.toml
 
+# Run test
 test:
   cargo nextest run
 
@@ -102,7 +105,14 @@ changelog: changelog-term
 changelog-term:
   git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
 
+changelog-authn:
+  git cliff --include-path "{{authn_dir}}/**" out> {{authn_dir}}/CHANGELOG.md
 
+# Release synd_authn
+release-authn *flags:
+  cargo release --package synd_authn {{flags}}
+
+# Release synd_term
 release-term *flags:
   cargo release --package synd_term {{flags}}
   
