@@ -8,6 +8,7 @@ loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
 term_dir := "crates/synd_term"
 auth_dir := "crates/synd_auth"
 feed_dir := "crates/synd_feed"
+o11y_dir := "crates/synd_o11y"
 
 alias format := fmt
 alias integration := integration-test
@@ -102,6 +103,10 @@ changelog-auth:
   GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
   git cliff --include-path "{{auth_dir}}/**" --include-path "crates/synd_authn/**" out> {{auth_dir}}/CHANGELOG.md
 
+changelog-o11y:
+  GIT_CLIFF__GIT__TAG_PATTERN="synd-o11y-v.*" \
+  git cliff --include-path "{{o11y_dir}}/**" out> {{o11y_dir}}/CHANGELOG.md
+
 changelog-feed:
   GIT_CLIFF__GIT__TAG_PATTERN="synd-feed-v.*" \
   git cliff --include-path "{{feed_dir}}/**" out> {{feed_dir}}/CHANGELOG.md
@@ -114,6 +119,10 @@ changelog-term:
 release-auth *flags: changelog-auth
   cargo release --package synd-auth {{flags}}
 
+release-o11y *flags: changelog-o11y
+  cargo release --package synd-o11y {{flags}}
+
+# Release synd_feed
 release-feed *flags: changelog-feed
   cargo release --package synd-feed {{flags}}
 
