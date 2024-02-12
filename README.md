@@ -39,7 +39,7 @@ The theme can be changed using the `--theme` flag. Please refer to the help for 
 
 ### Backend api
 
-By default, use `https://syndicationd.ymgyt.io` as the backend api([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
+By default, use `https://syndicationd.ymgyt.io` as the [backend api](./crates/synd_api)([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
 To change the endpoint, specify the `--endpoint` flag
 
 ### Clear cache and logs
