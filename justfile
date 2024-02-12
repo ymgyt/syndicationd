@@ -36,7 +36,7 @@ test:
 
 # Run integration test
 integration-test:
-  RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd_term --features integration --test integration --no-capture 
+  RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd-term --features integration --test integration --no-capture 
 
 # Update synd_api graphql schema
 update-gql-schema:
@@ -110,9 +110,9 @@ changelog-authn:
 
 # Release synd_authn
 release-authn *flags:
-  cargo release --package synd_authn {{flags}}
+  cargo release --package synd-authn {{flags}}
 
 # Release synd_term
 release-term *flags:
-  cargo release --package synd_term {{flags}}
+  cargo release --package synd-term {{flags}}
   

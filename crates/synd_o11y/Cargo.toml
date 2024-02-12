@@ -7,7 +7,7 @@ license.workspace    = true
 repository.workspace = true
 
 description = "syndicationd lib for tracing and opentelemetry ecosystem"
-name        = "synd_o11y"
+name        = "synd-o11y"
 readme      = "README.md"
 version     = "0.1.0"
 

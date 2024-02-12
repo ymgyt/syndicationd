@@ -2940,7 +2940,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 
 [[package]]
-name = "synd_api"
+name = "synd-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2962,8 +2962,8 @@ dependencies = [
  "serde",
  "serde_json",
  "supports-color",
- "synd_feed",
- "synd_o11y",
+ "synd-feed",
+ "synd-o11y",
  "thiserror",
  "tokio",
  "tower",
@@ -2973,8 +2973,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd_authn"
-version = "0.1.1"
+name = "synd-authn"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "http 0.2.11",
@@ -2987,7 +2987,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd_feed"
+name = "synd-feed"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3003,7 +3003,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd_o11y"
+name = "synd-o11y"
 version = "0.1.0"
 dependencies = [
  "axum 0.7.4",
@@ -3022,7 +3022,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd_term"
+name = "synd-term"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3042,11 +3042,11 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
- "synd_api",
- "synd_authn",
- "synd_feed",
- "synd_o11y",
- "synd_test",
+ "synd-api",
+ "synd-authn",
+ "synd-feed",
+ "synd-o11y",
+ "synd-test",
  "tempdir",
  "tokio",
  "tokio-stream",
@@ -3058,14 +3058,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd_test"
+name = "synd-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum 0.7.4",
  "headers",
  "serde_json",
- "synd_authn",
+ "synd-authn",
  "tokio",
  "tracing",
 ]

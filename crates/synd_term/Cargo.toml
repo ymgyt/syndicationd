@@ -8,7 +8,7 @@ license.workspace     = true
 readme.workspace      = true
 repository.workspace  = true
 
-name    = "synd_term"
+name    = "synd-term"
 version = "0.1.0"
 
 [[bin]]
@@ -16,9 +16,9 @@ name = "synd"
 path = "src/main.rs"
 
 [dependencies]
-synd_authn = { path = "../synd_authn", version = "0.1.1" }
-synd_feed  = { path = "../synd_feed", version = "0.1.0" }
-synd_o11y  = { path = "../synd_o11y", version = "0.1.0" }
+synd-authn = { path = "../synd_authn", version = "0.1.0" }
+synd-feed  = { path = "../synd_feed", version = "0.1.0" }
+synd-o11y  = { path = "../synd_o11y", version = "0.1.0" }
 
 anyhow         = { workspace = true }
 chrono         = { workspace = true }
@@ -49,8 +49,9 @@ url                  = { workspace = true }
 integration = []
 
 [dev-dependencies]
-synd_api  = { path = "../synd_api" }
-synd_test = { path = "../synd_test" }
+synd-api = { path = "../synd_api" }
+
+synd-test = { path = "../synd_test" }
 
 axum-server  = { workspace = true }
 kvsd         = { workspace = true }

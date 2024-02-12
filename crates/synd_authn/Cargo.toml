@@ -8,8 +8,8 @@ readme.workspace     = true
 repository.workspace = true
 
 description = "syndicationd authentication lib"
-name        = "synd_authn"
-version     = "0.1.1"
+name        = "synd-authn"
+version     = "0.1.0"
 
 [dependencies]
 anyhow         = { workspace = true }

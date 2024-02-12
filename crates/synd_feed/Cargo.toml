@@ -7,7 +7,7 @@ license.workspace    = true
 repository.workspace = true
 
 description = "Library to handle syndication spec"
-name        = "synd_feed"
+name        = "synd-feed"
 readme      = "README.md"
 version     = "0.1.0"
 

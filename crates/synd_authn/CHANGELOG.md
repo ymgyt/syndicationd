@@ -2,12 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.1]
+## [unreleased]
 
 ### Features
 
 - Add palette flag by @ymgyt ([04dc486d](04dc486d0ab3043e021e164e70f5fe081e3c464d))
 - Use cow by @ymgyt ([ab6ae298](ab6ae298abeda1d7d3c67939bc70f0d2269e8654))
+
+### Miscellaneous Tasks
+
+- Update changelog by @ymgyt ([55ee02cc](55ee02cc2d1e6c31bada610ea0b6e00a7b035753))
+- Release by @ymgyt ([da25a6e1](da25a6e1f8e15a34e94e8cc88d5eec68262b76b0))
+- Use hyphen as package name instead of underscore by @ymgyt ([7da73d16](7da73d16f68b10e42b238fab75517e486c39181c))
 
 ### Refactor
 

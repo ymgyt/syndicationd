@@ -7,13 +7,13 @@ license.workspace    = true
 repository.workspace = true
 
 description = "syndicationd backend api"
-name        = "synd_api"
+name        = "synd-api"
 readme      = "README.md"
 version     = "0.1.0"
 
 [dependencies]
-synd_feed = { path = "../synd_feed", version = "0.1.0" }
-synd_o11y = { path = "../synd_o11y", version = "0.1.0" }
+synd-feed = { path = "../synd_feed", version = "0.1.0" }
+synd-o11y = { path = "../synd_o11y", version = "0.1.0" }
 
 anyhow             = { workspace = true }
 async-graphql      = { version = "7.0", features = ["tracing"] }

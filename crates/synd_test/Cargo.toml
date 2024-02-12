@@ -7,12 +7,12 @@ license.workspace     = true
 readme.workspace      = true
 repository.workspace  = true
 
-name    = "synd_test"
+name    = "synd-test"
 publish = false
 version = "0.1.0"
 
 [dependencies]
-synd_authn = { path = "../synd_authn" }
+synd-authn = { path = "../synd_authn" }
 
 anyhow     = { workspace = true }
 axum       = { workspace = true }
