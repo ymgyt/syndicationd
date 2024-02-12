@@ -7,6 +7,7 @@ loki_endpoint := env_var_or_default("LOKI_ENDPOINT","")
 
 term_dir := "crates/synd_term"
 auth_dir := "crates/synd_auth"
+feed_dir := "crates/synd_feed"
 
 alias format := fmt
 alias integration := integration-test
@@ -97,24 +98,26 @@ term *flags:
 backend: 
   zellij action new-tab --layout .dev/backend_layout.kdl
 
-# Generate CHANGELOG
-changelog: changelog-term changelog-auth
-
-# Generate synd_term CHANGELOG
-# todo use GIT_CLIFF__CHANGELOG__TAG_PATTERN="" 
-changelog-term:
-  GIT_CLIFF__GIT__TAG_PATTERN="synd-term-v.*" \
-  git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
-
 changelog-auth:
   GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
   git cliff --include-path "{{auth_dir}}/**" --include-path "crates/synd_authn/**" out> {{auth_dir}}/CHANGELOG.md
 
+changelog-feed:
+  GIT_CLIFF__GIT__TAG_PATTERN="synd-feed-v.*" \
+  git cliff --include-path "{{feed_dir}}/**" out> {{feed_dir}}/CHANGELOG.md
+
+changelog-term:
+  GIT_CLIFF__GIT__TAG_PATTERN="synd-term-v.*" \
+  git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
+
 # Release synd_auth
-release-auth *flags:
+release-auth *flags: changelog-auth
   cargo release --package synd-auth {{flags}}
 
+release-feed *flags: changelog-feed
+  cargo release --package synd-feed {{flags}}
+
 # Release synd_term
-release-term *flags:
+release-term *flags: changelog-term
   cargo release --package synd-term {{flags}}
   
