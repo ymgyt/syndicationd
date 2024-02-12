@@ -65,6 +65,5 @@ must_use_candidate      = "allow"
 [workspace.metadata.release]
 allow-branch               = ["main"]
 pre-release-commit-message = "chore: release"
-pre-release-hook           = ["just", "changelog"]
 pre-release-replacements   = [{ file = "CHANGELOG.md", search = "unreleased", replace = "{{version}}" }]
 tag-message                = "chore: release {{crate_name}} version {{version}}"
