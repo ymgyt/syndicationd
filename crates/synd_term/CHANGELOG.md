@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 
 - Format toml by @ymgyt ([36677745](3667774506106fe0f38d77efac9f4b27c70090aa))
 - Update CHANGELOG by @ymgyt ([f5091f3c](f5091f3ceff04b9ff818bb4e0ce0e4bbe9851177))
+- Update CHANGELOG by @ymgyt ([99f036df](99f036dfe227c1670f967aa949116e3ae8a2c97b))
 
 ### Refactor
 
