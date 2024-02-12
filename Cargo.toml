@@ -61,3 +61,10 @@ missing_errors_doc      = "allow"
 missing_panics_doc      = "allow"
 module_name_repetitions = "allow"
 must_use_candidate      = "allow"
+
+[workspace.metadata.release]
+allow-branch               = ["main"]
+pre-release-commit-message = "chore: release"
+pre-release-hook           = ["just check", "just changelog"]
+pre-release-replacements   = [{ file = "CHANGELOG.md", search = "unreleased", replace = "{{version}}" }]
+tag-message                = "chore: release {{crate_name}} version {{version}}"

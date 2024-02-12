@@ -92,3 +92,7 @@ term *flags:
 # Run backends
 backend: 
   zellij action new-tab --layout .dev/backend_layout.kdl
+
+# Generate CHANGELOG
+changelog:
+  git cliff out> CHANGELOG.md

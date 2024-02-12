@@ -4,11 +4,11 @@ categories.workspace = true
 edition.workspace    = true
 keywords.workspace   = true
 license.workspace    = true
-readme.workspace     = true
 repository.workspace = true
 
 description = "syndicationd lib for tracing and opentelemetry ecosystem"
 name        = "synd_o11y"
+readme      = "README.md"
 version     = "0.1.0"
 
 [dependencies]

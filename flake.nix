@@ -106,6 +106,7 @@
             # rust-analyzer
             opentelemetry-collector-contrib
             git-cliff
+            cargo-release
           ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ ];
 
       in {
