@@ -42,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG by @ymgyt ([e688670c](e688670c853718a1cb825cb787861dffe55046d1))
 - Release by @ymgyt ([e853cdbd](e853cdbd1d4ce7f3cf22234e80e91088c9f1dcf7))
 - Rename synd-authn to synt-auth to publish as a new crate by @ymgyt ([59ae4ffa](59ae4ffa51f5323fa4a3aae5e30e950b15730519))
+- Update CHANGELOG by @ymgyt ([31eb8a34](31eb8a3472e770931fab427e2a8c74a9754b157a))
 
 ### Refactor
 
