@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Update README by [@ymgyt](https://github.com/ymgyt) ([2a546b13](https://github.com/ymgyt/syndicationd/commit/2a546b136dfa4284168025e1a909ac0c81a630bd))
+- Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([6db0accc](https://github.com/ymgyt/syndicationd/commit/6db0accc0333a97ed07ba1b653f0fed71c4da7f5))
 
 ## [synd-auth-v0.1.2] - 2024-02-12
 
@@ -18,13 +19,10 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Update changelog by [@ymgyt](https://github.com/ymgyt) ([55ee02cc](https://github.com/ymgyt/syndicationd/commit/55ee02cc2d1e6c31bada610ea0b6e00a7b035753))
-- Release by [@ymgyt](https://github.com/ymgyt) ([da25a6e1](https://github.com/ymgyt/syndicationd/commit/da25a6e1f8e15a34e94e8cc88d5eec68262b76b0))
 - Use hyphen as package name instead of underscore by [@ymgyt](https://github.com/ymgyt) ([0a8ed059](https://github.com/ymgyt/syndicationd/commit/0a8ed05997790f9f05c932c92fa2b2b2d74065a9))
 - Add README by [@ymgyt](https://github.com/ymgyt) ([80a20bdd](https://github.com/ymgyt/syndicationd/commit/80a20bddaaa8a20904a0d4bd92a6643f2c8fce03))
-- Release by [@ymgyt](https://github.com/ymgyt) ([e853cdbd](https://github.com/ymgyt/syndicationd/commit/e853cdbd1d4ce7f3cf22234e80e91088c9f1dcf7))
 - Rename synd-authn to synt-auth to publish as a new crate by [@ymgyt](https://github.com/ymgyt) ([59ae4ffa](https://github.com/ymgyt/syndicationd/commit/59ae4ffa51f5323fa4a3aae5e30e950b15730519))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([199b6471](https://github.com/ymgyt/syndicationd/commit/199b6471f1c0097d662d3c1ee5ceb3e97b53d0c5))
-- Release by [@ymgyt](https://github.com/ymgyt) ([fa235e40](https://github.com/ymgyt/syndicationd/commit/fa235e4012d4378e0bb971c52408f62becab087d))
 
 ### Refactor
 
