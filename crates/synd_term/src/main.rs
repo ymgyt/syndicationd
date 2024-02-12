@@ -6,6 +6,7 @@ use synd_term::{
     auth,
     cli::{self, Args},
     client::Client,
+    config,
     terminal::Terminal,
     ui::theme::Theme,
 };
@@ -44,7 +45,7 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
                 .with_writer(writer),
         )
         .with(
-            EnvFilter::try_from_default_env()
+            EnvFilter::try_from_env(config::env::LOG_DIRECTIVE)
                 .or_else(|_| EnvFilter::try_new("info"))
                 .unwrap(),
         )

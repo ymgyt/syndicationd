@@ -13,6 +13,16 @@ pub mod github {
     pub const CLIENT_ID: &str = "6652e5931c88e528a851";
 }
 
+pub mod env {
+    macro_rules! env_key {
+        ($key:expr) => {
+            concat!("SYND", "_", $key)
+        };
+    }
+    /// Log directive
+    pub const LOG_DIRECTIVE: &str = env_key!("LOG");
+}
+
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 /// Number of entries to fetch
@@ -30,6 +40,6 @@ fn project_dirs() -> &'static ProjectDirs {
     static PROJECT_DIRS: OnceLock<ProjectDirs> = OnceLock::new();
 
     PROJECT_DIRS.get_or_init(|| {
-        ProjectDirs::from("io", "ymgyt", "syndterm").expect("Failed to get project dirs")
+        ProjectDirs::from("io", "ymgyt", "synd").expect("Failed to get project dirs")
     })
 }
