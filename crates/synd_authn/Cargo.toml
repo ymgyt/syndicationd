@@ -4,11 +4,11 @@ categories.workspace = true
 edition.workspace    = true
 keywords.workspace   = true
 license.workspace    = true
-readme.workspace     = true
 repository.workspace = true
 
 description = "syndicationd authentication lib"
 name        = "synd-authn"
+readme      = "README.md"
 version     = "0.1.0"
 
 [dependencies]
