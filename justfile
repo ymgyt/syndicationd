@@ -98,15 +98,17 @@ backend:
   zellij action new-tab --layout .dev/backend_layout.kdl
 
 # Generate CHANGELOG
-changelog: changelog-term
+changelog: changelog-term changelog-auth
 
 # Generate synd_term CHANGELOG
 # todo use GIT_CLIFF__CHANGELOG__TAG_PATTERN="" 
 changelog-term:
+  GIT_CLIFF__GIT__TAG_PATTERN="synd-term-v.*" \
   git cliff --include-path "{{term_dir}}/**" out> {{term_dir}}/CHANGELOG.md
 
 changelog-auth:
-  git cliff --include-path "{{auth_dir}}/**" --include-path "crates/synd_authn/*" out> {{auth_dir}}/CHANGELOG.md
+  GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
+  git cliff --include-path "{{auth_dir}}/**" --include-path "crates/synd_authn/**" out> {{auth_dir}}/CHANGELOG.md
 
 # Release synd_auth
 release-auth *flags:
