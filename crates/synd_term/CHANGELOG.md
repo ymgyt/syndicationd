@@ -39,6 +39,7 @@ All notable changes to this project will be documented in this file.
 - Update CHANGELOG by @ymgyt ([99f036df](99f036dfe227c1670f967aa949116e3ae8a2c97b))
 - Release by @ymgyt ([da25a6e1](da25a6e1f8e15a34e94e8cc88d5eec68262b76b0))
 - Use hyphen as package name instead of underscore by @ymgyt ([0a8ed059](0a8ed05997790f9f05c932c92fa2b2b2d74065a9))
+- Update CHANGELOG by @ymgyt ([e688670c](e688670c853718a1cb825cb787861dffe55046d1))
 
 ### Refactor
 
