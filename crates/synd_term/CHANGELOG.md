@@ -37,13 +37,11 @@ All notable changes to this project will be documented in this file.
 - Format toml by [@ymgyt](https://github.com/ymgyt) ([36677745](https://github.com/ymgyt/syndicationd/commit/3667774506106fe0f38d77efac9f4b27c70090aa))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([f5091f3c](https://github.com/ymgyt/syndicationd/commit/f5091f3ceff04b9ff818bb4e0ce0e4bbe9851177))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([99f036df](https://github.com/ymgyt/syndicationd/commit/99f036dfe227c1670f967aa949116e3ae8a2c97b))
-- Release by [@ymgyt](https://github.com/ymgyt) ([da25a6e1](https://github.com/ymgyt/syndicationd/commit/da25a6e1f8e15a34e94e8cc88d5eec68262b76b0))
 - Use hyphen as package name instead of underscore by [@ymgyt](https://github.com/ymgyt) ([0a8ed059](https://github.com/ymgyt/syndicationd/commit/0a8ed05997790f9f05c932c92fa2b2b2d74065a9))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([e688670c](https://github.com/ymgyt/syndicationd/commit/e688670c853718a1cb825cb787861dffe55046d1))
-- Release by [@ymgyt](https://github.com/ymgyt) ([e853cdbd](https://github.com/ymgyt/syndicationd/commit/e853cdbd1d4ce7f3cf22234e80e91088c9f1dcf7))
 - Rename synd-authn to synt-auth to publish as a new crate by [@ymgyt](https://github.com/ymgyt) ([59ae4ffa](https://github.com/ymgyt/syndicationd/commit/59ae4ffa51f5323fa4a3aae5e30e950b15730519))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([31eb8a34](https://github.com/ymgyt/syndicationd/commit/31eb8a3472e770931fab427e2a8c74a9754b157a))
-- Release by [@ymgyt](https://github.com/ymgyt) ([fa235e40](https://github.com/ymgyt/syndicationd/commit/fa235e4012d4378e0bb971c52408f62becab087d))
+- Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([e1910ce1](https://github.com/ymgyt/syndicationd/commit/e1910ce120ca9d8f38fa4c479156f723d54ae59c))
 
 ### Refactor
 
