@@ -45,7 +45,7 @@ impl CacheConfig {
 #[async_trait]
 pub trait FetchCachedFeed: Send + Sync {
     async fn fetch_feed(&self, url: String) -> ParseResult<Arc<types::Feed>>;
-    /// Fetch feeds by spawing tasks
+    /// Fetch feeds by spawning tasks
     async fn fetch_feeds_parallel(&self, urls: &[String]) -> Vec<ParseResult<Arc<types::Feed>>>;
 }
 
@@ -101,7 +101,7 @@ where
         Ok(feed)
     }
 
-    /// Fetch feeds by spawing tasks
+    /// Fetch feeds by spawning tasks
     async fn fetch_feeds_parallel(&self, urls: &[String]) -> Vec<ParseResult<Arc<types::Feed>>> {
         let mut handles = Vec::with_capacity(urls.len());
 

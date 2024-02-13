@@ -23,7 +23,7 @@ pub enum ParserError {
 #[async_trait]
 pub trait FetchFeed: Send + Sync {
     async fn fetch_feed(&self, url: String) -> ParseResult<Feed>;
-    /// Fetch feeds by spawing tasks
+    /// Fetch feeds by spawning tasks
     async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>>;
 }
 
@@ -35,7 +35,7 @@ where
     async fn fetch_feed(&self, url: String) -> ParseResult<Feed> {
         self.fetch_feed(url).await
     }
-    /// Fetch feeds by spawing tasks
+    /// Fetch feeds by spawning tasks
     async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>> {
         self.fetch_feeds_parallel(urls).await
     }
