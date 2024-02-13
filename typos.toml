@@ -1,0 +1,5 @@
+[files]
+extend-exclude = ["crates/synd_api/src/client/github/schema.json", "CHANGELOG.md"]
+
+[default.extend-words]
+"ratatui" = "ratatui"

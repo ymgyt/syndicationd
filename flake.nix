@@ -107,6 +107,7 @@
             opentelemetry-collector-contrib
             git-cliff
             cargo-release
+            typos
           ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ ];
 
       in {

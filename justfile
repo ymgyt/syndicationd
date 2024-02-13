@@ -21,6 +21,10 @@ default:
 check:
   nix flake check --all-systems --accept-flake-config
 
+# Run spell checker
+typo:
+  typos
+
 # Format files
 fmt: fmt-toml
 
