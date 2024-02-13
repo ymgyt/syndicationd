@@ -1,5 +1,10 @@
 [files]
-extend-exclude = ["crates/synd_api/src/client/github/schema.json", "CHANGELOG.md"]
+extend-exclude = [
+  # Could not fix github api typo
+  "crates/synd_api/src/client/github/schema.json",
+  # Ignore commit message typo
+  "CHANGELOG.md",
+]
 
 [default.extend-words]
 "ratatui" = "ratatui"
