@@ -17,7 +17,7 @@ fn init_meter_provider(resource: Resource) -> MeterProvider {
         .metrics(runtime::Tokio)
         .with_resource(resource)
         .with_exporter(opentelemetry_otlp::new_exporter().tonic())
-        .with_period(Duration::from_secs(60 * 3))
+        .with_period(Duration::from_secs(60))
         .build()
         .unwrap();
 

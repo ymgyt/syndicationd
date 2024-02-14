@@ -17,7 +17,7 @@ use crate::{
     config,
     dependency::Dependency,
     gql,
-    serve::layer::{authenticate, trace},
+    serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
     shutdown::Shutdown,
 };
 
@@ -68,7 +68,8 @@ pub async fn serve(
                 .layer(RequestBodyLimitLayer::new(2048))
                 .layer(CorsLayer::new()),
         )
-        .route("/healthcheck", get(probe::healthcheck));
+        .route("/healthcheck", get(probe::healthcheck))
+        .layer(RequestMetricsLayer::new());
 
     axum_server::from_tcp_rustls(listener.into_std()?, tls_config)
         .handle(shutdown.into_handle())

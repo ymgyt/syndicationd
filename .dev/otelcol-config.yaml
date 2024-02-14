@@ -3,7 +3,6 @@ receivers:
     protocols:
       grpc:
         endpoint: localhost:4317
-
 processors:
   resource/loki:
     attributes:
@@ -13,7 +12,6 @@ processors:
       - action: insert
         key: loki.format
         value: logfmt # logfmt | json   raw
-
 exporters:
   loki:
     endpoint: ${env:LOKI_ENDPOINT}
@@ -22,14 +20,14 @@ exporters:
       job: false
       instance: false
       level: false
-      
   debug:
     verbosity: detailed
-
 service:
   pipelines:
-    logs:
+    # logs:
+    #   receivers: [otlp]
+    #   processors: [resource/loki]
+    #   exporters: [debug]
+    metrics:
       receivers: [otlp]
-      processors: [resource/loki]
-      exporters: [debug,loki]
-    
+      exporters: [debug]

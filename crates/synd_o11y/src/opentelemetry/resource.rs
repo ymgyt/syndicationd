@@ -1,7 +1,8 @@
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::Resource;
-use opentelemetry_semantic_conventions::resource::{
-    DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_NAMESPACE, SERVICE_VERSION,
+use opentelemetry_semantic_conventions::{
+    resource::{DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, SERVICE_NAMESPACE, SERVICE_VERSION},
+    SCHEMA_URL,
 };
 use std::borrow::Cow;
 
@@ -10,7 +11,7 @@ pub fn resource(
     service_version: impl Into<Cow<'static, str>>,
     deployment_environment: impl Into<Cow<'static, str>>,
 ) -> Resource {
-    Resource::new(
+    Resource::from_schema_url(
         [
             (SERVICE_NAME, service_name.into()),
             (SERVICE_VERSION, service_version.into()),
@@ -19,5 +20,6 @@ pub fn resource(
         ]
         .into_iter()
         .map(|(key, value)| KeyValue::new(key, value)),
+        SCHEMA_URL,
     )
 }

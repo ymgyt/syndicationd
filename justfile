@@ -92,7 +92,7 @@ api *flags:
 
 # Run term
 term *flags:
-  cd crates/synd_term; cargo run -- --log /tmp/syndterm.log {{flags}}
+  cd crates/synd_term; cargo run -- --log /tmp/syndterm.log --endpoint https://localhost:5959/graphql {{flags}}
 
 # Run opentelemetry-collector-contrib
 @otelcol:
