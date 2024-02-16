@@ -12,7 +12,7 @@ pub fn resource(
 ) -> Resource {
     Resource::from_detectors(
         Duration::from_millis(200),
-        // Detect "OTEL_RESOURCE_ATTRIBUTES" enviornment variables
+        // Detect "OTEL_RESOURCE_ATTRIBUTES" environment variables
         vec![Box::new(EnvResourceDetector::new())],
     )
     .merge(&Resource::from_schema_url(
