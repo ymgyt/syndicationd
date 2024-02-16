@@ -18,7 +18,7 @@ pub mod authorize;
 use std::{future::Future, sync::Arc};
 
 use synd_feed::feed::cache::FetchCachedFeed;
-use synd_o11y::{audit, tracing_subscriber::audit::Audit};
+use synd_o11y::{audit, metric, tracing_subscriber::audit::Audit};
 
 use crate::{
     principal::Principal,
@@ -113,10 +113,12 @@ impl Runtime {
 
         {
             let user_id = principal.user_id().unwrap_or("?");
+            let operation = uc.audit_operation();
             audit!(
                 { Audit::USER_ID } = user_id,
-                { Audit::OPERATION } = uc.audit_operation(),
+                { Audit::OPERATION } = operation,
             );
+            metric!(monotonic_counter.usecase = 1, operation);
         }
 
         let principal = match self.authorizer.authorize(principal, &uc, &input).await {

@@ -6,10 +6,8 @@ use std::{
 
 use axum::{extract::Request, response::Response};
 use futures_util::Future;
+use synd_o11y::metric;
 use tower::{Layer, Service};
-use tracing::Level;
-
-pub const METRICS_TARGET: &str = "metrics";
 
 #[derive(Clone)]
 pub struct RequestMetricsLayer {}
@@ -55,7 +53,7 @@ where
             let response = this.inner.call(req).await.unwrap();
             let status = response.status().as_u16();
 
-            tracing::event!(target: METRICS_TARGET, Level::INFO, monotonic_counter.request = 1, path, status);
+            metric!(monotonic_counter.request = 1, path, status);
 
             Ok(response)
         })

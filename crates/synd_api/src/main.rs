@@ -1,4 +1,7 @@
-use synd_o11y::{opentelemetry::OpenTelemetryGuard, tracing_subscriber::otel_metrics};
+use synd_o11y::{
+    opentelemetry::OpenTelemetryGuard,
+    tracing_subscriber::otel_metrics::{self, metrics_event_filter},
+};
 use tracing::{error, info};
 
 use synd_api::{
@@ -6,10 +9,9 @@ use synd_api::{
     config,
     dependency::Dependency,
     repository::kvsd::ConnectKvsdFailed,
-    serve::{layer::request_metrics::METRICS_TARGET, listen_and_serve},
+    serve::listen_and_serve,
     shutdown::Shutdown,
 };
-use tracing_subscriber::filter::filter_fn;
 
 fn init_tracing() -> Option<OpenTelemetryGuard> {
     use synd_o11y::{
@@ -33,8 +35,7 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
             None => (None, None),
             Some(endpoint) if endpoint.is_empty() => (None, None),
             Some(endpoint) => {
-                let resource =
-                    synd_o11y::opentelemetry::resource(config::NAME, config::VERSION, "local");
+                let resource = synd_o11y::opentelemetry::resource(config::NAME, config::VERSION);
 
                 tracing::info!(endpoint, ?resource, "Export opentelemetry signals");
 
@@ -58,7 +59,7 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
                 .with_file(show_src)
                 .with_line_number(show_src)
                 .with_target(show_target)
-                .with_filter(filter_fn(|metadata| metadata.target() != METRICS_TARGET))
+                .with_filter(metrics_event_filter())
                 .and_then(opentelemetry_layers)
                 .with_filter(
                     EnvFilter::try_from_default_env()
