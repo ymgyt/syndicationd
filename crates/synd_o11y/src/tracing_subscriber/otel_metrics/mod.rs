@@ -1,9 +1,17 @@
 use std::time::Duration;
 
 use opentelemetry_sdk::{metrics::MeterProvider, runtime, Resource};
-use tracing::Subscriber;
+use tracing::{Metadata, Subscriber};
 use tracing_opentelemetry::MetricsLayer;
-use tracing_subscriber::{registry::LookupSpan, Layer};
+use tracing_subscriber::{filter::filter_fn, layer::Filter, registry::LookupSpan, Layer};
+
+pub mod macros;
+
+pub const METRICS_EVENT_TARGET: &str = "metrics";
+
+pub fn metrics_event_filter<S: Subscriber>() -> impl Filter<S> {
+    filter_fn(|metadata: &Metadata<'_>| metadata.target() != METRICS_EVENT_TARGET)
+}
 
 pub fn layer<S>(resource: Resource) -> impl Layer<S>
 where
