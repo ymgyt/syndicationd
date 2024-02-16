@@ -85,6 +85,7 @@ api *flags:
   cd crates/synd_api; \
     RUST_LOG="info,synd_api=debug" \
     OTEL_EXPORTER_OTLP_ENDPOINT={{otlp_endpoint}} \
+    OTEL_RESOURCE_ATTRIBUTES="deployment.environment=local" \
     cargo run \
       --features "introspection" -- \
       --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret \
@@ -95,9 +96,8 @@ term *flags:
   cd crates/synd_term; cargo run -- --log /tmp/syndterm.log --endpoint https://localhost:5959/graphql {{flags}}
 
 # Run opentelemetry-collector-contrib
-@otelcol:
-  LOKI_ENDPOINT={{loki_endpoint}} \
-  otelcontribcol --config=file:.dev/otelcol-config.yaml
+@otelcol config:
+  otelcontribcol --config=file:.dev/otelcol/{{config}}
 
 # Run backends
 backend: 

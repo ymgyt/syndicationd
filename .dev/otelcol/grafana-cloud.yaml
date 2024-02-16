@@ -1,0 +1,45 @@
+# Grafana Cloud Example
+extensions:
+  memory_ballast:
+    size_mib: 64
+  basicauth/grafanacloudprom:
+    client_auth:
+      username: "${env:GC_PROM_USERNAME}"
+      password: "${env:GC_API_KEY}"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "127.0.0.1:4317"
+processors:
+  memory_limiter:
+    check_interval: 10s
+    # hard limit
+    limit_mib: 500
+    # sort limit 400
+    spike_limit_mib: 100
+  batch/metrics:
+    send_batch_size: 8192
+    timeout: 3s
+    send_batch_max_size: 16384
+exporters:
+  prometheusremotewrite/grafanacloud:
+    endpoint: "${env:GC_PROM_REMOTE_WRITE_URL}"
+    resource_to_telemetry_conversion:
+      enabled: true
+    auth:
+      authenticator: basicauth/grafanacloudprom
+  debug:
+    verbosity: detailed
+service:
+  extensions: [memory_ballast, basicauth/grafanacloudprom]
+  pipelines:
+    metrics:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - batch/metrics
+      exporters:
+        - debug
+        - prometheusremotewrite/grafanacloud
