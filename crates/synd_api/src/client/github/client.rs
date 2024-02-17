@@ -37,6 +37,7 @@ impl GithubClient {
         }
     }
 
+    #[tracing::instrument(name = "github::authenticate", skip_all)]
     pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<String> {
         let variables = query::authenticate::Variables {};
         let request = query::Authenticate::build_query(variables);

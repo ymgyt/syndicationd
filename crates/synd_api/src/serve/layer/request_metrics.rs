@@ -2,9 +2,10 @@ use std::{
     convert::Infallible,
     pin::Pin,
     task::{Context, Poll},
+    time::Instant,
 };
 
-use axum::{extract::Request, response::Response};
+use axum::{extract::Request, http::Method, response::Response};
 use futures_util::Future;
 use synd_o11y::metric;
 use tower::{Layer, Service};
@@ -46,14 +47,30 @@ where
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
+        let start = Instant::now();
         let path = req.uri().path().to_owned();
+        let method = req.method().clone();
 
         let mut this = self.clone();
         Box::pin(async move {
             let response = this.inner.call(req).await.unwrap();
             let status = response.status().as_u16();
 
+            // https://opentelemetry.io/docs/specs/semconv/http/http-metrics/
+            // should be http.server.request ?
             metric!(monotonic_counter.request = 1, path, status);
+
+            // instrument graphql latency
+            if path == "/graphql" && method == Method::POST {
+                // f64 is matter
+                // The type of the field that MetricsVisitor visits when on_event() is called is pre defined.
+                // If u128 which is returned from elapsed() is used, it will not be visited, resulting in no metrics recorded.
+                // Spec say "When instruments are measuring durations, seconds SHOULD be used"
+                // https://opentelemetry.io/docs/specs/semconv/general/metrics/#instrument-units
+                let elapsed: f64 = start.elapsed().as_secs_f64();
+                // is there any semantic conventions?
+                metric!(histogram.graphql.duration = elapsed);
+            }
 
             Ok(response)
         })

@@ -2,7 +2,7 @@ mod query;
 pub use query::Query;
 
 mod mutation;
-use async_graphql::{extensions::Tracing, EmptySubscription, Schema, SchemaBuilder};
+use async_graphql::{EmptySubscription, Schema, SchemaBuilder};
 pub use mutation::Mutation;
 
 use crate::{principal::Principal, usecase};
@@ -45,7 +45,9 @@ pub fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
     #[cfg(not(feature = "introspection"))]
     let schema = Schema::build(Query, Mutation, EmptySubscription).disable_introspection();
 
-    schema.extension(Tracing)
+    // disabled
+    // schema.extension(Tracing)
+    schema
 }
 
 impl<'a> usecase::Context for &async_graphql::Context<'a> {

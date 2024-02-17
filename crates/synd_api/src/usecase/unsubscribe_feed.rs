@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use synd_o11y::metric;
+
 use crate::{
     principal::Principal,
     repository::{self, SubscriptionRepository},
@@ -55,6 +57,8 @@ impl Usecase for UnsubscribeFeed {
                 url,
             })
             .await?;
+
+        metric!(counter.feed.subscription = -1);
 
         Ok(Output {
             output: UnsubscribeFeedOutput {},

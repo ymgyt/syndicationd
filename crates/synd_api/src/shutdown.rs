@@ -22,7 +22,7 @@ impl Shutdown {
                 Err(err) => tracing::error!("Failed to handle signal {err}"),
             }
             // Signal graceful shutdown to axum_server
-            handle2.graceful_shutdown(Some(Duration::from_secs(10)));
+            handle2.graceful_shutdown(Some(Duration::from_secs(3)));
             tx2.send(()).ok();
         });
 

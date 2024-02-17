@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use synd_feed::{feed::cache::FetchCachedFeed, types::Feed};
+use synd_o11y::metric;
 
 use crate::{
     principal::Principal,
@@ -69,6 +70,8 @@ impl Usecase for SubscribeFeed {
                 url: feed.meta().url().to_owned(),
             })
             .await?;
+
+        metric!(counter.feed.subscription = 1);
 
         Ok(Output {
             output: SubscribeFeedOutput { feed },

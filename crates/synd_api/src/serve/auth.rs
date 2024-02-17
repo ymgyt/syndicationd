@@ -35,6 +35,7 @@ impl Authenticator {
     }
 
     /// Authenticate from given token
+    #[tracing::instrument(skip_all)]
     pub async fn authenticate<S>(&self, token: S) -> Result<Principal, ()>
     where
         S: AsRef<str>,

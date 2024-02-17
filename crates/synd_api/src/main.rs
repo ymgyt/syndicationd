@@ -5,7 +5,7 @@ use synd_o11y::{
 use tracing::{error, info};
 
 use synd_api::{
-    args::{self, Args},
+    args::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
     repository::kvsd::ConnectKvsdFailed,
@@ -13,7 +13,7 @@ use synd_api::{
     shutdown::Shutdown,
 };
 
-fn init_tracing() -> Option<OpenTelemetryGuard> {
+fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     use synd_o11y::{
         opentelemetry::init_propagation,
         tracing_subscriber::{audit, otel_log, otel_trace},
@@ -27,21 +27,19 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
         use supports_color::Stream;
         supports_color::on(Stream::Stdout).is_some()
     };
-    let show_src = true;
-    let show_target = !show_src;
+    let show_src = options.show_code_location;
+    let show_target = options.show_target;
 
     let (opentelemetry_layers, guard) = {
-        match std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok() {
-            None => (None, None),
-            Some(endpoint) if endpoint.is_empty() => (None, None),
+        match options.otlp_endpoint.as_deref() {
+            None | Some("") => (None, None),
             Some(endpoint) => {
                 let resource = synd_o11y::opentelemetry::resource(config::NAME, config::VERSION);
 
-                tracing::info!(endpoint, ?resource, "Export opentelemetry signals");
-
-                let trace_layer = otel_trace::layer(resource.clone());
+                let trace_layer =
+                    otel_trace::layer(endpoint, resource.clone(), options.trace_sampler_ratio);
                 let log_layer = otel_log::layer(endpoint, resource.clone());
-                let metrics_layer = otel_metrics::layer(resource);
+                let metrics_layer = otel_metrics::layer(endpoint, resource);
 
                 (
                     Some(trace_layer.and_then(log_layer).and_then(metrics_layer)),
@@ -62,7 +60,7 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
                 .with_filter(metrics_event_filter())
                 .and_then(opentelemetry_layers)
                 .with_filter(
-                    EnvFilter::try_from_default_env()
+                    EnvFilter::try_from_env("SYND_LOG")
                         .or_else(|_| EnvFilter::try_new("info"))
                         .unwrap()
                         .add_directive(audit::Audit::directive()),
@@ -77,10 +75,10 @@ fn init_tracing() -> Option<OpenTelemetryGuard> {
     guard
 }
 
-async fn run(Args { kvsd, tls }: Args, shutdown: Shutdown) -> anyhow::Result<()> {
+async fn run(Args { kvsd, tls, o11y }: Args, shutdown: Shutdown) -> anyhow::Result<()> {
     let dep = Dependency::new(kvsd, tls).await?;
 
-    info!(version = config::VERSION, "Runinng...");
+    info!(version = config::VERSION, otlp_endpoint=?o11y.otlp_endpoint, "Runinng...");
 
     listen_and_serve(dep, shutdown).await
 }
@@ -88,7 +86,7 @@ async fn run(Args { kvsd, tls }: Args, shutdown: Shutdown) -> anyhow::Result<()>
 #[tokio::main]
 async fn main() {
     let args = args::parse();
-    let _guard = init_tracing();
+    let _guard = init_tracing(&args.o11y);
     let shutdown = Shutdown::watch_signal();
 
     if let Err(err) = run(args, shutdown).await {

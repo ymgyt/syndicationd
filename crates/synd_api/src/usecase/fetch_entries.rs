@@ -50,6 +50,7 @@ impl Usecase for FetchEntries {
         Ok(principal)
     }
 
+    #[tracing::instrument(name = "fetch_entries", skip(self, principal))]
     async fn usecase(
         &self,
         Input {
