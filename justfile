@@ -83,13 +83,14 @@ kvsd:
 api *flags:
   do -i { ps | where name =~ "synd_api$" | first | kill $in.pid }
   cd crates/synd_api; \
-    RUST_LOG="info,synd_api=debug" \
+    SYND_LOG="info,synd_api=debug" \
     OTEL_EXPORTER_OTLP_ENDPOINT={{otlp_endpoint}} \
-    OTEL_RESOURCE_ATTRIBUTES="deployment.environment=local" \
+    OTEL_RESOURCE_ATTRIBUTES="service.namespace=syndlocal,deployment.environment=local" \
     cargo run \
       --features "introspection" -- \
       --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{kvsd_user}} --kvsd-password secret \
-      --tls-cert ../../.dev/self_signed_certs/certificate.pem --tls-key ../../.dev/self_signed_certs/private_key.pem {{flags}}
+      --tls-cert ../../.dev/self_signed_certs/certificate.pem --tls-key ../../.dev/self_signed_certs/private_key.pem \
+      --show-code-location=true --show-target=false --trace-sampler-ratio "1.0" {{flags}}
 
 # Run term
 term *flags:

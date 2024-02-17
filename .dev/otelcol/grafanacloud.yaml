@@ -1,0 +1,68 @@
+# Grafana Cloud Example
+extensions:
+  memory_ballast:
+    size_mib: 64
+  basicauth/grafanacloud:
+    client_auth:
+      username: ${env:GC_INSTANCE_ID}
+      password: ${env:GC_API_KEY}
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "127.0.0.1:4317"
+processors:
+  memory_limiter:
+    check_interval: 10s
+    # hard limit
+    limit_mib: 500
+    # sort limit 400
+    spike_limit_mib: 100
+  batch/metrics:
+    send_batch_size: 8192
+    timeout: 3s
+    send_batch_max_size: 16384
+  batch/logs:
+    send_batch_size: 8192
+    timeout: 30s
+    send_batch_max_size: 16384
+  batch/traces:
+exporters:
+  otlphttp/grafanacloud:
+    auth:
+      authenticator: basicauth/grafanacloud
+    endpoint: ${env:GC_OTLP_ENDPOINT}
+  debug/detailed:
+    verbosity: detailed
+  debug/basic:
+    verbosity: basic
+service:
+  extensions: [memory_ballast, basicauth/grafanacloud]
+  pipelines:
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - batch/traces
+      exporters:
+        - debug/basic
+        - otlphttp/grafanacloud
+    metrics:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - batch/metrics
+      exporters:
+        - debug/basic
+        - otlphttp/grafanacloud
+    logs:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - batch/logs
+      exporters:
+        - debug/basic
+        - otlphttp/grafanacloud
