@@ -1,3 +1,4 @@
+use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     runtime,
     trace::{BatchConfig, Sampler, Tracer},
@@ -7,21 +8,18 @@ use tracing::Subscriber;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{registry::LookupSpan, Layer};
 
-pub fn layer<S>(resource: Resource) -> impl Layer<S>
+pub fn layer<S>(
+    endpoint: impl Into<String>,
+    resource: Resource,
+    sampler_ratio: f64,
+) -> impl Layer<S>
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    OpenTelemetryLayer::new(init_tracer(resource))
+    OpenTelemetryLayer::new(init_tracer(endpoint, resource, sampler_ratio))
 }
 
-fn init_tracer(resource: Resource) -> Tracer {
-    // https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/
-    let sampler_ratio = std::env::var("OTEL_TRACES_SAMPLER_ARG")
-        .ok()
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(0.);
-
-    // TODO: construct tonic transport channel
+fn init_tracer(endpoint: impl Into<String>, resource: Resource, sampler_ratio: f64) -> Tracer {
     opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_trace_config(
@@ -32,7 +30,11 @@ fn init_tracer(resource: Resource) -> Tracer {
                 .with_resource(resource),
         )
         .with_batch_config(BatchConfig::default())
-        .with_exporter(opentelemetry_otlp::new_exporter().tonic())
+        .with_exporter(
+            opentelemetry_otlp::new_exporter()
+                .tonic()
+                .with_endpoint(endpoint),
+        )
         .install_batch(runtime::Tokio)
         .unwrap()
 }

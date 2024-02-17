@@ -1,5 +1,5 @@
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::WithExportConfig as _;
 use opentelemetry_sdk::{runtime, Resource};
 use tracing::Subscriber;
 use tracing_subscriber::{registry::LookupSpan, Layer};

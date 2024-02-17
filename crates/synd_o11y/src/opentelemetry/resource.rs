@@ -10,12 +10,7 @@ pub fn resource(
     service_name: impl Into<Cow<'static, str>>,
     service_version: impl Into<Cow<'static, str>>,
 ) -> Resource {
-    Resource::from_detectors(
-        Duration::from_millis(200),
-        // Detect "OTEL_RESOURCE_ATTRIBUTES" environment variables
-        vec![Box::new(EnvResourceDetector::new())],
-    )
-    .merge(&Resource::from_schema_url(
+    Resource::from_schema_url(
         [
             (SERVICE_NAME, service_name.into()),
             (SERVICE_VERSION, service_version.into()),
@@ -24,5 +19,10 @@ pub fn resource(
         .into_iter()
         .map(|(key, value)| KeyValue::new(key, value)),
         SCHEMA_URL,
+    )
+    .merge(&Resource::from_detectors(
+        Duration::from_millis(200),
+        // Detect "OTEL_RESOURCE_ATTRIBUTES" environment variables
+        vec![Box::new(EnvResourceDetector::new())],
     ))
 }
