@@ -11,6 +11,10 @@ name        = "synd-api"
 readme      = "README.md"
 version     = "0.1.0"
 
+[[bin]]
+name = "synd-api"
+path = "src/main.rs"
+
 [dependencies]
 synd-feed = { path = "../synd_feed", version = "0.1.1" }
 synd-o11y = { path = "../synd_o11y", version = "0.1.1" }
