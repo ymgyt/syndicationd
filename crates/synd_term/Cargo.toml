@@ -8,9 +8,9 @@ license.workspace     = true
 readme.workspace      = true
 repository.workspace  = true
 
+include = ["src/**/*", "CHANGELOG.md"]
 name    = "synd-term"
 version = "0.1.2"
-include = ["src/**/*", "CHANGELOG.md"]
 
 [[bin]]
 name = "synd"
@@ -35,6 +35,7 @@ ratatui              = { version = "0.26.0" }
 reqwest              = { workspace = true }
 serde                = { workspace = true, features = ["derive"] }
 serde_json           = "1.0.111"
+thiserror            = { workspace = true }
 tokio                = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing              = { workspace = true }
 tracing-appender     = "0.2.3"

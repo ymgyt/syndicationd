@@ -9,6 +9,7 @@ use synd_auth::device_flow::{
 use tokio::time::{Instant, Sleep};
 
 use crate::{
+    application::input_parser::ParseFeedUrlError,
     auth::{AuthenticationProvider, Credential},
     client::Client,
     command::Command,
@@ -28,6 +29,9 @@ pub use direction::{Direction, IndexOutOfRange};
 
 mod in_flight;
 pub use in_flight::{InFlight, RequestId, RequestSequence};
+
+mod input_parser;
+use input_parser::InputParser;
 
 enum Screen {
     Login,
@@ -414,14 +418,33 @@ impl Application {
 
 impl Application {
     fn prompt_feed_subscription(&mut self) {
-        let prompt = "URL: ";
-        let input = self.interactor.open_editor(prompt);
+        let input = self
+            .interactor
+            .open_editor(InputParser::SUSBSCRIBE_FEED_PROMPT);
         tracing::debug!("Got user modified feed subscription: {input}");
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
-        let url = input.trim_start_matches("URL:").trim().to_owned();
 
-        let fut = async move { Ok(Command::SubscribeFeed { url }) }.boxed();
+        let fut = match InputParser::new(input.as_str()).parse_feed_url() {
+            Ok(url) => {
+                let url = url.to_owned();
+                async move { Ok(Command::SubscribeFeed { url }) }.boxed()
+            }
+            Err(err) => async move {
+                let message = match err {
+                    ParseFeedUrlError::NoInput => {
+                        "Abort subscription. please enter feed URL to subscribe".to_owned()
+                    }
+                    ParseFeedUrlError::InvalidUrl { .. } => format!("{err}"),
+                };
+                Ok(Command::HandleError {
+                    message,
+                    request_seq: None,
+                })
+            }
+            .boxed(),
+        };
+
         self.jobs.futures.push(fut);
     }
 
