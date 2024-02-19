@@ -63,6 +63,10 @@
           inherit (syndTermCrate) pname version;
           cargoExtraArgs = "--package ${syndTermCrate.pname}";
         });
+        syndTermOnly = craneLib.buildPackage (commonArgs // {
+          inherit (syndTermCrate) pname version;
+          cargoExtraArgs = "--package ${syndApiCrate.pname}";
+        });
 
         syndApiCrate = craneLib.crateNameFromCargoToml {
           cargoToml = ./crates/synd_api/Cargo.toml;
@@ -123,10 +127,10 @@
         inherit checks;
 
         packages.default = self.packages."${system}".synd;
-        packages.synd = syndTerm;
+        packages.synd = syndTermOnly;
         packages.synd_api = syndApiOnly;
 
-        apps.default = flake-utils.lib.mkApp { drv = syndTerm; };
+        apps.default = flake-utils.lib.mkApp { drv = syndTermOnly; };
 
         devShells.default = craneLib.devShell {
           packages = dev_packages;
