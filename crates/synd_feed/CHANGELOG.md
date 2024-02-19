@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [synd-feed-v0.1.2]
 
 ### Documentation
 
