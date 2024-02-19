@@ -130,7 +130,10 @@
         packages.synd = syndTermOnly;
         packages.synd_api = syndApiOnly;
 
-        apps.default = flake-utils.lib.mkApp { drv = syndTermOnly; };
+        apps.default = flake-utils.lib.mkApp {
+          drv = syndTermOnly;
+          name = "synd";
+        };
 
         devShells.default = craneLib.devShell {
           packages = dev_packages;
