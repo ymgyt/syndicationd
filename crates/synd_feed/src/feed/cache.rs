@@ -86,6 +86,7 @@ impl<S> FetchCachedFeed for CacheLayer<S>
 where
     S: FetchFeed + Clone + 'static,
 {
+    #[tracing::instrument(skip_all, fields(%url))]
     async fn fetch_feed(&self, url: String) -> ParseResult<Arc<types::Feed>> {
         // lookup cache
         if let Some(feed) = self.cache.get(&url).await {
