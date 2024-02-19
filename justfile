@@ -103,6 +103,14 @@ term *flags:
 backend:
     zellij action new-tab --layout .dev/backend_layout.kdl
 
+# Record demo
+demo *flags:
+    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema -- rec demo.cast --overwrite {{flags}}
+
+# Convert demo to gif
+demo2gif *flags:
+    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast demo.gif {{flags}}
+
 changelog-auth:
     GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
     git cliff --include-path "{{ auth_dir }}/**" --include-path "crates/synd_authn/**" out> {{ auth_dir }}/CHANGELOG.md
@@ -133,3 +141,4 @@ release-feed *flags: changelog-feed
 # Release synd_term
 release-term *flags: changelog-term
     cargo release --package synd-term {{ flags }}
+
