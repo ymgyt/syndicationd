@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-feed-v0.1.1]
+## [unreleased]
+
+### Features
+
+- Instrument request counter metrics by [@ymgyt](https://github.com/ymgyt) ([ac64b3aa](https://github.com/ymgyt/syndicationd/commit/ac64b3aa6880482597e672649de800eb30b3ad56))
+- Add metric macro by [@ymgyt](https://github.com/ymgyt) ([5b723f4b](https://github.com/ymgyt/syndicationd/commit/5b723f4b0c68b422f4778b502d2136ef4662bebd))
+- Configure endpoint by [@ymgyt](https://github.com/ymgyt) ([14e09265](https://github.com/ymgyt/syndicationd/commit/14e0926596c59a5e32c283d0f8ac7f805e9e97d9))
+
+### Documentation
+
+- Fix typo by [@ymgyt](https://github.com/ymgyt) ([c311417b](https://github.com/ymgyt/syndicationd/commit/c311417bb69d22c7826d4ec931ec8dfe59042ca1))
+
+## [synd-o11y-v0.1.1] - 2024-02-12
 
 ### Features
 
