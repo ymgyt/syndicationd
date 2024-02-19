@@ -57,8 +57,13 @@ where
             let status = response.status().as_u16();
 
             // https://opentelemetry.io/docs/specs/semconv/http/http-metrics/
-            // should be http.server.request ?
-            metric!(monotonic_counter.request = 1, path, status);
+            // Considiering the case of not found(404), recording the path as
+            // an attribute leads to an inability to control cardinality.
+            // Therefore, the path is not recorded.
+            metric!(
+                monotonic_counter.http.server.request = 1,
+                http.response.status.code = status
+            );
 
             // instrument graphql latency
             if path == "/graphql" && method == Method::POST {
