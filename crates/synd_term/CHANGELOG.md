@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-term-v0.1.1]
+## [unreleased]
+
+### Features
+
+- Change log directive env key by [@ymgyt](https://github.com/ymgyt) ([6da13de1](https://github.com/ymgyt/syndicationd/commit/6da13de165e3ec57e3c15c08dc6f8237debe082e))
+
+### Miscellaneous Tasks
+
+- Use include by [@ymgyt](https://github.com/ymgyt) ([cdff7a76](https://github.com/ymgyt/syndicationd/commit/cdff7a762d6cca85160f01b6f646d8baa6e47e59))
+
+### Refactor
+
+- Remove comment by [@ymgyt](https://github.com/ymgyt) ([2b042c69](https://github.com/ymgyt/syndicationd/commit/2b042c696d5c64c3dd2608e4382f50e4a76ed38c))
+
+## [synd-term-v0.1.1] - 2024-02-12
 
 ### Features
 
