@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [synd-auth-v0.1.3]
 
 ### Miscellaneous Tasks
 
