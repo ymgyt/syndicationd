@@ -27,6 +27,7 @@ axum               = { workspace = true }
 axum-server        = { workspace = true }
 chrono             = { workspace = true }
 clap               = { workspace = true, features = ["derive", "env"] }
+fdlimit            = { workspace = true }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }

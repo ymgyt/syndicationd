@@ -1,3 +1,4 @@
+use fdlimit::Outcome;
 use synd_o11y::{
     opentelemetry::OpenTelemetryGuard,
     tracing_subscriber::otel_metrics::{self, metrics_event_filter},
@@ -88,6 +89,13 @@ async fn main() {
     let args = args::parse();
     let _guard = init_tracing(&args.o11y);
     let shutdown = Shutdown::watch_signal();
+
+    fdlimit::raise_fd_limit()
+        .inspect(|outcome| match outcome {
+            Outcome::LimitRaised { from, to } => tracing::info!("Raise fd limit {from} to {to}"),
+            Outcome::Unsupported => tracing::info!("Raise fd limit unsupported"),
+        })
+        .ok();
 
     if let Err(err) = run(args, shutdown).await {
         if let Some(err) = err.downcast_ref::<ConnectKvsdFailed>() {

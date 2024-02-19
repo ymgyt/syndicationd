@@ -921,6 +921,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
 
 [[package]]
+name = "fdlimit"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e182f7dbc2ef73d9ef67351c5fbbea084729c48362d3ce9dd44c28e32e277fe5"
+dependencies = [
+ "libc",
+ "thiserror",
+]
+
+[[package]]
 name = "feed-rs"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2951,6 +2961,7 @@ dependencies = [
  "axum-server",
  "chrono",
  "clap 4.5.0",
+ "fdlimit",
  "feed-rs",
  "futures-util",
  "graphql_client",

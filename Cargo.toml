@@ -13,20 +13,19 @@ readme      = "README.md"
 repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
-anyhow         = { version = "1" }
-async-trait    = { version = "0.1.77" }
-axum           = { version = "0.7.4" }
-axum-server    = { version = "0.6.0", features = ["tls-rustls"] }
-chrono         = { version = "0.4.31" }
-clap           = { version = "4.5" }
-feed-rs        = { version = "1.4" }
-futures-util   = { version = "0.3.30" }
-graphql_client = { version = "0.13.0", default-features = false }
-headers        = { version = "0.4.0" }
-http           = { version = "0.2" }                              # request use 0.2
-kvsd           = { version = "0.1.2", default-features = false }
-thiserror      = { version = "1.0.56" }
-# kvsd                               = { path = "../kvsd" }
+anyhow                             = { version = "1" }
+async-trait                        = { version = "0.1.77" }
+axum                               = { version = "0.7.4" }
+axum-server                        = { version = "0.6.0", features = ["tls-rustls"] }
+chrono                             = { version = "0.4.31" }
+clap                               = { version = "4.5" }
+fdlimit                            = { version = "0.3.0" }
+feed-rs                            = { version = "1.4" }
+futures-util                       = { version = "0.3.30" }
+graphql_client                     = { version = "0.13.0", default-features = false }
+headers                            = { version = "0.4.0" }
+http                               = { version = "0.2" }                                                                                                   # request use 0.2
+kvsd                               = { version = "0.1.2", default-features = false }
 moka                               = { version = "0.12.4", features = ["future"] }
 opentelemetry                      = { version = "0.21.0" }
 opentelemetry-http                 = { version = "0.10.0" }
@@ -36,6 +35,7 @@ rand                               = { version = "0.8.5" }
 reqwest                            = { version = "0.11.24", default-features = false, features = ["rustls-tls", "json"] }
 serde                              = { version = "1", features = ["derive"] }
 serde_json                         = { version = "1.0.111" }
+thiserror                          = { version = "1.0.56" }
 tokio                              = { version = "1.35" }
 tracing                            = { version = "0.1.40" }
 tracing-opentelemetry              = { version = "0.22.0" }
