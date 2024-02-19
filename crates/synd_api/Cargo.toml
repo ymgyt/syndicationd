@@ -9,7 +9,7 @@ repository.workspace = true
 description = "syndicationd backend api"
 name        = "synd-api"
 readme      = "README.md"
-version     = "0.1.0"
+version     = "0.1.1"
 
 [[bin]]
 name = "synd-api"
