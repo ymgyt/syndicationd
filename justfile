@@ -37,8 +37,8 @@ fmt-toml:
     taplo fmt --config taplo.toml **.toml
 
 # Run test
-test:
-    cargo nextest run
+test *flags:
+    cargo nextest run {{ flags }}
 
 # Run integration test
 integration-test:
