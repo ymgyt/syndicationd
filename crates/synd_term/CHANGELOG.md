@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased] __release_date__
+## [synd-term-v0.1.3] 2024-02-19
 
 ### Features
 
