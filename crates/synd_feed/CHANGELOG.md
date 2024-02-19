@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### Documentation
+
+- Fix typo by [@ymgyt](https://github.com/ymgyt) ([d611d33a](https://github.com/ymgyt/syndicationd/commit/d611d33af376e593d24533378845c565dadd4e5e))
+
 ## [synd-feed-v0.1.1] - 2024-02-12
 
 ### Features
