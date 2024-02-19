@@ -65,7 +65,7 @@
         });
         syndTermOnly = craneLib.buildPackage (commonArgs // {
           inherit (syndTermCrate) pname version;
-          cargoExtraArgs = "--package ${syndApiCrate.pname}";
+          cargoExtraArgs = "--package ${syndTermCrate.pname}";
         });
 
         syndApiCrate = craneLib.crateNameFromCargoToml {
