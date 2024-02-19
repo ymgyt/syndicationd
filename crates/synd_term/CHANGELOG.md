@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-term-v0.1.2]
+## [unreleased] __release_date__
+
+### Features
+
+- Improve feed url parse by [@ymgyt](https://github.com/ymgyt) ([460e87d0](https://github.com/ymgyt/syndicationd/commit/460e87d00f9acd83a922a97c339a620c0037c14f))
+
+## [synd-term-v0.1.2] - 2024-02-19
 
 ### Features
 
