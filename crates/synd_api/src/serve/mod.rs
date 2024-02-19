@@ -3,6 +3,7 @@ use std::time::Duration;
 use axum::{
     error_handling::HandleErrorLayer,
     http::{header::AUTHORIZATION, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     BoxError, Extension, Router,
 };
@@ -69,7 +70,8 @@ pub async fn serve(
                 .layer(CorsLayer::new()),
         )
         .route("/healthcheck", get(probe::healthcheck))
-        .layer(RequestMetricsLayer::new());
+        .layer(RequestMetricsLayer::new())
+        .fallback(not_found);
 
     axum_server::from_tcp_rustls(listener.into_std()?, tls_config)
         .handle(shutdown.into_handle())
@@ -93,4 +95,8 @@ async fn handle_middleware_error(err: BoxError) -> (StatusCode, String) {
             format!("Unhandled internal error: {err}"),
         )
     }
+}
+
+async fn not_found() -> impl IntoResponse {
+    StatusCode::NOT_FOUND
 }
