@@ -112,7 +112,12 @@
             git-cliff
             cargo-release
             typos
-          ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [ ];
+          ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            # For cargo-release build
+            pkgs.libiconv
+            pkgs.darwin.apple_sdk.frameworks.Security
+            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+          ];
 
       in {
         inherit checks;
