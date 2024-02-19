@@ -30,3 +30,7 @@ features = ["introspection", "integration"]
 [language-server.rust-analyzer.config.check]
 command  = "clippy"
 features = "all"
+
+[[language]]
+auto-format = false
+name        = "just"
