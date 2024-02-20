@@ -180,8 +180,15 @@ mod link {
                 .find(|link| link.rel.as_deref() == Some("alternate"))
                 .map(|link| link.href.as_str()),
 
-            // TODO
-            FeedType::JSON => todo!(),
+            // how to detect homepage(website) url?
+            // ignore .json extension link
+            FeedType::JSON => links
+                .find(|link| {
+                    !std::path::Path::new(link.href.as_str())
+                        .extension()
+                        .map_or(false, |ext| ext.eq_ignore_ascii_case("json"))
+                })
+                .map(|link| link.href.as_str()),
 
             // TODO
             FeedType::RSS0 => todo!(),
@@ -252,6 +259,33 @@ mod link {
             assert_eq!(
                 find_website_url(&FeedType::Atom, &links),
                 Some("https://syndicationd.ymgyt.io/")
+            );
+        }
+
+        #[test]
+        fn json_ignore_json_ext() {
+            let links = vec![
+                Link {
+                    href: "https://kubernetes.io/docs/reference/issues-security/official-cve-feed/index.json".into(),
+                    title: None,
+                    rel: None,
+                    media_type: None,
+                    href_lang: None,
+                    length: None,
+                },
+                Link {
+                    href: "https://kubernetes.io".into(),
+                    title: None,
+                    rel: None,
+                    media_type: None,
+                    href_lang: None,
+                    length: None,
+                },
+            ];
+
+            assert_eq!(
+                find_website_url(&FeedType::JSON, &links),
+                Some("https://kubernetes.io")
             );
         }
     }
