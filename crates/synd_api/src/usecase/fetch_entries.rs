@@ -89,7 +89,7 @@ impl Usecase for FetchEntries {
         let in_flight_limit = 10;
 
         for url in urls {
-            if tasks.len() > in_flight_limit {
+            if tasks.len() >= in_flight_limit {
                 if let Some(result) = tasks.next().await {
                     handle_feed(result);
                 }
