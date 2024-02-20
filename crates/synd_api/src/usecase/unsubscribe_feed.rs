@@ -58,7 +58,7 @@ impl Usecase for UnsubscribeFeed {
             })
             .await?;
 
-        metric!(counter.feed.subscription = -1);
+        metric!(monotonic_counter.feed.unsubscription = 1);
 
         Ok(Output {
             output: UnsubscribeFeedOutput {},

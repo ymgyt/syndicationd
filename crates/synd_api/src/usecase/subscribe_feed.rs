@@ -71,7 +71,7 @@ impl Usecase for SubscribeFeed {
             })
             .await?;
 
-        metric!(counter.feed.subscription = 1);
+        metric!(monotonic_counter.feed.subscription = 1);
 
         Ok(Output {
             output: SubscribeFeedOutput { feed },
