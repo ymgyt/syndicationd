@@ -14,6 +14,7 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           changelog: crates/synd_api/CHANGELOG.md
+          prefix: synd-api
           title: $tag
           token: ${{ secrets.GITHUB_TOKEN }}
   create-term-release:
@@ -24,5 +25,6 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           changelog: crates/synd_term/CHANGELOG.md
+          prefix: synd-term
           title: $tag
           token: ${{ secrets.GITHUB_TOKEN }}
