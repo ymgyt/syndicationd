@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-feed-v0.1.2]
+## [unreleased] __release_date__
+
+### Features
+
+- Instrument fetch_feed span by [@ymgyt](https://github.com/ymgyt) ([b5cdacb7](https://github.com/ymgyt/syndicationd/commit/b5cdacb7d5a21012b1273a34af419abf6143251d))
+
+## [synd-feed-v0.1.2] - 2024-02-19
 
 ### Documentation
 
