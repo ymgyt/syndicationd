@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-api-v0.1.1] 2024-02-19
+## [unreleased] __release_date__
+
+### Features
+
+- Raise soft fd limit by [@ymgyt](https://github.com/ymgyt) ([54e7ba3c](https://github.com/ymgyt/syndicationd/commit/54e7ba3c44a4a379e61edea95bc27c487fa0b7d6))
+- Instrument kvsd client span name by [@ymgyt](https://github.com/ymgyt) ([bced1b62](https://github.com/ymgyt/syndicationd/commit/bced1b62a52e79e0af70fb2177a2efa940adf91c))
+- Use monotonic_counter as feed subscription metrics by [@ymgyt](https://github.com/ymgyt) ([670dc430](https://github.com/ymgyt/syndicationd/commit/670dc4300310695a71ee73db90f066309323ba6b))
+
+### Bug Fixes
+
+- Strict fetch feed in flight limit by [@ymgyt](https://github.com/ymgyt) ([5a2b646e](https://github.com/ymgyt/syndicationd/commit/5a2b646e2d4fa2b24a2f115a27288c922fa87af3))
+
+## [synd-api-v0.1.1] - 2024-02-19
 
 ### Features
 
