@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased] __release_date__
+## [synd-api-v0.1.2] 2024-02-20
 
 ### Features
 
