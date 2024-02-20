@@ -109,7 +109,7 @@ impl KvsdClient {
 
 #[async_trait]
 impl SubscriptionRepository for KvsdClient {
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(name = "repo::put_feed_subscription", skip_all)]
     async fn put_feed_subscription(
         &self,
         feed: repository::types::FeedSubscription,
@@ -132,7 +132,7 @@ impl SubscriptionRepository for KvsdClient {
         Self::set(&mut client, key, urls).await
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(name = "repo::delete_feed_subscription", skip_all)]
     async fn delete_feed_subscription(
         &self,
         feed: repository::types::FeedSubscription,
@@ -150,7 +150,7 @@ impl SubscriptionRepository for KvsdClient {
         Self::set(&mut client, key, urls).await
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(name = "repo::fetch_subscribed_feed_urls", skip_all)]
     async fn fetch_subscribed_feed_urls(&self, user_id: &str) -> RepositoryResult<Vec<String>> {
         let key = Self::feed_subscription_key(user_id);
 
