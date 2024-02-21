@@ -21,6 +21,10 @@ pub mod env {
     }
     /// Log directive
     pub const LOG_DIRECTIVE: &str = env_key!("LOG");
+
+    pub const ENDPOINT: &str = env_key!("ENDPOINT");
+    pub const LOG_PATH: &str = env_key!("LOG");
+    pub const THEME: &str = env_key!("THEME");
 }
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));

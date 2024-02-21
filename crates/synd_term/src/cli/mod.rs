@@ -66,13 +66,13 @@ impl From<Palette> for tailwind::Palette {
 #[command(version, propagate_version = true)]
 pub struct Args {
     /// synd_api endpoint
-    #[arg(long, default_value = config::api::ENDPOINT)]
+    #[arg(long, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
     pub endpoint: Url,
     /// Log file path
-    #[arg(long, default_value = config::log_path().into_os_string())]
+    #[arg(long, default_value = config::log_path().into_os_string(), env = config::env::LOG_PATH)]
     pub log: PathBuf,
     /// Color palette
-    #[arg(value_enum, long = "theme", default_value_t = Palette::Slate)]
+    #[arg(value_enum, long = "theme", default_value_t = Palette::Slate, env = config::env::THEME)]
     pub palette: Palette,
     #[command(subcommand)]
     pub command: Option<Command>,
