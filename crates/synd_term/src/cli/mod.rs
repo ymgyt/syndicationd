@@ -63,7 +63,7 @@ impl From<Palette> for tailwind::Palette {
 }
 
 #[derive(Parser, Debug)]
-#[command(version, propagate_version = true)]
+#[command(version, propagate_version = true, bin_name = "synd")]
 pub struct Args {
     /// synd_api endpoint
     #[arg(long, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
