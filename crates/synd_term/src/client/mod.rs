@@ -5,6 +5,7 @@ use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
 use synd_o11y::opentelemetry::extension::*;
+use thiserror::Error;
 use tracing::{error, Span};
 use url::Url;
 
@@ -17,6 +18,14 @@ pub use scalar::*;
 pub mod mutation;
 pub mod payload;
 pub mod query;
+
+#[derive(Error, Debug)]
+pub enum SubscribeFeedError {
+    #[error("invalid feed url: `{feed_url}` ({message})`")]
+    InvalidFeedUrl { feed_url: String, message: String },
+    #[error("internal error: {0}")]
+    Internal(anyhow::Error),
+}
 
 #[derive(Clone)]
 pub struct Client {
@@ -64,19 +73,32 @@ impl Client {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn subscribe_feed(&self, url: String) -> anyhow::Result<types::Feed> {
+    pub async fn subscribe_feed(&self, url: String) -> Result<types::Feed, SubscribeFeedError> {
+        use crate::client::mutation::subscribe_feed::ResponseCode;
         let var = mutation::subscribe_feed::Variables {
-            input: mutation::subscribe_feed::SubscribeFeedInput { url },
+            input: mutation::subscribe_feed::SubscribeFeedInput { url: url.clone() },
         };
         let request = mutation::SubscribeFeed::build_query(var);
-        let response: mutation::subscribe_feed::ResponseData = self.request(&request).await?;
+        let response: mutation::subscribe_feed::ResponseData = self
+            .request(&request)
+            .await
+            .map_err(SubscribeFeedError::Internal)?;
 
         match response.subscribe_feed {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
                 Ok(types::Feed::from(success.feed))
             }
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedError(err) => {
-                Err(anyhow!("Failed to mutate subscribe_feed {err:?}"))
+                match err.status.code {
+                    ResponseCode::OK => unreachable!(),
+                    ResponseCode::INVALID_FEED_URL => Err(SubscribeFeedError::InvalidFeedUrl {
+                        feed_url: url,
+                        message: err.message,
+                    }),
+                    err_code => Err(SubscribeFeedError::Internal(anyhow::anyhow!(
+                        "{err_code:?}"
+                    ))),
+                }
             }
         }
     }

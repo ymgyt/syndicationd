@@ -673,7 +673,7 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Title of the feed",
               "isDeprecated": false,
               "name": "title",
               "type": {
@@ -685,7 +685,7 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Url of the feed",
               "isDeprecated": false,
               "name": "url",
               "type": {
@@ -1150,6 +1150,12 @@
               "description": "Principal does not have enough permissions",
               "isDeprecated": false,
               "name": "UNAUTHORIZED"
+            },
+            {
+              "deprecationReason": null,
+              "description": "Given url is not valid feed url",
+              "isDeprecated": false,
+              "name": "INVALID_FEED_URL"
             },
             {
               "deprecationReason": null,

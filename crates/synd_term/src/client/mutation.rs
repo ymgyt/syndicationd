@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n      message\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -20,6 +20,7 @@ pub mod subscribe_feed {
     pub enum ResponseCode {
         OK,
         UNAUTHORIZED,
+        INVALID_FEED_URL,
         INTERNAL_ERROR,
         Other(String),
     }
@@ -28,6 +29,7 @@ pub mod subscribe_feed {
             ser.serialize_str(match *self {
                 ResponseCode::OK => "OK",
                 ResponseCode::UNAUTHORIZED => "UNAUTHORIZED",
+                ResponseCode::INVALID_FEED_URL => "INVALID_FEED_URL",
                 ResponseCode::INTERNAL_ERROR => "INTERNAL_ERROR",
                 ResponseCode::Other(ref s) => &s,
             })
@@ -39,6 +41,7 @@ pub mod subscribe_feed {
             match s.as_str() {
                 "OK" => Ok(ResponseCode::OK),
                 "UNAUTHORIZED" => Ok(ResponseCode::UNAUTHORIZED),
+                "INVALID_FEED_URL" => Ok(ResponseCode::INVALID_FEED_URL),
                 "INTERNAL_ERROR" => Ok(ResponseCode::INTERNAL_ERROR),
                 _ => Ok(ResponseCode::Other(s)),
             }
@@ -113,6 +116,7 @@ pub mod subscribe_feed {
     #[derive(Deserialize, Debug)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedError {
         pub status: SubscribeFeedSubscribeFeedOnSubscribeFeedErrorStatus,
+        pub message: String,
     }
     #[derive(Deserialize, Debug)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedErrorStatus {
@@ -135,7 +139,7 @@ pub mod unsubscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "UnsubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n      message\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -150,6 +154,7 @@ pub mod unsubscribe_feed {
     pub enum ResponseCode {
         OK,
         UNAUTHORIZED,
+        INVALID_FEED_URL,
         INTERNAL_ERROR,
         Other(String),
     }
@@ -158,6 +163,7 @@ pub mod unsubscribe_feed {
             ser.serialize_str(match *self {
                 ResponseCode::OK => "OK",
                 ResponseCode::UNAUTHORIZED => "UNAUTHORIZED",
+                ResponseCode::INVALID_FEED_URL => "INVALID_FEED_URL",
                 ResponseCode::INTERNAL_ERROR => "INTERNAL_ERROR",
                 ResponseCode::Other(ref s) => &s,
             })
@@ -169,6 +175,7 @@ pub mod unsubscribe_feed {
             match s.as_str() {
                 "OK" => Ok(ResponseCode::OK),
                 "UNAUTHORIZED" => Ok(ResponseCode::UNAUTHORIZED),
+                "INVALID_FEED_URL" => Ok(ResponseCode::INVALID_FEED_URL),
                 "INTERNAL_ERROR" => Ok(ResponseCode::INTERNAL_ERROR),
                 _ => Ok(ResponseCode::Other(s)),
             }

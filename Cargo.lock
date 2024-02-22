@@ -3008,6 +3008,7 @@ dependencies = [
  "futures-util",
  "moka",
  "reqwest",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",

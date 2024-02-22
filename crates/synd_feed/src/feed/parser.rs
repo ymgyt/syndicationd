@@ -1,30 +1,37 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use feed_rs::parser::Parser;
+use feed_rs::parser::{ParseErrorKind, ParseFeedError, Parser};
 
 use crate::types::Feed;
 
-pub type ParseResult<T> = std::result::Result<T, ParserError>;
+pub type FetchFeedResult<T> = std::result::Result<T, FetchFeedError>;
 
 #[derive(Debug, thiserror::Error)]
-pub enum ParserError {
+pub enum FetchFeedError {
     #[error("fetch failed")]
     Fetch(#[from] reqwest::Error),
     #[error("response size limit exceeded")]
     ResponseLimitExceed,
-
-    #[error("parse error url: {url} {source}")]
-    Parse { url: String, source: anyhow::Error },
+    #[error("invalid feed: {0}")]
+    InvalidFeed(ParseErrorKind),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("json format error: {0}")]
+    JsonFormat(#[from] serde_json::Error),
+    #[error("unsupported json version: {0}")]
+    JsonUnsupportedVersion(String),
+    #[error("xml format error: {0}")]
+    XmlFormat(String),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
 #[async_trait]
 pub trait FetchFeed: Send + Sync {
-    async fn fetch_feed(&self, url: String) -> ParseResult<Feed>;
+    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Feed>;
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>>;
+    async fn fetch_feeds_parallel(&self, urls: &[String]) -> FetchFeedResult<Vec<Feed>>;
 }
 
 #[async_trait]
@@ -32,11 +39,11 @@ impl<T> FetchFeed for Arc<T>
 where
     T: FetchFeed,
 {
-    async fn fetch_feed(&self, url: String) -> ParseResult<Feed> {
+    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Feed> {
         self.fetch_feed(url).await
     }
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>> {
+    async fn fetch_feeds_parallel(&self, urls: &[String]) -> FetchFeedResult<Vec<Feed>> {
         self.fetch_feeds_parallel(urls).await
     }
 }
@@ -50,24 +57,24 @@ pub struct FeedService {
 
 #[async_trait]
 impl FetchFeed for FeedService {
-    async fn fetch_feed(&self, url: String) -> ParseResult<Feed> {
+    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Feed> {
         use futures_util::StreamExt;
         let mut stream = self
             .http
             .get(&url)
             .send()
             .await
-            .map_err(ParserError::Fetch)?
+            .map_err(FetchFeedError::Fetch)?
             .error_for_status()
-            .map_err(ParserError::Fetch)?
+            .map_err(FetchFeedError::Fetch)?
             .bytes_stream();
 
         let mut buff = Vec::new();
 
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(ParserError::Fetch)?;
+            let chunk = chunk.map_err(FetchFeedError::Fetch)?;
             if buff.len() + chunk.len() > self.buff_limit {
-                return Err(ParserError::ResponseLimitExceed);
+                return Err(FetchFeedError::ResponseLimitExceed);
             }
             buff.extend(chunk);
         }
@@ -75,7 +82,7 @@ impl FetchFeed for FeedService {
         self.parse(url, buff.as_slice())
     }
 
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> ParseResult<Vec<Feed>> {
+    async fn fetch_feeds_parallel(&self, urls: &[String]) -> FetchFeedResult<Vec<Feed>> {
         // Order is matter, so we could not use tokio JoinSet or futures FuturesUnordered
         // should use FuturesOrders ?
         let mut handles = Vec::with_capacity(urls.len());
@@ -108,21 +115,27 @@ impl FeedService {
         Self { http, buff_limit }
     }
 
-    pub fn parse<S>(&self, url: impl Into<String>, source: S) -> ParseResult<Feed>
+    pub fn parse<S>(&self, url: impl Into<String>, source: S) -> FetchFeedResult<Feed>
     where
         S: std::io::Read,
     {
         let url = url.into();
         let parser = Self::build_parser(&url);
 
-        match parser.parse(source) {
-            Ok(feed) => Ok(Feed::from((url, feed))),
-            // TODO: handle error
-            Err(err) => Err(ParserError::Parse {
-                url,
-                source: anyhow::Error::from(err),
-            }),
-        }
+        parser
+            .parse(source)
+            .map(|feed| Feed::from((url, feed)))
+            .map_err(|err| match err {
+                ParseFeedError::ParseError(kind) => FetchFeedError::InvalidFeed(kind),
+                ParseFeedError::IoError(io_err) => FetchFeedError::Io(io_err),
+                ParseFeedError::JsonSerde(json_err) => FetchFeedError::JsonFormat(json_err),
+                ParseFeedError::JsonUnsupportedVersion(version) => {
+                    FetchFeedError::JsonUnsupportedVersion(version)
+                }
+                ParseFeedError::XmlReader(xml_err) => {
+                    FetchFeedError::XmlFormat(format!("{xml_err}"))
+                }
+            })
     }
 
     fn build_parser(base_uri: impl AsRef<str>) -> Parser {

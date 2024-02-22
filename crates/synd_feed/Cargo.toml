@@ -19,6 +19,7 @@ feed-rs      = { workspace = true }
 futures-util = { workspace = true }
 moka         = { workspace = true, features = ["future"] }
 reqwest      = { workspace = true, features = ["stream"] }
+serde_json   = { workspace = true }
 thiserror    = { workspace = true }
 tokio        = { workspace = true }
 tracing      = { workspace = true }

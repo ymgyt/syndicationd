@@ -46,7 +46,7 @@ integration-test:
 
 # Update synd_api graphql schema
 update-gql-schema:
-    @graphql-client introspect-schema http://localhost:5959/graphql \
+    @graphql-client introspect-schema https://localhost:5959/graphql --no-ssl \
       --header 'authorization: github {{ github_pat }}' out> crates/synd_term/gql/schema.json
 
 # Generate graphql code

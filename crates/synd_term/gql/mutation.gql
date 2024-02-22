@@ -13,6 +13,7 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
       status {
         code
       }
+      message
     }
   }
 }

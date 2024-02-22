@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use moka::future::Cache;
 
 use crate::{
-    feed::parser::{FetchFeed, ParseResult},
+    feed::parser::{FetchFeed, FetchFeedResult},
     types,
 };
 
@@ -44,9 +44,10 @@ impl CacheConfig {
 
 #[async_trait]
 pub trait FetchCachedFeed: Send + Sync {
-    async fn fetch_feed(&self, url: String) -> ParseResult<Arc<types::Feed>>;
+    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Arc<types::Feed>>;
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> Vec<ParseResult<Arc<types::Feed>>>;
+    async fn fetch_feeds_parallel(&self, urls: &[String])
+        -> Vec<FetchFeedResult<Arc<types::Feed>>>;
 }
 
 #[derive(Clone)]
@@ -87,15 +88,14 @@ where
     S: FetchFeed + Clone + 'static,
 {
     #[tracing::instrument(skip_all, fields(%url))]
-    async fn fetch_feed(&self, url: String) -> ParseResult<Arc<types::Feed>> {
+    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Arc<types::Feed>> {
         // lookup cache
         if let Some(feed) = self.cache.get(&url).await {
             tracing::debug!(url, "Feed cache hit");
             return Ok(feed);
         }
 
-        let feed = self.service.fetch_feed(url.clone()).await?;
-        let feed = Arc::new(feed);
+        let feed = self.service.fetch_feed(url.clone()).await.map(Arc::new)?;
 
         self.cache.insert(url, Arc::clone(&feed)).await;
 
@@ -103,7 +103,10 @@ where
     }
 
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> Vec<ParseResult<Arc<types::Feed>>> {
+    async fn fetch_feeds_parallel(
+        &self,
+        urls: &[String],
+    ) -> Vec<FetchFeedResult<Arc<types::Feed>>> {
         let mut handles = Vec::with_capacity(urls.len());
 
         for url in urls {
