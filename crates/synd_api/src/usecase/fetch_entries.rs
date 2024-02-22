@@ -2,9 +2,10 @@ use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use synd_feed::{
-    feed::{cache::FetchCachedFeed, parser::ParserError},
+    feed::{cache::FetchCachedFeed, parser::FetchFeedError},
     types::{self, EntryId},
 };
+use thiserror::Error;
 
 use crate::{
     principal::Principal,
@@ -28,12 +29,15 @@ pub struct FetchEntriesOutput {
     pub feeds: HashMap<types::FeedUrl, types::FeedMeta>,
 }
 
+#[derive(Error, Debug)]
+pub enum FetchEntriesError {}
+
 impl Usecase for FetchEntries {
     type Input = FetchEntriesInput;
 
     type Output = FetchEntriesOutput;
 
-    type Error = anyhow::Error;
+    type Error = FetchEntriesError;
 
     fn new(make: &MakeUsecase) -> Self {
         Self {
@@ -66,7 +70,7 @@ impl Usecase for FetchEntries {
 
         let mut feed_metas = HashMap::new();
         let mut entries = Vec::with_capacity(urls.len() * 2);
-        let mut handle_feed = |feed: Result<Arc<types::Feed>, ParserError>| {
+        let mut handle_feed = |feed: Result<Arc<types::Feed>, FetchFeedError>| {
             let feed = match feed {
                 Ok(feed) => feed,
                 Err(err) => {

@@ -9,8 +9,9 @@ use crate::{
         run_usecase,
     },
     usecase::{
-        FetchEntries, FetchEntriesInput, FetchEntriesOutput, FetchSubscribedFeeds,
-        FetchSubscribedFeedsInput, FetchSubscribedFeedsOutput, Output,
+        FetchEntries, FetchEntriesError, FetchEntriesInput, FetchEntriesOutput,
+        FetchSubscribedFeeds, FetchSubscribedFeedsError, FetchSubscribedFeedsInput,
+        FetchSubscribedFeedsOutput, Output,
     },
 };
 
@@ -34,7 +35,12 @@ impl Subscription {
         };
         let Output {
             output: FetchSubscribedFeedsOutput { feeds },
-        } = run_usecase!(FetchSubscribedFeeds, cx, input)?;
+        } = run_usecase!(
+            FetchSubscribedFeeds,
+            cx,
+            input,
+            |err: FetchSubscribedFeedsError| Err(async_graphql::ErrorExtensions::extend(&err))
+        )?;
 
         let has_next = feeds.len() > first;
         let mut connection = Connection::new(has_prev, has_next);
@@ -67,7 +73,9 @@ impl Subscription {
         };
         let Output {
             output: FetchEntriesOutput { entries, feeds },
-        } = run_usecase!(FetchEntries, cx, input)?;
+        } = run_usecase!(FetchEntries, cx, input, |err: FetchEntriesError| Err(
+            async_graphql::ErrorExtensions::extend(&err)
+        ))?;
 
         let has_next = entries.len() > first;
         let mut connection = Connection::new(has_prev, has_next);

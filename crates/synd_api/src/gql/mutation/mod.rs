@@ -2,7 +2,7 @@ use async_graphql::{Context, Enum, Interface, Object, SimpleObject};
 
 use crate::{
     gql::run_usecase,
-    usecase::{SubscribeFeed, UnsubscribeFeed},
+    usecase::{SubscribeFeed, SubscribeFeedError, UnsubscribeFeed},
 };
 
 pub mod subscribe_feed;
@@ -14,6 +14,8 @@ pub enum ResponseCode {
     Ok,
     /// Principal does not have enough permissions
     Unauthorized,
+    /// Given url is not valid feed url
+    InvalidFeedUrl,
     /// Something went wrong
     InternalError,
 }
@@ -35,6 +37,18 @@ impl ResponseStatus {
     fn unauthorized() -> Self {
         ResponseStatus {
             code: ResponseCode::Unauthorized,
+        }
+    }
+
+    fn invalid_feed_url() -> Self {
+        Self {
+            code: ResponseCode::InvalidFeedUrl,
+        }
+    }
+
+    fn internal() -> Self {
+        Self {
+            code: ResponseCode::InternalError,
         }
     }
 }
@@ -67,7 +81,9 @@ impl Mutation {
         cx: &Context<'_>,
         input: subscribe_feed::SubscribeFeedInput,
     ) -> async_graphql::Result<subscribe_feed::SubscribeFeedResponse> {
-        run_usecase!(SubscribeFeed, cx, input)
+        run_usecase!(SubscribeFeed, cx, input, |err: SubscribeFeedError| Ok(
+            err.into()
+        ))
     }
 
     /// Unsubscribe feed
@@ -77,6 +93,8 @@ impl Mutation {
         cx: &Context<'_>,
         input: unsubscribe_feed::UnsubscribeFeedInput,
     ) -> async_graphql::Result<unsubscribe_feed::UnsubscribeFeedResponse> {
-        run_usecase!(UnsubscribeFeed, cx, input)
+        run_usecase!(UnsubscribeFeed, cx, input, |err: anyhow::Error| Ok(
+            err.into()
+        ))
     }
 }

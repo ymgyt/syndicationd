@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
-use synd_feed::{feed::cache::FetchCachedFeed, types::Feed};
+use synd_feed::{
+    feed::{cache::FetchCachedFeed, parser::FetchFeedError},
+    types::Feed,
+};
 use synd_o11y::metric;
+use thiserror::Error;
 
 use crate::{
     principal::Principal,
@@ -24,12 +28,18 @@ pub struct SubscribeFeedOutput {
     pub feed: Arc<Feed>,
 }
 
+#[derive(Error, Debug)]
+pub enum SubscribeFeedError {
+    #[error("fetch feed error: {0}")]
+    FetchFeed(FetchFeedError),
+}
+
 impl Usecase for SubscribeFeed {
     type Input = SubscribeFeedInput;
 
     type Output = SubscribeFeedOutput;
 
-    type Error = anyhow::Error;
+    type Error = SubscribeFeedError;
 
     fn new(make: &super::MakeUsecase) -> Self {
         Self {
@@ -60,7 +70,7 @@ impl Usecase for SubscribeFeed {
             .fetch_feed
             .fetch_feed(url.clone())
             .await
-            .map_err(|err| super::Error::Usecase(anyhow::Error::from(err)))?;
+            .map_err(|err| super::Error::Usecase(SubscribeFeedError::FetchFeed(err)))?;
 
         tracing::debug!("{:?}", feed.meta());
 

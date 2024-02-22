@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use synd_feed::{feed::cache::FetchCachedFeed, types};
+use thiserror::Error;
 
 use crate::{
     principal::Principal,
@@ -23,12 +24,15 @@ pub struct FetchSubscribedFeedsOutput {
     pub feeds: Vec<Arc<types::Feed>>,
 }
 
+#[derive(Error, Debug)]
+pub enum FetchSubscribedFeedsError {}
+
 impl Usecase for FetchSubscribedFeeds {
     type Input = FetchSubscribedFeedsInput;
 
     type Output = FetchSubscribedFeedsOutput;
 
-    type Error = anyhow::Error;
+    type Error = FetchSubscribedFeedsError;
 
     fn new(make: &MakeUsecase) -> Self {
         Self {

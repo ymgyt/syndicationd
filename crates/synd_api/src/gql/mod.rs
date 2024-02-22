@@ -5,7 +5,7 @@ mod mutation;
 use async_graphql::{EmptySubscription, Schema, SchemaBuilder};
 pub use mutation::Mutation;
 
-use crate::{principal::Principal, usecase};
+use crate::{gql::mutation::ResponseCode, principal::Principal, usecase};
 
 pub mod object;
 pub mod scalar;
@@ -62,22 +62,37 @@ where
 {
     fn extend(&self) -> async_graphql::Error {
         async_graphql::Error::new(format!("{self}")).extend_with(|_, ext| match self {
-            usecase::Error::Usecase(_) => ext.set("code", "TODO"),
-            usecase::Error::Unauthorized(_) => ext.set("code", "UNAUTHORIZED"),
-            usecase::Error::Repository(_) => ext.set("code", "INTERNAL"),
+            usecase::Error::Usecase(_) => unreachable!(),
+            usecase::Error::Unauthorized(_) => ext.set("code", ResponseCode::Unauthorized),
+            usecase::Error::Repository(_) => ext.set("code", ResponseCode::InternalError),
         })
     }
 }
 
-macro_rules! run_usecase {
-    ($usecase:ty, $cx:expr, $input:expr) => {{
-        let runtime = $cx.data_unchecked::<crate::usecase::Runtime>();
+impl async_graphql::ErrorExtensions for usecase::FetchEntriesError {
+    fn extend(&self) -> async_graphql::Error {
+        async_graphql::Error::new(format!("{self}"))
+            .extend_with(|_, ext| ext.set("code", ResponseCode::InternalError))
+    }
+}
 
-        runtime
-            .run::<$usecase, _, _>($cx, $input)
-            .await
-            .map_err(|err| async_graphql::ErrorExtensions::extend(&err))
-            .map(Into::into)
+impl async_graphql::ErrorExtensions for usecase::FetchSubscribedFeedsError {
+    fn extend(&self) -> async_graphql::Error {
+        async_graphql::Error::new(format!("{self}"))
+            .extend_with(|_, ext| ext.set("code", ResponseCode::InternalError))
+    }
+}
+
+macro_rules! run_usecase {
+    ($usecase:ty, $cx:expr, $input:expr,$err_handle:expr) => {{
+        let runtime = $cx.data_unchecked::<crate::usecase::Runtime>();
+        let err_handle = $err_handle;
+
+        match runtime.run::<$usecase, _, _>($cx, $input).await {
+            Ok(output) => Ok(output.into()),
+            Err($crate::usecase::Error::Usecase(uc_err)) => err_handle(uc_err),
+            Err(err) => Err(async_graphql::ErrorExtensions::extend(&err)),
+        }
     }};
 }
 

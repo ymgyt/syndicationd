@@ -1,11 +1,12 @@
 use async_graphql::{InputObject, Object, Union};
+use synd_feed::feed::parser::FetchFeedError;
 
 use crate::{
     gql::{
         mutation::ResponseStatus,
         object::{self, Feed},
     },
-    usecase,
+    usecase::{self, SubscribeFeedError as UsecaseSubscribeFeedError},
 };
 
 #[derive(InputObject)]
@@ -76,5 +77,28 @@ impl From<usecase::Output<usecase::SubscribeFeedOutput>> for SubscribeFeedRespon
             status: ResponseStatus::ok(),
             feed: Feed::from(output.output.feed),
         })
+    }
+}
+
+impl From<UsecaseSubscribeFeedError> for SubscribeFeedResponse {
+    fn from(err: UsecaseSubscribeFeedError) -> Self {
+        SubscribeFeedResponse::Error(err.into())
+    }
+}
+
+impl From<UsecaseSubscribeFeedError> for SubscribeFeedError {
+    fn from(err: UsecaseSubscribeFeedError) -> Self {
+        match err {
+            UsecaseSubscribeFeedError::FetchFeed(fetch_err) => match fetch_err {
+                FetchFeedError::InvalidFeed(kind) => Self {
+                    status: ResponseStatus::invalid_feed_url(),
+                    message: format!("{kind}"),
+                },
+                fetch_err => Self {
+                    status: ResponseStatus::internal(),
+                    message: format!("{fetch_err}"),
+                },
+            },
+        }
     }
 }

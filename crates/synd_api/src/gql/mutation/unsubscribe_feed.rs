@@ -58,6 +58,15 @@ impl From<ResponseStatus> for UnsubscribeFeedResponse {
     }
 }
 
+impl From<anyhow::Error> for UnsubscribeFeedResponse {
+    fn from(err: anyhow::Error) -> Self {
+        UnsubscribeFeedResponse::Error(UnsubscribeFeedError {
+            status: ResponseStatus::internal(),
+            message: format!("{err}"),
+        })
+    }
+}
+
 impl From<usecase::Output<usecase::UnsubscribeFeedOutput>> for UnsubscribeFeedResponse {
     fn from(_output: usecase::Output<usecase::UnsubscribeFeedOutput>) -> Self {
         UnsubscribeFeedResponse::Success(UnsubscribeFeedSuccess {
