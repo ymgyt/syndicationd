@@ -155,3 +155,9 @@ dist-init:
 
 dist-plan version:
     ~/.cargo/bin/cargo-dist dist plan --tag=synd-term-{{version}} --output-format=json
+
+retag tag:
+    git tag --delete {{ tag }}
+    git push --delete origin {{ tag }}
+    git tag {{ tag }}
+    git push --tags
