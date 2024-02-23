@@ -79,12 +79,11 @@ impl Subscription {
 
 impl Subscription {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        // let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
-        let vertical = Layout::vertical([Constraint::Min(0), Constraint::Length(15)]);
-        let [feeds_area, feed_entries_area] = vertical.areas(area);
+        let vertical = Layout::vertical([Constraint::Min(0), Constraint::Max(19)]);
+        let [feeds_area, feed_detail_area] = vertical.areas(area);
 
         self.render_feeds(feeds_area, buf, cx);
-        self.render_feed_detail(feed_entries_area, buf, cx);
+        self.render_feed_detail(feed_detail_area, buf, cx);
     }
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
