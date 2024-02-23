@@ -62,3 +62,6 @@ tokio-stream = "0.1.14"
 
 [lints]
 workspace = true
+
+[package.metadata.dist]
+formula = "synd"
