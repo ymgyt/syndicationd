@@ -149,3 +149,9 @@ release-term *flags: changelog-term
 
 release-api *flags: changelog-api
     cargo release --package synd-api {{ flags }}
+
+dist-init:
+    ~/.cargo/bin/cargo-dist dist init
+
+dist-plan version:
+    ~/.cargo/bin/cargo-dist dist plan --tag=synd-term-{{version}} --output-format=json
