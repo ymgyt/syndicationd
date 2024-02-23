@@ -33,6 +33,7 @@ fragment Feed on Feed {
 fragment EntryMeta on Entry {
     title,
     published,
+    updated,
     summary,
 }
 
@@ -59,6 +60,7 @@ query Entries($after: String, $first: Int!) {
 fragment Entry on Entry {
   title
   published
+  updated
   summary
   websiteUrl
   feed {

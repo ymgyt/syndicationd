@@ -4,7 +4,7 @@ pub mod subscription {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "Subscription";
-    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n" ;
+    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -48,6 +48,7 @@ pub mod subscription {
     pub struct EntryMeta {
         pub title: Option<String>,
         pub published: Option<Rfc3339Time>,
+        pub updated: Option<Rfc3339Time>,
         pub summary: Option<String>,
     }
     #[derive(Deserialize, Debug)]
@@ -98,7 +99,7 @@ pub mod entries {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "Entries";
-    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n" ;
+    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  title\n  url\n  updated\n  websiteUrl\n  description\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -120,6 +121,7 @@ pub mod entries {
     pub struct Entry {
         pub title: Option<String>,
         pub published: Option<Rfc3339Time>,
+        pub updated: Option<Rfc3339Time>,
         pub summary: Option<String>,
         #[serde(rename = "websiteUrl")]
         pub website_url: Option<String>,

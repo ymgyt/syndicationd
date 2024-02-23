@@ -106,6 +106,18 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Time at which the entry was last modified",
+              "isDeprecated": false,
+              "name": "updated",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Rfc3339Time",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "The time at which the entry published",
               "isDeprecated": false,
               "name": "published",

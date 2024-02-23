@@ -42,6 +42,10 @@ impl Entry {
         self.0.title.as_ref().map(|text| text.content.as_str())
     }
 
+    pub fn updated(&self) -> Option<Time> {
+        self.0.updated
+    }
+
     pub fn published(&self) -> Option<Time> {
         self.0.published
     }

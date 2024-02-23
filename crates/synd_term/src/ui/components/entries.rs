@@ -133,6 +133,7 @@ impl Entries {
             let published = entry
                 .published
                 .as_ref()
+                .or(entry.updated.as_ref())
                 .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
 
             let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);

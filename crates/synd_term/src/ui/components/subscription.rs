@@ -205,6 +205,7 @@ impl Subscription {
             let published = entry
                 .published
                 .as_ref()
+                .or(entry.updated.as_ref())
                 .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
             let summary = entry.summary_text(100).unwrap_or(ui::UNKNOWN_SYMBOL.into());
 

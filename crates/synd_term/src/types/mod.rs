@@ -42,6 +42,7 @@ impl From<mutation::subscribe_feed::Link> for Link {
 pub struct EntryMeta {
     pub title: Option<String>,
     pub published: Option<Time>,
+    pub updated: Option<Time>,
     pub summary: Option<String>,
 }
 
@@ -50,6 +51,7 @@ impl From<query::subscription::EntryMeta> for EntryMeta {
         Self {
             title: e.title,
             published: e.published.map(parse_time),
+            updated: e.updated.map(parse_time),
             summary: e.summary,
         }
     }
@@ -60,6 +62,7 @@ impl From<mutation::subscribe_feed::EntryMeta> for EntryMeta {
         Self {
             title: e.title,
             published: e.published.map(parse_time),
+            updated: e.updated.map(parse_time),
             summary: e.summary,
         }
     }
@@ -116,6 +119,7 @@ impl From<mutation::subscribe_feed::Feed> for Feed {
 pub struct Entry {
     pub title: Option<String>,
     pub published: Option<Time>,
+    pub updated: Option<Time>,
     pub website_url: Option<String>,
     pub summary: Option<String>,
     pub feed_title: Option<String>,
@@ -135,6 +139,7 @@ impl From<query::entries::Entry> for Entry {
         Self {
             title: v.title,
             published: v.published.map(parse_time),
+            updated: v.updated.map(parse_time),
             website_url: v.website_url,
             feed_title: v.feed.title,
             feed_url: v.feed.url,
