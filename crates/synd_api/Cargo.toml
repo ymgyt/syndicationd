@@ -53,3 +53,7 @@ introspection = []
 
 [lints]
 workspace = true
+
+[package.metadata.dist]
+# Ignore this package with cargo-dist
+dist = false
