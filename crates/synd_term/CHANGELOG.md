@@ -2,7 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-term-v0.1.3] 2024-02-19
+## [unreleased] __release_date__
+
+### Features
+
+- Use env var as default flag value by [@ymgyt](https://github.com/ymgyt) ([c7887e92](https://github.com/ymgyt/syndicationd/commit/c7887e925d6856f761051d118662d77d35d08968))
+- Handle subscribe feed error by [@ymgyt](https://github.com/ymgyt) ([d6abb26e](https://github.com/ymgyt/syndicationd/commit/d6abb26eb7ea75ba479f07cb83ff680a1708c6af))
+- Use entry updated if published is none by [@ymgyt](https://github.com/ymgyt) ([2b16b51c](https://github.com/ymgyt/syndicationd/commit/2b16b51c3cadb7b0dd74a848ae43ff078372b678))
+- Add feed detail widget by [@ymgyt](https://github.com/ymgyt) ([836258d4](https://github.com/ymgyt/syndicationd/commit/836258d490bd63de7bc481bc6ad9f5866f5e861e))
+- Add reload by [@ymgyt](https://github.com/ymgyt) ([de11397c](https://github.com/ymgyt/syndicationd/commit/de11397cde2d003b81eb029752673f214724c4c2))
+
+### Bug Fixes
+
+- Use name instead of bin_name by [@ymgyt](https://github.com/ymgyt) ([1a9b81dd](https://github.com/ymgyt/syndicationd/commit/1a9b81dd6a9734ea99d63bac052b73b55e9470fd))
+
+### Miscellaneous Tasks
+
+- Set clap bin_name by [@ymgyt](https://github.com/ymgyt) ([dca2b898](https://github.com/ymgyt/syndicationd/commit/dca2b898b2cd596b0655797e037c5a5c82cf9b0a))
+- Configure feed detail height by [@ymgyt](https://github.com/ymgyt) ([3de1c98f](https://github.com/ymgyt/syndicationd/commit/3de1c98fdce08a622323c269373d2ece0b00ec74))
+
+## [synd-term-v0.1.3] - 2024-02-19
 
 ### Features
 
