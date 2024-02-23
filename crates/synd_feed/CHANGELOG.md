@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-feed-v0.1.3] 2024-02-20
+## [unreleased] __release_date__
+
+### Features
+
+- Support json feed website url parse by [@ymgyt](https://github.com/ymgyt) ([7e8db96c](https://github.com/ymgyt/syndicationd/commit/7e8db96c05d33604381168e85f929063b5a85bdd))
+- Handle subscribe feed error by [@ymgyt](https://github.com/ymgyt) ([d6abb26e](https://github.com/ymgyt/syndicationd/commit/d6abb26eb7ea75ba479f07cb83ff680a1708c6af))
+- Use entry updated if published is none by [@ymgyt](https://github.com/ymgyt) ([2b16b51c](https://github.com/ymgyt/syndicationd/commit/2b16b51c3cadb7b0dd74a848ae43ff078372b678))
+- Add generators to feed by [@ymgyt](https://github.com/ymgyt) ([3f0f8b43](https://github.com/ymgyt/syndicationd/commit/3f0f8b4303e2698a9ae364c2c114f0f6d83ffc33))
+- Return entry content by [@ymgyt](https://github.com/ymgyt) ([9f462854](https://github.com/ymgyt/syndicationd/commit/9f462854a1e0d46af515a91237fb3660c72c1fad))
+
+## [synd-feed-v0.1.3] - 2024-02-20
 
 ### Features
 
