@@ -121,6 +121,10 @@ impl FeedMeta {
     pub fn website_url(&self) -> Option<&str> {
         link::find_website_url(self.r#type(), &self.feed.links)
     }
+
+    pub fn generator(&self) -> Option<&str> {
+        self.feed.generator.as_ref().map(|g| g.content.as_str())
+    }
 }
 
 impl<'a> From<&'a FeedMeta> for Cow<'a, FeedMeta> {
