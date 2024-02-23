@@ -50,6 +50,11 @@ impl<'a> Entry<'a> {
         self.entry.title()
     }
 
+    /// Time at which the entry was last modified
+    async fn updated(&self) -> Option<scalar::Rfc3339Time> {
+        self.entry.updated().map(Into::into)
+    }
+
     /// The time at which the entry published
     async fn published(&self) -> Option<scalar::Rfc3339Time> {
         self.entry.published().map(Into::into)

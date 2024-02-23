@@ -64,7 +64,7 @@ impl Usecase for FetchEntries {
     ) -> Result<Output<Self::Output>, Error<Self::Error>> {
         let user_id = principal
             .user_id()
-            .expect("user id not found. this isa bug");
+            .expect("user id not found. this is a bug");
 
         let urls = self.repository.fetch_subscribed_feed_urls(user_id).await?;
 
@@ -107,12 +107,14 @@ impl Usecase for FetchEntries {
             handle_feed(result);
         }
 
-        // Sort by published
-        entries.sort_unstable_by(|(a, _), (b, _)| match (a.published(), b.published()) {
-            (Some(a), Some(b)) => b.cmp(&a),
-            (None, Some(_)) => Ordering::Greater,
-            (Some(_), None) => Ordering::Less,
-            (None, None) => std::cmp::Ordering::Equal,
+        // Sort by published or updated
+        entries.sort_unstable_by(|(a, _), (b, _)| {
+            match (a.published().or(a.updated()), b.published().or(b.updated())) {
+                (Some(a), Some(b)) => b.cmp(&a),
+                (None, Some(_)) => Ordering::Greater,
+                (Some(_), None) => Ordering::Less,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
         });
 
         // Paginate
