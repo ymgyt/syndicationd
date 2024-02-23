@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-api-v0.1.2] 2024-02-20
+## [unreleased] __release_date__
+
+### Features
+
+- Handle subscribe feed error by [@ymgyt](https://github.com/ymgyt) ([90c47d3f](https://github.com/ymgyt/syndicationd/commit/90c47d3f8e225cb71f33b1e6d6df0f0735e21f73))
+- Use updated if published is none by [@ymgyt](https://github.com/ymgyt) ([9967dc10](https://github.com/ymgyt/syndicationd/commit/9967dc108f7f6602e321808398737f891462ec81))
+- Add generator resolver in feed by [@ymgyt](https://github.com/ymgyt) ([f8de4aa4](https://github.com/ymgyt/syndicationd/commit/f8de4aa4a9a4edb8d1f7e8dd31c53b2e66360b18))
+- Resolve entry content if there is no summary by [@ymgyt](https://github.com/ymgyt) ([0459e71c](https://github.com/ymgyt/syndicationd/commit/0459e71c38aba96b4d878ce97cd35ed78587032b))
+
+## [synd-api-v0.1.2] - 2024-02-20
 
 ### Features
 
