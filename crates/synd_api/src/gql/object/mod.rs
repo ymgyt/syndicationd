@@ -189,6 +189,10 @@ impl Feed {
     async fn website_url(&self) -> Option<&str> {
         self.0.meta().website_url()
     }
+
+    async fn generator(&self) -> Option<&str> {
+        self.0.meta().generator()
+    }
 }
 
 pub struct FeedEntryConnectionName;
