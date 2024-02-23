@@ -1,4 +1,5 @@
 use chrono::DateTime;
+use synd_feed::types::FeedType;
 
 use crate::client::{mutation, query};
 
@@ -78,25 +79,38 @@ impl EntryMeta {
 
 #[derive(Debug)]
 pub struct Feed {
+    pub r#type: Option<FeedType>,
     pub title: Option<String>,
     pub url: String,
     pub updated: Option<Time>,
     pub links: Vec<Link>,
     pub website_url: Option<String>,
     pub description: Option<String>,
+    pub generator: Option<String>,
     pub entries: Vec<EntryMeta>,
+    pub authors: Vec<String>,
 }
 
 impl From<query::subscription::Feed> for Feed {
     fn from(f: query::subscription::Feed) -> Self {
         Self {
+            r#type: match f.type_ {
+                query::subscription::FeedType::ATOM => Some(FeedType::Atom),
+                query::subscription::FeedType::RSS1 => Some(FeedType::RSS1),
+                query::subscription::FeedType::RSS2 => Some(FeedType::RSS2),
+                query::subscription::FeedType::RSS0 => Some(FeedType::RSS0),
+                query::subscription::FeedType::JSON => Some(FeedType::JSON),
+                query::subscription::FeedType::Other(_) => None,
+            },
             title: f.title,
             url: f.url,
             updated: f.updated.map(parse_time),
             links: f.links.nodes.into_iter().map(From::from).collect(),
             website_url: f.website_url,
             description: f.description,
+            generator: f.generator,
             entries: f.entries.nodes.into_iter().map(From::from).collect(),
+            authors: f.authors.nodes,
         }
     }
 }
@@ -104,13 +118,23 @@ impl From<query::subscription::Feed> for Feed {
 impl From<mutation::subscribe_feed::Feed> for Feed {
     fn from(f: mutation::subscribe_feed::Feed) -> Self {
         Self {
+            r#type: match f.type_ {
+                mutation::subscribe_feed::FeedType::ATOM => Some(FeedType::Atom),
+                mutation::subscribe_feed::FeedType::RSS1 => Some(FeedType::RSS1),
+                mutation::subscribe_feed::FeedType::RSS2 => Some(FeedType::RSS2),
+                mutation::subscribe_feed::FeedType::RSS0 => Some(FeedType::RSS0),
+                mutation::subscribe_feed::FeedType::JSON => Some(FeedType::JSON),
+                mutation::subscribe_feed::FeedType::Other(_) => None,
+            },
             title: f.title,
             url: f.url,
             updated: f.updated.map(parse_time),
             links: f.links.nodes.into_iter().map(From::from).collect(),
             website_url: f.website_url,
             description: f.description,
+            generator: f.generator,
             entries: f.entries.nodes.into_iter().map(From::from).collect(),
+            authors: f.authors.nodes,
         }
     }
 }

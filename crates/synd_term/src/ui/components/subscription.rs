@@ -1,12 +1,17 @@
+use std::borrow::Cow;
+
+use itertools::Itertools;
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
-    text::Span,
+    style::{Modifier, Style},
+    text::{Line, Span},
     widgets::{
         block::{Position, Title},
-        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Row, Scrollbar,
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row, Scrollbar,
         ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
 };
+use synd_feed::types::FeedType;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
@@ -74,11 +79,12 @@ impl Subscription {
 
 impl Subscription {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
+        // let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
+        let vertical = Layout::vertical([Constraint::Min(0), Constraint::Length(15)]);
         let [feeds_area, feed_entries_area] = vertical.areas(area);
 
         self.render_feeds(feeds_area, buf, cx);
-        self.render_feed_entries(feed_entries_area, buf, cx);
+        self.render_feed_detail(feed_entries_area, buf, cx);
     }
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -106,7 +112,7 @@ impl Subscription {
 
         let scrollbar_area = Rect {
             y: area.y + 2, // table header
-            height: area.height - 3,
+            height: area.height.saturating_sub(3),
             ..area
         };
 
@@ -169,7 +175,7 @@ impl Subscription {
         (header, constraints, self.feeds.iter().map(row))
     }
 
-    fn render_feed_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+    fn render_feed_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding {
                 left: 1,
@@ -178,7 +184,7 @@ impl Subscription {
                 bottom: 1,
             })
             .title(
-                Title::from("Latest 10 entries")
+                Title::from("Feed Detail")
                     .position(Position::Top)
                     .alignment(Alignment::Center),
             )
@@ -191,6 +197,43 @@ impl Subscription {
         let Some(feed) = self.feeds.get(self.selected_feed_meta_index) else {
             return;
         };
+
+        let vertical = Layout::vertical([Constraint::Length(5), Constraint::Min(0)]);
+        let [meta_area, entries_area] = vertical.areas(inner);
+
+        let meta = {
+            let meta = vec![
+                Line::from(vec![
+                    Span::styled("Feed Src  ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::from(feed.url.as_str()),
+                ]),
+                Line::from(vec![
+                    Span::styled("Feed type ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::from(match feed.r#type {
+                        Some(FeedType::RSS0) => "RSS 0",
+                        Some(FeedType::RSS1) => "RSS 1",
+                        Some(FeedType::RSS2) => "RSS 2",
+                        Some(FeedType::Atom) => "Atom",
+                        Some(FeedType::JSON) => "JSON Feed",
+                        None => ui::UNKNOWN_SYMBOL,
+                    }),
+                ]),
+                Line::from(vec![
+                    Span::styled("Authors   ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::from(if feed.authors.is_empty() {
+                        Cow::Borrowed(ui::UNKNOWN_SYMBOL)
+                    } else {
+                        Cow::Owned(feed.authors.iter().join(", "))
+                    }),
+                ]),
+                Line::from(vec![
+                    Span::styled("Generator ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::from(feed.generator.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL)),
+                ]),
+            ];
+            Paragraph::new(meta)
+        };
+        Widget::render(meta, meta_area, buf);
 
         let title_width = feed
             .entries
@@ -233,6 +276,6 @@ impl Subscription {
             .column_spacing(2)
             .style(cx.theme.subscription.background);
 
-        Widget::render(table, inner, buf);
+        Widget::render(table, entries_area, buf);
     }
 }

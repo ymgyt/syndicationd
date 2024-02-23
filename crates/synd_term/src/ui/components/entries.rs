@@ -90,7 +90,7 @@ impl Entries {
 
         let scrollbar_area = Rect {
             y: area.y + 2, // table header
-            height: area.height - 3,
+            height: area.height.saturating_sub(3),
             ..area
         };
 

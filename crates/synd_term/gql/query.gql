@@ -13,11 +13,13 @@ query Subscription($after: String, $first: Int) {
 
 fragment Feed on Feed {
   id
+  type
   title
   url
   updated
   websiteUrl
   description
+  generator
   entries(first: 10) {
     nodes {
       ...EntryMeta
@@ -27,6 +29,9 @@ fragment Feed on Feed {
     nodes {
       ...Link
     }
+  }
+  authors {
+    nodes
   }
 }
 

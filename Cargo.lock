@@ -3047,6 +3047,7 @@ dependencies = [
  "futures-util",
  "graphql_client",
  "html2text",
+ "itertools 0.12.0",
  "kvsd",
  "open",
  "ratatui",
