@@ -47,9 +47,11 @@ pub enum Command {
         first: i64,
     },
     UpdateSubscription {
+        action: ListAction,
         subscription: SubscriptionOutput,
         request_seq: RequestSequence,
     },
+    ReloadSubscription,
     OpenFeed,
 
     // Entries
@@ -62,6 +64,7 @@ pub enum Command {
         payload: payload::FetchEntriesPayload,
         request_seq: RequestSequence,
     },
+    ReloadEntries,
     MoveEntry(Direction),
     OpenEntry,
 

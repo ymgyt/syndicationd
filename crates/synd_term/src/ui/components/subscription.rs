@@ -15,7 +15,7 @@ use synd_feed::types::FeedType;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    application::{Direction, IndexOutOfRange},
+    application::{Direction, IndexOutOfRange, ListAction},
     client::query::subscription::SubscriptionOutput,
     types::{self, EntryMeta, Feed, TimeExt},
     ui::{self, Context},
@@ -54,9 +54,12 @@ impl Subscription {
             .map(|feed_meta| feed_meta.url.as_str())
     }
 
-    pub fn update_subscription(&mut self, subscription: SubscriptionOutput) {
+    pub fn update_subscription(&mut self, action: ListAction, subscription: SubscriptionOutput) {
         let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
-        self.feeds = feed_metas.collect();
+        match action {
+            ListAction::Append => self.feeds.extend(feed_metas),
+            ListAction::Replace => self.feeds = feed_metas.collect(),
+        }
     }
 
     pub fn add_subscribed_feed(&mut self, feed: types::Feed) {

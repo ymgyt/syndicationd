@@ -122,7 +122,7 @@ impl Application {
         let fut = async {
             Ok(Command::FetchEntries {
                 after: None,
-                first: config::INITIAL_ENTRY_TO_FETCH,
+                first: config::INITIAL_ENTRIES_TO_FETCH,
             })
         }
         .boxed();
@@ -226,7 +226,7 @@ impl Application {
                         Tab::Feeds if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
-                                first: 50,
+                                first: config::INITIAL_FEEDS_TO_FETCH,
                             });
                         }
                         _ => {}
@@ -254,22 +254,31 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::FetchSubscription { after, first } => {
-                    self.fetch_subscription(after, first);
+                    self.fetch_subscription(ListAction::Append, after, first);
                 }
                 Command::UpdateSubscription {
+                    action,
                     subscription,
                     request_seq,
                 } => {
                     self.in_flight.remove(request_seq);
                     self.components
                         .subscription
-                        .update_subscription(subscription);
+                        .update_subscription(action, subscription);
+                    self.should_render = true;
+                }
+                Command::ReloadSubscription => {
+                    self.fetch_subscription(
+                        ListAction::Replace,
+                        None,
+                        config::INITIAL_FEEDS_TO_FETCH,
+                    );
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
                     self.in_flight.remove(request_seq);
                     self.components.subscription.add_subscribed_feed(feed);
-                    self.fetch_entries(ListAction::Replace, None, config::INITIAL_ENTRY_TO_FETCH);
+                    self.fetch_entries(ListAction::Replace, None, config::INITIAL_ENTRIES_TO_FETCH);
                     self.should_render = true;
                 }
                 Command::CompleteUnsubscribeFeed { url, request_seq } => {
@@ -291,6 +300,10 @@ impl Application {
                 } => {
                     self.in_flight.remove(request_seq);
                     self.components.entries.update_entries(action, payload);
+                    self.should_render = true;
+                }
+                Command::ReloadEntries => {
+                    self.fetch_entries(ListAction::Replace, None, config::INITIAL_ENTRIES_TO_FETCH);
                     self.should_render = true;
                 }
                 Command::MoveEntry(direction) => {
@@ -365,6 +378,7 @@ impl Application {
                                 KeyCode::Char('k') => {
                                     return Some(Command::MoveEntry(Direction::Up))
                                 }
+                                KeyCode::Char('r') => return Some(Command::ReloadEntries),
                                 KeyCode::Enter => return Some(Command::OpenEntry),
                                 _ => {}
                             },
@@ -379,6 +393,7 @@ impl Application {
                                 KeyCode::Char('k') => {
                                     return Some(Command::MoveSubscribedFeed(Direction::Up));
                                 }
+                                KeyCode::Char('r') => return Some(Command::ReloadSubscription),
                                 KeyCode::Enter => return Some(Command::OpenFeed),
                                 _ => {}
                             },
@@ -396,12 +411,13 @@ impl Application {
 }
 
 impl Application {
-    fn fetch_subscription(&mut self, after: Option<String>, first: i64) {
+    fn fetch_subscription(&mut self, action: ListAction, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {
             match client.fetch_subscription(after, Some(first)).await {
                 Ok(subscription) => Ok(Command::UpdateSubscription {
+                    action,
                     subscription,
                     request_seq,
                 }),

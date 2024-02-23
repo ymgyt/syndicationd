@@ -42,7 +42,12 @@ impl Prompt {
 
     #[allow(clippy::cast_possible_truncation)]
     fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
-        let keys = [("q", "Quit"), ("Tab", "Next Tab"), ("j/k", "Up/Down")];
+        let keys = [
+            ("q", "Quit"),
+            ("Tab", "Next Tab"),
+            ("j/k", "Up/Down"),
+            ("r", "Reload"),
+        ];
         let per_screen_keys = match tab {
             Tab::Feeds => [
                 ("a", "Subscribe"),
