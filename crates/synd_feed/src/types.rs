@@ -54,6 +54,13 @@ impl Entry {
         self.0.summary.as_ref().map(|text| text.content.as_str())
     }
 
+    pub fn content(&self) -> Option<&str> {
+        self.0
+            .content
+            .as_ref()
+            .and_then(|content| content.body.as_deref())
+    }
+
     pub fn website_url(&self, feed_type: &FeedType) -> Option<&str> {
         link::find_website_url(feed_type, &self.0.links)
     }
