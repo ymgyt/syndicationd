@@ -63,8 +63,7 @@ impl KvsdClient {
             .map_err(anyhow::Error::from)
             .context(ConnectKvsdFailed)?
             .map_err(anyhow::Error::from)
-        // TODO: github action macos-11 runner use cargo 1.75.0
-        // .inspect(|_| tracing::info!("Kvsd handshake successfully completed"))
+            .inspect(|_| tracing::info!("Kvsd handshake successfully completed"))
     }
 
     async fn get<'a, T>(

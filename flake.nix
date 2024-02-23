@@ -115,7 +115,8 @@
             opentelemetry-collector-contrib
             git-cliff
             cargo-release
-            cargo-dist
+            # We need latest cargo-dist which is not avaiable in nixpkgs-unstable now
+            # cargo-dist
             typos
           ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             # For cargo-release build

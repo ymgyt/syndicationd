@@ -91,9 +91,7 @@ async fn main() {
     let shutdown = Shutdown::watch_signal();
 
     fdlimit::raise_fd_limit()
-        // TODO: use inspect
-        // github action macos-11 runner use cargo 1.75.0
-        .map(|outcome| {
+        .inspect(|outcome| {
             match outcome {
                 Outcome::LimitRaised { from, to } => {
                     tracing::info!("Raise fd limit {from} to {to}");
@@ -101,7 +99,6 @@ async fn main() {
 
                 Outcome::Unsupported => tracing::info!("Raise fd limit unsupported"),
             };
-            outcome
         })
         .ok();
 
