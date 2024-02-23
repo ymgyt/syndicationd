@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-term-v0.1.4] 2024-02-23
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Typo by [@ymgyt](https://github.com/ymgyt) ([13ccdb5d](https://github.com/ymgyt/syndicationd/commit/13ccdb5d7c80627913d9858887b7b6d84dc07dff))
+
+## [v0.1.4] - 2024-02-23
 
 ### Features
 
@@ -21,13 +27,13 @@ All notable changes to this project will be documented in this file.
 - Set clap bin_name by [@ymgyt](https://github.com/ymgyt) ([dca2b898](https://github.com/ymgyt/syndicationd/commit/dca2b898b2cd596b0655797e037c5a5c82cf9b0a))
 - Configure feed detail height by [@ymgyt](https://github.com/ymgyt) ([3de1c98f](https://github.com/ymgyt/syndicationd/commit/3de1c98fdce08a622323c269373d2ece0b00ec74))
 
-## [synd-term-v0.1.3] - 2024-02-19
+## [v0.1.3] - 2024-02-19
 
 ### Features
 
 - Improve feed url parse by [@ymgyt](https://github.com/ymgyt) ([460e87d0](https://github.com/ymgyt/syndicationd/commit/460e87d00f9acd83a922a97c339a620c0037c14f))
 
-## [synd-term-v0.1.2] - 2024-02-19
+## [v0.1.2] - 2024-02-19
 
 ### Features
 
@@ -41,7 +47,7 @@ All notable changes to this project will be documented in this file.
 
 - Remove comment by [@ymgyt](https://github.com/ymgyt) ([2b042c69](https://github.com/ymgyt/syndicationd/commit/2b042c696d5c64c3dd2608e4382f50e4a76ed38c))
 
-## [synd-term-v0.1.1] - 2024-02-12
+## [v0.1.1] - 2024-02-12
 
 ### Features
 

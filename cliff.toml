@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.\n
 # https://keats.github.io/tera/docs/#introduction
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | trim_start_matches(pat="synd-") | trim_start_matches(pat="api-") | trim_start_matches(pat="term-") | trim_start_matches(pat="auth-") | trim_start_matches(pat="o11y-") | trim_start_matches(pat="feed-") | trim_start_matches(pat="authn-")}}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased] __release_date__
 {% endif %}\

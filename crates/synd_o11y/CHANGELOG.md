@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-o11y-v0.1.2]
+## [v0.1.2] - 2024-02-19
 
 ### Features
 
@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix typo by [@ymgyt](https://github.com/ymgyt) ([c311417b](https://github.com/ymgyt/syndicationd/commit/c311417bb69d22c7826d4ec931ec8dfe59042ca1))
 
-## [synd-o11y-v0.1.1] - 2024-02-12
+## [v0.1.1] - 2024-02-12
 
 ### Features
 

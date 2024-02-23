@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-api-v0.1.3] 2024-02-23
+## [v0.1.3] - 2024-02-23
 
 ### Features
 
@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - Add generator resolver in feed by [@ymgyt](https://github.com/ymgyt) ([f8de4aa4](https://github.com/ymgyt/syndicationd/commit/f8de4aa4a9a4edb8d1f7e8dd31c53b2e66360b18))
 - Resolve entry content if there is no summary by [@ymgyt](https://github.com/ymgyt) ([0459e71c](https://github.com/ymgyt/syndicationd/commit/0459e71c38aba96b4d878ce97cd35ed78587032b))
 
-## [synd-api-v0.1.2] - 2024-02-20
+## [v0.1.2] - 2024-02-20
 
 ### Features
 
@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file.
 
 - Strict fetch feed in flight limit by [@ymgyt](https://github.com/ymgyt) ([5a2b646e](https://github.com/ymgyt/syndicationd/commit/5a2b646e2d4fa2b24a2f115a27288c922fa87af3))
 
-## [synd-api-v0.1.1] - 2024-02-19
+## [v0.1.1] - 2024-02-19
 
 ### Features
 
