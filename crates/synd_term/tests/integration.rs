@@ -173,7 +173,7 @@ mod test {
         // polling device access token complete
         application.event_loop_until_idle(&mut event_stream).await;
 
-        // it would be better to reconcider the current implementation of test
+        // it would be better to reconsider the current implementation of test
         // for instance, assertions for buffers should be performed on a per-component basis
         // while here, do snapshots via insta
         /*
