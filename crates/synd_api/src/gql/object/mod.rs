@@ -60,9 +60,9 @@ impl<'a> Entry<'a> {
         self.entry.published().map(Into::into)
     }
 
-    /// Entry summary
+    /// Entry summary. If there is no summary of the entry, return the content(is this bad api?)
     async fn summary(&self) -> Option<&str> {
-        self.entry.summary()
+        self.entry.summary().or(self.entry.content())
     }
 
     /// Link to websiteurl at which this entry is published
