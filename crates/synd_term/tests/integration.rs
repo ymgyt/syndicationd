@@ -46,7 +46,7 @@ mod test {
             .parse()
             .unwrap();
         let terminal = helper::new_test_terminal();
-        let client = Client::new(endpoint).unwrap();
+        let client = Client::new(endpoint, Duration::from_secs(30)).unwrap();
         let config = Config {
             idle_timer_interval: Duration::from_millis(1000),
             throbber_timer_interval: Duration::from_secs(3600), // disable throbber

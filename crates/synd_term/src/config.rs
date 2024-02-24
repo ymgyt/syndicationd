@@ -27,12 +27,15 @@ pub mod env {
     pub const THEME: &str = env_key!("THEME");
 }
 
-pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+pub mod client {
+    pub const DEFAULT_TIMEOUT: &str = "30s";
+    pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-/// Number of entries to fetch
-pub const INITIAL_ENTRIES_TO_FETCH: i64 = 200;
-/// Number of feeds to fetch
-pub const INITIAL_FEEDS_TO_FETCH: i64 = 50;
+    /// Number of entries to fetch
+    pub const INITIAL_ENTRIES_TO_FETCH: i64 = 200;
+    /// Number of feeds to fetch
+    pub const INITIAL_FEEDS_TO_FETCH: i64 = 50;
+}
 
 pub fn cache_dir() -> &'static Path {
     project_dirs().cache_dir()

@@ -122,7 +122,7 @@ impl Application {
         let fut = async {
             Ok(Command::FetchEntries {
                 after: None,
-                first: config::INITIAL_ENTRIES_TO_FETCH,
+                first: config::client::INITIAL_ENTRIES_TO_FETCH,
             })
         }
         .boxed();
@@ -226,7 +226,7 @@ impl Application {
                         Tab::Feeds if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
-                                first: config::INITIAL_FEEDS_TO_FETCH,
+                                first: config::client::INITIAL_FEEDS_TO_FETCH,
                             });
                         }
                         _ => {}
@@ -271,14 +271,18 @@ impl Application {
                     self.fetch_subscription(
                         ListAction::Replace,
                         None,
-                        config::INITIAL_FEEDS_TO_FETCH,
+                        config::client::INITIAL_FEEDS_TO_FETCH,
                     );
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
                     self.in_flight.remove(request_seq);
                     self.components.subscription.add_subscribed_feed(feed);
-                    self.fetch_entries(ListAction::Replace, None, config::INITIAL_ENTRIES_TO_FETCH);
+                    self.fetch_entries(
+                        ListAction::Replace,
+                        None,
+                        config::client::INITIAL_ENTRIES_TO_FETCH,
+                    );
                     self.should_render = true;
                 }
                 Command::CompleteUnsubscribeFeed { url, request_seq } => {
@@ -303,7 +307,11 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::ReloadEntries => {
-                    self.fetch_entries(ListAction::Replace, None, config::INITIAL_ENTRIES_TO_FETCH);
+                    self.fetch_entries(
+                        ListAction::Replace,
+                        None,
+                        config::client::INITIAL_ENTRIES_TO_FETCH,
+                    );
                     self.should_render = true;
                 }
                 Command::MoveEntry(direction) => {

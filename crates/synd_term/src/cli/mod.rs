@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
 use ratatui::style::palette::tailwind;
@@ -74,6 +74,9 @@ pub struct Args {
     /// Color palette
     #[arg(value_enum, long = "theme", default_value_t = Palette::Slate, env = config::env::THEME)]
     pub palette: Palette,
+    /// Client timeout
+    #[arg(long, value_parser = parse_duration::parse, default_value = config::client::DEFAULT_TIMEOUT)]
+    pub timeout: Duration,
     #[command(subcommand)]
     pub command: Option<Command>,
 }

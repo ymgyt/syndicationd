@@ -44,6 +44,7 @@ tracing-appender     = "0.2.3"
 tracing-subscriber   = { workspace = true }
 unicode-segmentation = "1.10.1"
 url                  = { workspace = true }
+parse_duration = "2.1.1"
 # https://github.com/arkbig/throbber-widgets-tui/pull/5
 # throbber-widgets-tui = "0.3.0"
 

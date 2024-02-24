@@ -35,10 +35,10 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(endpoint: Url) -> anyhow::Result<Self> {
+    pub fn new(endpoint: Url, timeout: Duration) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
-            .user_agent(config::USER_AGENT)
-            .timeout(Duration::from_secs(10))
+            .user_agent(config::client::USER_AGENT)
+            .timeout(timeout)
             .connect_timeout(Duration::from_secs(10))
             // this client specifically targets the syndicationd api, so accepts self signed certificates
             .danger_accept_invalid_certs(true)

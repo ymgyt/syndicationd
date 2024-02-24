@@ -64,6 +64,7 @@ async fn main() {
         log,
         command,
         palette,
+        timeout,
     } = cli::parse();
 
     let log = if command.is_some() { None } else { Some(log) };
@@ -77,7 +78,7 @@ async fn main() {
 
     let mut app = {
         let terminal = Terminal::new().expect("Failed to construct terminal");
-        let client = Client::new(endpoint).expect("Failed to construct client");
+        let client = Client::new(endpoint, timeout).expect("Failed to construct client");
         Application::new(terminal, client).with_theme(Theme::with_palette(&palette.into()))
     };
 
