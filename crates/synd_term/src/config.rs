@@ -6,7 +6,7 @@ use std::{
 use directories::ProjectDirs;
 
 pub mod api {
-    pub const ENDPOINT: &str = "https://syndicationd.ymgyt.io:6100/graphql";
+    pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100/graphql";
 }
 
 pub mod github {
