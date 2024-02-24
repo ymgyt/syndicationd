@@ -6,5 +6,12 @@
   "styles": {
     "theme": "axo_dark",
     "favicon": "https://blog.ymgyt.io/favicon.ico"
+  },
+  "marketing": {
+    "social": {
+      "image": "https://blog.ymgyt.io/images/emoji/crab.png",
+      "image_alt": "synd",
+      "twitter_account": "@YAmaguchixt"
+    }
   }
 }
