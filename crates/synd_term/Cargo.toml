@@ -33,6 +33,7 @@ graphql_client       = { workspace = true }
 html2text            = { version = "0.12" }
 itertools            = { workspace = true }
 open                 = "5.0.1"
+parse_duration       = { workspace = true }
 ratatui              = { version = "0.26.0" }
 reqwest              = { workspace = true }
 serde                = { workspace = true, features = ["derive"] }
@@ -44,7 +45,6 @@ tracing-appender     = "0.2.3"
 tracing-subscriber   = { workspace = true }
 unicode-segmentation = "1.10.1"
 url                  = { workspace = true }
-parse_duration = "2.1.1"
 # https://github.com/arkbig/throbber-widgets-tui/pull/5
 # throbber-widgets-tui = "0.3.0"
 

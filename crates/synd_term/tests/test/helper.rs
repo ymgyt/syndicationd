@@ -7,7 +7,7 @@ use synd_api::{
     client::github::GithubClient,
     dependency::Dependency,
     repository::kvsd::KvsdClient,
-    serve::auth::Authenticator,
+    serve::{auth::Authenticator, ServeOptions},
     shutdown::Shutdown,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
@@ -51,10 +51,16 @@ pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
             .join("private_key.pem"),
     )
     .await?;
+    let serve_options = ServeOptions {
+        timeout: Duration::from_secs(10),
+        body_limit_bytes: 1024 * 2,
+        concurrency_limit: 100,
+    };
     let dep = Dependency {
         authenticator,
         runtime,
         tls_config,
+        serve_options,
     };
     let listener = TcpListener::bind(("localhost", api_port)).await?;
 
