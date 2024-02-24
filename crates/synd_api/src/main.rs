@@ -88,7 +88,14 @@ async fn run(
 ) -> anyhow::Result<()> {
     let dep = Dependency::new(kvsd, tls, serve).await?;
 
-    info!(version = config::VERSION, otlp_endpoint=?o11y.otlp_endpoint, "Runinng...");
+    info!(
+        version = config::VERSION,
+        otlp_endpoint=?o11y.otlp_endpoint,
+        request_timeout=?dep.serve_options.timeout,
+        request_body_limit_bytes=dep.serve_options.body_limit_bytes,
+        concurrency_limit=?dep.serve_options.concurrency_limit,
+        "Runinng...",
+    );
 
     listen_and_serve(dep, bind.into(), shutdown).await
 }
