@@ -170,3 +170,4 @@ oranda-dev:
 # Generate oranda github actions workflow
 oranda-gen:
     oranda generate ci --output-path .github/workflows/website.yaml --ci github
+    echo "Make sure cp CNAME job add to workflow!!"
