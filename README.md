@@ -62,6 +62,32 @@ powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-
 
 ## Usage
 
+`synd` will start the TUI application.
+
+<details>
+<summary>Click to show a complete list of options</summary>
+
+```console
+Usage: synd [OPTIONS] [COMMAND]
+
+Commands:
+  clear  Clear cache, log
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+      --endpoint <ENDPOINT>  synd_api endpoint [env: SYND_ENDPOINT=] [default:
+                             https://syndicationd.ymgyt.io:6100/graphql]
+      --log <LOG>            Log file path [env: SYND_LOG=] [default:
+                             /home/ymgyt/.local/share/synd/syndterm.log]
+      --theme <PALETTE>      Color palette [env: SYND_THEME=] [default: slate] [possible values: slate, gray,
+                             zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal,
+                             cyan, sky, blue, indigo, violet, purple, fuchsia, pink]
+  -h, --help                 Print help
+  -V, --version              Print version
+```
+
+</details>
+
 ### Log file
 
 The log file path is based on [`ProjectDirs::data_dir()`](https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir).  
