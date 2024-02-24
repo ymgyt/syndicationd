@@ -2,12 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased] __release_date__
-
-### Miscellaneous Tasks
-
-- Typo by [@ymgyt](https://github.com/ymgyt) ([13ccdb5d](https://github.com/ymgyt/syndicationd/commit/13ccdb5d7c80627913d9858887b7b6d84dc07dff))
-
 ## [v0.1.4] - 2024-02-23
 
 ### Features
