@@ -10,6 +10,7 @@
 
 Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
+[Website](https://docs.syndicationd.ymgyt.io/synd-term/)
 
 ## Features
 
