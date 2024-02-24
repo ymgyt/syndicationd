@@ -11,6 +11,7 @@ pub mod env {
             concat!("SYND", "_", $key)
         };
     }
+    pub(crate) use env_key;
 }
 
 pub mod serve {

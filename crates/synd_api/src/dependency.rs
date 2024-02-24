@@ -29,13 +29,19 @@ impl Dependency {
         serve_options: args::ServeOptions,
     ) -> anyhow::Result<Self> {
         let KvsdOptions {
-            host,
-            port,
-            username,
-            password,
+            kvsd_host,
+            kvsd_port,
+            kvsd_username,
+            kvsd_password,
         } = kvsd;
-        let kvsd =
-            KvsdClient::connect(host, port, username, password, Duration::from_secs(10)).await?;
+        let kvsd = KvsdClient::connect(
+            kvsd_host,
+            kvsd_port,
+            kvsd_username,
+            kvsd_password,
+            Duration::from_secs(10),
+        )
+        .await?;
 
         let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
         let cache_feed_service = CacheLayer::with(

@@ -2,7 +2,10 @@ use std::{net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
 use clap::{ArgAction, Parser};
 
-use crate::{config, serve};
+use crate::{
+    config::{self, env::env_key},
+    serve,
+};
 
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, disable_help_subcommand = true)]
@@ -22,22 +25,22 @@ pub struct Args {
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Kvsd options")]
 pub struct KvsdOptions {
-    #[arg(long = "kvsd-host", env = "SYND_KVSD_HOST")]
-    pub host: String,
-    #[arg(long = "kvsd-port", env = "SYND_KVSD_PORT")]
-    pub port: u16,
-    #[arg(long = "kvsd-username", alias = "kvsd-user", env = "SYND_KVSD_USER")]
-    pub username: String,
-    #[arg(long = "kvsd-password", alias = "kvsd-pass", env = "SYND_KVSD_PASS")]
-    pub password: String,
+    #[arg(long = "kvsd-host", env = env_key!("KVSD_HOST"))]
+    pub kvsd_host: String,
+    #[arg(long = "kvsd-port", env = env_key!("KVSD_PORT"))]
+    pub kvsd_port: u16,
+    #[arg(long = "kvsd-username", alias = "kvsd-user", env = env_key!("KVSD_USER"))]
+    pub kvsd_username: String,
+    #[arg(long = "kvsd-password", alias = "kvsd-pass", env = env_key!("KVSD_PASS"))]
+    pub kvsd_password: String,
 }
 
 #[derive(clap::Args, Debug)]
-#[command(next_help_heading = "Kvsd options")]
+#[command(next_help_heading = "Bind options")]
 pub struct BindOptions {
-    #[arg(long, value_parser = IpAddr::from_str, default_value = config::serve::DEFAULT_ADDR)]
+    #[arg(long, value_parser = IpAddr::from_str, default_value = config::serve::DEFAULT_ADDR, env = env_key!("BIND_ADDR"))]
     pub addr: IpAddr,
-    #[arg(long, default_value_t = config::serve::DEFAULT_PORT)]
+    #[arg(long, default_value_t = config::serve::DEFAULT_PORT, env = env_key!("BIND_PORT"))]
     pub port: u16,
 }
 
@@ -58,10 +61,10 @@ pub struct ServeOptions {
 #[command(next_help_heading = "Tls options")]
 pub struct TlsOptions {
     /// Tls certificate file path
-    #[arg(long = "tls-cert", env = "SYND_TLS_CERT", value_name = "CERT_PATH")]
+    #[arg(long = "tls-cert", env = env_key!("TLS_CERT"), value_name = "CERT_PATH")]
     pub certificate: PathBuf,
     /// Tls private key file path
-    #[arg(long = "tls-key", env = "SYND_TLS_KEY", value_name = "KEY_PATH")]
+    #[arg(long = "tls-key", env = env_key!("TLS_KEY"), value_name = "KEY_PATH")]
     pub private_key: PathBuf,
 }
 
@@ -69,11 +72,11 @@ pub struct TlsOptions {
 #[command(next_help_heading = "Observability options")]
 pub struct ObservabilityOptions {
     /// Show code location(file, line number) in logs
-    #[arg(long, env = "SYND_LOG_SHOW_LOCATION", default_value_t = false, action = ArgAction::Set )]
+    #[arg(long, env = env_key!("LOG_SHOW_LOCATION"), default_value_t = false, action = ArgAction::Set )]
     pub show_code_location: bool,
 
     /// Show event target(module in default) in logs
-    #[arg(long, env = "SYND_LOG_SHOW_TARGET", default_value_t = true, action = ArgAction::Set)]
+    #[arg(long, env = env_key!("LOG_SHOW_TARGET"), default_value_t = true, action = ArgAction::Set)]
     pub show_target: bool,
 
     /// Opentelemetry otlp exporter endpoint
