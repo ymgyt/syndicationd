@@ -1,11 +1,9 @@
 # Workflow to build your docs with oranda (and mdbook)
 # and deploy them to Github Pages
 name: Web
-
 # We're going to push to the gh-pages branch, so we need that permission
 permissions:
   contents: write
-
 # What situations do we want to build docs in?
 # All of these work independently and can be removed / commented out
 # if you don't want oranda/mdbook running in that situation
@@ -16,7 +14,6 @@ on:
   # so this won't have any side-effects. But it will tell you if a PR
   # completely broke oranda/mdbook. Sadly we don't provide previews (yet)!
   pull_request:
-
   # Whenever something gets pushed to main, update the docs!
   # This is great for getting docs changes live without cutting a full release.
   #
@@ -33,7 +30,6 @@ on:
   push:
     branches:
       - main
-
   # Whenever a workflow called "Release" completes, update the docs!
   #
   # If you're using cargo-dist, this is recommended, as it will ensure that
@@ -43,10 +39,9 @@ on:
   # tab for your repo to see this one running (the gh-pages deploy will also
   # only show up there).
   workflow_run:
-    workflows: [ "Release" ]
+    workflows: ["Release"]
     types:
       - completed
-
 # Alright, let's do it!
 jobs:
   web:
@@ -59,7 +54,6 @@ jobs:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
-
       # If you use any mdbook plugins, here's the place to install them!
 
       # Install and run oranda (and mdbook)
@@ -68,7 +62,8 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/oranda/releases/latest/download/oranda-installer.sh | sh
           oranda build
-      
+      # Manually added
+      - run: cp assets/CNAME public/CNAME
       # Deploy to our gh-pages branch (creating it if it doesn't exist)
       # the "public" dir that oranda made above will become the root dir
       # of this branch.
