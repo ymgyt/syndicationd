@@ -5,6 +5,7 @@
 </div>
 
 [![CI](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml)
+[![Release](https://github.com/ymgyt/syndicationd/actions/workflows/release.yml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/release.yml)
 
 ![Demo](./assets/demo.gif)
 
