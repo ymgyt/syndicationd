@@ -1,0 +1,11 @@
+{
+  "workspace": {
+    "name": "Syndicationd",
+    "members": [
+      {
+        "slug": "synd-term",
+        "path": "./crates/synd_term"
+      }
+    ]
+  }
+}

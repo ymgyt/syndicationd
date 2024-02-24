@@ -118,6 +118,7 @@
             # We need latest cargo-dist which is not available in nixpkgs-unstable now
             # cargo-dist
             typos
+            oranda
           ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             # For cargo-release build
             pkgs.libiconv

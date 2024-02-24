@@ -1,10 +1,14 @@
+<div class="oranda-hide">
+
 # Syndicationd
+
+</div>
 
 [![CI](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml)
 
-![Demo](./demo.gif)
+![Demo](./assets/demo.gif)
 
-Syndicationd is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
+Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
 
 ## Features

@@ -1,0 +1,10 @@
+{
+  "build": {
+    "static_dir": "assets",
+    "dist_dir": "website"
+  },
+  "styles": {
+    "theme": "axo_dark",
+    "favicon": "https://blog.ymgyt.io/favicon.ico"
+  }
+}

@@ -110,7 +110,8 @@ demo *flags:
 
 # Convert demo to gif
 demo2gif *flags:
-    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast demo.gif {{ flags }}
+    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast assets/demo.gif {{ flags }}
+    rm demo.cast
 
 changelog-auth:
     GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
@@ -161,3 +162,11 @@ retag tag:
     git push --delete origin {{ tag }}
     git tag {{ tag }}
     git push --tags
+
+# Build and serve oranda server then watch
+oranda-dev:
+    oranda dev --verbose
+
+# Generate oranda github actions workflow
+oranda-gen:
+    oranda generate ci --output-path .github/workflows/website.yaml --ci github
