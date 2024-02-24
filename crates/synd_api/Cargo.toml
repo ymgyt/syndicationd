@@ -35,6 +35,7 @@ graphql_client     = { workspace = true }
 headers            = { workspace = true }
 kvsd               = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
+parse_duration     = { workspace = true }
 pin-project        = "1.1.4"
 reqwest            = { workspace = true }
 serde              = { workspace = true }

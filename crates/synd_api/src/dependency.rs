@@ -8,10 +8,10 @@ use synd_feed::feed::{
 };
 
 use crate::{
-    args::{KvsdOptions, TlsOptions},
+    args::{self, KvsdOptions, TlsOptions},
     config,
     repository::kvsd::KvsdClient,
-    serve::auth::Authenticator,
+    serve::{auth::Authenticator, ServeOptions},
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
 
@@ -19,10 +19,15 @@ pub struct Dependency {
     pub authenticator: Authenticator,
     pub runtime: Runtime,
     pub tls_config: RustlsConfig,
+    pub serve_options: ServeOptions,
 }
 
 impl Dependency {
-    pub async fn new(kvsd: KvsdOptions, tls: TlsOptions) -> anyhow::Result<Self> {
+    pub async fn new(
+        kvsd: KvsdOptions,
+        tls: TlsOptions,
+        serve_options: args::ServeOptions,
+    ) -> anyhow::Result<Self> {
         let KvsdOptions {
             host,
             port,
@@ -59,6 +64,7 @@ impl Dependency {
             authenticator,
             runtime,
             tls_config,
+            serve_options: serve_options.into(),
         })
     }
 }

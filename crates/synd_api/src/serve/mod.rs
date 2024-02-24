@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{net::IpAddr, time::Duration};
 
 use axum::{
     error_handling::HandleErrorLayer,
@@ -15,7 +15,6 @@ use tower_http::{
 use tracing::info;
 
 use crate::{
-    config,
     dependency::Dependency,
     gql,
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
@@ -27,13 +26,25 @@ mod probe;
 
 pub mod layer;
 
-/// Bind tcp listener and serve.
-pub async fn listen_and_serve(dep: Dependency, shutdown: Shutdown) -> anyhow::Result<()> {
-    // should 127.0.0.1?
-    let addr = ("0.0.0.0", config::PORT);
-    let listener = TcpListener::bind(addr).await?;
+pub struct BindOptions {
+    pub port: u16,
+    pub addr: IpAddr,
+}
 
-    info!(ip = addr.0, port = addr.1, "Listening...");
+pub struct ServeOptions {
+    pub timeout: Duration,
+    pub body_limit_bytes: usize,
+    pub concurrency_limit: usize,
+}
+
+/// Bind tcp listener and serve.
+pub async fn listen_and_serve(
+    dep: Dependency,
+    bind: BindOptions,
+    shutdown: Shutdown,
+) -> anyhow::Result<()> {
+    info!(addr = %bind.addr, port = bind.port, "Listening...");
+    let listener = TcpListener::bind((bind.addr, bind.port)).await?;
 
     serve(listener, dep, shutdown).await
 }
@@ -48,6 +59,12 @@ pub async fn serve(
         authenticator,
         runtime,
         tls_config,
+        serve_options:
+            ServeOptions {
+                timeout: request_timeout,
+                body_limit_bytes: request_body_limit_bytes,
+                concurrency_limit,
+            },
     } = dep;
 
     let schema = gql::schema_builder().data(runtime).finish();
@@ -64,9 +81,9 @@ pub async fn serve(
                 )))
                 .layer(trace::layer())
                 .layer(HandleErrorLayer::new(handle_middleware_error))
-                .layer(TimeoutLayer::new(Duration::from_secs(20)))
-                .layer(ConcurrencyLimitLayer::new(100))
-                .layer(RequestBodyLimitLayer::new(2048))
+                .layer(TimeoutLayer::new(request_timeout))
+                .layer(ConcurrencyLimitLayer::new(concurrency_limit))
+                .layer(RequestBodyLimitLayer::new(request_body_limit_bytes))
                 .layer(CorsLayer::new()),
         )
         .route("/healthcheck", get(probe::healthcheck))

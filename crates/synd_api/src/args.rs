@@ -1,12 +1,18 @@
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
 use clap::{ArgAction, Parser};
+
+use crate::{config, serve};
 
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, disable_help_subcommand = true)]
 pub struct Args {
     #[command(flatten)]
     pub kvsd: KvsdOptions,
+    #[command(flatten)]
+    pub bind: BindOptions,
+    #[command(flatten)]
+    pub serve: ServeOptions,
     #[command(flatten)]
     pub tls: TlsOptions,
     #[command(flatten)]
@@ -24,6 +30,28 @@ pub struct KvsdOptions {
     pub username: String,
     #[arg(long = "kvsd-password", alias = "kvsd-pass", env = "SYND_KVSD_PASS")]
     pub password: String,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Kvsd options")]
+pub struct BindOptions {
+    #[arg(long, value_parser = IpAddr::from_str, default_value = config::serve::DEFAULT_ADDR)]
+    pub addr: IpAddr,
+    #[arg(long, default_value_t = config::serve::DEFAULT_PORT)]
+    pub port: u16,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Serve options")]
+pub struct ServeOptions {
+    /// Request timeout duration
+    #[arg(long, value_parser = parse_duration::parse, default_value = config::serve::DEFAULT_REQUEST_TIMEOUT)]
+    pub timeout: Duration,
+    /// Request body limit
+    #[arg(long, default_value_t = config::serve::DEFAULT_REQUEST_BODY_LIMIT_BYTES)]
+    pub body_limit_bytes: usize,
+    #[arg(long, default_value_t = config::serve::DEFAULT_REQUEST_CONCURRENCY_LIMIT)]
+    pub concurrency_limit: usize,
 }
 
 #[derive(clap::Args, Debug)]
@@ -60,4 +88,26 @@ pub struct ObservabilityOptions {
 #[must_use]
 pub fn parse() -> Args {
     Args::parse()
+}
+
+impl From<BindOptions> for serve::BindOptions {
+    fn from(BindOptions { addr, port }: BindOptions) -> Self {
+        Self { port, addr }
+    }
+}
+
+impl From<ServeOptions> for serve::ServeOptions {
+    fn from(
+        ServeOptions {
+            timeout,
+            body_limit_bytes,
+            concurrency_limit,
+        }: ServeOptions,
+    ) -> Self {
+        Self {
+            timeout,
+            body_limit_bytes,
+            concurrency_limit,
+        }
+    }
 }

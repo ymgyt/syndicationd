@@ -76,12 +76,21 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     guard
 }
 
-async fn run(Args { kvsd, tls, o11y }: Args, shutdown: Shutdown) -> anyhow::Result<()> {
-    let dep = Dependency::new(kvsd, tls).await?;
+async fn run(
+    Args {
+        kvsd,
+        bind,
+        serve,
+        tls,
+        o11y,
+    }: Args,
+    shutdown: Shutdown,
+) -> anyhow::Result<()> {
+    let dep = Dependency::new(kvsd, tls, serve).await?;
 
     info!(version = config::VERSION, otlp_endpoint=?o11y.otlp_endpoint, "Runinng...");
 
-    listen_and_serve(dep, shutdown).await
+    listen_and_serve(dep, bind.into(), shutdown).await
 }
 
 #[tokio::main]
