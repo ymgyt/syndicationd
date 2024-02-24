@@ -46,6 +46,12 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/rele
 cargo install synd-term --locked
 ```
 
+### npm
+
+```sh
+npm install @syndicationd/synd-term
+```
+
 ### powershell
 
 ```sh
