@@ -15,9 +15,11 @@ Syndicationd is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs
 
 ## Install
 
-### Nix
+### nix
 
-`nix run github:ymgyt/syndicationd`
+```sh
+nix profile install github:ymgyt/syndicationd
+```
 
 ### brew
 
@@ -28,10 +30,23 @@ brew install synd
 brew install ymgyt/homebrew-syndicationd/synd
 ```
 
-### Cargo
+### shell
 
-`cargo install synd-term --locked`
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-installer.sh | sh
+```
 
+### cargo
+
+```sh
+cargo install synd-term --locked
+```
+
+### powershell
+
+```sh
+powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-installer.ps1 | iex"
+```
 
 ## Usage
 
