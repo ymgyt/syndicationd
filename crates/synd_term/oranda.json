@@ -13,5 +13,18 @@
       "image_alt": "synd",
       "twitter_account": "@YAmaguchixt"
     }
+  },
+  "components": {
+    "changelog": {
+      "read_changelog_file": false
+    },
+    "artifacts": {
+      "package_managers": {
+        "additional": {
+          "nix": "nix profile install github:ymgyt/syndicationd",
+          "cargo": "cargo install synd-term --locked"
+        }
+      }
+    }
   }
 }
