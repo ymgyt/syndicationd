@@ -110,6 +110,23 @@ The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,
 
 Authentication credentials are cached. to remove them, execute `synd clear`.
 
+### Check application status
+
+`synd check [--format (human|json)]` return current application status.
+
+```console
+synd check --format json | from json
+╭───────┬─────────────────────────────────────────╮
+│       │ ╭─────────────┬────────────────────╮    │
+│ api   │ │ description │ health of synd-api │    │
+│       │ │ status      │ Pass               │    │
+│       │ │ version     │ 0.1.3              │    │
+│       │ ╰─────────────┴────────────────────╯    │
+│ cache │ /home/ferris/.cache/synd                │
+│ log   │ /home/ferris/.local/share/synd/synd.log │
+╰───────┴─────────────────────────────────────────╯
+```
+
 ## License
 
 This project is available under the terms of either the [Apache 2.0 license](./LICENSE-APACHE) or the [MIT license](./LICENSE-MIT).

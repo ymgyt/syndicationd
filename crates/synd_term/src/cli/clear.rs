@@ -11,15 +11,13 @@ pub struct ClearCommand {}
 
 impl ClearCommand {
     #[allow(clippy::unused_self)]
-    pub fn run(self) {
-        let exit_code = if let Err(err) = Self::clear() {
+    pub fn run(self) -> i32 {
+        if let Err(err) = Self::clear() {
             tracing::error!("{err}");
             1
         } else {
             0
-        };
-
-        std::process::exit(exit_code);
+        }
     }
 
     fn clear() -> anyhow::Result<()> {

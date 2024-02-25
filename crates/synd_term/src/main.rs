@@ -70,11 +70,14 @@ async fn main() {
     let log = if command.is_some() { None } else { Some(log) };
     let _guard = init_tracing(log).unwrap();
 
-    #[allow(clippy::single_match)]
-    match command {
-        Some(cli::Command::Clear(clear)) => clear.run(),
-        None => {}
-    }
+    if let Some(command) = command {
+        let exit_code = match command {
+            cli::Command::Clear(clear) => clear.run(),
+            cli::Command::Check(check) => check.run().await,
+        };
+
+        std::process::exit(exit_code);
+    };
 
     let mut app = {
         let terminal = Terminal::new().expect("Failed to construct terminal");

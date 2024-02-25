@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{de::DeserializeOwned, Serialize};
-use synd_o11y::opentelemetry::extension::*;
+use synd_o11y::{health_check::Health, opentelemetry::extension::*};
 use thiserror::Error;
 use tracing::{error, Span};
 use url::Url;
@@ -27,6 +27,7 @@ pub enum SubscribeFeedError {
     Internal(anyhow::Error),
 }
 
+/// synd-api client
 #[derive(Clone)]
 pub struct Client {
     client: reqwest::Client,
@@ -35,6 +36,9 @@ pub struct Client {
 }
 
 impl Client {
+    const GRAPHQL: &'static str = "/graphql";
+    const HEALTH_CHECK: &'static str = "/health";
+
     pub fn new(endpoint: Url, timeout: Duration) -> anyhow::Result<Self> {
         let client = reqwest::ClientBuilder::new()
             .user_agent(config::client::USER_AGENT)
@@ -146,7 +150,7 @@ impl Client {
     {
         let mut request = self
             .client
-            .post(self.endpoint.clone())
+            .post(self.endpoint.join(Self::GRAPHQL).unwrap())
             .header(
                 header::AUTHORIZATION,
                 self.credential
@@ -183,5 +187,17 @@ impl Client {
             (Some(data), _) => Ok(data),
             _ => Err(anyhow::anyhow!("unexpected response",)),
         }
+    }
+
+    // call health check api
+    pub async fn health(&self) -> anyhow::Result<Health> {
+        self.client
+            .get(self.endpoint.join(Self::HEALTH_CHECK).unwrap())
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .map_err(anyhow::Error::from)
     }
 }

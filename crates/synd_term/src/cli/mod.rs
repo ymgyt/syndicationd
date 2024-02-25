@@ -6,6 +6,7 @@ use url::Url;
 
 use crate::config;
 
+mod check;
 mod clear;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
@@ -84,6 +85,7 @@ pub struct Args {
 #[derive(Subcommand, Debug)]
 pub enum Command {
     Clear(clear::ClearCommand),
+    Check(check::CheckCommand),
 }
 
 pub fn parse() -> Args {

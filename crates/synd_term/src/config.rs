@@ -6,7 +6,7 @@ use std::{
 use directories::ProjectDirs;
 
 pub mod api {
-    pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100/graphql";
+    pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100";
 }
 
 pub mod github {
@@ -42,13 +42,13 @@ pub fn cache_dir() -> &'static Path {
 }
 
 pub fn log_path() -> PathBuf {
-    project_dirs().data_dir().join("syndterm.log")
+    project_dirs().data_dir().join("synd.log")
 }
 
 fn project_dirs() -> &'static ProjectDirs {
     static PROJECT_DIRS: OnceLock<ProjectDirs> = OnceLock::new();
 
     PROJECT_DIRS.get_or_init(|| {
-        ProjectDirs::from("io", "ymgyt", "synd").expect("Failed to get project dirs")
+        ProjectDirs::from("ymgyt.io", "syndicationd", "synd").expect("Failed to get project dirs")
     })
 }
