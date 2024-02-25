@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.4] - 2024-02-23
+## [unreleased] __release_date__
 
 ### Features
 
@@ -11,15 +11,35 @@ All notable changes to this project will be documented in this file.
 - Use entry updated if published is none by [@ymgyt](https://github.com/ymgyt) ([2b16b51c](https://github.com/ymgyt/syndicationd/commit/2b16b51c3cadb7b0dd74a848ae43ff078372b678))
 - Add feed detail widget by [@ymgyt](https://github.com/ymgyt) ([836258d4](https://github.com/ymgyt/syndicationd/commit/836258d490bd63de7bc481bc6ad9f5866f5e861e))
 - Add reload by [@ymgyt](https://github.com/ymgyt) ([de11397c](https://github.com/ymgyt/syndicationd/commit/de11397cde2d003b81eb029752673f214724c4c2))
+- Add client timeout flag by [@ymgyt](https://github.com/ymgyt) ([86f5bf43](https://github.com/ymgyt/syndicationd/commit/86f5bf437193791905d82b441f9bc39cecc401ff))
+- Add check command by [@ymgyt](https://github.com/ymgyt) ([018c0c22](https://github.com/ymgyt/syndicationd/commit/018c0c222704746315e3a0faf852a0868f719a00))
 
 ### Bug Fixes
 
 - Use name instead of bin_name by [@ymgyt](https://github.com/ymgyt) ([1a9b81dd](https://github.com/ymgyt/syndicationd/commit/1a9b81dd6a9734ea99d63bac052b73b55e9470fd))
 
+### Documentation
+
+- Update install description by [@ymgyt](https://github.com/ymgyt) ([13ecd094](https://github.com/ymgyt/syndicationd/commit/13ecd094ae813517d7554c54572dcc2a83654311))
+- Configure oranda by [@ymgyt](https://github.com/ymgyt) ([91e158df](https://github.com/ymgyt/syndicationd/commit/91e158df904e91a27d8f68217500ad76ea91ffe9))
+- Configure oranda social by [@ymgyt](https://github.com/ymgyt) ([1624d62a](https://github.com/ymgyt/syndicationd/commit/1624d62a51fdeea38594869c707d036c792f2e61))
+- Configure oranda components by [@ymgyt](https://github.com/ymgyt) ([3dcbc57a](https://github.com/ymgyt/syndicationd/commit/3dcbc57a435321d7f39e7e39bf90b44b1b712e7b))
+
 ### Miscellaneous Tasks
 
 - Set clap bin_name by [@ymgyt](https://github.com/ymgyt) ([dca2b898](https://github.com/ymgyt/syndicationd/commit/dca2b898b2cd596b0655797e037c5a5c82cf9b0a))
 - Configure feed detail height by [@ymgyt](https://github.com/ymgyt) ([3de1c98f](https://github.com/ymgyt/syndicationd/commit/3de1c98fdce08a622323c269373d2ece0b00ec74))
+- Typo by [@ymgyt](https://github.com/ymgyt) ([13ccdb5d](https://github.com/ymgyt/syndicationd/commit/13ccdb5d7c80627913d9858887b7b6d84dc07dff))
+- Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
+- Set brew fomula name by [@ymgyt](https://github.com/ymgyt) ([8b33da9a](https://github.com/ymgyt/syndicationd/commit/8b33da9afc98ab6cdc12a0ca48829b27f39c63f6))
+- Change default endpoint by [@ymgyt](https://github.com/ymgyt) ([c352b871](https://github.com/ymgyt/syndicationd/commit/c352b8713f4acbaf022c857e036d33fc688c9991))
+- Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
+- Use workspace dep by [@ymgyt](https://github.com/ymgyt) ([92163422](https://github.com/ymgyt/syndicationd/commit/921634227a53e2a3594d1cedb5116e53dc43baa4))
+- Enable cargo-dist explicitly by [@ymgyt](https://github.com/ymgyt) ([3a04e732](https://github.com/ymgyt/syndicationd/commit/3a04e7327a752dea0497f900f0a96364977de96e))
+
+### Testing
+
+- Use tempfile instead of deprecated tempdir by [@ymgyt](https://github.com/ymgyt) ([749de1db](https://github.com/ymgyt/syndicationd/commit/749de1dba0235e30e1e79ca10849d049005c0a15))
 
 ## [v0.1.3] - 2024-02-19
 
