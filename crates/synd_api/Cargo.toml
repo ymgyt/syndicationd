@@ -57,5 +57,4 @@ introspection = []
 workspace = true
 
 [package.metadata.dist]
-# Ignore this package with cargo-dist
-dist = false
+dist = true

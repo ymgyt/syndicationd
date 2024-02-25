@@ -5,6 +5,10 @@
       {
         "slug": "synd-term",
         "path": "./crates/synd_term"
+      },
+      {
+        "slug": "synd-api",
+        "path": "./crates/synd_api"
       }
     ]
   }

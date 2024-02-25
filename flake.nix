@@ -151,7 +151,7 @@
 
         packages.default = self.packages."${system}".synd;
         packages.synd = syndTermOnly;
-        packages.synd_api = syndApiOnly;
+        packages.synd-api = syndApiOnly;
 
         apps.default = flake-utils.lib.mkApp {
           drv = syndTermOnly;
