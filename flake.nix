@@ -15,9 +15,14 @@
     };
 
     flake-utils.url = "github:numtide/flake-utils";
+
+    advisory-db = {
+      url = "github:rustsec/advisory-db";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, fenix, crane, flake-utils, ... }:
+  outputs = { self, nixpkgs, fenix, crane, flake-utils, advisory-db, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ fenix.overlays.default ];
@@ -38,6 +43,12 @@
             (craneLib.filterCargoSources path type);
         };
 
+        darwinDeps = [
+          pkgs.libiconv
+          pkgs.darwin.apple_sdk.frameworks.Security
+          pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+        ];
+
         commonArgs = {
           inherit src;
           strictDeps = true;
@@ -46,11 +57,8 @@
           pname = "syndicationd-workspace";
           version = "0.1";
 
-          buildInputs = [ ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.libiconv
-            pkgs.darwin.apple_sdk.frameworks.Security
-            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
+          buildInputs = [ ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -81,6 +89,16 @@
           cargoExtraArgs = "--package ${syndApiCrate.pname}";
         });
 
+        # TODO: should parse .cargo/audit.toml
+        ignoreAdvisories = pkgs.lib.concatStrings
+          (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}") [
+            "RUSTSEC-2024-0003"
+            "RUSTSEC-2021-0041"
+            "RUSTSEC-2023-0052"
+            "RUSTSEC-2021-0139"
+            "RUSTSEC-2021-0145"
+          ]));
+
         checks = {
           inherit syndTerm syndApi;
 
@@ -97,6 +115,11 @@
             RUST_LOG = "synd,integration=debug";
           });
 
+          audit = craneLib.cargoAudit {
+            inherit src advisory-db;
+            cargoAuditExtraArgs = "--ignore yanked ${ignoreAdvisories}";
+          };
+
           fmt = craneLib.cargoFmt commonArgs;
         };
 
@@ -105,9 +128,9 @@
           nushell # just set nu as shell
         ];
 
+        # Inherits from checks cargo-nextest, cargo-audit
         dev_packages = with pkgs;
           [
-            cargo-nextest
             graphql-client
             nixfmt
             # Failed to run proc-macro server from path /nix/store/z1vlkv6nccjd523iwp5p6pdkr2abm9jq-rust-1.76.0/libexec/rust-analyzer-proc-macro-srv,
@@ -119,12 +142,9 @@
             # cargo-dist
             typos
             oranda
-          ] ++ ci_packages ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            # For cargo-release build
-            pkgs.libiconv
-            pkgs.darwin.apple_sdk.frameworks.Security
-            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
+          ] ++ ci_packages
+          ## For cargo-release build
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
 
       in {
         inherit checks;
@@ -139,6 +159,8 @@
         };
 
         devShells.default = craneLib.devShell {
+          # Inherit inputs from checks
+          checks = self.checks.${system};
           packages = dev_packages;
           shellHook = ''
             exec nu
