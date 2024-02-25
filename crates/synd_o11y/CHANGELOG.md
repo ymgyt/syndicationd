@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.2] - 2024-02-19
+## [unreleased] __release_date__
+
+### Features
+
+- Add health check response type by [@ymgyt](https://github.com/ymgyt) ([f2420630](https://github.com/ymgyt/syndicationd/commit/f242063027b2ba5cac06a871a4c24d2413366cf4))
+- Impl fmt::Display for health check status by [@ymgyt](https://github.com/ymgyt) ([b52bd8d5](https://github.com/ymgyt/syndicationd/commit/b52bd8d56d39bc4263f0c4851fb078803bd65881))
+
+### Miscellaneous Tasks
+
+- Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
+- Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
+
+## [synd-o11y-v0.1.2] - 2024-02-19
 
 ### Features
 
@@ -14,7 +26,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix typo by [@ymgyt](https://github.com/ymgyt) ([c311417b](https://github.com/ymgyt/syndicationd/commit/c311417bb69d22c7826d4ec931ec8dfe59042ca1))
 
-## [v0.1.1] - 2024-02-12
+## [synd-o11y-v0.1.1] - 2024-02-12
 
 ### Features
 
