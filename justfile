@@ -25,6 +25,10 @@ check: typo
 typo:
     typos
 
+# Run audit
+audit:
+    cargo audit
+
 # Format files
 fmt: fmt-toml
 
