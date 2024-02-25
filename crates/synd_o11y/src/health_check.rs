@@ -1,6 +1,7 @@
 //! RFC Draft Health Check Response Format for HTTP APIs implementation
 //! [RFC Draft](https://datatracker.ietf.org/doc/html/draft-inadarei-api-health-check)
 
+use core::fmt;
 use std::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
@@ -15,6 +16,16 @@ pub enum Status {
     Fail,
     /// healthy, with some concerns
     Warn,
+}
+
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Status::Pass => f.write_str("pass"),
+            Status::Fail => f.write_str("fail"),
+            Status::Warn => f.write_str("warn"),
+        }
+    }
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
