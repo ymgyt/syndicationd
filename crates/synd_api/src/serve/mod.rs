@@ -86,7 +86,7 @@ pub async fn serve(
                 .layer(RequestBodyLimitLayer::new(request_body_limit_bytes))
                 .layer(CorsLayer::new()),
         )
-        .route("/healthcheck", get(probe::healthcheck))
+        .route("/health", get(probe::healthcheck))
         .layer(RequestMetricsLayer::new())
         .fallback(not_found);
 
