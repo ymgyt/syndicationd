@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.4] - 2024-02-23
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
+- Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
+
+## [synd-feed-v0.1.4] - 2024-02-23
 
 ### Features
 
@@ -12,19 +19,19 @@ All notable changes to this project will be documented in this file.
 - Add generators to feed by [@ymgyt](https://github.com/ymgyt) ([3f0f8b43](https://github.com/ymgyt/syndicationd/commit/3f0f8b4303e2698a9ae364c2c114f0f6d83ffc33))
 - Return entry content by [@ymgyt](https://github.com/ymgyt) ([9f462854](https://github.com/ymgyt/syndicationd/commit/9f462854a1e0d46af515a91237fb3660c72c1fad))
 
-## [v0.1.3] - 2024-02-20
+## [synd-feed-v0.1.3] - 2024-02-20
 
 ### Features
 
 - Instrument fetch_feed span by [@ymgyt](https://github.com/ymgyt) ([b5cdacb7](https://github.com/ymgyt/syndicationd/commit/b5cdacb7d5a21012b1273a34af419abf6143251d))
 
-## [v0.1.2] - 2024-02-19
+## [synd-feed-v0.1.2] - 2024-02-19
 
 ### Documentation
 
 - Fix typo by [@ymgyt](https://github.com/ymgyt) ([d611d33a](https://github.com/ymgyt/syndicationd/commit/d611d33af376e593d24533378845c565dadd4e5e))
 
-## [v0.1.1] - 2024-02-12
+## [synd-feed-v0.1.1] - 2024-02-12
 
 ### Features
 
