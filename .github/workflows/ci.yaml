@@ -17,10 +17,3 @@ jobs:
           name: syndicationd
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - run: nix develop .#ci --accept-flake-config --command just check
-  spell_check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: crate-ci/typos@v1.18.2
-        with:
-          config: "./typos.toml"

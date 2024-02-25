@@ -18,7 +18,7 @@ default:
     just --list
 
 # Run check
-check:
+check: typo
     nix flake check --all-systems --accept-flake-config
 
 # Run spell checker

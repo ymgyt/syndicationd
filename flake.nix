@@ -126,6 +126,7 @@
         ci_packages = with pkgs; [
           just
           nushell # just set nu as shell
+          typos
         ];
 
         # Inherits from checks cargo-nextest, cargo-audit
@@ -140,7 +141,6 @@
             cargo-release
             # We need latest cargo-dist which is not available in nixpkgs-unstable now
             # cargo-dist
-            typos
             oranda
           ] ++ ci_packages
           ## For cargo-release build
