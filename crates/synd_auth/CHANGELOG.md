@@ -2,14 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.3] - 2024-02-19
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
+- Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
+
+## [synd-auth-v0.1.3] - 2024-02-19
 
 ### Miscellaneous Tasks
 
 - Update README by [@ymgyt](https://github.com/ymgyt) ([2a546b13](https://github.com/ymgyt/syndicationd/commit/2a546b136dfa4284168025e1a909ac0c81a630bd))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([6db0accc](https://github.com/ymgyt/syndicationd/commit/6db0accc0333a97ed07ba1b653f0fed71c4da7f5))
 
-## [v0.1.2] - 2024-02-12
+## [synd-auth-v0.1.2] - 2024-02-12
 
 ### Features
 
