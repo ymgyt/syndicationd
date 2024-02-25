@@ -3059,6 +3059,7 @@ dependencies = [
  "opentelemetry_sdk",
  "rand",
  "reqwest",
+ "serde",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",

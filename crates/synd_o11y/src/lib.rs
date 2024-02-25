@@ -1,5 +1,6 @@
 use ::opentelemetry::KeyValue;
 
+pub mod health_check;
 pub mod opentelemetry;
 pub mod tracing_subscriber;
 
