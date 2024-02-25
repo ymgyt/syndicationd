@@ -59,7 +59,7 @@ synd-test = { path = "../synd_test" }
 axum-server  = { workspace = true }
 kvsd         = { workspace = true }
 serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }
-tempdir      = "0.3.7"
+tempfile     = "3"
 tokio-stream = "0.1.14"
 
 [lints]

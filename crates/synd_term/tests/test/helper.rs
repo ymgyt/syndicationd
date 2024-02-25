@@ -113,6 +113,6 @@ pub async fn run_kvsd() -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> 
     Ok(client)
 }
 
-pub fn temp_dir() -> tempdir::TempDir {
-    tempdir::TempDir::new("synd_term").unwrap()
+pub fn temp_dir() -> tempfile::TempDir {
+    tempfile::TempDir::new().unwrap()
 }
