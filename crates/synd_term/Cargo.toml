@@ -66,4 +66,5 @@ tokio-stream = "0.1.14"
 workspace = true
 
 [package.metadata.dist]
+dist    = true
 formula = "synd"
