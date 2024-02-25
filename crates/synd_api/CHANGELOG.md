@@ -2,7 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.3] - 2024-02-23
+## [unreleased] __release_date__
+
+### Features
+
+- Add serve options by [@ymgyt](https://github.com/ymgyt) ([c06cd23b](https://github.com/ymgyt/syndicationd/commit/c06cd23b23ff2e62b57156338330967f59f7b822))
+- More verbose at startup by [@ymgyt](https://github.com/ymgyt) ([1e9f6550](https://github.com/ymgyt/syndicationd/commit/1e9f6550f5cea8762633021f181d4dc12c439a63))
+- Use health check response type for health check by [@ymgyt](https://github.com/ymgyt) ([ceff27f5](https://github.com/ymgyt/syndicationd/commit/ceff27f5d5d0a1aa0a3a3751335fe57e4f0bfcdb))
+
+### Miscellaneous Tasks
+
+- Configure cargo-dist by [@ymgyt](https://github.com/ymgyt) ([1da44d02](https://github.com/ymgyt/syndicationd/commit/1da44d0261b5266566d8d8c97147a6bb7053305a))
+- Temporary disable Result::inspect to compile with 1.75 in macos runner by [@ymgyt](https://github.com/ymgyt) ([88d1634a](https://github.com/ymgyt/syndicationd/commit/88d1634a6d9d0c6c2f92cb358008e76e98c3d6b3))
+- Update cargo-dist to 0.11 by [@ymgyt](https://github.com/ymgyt) ([6e75b48d](https://github.com/ymgyt/syndicationd/commit/6e75b48d1b56e08ea8212f297864aa8f7c70d4e6))
+- Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
+
+### Refactor
+
+- Refactor flags by [@ymgyt](https://github.com/ymgyt) ([7e2a91d9](https://github.com/ymgyt/syndicationd/commit/7e2a91d93a8ed1afd7955583a2dc9ff9c6289a4f))
+
+## [synd-api-v0.1.3] - 2024-02-23
 
 ### Features
 
@@ -11,7 +30,11 @@ All notable changes to this project will be documented in this file.
 - Add generator resolver in feed by [@ymgyt](https://github.com/ymgyt) ([f8de4aa4](https://github.com/ymgyt/syndicationd/commit/f8de4aa4a9a4edb8d1f7e8dd31c53b2e66360b18))
 - Resolve entry content if there is no summary by [@ymgyt](https://github.com/ymgyt) ([0459e71c](https://github.com/ymgyt/syndicationd/commit/0459e71c38aba96b4d878ce97cd35ed78587032b))
 
-## [v0.1.2] - 2024-02-20
+### Miscellaneous Tasks
+
+- Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
+
+## [synd-api-v0.1.2] - 2024-02-20
 
 ### Features
 
@@ -23,7 +46,7 @@ All notable changes to this project will be documented in this file.
 
 - Strict fetch feed in flight limit by [@ymgyt](https://github.com/ymgyt) ([5a2b646e](https://github.com/ymgyt/syndicationd/commit/5a2b646e2d4fa2b24a2f115a27288c922fa87af3))
 
-## [v0.1.1] - 2024-02-19
+## [synd-api-v0.1.1] - 2024-02-19
 
 ### Features
 
