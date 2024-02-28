@@ -6,9 +6,4 @@ ignore = [
   # Denial of service through parsing payloads with too big exponent
   # No fixed upgrade available
   "RUSTSEC-2021-0041",
-  # TODO: update kvsd tokio-rustls
-  "RUSTSEC-2023-0052",
-  # TODO: update kvsd clap
-  "RUSTSEC-2021-0139",
-  "RUSTSEC-2021-0145",
 ]
