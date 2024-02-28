@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-term-v0.1.5] 2024-02-25
+## [unreleased] __release_date__
+
+### Features
+
+- Add move to first/last commnad by [@ymgyt](https://github.com/ymgyt) ([4bc7f482](https://github.com/ymgyt/syndicationd/commit/4bc7f482d10e52339057784052194d8ddeff30b5))
+
+## [v0.1.5] - 2024-02-25
 
 ### Features
 
