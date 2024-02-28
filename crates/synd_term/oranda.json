@@ -16,7 +16,7 @@
   },
   "components": {
     "changelog": {
-      "read_changelog_file": true
+      "read_changelog_file": false
     },
     "artifacts": {
       "package_managers": {
