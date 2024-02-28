@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Add move to first/last commnad by [@ymgyt](https://github.com/ymgyt) ([4bc7f482](https://github.com/ymgyt/syndicationd/commit/4bc7f482d10e52339057784052194d8ddeff30b5))
 
+### Miscellaneous Tasks
+
+- Read changelog by [@ymgyt](https://github.com/ymgyt) ([9095f676](https://github.com/ymgyt/syndicationd/commit/9095f6764cf8ee1bf2acff85f4df4250bb0e4167))
+
 ## [v0.1.5] - 2024-02-25
 
 ### Features
