@@ -76,6 +76,7 @@ pub struct Application {
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
 
+    prev_key_seq: Vec<KeyEvent>,
     screen: Screen,
     should_render: bool,
     should_quit: bool,
@@ -96,6 +97,7 @@ impl Application {
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
+            prev_key_seq: Vec::with_capacity(2),
             screen: Screen::Login,
             config,
             should_quit: false,
@@ -198,7 +200,6 @@ impl Application {
     fn apply(&mut self, command: Command) {
         let mut next = Some(command);
 
-        // how to handle command => command pattern ?
         // should detect infinite loop ?
         while let Some(command) = next.take() {
             match command {
@@ -235,6 +236,14 @@ impl Application {
                 }
                 Command::MoveSubscribedFeed(direction) => {
                     self.components.subscription.move_selection(&direction);
+                    self.should_render = true;
+                }
+                Command::MoveSubscribedFeedFirst => {
+                    self.components.subscription.move_first();
+                    self.should_render = true;
+                }
+                Command::MoveSubscribedFeedLast => {
+                    self.components.subscription.move_last();
                     self.should_render = true;
                 }
                 Command::PromptFeedSubscription => {
@@ -318,6 +327,14 @@ impl Application {
                     self.components.entries.move_selection(&direction);
                     self.should_render = true;
                 }
+                Command::MoveEntryFirst => {
+                    self.components.entries.move_first();
+                    self.should_render = true;
+                }
+                Command::MoveEntryLast => {
+                    self.components.entries.move_last();
+                    self.should_render = true;
+                }
                 Command::OpenEntry => {
                     self.open_entry();
                 }
@@ -347,7 +364,7 @@ impl Application {
             .expect("Failed to render");
     }
 
-    #[allow(clippy::single_match)]
+    #[allow(clippy::single_match, clippy::too_many_lines)]
     fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) -> Option<Command> {
         match event.unwrap() {
             CrosstermEvent::Resize(columns, rows) => {
@@ -360,6 +377,7 @@ impl Application {
             CrosstermEvent::Key(key) => {
                 self.reset_idle_timer();
 
+                // TODO: impl helix like KeyTrie
                 tracing::debug!("Handle key event: {key:?}");
                 match self.screen {
                     Screen::Login => match key.code {
@@ -381,29 +399,101 @@ impl Application {
                         _ => match self.components.tabs.current() {
                             Tab::Entries => match key.code {
                                 KeyCode::Char('j') => {
-                                    return Some(Command::MoveEntry(Direction::Down))
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::MoveEntry(Direction::Down));
                                 }
                                 KeyCode::Char('k') => {
-                                    return Some(Command::MoveEntry(Direction::Up))
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::MoveEntry(Direction::Up));
                                 }
-                                KeyCode::Char('r') => return Some(Command::ReloadEntries),
-                                KeyCode::Enter => return Some(Command::OpenEntry),
-                                _ => {}
+                                KeyCode::Char('r') => {
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::ReloadEntries);
+                                }
+                                KeyCode::Enter => {
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::OpenEntry);
+                                }
+                                KeyCode::Char('g') => match self.prev_key_seq.as_slice() {
+                                    &[KeyEvent {
+                                        code: KeyCode::Char('g'),
+                                        ..
+                                    }] => {
+                                        self.prev_key_seq.clear();
+                                        return Some(Command::MoveEntryFirst);
+                                    }
+                                    _ => {
+                                        self.prev_key_seq.push(key);
+                                    }
+                                },
+                                KeyCode::Char('e') => match self.prev_key_seq.as_slice() {
+                                    &[KeyEvent {
+                                        code: KeyCode::Char('g'),
+                                        ..
+                                    }] => {
+                                        self.prev_key_seq.clear();
+                                        return Some(Command::MoveEntryLast);
+                                    }
+                                    _ => {
+                                        self.prev_key_seq.clear();
+                                    }
+                                },
+                                _ => {
+                                    self.prev_key_seq.clear();
+                                }
                             },
                             Tab::Feeds => match key.code {
-                                KeyCode::Char('a') => return Some(Command::PromptFeedSubscription),
+                                KeyCode::Char('a') => {
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::PromptFeedSubscription);
+                                }
                                 KeyCode::Char('d') => {
-                                    return Some(Command::PromptFeedUnsubscription)
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::PromptFeedUnsubscription);
                                 }
                                 KeyCode::Char('j') => {
+                                    self.prev_key_seq.clear();
                                     return Some(Command::MoveSubscribedFeed(Direction::Down));
                                 }
                                 KeyCode::Char('k') => {
+                                    self.prev_key_seq.clear();
                                     return Some(Command::MoveSubscribedFeed(Direction::Up));
                                 }
-                                KeyCode::Char('r') => return Some(Command::ReloadSubscription),
-                                KeyCode::Enter => return Some(Command::OpenFeed),
-                                _ => {}
+                                KeyCode::Char('r') => {
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::ReloadSubscription);
+                                }
+                                KeyCode::Enter => {
+                                    self.prev_key_seq.clear();
+                                    return Some(Command::OpenFeed);
+                                }
+                                KeyCode::Char('g') => match self.prev_key_seq.as_slice() {
+                                    &[KeyEvent {
+                                        code: KeyCode::Char('g'),
+                                        ..
+                                    }] => {
+                                        self.prev_key_seq.clear();
+                                        return Some(Command::MoveSubscribedFeedFirst);
+                                    }
+                                    _ => {
+                                        self.prev_key_seq.push(key);
+                                    }
+                                },
+                                KeyCode::Char('e') => match self.prev_key_seq.as_slice() {
+                                    &[KeyEvent {
+                                        code: KeyCode::Char('g'),
+                                        ..
+                                    }] => {
+                                        self.prev_key_seq.clear();
+                                        return Some(Command::MoveSubscribedFeedLast);
+                                    }
+                                    _ => {
+                                        self.prev_key_seq.clear();
+                                    }
+                                },
+                                _ => {
+                                    self.prev_key_seq.clear();
+                                }
                             },
                         },
                     },

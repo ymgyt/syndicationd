@@ -78,6 +78,16 @@ impl Subscription {
             IndexOutOfRange::Wrapping,
         );
     }
+
+    pub fn move_first(&mut self) {
+        self.selected_feed_meta_index = 0;
+    }
+
+    pub fn move_last(&mut self) {
+        if !self.feeds.is_empty() {
+            self.selected_feed_meta_index = self.feeds.len() - 1;
+        }
+    }
 }
 
 impl Subscription {

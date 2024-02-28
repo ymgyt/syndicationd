@@ -26,6 +26,8 @@ pub enum Command {
 
     // Subscription
     MoveSubscribedFeed(Direction),
+    MoveSubscribedFeedFirst,
+    MoveSubscribedFeedLast,
     PromptFeedSubscription,
     PromptFeedUnsubscription,
     SubscribeFeed {
@@ -66,6 +68,8 @@ pub enum Command {
     },
     ReloadEntries,
     MoveEntry(Direction),
+    MoveEntryFirst,
+    MoveEntryLast,
     OpenEntry,
 
     HandleError {

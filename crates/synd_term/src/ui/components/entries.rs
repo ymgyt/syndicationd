@@ -46,6 +46,16 @@ impl Entries {
         );
     }
 
+    pub fn move_first(&mut self) {
+        self.selected_entry_index = 0;
+    }
+
+    pub fn move_last(&mut self) {
+        if !self.entries.is_empty() {
+            self.selected_entry_index = self.entries.len() - 1;
+        }
+    }
+
     pub fn selected_entry_website_url(&self) -> Option<&str> {
         self.selected_entry()
             .and_then(|entry| entry.website_url.as_deref())
