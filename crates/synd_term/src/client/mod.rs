@@ -179,10 +179,13 @@ impl Client {
 
         match (response.data, response.errors) {
             (_, Some(errs)) if !errs.is_empty() => {
-                for err in errs {
+                for err in &errs {
                     error!("{err:?}");
                 }
-                Err(anyhow::anyhow!("failed to request synd api"))
+                Err(anyhow::anyhow!(
+                    "failed to request synd api: {}",
+                    errs.first().unwrap()
+                ))
             }
             (Some(data), _) => Ok(data),
             _ => Err(anyhow::anyhow!("unexpected response",)),
