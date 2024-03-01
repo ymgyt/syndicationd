@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased] __release_date__
+
+### Features
+
+- Set graphql depth and complexity limit by [@ymgyt](https://github.com/ymgyt) ([54b44e88](https://github.com/ymgyt/syndicationd/commit/54b44e889ec4c50d78ed1b1142ccdf964b69b056))
+
 ## [v0.1.4] - 2024-02-25
 
 ### Features
