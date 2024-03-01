@@ -40,14 +40,14 @@ pub mod handler {
 
 #[must_use]
 pub fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
-    #[cfg(feature = "introspection")]
     let schema = Schema::build(Query, Mutation, EmptySubscription);
+
     #[cfg(not(feature = "introspection"))]
-    let schema = Schema::build(Query, Mutation, EmptySubscription).disable_introspection();
+    let schema = schema.disable_introspection();
 
     // disabled
     // schema.extension(Tracing)
-    schema
+    schema.limit_depth(10).limit_complexity(50)
 }
 
 impl<'a> usecase::Context for &async_graphql::Context<'a> {
