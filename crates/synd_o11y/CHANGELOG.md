@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-o11y-v0.1.3] 2024-02-25
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Disable cargo-dist by [@ymgyt](https://github.com/ymgyt) ([d7cf038f](https://github.com/ymgyt/syndicationd/commit/d7cf038f329f43645d49667b923125879afb8e1c))
+- Remove workspace otel deps by [@ymgyt](https://github.com/ymgyt) ([20c071ea](https://github.com/ymgyt/syndicationd/commit/20c071ea08d1c4afc1cd0a724037bbdfa10eb1cf))
+- Update opentelemetry from 0.21 to 0.22 by [@ymgyt](https://github.com/ymgyt) ([b874c1d5](https://github.com/ymgyt/syndicationd/commit/b874c1d5ba804339a495a29a28cfd6443b2e2339))
+
+## [v0.1.3] - 2024-02-25
 
 ### Features
 
@@ -14,7 +22,7 @@ All notable changes to this project will be documented in this file.
 - Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
 - Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
 
-## [synd-o11y-v0.1.2] - 2024-02-19
+## [v0.1.2] - 2024-02-19
 
 ### Features
 
@@ -26,7 +34,7 @@ All notable changes to this project will be documented in this file.
 
 - Fix typo by [@ymgyt](https://github.com/ymgyt) ([c311417b](https://github.com/ymgyt/syndicationd/commit/c311417bb69d22c7826d4ec931ec8dfe59042ca1))
 
-## [synd-o11y-v0.1.1] - 2024-02-12
+## [v0.1.1] - 2024-02-12
 
 ### Features
 
