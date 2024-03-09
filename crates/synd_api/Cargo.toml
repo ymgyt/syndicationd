@@ -32,7 +32,6 @@ fdlimit            = { workspace = true }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
-headers            = { workspace = true }
 kvsd               = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
 parse_duration     = { workspace = true }

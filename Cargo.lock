@@ -2924,7 +2924,6 @@ dependencies = [
  "feed-rs",
  "futures-util",
  "graphql_client",
- "headers",
  "kvsd",
  "moka",
  "parse_duration",
