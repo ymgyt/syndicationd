@@ -136,6 +136,7 @@
             opentelemetry-collector-contrib
             git-cliff
             cargo-release
+            cargo-machete
             # We need latest cargo-dist which is not available in nixpkgs-unstable now
             # cargo-dist
             oranda

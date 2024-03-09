@@ -12,6 +12,7 @@ api_dir := "crates/synd_api"
 
 alias format := fmt
 alias integration := integration-test
+alias unused := machete
 
 # List recipe
 default:
@@ -39,6 +40,10 @@ lint:
 # Format toml files
 fmt-toml:
     taplo fmt --config taplo.toml **.toml
+
+# Check unused dependencies
+machete:
+    cargo machete
 
 # Run test
 test *flags:
