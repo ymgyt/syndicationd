@@ -42,15 +42,14 @@ pub mod handler {
 pub fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
     let schema = Schema::build(Query, Mutation, EmptySubscription);
 
-    #[cfg(not(feature = "introspection"))]
-    schema
-        .disable_introspection()
-        .limit_depth(10)
-        .limit_complexity(50);
-
-    #[cfg(feature = "introspection")]
-    schema.limit_depth(20).limit_complexity(300)
-
+    if cfg!(not(feature = "introspection")) {
+        schema
+            .disable_introspection()
+            .limit_depth(10)
+            .limit_complexity(50)
+    } else {
+        schema.limit_depth(20).limit_complexity(300)
+    }
     // disabled
     // schema.extension(Tracing)
 }
