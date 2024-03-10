@@ -14,3 +14,17 @@ impl From<query::entries::EntriesOutput> for FetchEntriesPayload {
         Self { entries, page_info }
     }
 }
+
+pub struct ExportSubscriptionPayload {
+    pub feeds: Vec<types::ExportedFeed>,
+    pub page_info: types::PageInfo,
+}
+
+impl From<query::export_subscription::ExportSubscriptionOutput> for ExportSubscriptionPayload {
+    fn from(v: query::export_subscription::ExportSubscriptionOutput) -> Self {
+        Self {
+            feeds: v.feeds.nodes.into_iter().map(Into::into).collect(),
+            page_info: v.feeds.page_info.into(),
+        }
+    }
+}

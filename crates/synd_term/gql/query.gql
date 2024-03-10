@@ -82,3 +82,19 @@ fragment PageInfo on PageInfo {
   hasNextPage
   endCursor
 }
+
+query ExportSubscription($after: String, $first: Int!) {
+  output: subscription {
+    feeds(after: $after, first: $first) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        title
+        url
+        type
+      }
+    }
+  }
+}

@@ -9,7 +9,7 @@ use thiserror::Error;
 use tracing::{error, Span};
 use url::Url;
 
-use crate::{auth::Credential, config, types};
+use crate::{auth::Credential, client::payload::ExportSubscriptionPayload, config, types};
 
 use self::query::subscription::SubscriptionOutput;
 
@@ -138,6 +138,19 @@ impl Client {
         let response: query::entries::ResponseData = self.request(&request).await?;
 
         tracing::debug!("Got response");
+
+        Ok(response.output.into())
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn export_subscription(
+        &self,
+        after: Option<String>,
+        first: i64,
+    ) -> anyhow::Result<ExportSubscriptionPayload> {
+        let var = query::export_subscription::Variables { after, first };
+        let request = query::ExportSubscription::build_query(var);
+        let response: query::export_subscription::ResponseData = self.request(&request).await?;
 
         Ok(response.output.into())
     }

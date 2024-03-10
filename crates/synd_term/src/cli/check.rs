@@ -16,18 +16,14 @@ pub enum CheckFormat {
 /// Check application conditions
 #[derive(Args, Debug)]
 pub struct CheckCommand {
-    /// synd_api endpoint
-    #[arg(long, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
-    pub endpoint: Url,
-
     #[arg(value_enum, long, default_value_t = CheckFormat::Human)]
     pub format: CheckFormat,
 }
 
 impl CheckCommand {
     #[allow(clippy::unused_self)]
-    pub async fn run(self) -> i32 {
-        if let Err(err) = self.check().await {
+    pub async fn run(self, endpoint: Url) -> i32 {
+        if let Err(err) = self.check(endpoint).await {
             tracing::error!("{err:?}");
             1
         } else {
@@ -35,8 +31,8 @@ impl CheckCommand {
         }
     }
 
-    async fn check(self) -> anyhow::Result<()> {
-        let Self { endpoint, format } = self;
+    async fn check(self, endpoint: Url) -> anyhow::Result<()> {
+        let Self { format } = self;
         let client = Client::new(endpoint, Duration::from_secs(10))?;
 
         let api_health = client

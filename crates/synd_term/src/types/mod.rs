@@ -1,7 +1,11 @@
 use chrono::DateTime;
+use serde::Serialize;
 use synd_feed::types::FeedType;
 
-use crate::client::{mutation, query};
+use crate::client::{
+    mutation,
+    query::{self, export_subscription},
+};
 
 mod time;
 pub use time::{Time, TimeExt};
@@ -168,6 +172,24 @@ impl From<query::entries::Entry> for Entry {
             feed_title: v.feed.title,
             feed_url: v.feed.url,
             summary: v.summary,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ExportedFeed {
+    pub title: Option<String>,
+    pub url: String,
+    // does not convert to utilize generated serde::Serialize impl
+    pub r#type: export_subscription::FeedType,
+}
+
+impl From<query::export_subscription::ExportSubscriptionOutputFeedsNodes> for ExportedFeed {
+    fn from(v: query::export_subscription::ExportSubscriptionOutputFeedsNodes) -> Self {
+        Self {
+            title: v.title,
+            url: v.url,
+            r#type: v.type_,
         }
     }
 }

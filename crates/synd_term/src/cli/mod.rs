@@ -8,6 +8,7 @@ use crate::config;
 
 mod check;
 mod clear;
+mod export;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
 pub enum Palette {
@@ -67,7 +68,7 @@ impl From<Palette> for tailwind::Palette {
 #[command(version, propagate_version = true, name = "synd")]
 pub struct Args {
     /// synd_api endpoint
-    #[arg(long, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
+    #[arg(long, global = true, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
     pub endpoint: Url,
     /// Log file path
     #[arg(long, default_value = config::log_path().into_os_string(), env = config::env::LOG_PATH)]
@@ -86,6 +87,7 @@ pub struct Args {
 pub enum Command {
     Clear(clear::ClearCommand),
     Check(check::CheckCommand),
+    Export(export::ExportCommand),
 }
 
 pub fn parse() -> Args {
