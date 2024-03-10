@@ -106,6 +106,10 @@ To change the endpoint, specify the `--endpoint` flag
 
 The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [Grafana dashboard](https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now)
 
+### Export subscribed feeds
+
+To export subscribed feeds, execute the `synd export` command.
+
 ### Clear cache and logs
 
 Authentication credentials are cached. to remove them, execute `synd clear`.
