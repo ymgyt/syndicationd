@@ -23,8 +23,8 @@ synd-feed = { path = "../synd_feed", version = "0.1.5" }
 synd-o11y = { path = "../synd_o11y", version = "0.1.4" }
 
 anyhow               = { workspace = true }
-chrono               = { workspace = true }
-clap                 = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env"] }
+chrono               = { workspace = true, features = ["std"] }
+clap                 = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env", "std"] }
 crossterm            = { version = "0.27.0", features = ["event-stream"] }
 directories          = "5.0.1"
 edit                 = "0.1.5"
