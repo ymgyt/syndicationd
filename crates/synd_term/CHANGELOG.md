@@ -2,7 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.6] 2024-02-28
+## [unreleased] __release_date__
+
+### Features
+
+- Show first graphql error in ui by [@ymgyt](https://github.com/ymgyt) ([ca29ea02](https://github.com/ymgyt/syndicationd/commit/ca29ea021937f9818555dd64659041da04762f15))
+- Add export command by [@ymgyt](https://github.com/ymgyt) ([9bb73182](https://github.com/ymgyt/syndicationd/commit/9bb731820e1f064f1d5776f5285ea57785596006))
+- Print export json schema by [@ymgyt](https://github.com/ymgyt) ([3023c3f7](https://github.com/ymgyt/syndicationd/commit/3023c3f74824d4001b7d684b53b3e4e978384302))
+
+### Miscellaneous Tasks
+
+- Configure oranda changelog by [@ymgyt](https://github.com/ymgyt) ([1aecb8ce](https://github.com/ymgyt/syndicationd/commit/1aecb8ce5a31b766d63d8bb283e993508e379608))
+- Specify features to build by [@ymgyt](https://github.com/ymgyt) ([b7db28d1](https://github.com/ymgyt/syndicationd/commit/b7db28d1eb796899a48cf23366499e287fe775fa))
+
+## [v0.1.6] - 2024-02-28
 
 ### Features
 
