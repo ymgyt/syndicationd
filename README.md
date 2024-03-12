@@ -88,6 +88,11 @@ Options:
 
 </details>
 
+### Authentication
+
+syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
+Currently, only GitHub is supported. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps) to read the user's email. the user's email is used only as an identifier after being hashed.
+
 ### Log file
 
 The log file path is based on [`ProjectDirs::data_dir()`](https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir).  
@@ -124,7 +129,7 @@ synd check --format json | from json
 │       │ ╭─────────────┬────────────────────╮    │
 │ api   │ │ description │ health of synd-api │    │
 │       │ │ status      │ Pass               │    │
-│       │ │ version     │ 0.1.3              │    │
+│       │ │ version     │ 0.1.5              │    │
 │       │ ╰─────────────┴────────────────────╯    │
 │ cache │ /home/ferris/.cache/synd                │
 │ log   │ /home/ferris/.local/share/synd/synd.log │
