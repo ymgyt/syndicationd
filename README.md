@@ -93,6 +93,53 @@ Options:
 syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
 Currently, only GitHub is supported. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps) to read the user's email. the user's email is used only as an identifier after being hashed.
 
+### Export subscribed feeds
+
+To export subscribed feeds, execute the `synd export` command.  
+You can check the JSON schema of the data to be exported with `synd export --print-schema`
+
+<details>
+<summary>Click to show a export json schema</summary>
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Export",
+  "type": "object",
+  "required": [
+    "feeds"
+  ],
+  "properties": {
+    "feeds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExportedFeed"
+      }
+    }
+  },
+  "definitions": {
+    "ExportedFeed": {
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+```
+</details>
+
 ### Log file
 
 The log file path is based on [`ProjectDirs::data_dir()`](https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir).  
@@ -111,9 +158,6 @@ To change the endpoint, specify the `--endpoint` flag
 
 The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [Grafana dashboard](https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now)
 
-### Export subscribed feeds
-
-To export subscribed feeds, execute the `synd export` command.
 
 ### Clear cache and logs
 
