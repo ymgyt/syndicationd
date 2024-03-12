@@ -4,7 +4,7 @@ pub mod subscription {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "Subscription";
-    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n\nquery ExportSubscription($after: String, $first: Int!) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      pageInfo {\n        hasNextPage\n        endCursor\n      }\n      nodes {\n        title\n        url\n        type\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n\nquery ExportSubscription($after: String, $first: Int!) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      pageInfo {\n        hasNextPage\n        endCursor\n      }\n      nodes {\n        title\n        url\n      }\n    }\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -141,7 +141,7 @@ pub mod entries {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "Entries";
-    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n\nquery ExportSubscription($after: String, $first: Int!) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      pageInfo {\n        hasNextPage\n        endCursor\n      }\n      nodes {\n        title\n        url\n        type\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n\nquery ExportSubscription($after: String, $first: Int!) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      pageInfo {\n        hasNextPage\n        endCursor\n      }\n      nodes {\n        title\n        url\n      }\n    }\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -215,7 +215,7 @@ pub mod export_subscription {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "ExportSubscription";
-    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n\nquery ExportSubscription($after: String, $first: Int!) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      pageInfo {\n        hasNextPage\n        endCursor\n      }\n      nodes {\n        title\n        url\n        type\n      }\n    }\n  }\n}\n" ;
+    pub const QUERY : & str = "query Subscription($after: String, $first: Int) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      nodes {\n        ...Feed\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 10) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n\nquery Entries($after: String, $first: Int!) {\n  output: subscription {\n    entries(after: $after, first: $first) {\n      nodes {\n        ...Entry\n      }\n      pageInfo {\n        ...PageInfo\n      }\n    }\n  }\n}\n\nfragment Entry on Entry {\n  title\n  published\n  updated\n  summary\n  websiteUrl\n  feed {\n    ...FeedMeta\n  }\n}\n\nfragment FeedMeta on FeedMeta {\n  title\n  url\n}\n\nfragment PageInfo on PageInfo {\n  hasNextPage\n  endCursor\n}\n\nquery ExportSubscription($after: String, $first: Int!) {\n  output: subscription {\n    feeds(after: $after, first: $first) {\n      pageInfo {\n        hasNextPage\n        endCursor\n      }\n      nodes {\n        title\n        url\n      }\n    }\n  }\n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -226,40 +226,6 @@ pub mod export_subscription {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
-    #[derive(Debug)]
-    pub enum FeedType {
-        ATOM,
-        RSS1,
-        RSS2,
-        RSS0,
-        JSON,
-        Other(String),
-    }
-    impl ::serde::Serialize for FeedType {
-        fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-            ser.serialize_str(match *self {
-                FeedType::ATOM => "ATOM",
-                FeedType::RSS1 => "RSS1",
-                FeedType::RSS2 => "RSS2",
-                FeedType::RSS0 => "RSS0",
-                FeedType::JSON => "JSON",
-                FeedType::Other(ref s) => &s,
-            })
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for FeedType {
-        fn deserialize<D: ::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            let s: String = ::serde::Deserialize::deserialize(deserializer)?;
-            match s.as_str() {
-                "ATOM" => Ok(FeedType::ATOM),
-                "RSS1" => Ok(FeedType::RSS1),
-                "RSS2" => Ok(FeedType::RSS2),
-                "RSS0" => Ok(FeedType::RSS0),
-                "JSON" => Ok(FeedType::JSON),
-                _ => Ok(FeedType::Other(s)),
-            }
-        }
-    }
     #[derive(Serialize, Debug)]
     pub struct Variables {
         pub after: Option<String>,
@@ -291,8 +257,6 @@ pub mod export_subscription {
     pub struct ExportSubscriptionOutputFeedsNodes {
         pub title: Option<String>,
         pub url: String,
-        #[serde(rename = "type")]
-        pub type_: FeedType,
     }
 }
 impl graphql_client::GraphQLQuery for ExportSubscription {

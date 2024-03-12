@@ -93,7 +93,6 @@ query ExportSubscription($after: String, $first: Int!) {
       nodes {
         title
         url
-        type
       }
     }
   }
