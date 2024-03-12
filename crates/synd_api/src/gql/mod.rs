@@ -46,7 +46,7 @@ pub fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
         schema
             .disable_introspection()
             .limit_depth(10)
-            .limit_complexity(50)
+            .limit_complexity(60)
     } else {
         schema.limit_depth(20).limit_complexity(300)
     }
