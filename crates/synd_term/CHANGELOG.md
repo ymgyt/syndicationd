@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.7] 2024-03-12
+## [unreleased] __release_date__
+
+### Features
+
+- Use nerd fond in prompt by [@ymgyt](https://github.com/ymgyt) ([b864e277](https://github.com/ymgyt/syndicationd/commit/b864e27793087d12ea63a5215df509c25854ac46))
+- Use nerd font in columns by [@ymgyt](https://github.com/ymgyt) ([278fbbe8](https://github.com/ymgyt/syndicationd/commit/278fbbe833abd770d25c41f7e9e4267514ba2714))
+
+### Refactor
+
+- Rename device flow poll method by [@ymgyt](https://github.com/ymgyt) ([19fe8c4f](https://github.com/ymgyt/syndicationd/commit/19fe8c4fbce84cc8dab6678d38653fa304bd26ff))
+
+## [v0.1.7] - 2024-03-12
 
 ### Features
 
