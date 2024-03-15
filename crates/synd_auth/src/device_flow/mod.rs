@@ -4,6 +4,9 @@ use http::Uri;
 use serde::{Deserialize, Serialize};
 
 pub mod github;
+pub mod google;
+
+const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 /// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,6 +45,11 @@ pub struct DeviceAccessTokenRequest<'s> {
     /// The device verification code, "device_code" from the device authorization response
     pub device_code: Cow<'s, str>,
     pub client_id: Cow<'s, str>,
+
+    // vendor extensions
+    /// Google require client secret
+    /// <https://developers.google.com/identity/gsi/web/guides/devices#obtain_an_id_token_and_refresh_token>
+    pub client_secret: Option<Cow<'s, str>>,
 }
 
 impl<'s> DeviceAccessTokenRequest<'s> {
@@ -53,6 +61,25 @@ impl<'s> DeviceAccessTokenRequest<'s> {
             grant_type: Self::GRANT_TYPE.into(),
             device_code: device_code.into(),
             client_id: client_id.into(),
+            client_secret: None,
+        }
+    }
+
+    /// Configure `grant_type`
+    #[must_use]
+    pub fn with_grant_type(self, grant_type: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            grant_type: grant_type.into(),
+            ..self
+        }
+    }
+
+    /// Configure `client_secret`
+    #[must_use]
+    pub fn with_client_secret(self, client_secret: impl Into<Cow<'s, str>>) -> Self {
+        Self {
+            client_secret: Some(client_secret.into()),
+            ..self
         }
     }
 }
@@ -66,6 +93,10 @@ pub struct DeviceAccessTokenResponse {
     pub token_type: String,
     /// the lifetime in seconds of the access token
     pub expires_in: Option<i64>,
+
+    // OIDC usecase
+    pub refresh_token: Option<String>,
+    pub id_token: Option<String>,
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>

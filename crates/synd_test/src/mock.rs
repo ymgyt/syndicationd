@@ -47,6 +47,8 @@ async fn device_access_token(
         access_token: "gh_dummy_access_token".into(),
         token_type: String::new(),
         expires_in: None,
+        refresh_token: None,
+        id_token: None,
     };
 
     Ok(Json(res))

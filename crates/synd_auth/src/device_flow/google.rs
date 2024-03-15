@@ -1,6 +1,6 @@
-use std::{borrow::Cow, future::Future, time::Duration};
+use std::{borrow::Cow, time::Duration};
 
-use http::{StatusCode, Uri};
+use http::StatusCode;
 use reqwest::Client;
 use tracing::debug;
 
@@ -9,20 +9,22 @@ use crate::device_flow::{
     DeviceAuthorizationRequest, DeviceAuthorizationResponse, USER_AGENT,
 };
 
-/// <https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow>
-#[derive(Clone)]
 pub struct DeviceFlow {
     client: Client,
     client_id: Cow<'static, str>,
-    device_authorization_endpoint: Option<Cow<'static, str>>,
-    token_endpoint: Option<Cow<'static, str>>,
+    client_secret: Cow<'static, str>,
 }
 
 impl DeviceFlow {
-    const DEVICE_AUTHORIZATION_ENDPOINT: &'static str = "https://github.com/login/device/code";
-    const TOKEN_ENDPOINT: &'static str = "https://github.com/login/oauth/access_token";
+    const DEVICE_AUTHORIZATION_ENDPOINT: &'static str = "https://oauth2.googleapis.com/device/code";
+    const TOKEN_ENDPOINT: &'static str = "https://oauth2.googleapis.com/token";
+    /// <https://developers.google.com/identity/gsi/web/guides/devices#obtain_an_id_token_and_refresh_token>
+    const GRANT_TYPE: &'static str = "http://oauth.net/grant_type/device/1.0";
 
-    pub fn new(client_id: impl Into<Cow<'static, str>>) -> Self {
+    pub fn new(
+        client_id: impl Into<Cow<'static, str>>,
+        client_secret: impl Into<Cow<'static, str>>,
+    ) -> Self {
         let client = reqwest::ClientBuilder::new()
             .user_agent(USER_AGENT)
             .timeout(Duration::from_secs(5))
@@ -32,44 +34,17 @@ impl DeviceFlow {
         Self {
             client,
             client_id: client_id.into(),
-            device_authorization_endpoint: None,
-            token_endpoint: None,
-        }
-    }
-
-    #[must_use]
-    pub fn with_device_authorization_endpoint(
-        self,
-        endpoint: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self {
-            device_authorization_endpoint: Some(endpoint.into()),
-            ..self
-        }
-    }
-
-    #[must_use]
-    pub fn with_token_endpoint(self, endpoint: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            token_endpoint: Some(endpoint.into()),
-            ..self
+            client_secret: client_secret.into(),
         }
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn device_authorize_request(&self) -> anyhow::Result<DeviceAuthorizationResponse> {
-        tracing::debug!("Sending request");
-
-        // https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
-        let scope = "user:email";
-
+        // https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url
+        let scope = "email";
         let response = self
             .client
-            .post(
-                self.device_authorization_endpoint
-                    .as_deref()
-                    .unwrap_or(Self::DEVICE_AUTHORIZATION_ENDPOINT),
-            )
+            .post(Self::DEVICE_AUTHORIZATION_ENDPOINT)
             .header(http::header::ACCEPT, "application/json")
             .form(&DeviceAuthorizationRequest {
                 client_id: self.client_id.clone(),
@@ -80,8 +55,6 @@ impl DeviceFlow {
             .error_for_status()?
             .json::<DeviceAuthorizationResponse>()
             .await?;
-
-        tracing::debug!("Got response");
 
         Ok(response)
     }
@@ -112,16 +85,13 @@ impl DeviceFlow {
         let response = loop {
             let response = self
                 .client
-                .post(
-                    self.token_endpoint
-                        .as_deref()
-                        .unwrap_or(Self::TOKEN_ENDPOINT),
-                )
+                .post(Self::TOKEN_ENDPOINT)
                 .header(http::header::ACCEPT, "application/json")
-                .form(&DeviceAccessTokenRequest::new(
-                    &device_code,
-                    self.client_id.as_ref(),
-                ))
+                .form(
+                    &DeviceAccessTokenRequest::new(&device_code, self.client_id.as_ref())
+                        .with_grant_type(Self::GRANT_TYPE)
+                        .with_client_secret(self.client_secret.clone()),
+                )
                 .send()
                 .await?;
 
@@ -146,24 +116,5 @@ impl DeviceFlow {
         };
 
         Ok(response)
-    }
-
-    #[tracing::instrument(skip_all)]
-    pub async fn device_flow<F, Fut>(self, callback: F) -> anyhow::Result<DeviceAccessTokenResponse>
-    where
-        F: FnOnce(Uri, String) -> Fut,
-        Fut: Future<Output = ()>,
-    {
-        let DeviceAuthorizationResponse {
-            device_code,
-            user_code,
-            verification_uri,
-            interval,
-            ..
-        } = self.device_authorize_request().await?;
-
-        callback(verification_uri, user_code).await;
-
-        self.poll_device_access_token(device_code, interval).await
     }
 }
