@@ -88,7 +88,7 @@ impl DeviceFlow {
         Ok(response)
     }
 
-    pub async fn pool_device_access_token(
+    pub async fn poll_device_access_token(
         &self,
         device_code: String,
         interval: Option<i64>,
@@ -166,6 +166,6 @@ impl DeviceFlow {
 
         callback(verification_uri, user_code).await;
 
-        self.pool_device_access_token(device_code, interval).await
+        self.poll_device_access_token(device_code, interval).await
     }
 }

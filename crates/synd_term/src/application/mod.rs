@@ -695,7 +695,7 @@ impl Application {
         let device_flow = self.config.github_device_flow.clone();
         let fut = async move {
             match device_flow
-                .pool_device_access_token(
+                .poll_device_access_token(
                     device_authorization.device_code,
                     device_authorization.interval,
                 )
