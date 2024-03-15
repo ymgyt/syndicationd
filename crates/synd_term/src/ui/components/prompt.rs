@@ -42,29 +42,20 @@ impl Prompt {
 
     #[allow(clippy::cast_possible_truncation)]
     fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
-        let keys = [
-            ("q", "Quit"),
-            ("Tab", "Next Tab"),
-            ("j/k", "Up/Down"),
-            ("r", "Reload"),
-        ];
+        let keys = [("q", ""), ("Tab", "󰹳"), ("j/k", "󰹹"), ("r", "󰑓")];
         let per_screen_keys = match tab {
-            Tab::Feeds => [
-                ("a", "Subscribe"),
-                ("d", "Unsubscribe"),
-                ("Ent", "Open Feed"),
-            ]
-            .iter(),
-            Tab::Entries => [("Ent", "Open Entry")].iter(),
+            Tab::Feeds => [("a", "󰑫"), ("d", "󰼡"), ("Ent", "󰏌")].iter(),
+            Tab::Entries => [("Ent", "󰏌")].iter(),
         };
 
         let spans = keys
             .iter()
             .chain(per_screen_keys)
             .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), cx.theme.prompt.key);
-                let desc = Span::styled(format!(" {desc} "), cx.theme.prompt.key_desc);
-                [key, desc]
+                // let key = Span::styled(format!(" {key}"), cx.theme.prompt.key);
+                let desc = Span::styled(format!(" {key} {desc} "), cx.theme.prompt.key_desc);
+                let sep = Span::styled("", cx.theme.prompt.key);
+                [desc, sep]
             })
             .collect::<Vec<_>>();
 
