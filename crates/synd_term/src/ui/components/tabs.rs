@@ -24,7 +24,7 @@ impl Tabs {
     pub fn new() -> Self {
         Self {
             selected: 0,
-            tabs: vec!["Entries", "Feeds"],
+            tabs: vec!["󱉯 Entries", "󰑫 Feeds"],
         }
     }
 
@@ -50,7 +50,7 @@ impl Tabs {
             ..area
         };
         // left padding * 2 + len("Entries" + "Feeds") = 20
-        let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(20)]);
+        let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(24)]);
         let [title, tabs] = horizontal.areas(area);
 
         Paragraph::new(Span::styled("Syndicationd", cx.theme.application_title)).render(title, buf);

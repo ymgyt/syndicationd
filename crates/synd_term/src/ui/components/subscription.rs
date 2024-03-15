@@ -151,10 +151,10 @@ impl Subscription {
         impl IntoIterator<Item = Row<'a>>,
     ) {
         let header = Row::new([
-            Cell::from("Feed"),
-            Cell::from("Updated"),
-            Cell::from("URL"),
-            Cell::from("Description"),
+            Cell::from("󰑫 Feed"),
+            Cell::from(" Updated"),
+            Cell::from(" URL"),
+            Cell::from("󰎞 Description"),
         ]);
 
         let constraints = [

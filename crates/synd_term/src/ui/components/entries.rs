@@ -127,13 +127,13 @@ impl Entries {
         impl IntoIterator<Item = Row<'a>>,
     ) {
         let header = Row::new([
-            Cell::from("Published"),
-            Cell::from("Title"),
-            Cell::from("Feed"),
+            Cell::from(" Published"),
+            Cell::from("󰯂 Title"),
+            Cell::from("󰑫 Feed"),
         ]);
 
         let constraints = [
-            Constraint::Length(10),
+            Constraint::Length(11),
             Constraint::Fill(2),
             Constraint::Fill(1),
         ];
