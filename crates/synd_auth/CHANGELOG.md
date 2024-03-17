@@ -2,21 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
-## [synd-auth-v0.1.4] 2024-02-25
+## [unreleased] __release_date__
+
+### Features
+
+- Add google oidc device flow by [@ymgyt](https://github.com/ymgyt) ([24ccb771](https://github.com/ymgyt/syndicationd/commit/24ccb7711a3ef274671e49ad459cec48e66664fd))
+- Add google oidc by [@ymgyt](https://github.com/ymgyt) ([92b1f01f](https://github.com/ymgyt/syndicationd/commit/92b1f01f5786a98ae7f35d9b3ea997aa7e3cccba))
+
+### Miscellaneous Tasks
+
+- Disable cargo-dist by [@ymgyt](https://github.com/ymgyt) ([a04a8983](https://github.com/ymgyt/syndicationd/commit/a04a89839d6d3000799c648361b7a3f5db60ede9))
+
+### Refactor
+
+- Rename device flow poll method by [@ymgyt](https://github.com/ymgyt) ([19fe8c4f](https://github.com/ymgyt/syndicationd/commit/19fe8c4fbce84cc8dab6678d38653fa304bd26ff))
+
+## [v0.1.4] - 2024-02-25
 
 ### Miscellaneous Tasks
 
 - Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
 - Add homepage to package metadata by [@ymgyt](https://github.com/ymgyt) ([4bfdb49e](https://github.com/ymgyt/syndicationd/commit/4bfdb49e317e18ff6345ce1b8e8071f0497a1a5f))
 
-## [synd-auth-v0.1.3] - 2024-02-19
+## [v0.1.3] - 2024-02-19
 
 ### Miscellaneous Tasks
 
 - Update README by [@ymgyt](https://github.com/ymgyt) ([2a546b13](https://github.com/ymgyt/syndicationd/commit/2a546b136dfa4284168025e1a909ac0c81a630bd))
 - Update CHANGELOG by [@ymgyt](https://github.com/ymgyt) ([6db0accc](https://github.com/ymgyt/syndicationd/commit/6db0accc0333a97ed07ba1b653f0fed71c4da7f5))
 
-## [synd-auth-v0.1.2] - 2024-02-12
+## [v0.1.2] - 2024-02-12
 
 ### Features
 
