@@ -2,11 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.5] 2024-03-01
+## [unreleased] __release_date__
 
 ### Features
 
 - Set graphql depth and complexity limit by [@ymgyt](https://github.com/ymgyt) ([54b44e88](https://github.com/ymgyt/syndicationd/commit/54b44e889ec4c50d78ed1b1142ccdf964b69b056))
+- Set graphql depth and complexity limit for introspection by [@ymgyt](https://github.com/ymgyt) ([f6db33dc](https://github.com/ymgyt/syndicationd/commit/f6db33dc4a36390af6d7b573d32f763588a5e516))
+- Support google oidc by [@ymgyt](https://github.com/ymgyt) ([c7c81fd8](https://github.com/ymgyt/syndicationd/commit/c7c81fd8e786ea89c977abc107c39fc521135553))
+
+### Miscellaneous Tasks
+
+- Remove unused headers crate by [@ymgyt](https://github.com/ymgyt) ([2eaf00db](https://github.com/ymgyt/syndicationd/commit/2eaf00dbd5ce5984763ae4add18a6150de1c213d))
+- Inc gql complexity limit by [@ymgyt](https://github.com/ymgyt) ([f7ac84b5](https://github.com/ymgyt/syndicationd/commit/f7ac84b58a7db7846f84b4e5c88d249b4b2f16c1))
+
+### Refactor
+
+- Use cfg macro to configure gql schema by [@ymgyt](https://github.com/ymgyt) ([d2a1f551](https://github.com/ymgyt/syndicationd/commit/d2a1f551d72d49d68ce288f6c06753aa55b57fdd))
 
 ## [v0.1.4] - 2024-02-25
 
