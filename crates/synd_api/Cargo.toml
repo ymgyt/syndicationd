@@ -17,7 +17,7 @@ name = "synd-api"
 path = "src/main.rs"
 
 [dependencies]
-synd-auth = { path = "../synd_auth", version = "0.1.4" }
+synd-auth = { path = "../synd_auth", version = "0.2.0" }
 synd-feed = { path = "../synd_feed", version = "0.1.5" }
 synd-o11y = { path = "../synd_o11y", version = "0.1.4" }
 
