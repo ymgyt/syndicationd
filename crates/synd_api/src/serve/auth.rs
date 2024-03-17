@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use futures_util::future::BoxFuture;
 use moka::future::Cache;
+use synd_auth::jwt::google::JwtService as GoogleJwtService;
 use tracing::warn;
 
 use crate::{
@@ -13,6 +14,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Authenticator {
     github: GithubClient,
+    google: GoogleJwtService,
     cache: Cache<String, Principal>,
 }
 
@@ -25,6 +27,7 @@ impl Authenticator {
 
         Ok(Self {
             github: GithubClient::new()?,
+            google: GoogleJwtService::default(),
             cache,
         })
     }
@@ -59,6 +62,36 @@ impl Authenticator {
                     }
                     Err(err) => {
                         warn!("Failed to authenticate github: {err}");
+                        Err(())
+                    }
+                }
+            }
+            (Some("google"), Some(id_token)) => {
+                if let Some(principal) = self.cache.get(id_token).await {
+                    tracing::info!("Principal cache hit");
+                    return Ok(principal);
+                }
+
+                match self.google.decode_id_token(id_token).await {
+                    Ok(claims) => {
+                        if !claims.email_verified {
+                            warn!("Google jwt claims email is not verified");
+                            return Err(());
+                        }
+                        let principal = Principal::User(User::from_email(claims.email));
+
+                        self.cache
+                            .insert(id_token.to_owned(), principal.clone())
+                            .await;
+
+                        Ok(principal)
+                    }
+                    Err(err) => {
+                        // Id a lot of intentional invalid id tokens are sent
+                        // google's api limit will be exceeded.
+                        // To prevent this, it is necessary to cache the currently valid kids
+                        // and discard jwt headers with other kids.
+                        warn!("Failed to authenticate google: {err}");
                         Err(())
                     }
                 }
