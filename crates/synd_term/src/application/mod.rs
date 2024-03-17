@@ -4,7 +4,7 @@ use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind}
 use futures_util::{FutureExt, Stream, StreamExt};
 use ratatui::{style::palette::tailwind, widgets::Widget};
 use synd_auth::device_flow::{
-    github::DeviceFlow, DeviceAccessTokenResponse, DeviceAuthorizationResponse,
+    self, DeviceAccessTokenResponse, DeviceAuthorizationResponse, DeviceFlow,
 };
 use tokio::time::{Instant, Sleep};
 
@@ -33,6 +33,9 @@ pub use in_flight::{InFlight, RequestId, RequestSequence};
 mod input_parser;
 use input_parser::InputParser;
 
+mod authenticator;
+pub use authenticator::{Authenticator, DeviceFlows, JwtService};
+
 enum Screen {
     Login,
     Browse,
@@ -52,7 +55,6 @@ pub enum ListAction {
 pub struct Config {
     pub idle_timer_interval: Duration,
     pub throbber_timer_interval: Duration,
-    pub github_device_flow: DeviceFlow,
 }
 
 impl Default for Config {
@@ -60,7 +62,6 @@ impl Default for Config {
         Self {
             idle_timer_interval: Duration::from_secs(250),
             throbber_timer_interval: Duration::from_millis(250),
-            github_device_flow: DeviceFlow::new(config::github::CLIENT_ID),
         }
     }
 }
@@ -71,6 +72,7 @@ pub struct Application {
     jobs: Jobs,
     components: Components,
     interactor: Interactor,
+    authenticator: Authenticator,
     in_flight: InFlight,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
@@ -94,6 +96,7 @@ impl Application {
             jobs: Jobs::new(),
             components: Components::new(),
             interactor: Interactor::new(),
+            authenticator: Authenticator::new(),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
@@ -108,6 +111,18 @@ impl Application {
     #[must_use]
     pub fn with_theme(self, theme: Theme) -> Self {
         Self { theme, ..self }
+    }
+
+    #[must_use]
+    pub fn with_authenticator(self, authenticator: Authenticator) -> Self {
+        Self {
+            authenticator,
+            ..self
+        }
+    }
+
+    pub fn jwt_decoders(&self) -> &JwtService {
+        &self.authenticator.jwt_decoders
     }
 
     pub fn set_credential(&mut self, cred: Credential) {
@@ -215,12 +230,42 @@ impl Application {
                 Command::Idle => {
                     self.handle_idle();
                 }
-                Command::Authenticate(method) => self.authenticate(method),
-                Command::DeviceAuthorizationFlow(device_authorization) => {
-                    self.device_authorize_flow(device_authorization);
+                Command::Authenticate(provider) => match provider {
+                    AuthenticationProvider::Github => {
+                        self.authenticate(provider, self.authenticator.device_flows.github.clone());
+                    }
+                    AuthenticationProvider::Google => {
+                        self.authenticate(provider, self.authenticator.device_flows.google.clone());
+                    }
+                },
+                Command::MoveAuthenticationProvider(direction) => {
+                    self.components.auth.move_selection(&direction);
+                    self.should_render = true;
                 }
-                Command::CompleteDevieAuthorizationFlow(device_access_token) => {
-                    self.complete_device_authroize_flow(device_access_token);
+                Command::DeviceAuthorizationFlow {
+                    provider,
+                    device_authorization,
+                } => match provider {
+                    AuthenticationProvider::Github => {
+                        self.device_authorize_flow(
+                            provider,
+                            self.authenticator.device_flows.github.clone(),
+                            device_authorization,
+                        );
+                    }
+                    AuthenticationProvider::Google => {
+                        self.device_authorize_flow(
+                            provider,
+                            self.authenticator.device_flows.google.clone(),
+                            device_authorization,
+                        );
+                    }
+                },
+                Command::CompleteDevieAuthorizationFlow {
+                    provider,
+                    device_access_token,
+                } => {
+                    self.complete_device_authroize_flow(provider, device_access_token);
                 }
                 Command::MoveTabSelection(direction) => {
                     match self.components.tabs.move_selection(&direction) {
@@ -342,6 +387,8 @@ impl Application {
                     message,
                     request_seq,
                 } => {
+                    tracing::error!("{message}");
+
                     if let Some(request_seq) = request_seq {
                         self.in_flight.remove(request_seq);
                     }
@@ -388,6 +435,12 @@ impl Application {
                                     self.components.auth.selected_provider(),
                                 ));
                             };
+                        }
+                        KeyCode::Char('j') => {
+                            return Some(Command::MoveAuthenticationProvider(Direction::Down))
+                        }
+                        KeyCode::Char('k') => {
+                            return Some(Command::MoveAuthenticationProvider(Direction::Up))
                         }
                         _ => {}
                     },
@@ -661,47 +714,19 @@ impl Application {
 }
 
 impl Application {
-    #[tracing::instrument(skip(self))]
-    fn authenticate(&mut self, provider: AuthenticationProvider) {
+    #[tracing::instrument(skip(self, device_flow))]
+    fn authenticate<P>(&mut self, provider: AuthenticationProvider, device_flow: DeviceFlow<P>)
+    where
+        P: device_flow::Provider + Sync + Send + 'static,
+    {
         tracing::info!("Start authenticate");
-        match provider {
-            AuthenticationProvider::Github => {
-                let device_flow = self.config.github_device_flow.clone();
-                let fut = async move {
-                    match device_flow.device_authorize_request().await {
-                        Ok(res) => Ok(Command::DeviceAuthorizationFlow(res)),
-                        Err(err) => Ok(Command::HandleError {
-                            message: format!("{err}"),
-                            request_seq: None,
-                        }),
-                    }
-                }
-                .boxed();
-                self.jobs.futures.push(fut);
-            }
-        }
-    }
 
-    fn device_authorize_flow(&mut self, device_authorization: DeviceAuthorizationResponse) {
-        self.components
-            .auth
-            .set_device_authorization_response(device_authorization.clone());
-        self.should_render = true;
-
-        // try to open input screen in the browser
-        self.interactor
-            .open_browser(device_authorization.verification_uri.to_string());
-
-        let device_flow = self.config.github_device_flow.clone();
         let fut = async move {
-            match device_flow
-                .poll_device_access_token(
-                    device_authorization.device_code,
-                    device_authorization.interval,
-                )
-                .await
-            {
-                Ok(res) => Ok(Command::CompleteDevieAuthorizationFlow(res)),
+            match device_flow.device_authorize_request().await {
+                Ok(device_authorization) => Ok(Command::DeviceAuthorizationFlow {
+                    provider,
+                    device_authorization,
+                }),
                 Err(err) => Ok(Command::HandleError {
                     message: format!("{err}"),
                     request_seq: None,
@@ -712,9 +737,63 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
-    fn complete_device_authroize_flow(&mut self, device_access_token: DeviceAccessTokenResponse) {
-        let auth = Credential::Github {
-            access_token: device_access_token.access_token,
+    fn device_authorize_flow<P>(
+        &mut self,
+        provider: AuthenticationProvider,
+        device_flow: DeviceFlow<P>,
+        device_authorization: DeviceAuthorizationResponse,
+    ) where
+        P: device_flow::Provider + Sync + Send + 'static,
+    {
+        self.components
+            .auth
+            .set_device_authorization_response(device_authorization.clone());
+        self.should_render = true;
+        // try to open input screen in the browser
+        self.interactor
+            .open_browser(device_authorization.verification_uri().to_string());
+
+        let fut = async move {
+            match device_flow
+                .poll_device_access_token(
+                    device_authorization.device_code,
+                    device_authorization.interval,
+                )
+                .await
+            {
+                Ok(device_access_token) => Ok(Command::CompleteDevieAuthorizationFlow {
+                    provider,
+                    device_access_token,
+                }),
+                Err(err) => Ok(Command::HandleError {
+                    message: format!("{err}"),
+                    request_seq: None,
+                }),
+            }
+        }
+        .boxed();
+
+        self.jobs.futures.push(fut);
+    }
+
+    fn complete_device_authroize_flow(
+        &mut self,
+        provider: AuthenticationProvider,
+        device_access_token: DeviceAccessTokenResponse,
+    ) {
+        // TODO: remove
+        tracing::info!("{device_access_token:?}");
+
+        let auth = match provider {
+            AuthenticationProvider::Github => Credential::Github {
+                access_token: device_access_token.access_token,
+            },
+            AuthenticationProvider::Google => Credential::Google {
+                id_token: device_access_token.id_token.expect("id token not found"),
+                refresh_token: device_access_token
+                    .refresh_token
+                    .expect("refresh token not found"),
+            },
         };
 
         // should test with tmp file?

@@ -86,7 +86,7 @@ async fn main() {
         Application::new(terminal, client).with_theme(Theme::with_palette(&palette.into()))
     };
 
-    if let Some(auth) = auth::credential_from_cache() {
+    if let Some(auth) = auth::credential_from_cache(app.jwt_decoders()).await {
         info!("Use authentication cache");
         app.set_credential(auth);
     }

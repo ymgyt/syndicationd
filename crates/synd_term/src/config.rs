@@ -9,10 +9,6 @@ pub mod api {
     pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100";
 }
 
-pub mod github {
-    pub const CLIENT_ID: &str = "6652e5931c88e528a851";
-}
-
 pub mod env {
     macro_rules! env_key {
         ($key:expr) => {

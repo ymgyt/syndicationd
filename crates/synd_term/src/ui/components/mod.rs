@@ -28,7 +28,10 @@ impl Components {
             prompt: Prompt::new(),
             subscription: Subscription::new(),
             entries: Entries::new(),
-            auth: Authentication::new(vec![AuthenticationProvider::Github]),
+            auth: Authentication::new(vec![
+                AuthenticationProvider::Github,
+                AuthenticationProvider::Google,
+            ]),
         }
     }
 }

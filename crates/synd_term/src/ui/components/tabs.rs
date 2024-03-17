@@ -9,7 +9,7 @@ use crate::{
     ui::Context,
 };
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Tab {
     Entries,
     Feeds,

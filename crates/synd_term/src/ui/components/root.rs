@@ -37,7 +37,7 @@ impl<'a> Root<'a> {
 
         self.components
             .prompt
-            .render(prompt_area, buf, cx, &self.components.tabs.current());
+            .render(prompt_area, buf, cx, Some(self.components.tabs.current()));
     }
 }
 
@@ -49,7 +49,13 @@ impl<'a> Widget for Root<'a> {
             .render(area, buf);
 
         if self.components.auth.should_render() {
-            self.components.auth.render(area, buf, &self.cx);
+            let [auth_area, prompt_area] =
+                Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
+
+            self.components.auth.render(auth_area, buf, &self.cx);
+            self.components
+                .prompt
+                .render(prompt_area, buf, &self.cx, None);
         } else {
             self.render_browse(area, buf);
         }

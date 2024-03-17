@@ -10,6 +10,7 @@ use ratatui::{
 use synd_auth::device_flow::DeviceAuthorizationResponse;
 
 use crate::{
+    application::Direction,
     auth::AuthenticationProvider,
     ui::{self, extension::RectExt, Context},
 };
@@ -45,6 +46,14 @@ impl Authentication {
 
     pub fn selected_provider(&self) -> AuthenticationProvider {
         self.providers[self.selected_provider_index]
+    }
+
+    pub fn move_selection(&mut self, direction: &Direction) {
+        self.selected_provider_index = direction.apply(
+            self.selected_provider_index,
+            self.providers.len(),
+            crate::application::IndexOutOfRange::Wrapping,
+        );
     }
 
     pub fn authenticated(&mut self) {
@@ -85,7 +94,8 @@ impl Authentication {
                 .providers
                 .iter()
                 .map(|provider| match provider {
-                    AuthenticationProvider::Github => Text::from("with GitHub"),
+                    AuthenticationProvider::Github => Text::from("󰊤 GitHub"),
+                    AuthenticationProvider::Google => Text::from("󰊭 Google"),
                 })
                 .map(ListItem::new);
 
@@ -121,7 +131,7 @@ impl Authentication {
             Line::from(vec![
                 Span::styled("URL:  ", Style::default()),
                 Span::styled(
-                    res.verification_uri.to_string(),
+                    res.verification_uri().to_string(),
                     Style::default().add_modifier(Modifier::BOLD),
                 ),
             ]),

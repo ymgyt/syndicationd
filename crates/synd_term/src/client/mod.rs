@@ -58,6 +58,7 @@ impl Client {
     pub fn set_credential(&mut self, auth: Credential) {
         let mut token = HeaderValue::try_from(match auth {
             Credential::Github { access_token } => format!("github {access_token}"),
+            Credential::Google { id_token, .. } => format!("google {id_token}"),
         })
         .unwrap();
         token.set_sensitive(true);

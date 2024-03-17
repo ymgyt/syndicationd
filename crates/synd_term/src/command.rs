@@ -19,8 +19,16 @@ pub enum Command {
     Idle,
 
     Authenticate(AuthenticationProvider),
-    DeviceAuthorizationFlow(DeviceAuthorizationResponse),
-    CompleteDevieAuthorizationFlow(DeviceAccessTokenResponse),
+    MoveAuthenticationProvider(Direction),
+
+    DeviceAuthorizationFlow {
+        provider: AuthenticationProvider,
+        device_authorization: DeviceAuthorizationResponse,
+    },
+    CompleteDevieAuthorizationFlow {
+        provider: AuthenticationProvider,
+        device_access_token: DeviceAccessTokenResponse,
+    },
 
     MoveTabSelection(Direction),
 
@@ -83,6 +91,9 @@ impl Display for Command {
         match self {
             Command::UpdateSubscription { .. } => f.write_str("UpdateSubscription"),
             Command::UpdateEntries { .. } => f.write_str("UpdateEntries"),
+            Command::CompleteDevieAuthorizationFlow { .. } => {
+                f.write_str("CompleteDeviceAuthorizationFlow")
+            }
             cmd => write!(f, "{cmd:?}"),
         }
     }

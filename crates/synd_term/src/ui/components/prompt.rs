@@ -33,7 +33,7 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
         match self.error_message.as_ref() {
             Some(error_message) => Self::render_error(area, buf, cx, error_message),
             None => Self::render_prompt(area, buf, cx, tab),
@@ -41,16 +41,16 @@ impl Prompt {
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: &Tab) {
-        let keys = [("q", ""), ("Tab", "󰹳"), ("j/k", "󰹹"), ("r", "󰑓")];
+    fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
+        let keys = &[("q", ""), ("Tab", "󰹳"), ("j/k", "󰹹"), ("r", "󰑓")][..];
         let per_screen_keys = match tab {
-            Tab::Feeds => [("a", "󰑫"), ("d", "󰼡"), ("Ent", "󰏌")].iter(),
-            Tab::Entries => [("Ent", "󰏌")].iter(),
+            Some(Tab::Feeds) => [("a", "󰑫"), ("d", "󰼡"), ("Ent", "󰏌")].iter().chain(keys),
+            Some(Tab::Entries) => [("Ent", "󰏌")].iter().chain(keys),
+            // Imply login
+            None => [("q", ""), ("j/k", "󰹹")].iter().chain(&[("Ent", "󰏌")][..]),
         };
 
-        let spans = keys
-            .iter()
-            .chain(per_screen_keys)
+        let spans = per_screen_keys
             .flat_map(|(key, desc)| {
                 // let key = Span::styled(format!(" {key}"), cx.theme.prompt.key);
                 let desc = Span::styled(format!(" {key} {desc} "), cx.theme.prompt.key_desc);

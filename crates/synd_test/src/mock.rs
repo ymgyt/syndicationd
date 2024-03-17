@@ -23,7 +23,8 @@ async fn device_authorization(
     let res = DeviceAuthorizationResponse {
         device_code: "DC001".into(),
         user_code: "UC123456".into(),
-        verification_uri: "https://syndicationd.ymgyt.io/test".parse().unwrap(),
+        verification_uri: Some("https://syndicationd.ymgyt.io/test".parse().unwrap()),
+        verification_url: None,
         verification_uri_complete: None,
         expires_in: 3600,
         interval: None,
