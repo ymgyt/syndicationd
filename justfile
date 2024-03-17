@@ -102,7 +102,7 @@ api *flags:
 
 # Run term
 term *flags:
-    cd crates/synd_term; cargo run -- --log /tmp/syndterm.log --endpoint https://localhost:5959 {{ flags }}
+    cd crates/synd_term; SYND_LOG=info cargo run -- --log /tmp/syndterm.log --endpoint https://localhost:5959 {{ flags }}
 
 # Run opentelemetry-collector-contrib
 @otelcol config:
