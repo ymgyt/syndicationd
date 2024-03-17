@@ -49,9 +49,9 @@ impl ExportCommand {
 
     async fn export(self, endpoint: Url) -> anyhow::Result<()> {
         let mut client = Client::new(endpoint, Duration::from_secs(10))?;
-        let jwt_decoders = JwtService::new();
+        let jwt_service = JwtService::new();
 
-        let credentials = auth::credential_from_cache(&jwt_decoders)
+        let credentials = auth::credential_from_cache(&jwt_service)
             .await
             .ok_or_else(|| anyhow!("You are not authenticated, try login in first"))?;
         client.set_credential(credentials);

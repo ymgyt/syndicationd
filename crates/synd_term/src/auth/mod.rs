@@ -115,8 +115,8 @@ fn cred_file() -> PathBuf {
     config::cache_dir().join("credential.json")
 }
 
-pub async fn credential_from_cache(jwt_decoders: &JwtService) -> Option<Credential> {
-    Credential::restore_from_path(cred_file().as_path(), jwt_decoders)
+pub async fn credential_from_cache(jwt_service: &JwtService) -> Option<Credential> {
+    Credential::restore_from_path(cred_file().as_path(), jwt_service)
         .inspect_err(|err| {
             tracing::error!("Restore credential from cache: {err}");
         })

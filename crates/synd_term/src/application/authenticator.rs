@@ -22,7 +22,7 @@ impl JwtService {
 
 pub struct Authenticator {
     pub device_flows: DeviceFlows,
-    pub jwt_decoders: JwtService,
+    pub jwt_service: JwtService,
 }
 
 impl Authenticator {
@@ -32,7 +32,7 @@ impl Authenticator {
                 github: DeviceFlow::new(provider::Github::default()),
                 google: DeviceFlow::new(provider::Google::default()),
             },
-            jwt_decoders: JwtService::new(),
+            jwt_service: JwtService::new(),
         }
     }
 

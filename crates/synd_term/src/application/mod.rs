@@ -121,8 +121,8 @@ impl Application {
         }
     }
 
-    pub fn jwt_decoders(&self) -> &JwtService {
-        &self.authenticator.jwt_decoders
+    pub fn jwt_service(&self) -> &JwtService {
+        &self.authenticator.jwt_service
     }
 
     pub fn set_credential(&mut self, cred: Credential) {
