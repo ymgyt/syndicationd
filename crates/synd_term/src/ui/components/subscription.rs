@@ -169,6 +169,10 @@ impl Subscription {
             let updated = feed_meta
                 .updated
                 .as_ref()
+                .or(feed_meta
+                    .entries
+                    .first()
+                    .and_then(|entry| entry.published.as_ref().or(entry.updated.as_ref())))
                 .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
             let desc = feed_meta.description.as_deref().unwrap_or("");
             let website_url = feed_meta
