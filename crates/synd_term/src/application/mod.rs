@@ -781,9 +781,6 @@ impl Application {
         provider: AuthenticationProvider,
         device_access_token: DeviceAccessTokenResponse,
     ) {
-        // TODO: remove
-        tracing::info!("{device_access_token:?}");
-
         let auth = match provider {
             AuthenticationProvider::Github => Credential::Github {
                 access_token: device_access_token.access_token,
