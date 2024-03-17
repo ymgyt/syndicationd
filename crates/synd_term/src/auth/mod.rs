@@ -19,6 +19,8 @@ pub enum AuthenticationProvider {
 pub enum CredentialError {
     #[error("google jwt expired")]
     GoogleJwtExpired { refresh_token: String },
+    #[error("google jwt email not verified")]
+    GoogleJwtEmailNotVerified,
     #[error("failed to open: {0}")]
     Open(std::io::Error),
     #[error("deserialize credential: {0}")]
@@ -64,6 +66,9 @@ impl Credential {
                     .google
                     .decode_id_token_insecure(id_token, false)
                     .map_err(CredentialError::DecodeJwt)?;
+                if !claims.email_verified {
+                    return Err(CredentialError::GoogleJwtEmailNotVerified);
+                }
                 tracing::info!("{claims:?}");
                 if !claims.is_expired(Utc::now()) {
                     return Ok(credential);
