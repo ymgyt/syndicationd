@@ -114,11 +114,12 @@ backend:
 
 # Record demo
 demo *flags:
-    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema -- rec demo.cast --overwrite "{{ flags }}"
+    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema -- rec demo.cast --overwrite {{ flags }}
 
 # Convert demo to gif
+# --rederer=resvg need to render nerd fonts and CJK
 demo2gif *flags:
-    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast assets/demo.gif {{ flags }}
+    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast assets/demo.gif --renderer=resvg {{ flags }}
     rm demo.cast
 
 changelog-auth:
