@@ -1,6 +1,6 @@
 use std::{pin::Pin, time::Duration};
 
-use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use futures_util::{FutureExt, Stream, StreamExt};
 use ratatui::{style::palette::tailwind, widgets::Widget};
 use synd_auth::device_flow::{
@@ -553,6 +553,9 @@ impl Application {
                 };
                 match key.code {
                     KeyCode::Char('q') => Some(Command::Quit),
+                    KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
+                        Some(Command::Quit)
+                    }
                     _ => None,
                 }
             }
