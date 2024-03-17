@@ -187,6 +187,7 @@ impl Subscription {
         (header, constraints, self.feeds.iter().map(row))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn render_feed_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding {
@@ -216,11 +217,17 @@ impl Subscription {
         let meta = {
             let meta = vec![
                 Line::from(vec![
-                    Span::styled("Feed Src  ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "󰗀 Feed Src  ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
                     Span::from(feed.url.as_str()),
                 ]),
                 Line::from(vec![
-                    Span::styled("Feed type ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "󰈙 Feed type ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
                     Span::from(match feed.r#type {
                         Some(FeedType::RSS0) => "RSS 0",
                         Some(FeedType::RSS1) => "RSS 1",
@@ -231,7 +238,10 @@ impl Subscription {
                     }),
                 ]),
                 Line::from(vec![
-                    Span::styled("Authors   ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "󰚼 Authors   ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
                     Span::from(if feed.authors.is_empty() {
                         Cow::Borrowed(ui::UNKNOWN_SYMBOL)
                     } else {
@@ -239,7 +249,10 @@ impl Subscription {
                     }),
                 ]),
                 Line::from(vec![
-                    Span::styled("Generator ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        " Generator ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
                     Span::from(feed.generator.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL)),
                 ]),
             ];
@@ -272,9 +285,9 @@ impl Subscription {
         };
 
         let header = Row::new([
-            Cell::new(Span::from("Published")),
-            Cell::new(Span::from("Entry")),
-            Cell::new(Span::from("Summary")),
+            Cell::new(Span::from("󰈙 Published")),
+            Cell::new(Span::from("󰯂 Entry")),
+            Cell::new(Span::from("󱙓 Summary")),
         ]);
 
         let widths = [
