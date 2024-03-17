@@ -71,27 +71,30 @@ powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-
 Usage: synd [OPTIONS] [COMMAND]
 
 Commands:
-  clear  Clear cache, log
-  help   Print this message or the help of the given subcommand(s)
+  clear   Clear cache, log
+  check   Check application conditions
+  export  Export subscribed feeds
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
       --endpoint <ENDPOINT>  synd_api endpoint [env: SYND_ENDPOINT=] [default:
-                             https://syndicationd.ymgyt.io:6100/graphql]
+                             https://api.syndicationd.ymgyt.io:6100]
       --log <LOG>            Log file path [env: SYND_LOG=] [default:
-                             /home/ymgyt/.local/share/synd/syndterm.log]
-      --theme <PALETTE>      Color palette [env: SYND_THEME=] [default: slate] [possible values: slate, gray,
-                             zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal,
-                             cyan, sky, blue, indigo, violet, purple, fuchsia, pink]
+                             /home/ymgyt/.local/share/synd/synd.log]
+      --theme <PALETTE>      Color palette [env: SYND_THEME=] [default: slate] [possible values: slate,
+                             gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green,
+                             emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink]
+      --timeout <TIMEOUT>    Client timeout [default: 30s]
   -h, --help                 Print help
   -V, --version              Print version
-```
+ ```
 
 </details>
 
 ### Authentication
 
 syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
-Currently, GitHub and Google are supported. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or ['email'](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to read the user's email. the user's email is used only as an identifier after being hashed and never stored.
+Currently, GitHub and Google are supported. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to read the user's email. the user's email is used only as an identifier after being hashed and never stored.
 
 ### Export subscribed feeds
 
