@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file.
 
 - Use nerd fond in prompt by [@ymgyt](https://github.com/ymgyt) ([b864e277](https://github.com/ymgyt/syndicationd/commit/b864e27793087d12ea63a5215df509c25854ac46))
 - Use nerd font in columns by [@ymgyt](https://github.com/ymgyt) ([278fbbe8](https://github.com/ymgyt/syndicationd/commit/278fbbe833abd770d25c41f7e9e4267514ba2714))
+- Support google login by [@ymgyt](https://github.com/ymgyt) ([a55c3109](https://github.com/ymgyt/syndicationd/commit/a55c31094a723e6541300898b8dab875b11a6f4a))
+- Error if google jwt email is not verified by [@ymgyt](https://github.com/ymgyt) ([a8ee97d0](https://github.com/ymgyt/syndicationd/commit/a8ee97d05714f9ac9f54df61ddfc8ea1bca2cea8))
+- Add nerd font to feed detail component by [@ymgyt](https://github.com/ymgyt) ([1379a297](https://github.com/ymgyt/syndicationd/commit/1379a297d6129675225f16c578aa51930293cda9))
 
 ### Refactor
 
