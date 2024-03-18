@@ -45,8 +45,8 @@ impl Tabs {
 impl Tabs {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = Rect {
-            x: area.x + 4,
-            width: area.width - 6,
+            x: area.x + 3,
+            width: area.width - 5,
             ..area
         };
         // left padding * 2 + len("Entries" + "Feeds") = 20

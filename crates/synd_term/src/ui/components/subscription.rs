@@ -12,7 +12,6 @@ use ratatui::{
     },
 };
 use synd_feed::types::FeedType;
-use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     application::{Direction, IndexOutOfRange, ListAction},
@@ -92,7 +91,7 @@ impl Subscription {
 
 impl Subscription {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let vertical = Layout::vertical([Constraint::Min(0), Constraint::Max(19)]);
+        let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [feeds_area, feed_detail_area] = vertical.areas(area);
 
         self.render_feeds(feeds_area, buf, cx);
@@ -113,6 +112,12 @@ impl Subscription {
         let (header, widths, rows) = self.feed_rows(cx);
 
         let feeds = Table::new(rows, widths)
+            .block(Block::new().padding(Padding {
+                left: 0,
+                right: 2,
+                top: 0,
+                bottom: 0,
+            }))
             .header(header.style(cx.theme.subscription.header))
             .column_spacing(2)
             .style(cx.theme.subscription.background)
@@ -195,8 +200,8 @@ impl Subscription {
     fn render_feed_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding {
-                left: 1,
-                right: 1,
+                left: 3,
+                right: 3,
                 top: 1,
                 bottom: 1,
             })
@@ -264,14 +269,6 @@ impl Subscription {
         };
         Widget::render(meta, meta_area, buf);
 
-        let title_width = feed
-            .entries
-            .iter()
-            .filter_map(|entry| entry.title.as_deref())
-            .map(|title| title.graphemes(true).count())
-            .max()
-            .unwrap_or(0);
-
         let entry = |entry: &EntryMeta| {
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let published = entry
@@ -296,8 +293,8 @@ impl Subscription {
 
         let widths = [
             Constraint::Length(10),
-            Constraint::Length(title_width.try_into().unwrap_or(100)),
-            Constraint::Max(200),
+            Constraint::Fill(1),
+            Constraint::Fill(2),
         ];
         let rows = feed.entries.iter().map(entry);
         let table = Table::new(rows, widths)

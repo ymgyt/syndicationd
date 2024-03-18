@@ -6,7 +6,7 @@ pub mod theme;
 pub mod widgets;
 
 pub const UNKNOWN_SYMBOL: &str = "-";
-pub const TABLE_HIGHLIGHT_SYMBOL: &str = ">> ";
+pub const TABLE_HIGHLIGHT_SYMBOL: &str = " ";
 
 pub struct Context<'a> {
     pub theme: &'a Theme,

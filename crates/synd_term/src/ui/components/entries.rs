@@ -68,7 +68,7 @@ impl Entries {
 
 impl Entries {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let vertical = Layout::vertical([Constraint::Percentage(70), Constraint::Percentage(30)]);
+        let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [entries_area, summary_area] = vertical.areas(area);
 
         self.render_entries(entries_area, buf, cx);
@@ -161,8 +161,8 @@ impl Entries {
     fn render_summary(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding {
-                left: 1,
-                right: 1,
+                left: 3,
+                right: 3,
                 top: 1,
                 bottom: 1,
             })
