@@ -42,17 +42,23 @@ impl Prompt {
 
     #[allow(clippy::cast_possible_truncation)]
     fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
-        let keys = &[("q", ""), ("Tab", "󰹳"), ("j/k", "󰹹"), ("r", "󰑓")][..];
+        let pre_keys = &[("Tab", "󰹳"), ("j/k", "󰹹"), ("r", "󰑓")][..];
+        let suf_keys = &[("q", "")][..];
         let per_screen_keys = match tab {
-            Some(Tab::Feeds) => [("a", "󰑫"), ("d", "󰼡"), ("Ent", "󰏌")].iter().chain(keys),
-            Some(Tab::Entries) => [("Ent", "󰏌")].iter().chain(keys),
+            Some(Tab::Feeds) => pre_keys
+                .iter()
+                .chain(&[("Ent", "󰏌"), ("a", "󰑫"), ("d", "󰼡")])
+                .chain(suf_keys),
+            Some(Tab::Entries) => pre_keys.iter().chain(&[("Ent", "󰏌")]).chain(suf_keys),
             // Imply login
-            None => [("q", ""), ("j/k", "󰹹")].iter().chain(&[("Ent", "󰏌")][..]),
+            None => [("j/k", "󰹹")][..]
+                .iter()
+                .chain(&[("Ent", "󰏌")])
+                .chain(&[("q", "")][..]),
         };
 
         let spans = per_screen_keys
             .flat_map(|(key, desc)| {
-                // let key = Span::styled(format!(" {key}"), cx.theme.prompt.key);
                 let desc = Span::styled(format!(" {key} {desc} "), cx.theme.prompt.key_desc);
                 let sep = Span::styled("", cx.theme.prompt.key);
                 [desc, sep]
