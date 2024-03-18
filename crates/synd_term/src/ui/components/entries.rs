@@ -172,7 +172,7 @@ impl Entries {
                     .alignment(Alignment::Center),
             )
             .borders(Borders::TOP)
-            .border_type(BorderType::Thick);
+            .border_type(BorderType::Plain);
 
         let inner = block.inner(area);
         Widget::render(block, area, buf);

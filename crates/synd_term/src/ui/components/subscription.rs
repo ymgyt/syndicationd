@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
-    style::{Modifier, Style},
+    style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
         block::{Position, Title},
@@ -202,8 +202,8 @@ impl Subscription {
             .padding(Padding {
                 left: 3,
                 right: 3,
-                top: 1,
-                bottom: 1,
+                top: 0,
+                bottom: 0,
             })
             .title(
                 Title::from("Feed Detail")
@@ -211,7 +211,7 @@ impl Subscription {
                     .alignment(Alignment::Center),
             )
             .borders(Borders::TOP)
-            .border_type(BorderType::Thick);
+            .border_type(BorderType::Plain);
 
         let inner = block.inner(area);
         Widget::render(block, area, buf);
@@ -220,8 +220,12 @@ impl Subscription {
             return;
         };
 
-        let vertical = Layout::vertical([Constraint::Length(5), Constraint::Min(0)]);
+        let vertical = Layout::vertical([Constraint::Length(4), Constraint::Min(0)]);
         let [meta_area, entries_area] = vertical.areas(inner);
+        let entries_area = entries_area.inner(&Margin {
+            vertical: 1,
+            horizontal: 0,
+        });
 
         let meta = {
             let meta = vec![
