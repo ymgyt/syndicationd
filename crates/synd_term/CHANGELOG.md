@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.8] 2024-03-17
+## [unreleased] __release_date__
+
+### Features
+
+- Fallback latest entries published date by [@ymgyt](https://github.com/ymgyt) ([98b57a10](https://github.com/ymgyt/syndicationd/commit/98b57a108e9b137b47e76f9e88bfa900db46ff8a))
+- Handle ctrl-c by [@ymgyt](https://github.com/ymgyt) ([ef2842e2](https://github.com/ymgyt/syndicationd/commit/ef2842e2cdd1bf4e0468e69e5cdea06869fa17b3))
+- Make the space policy consistent by [@ymgyt](https://github.com/ymgyt) ([0a3d9dfb](https://github.com/ymgyt/syndicationd/commit/0a3d9dfb8c91f8ea2875dd99a423ae3189f17e56))
+- Change detail border type by [@ymgyt](https://github.com/ymgyt) ([099c8524](https://github.com/ymgyt/syndicationd/commit/099c8524fa8a2af1fefd1bab3f8cd6cb91edee42))
+- Change feed meta widget from list to table by [@ymgyt](https://github.com/ymgyt) ([f583e2f2](https://github.com/ymgyt/syndicationd/commit/f583e2f27dbe11c0f6348ab43bd918877d719d6e))
+
+### Bug Fixes
+
+- Remove debug logging by [@ymgyt](https://github.com/ymgyt) ([066b3cc0](https://github.com/ymgyt/syndicationd/commit/066b3cc04490d15618a1503098fe4e1aae411198))
+
+### Refactor
+
+- Rename jwt_decoder to jwt_service by [@ymgyt](https://github.com/ymgyt) ([fa6f178c](https://github.com/ymgyt/syndicationd/commit/fa6f178cbad30c6100cde0a9c77ca2eed1eadb52))
+
+## [v0.1.8] - 2024-03-17
 
 ### Features
 
