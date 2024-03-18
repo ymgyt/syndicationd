@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
-    style::{Modifier, Style, Stylize},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
         block::{Position, Title},
-        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row, Scrollbar,
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Row, Scrollbar,
         ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
 };
@@ -202,7 +202,7 @@ impl Subscription {
             .padding(Padding {
                 left: 3,
                 right: 3,
-                top: 0,
+                top: 1,
                 bottom: 0,
             })
             .title(
@@ -220,23 +220,47 @@ impl Subscription {
             return;
         };
 
-        let vertical = Layout::vertical([Constraint::Length(4), Constraint::Min(0)]);
+        let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(0)]);
         let [meta_area, entries_area] = vertical.areas(inner);
         let entries_area = entries_area.inner(&Margin {
             vertical: 1,
             horizontal: 0,
         });
 
-        let meta = {
-            let meta = vec![
-                Line::from(vec![
+        let widths = [
+            Constraint::Length(10),
+            Constraint::Fill(1),
+            Constraint::Fill(2),
+        ];
+
+        let meta_rows = vec![
+            Row::new([
+                Cell::new(Span::styled(
+                    "󰚼 Authors",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Cell::new(Span::from(if feed.authors.is_empty() {
+                    Cow::Borrowed(ui::UNKNOWN_SYMBOL)
+                } else {
+                    Cow::Owned(feed.authors.iter().join(", "))
+                })),
+                Cell::new(Line::from(vec![
                     Span::styled(
                         "󰗀 Feed Src  ",
                         Style::default().add_modifier(Modifier::BOLD),
                     ),
                     Span::from(feed.url.as_str()),
-                ]),
-                Line::from(vec![
+                ])),
+            ]),
+            Row::new([
+                Cell::new(Span::styled(
+                    " Generator",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Cell::new(Span::from(
+                    feed.generator.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL),
+                )),
+                Cell::new(Line::from(vec![
                     Span::styled(
                         "󰈙 Feed type ",
                         Style::default().add_modifier(Modifier::BOLD),
@@ -249,29 +273,14 @@ impl Subscription {
                         Some(FeedType::JSON) => "JSON Feed",
                         None => ui::UNKNOWN_SYMBOL,
                     }),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        "󰚼 Authors   ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
-                    Span::from(if feed.authors.is_empty() {
-                        Cow::Borrowed(ui::UNKNOWN_SYMBOL)
-                    } else {
-                        Cow::Owned(feed.authors.iter().join(", "))
-                    }),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        " Generator ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
-                    Span::from(feed.generator.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL)),
-                ]),
-            ];
-            Paragraph::new(meta)
-        };
-        Widget::render(meta, meta_area, buf);
+                ])),
+            ]),
+        ];
+
+        let table = Table::new(meta_rows, widths)
+            .column_spacing(2)
+            .style(cx.theme.subscription.background);
+        Widget::render(table, meta_area, buf);
 
         let entry = |entry: &EntryMeta| {
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
@@ -295,11 +304,6 @@ impl Subscription {
             Cell::new(Span::from("󱙓 Summary")),
         ]);
 
-        let widths = [
-            Constraint::Length(10),
-            Constraint::Fill(1),
-            Constraint::Fill(2),
-        ];
         let rows = feed.entries.iter().map(entry);
         let table = Table::new(rows, widths)
             .header(header.style(cx.theme.subscription.header))
