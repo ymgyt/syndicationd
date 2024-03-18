@@ -49,7 +49,7 @@ impl Credential {
         path: &Path,
         jwt_service: &JwtService,
     ) -> Result<Self, CredentialError> {
-        tracing::info!(
+        debug!(
             path = path.display().to_string(),
             "Restore credential from cache"
         );
@@ -69,12 +69,11 @@ impl Credential {
                 if !claims.email_verified {
                     return Err(CredentialError::GoogleJwtEmailNotVerified);
                 }
-                tracing::info!("{claims:?}");
                 if !claims.is_expired(Utc::now()) {
                     return Ok(credential);
                 }
 
-                tracing::info!("Google jwt expired, trying to refresh");
+                debug!("Google jwt expired, trying to refresh");
 
                 let id_token = jwt_service
                     .google
@@ -89,7 +88,7 @@ impl Credential {
 
                 persist_credential(&credential).map_err(CredentialError::PersistCredential)?;
 
-                tracing::info!("Persist refreshed credential");
+                debug!("Persist refreshed credential");
 
                 Ok(credential)
             }
