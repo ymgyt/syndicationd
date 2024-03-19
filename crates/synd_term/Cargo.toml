@@ -11,7 +11,7 @@ repository.workspace  = true
 
 include = ["src/**/*", "CHANGELOG.md"]
 name    = "synd-term"
-version = "0.1.9"
+version = "0.1.10"
 
 [[bin]]
 name = "synd"
