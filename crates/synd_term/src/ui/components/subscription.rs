@@ -228,7 +228,7 @@ impl Subscription {
         });
 
         let widths = [
-            Constraint::Length(10),
+            Constraint::Length(11),
             Constraint::Fill(1),
             Constraint::Fill(2),
         ];
@@ -299,7 +299,7 @@ impl Subscription {
         };
 
         let header = Row::new([
-            Cell::new(Span::from("󰈙 Published")),
+            Cell::new(Span::from(" Published")),
             Cell::new(Span::from("󰯂 Entry")),
             Cell::new(Span::from("󱙓 Summary")),
         ]);

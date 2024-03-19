@@ -128,7 +128,7 @@ impl Entries {
     ) {
         let header = Row::new([
             Cell::from(" Published"),
-            Cell::from("󰯂 Title"),
+            Cell::from("󰯂 Entry"),
             Cell::from("󰑫 Feed"),
         ]);
 
