@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.9] 2024-03-18
+## [unreleased] __release_date__
+
+### Features
+
+- Make the order of keymap help consistent by [@ymgyt](https://github.com/ymgyt) ([76d385e3](https://github.com/ymgyt/syndicationd/commit/76d385e31d3f46513b4c5c39e6166f72874f16be))
+- Change time format delimiter by [@ymgyt](https://github.com/ymgyt) ([b0768bc1](https://github.com/ymgyt/syndicationd/commit/b0768bc11980f9a620b6857639a33a0c01cc3fe8))
+- Change entry column name by [@ymgyt](https://github.com/ymgyt) ([fd15bf63](https://github.com/ymgyt/syndicationd/commit/fd15bf633dab04159b69754901b6962cdc3f6d38))
+
+### Miscellaneous Tasks
+
+- Set log level for the credential restore process to debug by [@ymgyt](https://github.com/ymgyt) ([30dc7a2f](https://github.com/ymgyt/syndicationd/commit/30dc7a2f71e34ce431435acdc21c170c86c677b0))
+
+## [v0.1.9] - 2024-03-18
 
 ### Features
 
