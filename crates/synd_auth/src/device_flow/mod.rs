@@ -181,7 +181,7 @@ impl<'s> DeviceAccessTokenRequest<'s> {
 
 /// Successful Response
 /// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeviceAccessTokenResponse {
     /// the access token issued by the authorization server
     pub access_token: String,

@@ -14,7 +14,7 @@ pub use time::{Time, TimeExt};
 mod page_info;
 pub use page_info::PageInfo;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Link {
     pub href: String,
     pub rel: Option<String>,
@@ -44,7 +44,7 @@ impl From<mutation::subscribe_feed::Link> for Link {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EntryMeta {
     pub title: Option<String>,
     pub published: Option<Time>,
@@ -82,7 +82,7 @@ impl EntryMeta {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Feed {
     pub r#type: Option<FeedType>,
     pub title: Option<String>,
@@ -144,7 +144,7 @@ impl From<mutation::subscribe_feed::Feed> for Feed {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     pub title: Option<String>,
     pub published: Option<Time>,

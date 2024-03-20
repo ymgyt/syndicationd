@@ -1,6 +1,6 @@
 use crate::client::query;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PageInfo {
     pub has_next_page: bool,
     pub end_cursor: Option<String>,

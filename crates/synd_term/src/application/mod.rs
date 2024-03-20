@@ -1,6 +1,6 @@
 use std::{pin::Pin, time::Duration};
 
-use crossterm::event::{Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
 use ratatui::{style::palette::tailwind, widgets::Widget};
 use synd_auth::device_flow::{
@@ -16,6 +16,7 @@ use crate::{
     config,
     interact::Interactor,
     job::Jobs,
+    keymap::{KeyTrie, Keymaps},
     terminal::Terminal,
     ui::{
         self,
@@ -77,8 +78,8 @@ pub struct Application {
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
+    keymaps: Keymaps,
 
-    prev_key_seq: Vec<KeyEvent>,
     screen: Screen,
     should_render: bool,
     should_quit: bool,
@@ -100,9 +101,9 @@ impl Application {
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             theme: Theme::with_palette(&tailwind::BLUE),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
-            prev_key_seq: Vec::with_capacity(2),
             screen: Screen::Login,
             config,
+            keymaps: Keymaps::default(),
             should_quit: false,
             should_render: false,
         }
@@ -230,14 +231,26 @@ impl Application {
                 Command::Idle => {
                     self.handle_idle();
                 }
-                Command::Authenticate(provider) => match provider {
-                    AuthenticationProvider::Github => {
-                        self.authenticate(provider, self.authenticator.device_flows.github.clone());
+                Command::Authenticate => {
+                    if self.components.auth.state() != &AuthenticateState::NotAuthenticated {
+                        continue;
                     }
-                    AuthenticationProvider::Google => {
-                        self.authenticate(provider, self.authenticator.device_flows.google.clone());
+                    let provider = self.components.auth.selected_provider();
+                    match provider {
+                        AuthenticationProvider::Github => {
+                            self.authenticate(
+                                provider,
+                                self.authenticator.device_flows.github.clone(),
+                            );
+                        }
+                        AuthenticationProvider::Google => {
+                            self.authenticate(
+                                provider,
+                                self.authenticator.device_flows.google.clone(),
+                            );
+                        }
                     }
-                },
+                }
                 Command::MoveAuthenticationProvider(direction) => {
                     self.components.auth.move_selection(&direction);
                     self.should_render = true;
@@ -424,138 +437,29 @@ impl Application {
             CrosstermEvent::Key(key) => {
                 self.reset_idle_timer();
 
-                // TODO: impl helix like KeyTrie
                 tracing::debug!("Handle key event: {key:?}");
                 match self.screen {
-                    Screen::Login => match key.code {
-                        KeyCode::Enter => {
-                            if self.components.auth.state() == &AuthenticateState::NotAuthenticated
-                            {
-                                return Some(Command::Authenticate(
-                                    self.components.auth.selected_provider(),
-                                ));
-                            };
-                        }
-                        KeyCode::Char('j') => {
-                            return Some(Command::MoveAuthenticationProvider(Direction::Down))
-                        }
-                        KeyCode::Char('k') => {
-                            return Some(Command::MoveAuthenticationProvider(Direction::Up))
-                        }
+                    Screen::Login => match self.keymaps.login.search(&[key]) {
+                        Some(KeyTrie::Command(cmd)) => return Some(cmd),
                         _ => {}
                     },
-                    Screen::Browse => match key.code {
-                        KeyCode::Tab => return Some(Command::MoveTabSelection(Direction::Right)),
-                        KeyCode::BackTab => {
-                            return Some(Command::MoveTabSelection(Direction::Left))
-                        }
+                    Screen::Browse => match self.keymaps.tabs.search(&[key]) {
+                        Some(KeyTrie::Command(cmd)) => return Some(cmd),
                         _ => match self.components.tabs.current() {
-                            Tab::Entries => match key.code {
-                                KeyCode::Char('j') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::MoveEntry(Direction::Down));
-                                }
-                                KeyCode::Char('k') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::MoveEntry(Direction::Up));
-                                }
-                                KeyCode::Char('r') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::ReloadEntries);
-                                }
-                                KeyCode::Enter => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::OpenEntry);
-                                }
-                                KeyCode::Char('g') => match self.prev_key_seq.as_slice() {
-                                    &[KeyEvent {
-                                        code: KeyCode::Char('g'),
-                                        ..
-                                    }] => {
-                                        self.prev_key_seq.clear();
-                                        return Some(Command::MoveEntryFirst);
-                                    }
-                                    _ => {
-                                        self.prev_key_seq.push(key);
-                                    }
-                                },
-                                KeyCode::Char('e') => match self.prev_key_seq.as_slice() {
-                                    &[KeyEvent {
-                                        code: KeyCode::Char('g'),
-                                        ..
-                                    }] => {
-                                        self.prev_key_seq.clear();
-                                        return Some(Command::MoveEntryLast);
-                                    }
-                                    _ => {
-                                        self.prev_key_seq.clear();
-                                    }
-                                },
-                                _ => {
-                                    self.prev_key_seq.clear();
-                                }
+                            Tab::Entries => match self.keymaps.entries.search(&[key]) {
+                                Some(KeyTrie::Command(cmd)) => return Some(cmd),
+                                _ => {}
                             },
-                            Tab::Feeds => match key.code {
-                                KeyCode::Char('a') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::PromptFeedSubscription);
-                                }
-                                KeyCode::Char('d') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::PromptFeedUnsubscription);
-                                }
-                                KeyCode::Char('j') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::MoveSubscribedFeed(Direction::Down));
-                                }
-                                KeyCode::Char('k') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::MoveSubscribedFeed(Direction::Up));
-                                }
-                                KeyCode::Char('r') => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::ReloadSubscription);
-                                }
-                                KeyCode::Enter => {
-                                    self.prev_key_seq.clear();
-                                    return Some(Command::OpenFeed);
-                                }
-                                KeyCode::Char('g') => match self.prev_key_seq.as_slice() {
-                                    &[KeyEvent {
-                                        code: KeyCode::Char('g'),
-                                        ..
-                                    }] => {
-                                        self.prev_key_seq.clear();
-                                        return Some(Command::MoveSubscribedFeedFirst);
-                                    }
-                                    _ => {
-                                        self.prev_key_seq.push(key);
-                                    }
-                                },
-                                KeyCode::Char('e') => match self.prev_key_seq.as_slice() {
-                                    &[KeyEvent {
-                                        code: KeyCode::Char('g'),
-                                        ..
-                                    }] => {
-                                        self.prev_key_seq.clear();
-                                        return Some(Command::MoveSubscribedFeedLast);
-                                    }
-                                    _ => {
-                                        self.prev_key_seq.clear();
-                                    }
-                                },
-                                _ => {
-                                    self.prev_key_seq.clear();
-                                }
+                            Tab::Feeds => match self.keymaps.subscription.search(&[key]) {
+                                Some(KeyTrie::Command(cmd)) => return Some(cmd),
+                                _ => {}
                             },
                         },
                     },
-                };
-                match key.code {
-                    KeyCode::Char('q') => Some(Command::Quit),
-                    KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
-                        Some(Command::Quit)
-                    }
+                }
+
+                match self.keymaps.global.search(&[key]) {
+                    Some(crate::keymap::KeyTrie::Command(cmd)) => Some(cmd),
                     _ => None,
                 }
             }

@@ -114,7 +114,7 @@ impl Subscription {
         let feeds = Table::new(rows, widths)
             .block(Block::new().padding(Padding {
                 left: 0,
-                right: 2,
+                right: 0,
                 top: 0,
                 bottom: 0,
             }))

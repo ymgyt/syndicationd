@@ -16,7 +16,7 @@ pub mod subscription {
     #[allow(dead_code)]
     type ID = String;
     type Rfc3339Time = crate::client::scalar::Rfc3339Time;
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     pub enum FeedType {
         ATOM,
         RSS1,
@@ -56,7 +56,7 @@ pub mod subscription {
         pub first: Option<Int>,
     }
     impl Variables {}
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct Feed {
         pub id: ID,
         #[serde(rename = "type")]
@@ -72,28 +72,28 @@ pub mod subscription {
         pub links: FeedLinks,
         pub authors: FeedAuthors,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FeedEntries {
         pub nodes: Vec<FeedEntriesNodes>,
     }
     pub type FeedEntriesNodes = EntryMeta;
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FeedLinks {
         pub nodes: Vec<FeedLinksNodes>,
     }
     pub type FeedLinksNodes = Link;
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FeedAuthors {
         pub nodes: Vec<String>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct EntryMeta {
         pub title: Option<String>,
         pub published: Option<Rfc3339Time>,
         pub updated: Option<Rfc3339Time>,
         pub summary: Option<String>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct Link {
         pub href: String,
         pub rel: Option<String>,
@@ -101,22 +101,22 @@ pub mod subscription {
         pub media_type: Option<String>,
         pub title: Option<String>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct PageInfo {
         #[serde(rename = "hasNextPage")]
         pub has_next_page: Boolean,
         #[serde(rename = "endCursor")]
         pub end_cursor: Option<String>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ResponseData {
         pub output: SubscriptionOutput,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct SubscriptionOutput {
         pub feeds: SubscriptionOutputFeeds,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct SubscriptionOutputFeeds {
         pub nodes: Vec<SubscriptionOutputFeedsNodes>,
         #[serde(rename = "pageInfo")]
@@ -159,7 +159,7 @@ pub mod entries {
         pub first: Int,
     }
     impl Variables {}
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct Entry {
         pub title: Option<String>,
         pub published: Option<Rfc3339Time>,
@@ -170,27 +170,27 @@ pub mod entries {
         pub feed: EntryFeed,
     }
     pub type EntryFeed = FeedMeta;
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct FeedMeta {
         pub title: Option<String>,
         pub url: String,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct PageInfo {
         #[serde(rename = "hasNextPage")]
         pub has_next_page: Boolean,
         #[serde(rename = "endCursor")]
         pub end_cursor: Option<String>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ResponseData {
         pub output: EntriesOutput,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct EntriesOutput {
         pub entries: EntriesOutputEntries,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct EntriesOutputEntries {
         pub nodes: Vec<EntriesOutputEntriesNodes>,
         #[serde(rename = "pageInfo")]
@@ -232,28 +232,28 @@ pub mod export_subscription {
         pub first: Int,
     }
     impl Variables {}
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ResponseData {
         pub output: ExportSubscriptionOutput,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ExportSubscriptionOutput {
         pub feeds: ExportSubscriptionOutputFeeds,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ExportSubscriptionOutputFeeds {
         #[serde(rename = "pageInfo")]
         pub page_info: ExportSubscriptionOutputFeedsPageInfo,
         pub nodes: Vec<ExportSubscriptionOutputFeedsNodes>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ExportSubscriptionOutputFeedsPageInfo {
         #[serde(rename = "hasNextPage")]
         pub has_next_page: Boolean,
         #[serde(rename = "endCursor")]
         pub end_cursor: Option<String>,
     }
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub struct ExportSubscriptionOutputFeedsNodes {
         pub title: Option<String>,
         pub url: String,

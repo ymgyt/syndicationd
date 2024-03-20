@@ -1,6 +1,6 @@
 use crate::{client::query, types};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FetchEntriesPayload {
     pub entries: Vec<types::Entry>,
     pub page_info: types::PageInfo,
