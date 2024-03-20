@@ -2,6 +2,7 @@ set shell := ["nu", "-c"]
 
 kvsd_user := "synduser"
 github_pat := env_var_or_default("GH_PAT", "")
+synd_endpoint := env_var_or_default("SYND_ENDPOITINT", "https://localhost:5959")
 otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT", "")
 term_dir := "crates/synd_term"
@@ -64,7 +65,7 @@ gen-gql:
       --schema-path crates/synd_term/gql/schema.json \
       --output-directory crates/synd_term/src/client \
       --variables-derives "Debug" \
-      --response-derives "Debug" \
+      --response-derives "Debug,Clone" \
       --custom-scalars-module "crate::client::scalar" \
       crates/synd_term/gql/query.gql
 
@@ -72,7 +73,7 @@ gen-gql:
       --schema-path crates/synd_term/gql/schema.json \
       --output-directory crates/synd_term/src/client \
       --variables-derives "Debug" \
-      --response-derives "Debug" \
+      --response-derives "Debug,Clone" \
       --custom-scalars-module "crate::client::scalar" \
       crates/synd_term/gql/mutation.gql
 
@@ -102,7 +103,7 @@ api *flags:
 
 # Run term
 term *flags:
-    cd crates/synd_term; SYND_LOG=info cargo run -- --log /tmp/syndterm.log --endpoint https://localhost:5959 {{ flags }}
+    cd crates/synd_term; SYND_LOG=info SYND_ENDPOINT={{ synd_endpoint }} cargo run -- --log /tmp/syndterm.log {{ flags }}
 
 # Run opentelemetry-collector-contrib
 @otelcol config:
