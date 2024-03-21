@@ -24,6 +24,7 @@ struct Keymap {
     id: KeymapId,
     enable: bool,
     trie: KeyTrie,
+    pending_keys: Vec<KeyEvent>,
 }
 
 impl Keymap {
@@ -32,13 +33,29 @@ impl Keymap {
             id,
             enable: false,
             trie,
+            pending_keys: Vec::with_capacity(2),
         }
     }
 
     fn search(&mut self, event: &KeyEvent) -> Option<Command> {
-        match self.trie.search(&[event]) {
-            Some(KeyTrie::Command(cmd)) => Some(cmd),
-            Some(KeyTrie::Node(_)) | None => None,
+        let first = self.pending_keys.first().unwrap_or(event);
+        let trie = match self.trie.search(&[*first]) {
+            Some(KeyTrie::Command(cmd)) => return Some(cmd),
+            Some(KeyTrie::Node(node)) => KeyTrie::Node(node),
+            None => return None,
+        };
+
+        self.pending_keys.push(*event);
+        match trie.search(&self.pending_keys[1..]) {
+            Some(KeyTrie::Command(cmd)) => {
+                self.pending_keys.drain(..);
+                Some(cmd)
+            }
+            Some(KeyTrie::Node(_)) => None,
+            _ => {
+                self.pending_keys.drain(..);
+                None
+            }
         }
     }
 }
@@ -114,7 +131,7 @@ pub enum KeyTrie {
 }
 
 impl KeyTrie {
-    pub fn search(&self, keys: &[&KeyEvent]) -> Option<KeyTrie> {
+    pub fn search(&self, keys: &[KeyEvent]) -> Option<KeyTrie> {
         let mut trie = self;
         for key in keys {
             trie = match trie {
