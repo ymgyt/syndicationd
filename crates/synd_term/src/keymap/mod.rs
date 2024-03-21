@@ -9,8 +9,41 @@ pub mod macros;
 
 use crate::command::Command;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeymapId {
+    Global = 0,
+    Login = 1,
+    Tabs = 2,
+    Entries = 3,
+    Subscription = 4,
+}
+
 #[derive(Debug)]
-pub struct Keymaps {
+struct Keymap {
+    #[allow(unused)]
+    id: KeymapId,
+    enable: bool,
+    trie: KeyTrie,
+}
+
+impl Keymap {
+    fn new(id: KeymapId, trie: KeyTrie) -> Self {
+        Self {
+            id,
+            enable: false,
+            trie,
+        }
+    }
+
+    fn search(&mut self, event: &KeyEvent) -> Option<Command> {
+        match self.trie.search(&[event]) {
+            Some(KeyTrie::Command(cmd)) => Some(cmd),
+            Some(KeyTrie::Node(_)) | None => None,
+        }
+    }
+}
+
+pub struct KeymapsConfig {
     pub login: KeyTrie,
     pub tabs: KeyTrie,
     pub entries: KeyTrie,
@@ -18,9 +51,59 @@ pub struct Keymaps {
     pub global: KeyTrie,
 }
 
-impl Default for Keymaps {
+impl Default for KeymapsConfig {
     fn default() -> Self {
         default::default()
+    }
+}
+
+#[derive(Debug)]
+pub struct Keymaps {
+    keymaps: Box<[Keymap; 5]>,
+}
+
+impl Keymaps {
+    pub fn new(config: KeymapsConfig) -> Self {
+        // order is matter
+        let keymaps = [
+            Keymap::new(KeymapId::Global, config.global),
+            Keymap::new(KeymapId::Login, config.login),
+            Keymap::new(KeymapId::Tabs, config.tabs),
+            Keymap::new(KeymapId::Entries, config.entries),
+            Keymap::new(KeymapId::Subscription, config.subscription),
+        ];
+
+        Self {
+            keymaps: Box::new(keymaps),
+        }
+    }
+
+    pub fn enable(&mut self, id: KeymapId) {
+        self.keymaps[id as usize].enable = true;
+    }
+
+    pub fn disable(&mut self, id: KeymapId) {
+        self.keymaps[id as usize].enable = false;
+    }
+
+    pub fn toggle(&mut self, id: KeymapId) {
+        let enable = self.keymaps[id as usize].enable;
+        self.keymaps[id as usize].enable = !enable;
+    }
+
+    pub fn search(&mut self, event: KeyEvent) -> Option<Command> {
+        for keymap in self.keymaps.iter_mut().rev().filter(|k| k.enable) {
+            if let Some(cmd) = keymap.search(&event) {
+                return Some(cmd);
+            }
+        }
+        None
+    }
+}
+
+impl Default for Keymaps {
+    fn default() -> Self {
+        Self::new(KeymapsConfig::default())
     }
 }
 
@@ -31,7 +114,7 @@ pub enum KeyTrie {
 }
 
 impl KeyTrie {
-    pub fn search(&self, keys: &[KeyEvent]) -> Option<KeyTrie> {
+    pub fn search(&self, keys: &[&KeyEvent]) -> Option<KeyTrie> {
         let mut trie = self;
         for key in keys {
             trie = match trie {

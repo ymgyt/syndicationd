@@ -16,7 +16,7 @@ use crate::{
     config,
     interact::Interactor,
     job::Jobs,
-    keymap::{KeyTrie, Keymaps},
+    keymap::{KeymapId, Keymaps},
     terminal::Terminal,
     ui::{
         self,
@@ -91,6 +91,10 @@ impl Application {
     }
 
     pub fn with(terminal: Terminal, client: Client, config: Config) -> Self {
+        let mut keymaps = Keymaps::default();
+        keymaps.enable(KeymapId::Global);
+        keymaps.enable(KeymapId::Login);
+
         Self {
             terminal,
             client,
@@ -103,7 +107,7 @@ impl Application {
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
             config,
-            keymaps: Keymaps::default(),
+            keymaps,
             should_quit: false,
             should_render: false,
         }
@@ -129,6 +133,9 @@ impl Application {
     pub fn set_credential(&mut self, cred: Credential) {
         self.client.set_credential(cred);
         self.components.auth.authenticated();
+        self.keymaps.disable(KeymapId::Login);
+        self.keymaps.enable(KeymapId::Tabs);
+        self.keymaps.enable(KeymapId::Entries);
         self.initial_fetch();
         self.screen = Screen::Browse;
         self.should_render = true;
@@ -281,6 +288,9 @@ impl Application {
                     self.complete_device_authroize_flow(provider, device_access_token);
                 }
                 Command::MoveTabSelection(direction) => {
+                    self.keymaps.toggle(KeymapId::Entries);
+                    self.keymaps.toggle(KeymapId::Subscription);
+
                     match self.components.tabs.move_selection(&direction) {
                         Tab::Feeds if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
@@ -424,7 +434,6 @@ impl Application {
             .expect("Failed to render");
     }
 
-    #[allow(clippy::single_match, clippy::too_many_lines)]
     fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) -> Option<Command> {
         match event.unwrap() {
             CrosstermEvent::Resize(columns, rows) => {
@@ -435,33 +444,10 @@ impl Application {
                 ..
             }) => None,
             CrosstermEvent::Key(key) => {
-                self.reset_idle_timer();
-
                 tracing::debug!("Handle key event: {key:?}");
-                match self.screen {
-                    Screen::Login => match self.keymaps.login.search(&[key]) {
-                        Some(KeyTrie::Command(cmd)) => return Some(cmd),
-                        _ => {}
-                    },
-                    Screen::Browse => match self.keymaps.tabs.search(&[key]) {
-                        Some(KeyTrie::Command(cmd)) => return Some(cmd),
-                        _ => match self.components.tabs.current() {
-                            Tab::Entries => match self.keymaps.entries.search(&[key]) {
-                                Some(KeyTrie::Command(cmd)) => return Some(cmd),
-                                _ => {}
-                            },
-                            Tab::Feeds => match self.keymaps.subscription.search(&[key]) {
-                                Some(KeyTrie::Command(cmd)) => return Some(cmd),
-                                _ => {}
-                            },
-                        },
-                    },
-                }
 
-                match self.keymaps.global.search(&[key]) {
-                    Some(crate::keymap::KeyTrie::Command(cmd)) => Some(cmd),
-                    _ => None,
-                }
+                self.reset_idle_timer();
+                self.keymaps.search(key)
             }
             _ => None,
         }

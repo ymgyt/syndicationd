@@ -1,6 +1,6 @@
-use crate::keymap::{macros::keymap, Keymaps};
+use crate::keymap::{macros::keymap, KeymapsConfig};
 
-pub fn default() -> Keymaps {
+pub fn default() -> KeymapsConfig {
     let login = keymap!({
         "enter" => authenticate,
         "k" => move_up_authentication_provider,
@@ -36,7 +36,7 @@ pub fn default() -> Keymaps {
         "q" | "C-c" =>  quit ,
     });
 
-    Keymaps {
+    KeymapsConfig {
         login,
         tabs,
         entries,
