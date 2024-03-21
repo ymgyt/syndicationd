@@ -142,7 +142,7 @@ impl JwtService {
             .read()
             .unwrap()
             .get(kid)
-            .map(Arc::clone)
+            .cloned()
             .ok_or(JwtError::DecodingKeyPemNotFound)
     }
 
