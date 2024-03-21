@@ -96,6 +96,27 @@ Options:
 syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
 Currently, GitHub and Google are supported. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to read the user's email. the user's email is used only as an identifier after being hashed and never stored.
 
+### Keymap
+
+<details>
+<summary>Click to show a keymap table</summary>
+
+| Key     | Description                          |
+| ---     | ---                                  |
+| `k`     | Move up                              |
+| `j`     | Move down                            |
+| `Tab`   | Switch Tab                           |
+| `Enter` | Open entry/feed                      |
+| `q`     | Quit app                             |
+| `a`     | Add feed subscription(on Feeds Tab)  |
+| `d`     | Delete subscribed feed(on Feeds Tab) |
+| `r`     | Reload entries/feeds                 |
+
+</details>
+
+for more details, refer to [`keymap/default.rs`](https://github.com/ymgyt/syndicationd/blob/main/crates/synd_term/src/keymap/default.rs)
+
+
 ### Export subscribed feeds
 
 To export subscribed feeds, execute the `synd export` command.  
