@@ -103,14 +103,15 @@ Currently, GitHub and Google are supported. The only scope syndicationd requires
 
 | Key     | Description                          |
 | ---     | ---                                  |
-| `k`     | Move up                              |
-| `j`     | Move down                            |
+| `k/j`   | Move up/down                         |
+| `gg`    | Go to first                          |
+| `ge`    | Go to end                            |
 | `Tab`   | Switch Tab                           |
 | `Enter` | Open entry/feed                      |
-| `q`     | Quit app                             |
 | `a`     | Add feed subscription(on Feeds Tab)  |
 | `d`     | Delete subscribed feed(on Feeds Tab) |
 | `r`     | Reload entries/feeds                 |
+| `q`     | Quit app                             |
 
 </details>
 
