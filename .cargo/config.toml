@@ -1,4 +1,5 @@
 [build]
 # to use tokio_metrics
-rustdocflags = ["tokio_unstable"]
-rustflags    = ["--cfg", "tokio_unstable"]
+# cause 'too many file operands' on doctest
+# rustdocflags = ["tokio_unstable"]
+rustflags = ["--cfg", "tokio_unstable"]
