@@ -3028,6 +3028,7 @@ dependencies = [
  "synd-o11y",
  "thiserror",
  "tokio",
+ "tokio-metrics",
  "tower",
  "tower-http",
  "tracing",
@@ -3314,6 +3315,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.52",
+]
+
+[[package]]
+name = "tokio-metrics"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eace09241d62c98b7eeb1107d4c5c64ca3bd7da92e8c218c153ab3a78f9be112"
+dependencies = [
+ "futures-util",
+ "pin-project-lite",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

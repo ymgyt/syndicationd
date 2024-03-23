@@ -1,0 +1,4 @@
+[build]
+# to use tokio_metrics
+rustdocflags = ["tokio_unstable"]
+rustflags    = ["--cfg", "tokio_unstable"]

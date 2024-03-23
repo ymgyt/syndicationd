@@ -1,8 +1,12 @@
+use std::time::Duration;
+
 use fdlimit::Outcome;
 use synd_o11y::{
+    metric,
     opentelemetry::OpenTelemetryGuard,
     tracing_subscriber::otel_metrics::{self, metrics_event_filter},
 };
+use tokio_metrics::RuntimeMonitor;
 use tracing::{error, info};
 
 use synd_api::{
@@ -100,12 +104,7 @@ async fn run(
     listen_and_serve(dep, bind.into(), shutdown).await
 }
 
-#[tokio::main]
-async fn main() {
-    let args = args::parse();
-    let _guard = init_tracing(&args.o11y);
-    let shutdown = Shutdown::watch_signal();
-
+fn init_file_descriptor_limit() {
     fdlimit::raise_fd_limit()
         .inspect(|outcome| {
             match outcome {
@@ -117,6 +116,29 @@ async fn main() {
             };
         })
         .ok();
+}
+
+fn init_runtime_monitor() {
+    let handle = tokio::runtime::Handle::current();
+    let runtime_monitor = RuntimeMonitor::new(&handle);
+    tokio::spawn(async move {
+        for interval in runtime_monitor.intervals() {
+            metric!(counter.runtime.poll = interval.total_polls_count);
+            metric!(counter.runtime.busy_duration = interval.total_busy_duration.as_secs_f64());
+
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+    });
+}
+
+#[tokio::main]
+async fn main() {
+    let args = args::parse();
+    let _guard = init_tracing(&args.o11y);
+    let shutdown = Shutdown::watch_signal();
+
+    init_file_descriptor_limit();
+    init_runtime_monitor();
 
     if let Err(err) = run(args, shutdown).await {
         if let Some(err) = err.downcast_ref::<ConnectKvsdFailed>() {
