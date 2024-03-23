@@ -58,4 +58,7 @@ introspection = []
 workspace = true
 
 [package.metadata.dist]
-dist = true
+# Currently, cargo-dist does not respect .cargo/config.toml at workspace toplevel
+# this cause compile error dut to tokio-metrics which expect tokio-unstable is enabled
+# https://github.com/axodotdev/cargo-dist/issues/513
+dist = false
