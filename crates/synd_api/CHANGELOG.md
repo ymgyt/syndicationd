@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.6] 2024-03-17
+## [unreleased] __release_date__
+
+### Features
+
+- Use tokio-metrics to get runtime metrics by [@ymgyt](https://github.com/ymgyt) ([ed3b881d](https://github.com/ymgyt/syndicationd/commit/ed3b881d37888a9bdecb7653e6b9a46c5c71bd22))
+
+## [v0.1.6] - 2024-03-17
 
 ### Features
 
