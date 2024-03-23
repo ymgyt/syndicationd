@@ -17,24 +17,28 @@ pub mod handler {
     use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
     use axum::{response::IntoResponse, Extension};
     use synd_o11y::audit_span;
+    use tokio_metrics::TaskMonitor;
     use tracing::Instrument;
 
-    use crate::principal::Principal;
-
-    use super::SyndSchema;
+    use crate::{principal::Principal, serve::Context};
 
     pub async fn graphiql() -> impl IntoResponse {
         axum::response::Html(GraphiQLSource::build().endpoint("/graphql").finish())
     }
 
     pub async fn graphql(
-        Extension(schema): Extension<SyndSchema>,
+        Extension(Context {
+            schema,
+            gql_monitor,
+        }): Extension<Context>,
         Extension(principal): Extension<Principal>,
         req: GraphQLRequest,
     ) -> GraphQLResponse {
         // Inject authentication
         let req = req.into_inner().data(principal);
-        schema.execute(req).instrument(audit_span!()).await.into()
+        TaskMonitor::instrument(&gql_monitor, schema.execute(req).instrument(audit_span!()))
+            .await
+            .into()
     }
 }
 

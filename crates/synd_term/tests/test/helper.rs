@@ -6,6 +6,7 @@ use ratatui::backend::TestBackend;
 use synd_api::{
     client::github::GithubClient,
     dependency::Dependency,
+    monitor::Monitors,
     repository::kvsd::KvsdClient,
     serve::{auth::Authenticator, ServeOptions},
     shutdown::Shutdown,
@@ -61,6 +62,7 @@ pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
         runtime,
         tls_config,
         serve_options,
+        monitors: Monitors::new(),
     };
     let listener = TcpListener::bind(("localhost", api_port)).await?;
 

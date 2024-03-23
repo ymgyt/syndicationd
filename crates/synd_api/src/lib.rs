@@ -5,6 +5,7 @@ pub mod client;
 pub mod config;
 pub mod dependency;
 pub mod gql;
+pub mod monitor;
 pub mod principal;
 pub mod repository;
 pub mod serve;

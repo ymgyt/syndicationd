@@ -8,6 +8,7 @@ use axum::{
     BoxError, Extension, Router,
 };
 use tokio::net::TcpListener;
+use tokio_metrics::TaskMonitor;
 use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::{
     cors::CorsLayer, limit::RequestBodyLimitLayer, sensitive_headers::SetSensitiveHeadersLayer,
@@ -16,7 +17,7 @@ use tracing::info;
 
 use crate::{
     dependency::Dependency,
-    gql,
+    gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
     shutdown::Shutdown,
 };
@@ -35,6 +36,12 @@ pub struct ServeOptions {
     pub timeout: Duration,
     pub body_limit_bytes: usize,
     pub concurrency_limit: usize,
+}
+
+#[derive(Clone)]
+pub struct Context {
+    pub gql_monitor: TaskMonitor,
+    pub schema: SyndSchema,
 }
 
 /// Bind tcp listener and serve.
@@ -65,13 +72,17 @@ pub async fn serve(
                 body_limit_bytes: request_body_limit_bytes,
                 concurrency_limit,
             },
+        monitors,
     } = dep;
 
-    let schema = gql::schema_builder().data(runtime).finish();
+    let cx = Context {
+        gql_monitor: monitors.gql,
+        schema: gql::schema_builder().data(runtime).finish(),
+    };
 
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))
-        .layer(Extension(schema))
+        .layer(Extension(cx))
         .layer(authenticate::AuthenticateLayer::new(authenticator))
         .route("/graphql", get(gql::handler::graphiql))
         .layer(
