@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.0] 2024-03-17
+## [unreleased] __release_date__
+
+### Refactor
+
+- Add helix like keymaps by [@ymgyt](https://github.com/ymgyt) ([257beaad](https://github.com/ymgyt/syndicationd/commit/257beaad941844b931140d8b967812cf41ce2e22))
+- Use cloned instead of map by [@ymgyt](https://github.com/ymgyt) ([ae03934c](https://github.com/ymgyt/syndicationd/commit/ae03934c155b370ac3bc6f538787c7ea972d7b6f))
+
+## [v0.2.0] - 2024-03-17
 
 ### Features
 
