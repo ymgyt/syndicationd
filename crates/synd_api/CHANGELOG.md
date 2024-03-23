@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Disable cargo-dist due to .cargo/config by [@ymgyt](https://github.com/ymgyt) ([7407a67e](https://github.com/ymgyt/syndicationd/commit/7407a67e1b730e079016e138e58495c75354f456))
+
 ## [v0.1.7] - 2024-03-23
 
 ### Features
