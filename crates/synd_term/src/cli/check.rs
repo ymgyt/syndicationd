@@ -78,7 +78,7 @@ impl CheckCommand {
 
         writeln!(
             w,
-            "  Api Heath: {}",
+            " Api Health: {}",
             health
                 .as_ref()
                 .map_or("unknown".into(), |h| h.status.to_string())
