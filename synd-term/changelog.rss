@@ -1,0 +1,681 @@
+<?xml version="1.0" encoding="utf-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>synd-term Changelog</title><link>http://127.0.0.1:7979/synd-term/changelog</link><description>Changelog information for synd-term</description><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><atom:link href="http://127.0.0.1:7979/synd-term/changelog.rss" rel="self"/><item><title>v0.2.1 2024-03-23</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-auth-v0.2.1</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-auth-v0.2.1</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Refactor</h3>
+<ul>
+<li>Add helix like keymaps by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/257beaad941844b931140d8b967812cf41ce2e22" rel="noopener noreferrer">257beaad</a>)</li>
+<li>Use cloned instead of map by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/ae03934c155b370ac3bc6f538787c7ea972d7b6f" rel="noopener noreferrer">ae03934c</a>)</li>
+</ul>
+]]></content:encoded></item><item><title>v0.1.8 2024-03-23</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.8</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.8</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Disable cargo-dist due to .cargo/config by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/7407a67e1b730e079016e138e58495c75354f456" rel="noopener noreferrer">7407a67e</a>)</li>
+</ul>
+]]></content:encoded></item><item><title>v0.1.10 2024-03-19</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.10</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.10</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Make the order of keymap help consistent by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/76d385e31d3f46513b4c5c39e6166f72874f16be" rel="noopener noreferrer">76d385e3</a>)</li>
+<li>Change time format delimiter by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/b0768bc11980f9a620b6857639a33a0c01cc3fe8" rel="noopener noreferrer">b0768bc1</a>)</li>
+<li>Change entry column name by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/fd15bf633dab04159b69754901b6962cdc3f6d38" rel="noopener noreferrer">fd15bf63</a>)</li>
+</ul>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Set log level for the credential restore process to debug by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/30dc7a2f71e34ce431435acdc21c170c86c677b0" rel="noopener noreferrer">30dc7a2f</a>)</li>
+</ul>
+<h2>Install synd-term 0.1.10</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.10
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.10</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.1.9 2024-03-18</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.9</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.9</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Fallback latest entries published date by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/98b57a108e9b137b47e76f9e88bfa900db46ff8a" rel="noopener noreferrer">98b57a10</a>)</li>
+<li>Handle ctrl-c by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/ef2842e2cdd1bf4e0468e69e5cdea06869fa17b3" rel="noopener noreferrer">ef2842e2</a>)</li>
+<li>Make the space policy consistent by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/0a3d9dfb8c91f8ea2875dd99a423ae3189f17e56" rel="noopener noreferrer">0a3d9dfb</a>)</li>
+<li>Change detail border type by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/099c8524fa8a2af1fefd1bab3f8cd6cb91edee42" rel="noopener noreferrer">099c8524</a>)</li>
+<li>Change feed meta widget from list to table by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/f583e2f27dbe11c0f6348ab43bd918877d719d6e" rel="noopener noreferrer">f583e2f2</a>)</li>
+</ul>
+<h3>Bug Fixes</h3>
+<ul>
+<li>Remove debug logging by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/066b3cc04490d15618a1503098fe4e1aae411198" rel="noopener noreferrer">066b3cc0</a>)</li>
+</ul>
+<h3>Refactor</h3>
+<ul>
+<li>Rename jwt_decoder to jwt_service by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/fa6f178cbad30c6100cde0a9c77ca2eed1eadb52" rel="noopener noreferrer">fa6f178c</a>)</li>
+</ul>
+<h2>Install synd-term 0.1.9</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.9
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.9</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.9/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.1.8 2024-03-17</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.8</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.8</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Use nerd font in prompt by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/b864e27793087d12ea63a5215df509c25854ac46" rel="noopener noreferrer">b864e277</a>)</li>
+<li>Use nerd font in columns by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/278fbbe833abd770d25c41f7e9e4267514ba2714" rel="noopener noreferrer">278fbbe8</a>)</li>
+<li>Support google login by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/a55c31094a723e6541300898b8dab875b11a6f4a" rel="noopener noreferrer">a55c3109</a>)</li>
+<li>Error if google jwt email is not verified by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/a8ee97d05714f9ac9f54df61ddfc8ea1bca2cea8" rel="noopener noreferrer">a8ee97d0</a>)</li>
+<li>Add nerd font to feed detail component by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/1379a297d6129675225f16c578aa51930293cda9" rel="noopener noreferrer">1379a297</a>)</li>
+</ul>
+<h3>Refactor</h3>
+<ul>
+<li>Rename device flow poll method by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/19fe8c4fbce84cc8dab6678d38653fa304bd26ff" rel="noopener noreferrer">19fe8c4f</a>)</li>
+</ul>
+<h2>Install synd-term 0.1.8</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.8
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.8</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.8/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.2.0 2024-03-17</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-auth-v0.2.0</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-auth-v0.2.0</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Add google oidc device flow by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/24ccb7711a3ef274671e49ad459cec48e66664fd" rel="noopener noreferrer">24ccb771</a>)</li>
+<li>Add google oidc by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/92b1f01f5786a98ae7f35d9b3ea997aa7e3cccba" rel="noopener noreferrer">92b1f01f</a>)</li>
+</ul>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Disable cargo-dist by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/a04a89839d6d3000799c648361b7a3f5db60ede9" rel="noopener noreferrer">a04a8983</a>)</li>
+</ul>
+<h3>Refactor</h3>
+<ul>
+<li>Rename device flow poll method by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/19fe8c4fbce84cc8dab6678d38653fa304bd26ff" rel="noopener noreferrer">19fe8c4f</a>)</li>
+</ul>
+]]></content:encoded></item><item><title>v0.1.6 2024-03-17</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.6</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.6</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Set graphql depth and complexity limit by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/54b44e889ec4c50d78ed1b1142ccdf964b69b056" rel="noopener noreferrer">54b44e88</a>)</li>
+<li>Set graphql depth and complexity limit for introspection by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/f6db33dc4a36390af6d7b573d32f763588a5e516" rel="noopener noreferrer">f6db33dc</a>)</li>
+<li>Support google oidc by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/c7c81fd8e786ea89c977abc107c39fc521135553" rel="noopener noreferrer">c7c81fd8</a>)</li>
+</ul>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Remove unused headers crate by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/2eaf00dbd5ce5984763ae4add18a6150de1c213d" rel="noopener noreferrer">2eaf00db</a>)</li>
+<li>Inc gql complexity limit by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/f7ac84b58a7db7846f84b4e5c88d249b4b2f16c1" rel="noopener noreferrer">f7ac84b5</a>)</li>
+</ul>
+<h3>Refactor</h3>
+<ul>
+<li>Use cfg macro to configure gql schema by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/d2a1f551d72d49d68ce288f6c06753aa55b57fdd" rel="noopener noreferrer">d2a1f551</a>)</li>
+</ul>
+<h2>Install synd-api 0.1.6</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-api@0.1.6
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd-api
+</span></pre>
+
+<h2>Download synd-api 0.1.6</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-api-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-api-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-api-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-api-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-api-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.6/synd-api-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.1.7 2024-03-12</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.7</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.7</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Show first graphql error in ui by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/ca29ea021937f9818555dd64659041da04762f15" rel="noopener noreferrer">ca29ea02</a>)</li>
+<li>Add export command by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/9bb731820e1f064f1d5776f5285ea57785596006" rel="noopener noreferrer">9bb73182</a>)</li>
+<li>Print export json schema by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/3023c3f74824d4001b7d684b53b3e4e978384302" rel="noopener noreferrer">3023c3f7</a>)</li>
+</ul>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Configure oranda changelog by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/1aecb8ce5a31b766d63d8bb283e993508e379608" rel="noopener noreferrer">1aecb8ce</a>)</li>
+<li>Specify features to build by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/b7db28d1eb796899a48cf23366499e287fe775fa" rel="noopener noreferrer">b7db28d1</a>)</li>
+</ul>
+<h2>Install synd-term 0.1.7</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.7
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.7</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.7/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.1.4 2024-03-08</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-o11y-v0.1.4</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-o11y-v0.1.4</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Disable cargo-dist by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/d7cf038f329f43645d49667b923125879afb8e1c" rel="noopener noreferrer">d7cf038f</a>)</li>
+<li>Remove workspace otel deps by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/20c071ea08d1c4afc1cd0a724037bbdfa10eb1cf" rel="noopener noreferrer">20c071ea</a>)</li>
+<li>Update opentelemetry from 0.21 to 0.22 by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/b874c1d5ba804339a495a29a28cfd6443b2e2339" rel="noopener noreferrer">b874c1d5</a>)</li>
+</ul>
+]]></content:encoded></item><item><title>v0.1.5 2024-03-01</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.5</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.5</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Set graphql depth and complexity limit by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/54b44e889ec4c50d78ed1b1142ccdf964b69b056" rel="noopener noreferrer">54b44e88</a>)</li>
+</ul>
+<h2>Install synd-api 0.1.5</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-api@0.1.5
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd-api
+</span></pre>
+
+<h2>Download synd-api 0.1.5</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-api-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-api-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-api-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-api-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-api-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.5/synd-api-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.1.6 2024-02-28</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.6</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.6</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Add move to first/last commnad by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/4bc7f482d10e52339057784052194d8ddeff30b5" rel="noopener noreferrer">4bc7f482</a>)</li>
+</ul>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Read changelog by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/9095f6764cf8ee1bf2acff85f4df4250bb0e4167" rel="noopener noreferrer">9095f676</a>)</li>
+</ul>
+<h2>Install synd-term 0.1.6</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.6
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.6</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.6/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>synd-term-v0.1.5</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.5</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.5</guid><content:encoded><![CDATA[<h2>Install synd-term 0.1.5</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.5
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.5</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.5/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>synd-api-v0.1.4</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.4</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.4</guid><content:encoded><![CDATA[<h2>Install synd-api 0.1.4</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-api@0.1.4
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd-api
+</span></pre>
+
+<h2>Download synd-api 0.1.4</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-api-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-api-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-api-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-api-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-api-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-api-v0.1.4/synd-api-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>v0.1.4 - 2024-02-23</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.4</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-term-v0.1.4</guid><content:encoded><![CDATA[<h2>Release Notes</h2>
+<h3>Features</h3>
+<ul>
+<li>Use env var as default flag value by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/c7887e925d6856f761051d118662d77d35d08968" rel="noopener noreferrer">c7887e92</a>)</li>
+<li>Handle subscribe feed error by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/d6abb26eb7ea75ba479f07cb83ff680a1708c6af" rel="noopener noreferrer">d6abb26e</a>)</li>
+<li>Use entry updated if published is none by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/2b16b51c3cadb7b0dd74a848ae43ff078372b678" rel="noopener noreferrer">2b16b51c</a>)</li>
+<li>Add feed detail widget by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/836258d490bd63de7bc481bc6ad9f5866f5e861e" rel="noopener noreferrer">836258d4</a>)</li>
+<li>Add reload by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/de11397cde2d003b81eb029752673f214724c4c2" rel="noopener noreferrer">de11397c</a>)</li>
+</ul>
+<h3>Bug Fixes</h3>
+<ul>
+<li>Use name instead of bin_name by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/1a9b81dd6a9734ea99d63bac052b73b55e9470fd" rel="noopener noreferrer">1a9b81dd</a>)</li>
+</ul>
+<h3>Miscellaneous Tasks</h3>
+<ul>
+<li>Set clap bin_name by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/dca2b898b2cd596b0655797e037c5a5c82cf9b0a" rel="noopener noreferrer">dca2b898</a>)</li>
+<li>Configure feed detail height by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/3de1c98fdce08a622323c269373d2ece0b00ec74" rel="noopener noreferrer">3de1c98f</a>)</li>
+</ul>
+<h2>Install synd-term 0.1.4</h2>
+<h3>Install prebuilt binaries via shell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>Install prebuilt binaries via powershell script</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h3>Install prebuilt binaries into your npm project</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term@0.1.4
+</span></pre>
+
+<h3>Install prebuilt binaries via Homebrew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h2>Download synd-term 0.1.4</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Platform</th>
+<th>Checksum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-aarch64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-aarch64-apple-darwin.tar.gz</a></td>
+<td>Apple Silicon macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-aarch64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-apple-darwin.tar.gz" rel="noopener noreferrer">synd-term-x86_64-apple-darwin.tar.gz</a></td>
+<td>Intel macOS</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-apple-darwin.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-pc-windows-msvc.tar.gz" rel="noopener noreferrer">synd-term-x86_64-pc-windows-msvc.tar.gz</a></td>
+<td>x64 Windows</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-pc-windows-msvc.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-unknown-linux-gnu.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-gnu.tar.gz</a></td>
+<td>x64 Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-unknown-linux-gnu.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+<tr>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-unknown-linux-musl.tar.gz" rel="noopener noreferrer">synd-term-x86_64-unknown-linux-musl.tar.gz</a></td>
+<td>x64 MUSL Linux</td>
+<td><a href="https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.4/synd-term-x86_64-unknown-linux-musl.tar.gz.sha256" rel="noopener noreferrer">checksum</a></td>
+</tr>
+</tbody>
+</table>
+]]></content:encoded></item><item><title>synd-api-v0.1.3</title><link>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.3</link><category domain="https://github.com/ymgyt/syndicationd">synd-term Changelog</category><guid>http://127.0.0.1:7979/synd-term/changelog/synd-api-v0.1.3</guid><content:encoded><![CDATA[<h3>Features</h3>
+<ul>
+<li>Handle subscribe feed error by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/90c47d3f8e225cb71f33b1e6d6df0f0735e21f73" rel="noopener noreferrer">90c47d3f</a>)</li>
+<li>Use updated if published is none by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/9967dc108f7f6602e321808398737f891462ec81" rel="noopener noreferrer">9967dc10</a>)</li>
+<li>Add generator resolver in feed by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/f8de4aa4a9a4edb8d1f7e8dd31c53b2e66360b18" rel="noopener noreferrer">f8de4aa4</a>)</li>
+<li>Resolve entry content if there is no summary by <a href="https://github.com/ymgyt" rel="noopener noreferrer">@ymgyt</a> (<a href="https://github.com/ymgyt/syndicationd/commit/0459e71c38aba96b4d878ce97cd35ed78587032b" rel="noopener noreferrer">0459e71c</a>)</li>
+</ul>
+]]></content:encoded></item></channel></rss>

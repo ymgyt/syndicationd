@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en" id="oranda" class="dark axo">
+  <head>
+    <title>synd-term</title>
+    
+      <meta property="og:url" content="https://docs.syndicationd.ymgyt.io/synd-term/" />
+    
+    
+      <link rel="icon" href="/synd-term/favicon.ico" />
+    
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+      <meta name="description" content="terminal feed viewer" />
+      <meta property="og:description" content="terminal feed viewer" />
+    
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="synd-term" />
+    
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta property="og:image" content="https://blog.ymgyt.io/images/emoji/crab.png" />
+    
+    
+      <meta property="og:image:alt" content="synd" />
+    
+    
+      <meta name="twitter:creator" content="@YAmaguchixt" />
+      <meta name="twitter:site" content="@YAmaguchixt" />
+    
+    <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
+    <link rel="stylesheet" href="/synd-term/oranda-v0.6.1.css" />
+    
+    
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-body">
+        
+          <div class="repo_banner">
+            <a href="https://github.com/ymgyt/syndicationd">
+              <div class="github-icon" aria-hidden="true"></div>
+              Check out our GitHub!
+            </a>
+          </div>
+        
+
+        <main>
+          <header>
+            
+            <h1 class="title">synd-term</h1>
+            
+  <nav class="nav">
+    <ul>
+      <li><a href="/synd-term/">Home</a></li>
+
+      
+
+      
+        <li><a href="/synd-term/artifacts/">Install</a></li>
+      
+
+      
+
+      
+
+      
+        <li><a href="/synd-term/changelog/">Changelog</a></li>
+      
+    </ul>
+  </nav>
+
+          </header>
+
+          
+
+
+    <div class="oranda-hide">
+<h1>Syndicationd</h1>
+</div>
+<p><a href="https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml" rel="noopener noreferrer"><img src="https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
+<a href="https://github.com/ymgyt/syndicationd/actions/workflows/release.yml" rel="noopener noreferrer"><img src="https://github.com/ymgyt/syndicationd/actions/workflows/release.yml/badge.svg" alt="Release"></a></p>
+<p><img src="./assets/demo.gif" alt="Demo"></p>
+<p>Syndicationd(<code>synd</code>) is a TUI feed viewer, based on <a href="https://github.com/feed-rs/feed-rs" rel="noopener noreferrer">feed-rs</a> and <a href="https://github.com/ratatui-org/ratatui" rel="noopener noreferrer">ratatui</a>.</p>
+<p><a href="https://docs.syndicationd.ymgyt.io/synd-term/" rel="noopener noreferrer">Website</a></p>
+<h2>Features</h2>
+<ul>
+<li>Subscribe feeds(RSS1, RSS2, Atom,...) and browse latest entries</li>
+<li>Open the entry in a browser</li>
+</ul>
+<h2>Install</h2>
+<h3>nix</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">nix profile install github:ymgyt/syndicationd
+</span></pre>
+
+<h3>arch linux</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">pacman</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">S</span><span style="color:#82aaff;"> syndicationd
+</span></pre>
+
+<h3>brew</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">brew tap ymgyt/syndicationd
+</span><span style="color:#82aaff;">brew install synd
+</span><span style="font-style:italic;color:#546e7a;"># or
+</span><span style="color:#82aaff;">brew install ymgyt/homebrew-syndicationd/synd
+</span></pre>
+
+<h3>shell</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">curl</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">proto </span><span style="color:#89ddff;">'</span><span style="color:#c3e88d;">=https</span><span style="color:#89ddff;">' --</span><span style="color:#f78c6c;">tlsv1</span><span style="color:#82aaff;">.2</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">LsSf</span><span style="color:#82aaff;"> https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-installer.sh </span><span style="color:#89ddff;">| </span><span style="color:#82aaff;">sh
+</span></pre>
+
+<h3>cargo</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">cargo install synd-term</span><span style="color:#89ddff;"> --</span><span style="color:#f78c6c;">locked
+</span></pre>
+
+<h3>npm</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">npm install @syndicationd/synd-term
+</span></pre>
+
+<h3>powershell</h3>
+<pre style="background-color:#263238;"><span style="color:#82aaff;">powershell</span><span style="color:#89ddff;"> -</span><span style="color:#f78c6c;">c </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.1.10/synd-term-installer.ps1 | iex</span><span style="color:#89ddff;">"
+</span></pre>
+
+<h2>Usage</h2>
+<p><code>synd</code> will start the TUI application.</p>
+<details>
+<summary>Click to show a complete list of options</summary>
+<pre style="background-color:#263238;"><span style="color:#eeffff;">Usage: synd [OPTIONS] [COMMAND]
+</span><span style="color:#eeffff;">
+</span><span style="color:#eeffff;">Commands:
+</span><span style="color:#eeffff;">  clear   Clear cache, log
+</span><span style="color:#eeffff;">  check   Check application conditions
+</span><span style="color:#eeffff;">  export  Export subscribed feeds
+</span><span style="color:#eeffff;">  help    Print this message or the help of the given subcommand(s)
+</span><span style="color:#eeffff;">
+</span><span style="color:#eeffff;">Options:
+</span><span style="color:#eeffff;">      --endpoint &lt;ENDPOINT&gt;  synd_api endpoint [env: SYND_ENDPOINT=] [default:
+</span><span style="color:#eeffff;">                             https://api.syndicationd.ymgyt.io:6100]
+</span><span style="color:#eeffff;">      --log &lt;LOG&gt;            Log file path [env: SYND_LOG=] [default:
+</span><span style="color:#eeffff;">                             /home/ymgyt/.local/share/synd/synd.log]
+</span><span style="color:#eeffff;">      --theme &lt;PALETTE&gt;      Color palette [env: SYND_THEME=] [default: slate] [possible values: slate,
+</span><span style="color:#eeffff;">                             gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green,
+</span><span style="color:#eeffff;">                             emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink]
+</span><span style="color:#eeffff;">      --timeout &lt;TIMEOUT&gt;    Client timeout [default: 30s]
+</span><span style="color:#eeffff;">  -h, --help                 Print help
+</span><span style="color:#eeffff;">  -V, --version              Print version
+</span></pre>
+
+</details>
+<h3>Authentication</h3>
+<p>syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.<br>
+Currently, GitHub and Google are supported. The only scope syndicationd requires is <a href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps" rel="noopener noreferrer"><code>user:email</code></a>(Github) or <a href="https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url" rel="noopener noreferrer"><code>email</code></a>(Google) to read the user's email. the user's email is used only as an identifier after being hashed and never stored.</p>
+<h3>Keymap</h3>
+<details>
+<summary>Click to show a keymap table</summary>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>k/j</code></td>
+<td>Move up/down</td>
+</tr>
+<tr>
+<td><code>gg</code></td>
+<td>Go to first</td>
+</tr>
+<tr>
+<td><code>ge</code></td>
+<td>Go to end</td>
+</tr>
+<tr>
+<td><code>Tab</code></td>
+<td>Switch Tab</td>
+</tr>
+<tr>
+<td><code>Enter</code></td>
+<td>Open entry/feed</td>
+</tr>
+<tr>
+<td><code>a</code></td>
+<td>Add feed subscription(on Feeds Tab)</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>Delete subscribed feed(on Feeds Tab)</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>Reload entries/feeds</td>
+</tr>
+<tr>
+<td><code>q</code></td>
+<td>Quit app</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>for more details, refer to <a href="https://github.com/ymgyt/syndicationd/blob/main/crates/synd_term/src/keymap/default.rs" rel="noopener noreferrer"><code>keymap/default.rs</code></a></p>
+<h3>Export subscribed feeds</h3>
+<p>To export subscribed feeds, execute the <code>synd export</code> command.<br>
+You can check the JSON schema of the data to be exported with <code>synd export --print-schema</code></p>
+<details>
+<summary>Click to show a export json schema</summary>
+<pre style="background-color:#263238;"><span style="color:#89ddff;">{
+</span><span style="color:#eeffff;">  </span><span style="color:#c792ea;">"$schema"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">http://json-schema.org/draft-07/schema#</span><span style="color:#89ddff;">",
+</span><span style="color:#eeffff;">  </span><span style="color:#c792ea;">"title"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">Export</span><span style="color:#89ddff;">",
+</span><span style="color:#eeffff;">  </span><span style="color:#c792ea;">"type"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">object</span><span style="color:#89ddff;">",
+</span><span style="color:#eeffff;">  </span><span style="color:#c792ea;">"required"</span><span style="color:#89ddff;">: [
+</span><span style="color:#eeffff;">    </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">feeds</span><span style="color:#89ddff;">"
+</span><span style="color:#eeffff;">  </span><span style="color:#89ddff;">],
+</span><span style="color:#eeffff;">  </span><span style="color:#c792ea;">"properties"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">    </span><span style="color:#ffcb6b;">"feeds"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">      </span><span style="color:#f78c6c;">"type"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">array</span><span style="color:#89ddff;">",
+</span><span style="color:#eeffff;">      </span><span style="color:#f78c6c;">"items"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">        </span><span style="color:#ff5370;">"$ref"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">#/definitions/ExportedFeed</span><span style="color:#89ddff;">"
+</span><span style="color:#eeffff;">      </span><span style="color:#89ddff;">}
+</span><span style="color:#eeffff;">    </span><span style="color:#89ddff;">}
+</span><span style="color:#eeffff;">  </span><span style="color:#89ddff;">},
+</span><span style="color:#eeffff;">  </span><span style="color:#c792ea;">"definitions"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">    </span><span style="color:#ffcb6b;">"ExportedFeed"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">      </span><span style="color:#f78c6c;">"type"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">object</span><span style="color:#89ddff;">",
+</span><span style="color:#eeffff;">      </span><span style="color:#f78c6c;">"required"</span><span style="color:#89ddff;">: [
+</span><span style="color:#eeffff;">        </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">url</span><span style="color:#89ddff;">"
+</span><span style="color:#eeffff;">      </span><span style="color:#89ddff;">],
+</span><span style="color:#eeffff;">      </span><span style="color:#f78c6c;">"properties"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">        </span><span style="color:#ff5370;">"title"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">          </span><span style="color:#c17e70;">"type"</span><span style="color:#89ddff;">: [
+</span><span style="color:#eeffff;">            </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">string</span><span style="color:#89ddff;">",
+</span><span style="color:#eeffff;">            </span><span style="color:#89ddff;">"</span><span style="color:#c3e88d;">null</span><span style="color:#89ddff;">"
+</span><span style="color:#eeffff;">          </span><span style="color:#89ddff;">]
+</span><span style="color:#eeffff;">        </span><span style="color:#89ddff;">},
+</span><span style="color:#eeffff;">        </span><span style="color:#ff5370;">"url"</span><span style="color:#89ddff;">: {
+</span><span style="color:#eeffff;">          </span><span style="color:#c17e70;">"type"</span><span style="color:#89ddff;">: "</span><span style="color:#c3e88d;">string</span><span style="color:#89ddff;">"
+</span><span style="color:#eeffff;">        </span><span style="color:#89ddff;">}
+</span><span style="color:#eeffff;">      </span><span style="color:#89ddff;">}
+</span><span style="color:#eeffff;">    </span><span style="color:#89ddff;">}
+</span><span style="color:#eeffff;">  </span><span style="color:#89ddff;">}
+</span><span style="color:#89ddff;">}
+</span></pre>
+
+</details>
+<h3>Log file</h3>
+<p>The log file path is based on <a href="https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir" rel="noopener noreferrer"><code>ProjectDirs::data_dir()</code></a>.<br>
+Please refer to the <code>--log</code> flag in <code>synd --help</code> for the default output destination.</p>
+<p>You can modify the <a href="https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives" rel="noopener noreferrer">log directives</a> using the environment variable <code>SYND_LOG</code>. (for example, <code>SYND_LOG=synd=debug</code>)</p>
+<h3>Theme</h3>
+<p>The theme can be changed using the <code>--theme</code> flag. Please refer to the help for the values that can be specified.</p>
+<h3>Backend api</h3>
+<p>By default, use <code>https://api.syndicationd.ymgyt.io</code> as the <a href="./crates/synd_api" rel="noopener noreferrer">backend api</a>(<a href="https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix" rel="noopener noreferrer">hosted on my home Raspberry Pi</a>).<br>
+To change the endpoint, specify the <code>--endpoint</code> flag</p>
+<p>The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the <a href="https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&amp;refresh=1h&amp;from=now-1h&amp;to=now" rel="noopener noreferrer">Grafana dashboard</a></p>
+<h3>Clear cache and logs</h3>
+<p>Authentication credentials are cached. to remove them, execute <code>synd clear</code>.</p>
+<h3>Check application status</h3>
+<p><code>synd check [--format (human|json)]</code> return current application status.</p>
+<pre style="background-color:#263238;"><span style="color:#eeffff;">synd check --format json | from json
+</span><span style="color:#eeffff;">╭───────┬─────────────────────────────────────────╮
+</span><span style="color:#eeffff;">│       │ ╭─────────────┬────────────────────╮    │
+</span><span style="color:#eeffff;">│ api   │ │ description │ health of synd-api │    │
+</span><span style="color:#eeffff;">│       │ │ status      │ Pass               │    │
+</span><span style="color:#eeffff;">│       │ │ version     │ 0.1.5              │    │
+</span><span style="color:#eeffff;">│       │ ╰─────────────┴────────────────────╯    │
+</span><span style="color:#eeffff;">│ cache │ /home/ferris/.cache/synd                │
+</span><span style="color:#eeffff;">│ log   │ /home/ferris/.local/share/synd/synd.log │
+</span><span style="color:#eeffff;">╰───────┴─────────────────────────────────────────╯
+</span></pre>
+
+<h2>License</h2>
+<p>This project is available under the terms of either the <a href="./LICENSE-APACHE" rel="noopener noreferrer">Apache 2.0 license</a> or the <a href="./LICENSE-MIT" rel="noopener noreferrer">MIT license</a>.</p>
+
+
+
+        </main>
+      </div>
+
+      <footer>
+        
+          <a href="https://github.com/ymgyt/syndicationd"><div class="github-icon" aria-hidden="true"></div></a>
+        
+        <span>
+          synd-term, MIT OR Apache-2.0
+        </span>
+      </footer>
+    </div>
+
+    
+    
+
+    
+
+    <script src="/synd-term/artifacts.js"></script>
+
+
+  </body>
+</html>
