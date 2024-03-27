@@ -27,6 +27,12 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 nix profile install github:ymgyt/syndicationd
 ```
 
+### arch linux
+
+```sh
+pacman -S syndicationd
+```
+
 ### brew
 
 ```sh
