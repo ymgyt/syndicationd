@@ -246,7 +246,7 @@ impl Subscription {
                 })),
                 Cell::new(Line::from(vec![
                     Span::styled(
-                        "󰗀 Feed src  ",
+                        "󰗀 Feed Src  ",
                         Style::default().add_modifier(Modifier::BOLD),
                     ),
                     Span::from(feed.url.as_str()),
@@ -262,7 +262,7 @@ impl Subscription {
                 )),
                 Cell::new(Line::from(vec![
                     Span::styled(
-                        "󰈙 Feed type ",
+                        "󰈙 Feed Type ",
                         Style::default().add_modifier(Modifier::BOLD),
                     ),
                     Span::from(match feed.r#type {
