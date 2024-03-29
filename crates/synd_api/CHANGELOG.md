@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.8] 2024-03-23
+## [unreleased] __release_date__
+
+### Features
+
+- Instrument graphql task monitor by [@ymgyt](https://github.com/ymgyt) ([cb44f3b8](https://github.com/ymgyt/syndicationd/commit/cb44f3b8af19eeecf16c500bd4478da28c5576ec))
+- Instrument graphql task metrics by [@ymgyt](https://github.com/ymgyt) ([59614ff6](https://github.com/ymgyt/syndicationd/commit/59614ff6e7dd707f32e923703b98534b63150720))
+
+### Miscellaneous Tasks
+
+- Ignore health checks in request metrics by [@ymgyt](https://github.com/ymgyt) ([d56e142b](https://github.com/ymgyt/syndicationd/commit/d56e142b3b3fec205f0bb147d8a31e9f1f93b6af))
+
+## [v0.1.8] - 2024-03-23
 
 ### Miscellaneous Tasks
 
