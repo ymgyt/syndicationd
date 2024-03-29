@@ -83,7 +83,7 @@ fn view() -> impl View {
                     .unit(Unit::new("s")),
             ),
             name => {
-                tracing::info!(name, "There is no explicit view");
+                tracing::debug!(name, "There is no explicit view");
                 None
             }
         }
