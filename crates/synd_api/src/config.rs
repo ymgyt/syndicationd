@@ -23,4 +23,9 @@ pub mod serve {
 
     pub const HEALTH_CHECK_PATH: &str = "/health";
 }
+
+pub mod metrics {
+    use std::time::Duration;
+
+    pub const MONITOR_INTERVAL: Duration = Duration::from_secs(60);
 }

@@ -29,7 +29,6 @@ impl Dependency {
         kvsd: KvsdOptions,
         tls: TlsOptions,
         serve_options: args::ServeOptions,
-        monitors: Monitors,
     ) -> anyhow::Result<Self> {
         let KvsdOptions {
             kvsd_host,
@@ -68,6 +67,8 @@ impl Dependency {
         let tls_config = RustlsConfig::from_pem_file(&tls.certificate, &tls.private_key)
             .await
             .with_context(|| format!("tls options: {tls:?}"))?;
+
+        let monitors = Monitors::new();
 
         Ok(Dependency {
             authenticator,

@@ -1,19 +1,14 @@
-use std::time::Duration;
-
 use fdlimit::Outcome;
 use synd_o11y::{
-    metric,
     opentelemetry::OpenTelemetryGuard,
     tracing_subscriber::otel_metrics::{self, metrics_event_filter},
 };
-use tokio_metrics::RuntimeMonitor;
 use tracing::{error, info};
 
 use synd_api::{
     args::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
-    monitor::Monitors,
     repository::kvsd::ConnectKvsdFailed,
     serve::listen_and_serve,
     shutdown::Shutdown,
@@ -90,9 +85,8 @@ async fn run(
         o11y,
     }: Args,
     shutdown: Shutdown,
-    monitors: Monitors,
 ) -> anyhow::Result<()> {
-    let dep = Dependency::new(kvsd, tls, serve, monitors).await?;
+    let dep = Dependency::new(kvsd, tls, serve).await?;
 
     info!(
         version = config::VERSION,
@@ -120,40 +114,15 @@ fn init_file_descriptor_limit() {
         .ok();
 }
 
-fn init_runtime_monitor() -> Monitors {
-    let handle = tokio::runtime::Handle::current();
-    let runtime_monitor = RuntimeMonitor::new(&handle);
-    let task_monitors = Monitors::new();
-    let intervals = runtime_monitor
-        .intervals()
-        .zip(task_monitors.gql.intervals());
-    tokio::spawn(async move {
-        for (runtime_metrics, gql_metrics) in intervals {
-            metric!(counter.runtime.poll = runtime_metrics.total_polls_count);
-            metric!(
-                counter.runtime.busy_duration = runtime_metrics.total_busy_duration.as_secs_f64()
-            );
-            metric!(
-                counter.task.graphql.idle_duration = gql_metrics.total_idle_duration.as_secs_f64()
-            );
-
-            tokio::time::sleep(Duration::from_secs(60)).await;
-        }
-    });
-
-    task_monitors
-}
-
 #[tokio::main]
 async fn main() {
     let args = args::parse();
     let _guard = init_tracing(&args.o11y);
     let shutdown = Shutdown::watch_signal();
-    let monitors = init_runtime_monitor();
 
     init_file_descriptor_limit();
 
-    if let Err(err) = run(args, shutdown, monitors).await {
+    if let Err(err) = run(args, shutdown).await {
         if let Some(err) = err.downcast_ref::<ConnectKvsdFailed>() {
             error!("{err}: make sure kvsd is running");
         } else {

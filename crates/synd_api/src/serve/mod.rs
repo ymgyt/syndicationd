@@ -16,6 +16,7 @@ use tower_http::{
 use tracing::info;
 
 use crate::{
+    config,
     dependency::Dependency,
     gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
@@ -76,9 +77,11 @@ pub async fn serve(
     } = dep;
 
     let cx = Context {
-        gql_monitor: monitors.gql,
+        gql_monitor: monitors.gql.clone(),
         schema: gql::schema_builder().data(runtime).finish(),
     };
+
+    tokio::spawn(monitors.monitor(config::metrics::MONITOR_INTERVAL));
 
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))

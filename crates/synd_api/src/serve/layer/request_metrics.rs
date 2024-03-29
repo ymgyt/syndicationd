@@ -10,6 +10,8 @@ use futures_util::Future;
 use synd_o11y::metric;
 use tower::{Layer, Service};
 
+use crate::config;
+
 #[derive(Clone)]
 pub struct RequestMetricsLayer {}
 
