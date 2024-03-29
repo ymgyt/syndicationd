@@ -20,4 +20,7 @@ pub mod serve {
     pub const DEFAULT_REQUEST_TIMEOUT: &str = "30s";
     pub const DEFAULT_REQUEST_BODY_LIMIT_BYTES: usize = 1024 * 2;
     pub const DEFAULT_REQUEST_CONCURRENCY_LIMIT: usize = 100;
+
+    pub const HEALTH_CHECK_PATH: &str = "/health";
+}
 }

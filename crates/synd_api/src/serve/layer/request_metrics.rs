@@ -56,14 +56,19 @@ where
             let response = this.inner.call(req).await.unwrap();
             let status = response.status().as_u16();
 
-            // https://opentelemetry.io/docs/specs/semconv/http/http-metrics/
-            // Considiering the case of not found(404), recording the path as
-            // an attribute leads to an inability to control cardinality.
-            // Therefore, the path is not recorded.
-            metric!(
-                monotonic_counter.http.server.request = 1,
-                http.response.status.code = status
-            );
+            // Ignore health check
+            // Metrics related to health checks is ignored as the are collected
+            // by the service performing the health check
+            if path != config::serve::HEALTH_CHECK_PATH {
+                // https://opentelemetry.io/docs/specs/semconv/http/http-metrics/
+                // Considiering the case of not found(404), recording the path as
+                // an attribute leads to an inability to control cardinality.
+                // Therefore, the path is not recorded.
+                metric!(
+                    monotonic_counter.http.server.request = 1,
+                    http.response.status.code = status
+                );
+            }
 
             // instrument graphql latency
             if path == "/graphql" && method == Method::POST {
