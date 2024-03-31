@@ -29,27 +29,27 @@ impl Monitors {
 
             // Tasks poll metrics
             metric!(
-                counter.task.graphql.mean_poll_duration =
+                monotonic_counter.task.graphql.mean_poll_duration =
                     gql_metrics.mean_poll_duration().as_secs_f64()
             );
             metric!(
-                counter.task.graphql.mean_slow_poll_duration =
+                monotonic_counter.task.graphql.mean_slow_poll_duration =
                     gql_metrics.mean_slow_poll_duration().as_secs_f64()
             );
 
             // Tasks schedule metrics
             metric!(
-                counter.task.graphql.mean_first_poll_delay =
+                monotonic_counter.task.graphql.mean_first_poll_delay =
                     gql_metrics.mean_first_poll_delay().as_secs_f64(),
             );
             metric!(
-                counter.task.graphql.mean_scheduled_duration =
+                monotonic_counter.task.graphql.mean_scheduled_duration =
                     gql_metrics.mean_scheduled_duration().as_secs_f64(),
             );
 
             // Tasks idle metrics
             metric!(
-                counter.task.graphql.mean_idle_duration =
+                monotonic_counter.task.graphql.mean_idle_duration =
                     gql_metrics.mean_idle_duration().as_secs_f64(),
             );
 
