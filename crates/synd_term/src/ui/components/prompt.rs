@@ -42,12 +42,18 @@ impl Prompt {
 
     #[allow(clippy::cast_possible_truncation)]
     fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
-        let pre_keys = &[("Tab", "󰹳"), ("j/k", "󰹹"), ("r", "󰑓")][..];
+        let pre_keys = &[
+            ("Tab", "󰹳"),
+            ("j/k", "󰹹"),
+            ("gg", "󱞧"),
+            ("ge", "󱞥"),
+            ("r", "󰑓"),
+        ][..];
         let suf_keys = &[("q", "")][..];
         let per_screen_keys = match tab {
             Some(Tab::Feeds) => pre_keys
                 .iter()
-                .chain(&[("Ent", "󰏌"), ("a", "󰑫"), ("d", "󰼡")])
+                .chain(&[("Ent", "󰏌"), ("a", "󰑫"), ("e", ""), ("d", "󰼡")])
                 .chain(suf_keys),
             Some(Tab::Entries) => pre_keys.iter().chain(&[("Ent", "󰏌")]).chain(suf_keys),
             // Imply login

@@ -38,6 +38,7 @@ pub enum Command {
     MoveSubscribedFeedFirst,
     MoveSubscribedFeedLast,
     PromptFeedSubscription,
+    PromptFeedEdition,
     PromptFeedUnsubscription,
     SubscribeFeed {
         url: String,
@@ -139,6 +140,9 @@ impl Command {
     }
     pub fn prompt_feed_subscription() -> Self {
         Command::PromptFeedSubscription
+    }
+    pub fn prompt_feed_edition() -> Self {
+        Command::PromptFeedEdition
     }
     pub fn prompt_feed_unsubscription() -> Self {
         Command::PromptFeedUnsubscription

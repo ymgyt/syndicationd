@@ -21,14 +21,14 @@ use crate::{
 };
 
 pub struct Subscription {
-    selected_feed_meta_index: usize,
+    selected_feed_index: usize,
     feeds: Vec<types::Feed>,
 }
 
 impl Subscription {
     pub fn new() -> Self {
         Self {
-            selected_feed_meta_index: 0,
+            selected_feed_index: 0,
             feeds: Vec::new(),
         }
     }
@@ -41,17 +41,23 @@ impl Subscription {
         self.feeds.iter().any(|feed| feed.url == url)
     }
 
+    pub fn selected_feed(&self) -> Option<&types::Feed> {
+        self.feeds.get(self.selected_feed_index)
+    }
+
+    /*
     pub fn selected_feed_website_url(&self) -> Option<&str> {
         self.feeds
-            .get(self.selected_feed_meta_index)
+            .get(self.selected_feed_index)
             .and_then(|feed_meta| feed_meta.website_url.as_deref())
     }
 
     pub fn selected_feed_url(&self) -> Option<&str> {
         self.feeds
-            .get(self.selected_feed_meta_index)
+            .get(self.selected_feed_index)
             .map(|feed_meta| feed_meta.url.as_str())
     }
+    */
 
     pub fn update_subscription(&mut self, action: ListAction, subscription: SubscriptionOutput) {
         let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
@@ -71,20 +77,20 @@ impl Subscription {
     }
 
     pub fn move_selection(&mut self, direction: &Direction) {
-        self.selected_feed_meta_index = direction.apply(
-            self.selected_feed_meta_index,
+        self.selected_feed_index = direction.apply(
+            self.selected_feed_index,
             self.feeds.len(),
             IndexOutOfRange::Wrapping,
         );
     }
 
     pub fn move_first(&mut self) {
-        self.selected_feed_meta_index = 0;
+        self.selected_feed_index = 0;
     }
 
     pub fn move_last(&mut self) {
         if !self.feeds.is_empty() {
-            self.selected_feed_meta_index = self.feeds.len() - 1;
+            self.selected_feed_index = self.feeds.len() - 1;
         }
     }
 }
@@ -107,7 +113,7 @@ impl Subscription {
 
         let mut feeds_state = TableState::new()
             .with_offset(0)
-            .with_selected(self.selected_feed_meta_index);
+            .with_selected(self.selected_feed_index);
 
         let (header, widths, rows) = self.feed_rows(cx);
 
@@ -137,7 +143,7 @@ impl Subscription {
         // passing None to track_symbol cause incorrect rendering
         let mut scrollbar_state = ScrollbarState::default()
             .content_length(self.feeds.len())
-            .position(self.selected_feed_meta_index);
+            .position(self.selected_feed_index);
         Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(None)
@@ -216,7 +222,7 @@ impl Subscription {
         let inner = block.inner(area);
         Widget::render(block, area, buf);
 
-        let Some(feed) = self.feeds.get(self.selected_feed_meta_index) else {
+        let Some(feed) = self.feeds.get(self.selected_feed_index) else {
             return;
         };
 

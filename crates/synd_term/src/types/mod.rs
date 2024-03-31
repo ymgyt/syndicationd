@@ -14,6 +14,12 @@ pub use time::{Time, TimeExt};
 mod page_info;
 pub use page_info::PageInfo;
 
+mod requirement;
+pub use requirement::Requirement;
+
+mod category;
+pub use category::Category;
+
 #[derive(Debug, Clone)]
 pub struct Link {
     pub href: String,
@@ -190,6 +196,13 @@ impl From<query::export_subscription::ExportSubscriptionOutputFeedsNodes> for Ex
             url: v.url,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct SubscribeFeedInput {
+    pub feed_url: String,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category>,
 }
 
 fn parse_time(t: impl AsRef<str>) -> Time {

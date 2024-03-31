@@ -22,6 +22,7 @@ pub fn default() -> KeymapsConfig {
     });
     let subscription = keymap!({
         "a" => prompt_feed_subscription,
+        "e" => prompt_feed_edition,
         "d" => prompt_feed_unsubscription,
         "k" => move_up_subscribed_feed,
         "j" => move_down_subscribed_feed,

@@ -32,6 +32,8 @@ futures-util         = "0.3.30"
 graphql_client       = { workspace = true }
 html2text            = { version = "0.12" }
 itertools            = { workspace = true }
+nom                  = { version = "7.1.3", default-features = false, features = ["std"] }
+nutype               = { workspace = true }
 open                 = "5.1.0"
 parse_duration       = { workspace = true }
 ratatui              = { version = "0.26.0" }

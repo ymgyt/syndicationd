@@ -100,7 +100,7 @@ Options:
 ### Authentication
 
 syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
-Currently, GitHub and Google are supported. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to read the user's email. the user's email is used only as an identifier after being hashed and never stored.
+Currently, GitHub and Google are supported as authorize server/id provider. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to read the user's email. the user's email is used only as an identifier after being hashed and never stored.
 
 ### Keymap
 
@@ -184,7 +184,7 @@ The theme can be changed using the `--theme` flag. Please refer to the help for 
 
 ### Backend api
 
-By default, use `https://api.syndicationd.ymgyt.io` as the [backend api](./crates/synd_api)([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
+By default, `synd` use `https://api.syndicationd.ymgyt.io` as the [backend api](./crates/synd_api)([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
 To change the endpoint, specify the `--endpoint` flag
 
 The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [Grafana dashboard](https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now)

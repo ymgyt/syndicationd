@@ -9,7 +9,6 @@ use synd_auth::device_flow::{
 use tokio::time::{Instant, Sleep};
 
 use crate::{
-    application::input_parser::ParseFeedUrlError,
     auth::{AuthenticationProvider, Credential},
     client::Client,
     command::Command,
@@ -32,6 +31,7 @@ mod in_flight;
 pub use in_flight::{InFlight, RequestId, RequestSequence};
 
 mod input_parser;
+pub use input_parser::parse_requirement;
 use input_parser::InputParser;
 
 mod authenticator;
@@ -318,6 +318,10 @@ impl Application {
                     self.prompt_feed_subscription();
                     self.should_render = true;
                 }
+                Command::PromptFeedEdition => {
+                    self.prompt_feed_edition();
+                    self.should_render = true;
+                }
                 Command::PromptFeedUnsubscription => {
                     self.prompt_feed_unsubscription();
                     self.should_render = true;
@@ -485,20 +489,14 @@ impl Application {
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
 
-        let fut = match InputParser::new(input.as_str()).parse_feed_url() {
-            Ok(url) => {
-                let url = url.to_owned();
+        let fut = match InputParser::new(input.as_str()).parse_feed_subscription() {
+            Ok(input) => {
+                let url = input.feed_url;
                 async move { Ok(Command::SubscribeFeed { url }) }.boxed()
             }
             Err(err) => async move {
-                let message = match err {
-                    ParseFeedUrlError::NoInput => {
-                        "Abort subscription. please enter feed URL to subscribe".to_owned()
-                    }
-                    ParseFeedUrlError::InvalidUrl { .. } => format!("{err}"),
-                };
                 Ok(Command::HandleError {
-                    message,
+                    message: err.to_string(),
                     request_seq: None,
                 })
             }
@@ -508,13 +506,25 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
+    fn prompt_feed_edition(&mut self) {
+        let Some(feed) = self.components.subscription.selected_feed() else {
+            return;
+        };
+
+        let _input = self
+            .interactor
+            .open_editor(InputParser::edit_feed_prompt(feed));
+        // the terminal state becomes strange after editing in the editor
+        self.terminal.force_redraw();
+    }
+
     fn prompt_feed_unsubscription(&mut self) {
         // TODO: prompt deletion confirm
         let Some(url) = self
             .components
             .subscription
-            .selected_feed_url()
-            .map(ToOwned::to_owned)
+            .selected_feed()
+            .map(|feed| feed.url.clone())
         else {
             return;
         };
@@ -568,7 +578,11 @@ impl Application {
 
 impl Application {
     fn open_feed(&mut self) {
-        let Some(feed_website_url) = self.components.subscription.selected_feed_website_url()
+        let Some(feed_website_url) = self
+            .components
+            .subscription
+            .selected_feed()
+            .and_then(|feed| feed.website_url.clone())
         else {
             return;
         };
