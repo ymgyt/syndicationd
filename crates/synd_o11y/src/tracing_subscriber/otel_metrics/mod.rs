@@ -47,12 +47,27 @@ fn init_meter_provider(endpoint: impl Into<String>, resource: Resource) -> impl 
         .build();
 
     let view = view();
-
-    let meter_provider = SdkMeterProvider::builder()
+    let meter_provider_builder = SdkMeterProvider::builder()
         .with_resource(resource)
         .with_reader(reader)
-        .with_view(view)
-        .build();
+        .with_view(view);
+
+    #[cfg(feature = "opentelemetry-stdout")]
+    let stdout_reader = {
+        let exporter = opentelemetry_stdout::MetricsExporterBuilder::default()
+            .with_encoder(|writer, data| {
+                serde_json::to_writer_pretty(writer, &data).unwrap();
+                Ok(())
+            })
+            .build();
+        PeriodicReader::builder(exporter, runtime::Tokio)
+            .with_interval(Duration::from_secs(60))
+            .build()
+    };
+    #[cfg(feature = "opentelemetry-stdout")]
+    let meter_provider_builder = meter_provider_builder.with_reader(stdout_reader);
+
+    let meter_provider = meter_provider_builder.build();
 
     global::set_meter_provider(meter_provider.clone());
 

@@ -20,13 +20,18 @@ opentelemetry-appender-tracing     = { version = "0.3.0", default-features = fal
 opentelemetry-http                 = { version = "0.11.0" }
 opentelemetry-otlp                 = { version = "0.15.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic"] }
 opentelemetry-semantic-conventions = { version = "0.14.0" }
+opentelemetry-stdout               = { version = "0.3.0", optional = true, default-features = false, features = ["metrics"] }
 opentelemetry_sdk                  = { version = "0.22.1", features = ["logs", "rt-tokio"] }
 rand                               = { workspace = true }
 reqwest                            = { workspace = true }
 serde                              = { workspace = true, features = ["derive"] }
+serde_json                         = { workspace = true, optional = true }
 tracing                            = { workspace = true }
 tracing-opentelemetry              = { version = "0.23.0" }
 tracing-subscriber                 = { workspace = true }
+
+[features]
+opentelemetry-stdout = ["dep:opentelemetry-stdout", "dep:serde_json"]
 
 [lints]
 workspace = true

@@ -25,7 +25,7 @@ diagnostics.disabled = ["inactive-code"]
 hover.actions.enable = false
 
 [language-server.rust-analyzer.config.cargo]
-features = ["introspection", "integration"]
+features = ["introspection", "integration", "opentelemetry-stdout"]
 
 [language-server.rust-analyzer.config.check]
 command  = "clippy"
