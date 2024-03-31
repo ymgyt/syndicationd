@@ -52,7 +52,8 @@ tracing-subscriber = { workspace = true }
 [features]
 
 # Enable graphql introspection
-introspection = []
+introspection        = []
+opentelemetry-stdout = ["synd-o11y/opentelemetry-stdout"]
 
 [lints]
 workspace = true
