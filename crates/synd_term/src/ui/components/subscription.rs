@@ -45,20 +45,6 @@ impl Subscription {
         self.feeds.get(self.selected_feed_index)
     }
 
-    /*
-    pub fn selected_feed_website_url(&self) -> Option<&str> {
-        self.feeds
-            .get(self.selected_feed_index)
-            .and_then(|feed_meta| feed_meta.website_url.as_deref())
-    }
-
-    pub fn selected_feed_url(&self) -> Option<&str> {
-        self.feeds
-            .get(self.selected_feed_index)
-            .map(|feed_meta| feed_meta.url.as_str())
-    }
-    */
-
     pub fn update_subscription(&mut self, action: ListAction, subscription: SubscriptionOutput) {
         let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
         match action {
@@ -251,10 +237,7 @@ impl Subscription {
                     Cow::Owned(feed.authors.iter().join(", "))
                 })),
                 Cell::new(Line::from(vec![
-                    Span::styled(
-                        "󰗀 Feed Src  ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
+                    Span::styled("󰗀 Src  ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::from(feed.url.as_str()),
                 ])),
             ]),
@@ -267,10 +250,7 @@ impl Subscription {
                     feed.generator.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL),
                 )),
                 Cell::new(Line::from(vec![
-                    Span::styled(
-                        "󰈙 Feed Type ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
+                    Span::styled("󰈙 Type ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::from(match feed.r#type {
                         Some(FeedType::RSS0) => "RSS 0",
                         Some(FeedType::RSS1) => "RSS 1",
