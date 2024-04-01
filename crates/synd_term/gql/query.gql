@@ -20,7 +20,7 @@ fragment Feed on Feed {
   websiteUrl
   description
   generator
-  entries(first: 10) {
+  entries(first: 20) {
     nodes {
       ...EntryMeta
     }
