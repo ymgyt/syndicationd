@@ -15,7 +15,7 @@ repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
 anyhow             = { version = "1", default-features = false, features = ["std"] }
-async-trait        = { version = "0.1.77", default-features = false }
+async-trait        = { version = "0.1.79", default-features = false }
 axum               = { version = "0.7.5", default-features = false }
 axum-server        = { version = "0.6.0", features = ["tls-rustls"] }
 chrono             = { version = "0.4.31", default-features = false }
