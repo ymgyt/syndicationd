@@ -17,7 +17,7 @@ anyhow         = { workspace = true }
 chrono         = { workspace = true }
 http           = { workspace = true }
 http-serde-ext = "0.1"
-jsonwebtoken   = "9.2.0"
+jsonwebtoken   = "9.3.0"
 reqwest        = { workspace = true, features = ["rustls-tls-webpki-roots"] }
 serde          = { workspace = true, features = ["derive"] }
 serde_json     = { workspace = true }
