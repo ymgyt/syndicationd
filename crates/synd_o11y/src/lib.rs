@@ -4,6 +4,9 @@ pub mod health_check;
 pub mod opentelemetry;
 pub mod tracing_subscriber;
 
+pub use opentelemetry::OpenTelemetryGuard;
+pub use tracing_subscriber::opentelemetry_layer;
+
 /// Request id key for opentelemetry baggage
 pub const REQUEST_ID_KEY: &str = "request.id";
 
