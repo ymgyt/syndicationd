@@ -1,7 +1,6 @@
 use fdlimit::Outcome;
 use synd_o11y::{
-    opentelemetry::OpenTelemetryGuard,
-    tracing_subscriber::otel_metrics::{self, metrics_event_filter},
+    opentelemetry::OpenTelemetryGuard, tracing_subscriber::otel_metrics::metrics_event_filter,
 };
 use tracing::{error, info};
 
@@ -14,11 +13,8 @@ use synd_api::{
     shutdown::Shutdown,
 };
 
-fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
-    use synd_o11y::{
-        opentelemetry::init_propagation,
-        tracing_subscriber::{audit, otel_log, otel_trace},
-    };
+fn init_tracing(options: &ObservabilityOptions) -> OpenTelemetryGuard {
+    use synd_o11y::{opentelemetry::init_propagation, tracing_subscriber::audit};
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
         Registry,
@@ -31,25 +27,6 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let show_src = options.show_code_location;
     let show_target = options.show_target;
 
-    let (opentelemetry_layers, guard) = {
-        match options.otlp_endpoint.as_deref() {
-            None | Some("") => (None, None),
-            Some(endpoint) => {
-                let resource = synd_o11y::opentelemetry::resource(config::NAME, config::VERSION);
-
-                let trace_layer =
-                    otel_trace::layer(endpoint, resource.clone(), options.trace_sampler_ratio);
-                let log_layer = otel_log::layer(endpoint, resource.clone());
-                let metrics_layer = otel_metrics::layer(endpoint, resource);
-
-                (
-                    Some(trace_layer.and_then(log_layer).and_then(metrics_layer)),
-                    Some(synd_o11y::opentelemetry::OpenTelemetryGuard),
-                )
-            }
-        }
-    };
-
     Registry::default()
         .with(
             fmt::Layer::new()
@@ -59,7 +36,20 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
                 .with_line_number(show_src)
                 .with_target(show_target)
                 .with_filter(metrics_event_filter())
-                .and_then(opentelemetry_layers)
+                .and_then(
+                    options
+                        .otlp_endpoint
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                        .map(|endpoint| {
+                            synd_o11y::opentelemetry_layer(
+                                endpoint,
+                                config::NAME,
+                                config::VERSION,
+                                options.trace_sampler_ratio,
+                            )
+                        }),
+                )
                 .with_filter(
                     EnvFilter::try_from_env("SYND_LOG")
                         .or_else(|_| EnvFilter::try_new("info"))
@@ -73,7 +63,7 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     // Set text map propagator globally
     init_propagation();
 
-    guard
+    synd_o11y::OpenTelemetryGuard
 }
 
 async fn run(
