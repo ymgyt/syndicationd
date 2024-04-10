@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use synd_feed::{feed::cache::FetchCachedFeed, types};
+use synd_feed::{
+    feed::cache::FetchCachedFeed,
+    types::{self, Annotated},
+};
 use thiserror::Error;
 
 use crate::{
@@ -21,7 +24,7 @@ pub struct FetchSubscribedFeedsInput {
 
 #[derive(Default)]
 pub struct FetchSubscribedFeedsOutput {
-    pub feeds: Vec<Arc<types::Feed>>,
+    pub feeds: Vec<Annotated<Arc<types::Feed>>>,
 }
 
 #[derive(Error, Debug)]
@@ -58,35 +61,43 @@ impl Usecase for FetchSubscribedFeeds {
     ) -> Result<Output<Self::Output>, Error<Self::Error>> {
         let user_id = principal.user_id().unwrap();
 
-        // fetch all urls from repository
-        let urls = self.repository.fetch_subscribed_feed_urls(user_id).await?;
+        let feeds = self.repository.fetch_subscribed_feeds(user_id).await?;
 
         // paginate
         let urls = {
             let start = after
-                .and_then(|after| urls.iter().position(|url| url == &after).map(|p| p + 1))
+                .and_then(|after| {
+                    feeds
+                        .urls
+                        .iter()
+                        .position(|url| url == &after)
+                        .map(|p| p + 1)
+                })
                 .unwrap_or(0);
-            if start >= urls.len() {
+            if start >= feeds.urls.len() {
                 return Ok(Output {
                     output: FetchSubscribedFeedsOutput::default(),
                 });
             }
-            let urls = &urls[start..];
+            let urls = &feeds.urls[start..];
             let end = (start + first).min(urls.len());
             &urls[..end]
         };
 
         // fetch feeds
-        let feeds = self.fetch_feed.fetch_feeds_parallel(urls).await;
+        let fetched_feeds = self.fetch_feed.fetch_feeds_parallel(urls).await;
 
         // TODO: return failed feeds
-        let (feeds, errors): (Vec<_>, Vec<_>) = feeds.into_iter().partition(Result::is_ok);
+        let (fetched_feeds, errors): (Vec<_>, Vec<_>) =
+            fetched_feeds.into_iter().partition(Result::is_ok);
 
         if !errors.is_empty() {
             tracing::error!("{errors:?}");
         }
 
-        let feeds = feeds.into_iter().map(Result::unwrap).collect();
+        let feeds = feeds
+            .annotate(fetched_feeds.into_iter().map(Result::unwrap))
+            .collect();
 
         Ok(Output {
             output: FetchSubscribedFeedsOutput { feeds },

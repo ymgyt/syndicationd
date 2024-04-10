@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use synd_feed::{
     feed::{cache::FetchCachedFeed, parser::FetchFeedError},
-    types::Feed,
+    types::{Annotated, Category, Feed, Requirement},
 };
 use synd_o11y::metric;
 use thiserror::Error;
@@ -22,10 +22,12 @@ pub struct SubscribeFeed {
 
 pub struct SubscribeFeedInput {
     pub url: String,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
 }
 
 pub struct SubscribeFeedOutput {
-    pub feed: Arc<Feed>,
+    pub feed: Annotated<Arc<Feed>>,
 }
 
 #[derive(Error, Debug)]
@@ -60,7 +62,12 @@ impl Usecase for SubscribeFeed {
         &self,
         Input {
             principal,
-            input: SubscribeFeedInput { url },
+            input:
+                SubscribeFeedInput {
+                    url,
+                    requirement,
+                    category,
+                },
             ..
         }: Input<Self::Input>,
     ) -> Result<Output<Self::Output>, super::Error<Self::Error>> {
@@ -78,10 +85,18 @@ impl Usecase for SubscribeFeed {
             .put_feed_subscription(repository::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url: feed.meta().url().to_owned(),
+                requirement,
+                category: category.clone(),
             })
             .await?;
 
         metric!(monotonic_counter.feed.subscription = 1);
+
+        let feed = Annotated {
+            feed,
+            requirement,
+            category,
+        };
 
         Ok(Output {
             output: SubscribeFeedOutput { feed },

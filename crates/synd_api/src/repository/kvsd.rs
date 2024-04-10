@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, time::Duration};
+use std::{collections::HashMap, io::ErrorKind, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
@@ -7,13 +7,15 @@ use kvsd::{
     client::{tcp::Client, Api},
     Key, Value,
 };
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::{net::TcpStream, sync::MutexGuard};
 
 use crate::repository::{
-    self, subscription::RepositoryResult, RepositoryError, SubscriptionRepository,
+    self,
+    subscription::RepositoryResult,
+    types::{FeedAnnotations, SubscribedFeeds},
+    RepositoryError, SubscriptionRepository,
 };
 
 #[derive(Error, Debug)]
@@ -117,19 +119,33 @@ impl SubscriptionRepository for KvsdClient {
         let key = Self::feed_subscription_key(&feed.user_id);
 
         let mut client = self.client.lock().await;
+        let annotations = FeedAnnotations {
+            requirement: feed.requirement,
+            category: feed.category,
+        };
 
-        let urls = if let Some(mut urls) =
-            Self::get::<SubscriptionUrls>(&mut client, key.clone()).await?
+        let feeds = if let Some(mut feeds) =
+            Self::get::<SubscribedFeeds>(&mut client, key.clone()).await?
         {
-            urls.urls.insert(0, feed.url);
-            urls
+            feeds.urls.insert(0, feed.url.clone());
+            if feeds.annotations.is_none() {
+                feeds.annotations = Some(HashMap::new());
+            };
+            feeds
+                .annotations
+                .as_mut()
+                .map(|m| m.insert(feed.url, annotations));
+            feeds
         } else {
-            SubscriptionUrls {
-                urls: vec![feed.url],
+            let mut metadata = HashMap::new();
+            metadata.insert(feed.url.clone(), annotations);
+            SubscribedFeeds {
+                urls: vec![feed.url.clone()],
+                annotations: Some(metadata),
             }
         };
 
-        Self::set(&mut client, key, urls).await
+        Self::set(&mut client, key, feeds).await
     }
 
     #[tracing::instrument(name = "repo::delete_feed_subscription", skip_all)]
@@ -141,45 +157,24 @@ impl SubscriptionRepository for KvsdClient {
 
         let mut client = self.client.lock().await;
 
-        let Some(mut urls) = Self::get::<SubscriptionUrls>(&mut client, key.clone()).await? else {
+        let Some(mut feeds) = Self::get::<SubscribedFeeds>(&mut client, key.clone()).await? else {
             return Ok(());
         };
 
-        urls.urls.retain(|url| url != &feed.url);
+        feeds.urls.retain(|url| url != &feed.url);
+        feeds.annotations.as_mut().map(|m| m.remove(&feed.url));
 
-        Self::set(&mut client, key, urls).await
+        Self::set(&mut client, key, feeds).await
     }
 
     #[tracing::instrument(name = "repo::fetch_subscribed_feed_urls", skip_all)]
-    async fn fetch_subscribed_feed_urls(&self, user_id: &str) -> RepositoryResult<Vec<String>> {
+    async fn fetch_subscribed_feeds(&self, user_id: &str) -> RepositoryResult<SubscribedFeeds> {
         let key = Self::feed_subscription_key(user_id);
 
         let mut client = self.client.lock().await;
-        let Some(urls) = Self::get::<SubscriptionUrls>(&mut client, key).await? else {
-            return Ok(Vec::new());
+        let Some(feeds) = Self::get::<SubscribedFeeds>(&mut client, key).await? else {
+            return Ok(SubscribedFeeds::default());
         };
-        Ok(urls.urls)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct SubscriptionUrls {
-    urls: Vec<String>,
-}
-
-impl TryFrom<Value> for SubscriptionUrls {
-    type Error = RepositoryError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        serde_json::from_slice(&value).map_err(RepositoryError::internal)
-    }
-}
-
-impl TryFrom<SubscriptionUrls> for Value {
-    type Error = RepositoryError;
-
-    fn try_from(value: SubscriptionUrls) -> Result<Self, Self::Error> {
-        let value = serde_json::to_vec(&value).map_err(RepositoryError::internal)?;
-        Ok(Value::new(value).unwrap())
+        Ok(feeds)
     }
 }

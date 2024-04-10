@@ -5,7 +5,7 @@ use async_graphql::{
     Enum, Object, SimpleObject, ID,
 };
 use feed_rs::model as feedrs;
-use synd_feed::types;
+use synd_feed::types::{self, Annotated, Category, Requirement};
 
 use crate::gql::scalar;
 
@@ -90,33 +90,33 @@ pub enum FeedType {
     JSON,
 }
 
-pub struct Feed(Arc<types::Feed>);
+pub struct Feed(Annotated<Arc<types::Feed>>);
 
 #[Object]
 impl Feed {
     /// Feed Id
     async fn id(&self) -> ID {
-        FeedIdV1::new(self.0.meta().url()).into()
+        FeedIdV1::new(self.0.feed.meta().url()).into()
     }
 
     /// Undering feed specification
     async fn r#type(&self) -> FeedType {
-        self.0.meta().r#type().clone().into()
+        self.0.feed.meta().r#type().clone().into()
     }
 
     /// Feed title
     async fn title(&self) -> Option<&str> {
-        self.0.meta().title()
+        self.0.feed.meta().title()
     }
 
     /// Feed URL
     async fn url(&self) -> &str {
-        self.0.meta().url()
+        self.0.feed.meta().url()
     }
 
     /// The time at which the feed was last modified
     async fn updated(&self) -> Option<scalar::Rfc3339Time> {
-        self.0.meta().updated().map(Into::into)
+        self.0.feed.meta().updated().map(Into::into)
     }
 
     /// Feed entries
@@ -134,9 +134,10 @@ impl Feed {
     > {
         #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(5).max(0) as usize;
-        let meta = self.0.meta();
+        let meta = self.0.feed.meta();
         let entries = self
             .0
+            .feed
             .entries()
             .map(|entry| Entry::new(meta, entry.clone()))
             .take(first)
@@ -158,6 +159,7 @@ impl Feed {
         let mut c = Connection::new(false, false);
         c.edges.extend(
             self.0
+                .feed
                 .meta()
                 .authors()
                 .enumerate()
@@ -169,13 +171,14 @@ impl Feed {
 
     /// Description of feed
     async fn description(&self) -> Option<&str> {
-        self.0.meta().description()
+        self.0.feed.meta().description()
     }
 
     async fn links(&self) -> Connection<usize, Link> {
         let mut c = Connection::new(false, false);
         c.edges.extend(
             self.0
+                .feed
                 .meta()
                 .links()
                 .map(|link| Link::from(link.clone()))
@@ -187,11 +190,21 @@ impl Feed {
     }
 
     async fn website_url(&self) -> Option<&str> {
-        self.0.meta().website_url()
+        self.0.feed.meta().website_url()
     }
 
     async fn generator(&self) -> Option<&str> {
-        self.0.meta().generator()
+        self.0.feed.meta().generator()
+    }
+
+    /// Requirement level for feed
+    async fn requirement(&self) -> Option<Requirement> {
+        self.0.requirement
+    }
+
+    /// Feed category
+    async fn category(&self) -> Option<&Category<'static>> {
+        self.0.category.as_ref()
     }
 }
 
@@ -211,8 +224,8 @@ impl EdgeNameType for FeedEntryEdgeName {
     }
 }
 
-impl From<Arc<types::Feed>> for Feed {
-    fn from(value: Arc<types::Feed>) -> Self {
+impl From<Annotated<Arc<types::Feed>>> for Feed {
+    fn from(value: Annotated<Arc<types::Feed>>) -> Self {
         Self(value)
     }
 }

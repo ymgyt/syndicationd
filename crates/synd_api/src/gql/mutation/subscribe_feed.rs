@@ -1,5 +1,8 @@
 use async_graphql::{InputObject, Object, Union};
-use synd_feed::feed::parser::FetchFeedError;
+use synd_feed::{
+    feed::parser::FetchFeedError,
+    types::{Category, Requirement},
+};
 
 use crate::{
     gql::{
@@ -9,15 +12,23 @@ use crate::{
     usecase::{self, SubscribeFeedError as UsecaseSubscribeFeedError},
 };
 
-#[derive(InputObject)]
+#[derive(InputObject, Debug)]
 pub struct SubscribeFeedInput {
     /// Feed url to subscribe
     pub url: String,
+    /// Requirement level for feed
+    pub requirement: Option<Requirement>,
+    /// Feed category
+    pub category: Option<Category<'static>>,
 }
 
 impl From<SubscribeFeedInput> for usecase::SubscribeFeedInput {
     fn from(value: SubscribeFeedInput) -> Self {
-        usecase::SubscribeFeedInput { url: value.url }
+        usecase::SubscribeFeedInput {
+            url: value.url,
+            requirement: value.requirement,
+            category: value.category,
+        }
     }
 }
 

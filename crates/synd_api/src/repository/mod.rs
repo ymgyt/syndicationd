@@ -3,7 +3,6 @@ use ::kvsd::KvsdError;
 pub use subscription::SubscriptionRepository;
 
 pub mod kvsd;
-pub mod memory;
 pub mod types;
 
 #[derive(thiserror::Error, Debug)]

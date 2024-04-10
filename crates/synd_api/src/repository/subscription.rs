@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::repository;
+use crate::repository::{self, types::SubscribedFeeds};
 
 use super::RepositoryError;
 
@@ -20,7 +20,7 @@ pub trait SubscriptionRepository: Send + Sync {
         feed: repository::types::FeedSubscription,
     ) -> RepositoryResult<()>;
 
-    async fn fetch_subscribed_feed_urls(&self, _user_id: &str) -> RepositoryResult<Vec<String>>;
+    async fn fetch_subscribed_feeds(&self, _user_id: &str) -> RepositoryResult<SubscribedFeeds>;
 }
 
 #[async_trait]
@@ -42,7 +42,7 @@ where
         self.delete_feed_subscription(feed).await
     }
 
-    async fn fetch_subscribed_feed_urls(&self, user_id: &str) -> RepositoryResult<Vec<String>> {
-        self.fetch_subscribed_feed_urls(user_id).await
+    async fn fetch_subscribed_feeds(&self, user_id: &str) -> RepositoryResult<SubscribedFeeds> {
+        self.fetch_subscribed_feeds(user_id).await
     }
 }

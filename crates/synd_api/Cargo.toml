@@ -18,11 +18,11 @@ path = "src/main.rs"
 
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.1" }
-synd-feed = { path = "../synd_feed", version = "0.1.5" }
+synd-feed = { path = "../synd_feed", version = "0.1.5", features = ["graphql"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.4" }
 
 anyhow             = { workspace = true }
-async-graphql      = { version = "7.0", features = ["tracing"] }
+async-graphql      = { workspace = true, features = ["tracing"] }
 async-graphql-axum = { version = "7.0" }
 async-trait        = { workspace = true }
 axum               = { workspace = true }
@@ -43,7 +43,7 @@ serde_json         = "1.0.111"
 supports-color     = { version = "3.0.0" }
 thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tokio-metrics      = { version = "0.3.1", default-features = false, features = ["rt", "tokio"] }
+tokio-metrics      = { version = "0.3.1", default-features = false, features = ["rt"] }
 tower              = { version = "0.4.13", default_features = false, features = ["limit", "timeout"] }
 tower-http         = { version = "0.5.1", default_features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
 tracing            = { workspace = true }

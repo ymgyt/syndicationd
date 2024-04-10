@@ -55,6 +55,8 @@ impl Usecase for UnsubscribeFeed {
             .delete_feed_subscription(repository::types::FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url,
+                requirement: None,
+                category: None,
             })
             .await?;
 

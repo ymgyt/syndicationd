@@ -66,10 +66,11 @@ impl Usecase for FetchEntries {
             .user_id()
             .expect("user id not found. this is a bug");
 
-        let urls = self.repository.fetch_subscribed_feed_urls(user_id).await?;
+        let feeds = self.repository.fetch_subscribed_feeds(user_id).await?;
 
-        let mut feed_metas = HashMap::new();
-        let mut entries = Vec::with_capacity(urls.len() * 2);
+        // TODO: refactor
+        let mut feed_metas = HashMap::with_capacity(feeds.urls.len());
+        let mut entries = Vec::with_capacity(feeds.urls.len() * 4);
         let mut handle_feed = |feed: Result<Arc<types::Feed>, FetchFeedError>| {
             let feed = match feed {
                 Ok(feed) => feed,
@@ -92,7 +93,7 @@ impl Usecase for FetchEntries {
         let mut tasks = FuturesUnordered::new();
         let in_flight_limit = 10;
 
-        for url in urls {
+        for url in feeds.urls {
             if tasks.len() >= in_flight_limit {
                 if let Some(result) = tasks.next().await {
                     handle_feed(result);
