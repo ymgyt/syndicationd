@@ -5,7 +5,7 @@ use moka::future::Cache;
 
 use crate::{
     feed::parser::{FetchFeed, FetchFeedResult},
-    types,
+    types::{self},
 };
 
 #[derive(Clone, Copy)]

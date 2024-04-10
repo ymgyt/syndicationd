@@ -1,12 +1,18 @@
 use std::{borrow::Cow, fmt::Display};
 
 use chrono::{DateTime, Utc};
-use feed_rs::model as feedrs;
+use feed_rs::model::{self as feedrs, Generator, Link, Person, Text};
 
 pub use feedrs::FeedType;
 
 pub type Time = DateTime<Utc>;
 pub type FeedUrl = String;
+
+mod requirement;
+pub use requirement::Requirement;
+
+mod category;
+pub use category::Category;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct EntryId<'a>(Cow<'a, str>);
@@ -87,14 +93,27 @@ impl Entry {
 #[derive(Debug, Clone)]
 pub struct FeedMeta {
     url: FeedUrl,
-    // TODO: extrace feedrs data
-    // no entries
-    feed: feedrs::Feed,
+    // feed_rs models
+    feed_type: FeedType,
+    title: Option<Text>,
+    updated: Option<Time>,
+    authors: Vec<Person>,
+    description: Option<Text>,
+    links: Vec<Link>,
+    generator: Option<Generator>,
+    published: Option<Time>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Annotated<T> {
+    pub feed: T,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
 }
 
 impl FeedMeta {
     pub fn r#type(&self) -> &FeedType {
-        &self.feed.feed_type
+        &self.feed_type
     }
 
     pub fn url(&self) -> &str {
@@ -102,35 +121,32 @@ impl FeedMeta {
     }
 
     pub fn title(&self) -> Option<&str> {
-        self.feed.title.as_ref().map(|text| text.content.as_str())
+        self.title.as_ref().map(|text| text.content.as_str())
     }
 
     pub fn updated(&self) -> Option<Time> {
-        self.feed.updated
+        self.updated.or(self.published)
     }
 
     pub fn authors(&self) -> impl Iterator<Item = &str> {
-        self.feed.authors.iter().map(|person| person.name.as_str())
+        self.authors.iter().map(|person| person.name.as_str())
     }
 
     pub fn description(&self) -> Option<&str> {
-        self.feed
-            .description
-            .as_ref()
-            .map(|text| text.content.as_str())
+        self.description.as_ref().map(|text| text.content.as_str())
     }
 
     pub fn links(&self) -> impl Iterator<Item = &feedrs::Link> {
-        self.feed.links.iter()
+        self.links.iter()
     }
 
     /// Return website link to which feed syndicate
     pub fn website_url(&self) -> Option<&str> {
-        link::find_website_url(self.r#type(), &self.feed.links)
+        link::find_website_url(self.r#type(), &self.links)
     }
 
     pub fn generator(&self) -> Option<&str> {
-        self.feed.generator.as_ref().map(|g| g.content.as_str())
+        self.generator.as_ref().map(|g| g.content.as_str())
     }
 }
 
@@ -172,11 +188,32 @@ impl Feed {
 }
 
 impl From<(FeedUrl, feed_rs::model::Feed)> for Feed {
-    fn from((url, mut feed): (FeedUrl, feedrs::Feed)) -> Self {
-        let entries = std::mem::take(&mut feed.entries);
+    fn from((url, feed): (FeedUrl, feedrs::Feed)) -> Self {
+        let feed_rs::model::Feed {
+            feed_type,
+            title,
+            updated,
+            authors,
+            description,
+            links,
+            generator,
+            published,
+            entries,
+            ..
+        } = feed;
+        let meta = FeedMeta {
+            url,
+            feed_type,
+            title,
+            updated,
+            authors,
+            description,
+            links,
+            generator,
+            published,
+        };
         let entries = entries.into_iter().map(Entry).collect();
 
-        let meta = FeedMeta { url, feed };
         Feed { meta, entries }
     }
 }
