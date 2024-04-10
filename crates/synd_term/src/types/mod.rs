@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::Serialize;
-use synd_feed::types::FeedType;
+use synd_feed::types::{Category, FeedType, Requirement};
 
 use crate::client::{
     mutation,
@@ -13,12 +13,6 @@ pub use time::{Time, TimeExt};
 
 mod page_info;
 pub use page_info::PageInfo;
-
-mod requirement;
-pub use requirement::Requirement;
-
-mod category;
-pub use category::Category;
 
 #[derive(Debug, Clone)]
 pub struct Link {
@@ -100,6 +94,8 @@ pub struct Feed {
     pub generator: Option<String>,
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
 }
 
 impl From<query::subscription::Feed> for Feed {
@@ -122,6 +118,13 @@ impl From<query::subscription::Feed> for Feed {
             generator: f.generator,
             entries: f.entries.nodes.into_iter().map(From::from).collect(),
             authors: f.authors.nodes,
+            requirement: f.requirement.and_then(|r| match r {
+                query::subscription::Requirement::MUST => Some(Requirement::Must),
+                query::subscription::Requirement::SHOULD => Some(Requirement::Should),
+                query::subscription::Requirement::MAY => Some(Requirement::May),
+                query::subscription::Requirement::Other(_) => None,
+            }),
+            category: f.category,
         }
     }
 }
@@ -146,6 +149,13 @@ impl From<mutation::subscribe_feed::Feed> for Feed {
             generator: f.generator,
             entries: f.entries.nodes.into_iter().map(From::from).collect(),
             authors: f.authors.nodes,
+            requirement: f.requirement.and_then(|r| match r {
+                mutation::subscribe_feed::Requirement::MUST => Some(Requirement::Must),
+                mutation::subscribe_feed::Requirement::SHOULD => Some(Requirement::Should),
+                mutation::subscribe_feed::Requirement::MAY => Some(Requirement::May),
+                mutation::subscribe_feed::Requirement::Other(_) => None,
+            }),
+            category: f.category,
         }
     }
 }
@@ -196,13 +206,6 @@ impl From<query::export_subscription::ExportSubscriptionOutputFeedsNodes> for Ex
             url: v.url,
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct SubscribeFeedInput {
-    pub feed_url: String,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category>,
 }
 
 fn parse_time(t: impl AsRef<str>) -> Time {

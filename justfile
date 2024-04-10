@@ -23,6 +23,10 @@ default:
 check: typo
     nix flake check --all-systems --accept-flake-config
 
+# Run cargo check
+c:
+    cargo check --all-features
+
 # Run spell checker
 typo:
     typos
@@ -64,16 +68,16 @@ gen-gql:
     graphql-client generate \
       --schema-path crates/synd_term/gql/schema.json \
       --output-directory crates/synd_term/src/client \
-      --variables-derives "Debug" \
-      --response-derives "Debug,Clone" \
+      --variables-derives "Debug,Clone,PartialEq,Eq" \
+      --response-derives "Debug,Clone,PartialEq,Eq" \
       --custom-scalars-module "crate::client::scalar" \
       crates/synd_term/gql/query.gql
 
     graphql-client generate \
       --schema-path crates/synd_term/gql/schema.json \
       --output-directory crates/synd_term/src/client \
-      --variables-derives "Debug" \
-      --response-derives "Debug,Clone" \
+      --variables-derives "Debug,Clone,PartialEq,Eq" \
+      --response-derives "Debug,Clone,PartialEq,Eq" \
       --custom-scalars-module "crate::client::scalar" \
       crates/synd_term/gql/mutation.gql
 
@@ -96,7 +100,7 @@ api *flags:
       SYND_LOG="info,synd_api=debug" \
       OTEL_EXPORTER_OTLP_ENDPOINT={{ otlp_endpoint }} \
       OTEL_RESOURCE_ATTRIBUTES="service.namespace=syndlocal,deployment.environment=local" \
-      cargo run --features opentelemetry-stdout -- \
+      cargo run --features opentelemetry-stdout,introspection -- \
         --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{ kvsd_user }} --kvsd-password secret \
         --tls-cert ../../.dev/self_signed_certs/certificate.pem --tls-key ../../.dev/self_signed_certs/private_key.pem \
         --show-code-location=true --show-target=false --trace-sampler-ratio "1.0" {{ flags }}

@@ -4,7 +4,7 @@ pub mod subscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "SubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n      message\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 20) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($subscribeInput: SubscribeFeedInput!) {\n  subscribeFeed(input: $subscribeInput) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n      message\n    }\n  }\n}\n\nmutation UnsubscribeFeed($unsubscribeInput: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $unsubscribeInput) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  requirement\n  category\n  entries(first: 20) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -15,8 +15,9 @@ pub mod subscribe_feed {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
+    type Category = crate::client::scalar::Category;
     type Rfc3339Time = crate::client::scalar::Rfc3339Time;
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum FeedType {
         ATOM,
         RSS1,
@@ -50,7 +51,35 @@ pub mod subscribe_feed {
             }
         }
     }
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub enum Requirement {
+        MUST,
+        SHOULD,
+        MAY,
+        Other(String),
+    }
+    impl ::serde::Serialize for Requirement {
+        fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+            ser.serialize_str(match *self {
+                Requirement::MUST => "MUST",
+                Requirement::SHOULD => "SHOULD",
+                Requirement::MAY => "MAY",
+                Requirement::Other(ref s) => &s,
+            })
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Requirement {
+        fn deserialize<D: ::serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let s: String = ::serde::Deserialize::deserialize(deserializer)?;
+            match s.as_str() {
+                "MUST" => Ok(Requirement::MUST),
+                "SHOULD" => Ok(Requirement::SHOULD),
+                "MAY" => Ok(Requirement::MAY),
+                _ => Ok(Requirement::Other(s)),
+            }
+        }
+    }
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum ResponseCode {
         OK,
         UNAUTHORIZED,
@@ -81,16 +110,19 @@ pub mod subscribe_feed {
             }
         }
     }
-    #[derive(Serialize, Debug)]
+    #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct SubscribeFeedInput {
         pub url: String,
+        pub requirement: Option<Requirement>,
+        pub category: Option<Category>,
     }
-    #[derive(Serialize, Debug)]
+    #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct Variables {
-        pub input: SubscribeFeedInput,
+        #[serde(rename = "subscribeInput")]
+        pub subscribe_input: SubscribeFeedInput,
     }
     impl Variables {}
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct Feed {
         pub id: ID,
         #[serde(rename = "type")]
@@ -102,32 +134,34 @@ pub mod subscribe_feed {
         pub website_url: Option<String>,
         pub description: Option<String>,
         pub generator: Option<String>,
+        pub requirement: Option<Requirement>,
+        pub category: Option<Category>,
         pub entries: FeedEntries,
         pub links: FeedLinks,
         pub authors: FeedAuthors,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct FeedEntries {
         pub nodes: Vec<FeedEntriesNodes>,
     }
     pub type FeedEntriesNodes = EntryMeta;
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct FeedLinks {
         pub nodes: Vec<FeedLinksNodes>,
     }
     pub type FeedLinksNodes = Link;
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct FeedAuthors {
         pub nodes: Vec<String>,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct EntryMeta {
         pub title: Option<String>,
         pub published: Option<Rfc3339Time>,
         pub updated: Option<Rfc3339Time>,
         pub summary: Option<String>,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct Link {
         pub href: String,
         pub rel: Option<String>,
@@ -135,33 +169,33 @@ pub mod subscribe_feed {
         pub media_type: Option<String>,
         pub title: Option<String>,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct ResponseData {
         #[serde(rename = "subscribeFeed")]
         pub subscribe_feed: SubscribeFeedSubscribeFeed,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(tag = "__typename")]
     pub enum SubscribeFeedSubscribeFeed {
         SubscribeFeedSuccess(SubscribeFeedSubscribeFeedOnSubscribeFeedSuccess),
         SubscribeFeedError(SubscribeFeedSubscribeFeedOnSubscribeFeedError),
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccess {
         pub feed: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed,
         pub status: SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus,
     }
     pub type SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessFeed = Feed;
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedSuccessStatus {
         pub code: ResponseCode,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedError {
         pub status: SubscribeFeedSubscribeFeedOnSubscribeFeedErrorStatus,
         pub message: String,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct SubscribeFeedSubscribeFeedOnSubscribeFeedErrorStatus {
         pub code: ResponseCode,
     }
@@ -182,7 +216,7 @@ pub mod unsubscribe_feed {
     #![allow(dead_code)]
     use std::result::Result;
     pub const OPERATION_NAME: &str = "UnsubscribeFeed";
-    pub const QUERY : & str = "mutation SubscribeFeed($input: SubscribeFeedInput!) {\n  subscribeFeed(input: $input) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n      message\n    }\n  }\n}\n\nmutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $input) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  entries(first: 20) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
+    pub const QUERY : & str = "mutation SubscribeFeed($subscribeInput: SubscribeFeedInput!) {\n  subscribeFeed(input: $subscribeInput) {\n    __typename\n    ... on SubscribeFeedSuccess {\n      feed {\n        ...Feed\n      }\n      status {\n        code\n      }\n    }\n    ... on SubscribeFeedError {\n      status {\n        code\n      }\n      message\n    }\n  }\n}\n\nmutation UnsubscribeFeed($unsubscribeInput: UnsubscribeFeedInput!) {\n  unsubscribeFeed(input: $unsubscribeInput) {\n    __typename\n    ... on UnsubscribeFeedSuccess {\n      status {\n        code\n      }\n    }\n    ... on UnsubscribeFeedError {\n      status {\n        code\n      }\n    }\n  }\n}\n\nfragment Feed on Feed {\n  id\n  type\n  title\n  url\n  updated\n  websiteUrl\n  description\n  generator\n  requirement\n  category\n  entries(first: 20) {\n    nodes {\n      ...EntryMeta\n    }\n  }\n  links {\n    nodes {\n      ...Link\n    }\n  }\n  authors {\n    nodes\n  }\n}\n\nfragment EntryMeta on Entry {\n    title,\n    published,\n    updated,\n    summary,\n}\n\nfragment Link on Link {\n  href\n  rel\n  mediaType\n  title  \n}\n" ;
     use super::*;
     use serde::{Deserialize, Serialize};
     #[allow(dead_code)]
@@ -193,7 +227,7 @@ pub mod unsubscribe_feed {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum ResponseCode {
         OK,
         UNAUTHORIZED,
@@ -224,39 +258,40 @@ pub mod unsubscribe_feed {
             }
         }
     }
-    #[derive(Serialize, Debug)]
+    #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnsubscribeFeedInput {
         pub url: String,
     }
-    #[derive(Serialize, Debug)]
+    #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct Variables {
-        pub input: UnsubscribeFeedInput,
+        #[serde(rename = "unsubscribeInput")]
+        pub unsubscribe_input: UnsubscribeFeedInput,
     }
     impl Variables {}
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct ResponseData {
         #[serde(rename = "unsubscribeFeed")]
         pub unsubscribe_feed: UnsubscribeFeedUnsubscribeFeed,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     #[serde(tag = "__typename")]
     pub enum UnsubscribeFeedUnsubscribeFeed {
         UnsubscribeFeedSuccess(UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccess),
         UnsubscribeFeedError(UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedError),
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccess {
         pub status: UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccessStatus,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedSuccessStatus {
         pub code: ResponseCode,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedError {
         pub status: UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedErrorStatus,
     }
-    #[derive(Deserialize, Debug, Clone)]
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnsubscribeFeedUnsubscribeFeedOnUnsubscribeFeedErrorStatus {
         pub code: ResponseCode,
     }

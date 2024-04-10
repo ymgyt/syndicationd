@@ -4,7 +4,10 @@ use synd_auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationRespo
 use crate::{
     application::{Direction, ListAction, RequestSequence},
     auth::AuthenticationProvider,
-    client::{payload, query::subscription::SubscriptionOutput},
+    client::{
+        mutation::subscribe_feed::SubscribeFeedInput, payload,
+        query::subscription::SubscriptionOutput,
+    },
     types::Feed,
 };
 
@@ -41,7 +44,7 @@ pub enum Command {
     PromptFeedEdition,
     PromptFeedUnsubscription,
     SubscribeFeed {
-        url: String,
+        input: SubscribeFeedInput,
     },
     UnsubscribeFeed {
         url: String,

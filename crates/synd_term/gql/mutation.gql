@@ -1,5 +1,5 @@
-mutation SubscribeFeed($input: SubscribeFeedInput!) {
-  subscribeFeed(input: $input) {
+mutation SubscribeFeed($subscribeInput: SubscribeFeedInput!) {
+  subscribeFeed(input: $subscribeInput) {
     __typename
     ... on SubscribeFeedSuccess {
       feed {
@@ -18,8 +18,8 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
   }
 }
 
-mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
-  unsubscribeFeed(input: $input) {
+mutation UnsubscribeFeed($unsubscribeInput: UnsubscribeFeedInput!) {
+  unsubscribeFeed(input: $unsubscribeInput) {
     __typename
     ... on UnsubscribeFeedSuccess {
       status {
@@ -43,6 +43,8 @@ fragment Feed on Feed {
   websiteUrl
   description
   generator
+  requirement
+  category
   entries(first: 20) {
     nodes {
       ...EntryMeta

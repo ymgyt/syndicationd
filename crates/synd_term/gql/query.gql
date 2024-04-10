@@ -20,6 +20,8 @@ fragment Feed on Feed {
   websiteUrl
   description
   generator
+  requirement
+  category
   entries(first: 20) {
     nodes {
       ...EntryMeta

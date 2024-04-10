@@ -74,6 +74,16 @@
         {
           "description": null,
           "enumValues": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "SCALAR",
+          "name": "Category",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
           "fields": [
             {
               "args": [],
@@ -130,7 +140,7 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Entry summary",
+              "description": "Entry summary. If there is no summary of the entry, return the content(is this bad api?)",
               "isDeprecated": false,
               "name": "summary",
               "type": {
@@ -444,6 +454,30 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Requirement level for feed",
+              "isDeprecated": false,
+              "name": "requirement",
+              "type": {
+                "kind": "ENUM",
+                "name": "Requirement",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Feed category",
+              "isDeprecated": false,
+              "name": "category",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Category",
                 "ofType": null
               }
             }
@@ -1161,6 +1195,35 @@
           "possibleTypes": null
         },
         {
+          "description": "`Requirement` expresses how important the feed is\nusing an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": "`Must` indicates it must be read",
+              "isDeprecated": false,
+              "name": "MUST"
+            },
+            {
+              "deprecationReason": null,
+              "description": "`Should` suggests it should be read unless there is a special reason not to",
+              "isDeprecated": false,
+              "name": "SHOULD"
+            },
+            {
+              "deprecationReason": null,
+              "description": "`May` implies it is probably worth reading",
+              "isDeprecated": false,
+              "name": "MAY"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "Requirement",
+          "possibleTypes": null
+        },
+        {
           "description": null,
           "enumValues": [
             {
@@ -1420,6 +1483,26 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "defaultValue": null,
+              "description": "Requirement level for feed",
+              "name": "requirement",
+              "type": {
+                "kind": "ENUM",
+                "name": "Requirement",
+                "ofType": null
+              }
+            },
+            {
+              "defaultValue": null,
+              "description": "Feed category",
+              "name": "category",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Category",
+                "ofType": null
               }
             }
           ],
@@ -2166,6 +2249,22 @@
           "description": "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes\nall available types and directives on the server, as well as the entry\npoints for query, mutation, and subscription operations.",
           "enumValues": null,
           "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "description of __Schema for newer graphiql introspection schema\nrequirements",
+              "isDeprecated": false,
+              "name": "description",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
             {
               "args": [],
               "deprecationReason": null,

@@ -10,7 +10,7 @@ use tokio::time::{Instant, Sleep};
 
 use crate::{
     auth::{AuthenticationProvider, Credential},
-    client::Client,
+    client::{mutation::subscribe_feed::SubscribeFeedInput, Client},
     command::Command,
     config,
     interact::Interactor,
@@ -326,8 +326,8 @@ impl Application {
                     self.prompt_feed_unsubscription();
                     self.should_render = true;
                 }
-                Command::SubscribeFeed { url } => {
-                    self.subscribe_feed(url);
+                Command::SubscribeFeed { input } => {
+                    self.subscribe_feed(input);
                     self.should_render = true;
                 }
                 Command::UnsubscribeFeed { url } => {
@@ -357,6 +357,9 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
+                    tracing::warn!("{feed:#?}");
+                    tracing::warn!("{feed:#?}");
+                    tracing::warn!("{feed:#?}");
                     self.in_flight.remove(request_seq);
                     self.components.subscription.add_subscribed_feed(feed);
                     self.fetch_entries(
@@ -490,10 +493,7 @@ impl Application {
         self.terminal.force_redraw();
 
         let fut = match InputParser::new(input.as_str()).parse_feed_subscription() {
-            Ok(input) => {
-                let url = input.feed_url;
-                async move { Ok(Command::SubscribeFeed { url }) }.boxed()
-            }
+            Ok(input) => async move { Ok(Command::SubscribeFeed { input }) }.boxed(),
             Err(err) => async move {
                 Ok(Command::HandleError {
                     message: err.to_string(),
@@ -532,10 +532,14 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
-    fn subscribe_feed(&mut self, url: String) {
+    fn subscribe_feed(&mut self, input: SubscribeFeedInput) {
         // Check for the duplicate subscription
-        if self.components.subscription.is_already_subscribed(&url) {
-            let message = format!("{url} already subscribed");
+        if self
+            .components
+            .subscription
+            .is_already_subscribed(&input.url)
+        {
+            let message = format!("{} already subscribed", input.url);
             let fut = std::future::ready(Ok(Command::HandleError {
                 message,
                 request_seq: None,
@@ -546,7 +550,7 @@ impl Application {
             let client = self.client.clone();
             let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
             let fut = async move {
-                match client.subscribe_feed(url).await {
+                match client.subscribe_feed(input).await {
                     Ok(feed) => Ok(Command::CompleteSubscribeFeed { feed, request_seq }),
                     Err(err) => Ok(Command::HandleError {
                         message: format!("{err}"),

@@ -9,7 +9,12 @@ use thiserror::Error;
 use tracing::{error, Span};
 use url::Url;
 
-use crate::{auth::Credential, client::payload::ExportSubscriptionPayload, config, types};
+use crate::{
+    auth::Credential,
+    client::payload::ExportSubscriptionPayload,
+    config,
+    types::{self},
+};
 
 use self::query::subscription::SubscriptionOutput;
 
@@ -78,10 +83,14 @@ impl Client {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn subscribe_feed(&self, url: String) -> Result<types::Feed, SubscribeFeedError> {
+    pub async fn subscribe_feed(
+        &self,
+        input: mutation::subscribe_feed::SubscribeFeedInput,
+    ) -> Result<types::Feed, SubscribeFeedError> {
         use crate::client::mutation::subscribe_feed::ResponseCode;
+        let url = input.url.clone();
         let var = mutation::subscribe_feed::Variables {
-            input: mutation::subscribe_feed::SubscribeFeedInput { url: url.clone() },
+            subscribe_input: input,
         };
         let request = mutation::SubscribeFeed::build_query(var);
         let response: mutation::subscribe_feed::ResponseData = self
@@ -111,7 +120,7 @@ impl Client {
     #[tracing::instrument(skip(self))]
     pub async fn unsubscribe_feed(&self, url: String) -> anyhow::Result<()> {
         let var = mutation::unsubscribe_feed::Variables {
-            input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
+            unsubscribe_input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
         };
         let request = mutation::UnsubscribeFeed::build_query(var);
         let response: mutation::unsubscribe_feed::ResponseData = self.request(&request).await?;
