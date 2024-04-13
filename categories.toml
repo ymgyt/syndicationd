@@ -1,0 +1,16 @@
+[categories]
+
+[categories.rust]
+# nf-md-language_rust 󱘗
+# icon = "󱘗"
+
+# nf-linux-ferris
+icon = { symbol = "", color = { rgb = 0xF74C00 } }
+
+[categories.database]
+# nf-dev-database 
+icon = { symbol = "\ue706" }
+
+[categories.default]
+# nf-md-note_text
+icon = { symbol = "󰎞", color = { name = "dark gray" } }

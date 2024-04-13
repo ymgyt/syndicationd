@@ -1,12 +1,13 @@
 use crate::{
     application::{Direction, IndexOutOfRange, ListAction},
     client::payload,
-    types::{self, TimeExt},
+    types::{self, RequirementExt, TimeExt},
     ui::{self, Context},
 };
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
-    text::{Span, Text},
+    style::{Modifier, Style, Stylize},
+    text::{Line, Span, Text},
     widgets::{
         block::{Position, Title},
         Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Scrollbar, ScrollbarOrientation,
@@ -120,7 +121,7 @@ impl Entries {
 
     fn entry_rows<'a>(
         &'a self,
-        _cx: &'a Context<'_>,
+        cx: &'a Context<'_>,
     ) -> (
         Row<'a>,
         impl IntoIterator<Item = Constraint>,
@@ -130,12 +131,14 @@ impl Entries {
             Cell::from(" Published"),
             Cell::from("󰯂 Entry"),
             Cell::from("󰑫 Feed"),
+            Cell::from(" ReqLv"),
         ]);
 
         let constraints = [
             Constraint::Length(11),
             Constraint::Fill(2),
             Constraint::Fill(1),
+            Constraint::Length(7),
         ];
 
         let row = |entry: &'a types::Entry| {
@@ -145,13 +148,28 @@ impl Entries {
                 .as_ref()
                 .or(entry.updated.as_ref())
                 .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
+            let category = entry
+                .category
+                .as_ref()
+                .unwrap_or_else(|| ui::default_category());
+            // TODO: handle fallback icon
+            let icon = cx.categories.icon(category).unwrap();
 
             let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
+            let requirement = entry
+                .requirement
+                .unwrap_or(ui::DEFAULT_REQUIREMNET)
+                .display();
 
             Row::new([
                 Cell::from(Span::from(published)),
-                Cell::from(Span::from(title)),
+                Cell::from(Line::from(vec![
+                    Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
+                    Span::from(" "),
+                    Span::from(title),
+                ])),
                 Cell::from(Span::from(feed_title)),
+                Cell::from(Span::from(requirement).dim()),
             ])
         };
 
@@ -186,6 +204,7 @@ impl Entries {
         // should to Lines?
         let paragraph = Paragraph::new(Text::from(summary))
             .wrap(Wrap { trim: false })
+            .style(Style::default().add_modifier(Modifier::DIM))
             .alignment(Alignment::Center);
 
         Widget::render(paragraph, inner, buf);

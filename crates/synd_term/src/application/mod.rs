@@ -12,7 +12,7 @@ use crate::{
     auth::{AuthenticationProvider, Credential},
     client::{mutation::subscribe_feed::SubscribeFeedInput, Client},
     command::Command,
-    config,
+    config::{self, Categories},
     interact::Interactor,
     job::Jobs,
     keymap::{KeymapId, Keymaps},
@@ -79,6 +79,7 @@ pub struct Application {
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
     keymaps: Keymaps,
+    categories: Categories,
 
     screen: Screen,
     should_render: bool,
@@ -108,6 +109,7 @@ impl Application {
             screen: Screen::Login,
             config,
             keymaps,
+            categories: Categories::default_toml(),
             should_quit: false,
             should_render: false,
         }
@@ -433,6 +435,7 @@ impl Application {
         let cx = ui::Context {
             theme: &self.theme,
             in_flight: &self.in_flight,
+            categories: &self.categories,
         };
         let root = Root::new(&self.components, cx);
 

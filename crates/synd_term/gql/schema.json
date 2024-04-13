@@ -755,6 +755,30 @@
                   "ofType": null
                 }
               }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Requirement Level for the feed",
+              "isDeprecated": false,
+              "name": "requirement",
+              "type": {
+                "kind": "ENUM",
+                "name": "Requirement",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "category",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Category",
+                "ofType": null
+              }
             }
           ],
           "inputFields": null,

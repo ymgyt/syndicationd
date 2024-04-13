@@ -78,6 +78,8 @@ fragment Entry on Entry {
 fragment FeedMeta on FeedMeta {
   title
   url
+  requirement
+  category
 }
 
 fragment PageInfo on PageInfo {

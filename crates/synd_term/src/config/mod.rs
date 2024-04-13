@@ -5,6 +5,9 @@ use std::{
 
 use directories::ProjectDirs;
 
+mod categories;
+pub use categories::Categories;
+
 pub mod api {
     pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100";
 }

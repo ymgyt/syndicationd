@@ -1,6 +1,6 @@
 use ratatui::style::{
     palette::tailwind::{self, Palette},
-    Modifier, Style,
+    Color, Modifier, Style,
 };
 
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub struct Theme {
     pub subscription: SubscriptionTheme,
     pub entries: EntriesTheme,
     pub error: ErrorTheme,
+    pub default_icon_fg: Color,
 }
 
 #[derive(Clone)]
@@ -84,6 +85,7 @@ impl Theme {
             error: ErrorTheme {
                 message: Style::new().fg(err).bg(bg),
             },
+            default_icon_fg: fg,
         }
     }
     pub fn new() -> Self {

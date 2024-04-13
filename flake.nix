@@ -38,7 +38,8 @@
           src = ./.; # The original, unfiltered source
           filter = path: type:
             # Load self signed certs to test
-            (pkgs.lib.hasSuffix ".pem" path) ||
+            (pkgs.lib.hasSuffix ".pem" path)
+            || (pkgs.lib.hasSuffix "categories.toml" path) ||
             # Default filter from crane (allow .rs files)
             (craneLib.filterCargoSources path type);
         };

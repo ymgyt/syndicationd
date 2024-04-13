@@ -14,6 +14,9 @@ pub use time::{Time, TimeExt};
 mod page_info;
 pub use page_info::PageInfo;
 
+mod requirement_ext;
+pub use requirement_ext::RequirementExt;
+
 #[derive(Debug, Clone)]
 pub struct Link {
     pub href: String,
@@ -169,6 +172,8 @@ pub struct Entry {
     pub summary: Option<String>,
     pub feed_title: Option<String>,
     pub feed_url: String,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
 }
 
 impl Entry {
@@ -189,6 +194,13 @@ impl From<query::entries::Entry> for Entry {
             feed_title: v.feed.title,
             feed_url: v.feed.url,
             summary: v.summary,
+            requirement: match v.feed.requirement {
+                Some(query::entries::Requirement::MUST) => Some(Requirement::Must),
+                Some(query::entries::Requirement::SHOULD) => Some(Requirement::Should),
+                Some(query::entries::Requirement::MAY) => Some(Requirement::May),
+                _ => None,
+            },
+            category: v.feed.category,
         }
     }
 }

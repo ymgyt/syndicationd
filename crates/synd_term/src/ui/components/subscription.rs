@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
-    style::{Modifier, Style},
+    style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
         block::{Position, Title},
@@ -16,7 +16,7 @@ use synd_feed::types::FeedType;
 use crate::{
     application::{Direction, IndexOutOfRange, ListAction},
     client::query::subscription::SubscriptionOutput,
-    types::{self, EntryMeta, Feed, TimeExt},
+    types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{self, Context},
 };
 
@@ -141,7 +141,7 @@ impl Subscription {
 
     fn feed_rows<'a>(
         &'a self,
-        _cx: &'a Context<'_>,
+        cx: &'a Context<'_>,
     ) -> (
         Row<'a>,
         impl IntoIterator<Item = Constraint>,
@@ -152,6 +152,7 @@ impl Subscription {
             Cell::from(" Updated"),
             Cell::from(" URL"),
             Cell::from("󰎞 Description"),
+            Cell::from(" ReqLv"),
         ]);
 
         let constraints = [
@@ -159,6 +160,7 @@ impl Subscription {
             Constraint::Length(10),
             Constraint::Fill(1),
             Constraint::Fill(2),
+            Constraint::Length(7),
         ];
 
         let row = |feed_meta: &'a Feed| {
@@ -171,17 +173,33 @@ impl Subscription {
                     .first()
                     .and_then(|entry| entry.published.as_ref().or(entry.updated.as_ref())))
                 .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
-            let desc = feed_meta.description.as_deref().unwrap_or("");
             let website_url = feed_meta
                 .website_url
                 .as_deref()
                 .unwrap_or(ui::UNKNOWN_SYMBOL);
+            let desc = feed_meta.description.as_deref().unwrap_or("");
+            let requirement = feed_meta
+                .requirement
+                .unwrap_or(ui::DEFAULT_REQUIREMNET)
+                .display();
+            let category = feed_meta
+                .category
+                .as_ref()
+                .unwrap_or_else(|| ui::default_category());
+            // TODO: fallback icon
+            let icon = cx.categories.icon(category).unwrap();
 
             Row::new([
-                Cell::from(Span::from(title)),
+                // Cell::from(Span::from(title)),
+                Cell::from(Line::from(vec![
+                    Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
+                    Span::from(" "),
+                    Span::from(title),
+                ])),
                 Cell::from(Span::from(updated)),
                 Cell::from(Span::from(website_url)),
                 Cell::from(Span::from(desc)),
+                Cell::from(Span::from(requirement).dim()),
             ])
         };
 
