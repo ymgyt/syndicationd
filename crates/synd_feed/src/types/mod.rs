@@ -111,6 +111,26 @@ pub struct Annotated<T> {
     pub category: Option<Category<'static>>,
 }
 
+impl<T> Annotated<T> {
+    pub fn project<U>(&self, f: impl Fn(&T) -> U) -> Annotated<U> {
+        Annotated {
+            feed: f(&self.feed),
+            requirement: self.requirement,
+            category: self.category.clone(),
+        }
+    }
+}
+
+impl<T> Annotated<T> {
+    pub fn new(feed: T) -> Self {
+        Self {
+            feed,
+            requirement: None,
+            category: None,
+        }
+    }
+}
+
 impl FeedMeta {
     pub fn r#type(&self) -> &FeedType {
         &self.feed_type

@@ -28,6 +28,10 @@ impl<'a> Category<'a> {
         Ok(Self(c.into()))
     }
 
+    pub fn as_str(&self) -> &str {
+        self.0.as_ref()
+    }
+
     pub fn into_inner(self) -> Cow<'a, str> {
         self.0
     }
