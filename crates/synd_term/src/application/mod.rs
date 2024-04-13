@@ -1,4 +1,4 @@
-use std::{pin::Pin, time::Duration};
+use std::{future, pin::Pin, time::Duration};
 
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
@@ -359,11 +359,8 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
-                    tracing::warn!("{feed:#?}");
-                    tracing::warn!("{feed:#?}");
-                    tracing::warn!("{feed:#?}");
                     self.in_flight.remove(request_seq);
-                    self.components.subscription.add_subscribed_feed(feed);
+                    self.components.subscription.upsert_subscribed_feed(feed);
                     self.fetch_entries(
                         ListAction::Replace,
                         None,
@@ -496,7 +493,24 @@ impl Application {
         self.terminal.force_redraw();
 
         let fut = match InputParser::new(input.as_str()).parse_feed_subscription() {
-            Ok(input) => async move { Ok(Command::SubscribeFeed { input }) }.boxed(),
+            Ok(input) => {
+                // Check for the duplicate subscription
+                if self
+                    .components
+                    .subscription
+                    .is_already_subscribed(&input.url)
+                {
+                    let message = format!("{} already subscribed", input.url);
+                    future::ready(Ok(Command::HandleError {
+                        message,
+                        request_seq: None,
+                    }))
+                    .boxed()
+                } else {
+                    future::ready(Ok(Command::SubscribeFeed { input })).boxed()
+                }
+            }
+
             Err(err) => async move {
                 Ok(Command::HandleError {
                     message: err.to_string(),
@@ -514,11 +528,27 @@ impl Application {
             return;
         };
 
-        let _input = self
+        let input = self
             .interactor
             .open_editor(InputParser::edit_feed_prompt(feed));
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
+
+        let fut = match InputParser::new(input.as_str()).parse_feed_subscription() {
+            // Strictly, if the URL of the feed changed before and after an update
+            // it is not considered an edit, so it could be considered an error
+            // but currently we are allowing it
+            Ok(input) => async move { Ok(Command::SubscribeFeed { input }) }.boxed(),
+            Err(err) => async move {
+                Ok(Command::HandleError {
+                    message: err.to_string(),
+                    request_seq: None,
+                })
+            }
+            .boxed(),
+        };
+
+        self.jobs.futures.push(fut);
     }
 
     fn prompt_feed_unsubscription(&mut self) {
@@ -536,34 +566,19 @@ impl Application {
     }
 
     fn subscribe_feed(&mut self, input: SubscribeFeedInput) {
-        // Check for the duplicate subscription
-        if self
-            .components
-            .subscription
-            .is_already_subscribed(&input.url)
-        {
-            let message = format!("{} already subscribed", input.url);
-            let fut = std::future::ready(Ok(Command::HandleError {
-                message,
-                request_seq: None,
-            }))
-            .boxed();
-            self.jobs.futures.push(fut);
-        } else {
-            let client = self.client.clone();
-            let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
-            let fut = async move {
-                match client.subscribe_feed(input).await {
-                    Ok(feed) => Ok(Command::CompleteSubscribeFeed { feed, request_seq }),
-                    Err(err) => Ok(Command::HandleError {
-                        message: format!("{err}"),
-                        request_seq: Some(request_seq),
-                    }),
-                }
+        let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
+        let fut = async move {
+            match client.subscribe_feed(input).await {
+                Ok(feed) => Ok(Command::CompleteSubscribeFeed { feed, request_seq }),
+                Err(err) => Ok(Command::HandleError {
+                    message: format!("{err}"),
+                    request_seq: Some(request_seq),
+                }),
             }
-            .boxed();
-            self.jobs.futures.push(fut);
         }
+        .boxed();
+        self.jobs.futures.push(fut);
     }
 
     fn unsubscribe_feed(&mut self, url: String) {

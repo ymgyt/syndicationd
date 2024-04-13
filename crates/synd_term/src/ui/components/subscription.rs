@@ -53,8 +53,11 @@ impl Subscription {
         }
     }
 
-    pub fn add_subscribed_feed(&mut self, feed: types::Feed) {
-        self.feeds.insert(0, feed);
+    pub fn upsert_subscribed_feed(&mut self, feed: types::Feed) {
+        match self.feeds.iter_mut().find(|x| x.url == feed.url) {
+            Some(x) => *x = feed,
+            None => self.feeds.insert(0, feed),
+        }
     }
 
     pub fn remove_unsubscribed_feed(&mut self, url: &str) {

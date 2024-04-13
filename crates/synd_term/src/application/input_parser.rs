@@ -3,6 +3,7 @@ use thiserror::Error;
 use crate::{
     client::mutation::subscribe_feed::SubscribeFeedInput,
     types::{self},
+    ui,
 };
 
 pub use feed::requirement as parse_requirement;
@@ -25,8 +26,11 @@ impl<'a> InputParser<'a> {
 #
 # <requirement> <category> <url>
 #
-#   * The requirement must be one of \"MUST\", \"SHOULD\", \"MAY\"
-#   * For the category, please choose one category of the feed(for exampke, \"rust\"
+#   * The requirement must be one of 
+#     * \"MUST\" 
+#     * \"SHOULD\" 
+#     * \"MAY\"
+#   * For the category, please choose one category of the feed(for example, \"rust\"
 #
 # with '#' will be ignored, and an empty URL aborts the subscription.
 #
@@ -44,8 +48,10 @@ impl<'a> InputParser<'a> {
 
     pub(super) fn edit_feed_prompt(feed: &types::Feed) -> String {
         format!(
-            "{}\n{feed_url}",
+            "{}\n{requirement} {category} {feed_url}",
             Self::SUSBSCRIBE_FEED_PROMPT,
+            requirement = feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET),
+            category = feed.category.as_ref().unwrap_or(ui::default_category()),
             feed_url = feed.url,
         )
     }
