@@ -3,7 +3,7 @@ use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use synd_feed::{
     feed::{cache::FetchCachedFeed, parser::FetchFeedError},
-    types::{self, EntryId},
+    types::{self, Annotated, EntryId},
 };
 use thiserror::Error;
 
@@ -26,7 +26,7 @@ pub struct FetchEntriesInput {
 #[derive(Default)]
 pub struct FetchEntriesOutput {
     pub entries: Vec<(types::Entry, types::FeedUrl)>,
-    pub feeds: HashMap<types::FeedUrl, types::FeedMeta>,
+    pub feeds: HashMap<types::FeedUrl, Annotated<types::FeedMeta>>,
 }
 
 #[derive(Error, Debug)]
@@ -66,7 +66,7 @@ impl Usecase for FetchEntries {
             .user_id()
             .expect("user id not found. this is a bug");
 
-        let feeds = self.repository.fetch_subscribed_feeds(user_id).await?;
+        let mut feeds = self.repository.fetch_subscribed_feeds(user_id).await?;
 
         // TODO: refactor
         let mut feed_metas = HashMap::with_capacity(feeds.urls.len());
@@ -82,6 +82,18 @@ impl Usecase for FetchEntries {
 
             let meta = feed.meta().clone();
             let feed_url = meta.url().to_owned();
+            let meta = match feeds
+                .annotations
+                .as_mut()
+                .and_then(|annotations| annotations.remove(&feed_url))
+            {
+                Some(feed_annotations) => Annotated {
+                    feed: meta,
+                    requirement: feed_annotations.requirement,
+                    category: feed_annotations.category,
+                },
+                None => Annotated::new(meta),
+            };
             feed_metas.insert(feed_url.clone(), meta);
             entries.extend(
                 feed.entries()

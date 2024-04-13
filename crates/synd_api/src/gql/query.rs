@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use async_graphql::{
     connection::{Connection, Edge},
     Context, Object, Result,
@@ -89,7 +91,7 @@ impl Subscription {
                     .expect("FeedMeta not found. this is a bug")
                     .clone();
                 let cursor = entry.id().into();
-                let node = Entry::new(meta, entry);
+                let node = Entry::new(Cow::Owned(meta), entry);
                 Edge::new(cursor, node)
             });
 

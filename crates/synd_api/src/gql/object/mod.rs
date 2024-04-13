@@ -35,15 +35,15 @@ impl From<feedrs::Link> for Link {
 }
 
 pub struct Entry<'a> {
-    meta: Cow<'a, types::FeedMeta>,
+    meta: Cow<'a, Annotated<types::FeedMeta>>,
     entry: types::Entry,
 }
 
 #[Object]
 impl<'a> Entry<'a> {
     /// Feed of this entry
-    async fn feed(&'a self) -> FeedMeta<'a> {
-        self.meta.as_ref().into()
+    async fn feed(&'a self) -> FeedMeta {
+        self.meta.clone().into()
     }
     /// Entry title
     async fn title(&self) -> Option<&str> {
@@ -67,16 +67,13 @@ impl<'a> Entry<'a> {
 
     /// Link to websiteurl at which this entry is published
     async fn website_url(&self) -> Option<&str> {
-        self.entry.website_url(self.meta.r#type())
+        self.entry.website_url(self.meta.feed.r#type())
     }
 }
 
 impl<'a> Entry<'a> {
-    pub fn new(meta: impl Into<Cow<'a, types::FeedMeta>>, entry: types::Entry) -> Self {
-        Self {
-            meta: meta.into(),
-            entry,
-        }
+    pub fn new(meta: Cow<'a, Annotated<types::FeedMeta>>, entry: types::Entry) -> Self {
+        Self { meta, entry }
     }
 }
 
@@ -134,12 +131,12 @@ impl Feed {
     > {
         #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(5).max(0) as usize;
-        let meta = self.0.feed.meta();
+        let meta = self.0.project(|feed| feed.meta().clone());
         let entries = self
             .0
             .feed
             .entries()
-            .map(|entry| Entry::new(meta, entry.clone()))
+            .map(move |entry| Entry::new(Cow::Owned(meta.clone()), entry.clone()))
             .take(first)
             .collect::<Vec<_>>();
 
@@ -230,29 +227,33 @@ impl From<Annotated<Arc<types::Feed>>> for Feed {
     }
 }
 
-pub(super) struct FeedMeta<'a>(Cow<'a, types::FeedMeta>);
+pub(super) struct FeedMeta<'a>(Cow<'a, Annotated<types::FeedMeta>>);
 
 #[Object]
 impl<'a> FeedMeta<'a> {
     /// Title of the feed
     async fn title(&self) -> Option<&str> {
-        self.0.title()
+        self.0.feed.title()
     }
 
     /// Url of the feed
     async fn url(&self) -> &str {
-        self.0.url()
+        self.0.feed.url()
+    }
+
+    /// Requirement Level for the feed
+    async fn requirement(&self) -> Option<Requirement> {
+        self.0.requirement
+    }
+
+    /// Category of the feed
+    async fn category(&self) -> Option<&Category<'static>> {
+        self.0.category.as_ref()
     }
 }
 
-impl From<types::FeedMeta> for FeedMeta<'static> {
-    fn from(value: types::FeedMeta) -> Self {
-        Self(Cow::Owned(value))
-    }
-}
-
-impl<'a> From<&'a types::FeedMeta> for FeedMeta<'a> {
-    fn from(value: &'a types::FeedMeta) -> Self {
-        Self(Cow::Borrowed(value))
+impl<'a> From<Cow<'a, Annotated<types::FeedMeta>>> for FeedMeta<'a> {
+    fn from(value: Cow<'a, Annotated<types::FeedMeta>>) -> Self {
+        Self(value)
     }
 }
