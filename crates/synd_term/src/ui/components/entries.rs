@@ -131,14 +131,14 @@ impl Entries {
             Cell::from(" Published"),
             Cell::from("󰯂 Entry"),
             Cell::from("󰑫 Feed"),
-            Cell::from(" ReqLv"),
+            Cell::from(" Req"),
         ]);
 
         let constraints = [
             Constraint::Length(11),
             Constraint::Fill(2),
             Constraint::Fill(1),
-            Constraint::Length(7),
+            Constraint::Length(5),
         ];
 
         let row = |entry: &'a types::Entry| {
@@ -159,7 +159,8 @@ impl Entries {
             let requirement = entry
                 .requirement
                 .unwrap_or(ui::DEFAULT_REQUIREMNET)
-                .display();
+                .label(cx.theme.requiment_fg)
+                .to_vec();
 
             Row::new([
                 Cell::from(Span::from(published)),
@@ -169,7 +170,7 @@ impl Entries {
                     Span::from(title),
                 ])),
                 Cell::from(Span::from(feed_title)),
-                Cell::from(Span::from(requirement).dim()),
+                Cell::from(Line::from(requirement)),
             ])
         };
 

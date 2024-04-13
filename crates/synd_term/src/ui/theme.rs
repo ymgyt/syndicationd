@@ -15,6 +15,7 @@ pub struct Theme {
     pub entries: EntriesTheme,
     pub error: ErrorTheme,
     pub default_icon_fg: Color,
+    pub requiment_fg: Color,
 }
 
 #[derive(Clone)]
@@ -86,6 +87,7 @@ impl Theme {
                 message: Style::new().fg(err).bg(bg),
             },
             default_icon_fg: fg,
+            requiment_fg: bg,
         }
     }
     pub fn new() -> Self {

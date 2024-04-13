@@ -152,7 +152,7 @@ impl Subscription {
             Cell::from(" Updated"),
             Cell::from(" URL"),
             Cell::from("󰎞 Description"),
-            Cell::from(" ReqLv"),
+            Cell::from(" Req"),
         ]);
 
         let constraints = [
@@ -160,7 +160,7 @@ impl Subscription {
             Constraint::Length(10),
             Constraint::Fill(1),
             Constraint::Fill(2),
-            Constraint::Length(7),
+            Constraint::Length(5),
         ];
 
         let row = |feed_meta: &'a Feed| {
@@ -181,7 +181,8 @@ impl Subscription {
             let requirement = feed_meta
                 .requirement
                 .unwrap_or(ui::DEFAULT_REQUIREMNET)
-                .display();
+                .label(cx.theme.requiment_fg)
+                .to_vec();
             let category = feed_meta
                 .category
                 .as_ref()
@@ -199,7 +200,7 @@ impl Subscription {
                 Cell::from(Span::from(updated)),
                 Cell::from(Span::from(website_url)),
                 Cell::from(Span::from(desc)),
-                Cell::from(Span::from(requirement).dim()),
+                Cell::from(Line::from(requirement)),
             ])
         };
 
