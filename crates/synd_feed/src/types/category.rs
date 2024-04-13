@@ -1,4 +1,7 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -34,6 +37,12 @@ impl<'a> Category<'a> {
 
     pub fn into_inner(self) -> Cow<'a, str> {
         self.0
+    }
+}
+
+impl<'a> Display for Category<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.as_ref())
     }
 }
 

@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 /// `Requirement` expresses how important the feed is
 /// using an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)
@@ -23,6 +26,16 @@ impl FromStr for Requirement {
             _ if s.eq_ignore_ascii_case("SHOULD") => Ok(Requirement::Should),
             _ if s.eq_ignore_ascii_case("MAY") => Ok(Requirement::May),
             _ => Err("invalid requirement, should be one of ['must', 'should', 'may']"),
+        }
+    }
+}
+
+impl Display for Requirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Requirement::Must => f.write_str("MUST"),
+            Requirement::Should => f.write_str("SHOULD"),
+            Requirement::May => f.write_str("MAY"),
         }
     }
 }
