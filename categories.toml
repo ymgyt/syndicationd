@@ -1,15 +1,57 @@
-[categories]
-
 [categories.rust]
-# nf-md-language_rust 󱘗
-# icon = "󱘗"
-
 # nf-linux-ferris
 icon = { symbol = "", color = { rgb = 0xF74C00 } }
 
+[categories.nix]
+aliases = ["nixos"]
+# nf-linux-nixos
+icon = { symbol = "", color = { name = "cyan" } }
+
+[categories.opentelemetry]
+aliases = ["otel"]
+# nf-md-telescope
+icon = { symbol = "󰭎", color = { name = "white" } }
+
+[categories.kubernetes]
+aliases = ["k8s"]
+# nf-md-kubernetes
+icon = { symbol = "󱃾", color = { name = "blue" } }
+
 [categories.database]
+aliases = ["db", "rds"]
 # nf-dev-database 
 icon = { symbol = "\ue706" }
+
+[categories.sre]
+# nf-md-cloud_check_outline
+icon = { symbol = "󱋌" }
+
+## Cloud
+[categories.cloud]
+aliases = ["cncf", "cloudnative"]
+# nf-fa-cloud
+icon = { symbol = "" }
+
+[categories.aws]
+# nf-md-aws
+icon = { symbol = "󰸏" }
+
+## Editor
+[categories.helix]
+# nf-md-dna
+icon = { symbol = "󰚄" }
+
+## Misc
+
+[categories.book]
+# nf-fa-book
+aliases = ["oreilly"]
+icon    = { symbol = "" }
+
+[categories.misc]
+aliases = ["etc"]
+# nf-cod-symbol_misc
+icon = { symbol = "" }
 
 [categories.default]
 # nf-md-note_text
