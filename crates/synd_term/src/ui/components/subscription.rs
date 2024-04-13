@@ -182,14 +182,10 @@ impl Subscription {
                 .unwrap_or(ui::UNKNOWN_SYMBOL);
             let desc = feed_meta.description.as_deref().unwrap_or("");
             let requirement = feed_meta
-                .requirement
-                .unwrap_or(ui::DEFAULT_REQUIREMNET)
+                .requirement()
                 .label(cx.theme.requiment_fg)
                 .to_vec();
-            let category = feed_meta
-                .category
-                .as_ref()
-                .unwrap_or_else(|| ui::default_category());
+            let category = feed_meta.category();
             // TODO: fallback icon
             let icon = cx.categories.icon(category).unwrap();
 
@@ -234,7 +230,7 @@ impl Subscription {
             return;
         };
 
-        let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(0)]);
+        let vertical = Layout::vertical([Constraint::Length(3), Constraint::Min(0)]);
         let [meta_area, entries_area] = vertical.areas(inner);
         let entries_area = entries_area.inner(&Margin {
             vertical: 1,
@@ -281,6 +277,20 @@ impl Subscription {
                         Some(FeedType::JSON) => "JSON Feed",
                         None => ui::UNKNOWN_SYMBOL,
                     }),
+                ])),
+            ]),
+            Row::new([
+                Cell::new(Span::styled(
+                    " Category",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Cell::new(Span::from(feed.category().as_str())),
+                Cell::new(Line::from(vec![
+                    Span::styled(
+                        " Requirement ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
+                    Span::from(feed.requirement().to_string()),
                 ])),
             ]),
         ];

@@ -3,9 +3,12 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use synd_feed::types::{Category, FeedType, Requirement};
 
-use crate::client::{
-    mutation,
-    query::{self},
+use crate::{
+    client::{
+        mutation,
+        query::{self},
+    },
+    ui,
 };
 
 mod time;
@@ -97,8 +100,18 @@ pub struct Feed {
     pub generator: Option<String>,
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    requirement: Option<Requirement>,
+    category: Option<Category<'static>>,
+}
+
+impl Feed {
+    pub fn requirement(&self) -> Requirement {
+        self.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET)
+    }
+
+    pub fn category(&self) -> &Category<'static> {
+        self.category.as_ref().unwrap_or(ui::default_category())
+    }
 }
 
 impl From<query::subscription::Feed> for Feed {
