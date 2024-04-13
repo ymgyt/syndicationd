@@ -492,7 +492,7 @@ impl Application {
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
 
-        let fut = match InputParser::new(input.as_str()).parse_feed_subscription() {
+        let fut = match InputParser::new(input.as_str()).parse_feed_subscription(&self.categories) {
             Ok(input) => {
                 // Check for the duplicate subscription
                 if self
@@ -534,7 +534,7 @@ impl Application {
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
 
-        let fut = match InputParser::new(input.as_str()).parse_feed_subscription() {
+        let fut = match InputParser::new(input.as_str()).parse_feed_subscription(&self.categories) {
             // Strictly, if the URL of the feed changed before and after an update
             // it is not considered an edit, so it could be considered an error
             // but currently we are allowing it

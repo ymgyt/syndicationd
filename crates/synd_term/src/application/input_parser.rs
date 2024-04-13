@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{
     client::mutation::subscribe_feed::SubscribeFeedInput,
+    config::Categories,
     types::{self},
-    ui,
 };
 
 pub use feed::requirement as parse_requirement;
@@ -42,16 +42,26 @@ impl<'a> InputParser<'a> {
         Self { input }
     }
 
-    pub(super) fn parse_feed_subscription(&self) -> Result<SubscribeFeedInput, ParseFeedError> {
-        feed::parse(self.input).map_err(|e| ParseFeedError::Parse(e.to_string()))
+    pub(super) fn parse_feed_subscription(
+        &self,
+        categories: &Categories,
+    ) -> Result<SubscribeFeedInput, ParseFeedError> {
+        feed::parse(self.input)
+            .map(|mut input| {
+                if let Some(category) = input.category {
+                    input.category = Some(categories.normalize(category));
+                }
+                input
+            })
+            .map_err(|e| ParseFeedError::Parse(e.to_string()))
     }
 
     pub(super) fn edit_feed_prompt(feed: &types::Feed) -> String {
         format!(
             "{}\n{requirement} {category} {feed_url}",
             Self::SUSBSCRIBE_FEED_PROMPT,
-            requirement = feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET),
-            category = feed.category.as_ref().unwrap_or(ui::default_category()),
+            requirement = feed.requirement(),
+            category = feed.category(),
             feed_url = feed.url,
         )
     }

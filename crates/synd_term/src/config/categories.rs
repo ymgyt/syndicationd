@@ -7,12 +7,16 @@ use synd_feed::types::Category;
 #[derive(Deserialize)]
 pub struct Categories {
     categories: HashMap<String, Entry>,
+    #[serde(skip)]
+    aliases: HashMap<String, String>,
 }
 
 impl Categories {
     pub fn default_toml() -> Self {
         let s = include_str!("../../../../categories.toml");
-        toml::from_str(s).unwrap()
+        let mut c: Self = toml::from_str(s).unwrap();
+        c.update_aliases();
+        c
     }
 
     pub fn icon(&self, category: &Category<'_>) -> Option<&Icon> {
@@ -20,11 +24,34 @@ impl Categories {
             .get(category.as_str())
             .map(|entry| &entry.icon)
     }
+
+    pub fn normalize(&self, category: Category<'static>) -> Category<'static> {
+        match self.aliases.get(category.as_str()) {
+            Some(normalized) => Category::new(normalized.to_owned()).unwrap_or(category),
+            None => category,
+        }
+    }
+
+    fn update_aliases(&mut self) {
+        let new_map = self.categories.iter().fold(
+            HashMap::with_capacity(self.categories.len()),
+            |mut m, (category, entry)| {
+                entry.aliases.iter().for_each(|alias| {
+                    m.insert(alias.to_lowercase(), category.to_lowercase());
+                });
+                m
+            },
+        );
+
+        self.aliases = new_map;
+    }
 }
 
 #[derive(Deserialize)]
 struct Entry {
     icon: Icon,
+    #[serde(default)]
+    aliases: Vec<String>,
 }
 
 #[derive(Deserialize)]
