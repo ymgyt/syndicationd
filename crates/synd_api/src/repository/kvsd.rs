@@ -127,7 +127,10 @@ impl SubscriptionRepository for KvsdClient {
         let feeds = if let Some(mut feeds) =
             Self::get::<SubscribedFeeds>(&mut client, key.clone()).await?
         {
-            feeds.urls.insert(0, feed.url.clone());
+            // Create case
+            if !feeds.urls.contains(&feed.url) {
+                feeds.urls.insert(0, feed.url.clone());
+            };
             if feeds.annotations.is_none() {
                 feeds.annotations = Some(HashMap::new());
             };
