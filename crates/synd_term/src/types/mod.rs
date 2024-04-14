@@ -185,8 +185,8 @@ pub struct Entry {
     pub summary: Option<String>,
     pub feed_title: Option<String>,
     pub feed_url: String,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    requirement: Option<Requirement>,
+    category: Option<Category<'static>>,
 }
 
 impl Entry {
@@ -194,6 +194,16 @@ impl Entry {
         self.summary
             .as_deref()
             .map(|summary| html2text::from_read(summary.as_bytes(), width))
+    }
+
+    pub fn requirement(&self) -> Requirement {
+        self.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET)
+    }
+
+    pub fn category(&self) -> &Category<'static> {
+        self.category
+            .as_ref()
+            .unwrap_or_else(|| ui::default_category())
     }
 }
 

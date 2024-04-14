@@ -138,6 +138,7 @@ impl Application {
         self.keymaps.disable(KeymapId::Login);
         self.keymaps.enable(KeymapId::Tabs);
         self.keymaps.enable(KeymapId::Entries);
+        self.keymaps.enable(KeymapId::Filter);
         self.initial_fetch();
         self.screen = Screen::Browse;
         self.should_render = true;
@@ -339,7 +340,7 @@ impl Application {
                 Command::FetchSubscription { after, first } => {
                     self.fetch_subscription(ListAction::Append, after, first);
                 }
-                Command::UpdateSubscription {
+                Command::UpdateSubscriptionState {
                     action,
                     subscription,
                     request_seq,
@@ -380,12 +381,17 @@ impl Application {
                 Command::FetchEntries { after, first } => {
                     self.fetch_entries(ListAction::Append, after, first);
                 }
-                Command::UpdateEntries {
+                Command::UpdateEntriesState {
                     action,
                     payload,
                     request_seq,
                 } => {
                     self.in_flight.remove(request_seq);
+                    self.components.filter.update_categories(
+                        &self.categories,
+                        action,
+                        payload.entries.as_slice(),
+                    );
                     self.components.entries.update_entries(action, payload);
                     self.should_render = true;
                 }
@@ -411,6 +417,11 @@ impl Application {
                 }
                 Command::OpenEntry => {
                     self.open_entry();
+                }
+                Command::MoveFilterRequirement(direction) => {
+                    let filter = self.components.filter.move_requirement(direction);
+                    self.components.entries.update_filter(filter);
+                    self.should_render = true;
                 }
                 Command::HandleError {
                     message,
@@ -467,7 +478,7 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {
             match client.fetch_subscription(after, Some(first)).await {
-                Ok(subscription) => Ok(Command::UpdateSubscription {
+                Ok(subscription) => Ok(Command::UpdateSubscriptionState {
                     action,
                     subscription,
                     request_seq,
@@ -626,7 +637,7 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
         let fut = async move {
             match client.fetch_entries(after, first).await {
-                Ok(payload) => Ok(Command::UpdateEntries {
+                Ok(payload) => Ok(Command::UpdateEntriesState {
                     action,
                     payload,
                     request_seq,

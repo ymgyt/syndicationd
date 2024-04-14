@@ -30,7 +30,7 @@ impl<'a> InputParser<'a> {
 #     * \"MUST\" 
 #     * \"SHOULD\" 
 #     * \"MAY\"
-#   * For the category, please choose one category of the feed(for example, \"rust\"
+#   * For the category, please choose one category of the feed(for example, \"rust\")
 #
 # with '#' will be ignored, and an empty URL aborts the subscription.
 #

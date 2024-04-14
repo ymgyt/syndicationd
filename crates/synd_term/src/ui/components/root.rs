@@ -23,12 +23,14 @@ impl<'a> Root<'a> {
 
         let layout = Layout::vertical([
             Constraint::Length(1),
+            Constraint::Length(1),
             Constraint::Min(0),
             Constraint::Length(1),
         ]);
-        let [tabs_area, content_area, prompt_area] = layout.areas(area);
+        let [tabs_area, filter_area, content_area, prompt_area] = layout.areas(area);
 
         self.components.tabs.render(tabs_area, buf, cx);
+        self.components.filter.render(filter_area, buf, cx);
 
         match self.components.tabs.current() {
             Tab::Feeds => self.components.subscription.render(content_area, buf, cx),

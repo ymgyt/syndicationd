@@ -2,7 +2,11 @@ use crate::{
     application::{Direction, IndexOutOfRange, ListAction},
     client::payload,
     types::{self, RequirementExt, TimeExt},
-    ui::{self, Context},
+    ui::{
+        self,
+        components::filter::{FeedFilter, FilterResult},
+        icon, Context,
+    },
 };
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
@@ -18,6 +22,8 @@ use ratatui::{
 pub struct Entries {
     selected_entry_index: usize,
     entries: Vec<types::Entry>,
+    effective_entries: Vec<usize>,
+    filter: FeedFilter,
 }
 
 impl Entries {
@@ -25,6 +31,8 @@ impl Entries {
         Self {
             selected_entry_index: 0,
             entries: Vec::new(),
+            effective_entries: Vec::new(),
+            filter: FeedFilter::default(),
         }
     }
 
@@ -33,16 +41,33 @@ impl Entries {
             ListAction::Append => self.entries.extend(payload.entries),
             ListAction::Replace => self.entries = payload.entries,
         }
+        self.apply_filter();
+    }
+
+    pub fn update_filter(&mut self, filter: FeedFilter) {
+        self.filter = filter;
+        self.apply_filter();
+    }
+
+    fn apply_filter(&mut self) {
+        self.effective_entries = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_idx, entry)| self.filter.entry(entry) == FilterResult::Use)
+            .map(|(idx, _)| idx)
+            .collect();
     }
 
     pub fn remove_unsubscribed_entries(&mut self, url: &str) {
         self.entries.retain(|entry| entry.feed_url != url);
+        self.apply_filter();
     }
 
     pub fn move_selection(&mut self, direction: &Direction) {
         self.selected_entry_index = direction.apply(
             self.selected_entry_index,
-            self.entries.len(),
+            self.effective_entries.len(),
             IndexOutOfRange::Wrapping,
         );
     }
@@ -53,7 +78,7 @@ impl Entries {
 
     pub fn move_last(&mut self) {
         if !self.entries.is_empty() {
-            self.selected_entry_index = self.entries.len() - 1;
+            self.selected_entry_index = self.effective_entries.len() - 1;
         }
     }
 
@@ -63,7 +88,9 @@ impl Entries {
     }
 
     fn selected_entry(&self) -> Option<&types::Entry> {
-        self.entries.get(self.selected_entry_index)
+        self.effective_entries
+            .get(self.selected_entry_index)
+            .map(|&idx| self.entries.get(idx).unwrap())
     }
 }
 
@@ -108,7 +135,7 @@ impl Entries {
         // https://github.com/ratatui-org/ratatui/pull/911
         // passing None to track_symbol cause incorrect rendering
         let mut scrollbar_state = ScrollbarState::default()
-            .content_length(self.entries.len())
+            .content_length(self.effective_entries.len())
             .position(self.selected_entry_index);
         Scrollbar::default()
             .orientation(ScrollbarOrientation::VerticalRight)
@@ -131,7 +158,7 @@ impl Entries {
             Cell::from(" Published"),
             Cell::from("󰯂 Entry"),
             Cell::from("󰑫 Feed"),
-            Cell::from(" Req"),
+            Cell::from(concat!(icon!(requirement), " Req")),
         ]);
 
         let constraints = [
@@ -148,19 +175,14 @@ impl Entries {
                 .as_ref()
                 .or(entry.updated.as_ref())
                 .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
-            let category = entry
-                .category
-                .as_ref()
-                .unwrap_or_else(|| ui::default_category());
-            // TODO: handle fallback icon
-            let icon = cx.categories.icon(category).unwrap();
+            let category = entry.category();
+            let icon = cx
+                .categories
+                .icon(category)
+                .unwrap_or_else(|| ui::default_icon());
 
             let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let requirement = entry
-                .requirement
-                .unwrap_or(ui::DEFAULT_REQUIREMNET)
-                .label(cx.theme.requiment_fg)
-                .to_vec();
+            let requirement = entry.requirement().label(cx.theme.requiment_fg).to_vec();
 
             Row::new([
                 Cell::from(Span::from(published)),
@@ -174,7 +196,13 @@ impl Entries {
             ])
         };
 
-        (header, constraints, self.entries.iter().map(row))
+        (
+            header,
+            constraints,
+            self.effective_entries
+                .iter()
+                .map(move |&idx| row(self.entries.get(idx).unwrap())),
+        )
     }
 
     fn render_summary(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {

@@ -16,6 +16,7 @@ pub enum KeymapId {
     Tabs = 2,
     Entries = 3,
     Subscription = 4,
+    Filter = 5,
 }
 
 #[derive(Debug)]
@@ -65,6 +66,7 @@ pub struct KeymapsConfig {
     pub tabs: KeyTrie,
     pub entries: KeyTrie,
     pub subscription: KeyTrie,
+    pub filter: KeyTrie,
     pub global: KeyTrie,
 }
 
@@ -76,7 +78,7 @@ impl Default for KeymapsConfig {
 
 #[derive(Debug)]
 pub struct Keymaps {
-    keymaps: Box<[Keymap; 5]>,
+    keymaps: Box<[Keymap; 6]>,
 }
 
 impl Keymaps {
@@ -88,6 +90,7 @@ impl Keymaps {
             Keymap::new(KeymapId::Tabs, config.tabs),
             Keymap::new(KeymapId::Entries, config.entries),
             Keymap::new(KeymapId::Subscription, config.subscription),
+            Keymap::new(KeymapId::Filter, config.filter),
         ];
 
         Self {
@@ -154,6 +157,10 @@ fn parse(s: &str) -> anyhow::Result<KeyEvent> {
         "enter" => KeyCode::Enter,
         "tab" => KeyCode::Tab,
         "backtab" => KeyCode::BackTab,
+        "left" => KeyCode::Left,
+        "right" => KeyCode::Right,
+        "up" => KeyCode::Up,
+        "down" => KeyCode::Down,
         single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),
         undefined => bail!("`{undefined}` is not implemented yet"),
     };

@@ -33,6 +33,10 @@ pub fn default() -> KeymapsConfig {
             "e" => move_subscribed_feed_last,
         },
     });
+    let filter = keymap!({
+       "h" | "left" => move_filter_requirement_left,
+       "l" | "right" => move_filter_requirement_right,
+    });
     let global = keymap!({
         "q" | "C-c" =>  quit ,
     });
@@ -42,6 +46,7 @@ pub fn default() -> KeymapsConfig {
         tabs,
         entries,
         subscription,
+        filter,
         global,
     }
 }

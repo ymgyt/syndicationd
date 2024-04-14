@@ -61,7 +61,7 @@ pub enum Command {
         after: Option<String>,
         first: i64,
     },
-    UpdateSubscription {
+    UpdateSubscriptionState {
         action: ListAction,
         subscription: SubscriptionOutput,
         request_seq: RequestSequence,
@@ -74,7 +74,7 @@ pub enum Command {
         after: Option<String>,
         first: i64,
     },
-    UpdateEntries {
+    UpdateEntriesState {
         action: ListAction,
         payload: payload::FetchEntriesPayload,
         request_seq: RequestSequence,
@@ -85,6 +85,9 @@ pub enum Command {
     MoveEntryLast,
     OpenEntry,
 
+    // Filter
+    MoveFilterRequirement(Direction),
+
     HandleError {
         message: String,
         request_seq: Option<RequestSequence>,
@@ -94,8 +97,8 @@ pub enum Command {
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::UpdateSubscription { .. } => f.write_str("UpdateSubscription"),
-            Command::UpdateEntries { .. } => f.write_str("UpdateEntries"),
+            Command::UpdateSubscriptionState { .. } => f.write_str("UpdateSubscription"),
+            Command::UpdateEntriesState { .. } => f.write_str("UpdateEntries"),
             Command::CompleteDevieAuthorizationFlow { .. } => {
                 f.write_str("CompleteDeviceAuthorizationFlow")
             }
@@ -167,5 +170,11 @@ impl Command {
     }
     pub fn move_subscribed_feed_last() -> Self {
         Command::MoveSubscribedFeedLast
+    }
+    pub fn move_filter_requirement_left() -> Self {
+        Command::MoveFilterRequirement(Direction::Left)
+    }
+    pub fn move_filter_requirement_right() -> Self {
+        Command::MoveFilterRequirement(Direction::Right)
     }
 }

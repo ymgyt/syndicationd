@@ -6,8 +6,14 @@ use ratatui::{
 
 use crate::{
     application::RequestId,
-    ui::widgets::throbber::{throbber, Throbber, ThrobberState},
-    ui::{widgets::throbber::throbber::WhichUse, Context},
+    ui::{
+        icon,
+        widgets::throbber::{
+            throbber::{self, WhichUse},
+            Throbber, ThrobberState,
+        },
+        Context,
+    },
 };
 
 use super::tabs::Tab;
@@ -47,6 +53,7 @@ impl Prompt {
             ("j/k", "󰹹"),
             ("gg", "󱞧"),
             ("ge", "󱞥"),
+            ("h/l", icon!(requirement)),
             ("r", "󰑓"),
         ][..];
         let suf_keys = &[("q", "")][..];
