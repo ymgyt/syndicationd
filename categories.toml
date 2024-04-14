@@ -7,16 +7,6 @@ aliases = ["nixos"]
 # nf-linux-nixos
 icon = { symbol = "", color = { name = "cyan" } }
 
-[categories.opentelemetry]
-aliases = ["otel"]
-# nf-md-telescope
-icon = { symbol = "󰭎", color = { name = "white" } }
-
-[categories.kubernetes]
-aliases = ["k8s"]
-# nf-md-kubernetes
-icon = { symbol = "󱃾", color = { name = "blue" } }
-
 [categories.database]
 aliases = ["db", "rds"]
 # nf-dev-database 
@@ -35,6 +25,16 @@ icon = { symbol = "" }
 [categories.aws]
 # nf-md-aws
 icon = { symbol = "󰸏" }
+
+[categories.kubernetes]
+aliases = ["k8s"]
+# nf-md-kubernetes
+icon = { symbol = "󱃾", color = { name = "blue" } }
+
+[categories.opentelemetry]
+aliases = ["otel"]
+# nf-md-telescope
+icon = { symbol = "󰭎", color = { name = "white" } }
 
 ## Editor
 [categories.helix]
