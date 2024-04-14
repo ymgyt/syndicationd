@@ -35,7 +35,7 @@ pub struct FeedFilter {
 impl Default for FeedFilter {
     fn default() -> Self {
         Self {
-            requirement: Filter::INTIAL_REQUIREMENT,
+            requirement: Filter::INITIAL_REQUIREMENT,
         }
     }
 }
@@ -70,11 +70,11 @@ struct CategoryState {
 }
 
 impl Filter {
-    const INTIAL_REQUIREMENT: Requirement = Requirement::May;
+    const INITIAL_REQUIREMENT: Requirement = Requirement::May;
 
     pub fn new() -> Self {
         Self {
-            requirement: Self::INTIAL_REQUIREMENT,
+            requirement: Self::INITIAL_REQUIREMENT,
             categories: Vec::new(),
             categoris_state: HashMap::new(),
         }
