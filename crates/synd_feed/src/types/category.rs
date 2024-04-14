@@ -14,7 +14,7 @@ pub enum CategoryError {
     LenMaxViolated,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Category<'a>(Cow<'a, str>);
 
 impl<'a> Category<'a> {

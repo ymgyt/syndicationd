@@ -10,11 +10,11 @@ use std::{
 #[cfg_attr(feature = "graphql", derive(async_graphql::Enum))]
 pub enum Requirement {
     /// `Must` indicates it must be read
-    Must,
+    Must = 2,
     /// `Should` suggests it should be read unless there is a special reason not to
-    Should,
+    Should = 1,
     /// `May` implies it is probably worth reading
-    May,
+    May = 0,
 }
 
 impl FromStr for Requirement {
@@ -36,6 +36,32 @@ impl Display for Requirement {
             Requirement::Must => f.write_str("MUST"),
             Requirement::Should => f.write_str("SHOULD"),
             Requirement::May => f.write_str("MAY"),
+        }
+    }
+}
+
+impl Requirement {
+    #[must_use]
+    pub fn up(self) -> Self {
+        Requirement::from_num((self as isize).saturating_add(1))
+    }
+
+    #[must_use]
+    pub fn down(self) -> Self {
+        #[allow(clippy::match_same_arms)]
+        let n = self as isize;
+        Requirement::from_num(n.saturating_sub(1))
+    }
+
+    pub fn is_satisfied(self, condition: Requirement) -> bool {
+        (self as isize) >= (condition as isize)
+    }
+
+    fn from_num(n: isize) -> Self {
+        match n {
+            2.. => Requirement::Must,
+            1 => Requirement::Should,
+            _ => Requirement::May,
         }
     }
 }
