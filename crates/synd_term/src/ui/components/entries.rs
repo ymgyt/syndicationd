@@ -182,7 +182,7 @@ impl Entries {
                 .unwrap_or_else(|| ui::default_icon());
 
             let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let requirement = entry.requirement().label(cx.theme.requiment_fg).to_vec();
+            let requirement = entry.requirement().label(&cx.theme.requirement).to_vec();
 
             Row::new([
                 Cell::from(Span::from(published)),

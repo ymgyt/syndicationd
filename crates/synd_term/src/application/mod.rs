@@ -420,7 +420,8 @@ impl Application {
                 }
                 Command::MoveFilterRequirement(direction) => {
                     let filter = self.components.filter.move_requirement(direction);
-                    self.components.entries.update_filter(filter);
+                    self.components.entries.update_filter(filter.clone());
+                    self.components.subscription.update_filter(filter);
                     self.should_render = true;
                 }
                 Command::HandleError {

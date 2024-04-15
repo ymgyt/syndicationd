@@ -28,6 +28,7 @@ pub enum FilterResult {
     Discard,
 }
 
+#[derive(Clone)]
 pub struct FeedFilter {
     requirement: Requirement,
 }
@@ -176,9 +177,9 @@ impl Filter {
             Span::from("     "),
             Span::from("Requirement ").dim(),
         ];
-        spans.extend(self.requirement.label(cx.theme.requiment_fg));
+        spans.extend(self.requirement.label(&cx.theme.requirement));
 
-        spans.extend([Span::from(" "), Span::from(" Category").dim()]);
+        spans.extend([Span::from(" "), Span::from(" Categories").dim()]);
 
         for c in &self.categories {
             let state = self

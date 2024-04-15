@@ -15,7 +15,7 @@ pub struct Theme {
     pub entries: EntriesTheme,
     pub error: ErrorTheme,
     pub default_icon_fg: Color,
-    pub requiment_fg: Color,
+    pub requirement: RequirementLabelTheme,
 }
 
 #[derive(Clone)]
@@ -48,6 +48,14 @@ pub struct EntriesTheme {
     pub background: Style,
     pub header: Style,
     pub selected_entry: Style,
+}
+
+#[derive(Clone)]
+pub struct RequirementLabelTheme {
+    pub must: Color,
+    pub should: Color,
+    pub may: Color,
+    pub fg: Color,
 }
 
 impl Theme {
@@ -87,7 +95,12 @@ impl Theme {
                 message: Style::new().fg(err).bg(bg),
             },
             default_icon_fg: fg,
-            requiment_fg: bg,
+            requirement: RequirementLabelTheme {
+                must: Color::Rgb(154, 4, 4),
+                should: Color::Rgb(243, 201, 105),
+                may: Color::Rgb(35, 57, 91),
+                fg: bg,
+            },
         }
     }
     pub fn new() -> Self {

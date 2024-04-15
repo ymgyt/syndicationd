@@ -17,12 +17,18 @@ use crate::{
     application::{Direction, IndexOutOfRange, ListAction},
     client::query::subscription::SubscriptionOutput,
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
-    ui::{self, Context},
+    ui::{
+        self,
+        components::filter::{FeedFilter, FilterResult},
+        Context,
+    },
 };
 
 pub struct Subscription {
     selected_feed_index: usize,
     feeds: Vec<types::Feed>,
+    effective_feeds: Vec<usize>,
+    filter: FeedFilter,
 }
 
 impl Subscription {
@@ -30,6 +36,8 @@ impl Subscription {
         Self {
             selected_feed_index: 0,
             feeds: Vec::new(),
+            effective_feeds: Vec::new(),
+            filter: FeedFilter::default(),
         }
     }
 
@@ -42,7 +50,9 @@ impl Subscription {
     }
 
     pub fn selected_feed(&self) -> Option<&types::Feed> {
-        self.feeds.get(self.selected_feed_index)
+        self.effective_feeds
+            .get(self.selected_feed_index)
+            .map(|&idx| self.feeds.get(idx).unwrap())
     }
 
     pub fn update_subscription(&mut self, action: ListAction, subscription: SubscriptionOutput) {
@@ -51,6 +61,22 @@ impl Subscription {
             ListAction::Append => self.feeds.extend(feed_metas),
             ListAction::Replace => self.feeds = feed_metas.collect(),
         }
+        self.apply_filter();
+    }
+
+    pub fn update_filter(&mut self, filter: FeedFilter) {
+        self.filter = filter;
+        self.apply_filter();
+    }
+
+    fn apply_filter(&mut self) {
+        self.effective_feeds = self
+            .feeds
+            .iter()
+            .enumerate()
+            .filter(|(_idx, feed)| self.filter.feed(feed) == FilterResult::Use)
+            .map(|(idx, _)| idx)
+            .collect();
     }
 
     pub fn upsert_subscribed_feed(&mut self, feed: types::Feed) {
@@ -58,17 +84,19 @@ impl Subscription {
             Some(x) => *x = feed,
             None => self.feeds.insert(0, feed),
         }
+        self.apply_filter();
     }
 
     pub fn remove_unsubscribed_feed(&mut self, url: &str) {
         self.feeds.retain(|feed_meta| feed_meta.url != url);
+        self.apply_filter();
         self.move_selection(&Direction::Up);
     }
 
     pub fn move_selection(&mut self, direction: &Direction) {
         self.selected_feed_index = direction.apply(
             self.selected_feed_index,
-            self.feeds.len(),
+            self.effective_feeds.len(),
             IndexOutOfRange::Wrapping,
         );
     }
@@ -79,7 +107,7 @@ impl Subscription {
 
     pub fn move_last(&mut self) {
         if !self.feeds.is_empty() {
-            self.selected_feed_index = self.feeds.len() - 1;
+            self.selected_feed_index = self.effective_feeds.len() - 1;
         }
     }
 }
@@ -183,14 +211,15 @@ impl Subscription {
             let desc = feed_meta.description.as_deref().unwrap_or("");
             let requirement = feed_meta
                 .requirement()
-                .label(cx.theme.requiment_fg)
+                .label(&cx.theme.requirement)
                 .to_vec();
             let category = feed_meta.category();
-            // TODO: fallback icon
-            let icon = cx.categories.icon(category).unwrap();
+            let icon = cx
+                .categories
+                .icon(category)
+                .unwrap_or_else(|| ui::default_icon());
 
             Row::new([
-                // Cell::from(Span::from(title)),
                 Cell::from(Line::from(vec![
                     Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
                     Span::from(" "),
@@ -203,7 +232,13 @@ impl Subscription {
             ])
         };
 
-        (header, constraints, self.feeds.iter().map(row))
+        (
+            header,
+            constraints,
+            self.effective_feeds
+                .iter()
+                .map(move |&idx| row(self.feeds.get(idx).unwrap())),
+        )
     }
 
     #[allow(clippy::too_many_lines)]
