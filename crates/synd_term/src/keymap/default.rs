@@ -3,16 +3,16 @@ use crate::keymap::{macros::keymap, KeymapsConfig};
 pub fn default() -> KeymapsConfig {
     let login = keymap!({
         "enter" => authenticate,
-        "k" => move_up_authentication_provider,
-        "j" => move_down_authentication_provider,
+        "k" | "up" => move_up_authentication_provider,
+        "j" | "down" => move_down_authentication_provider,
     });
     let tabs = keymap!({
         "tab" => move_right_tab_selection,
         "backtab" => move_left_tab_selection,
     });
     let entries = keymap!({
-        "k" => move_up_entry,
-        "j" => move_down_entry,
+        "k" | "up" => move_up_entry,
+        "j" | "down" => move_down_entry,
         "r" => reload_entries,
         "enter" => open_entry,
         "g" => {
@@ -24,8 +24,8 @@ pub fn default() -> KeymapsConfig {
         "a" => prompt_feed_subscription,
         "e" => prompt_feed_edition,
         "d" => prompt_feed_unsubscription,
-        "k" => move_up_subscribed_feed,
-        "j" => move_down_subscribed_feed,
+        "k" | "up" => move_up_subscribed_feed,
+        "j" | "down" => move_down_subscribed_feed,
         "r" => reload_subscription,
         "enter" => open_feed,
         "g" => {
