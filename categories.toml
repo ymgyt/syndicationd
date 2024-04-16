@@ -86,7 +86,7 @@ icon    = { symbol = "󰾡", color = { name = "yello" } }
 
 ## Editor
 [categories.helix]
-icon = { symbol = "󰚄" } # nf-md-dna
+icon = { symbol = "󰚄", color = { name = "magenta" } } # nf-md-dna
 
 ## Shell
 [categories.nu]
