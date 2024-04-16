@@ -131,11 +131,11 @@ impl Filter {
                     map
                 });
         map.insert(
-            KeyEvent::new(KeyCode::Char('A'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE),
             KeyTrie::Command(Command::ActivateAllFilterCategories),
         );
         map.insert(
-            KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
             KeyTrie::Command(Command::DeactivateAllFilterCategories),
         );
         Keymap::from_map(crate::keymap::KeymapId::CategoryFiltering, map)
@@ -326,7 +326,7 @@ impl Filter {
             }
         }
         if self.state == State::CategoryFiltering {
-            spans.push(Span::from("(Esc)").dim());
+            spans.push(Span::from("(Esc/+/-)").dim());
         }
 
         let filter = Line::from(spans);
