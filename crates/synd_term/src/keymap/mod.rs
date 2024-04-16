@@ -17,11 +17,11 @@ pub enum KeymapId {
     Entries = 3,
     Subscription = 4,
     Filter = 5,
+    CategoryFiltering = 6,
 }
 
 #[derive(Debug)]
-struct Keymap {
-    #[allow(unused)]
+pub struct Keymap {
     id: KeymapId,
     enable: bool,
     trie: KeyTrie,
@@ -29,13 +29,22 @@ struct Keymap {
 }
 
 impl Keymap {
-    fn new(id: KeymapId, trie: KeyTrie) -> Self {
+    /// Construct a `Keymap`
+    pub fn new(id: KeymapId, trie: KeyTrie) -> Self {
         Self {
             id,
             enable: false,
             trie,
             pending_keys: Vec::with_capacity(2),
         }
+    }
+
+    pub fn from_map(id: KeymapId, map: HashMap<KeyEvent, KeyTrie>) -> Self {
+        Self::new(id, KeyTrie::Node(KeyTrieNode { map }))
+    }
+
+    pub fn id(&self) -> KeymapId {
+        self.id
     }
 
     fn search(&mut self, event: &KeyEvent) -> Option<Command> {
@@ -78,24 +87,23 @@ impl Default for KeymapsConfig {
 
 #[derive(Debug)]
 pub struct Keymaps {
-    keymaps: Box<[Keymap; 6]>,
+    keymaps: Vec<Keymap>,
 }
 
 impl Keymaps {
     pub fn new(config: KeymapsConfig) -> Self {
         // order is matter
-        let keymaps = [
+        let keymaps = vec![
             Keymap::new(KeymapId::Global, config.global),
             Keymap::new(KeymapId::Login, config.login),
             Keymap::new(KeymapId::Tabs, config.tabs),
             Keymap::new(KeymapId::Entries, config.entries),
             Keymap::new(KeymapId::Subscription, config.subscription),
             Keymap::new(KeymapId::Filter, config.filter),
+            Keymap::new(KeymapId::CategoryFiltering, KeyTrie::default()),
         ];
 
-        Self {
-            keymaps: Box::new(keymaps),
-        }
+        Self { keymaps }
     }
 
     pub fn enable(&mut self, id: KeymapId) {
@@ -109,6 +117,12 @@ impl Keymaps {
     pub fn toggle(&mut self, id: KeymapId) {
         let enable = self.keymaps[id as usize].enable;
         self.keymaps[id as usize].enable = !enable;
+    }
+
+    pub fn update(&mut self, id: KeymapId, keymap: Keymap) {
+        let mut keymap = keymap;
+        keymap.enable = true;
+        self.keymaps[id as usize] = keymap;
     }
 
     pub fn search(&mut self, event: KeyEvent) -> Option<Command> {
@@ -146,6 +160,14 @@ impl KeyTrie {
     }
 }
 
+impl Default for KeyTrie {
+    fn default() -> Self {
+        KeyTrie::Node(KeyTrieNode {
+            map: HashMap::new(),
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct KeyTrieNode {
     map: HashMap<KeyEvent, KeyTrie>,
@@ -161,6 +183,7 @@ fn parse(s: &str) -> anyhow::Result<KeyEvent> {
         "right" => KeyCode::Right,
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
+        "esc" => KeyCode::Esc,
         single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),
         undefined => bail!("`{undefined}` is not implemented yet"),
     };

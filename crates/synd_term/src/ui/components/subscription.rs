@@ -251,7 +251,7 @@ impl Subscription {
                 bottom: 0,
             })
             .title(
-                Title::from("Feed Detail")
+                Title::from(" Feed Detail ")
                     .position(Position::Top)
                     .alignment(Alignment::Center),
             )

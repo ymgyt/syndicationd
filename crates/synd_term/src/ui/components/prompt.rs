@@ -54,6 +54,7 @@ impl Prompt {
             ("gg", "󱞧"),
             ("ge", "󱞥"),
             ("h/l", icon!(requirement)),
+            ("c", icon!(category)),
             ("r", "󰑓"),
         ][..];
         let suf_keys = &[("q", "")][..];

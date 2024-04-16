@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use synd_auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
+use synd_feed::types::Category;
 
 use crate::{
     application::{Direction, ListAction, RequestSequence},
@@ -87,6 +88,13 @@ pub enum Command {
 
     // Filter
     MoveFilterRequirement(Direction),
+    ActivateCategoryFilterling,
+    DeactivateCategoryFiltering,
+    ToggleFilterCategory {
+        category: Category<'static>,
+    },
+    ActivateAllFilterCategories,
+    DeactivateAllFilterCategories,
 
     HandleError {
         message: String,
@@ -176,5 +184,11 @@ impl Command {
     }
     pub fn move_filter_requirement_right() -> Self {
         Command::MoveFilterRequirement(Direction::Right)
+    }
+    pub fn activate_category_filtering() -> Self {
+        Command::ActivateCategoryFilterling
+    }
+    pub fn deactivate_category_filtering() -> Self {
+        Command::DeactivateCategoryFiltering
     }
 }

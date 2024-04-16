@@ -19,7 +19,10 @@ use crate::{
     terminal::Terminal,
     ui::{
         self,
-        components::{authentication::AuthenticateState, root::Root, tabs::Tab, Components},
+        components::{
+            authentication::AuthenticateState, filter::FeedFilter, root::Root, tabs::Tab,
+            Components,
+        },
         theme::Theme,
     },
 };
@@ -87,11 +90,16 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new(terminal: Terminal, client: Client) -> Self {
-        Application::with(terminal, client, Config::default())
+    pub fn new(terminal: Terminal, client: Client, categories: Categories) -> Self {
+        Application::with(terminal, client, categories, Config::default())
     }
 
-    pub fn with(terminal: Terminal, client: Client, config: Config) -> Self {
+    pub fn with(
+        terminal: Terminal,
+        client: Client,
+        categories: Categories,
+        config: Config,
+    ) -> Self {
         let mut keymaps = Keymaps::default();
         keymaps.enable(KeymapId::Global);
         keymaps.enable(KeymapId::Login);
@@ -109,7 +117,7 @@ impl Application {
             screen: Screen::Login,
             config,
             keymaps,
-            categories: Categories::default_toml(),
+            categories,
             should_quit: false,
             should_render: false,
         }
@@ -420,8 +428,32 @@ impl Application {
                 }
                 Command::MoveFilterRequirement(direction) => {
                     let filter = self.components.filter.move_requirement(direction);
-                    self.components.entries.update_filter(filter.clone());
-                    self.components.subscription.update_filter(filter);
+                    self.apply_feed_filter(filter);
+                    self.should_render = true;
+                }
+                Command::ActivateCategoryFilterling => {
+                    let keymap = self.components.filter.activate_category_filtering();
+                    self.keymaps.update(KeymapId::CategoryFiltering, keymap);
+                    self.should_render = true;
+                }
+                Command::DeactivateCategoryFiltering => {
+                    self.components.filter.deactivate_category_filtering();
+                    self.keymaps.disable(KeymapId::CategoryFiltering);
+                    self.should_render = true;
+                }
+                Command::ToggleFilterCategory { category } => {
+                    let filter = self.components.filter.toggle_category_state(&category);
+                    self.apply_feed_filter(filter);
+                    self.should_render = true;
+                }
+                Command::ActivateAllFilterCategories => {
+                    let filter = self.components.filter.activate_all_categories_state();
+                    self.apply_feed_filter(filter);
+                    self.should_render = true;
+                }
+                Command::DeactivateAllFilterCategories => {
+                    let filter = self.components.filter.deactivate_all_categories_state();
+                    self.apply_feed_filter(filter);
                     self.should_render = true;
                 }
                 Command::HandleError {
@@ -743,6 +775,13 @@ impl Application {
         }
 
         self.set_credential(auth);
+    }
+}
+
+impl Application {
+    fn apply_feed_filter(&mut self, filter: FeedFilter) {
+        self.components.entries.update_filter(filter.clone());
+        self.components.subscription.update_filter(filter);
     }
 }
 

@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
+use anyhow::Context;
 use ratatui::style::Color;
 use serde::Deserialize;
 use synd_feed::types::Category;
@@ -17,6 +18,15 @@ impl Categories {
         let mut c: Self = toml::from_str(s).unwrap();
         c.update_aliases();
         c
+    }
+
+    pub fn load(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let path = path.as_ref();
+        let buf =
+            std::fs::read_to_string(path).with_context(|| format!("path: {}", path.display()))?;
+        let mut c: Self = toml::from_str(&buf)?;
+        c.update_aliases();
+        Ok(c)
     }
 
     pub fn icon(&self, category: &Category<'_>) -> Option<&Icon> {

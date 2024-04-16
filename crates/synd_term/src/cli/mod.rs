@@ -79,6 +79,9 @@ pub struct Args {
     /// Client timeout
     #[arg(long, value_parser = parse_duration::parse, default_value = config::client::DEFAULT_TIMEOUT)]
     pub timeout: Duration,
+    /// categories.toml path
+    #[arg(long,aliases = ["category"],value_name = "CATEGORIES TOML PATH")]
+    pub categories: Option<PathBuf>,
     #[command(subcommand)]
     pub command: Option<Command>,
 }

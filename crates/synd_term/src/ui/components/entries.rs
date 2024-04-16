@@ -214,7 +214,7 @@ impl Entries {
                 bottom: 1,
             })
             .title(
-                Title::from("Summary")
+                Title::from(" Summary ")
                     .position(Position::Top)
                     .alignment(Alignment::Center),
             )
