@@ -82,6 +82,10 @@ impl Entries {
         }
     }
 
+    pub fn entries(&self) -> &[types::Entry] {
+        self.entries.as_slice()
+    }
+
     pub fn selected_entry_website_url(&self) -> Option<&str> {
         self.selected_entry()
             .and_then(|entry| entry.website_url.as_deref())

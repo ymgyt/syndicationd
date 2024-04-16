@@ -381,6 +381,11 @@ impl Application {
                     self.in_flight.remove(request_seq);
                     self.components.subscription.remove_unsubscribed_feed(&url);
                     self.components.entries.remove_unsubscribed_entries(&url);
+                    self.components.filter.update_categories(
+                        &self.categories,
+                        ListAction::Replace,
+                        self.components.entries.entries(),
+                    );
                     self.should_render = true;
                 }
                 Command::OpenFeed => {
