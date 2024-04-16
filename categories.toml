@@ -1,58 +1,107 @@
+## Programming Languages
 [categories.rust]
-# nf-linux-ferris
-icon = { symbol = "", color = { rgb = 0xF74C00 } }
+icon = { symbol = "", color = { rgb = 0xF74C00 } } # nf-linux-ferris
 
-[categories.nix]
-aliases = ["nixos"]
-# nf-linux-nixos
-icon = { symbol = "", color = { name = "cyan" } }
+[categories.go]
+aliases = ["golang"]
+icon    = { symbol = "", color = { name = "cyan" } } # nf-custom-go
+
+[categories.c]
+icon = { symbol = "󰙱" } # nf-custom-go
+
+[categories.cpp]
+aliases = ["cplus"]
+icon    = { symbol = "" }
+
+[categories.haskell]
+icon = { symbol = "󰲒" } # nf-md-language_haskell
+
+[categories.java]
+icon = { symbol = "󰬷" } # nf-md-language_java
+
+[categories.javascript]
+aliases = ["js"]
+icon    = { symbol = "" } # nf-dev-javascript
+
+[categories.typescript]
+aliases = ["ts"]
+icon    = { symbol = "" }
+
+[categories.kotlin]
+icon = { symbol = "󱈙" } # nf-md-language_kotlin
+
+[categories.swift]
+icon = { symbol = "󰛥" } # nf-md-language_swift
+
+[categories.php]
+icon = { symbol = "󰌟" } # nf-md-language_php
+
+[categories.python]
+icon = { symbol = "󰌠" } # nf-md-language_python
+
+[categories.ruby]
+icon = { symbol = "󰴭" } # nf-md-language_ruty
 
 [categories.database]
 aliases = ["db", "rds"]
-# nf-dev-database 
-icon = { symbol = "\ue706" }
+icon    = { symbol = "\ue706" } # nf-dev-database 
 
 [categories.sre]
-# nf-md-cloud_check_outline
-icon = { symbol = "󱋌" }
+icon = { symbol = "󱋌" } # nf-md-cloud_check_outline
 
 ## Cloud
 [categories.cloud]
 aliases = ["cncf", "cloudnative"]
-# nf-fa-cloud
-icon = { symbol = "" }
+icon    = { symbol = "" }        # nf-fa-cloud
 
 [categories.aws]
-# nf-md-aws
-icon = { symbol = "󰸏" }
+icon = { symbol = "󰸏" } # nf-md-aws
+
+[categories.gcp]
+aliases = ["googlecloud"]
+icon    = { symbol = "󱇶" } #nf-md-google_cloud
+
+[categories.azure]
+icon = { symbol = "" } #nf-cod-azure
 
 [categories.kubernetes]
 aliases = ["k8s"]
-# nf-md-kubernetes
-icon = { symbol = "󱃾", color = { name = "blue" } }
+icon    = { symbol = "󱃾", color = { name = "blue" } } # nf-md-kubernetes
 
 [categories.opentelemetry]
-aliases = ["otel"]
-# nf-md-telescope
-icon = { symbol = "󰭎", color = { name = "white" } }
+aliases = ["otel", "observability", "o11y"]
+icon    = { symbol = "󰭎", color = { name = "white" } } # nf-md-telescope
+
+## Linux
+[categories.linux]
+icon = { symbol = "" } #nf-fa-linux
+
+[categories.nix]
+aliases = ["nixos"]
+icon    = { symbol = "", color = { name = "cyan" } } # nf-linux-nixos
+
+[categories.ebpf]
+aliases = ["bpf"]
+icon    = { symbol = "󰾡", color = { name = "yello" } }
 
 ## Editor
 [categories.helix]
-# nf-md-dna
-icon = { symbol = "󰚄" }
+icon = { symbol = "󰚄" } # nf-md-dna
+
+## Shell
+[categories.nu]
+aliases = ["nushell"]
+icon    = { symbol = "" }
 
 ## Misc
 
 [categories.book]
-# nf-fa-book
 aliases = ["oreilly"]
-icon    = { symbol = "" }
+icon    = { symbol = "" } # nf-fa-book
 
 [categories.misc]
 aliases = ["etc"]
-# nf-cod-symbol_misc
-icon = { symbol = "" }
+icon    = { symbol = "" } # nf-cod-symbol_misc
 
 [categories.default]
-# nf-md-note_text
-icon = { symbol = "󰎞", color = { name = "dark gray" } }
+icon = { symbol = "󰎞", color = { name = "gray" } } # nf-md-note_text
