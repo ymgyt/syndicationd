@@ -14,7 +14,7 @@ pub struct Categories {
 
 impl Categories {
     pub fn default_toml() -> Self {
-        let s = include_str!("../../../../categories.toml");
+        let s = include_str!("../../categories.toml");
         let mut c: Self = toml::from_str(s).unwrap();
         c.update_aliases();
         c
