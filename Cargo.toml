@@ -74,7 +74,9 @@ tag-message = "chore: release {{crate_name}} version {{version}}"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.12.0"
+cargo-dist-version = "0.13.1"
+# To configure RUSTFLAGS="--cfg tokio_unstable" for tokio metrics
+allow-dirty = ["ci"]
 # CI backends to support
 ci = ["github"]
 # The installers to generate for each app
