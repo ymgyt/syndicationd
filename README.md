@@ -15,9 +15,9 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 
 ## Features
 
-* Subscribe feeds(RSS1, RSS2, Atom,...) and browse latest entries 
+* Subscribe feeds(RSS1, RSS2, Atom, JSON) and browse latest entries 
 * Open the entry in a browser
-
+* Filter entries by categories and [requirement](#requirement)
 
 ## Install
 
@@ -83,17 +83,15 @@ Commands:
   help    Print this message or the help of the given subcommand(s)
 
 Options:
-      --endpoint <ENDPOINT>  synd_api endpoint [env: SYND_ENDPOINT=] [default:
-                             https://api.syndicationd.ymgyt.io:6100]
-      --log <LOG>            Log file path [env: SYND_LOG=] [default:
-                             /home/ymgyt/.local/share/synd/synd.log]
-      --theme <PALETTE>      Color palette [env: SYND_THEME=] [default: slate] [possible values: slate,
-                             gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green,
-                             emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink]
-      --timeout <TIMEOUT>    Client timeout [default: 30s]
-  -h, --help                 Print help
-  -V, --version              Print version
- ```
+      --endpoint <ENDPOINT>                synd_api endpoint [env: SYND_ENDPOINT=] [default: https://api.syndicationd.ymgyt.io:6100]
+      --log <LOG>                          Log file path [env: SYND_LOG=] [default: " /home/ymgyt/.local/share/synd/synd.log"]
+      --theme <PALETTE>                    Color palette [env: SYND_THEME=] [default: slate] [possible values: slate, gray, zinc, neutral, stone, red, orange, amber,
+                                           yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink]
+      --timeout <TIMEOUT>                  Client timeout [default: 30s]
+      --categories <CATEGORIES TOML PATH>  categories.toml path
+  -h, --help                               Print help
+  -V, --version                            Print version
+```
 
 </details>
 
@@ -107,21 +105,74 @@ Currently, GitHub and Google are supported as authorize server/id provider. The 
 <details>
 <summary>Click to show a keymap table</summary>
 
-| Key     | Description                          |
-| ---     | ---                                  |
-| `k/j`   | Move up/down                         |
-| `gg`    | Go to first                          |
-| `ge`    | Go to end                            |
-| `Tab`   | Switch Tab                           |
-| `Enter` | Open entry/feed                      |
-| `a`     | Add feed subscription(on Feeds Tab)  |
-| `d`     | Delete subscribed feed(on Feeds Tab) |
-| `r`     | Reload entries/feeds                 |
-| `q`     | Quit app                             |
+| Key     | Description                                   |
+| ---     | ---                                           |
+| `k/j`   | Move up/down                                  |
+| `gg`    | Go to first                                   |
+| `ge`    | Go to end                                     |
+| `Tab`   | Switch Tab                                    |
+| `Enter` | Open entry/feed                               |
+| `a`     | Add feed subscription(on Feeds Tab)           |
+| `e`     | Edit subscribed feed(on Feeds Tab)            |
+| `d`     | Delete subscribed feed(on Feeds Tab)          |
+| `r`     | Reload entries/feeds                          |
+| `h/l`   | Change requirement filiter                    |
+| `c`     | Activate category filiter(Esc to deactivate)  |
+| `+`     | Activate all category(on Category filter)     |
+| `-`     | Deactivate all category(on Category filter)   |
+| `q`     | Quit app                                      |
 
 </details>
 
 for more details, refer to [`keymap/default.rs`](https://github.com/ymgyt/syndicationd/blob/main/crates/synd_term/src/keymap/default.rs)
+
+### Subscribe feed
+
+To subscribe a feed, type "Tab" to move to Feeds tab and then press "a".  
+`synd` uses [edit](https://docs.rs/edit/latest/edit/) to launch the user's editor(like a git commit).  
+The feed to subscribe to should be entered in the format:  
+`Requirement` `Category` `URL`  
+
+When you close the editor, the subscription request is sent to the API.
+
+#### Requirement
+
+`Requirement` indicates the importance of the feed.  
+This uses an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119) and can take one of the following values:
+
+* `MUST`: Most important, must be read.
+* `SHOULD`: Next in importance, should be read unless there is a special reason not to.
+* `MAY`: Lowest importance, may be read.
+
+#### Category
+
+`Category` represents the category of the feed. You can specify any value as a category. The values that `synd` recognizes as categories are defined in [`categories.toml`](./categories.toml). You can override the default values with the `--categories` flag.
+
+
+### Edit subscribed feed
+
+To change the requirement or category of a feed you have already subscribed to, select the target feed in the Feeds tab and then press "e".
+
+### Unsubscribe feed
+
+To unsubscribe from a feed, select the target feed and press "d".
+
+### Filter feeds/entries
+
+Feeds and entries can be filtered as follows.
+
+#### By requirement
+
+To filter bases on the specified requirement, press "h/l(Left/Right)".  
+If you set the filter to `MUST`, only those marked as MUST will be displayed. Setting it to SHOULD will display feeds and entries marked as MUST and SHOULD. If set to MAY, all feeds and entries will be displayed.
+
+#### By categories
+
+To filter bases on categories, presess "c". This will display a label with keys to control the activation/deactivation of each category, allowing you to toggle the visibility of categories.  
+Pressing "-" will deactivate all categories, and pressing "+" will activate all categories.  
+
+You can exit the filter category mode by pressing the "Esc" key.  
+The icons for categories can be specified in `categories.toml`
 
 
 ### Export subscribed feeds
