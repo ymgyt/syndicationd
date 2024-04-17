@@ -2,7 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.9] 2024-03-29
+## [unreleased] __release_date__
+
+### Features
+
+- Add opentelemetry-stdout feature by [@ymgyt](https://github.com/ymgyt) ([5f476cc1](https://github.com/ymgyt/syndicationd/commit/5f476cc171c1924ed0b22949a990964421f66ee1))
+- Support feed annotations by [@ymgyt](https://github.com/ymgyt) ([9c9c89a8](https://github.com/ymgyt/syndicationd/commit/9c9c89a886b92e25d10ceb83a19b2ce6476c5526))
+- Support annotations in fetch entries query by [@ymgyt](https://github.com/ymgyt) ([a1646a5b](https://github.com/ymgyt/syndicationd/commit/a1646a5b5dc0ea5c20ee4d7684ea0ff4bb5cb650))
+- Support subscription update by [@ymgyt](https://github.com/ymgyt) ([510106bb](https://github.com/ymgyt/syndicationd/commit/510106bbd33a0f4a6f878de74ee2685a507d19c4))
+
+### Documentation
+
+- Add config and signal description by [@ymgyt](https://github.com/ymgyt) ([edd62826](https://github.com/ymgyt/syndicationd/commit/edd62826b68fad63e2727f8efccaf2fa3438f98b))
+
+### Miscellaneous Tasks
+
+- Use monotonic counter for task metrics by [@ymgyt](https://github.com/ymgyt) ([e095b07e](https://github.com/ymgyt/syndicationd/commit/e095b07e9dfbc0d16b6f8f625a53131641e34d7e))
+
+### Refactor
+
+- Use synd_o11y otel layer by [@ymgyt](https://github.com/ymgyt) ([943b9c4d](https://github.com/ymgyt/syndicationd/commit/943b9c4d36b3e45a616deb9065f384faf5c193a0))
+
+## [v0.1.9] - 2024-03-29
 
 ### Features
 
