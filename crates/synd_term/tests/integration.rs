@@ -12,6 +12,7 @@ mod test {
     use synd_term::{
         application::{Application, Authenticator, Config, DeviceFlows},
         client::Client,
+        config::Categories,
         ui::theme::Theme,
     };
     use tokio::net::TcpListener;
@@ -66,9 +67,10 @@ mod test {
         let theme = Theme::new();
         // let bg = theme.background.bg.unwrap_or_default();
 
-        let mut application = Application::with(terminal, client, config)
-            .with_theme(theme.clone())
-            .with_authenticator(authenticator);
+        let mut application =
+            Application::with(terminal, client, Categories::default_toml(), config)
+                .with_theme(theme.clone())
+                .with_authenticator(authenticator);
         application.event_loop_until_idle(&mut event_stream).await;
 
         // login
