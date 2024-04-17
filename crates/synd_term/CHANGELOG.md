@@ -2,7 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.10] 2024-03-19
+## [unreleased] __release_date__
+
+### Features
+
+- Support go to first/end keymap by [@ymgyt](https://github.com/ymgyt) ([874cfbef](https://github.com/ymgyt/syndicationd/commit/874cfbefca272136dfdafe15b97f10607f3112e7))
+- Instrument graphql task monitor by [@ymgyt](https://github.com/ymgyt) ([cb44f3b8](https://github.com/ymgyt/syndicationd/commit/cb44f3b8af19eeecf16c500bd4478da28c5576ec))
+- Parse feed category and requirement by [@ymgyt](https://github.com/ymgyt) ([17b62885](https://github.com/ymgyt/syndicationd/commit/17b628850eca335d7a6e7501c021d1f94d622a6d))
+- Support feed annotations by [@ymgyt](https://github.com/ymgyt) ([937b561d](https://github.com/ymgyt/syndicationd/commit/937b561df1ae512da54408aa1996361cf9ca06ed))
+- Render annotations by [@ymgyt](https://github.com/ymgyt) ([1f41872c](https://github.com/ymgyt/syndicationd/commit/1f41872cc07d1e86e89a05d70ae70f409c194b68))
+- Stylize requirement lavel by [@ymgyt](https://github.com/ymgyt) ([324d599c](https://github.com/ymgyt/syndicationd/commit/324d599c119b1c10aa87ea7417622ae48850f7c5))
+- Handle feed update by [@ymgyt](https://github.com/ymgyt) ([b0c49072](https://github.com/ymgyt/syndicationd/commit/b0c49072a02985582af37ed094d7026b43c39853))
+- Normalize category by [@ymgyt](https://github.com/ymgyt) ([b25a147e](https://github.com/ymgyt/syndicationd/commit/b25a147eb02385c78e4509249cd1b6ab0caab02f))
+- Show annotations in feed detail by [@ymgyt](https://github.com/ymgyt) ([cb0db4ac](https://github.com/ymgyt/syndicationd/commit/cb0db4ac5616ed93c16b511171bf3d72f4466075))
+- Add entries requirement filter by [@ymgyt](https://github.com/ymgyt) ([5d49d7f4](https://github.com/ymgyt/syndicationd/commit/5d49d7f4757628cff7a8810175bb5cc2692137ae))
+- Add feeds requirement filter by [@ymgyt](https://github.com/ymgyt) ([7d4b3e5c](https://github.com/ymgyt/syndicationd/commit/7d4b3e5c5ea4643d5624b0ce492ec94360799c37))
+- Add category filter by [@ymgyt](https://github.com/ymgyt) ([176fc392](https://github.com/ymgyt/syndicationd/commit/176fc392a5385192d017fec4873c90ad4a92b3cf))
+- Add arrow keymap by [@ymgyt](https://github.com/ymgyt) ([952a3229](https://github.com/ymgyt/syndicationd/commit/952a32294411d6596684a13aca171732f6b038d8))
+
+### Bug Fixes
+
+- Remove unsubscribed category from filter by [@ymgyt](https://github.com/ymgyt) ([6f5b2cb4](https://github.com/ymgyt/syndicationd/commit/6f5b2cb40dc74de3a833bba8f3ec25b52adfcf3b))
+
+### Miscellaneous Tasks
+
+- Add pacman to oranda install section by [@ymgyt](https://github.com/ymgyt) ([873254cd](https://github.com/ymgyt/syndicationd/commit/873254cd5fa9c8667e8043b3d1462faeb0ff0c0a))
+- Fix check command typo by [@ymgyt](https://github.com/ymgyt) ([59ed1b83](https://github.com/ymgyt/syndicationd/commit/59ed1b83f911447144e648bbab2657c1d8f3bf59))
+- Make table column capital consistent by [@ymgyt](https://github.com/ymgyt) ([a9b7eff9](https://github.com/ymgyt/syndicationd/commit/a9b7eff978dfc44f1bc0511bb4c465f21939ec83))
+- Capitalize feed detail columns by [@ymgyt](https://github.com/ymgyt) ([ed9f0668](https://github.com/ymgyt/syndicationd/commit/ed9f0668d4d970c9181712336d9863f222aaaa4c))
+- Remove feed prefix from feed detail component by [@ymgyt](https://github.com/ymgyt) ([09a0a410](https://github.com/ymgyt/syndicationd/commit/09a0a41082be9ad26340e0a560793bb697cdf21f))
+- Increase fetched entries count by [@ymgyt](https://github.com/ymgyt) ([e5177160](https://github.com/ymgyt/syndicationd/commit/e5177160ace15c54a17c8bad070a1767a4fb76b8))
+- Fix typo by [@ymgyt](https://github.com/ymgyt) ([a70475ec](https://github.com/ymgyt/syndicationd/commit/a70475ec3a3dc284b1a209ace81bd29dcaaee00d))
+- Change category filter keymap by [@ymgyt](https://github.com/ymgyt) ([8a736ed4](https://github.com/ymgyt/syndicationd/commit/8a736ed46d970ec5e245bff1a8fa3ac7adaad21f))
+
+### Refactor
+
+- Add helix like keymaps by [@ymgyt](https://github.com/ymgyt) ([257beaad](https://github.com/ymgyt/syndicationd/commit/257beaad941844b931140d8b967812cf41ce2e22))
+- Resolve key events using an arrary of keymaps by [@ymgyt](https://github.com/ymgyt) ([311e3848](https://github.com/ymgyt/syndicationd/commit/311e38480f2959535cf9c7302cf335155fa15d6c))
+
+## [v0.1.10] - 2024-03-19
 
 ### Features
 
