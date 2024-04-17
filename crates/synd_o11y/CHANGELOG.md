@@ -2,7 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.4] 2024-03-08
+## [unreleased] __release_date__
+
+### Features
+
+- Add opentelemetry-stdout feature by [@ymgyt](https://github.com/ymgyt) ([765c036d](https://github.com/ymgyt/syndicationd/commit/765c036dc143f976e108935943bd9f89f03deea7))
+
+### Miscellaneous Tasks
+
+- Change view event level to debug by [@ymgyt](https://github.com/ymgyt) ([1e8e0c07](https://github.com/ymgyt/syndicationd/commit/1e8e0c07cffd48dc42e202185f42a0afdfd2fd03))
+
+### Refactor
+
+- Compose otel layer by [@ymgyt](https://github.com/ymgyt) ([3562f3f0](https://github.com/ymgyt/syndicationd/commit/3562f3f0eb6224f89181ab6af87ec0b1c2e2403c))
+- Use semantic conventions const by [@ymgyt](https://github.com/ymgyt) ([2f1bac7d](https://github.com/ymgyt/syndicationd/commit/2f1bac7d407d32078ce48ef8a495fa2deecbb9d2))
+
+## [v0.1.4] - 2024-03-08
 
 ### Miscellaneous Tasks
 
