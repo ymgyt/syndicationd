@@ -34,6 +34,7 @@ All notable changes to this project will be documented in this file.
 - Increase fetched entries count by [@ymgyt](https://github.com/ymgyt) ([e5177160](https://github.com/ymgyt/syndicationd/commit/e5177160ace15c54a17c8bad070a1767a4fb76b8))
 - Fix typo by [@ymgyt](https://github.com/ymgyt) ([a70475ec](https://github.com/ymgyt/syndicationd/commit/a70475ec3a3dc284b1a209ace81bd29dcaaee00d))
 - Change category filter keymap by [@ymgyt](https://github.com/ymgyt) ([8a736ed4](https://github.com/ymgyt/syndicationd/commit/8a736ed46d970ec5e245bff1a8fa3ac7adaad21f))
+- Create symlink to categories.toml by [@ymgyt](https://github.com/ymgyt) ([c990584c](https://github.com/ymgyt/syndicationd/commit/c990584c4865242a6fe97d72b63c3a2ba1b36616))
 
 ### Refactor
 
