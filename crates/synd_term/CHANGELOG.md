@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.0] 2024-04-17
+## [unreleased] __release_date__
+
+### Bug Fixes
+
+- Rollback ratatui from 0.26.2 to 0.26.1 by [@ymgyt](https://github.com/ymgyt) ([75b6db7f](https://github.com/ymgyt/syndicationd/commit/75b6db7ff5f237dba68fdb0480c1af4edede7dbd))
+
+## [v0.2.0] - 2024-04-17
 
 ### Features
 
@@ -40,6 +46,10 @@ All notable changes to this project will be documented in this file.
 
 - Add helix like keymaps by [@ymgyt](https://github.com/ymgyt) ([257beaad](https://github.com/ymgyt/syndicationd/commit/257beaad941844b931140d8b967812cf41ce2e22))
 - Resolve key events using an arrary of keymaps by [@ymgyt](https://github.com/ymgyt) ([311e3848](https://github.com/ymgyt/syndicationd/commit/311e38480f2959535cf9c7302cf335155fa15d6c))
+
+### Testing
+
+- Fix integration by [@ymgyt](https://github.com/ymgyt) ([0348ec21](https://github.com/ymgyt/syndicationd/commit/0348ec21b1605371c3532c648a29aca92680f7f0))
 
 ## [v0.1.10] - 2024-03-19
 
