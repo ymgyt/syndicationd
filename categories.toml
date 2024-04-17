@@ -82,7 +82,7 @@ icon    = { symbol = "", color = { name = "cyan" } } # nf-linux-nixos
 
 [categories.ebpf]
 aliases = ["bpf"]
-icon    = { symbol = "󰾡", color = { name = "yello" } }
+icon    = { symbol = "󰾡", color = { name = "yellow" } }
 
 ## Editor
 [categories.helix]
