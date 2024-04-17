@@ -3097,7 +3097,7 @@ dependencies = [
 
 [[package]]
 name = "synd-o11y"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "axum 0.7.5",
  "http 0.2.12",

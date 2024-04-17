@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased] __release_date__
+## [v0.1.5] 2024-04-17
 
 ### Features
 
