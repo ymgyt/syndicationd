@@ -261,7 +261,7 @@ impl Subscription {
         let inner = block.inner(area);
         Widget::render(block, area, buf);
 
-        let Some(feed) = self.feeds.get(self.selected_feed_index) else {
+        let Some(feed) = self.selected_feed() else {
             return;
         };
 
