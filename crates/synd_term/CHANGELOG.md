@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.1] 2024-04-17
+## [unreleased] __release_date__
+
+### Bug Fixes
+
+- Use selected_feed to render feed detail by [@ymgyt](https://github.com/ymgyt) ([404cc4cf](https://github.com/ymgyt/syndicationd/commit/404cc4cf6f52129a9a32bb58a23a3e9eb1e98efb))
+
+## [v0.2.1] - 2024-04-17
 
 ### Bug Fixes
 
