@@ -93,7 +93,7 @@
         # TODO: should parse .cargo/audit.toml
         ignoreAdvisories = pkgs.lib.concatStrings
           (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}") [
-            "RUSTSEC-2024-0003"
+            "RUSTSEC-2024-0320"
             "RUSTSEC-2021-0041"
           ]));
 

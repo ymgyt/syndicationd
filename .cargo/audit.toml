@@ -1,7 +1,7 @@
 [advisories]
 ignore = [
-  # h2 could not upgrade now
-  "RUSTSEC-2024-0003",
+  # yaml-rust unmaintained, but serde_yaml use it
+  "RUSTSEC-2024-0320",
   # parse_duration
   # Denial of service through parsing payloads with too big exponent
   # No fixed upgrade available
