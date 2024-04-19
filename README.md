@@ -270,6 +270,8 @@ This project is available under the terms of either the [Apache 2.0 license](./L
 
 Some tips about feed that I know.
 
+* Add [`openrss.org/`](https://openrss.org/) to the beginning of the URL to get its RSS feed. for example, for `https://example.ymgyt.io`, it would be `https://openrss.org/example.ymgyt.io`
+
 * You can retrieve various updates as feeds on GitHub.
   * To obtain releases of a repository, specify `releases.atom`. for example, to obtain releases of syndicationd, specify `https://github.com/ymgyt/syndicationd/releases.atom`
   * For tags, it's `https://github.com/ymgyt/syndicationd/tag.atom` 
@@ -321,7 +323,8 @@ If you're looking for feeds, here are my recommendations.
 | Feed | URL |
 | ---  | --- |
 | [observability news](https://buttondown.email/o11y.news) | `https://buttondown.email/o11y.news/rss` |
-| [Opentelemetry blog](https://opentelemetry.io/blog/2024/) | `https://opentelemetry.io/blog/2024/index.xml`
+| [Opentelemetry blog](https://opentelemetry.io/blog/2024/) | `https://opentelemetry.io/blog/2024/index.xml` |
+| [eBPF Blog](https://ebpf.io/blog/) | `https://ebpf.io/blog/rss.xml` |
 
 </details>
 
