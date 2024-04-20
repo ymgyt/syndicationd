@@ -50,7 +50,7 @@ impl Subscription {
         let edges = feeds
             .into_iter()
             .take(first)
-            .map(|feed| (feed.feed.meta().url().to_owned(), feed))
+            .map(|feed| (feed.feed.meta().url().as_str().to_owned(), feed))
             .map(|(cursor, feed)| (cursor, object::Feed::from(feed)))
             .map(|(cursor, feed)| Edge::new(cursor, feed));
 

@@ -1,7 +1,7 @@
 use async_graphql::{InputObject, Object, Union};
 use synd_feed::{
     feed::parser::FetchFeedError,
-    types::{Category, Requirement},
+    types::{Category, FeedUrl, Requirement},
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
 #[derive(InputObject, Debug)]
 pub struct SubscribeFeedInput {
     /// Feed url to subscribe
-    pub url: String,
+    pub url: FeedUrl,
     /// Requirement level for feed
     pub requirement: Option<Requirement>,
     /// Feed category

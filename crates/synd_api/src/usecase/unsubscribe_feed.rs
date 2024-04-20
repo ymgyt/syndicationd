@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use synd_feed::types::FeedUrl;
 use synd_o11y::metric;
 
 use crate::{
@@ -15,7 +16,7 @@ pub struct UnsubscribeFeed {
 }
 
 pub struct UnsubscribeFeedInput {
-    pub url: String,
+    pub url: FeedUrl,
 }
 
 pub struct UnsubscribeFeedOutput {}

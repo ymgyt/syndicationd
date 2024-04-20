@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use synd_feed::{
     feed::{cache::FetchCachedFeed, parser::FetchFeedError},
-    types::{Annotated, Category, Feed, Requirement},
+    types::{Annotated, Category, Feed, FeedUrl, Requirement},
 };
 use synd_o11y::metric;
 use thiserror::Error;
@@ -21,7 +21,7 @@ pub struct SubscribeFeed {
 }
 
 pub struct SubscribeFeedInput {
-    pub url: String,
+    pub url: FeedUrl,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
 }

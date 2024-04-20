@@ -1,11 +1,12 @@
 use async_graphql::{InputObject, Object, Union};
+use synd_feed::types::FeedUrl;
 
 use crate::{gql::mutation::ResponseStatus, usecase};
 
 #[derive(InputObject)]
 pub struct UnsubscribeFeedInput {
     /// Feed url to unsubscribe
-    pub url: String,
+    pub url: FeedUrl,
 }
 
 impl From<UnsubscribeFeedInput> for usecase::UnsubscribeFeedInput {

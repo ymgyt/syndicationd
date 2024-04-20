@@ -5,7 +5,7 @@ use async_graphql::{
     Enum, Object, SimpleObject, ID,
 };
 use feed_rs::model as feedrs;
-use synd_feed::types::{self, Annotated, Category, Requirement};
+use synd_feed::types::{self, Annotated, Category, FeedUrl, Requirement};
 
 use crate::gql::scalar;
 
@@ -107,7 +107,7 @@ impl Feed {
     }
 
     /// Feed URL
-    async fn url(&self) -> &str {
+    async fn url(&self) -> &FeedUrl {
         self.0.feed.meta().url()
     }
 
@@ -237,7 +237,7 @@ impl<'a> FeedMeta<'a> {
     }
 
     /// Url of the feed
-    async fn url(&self) -> &str {
+    async fn url(&self) -> &FeedUrl {
         self.0.feed.url()
     }
 

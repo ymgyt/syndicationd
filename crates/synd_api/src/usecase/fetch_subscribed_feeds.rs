@@ -70,7 +70,7 @@ impl Usecase for FetchSubscribedFeeds {
                     feeds
                         .urls
                         .iter()
-                        .position(|url| url == &after)
+                        .position(|url| url.as_str() == after)
                         .map(|p| p + 1)
                 })
                 .unwrap_or(0);

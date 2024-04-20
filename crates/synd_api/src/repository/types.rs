@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use kvsd::Value;
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{self, Annotated, Category, Requirement};
+use synd_feed::types::{self, Annotated, Category, FeedUrl, Requirement};
 
 use crate::repository::RepositoryError;
 
@@ -15,15 +15,15 @@ pub struct Feed {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedSubscription {
     pub user_id: String,
-    pub url: String,
+    pub url: FeedUrl,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct SubscribedFeeds {
-    pub urls: Vec<String>,
-    pub annotations: Option<HashMap<String, FeedAnnotations>>,
+    pub urls: Vec<FeedUrl>,
+    pub annotations: Option<HashMap<FeedUrl, FeedAnnotations>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
