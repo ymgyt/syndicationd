@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.0] 2024-04-17
+## [unreleased] __release_date__
+
+### Features
+
+- Add periodic cache refresher by [@ymgyt](https://github.com/ymgyt) ([d831d3ee](https://github.com/ymgyt/syndicationd/commit/d831d3ee80dab01c004ba37d7e30c64f9750e6de))
+
+### Refactor
+
+- Use FeedUrl instead of String by [@ymgyt](https://github.com/ymgyt) ([759950b9](https://github.com/ymgyt/syndicationd/commit/759950b9ff64d0b407483c55ebf733eceb6b6d09))
+- Make tests module consistent by [@ymgyt](https://github.com/ymgyt) ([5b85455e](https://github.com/ymgyt/syndicationd/commit/5b85455e15b29bafd1c357ec0ecba8b1e3eed0cc))
+
+## [v0.2.0] - 2024-04-17
 
 ### Features
 

@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.0] 2024-04-17
+## [unreleased] __release_date__
+
+### Features
+
+- Refresh feed cache periodically by [@ymgyt](https://github.com/ymgyt) ([66d4d3b7](https://github.com/ymgyt/syndicationd/commit/66d4d3b78bf85aeb42ac4c8ee2220dbaa1717e7b))
+
+### Refactor
+
+- Use FeedUrl instead of String by [@ymgyt](https://github.com/ymgyt) ([95bb5ea6](https://github.com/ymgyt/syndicationd/commit/95bb5ea6b3774c7f59a3502d495ef27b269b828d))
+
+## [v0.2.0] - 2024-04-17
 
 ### Features
 
