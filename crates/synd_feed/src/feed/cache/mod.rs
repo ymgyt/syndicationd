@@ -1,12 +1,17 @@
 use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use moka::future::Cache;
+// use moka::future::Cache;
 
 use crate::{
     feed::parser::{FetchFeed, FetchFeedResult},
     types::{self, FeedUrl},
 };
+
+mod periodic_refresher;
+pub use periodic_refresher::PeriodicRefresher;
+
+type Cache = moka::future::Cache<FeedUrl, Arc<types::Feed>>;
 
 #[derive(Clone, Copy)]
 pub struct CacheConfig {
@@ -57,7 +62,7 @@ pub struct CacheLayer<S> {
     service: S,
     // Use Arc to avoid expensive clone
     // https://github.com/moka-rs/moka?tab=readme-ov-file#avoiding-to-clone-the-value-at-get
-    cache: Cache<FeedUrl, Arc<types::Feed>>,
+    cache: Cache,
 }
 impl<S> CacheLayer<S> {
     /// Construct `CacheLayer` with default config
@@ -72,7 +77,7 @@ impl<S> CacheLayer<S> {
             time_to_live,
         } = config;
 
-        let cache = Cache::builder()
+        let cache = moka::future::Cache::builder()
             .weigher(|_key, value: &Arc<types::Feed>| -> u32 {
                 value.approximate_size().try_into().unwrap_or(u32::MAX)
             })
@@ -81,6 +86,15 @@ impl<S> CacheLayer<S> {
             .build();
 
         Self { service, cache }
+    }
+}
+
+impl<S> CacheLayer<S>
+where
+    S: Clone,
+{
+    pub fn periodic_refresher(&self) -> PeriodicRefresher<S> {
+        PeriodicRefresher::new(self.service.clone(), self.cache.clone())
     }
 }
 

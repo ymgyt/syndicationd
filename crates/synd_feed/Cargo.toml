@@ -13,6 +13,8 @@ readme      = "README.md"
 version     = "0.2.0"
 
 [dependencies]
+synd-o11y = { path = "../synd_o11y", version = "0.1.5" }
+
 anyhow        = { workspace = true }
 async-graphql = { workspace = true, optional = true }
 async-trait   = { workspace = true }
