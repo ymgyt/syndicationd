@@ -26,6 +26,7 @@ serde_json    = { workspace = true }
 thiserror     = { workspace = true }
 tokio         = { workspace = true }
 tracing       = { workspace = true }
+url           = { workspace = true, features = ["serde"] }
 
 [features]
 graphql = ["dep:async-graphql"]

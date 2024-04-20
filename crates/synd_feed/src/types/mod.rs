@@ -6,13 +6,16 @@ use feed_rs::model::{self as feedrs, Generator, Link, Person, Text};
 pub use feedrs::FeedType;
 
 pub type Time = DateTime<Utc>;
-pub type FeedUrl = String;
+// pub type FeedUrl = String;
 
 mod requirement;
 pub use requirement::Requirement;
 
 mod category;
 pub use category::Category;
+
+mod url;
+pub use url::FeedUrl;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct EntryId<'a>(Cow<'a, str>);
@@ -136,8 +139,8 @@ impl FeedMeta {
         &self.feed_type
     }
 
-    pub fn url(&self) -> &str {
-        self.url.as_str()
+    pub fn url(&self) -> &FeedUrl {
+        &self.url
     }
 
     pub fn title(&self) -> Option<&str> {

@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use async_trait::async_trait;
 use feed_rs::parser::{ParseErrorKind, ParseFeedError, Parser};
 
-use crate::types::Feed;
+use crate::types::{Feed, FeedUrl};
 
 pub type FetchFeedResult<T> = std::result::Result<T, FetchFeedError>;
 
@@ -29,9 +29,9 @@ pub enum FetchFeedError {
 
 #[async_trait]
 pub trait FetchFeed: Send + Sync {
-    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Feed>;
+    async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed>;
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> FetchFeedResult<Vec<Feed>>;
+    async fn fetch_feeds_parallel(&self, urls: &[FeedUrl]) -> FetchFeedResult<Vec<Feed>>;
 }
 
 #[async_trait]
@@ -39,11 +39,11 @@ impl<T> FetchFeed for Arc<T>
 where
     T: FetchFeed,
 {
-    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Feed> {
+    async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed> {
         self.fetch_feed(url).await
     }
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> FetchFeedResult<Vec<Feed>> {
+    async fn fetch_feeds_parallel(&self, urls: &[FeedUrl]) -> FetchFeedResult<Vec<Feed>> {
         self.fetch_feeds_parallel(urls).await
     }
 }
@@ -57,11 +57,11 @@ pub struct FeedService {
 
 #[async_trait]
 impl FetchFeed for FeedService {
-    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Feed> {
+    async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed> {
         use futures_util::StreamExt;
         let mut stream = self
             .http
-            .get(&url)
+            .get(url.clone().into_inner())
             .send()
             .await
             .map_err(FetchFeedError::Fetch)?
@@ -82,7 +82,7 @@ impl FetchFeed for FeedService {
         self.parse(url, buff.as_slice())
     }
 
-    async fn fetch_feeds_parallel(&self, urls: &[String]) -> FetchFeedResult<Vec<Feed>> {
+    async fn fetch_feeds_parallel(&self, urls: &[FeedUrl]) -> FetchFeedResult<Vec<Feed>> {
         // Order is matter, so we could not use tokio JoinSet or futures FuturesUnordered
         // should use FuturesOrders ?
         let mut handles = Vec::with_capacity(urls.len());
@@ -115,11 +115,10 @@ impl FeedService {
         Self { http, buff_limit }
     }
 
-    pub fn parse<S>(&self, url: impl Into<String>, source: S) -> FetchFeedResult<Feed>
+    pub fn parse<S>(&self, url: FeedUrl, source: S) -> FetchFeedResult<Feed>
     where
         S: std::io::Read,
     {
-        let url = url.into();
         let parser = Self::build_parser(&url);
 
         parser

@@ -5,7 +5,7 @@ use moka::future::Cache;
 
 use crate::{
     feed::parser::{FetchFeed, FetchFeedResult},
-    types::{self},
+    types::{self, FeedUrl},
 };
 
 #[derive(Clone, Copy)]
@@ -44,10 +44,12 @@ impl CacheConfig {
 
 #[async_trait]
 pub trait FetchCachedFeed: Send + Sync {
-    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Arc<types::Feed>>;
+    async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Arc<types::Feed>>;
     /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[String])
-        -> Vec<FetchFeedResult<Arc<types::Feed>>>;
+    async fn fetch_feeds_parallel(
+        &self,
+        urls: &[FeedUrl],
+    ) -> Vec<FetchFeedResult<Arc<types::Feed>>>;
 }
 
 #[derive(Clone)]
@@ -55,7 +57,7 @@ pub struct CacheLayer<S> {
     service: S,
     // Use Arc to avoid expensive clone
     // https://github.com/moka-rs/moka?tab=readme-ov-file#avoiding-to-clone-the-value-at-get
-    cache: Cache<String, Arc<types::Feed>>,
+    cache: Cache<FeedUrl, Arc<types::Feed>>,
 }
 impl<S> CacheLayer<S> {
     /// Construct `CacheLayer` with default config
@@ -88,10 +90,10 @@ where
     S: FetchFeed + Clone + 'static,
 {
     #[tracing::instrument(skip_all, fields(%url))]
-    async fn fetch_feed(&self, url: String) -> FetchFeedResult<Arc<types::Feed>> {
+    async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Arc<types::Feed>> {
         // lookup cache
         if let Some(feed) = self.cache.get(&url).await {
-            tracing::debug!(url, "Feed cache hit");
+            tracing::debug!(url = url.as_str(), "Feed cache hit");
             return Ok(feed);
         }
 
@@ -105,7 +107,7 @@ where
     /// Fetch feeds by spawning tasks
     async fn fetch_feeds_parallel(
         &self,
-        urls: &[String],
+        urls: &[FeedUrl],
     ) -> Vec<FetchFeedResult<Arc<types::Feed>>> {
         let mut handles = Vec::with_capacity(urls.len());
 
