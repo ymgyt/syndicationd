@@ -3,7 +3,7 @@
     "name": "Syndicationd",
     "members": [
       {
-        "slug": "syndicationd",
+        "slug": "synd-term",
         "path": "./crates/synd_term"
       },
       {
