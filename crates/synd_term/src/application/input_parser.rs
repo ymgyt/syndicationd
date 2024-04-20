@@ -149,7 +149,7 @@ mod feed {
     }
 
     #[cfg(test)]
-    mod test {
+    mod tests {
         use super::*;
 
         #[test]
@@ -207,7 +207,7 @@ mod comment {
     }
 
     #[cfg(test)]
-    mod test {
+    mod tests {
         use super::*;
 
         #[test]
@@ -222,35 +222,4 @@ mod comment {
             assert_eq!(comments(s), Ok(("", ())));
         }
     }
-}
-
-#[cfg(test)]
-mod test {
-    // use super::*;
-    // TODO: update test
-    /*
-    #[test]
-    fn parse_feed_url() {
-        let prompt = InputParser::SUSBSCRIBE_FEED_PROMPT;
-        let cases = vec![
-            (
-                format!("{prompt}https://blog.ymgyt.io/atom.xml"),
-                Ok("https://blog.ymgyt.io/atom.xml"),
-            ),
-            (
-                format!("{prompt}   https://blog.ymgyt.io/atom.xml  "),
-                Ok("https://blog.ymgyt.io/atom.xml"),
-            ),
-            (
-                format!("{prompt}\nhttps://blog.ymgyt.io/atom.xml\n"),
-                Ok("https://blog.ymgyt.io/atom.xml"),
-            ),
-        ];
-
-        for case in cases {
-            let p = InputParser::new(case.0.as_str());
-            assert_eq!(p.parse_feed_subscription(), case.1);
-        }
-    }
-    */
 }
