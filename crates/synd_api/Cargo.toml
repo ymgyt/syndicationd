@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.1" }
-synd-feed = { path = "../synd_feed", version = "0.2.0", features = ["graphql"] }
+synd-feed = { path = "../synd_feed", version = "0.3.0", features = ["graphql"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.5" }
 
 anyhow             = { workspace = true }
