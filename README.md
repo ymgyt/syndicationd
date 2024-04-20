@@ -358,6 +358,6 @@ If you're looking for feeds, here are my recommendations.
 
 | Feed | URL |
 | ---  | --- |
-| [Terminal Trove](https://blog.cocl2.com/index.xml) | `https://terminaltrove.com/blog.xml` |
+| [Terminal Trove](https://terminaltrove.com/) | `https://terminaltrove.com/blog.xml` |
 
 </details>
