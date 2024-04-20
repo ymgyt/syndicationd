@@ -345,7 +345,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "FeedUrl",
                   "ofType": null
                 }
               }
@@ -751,7 +751,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "FeedUrl",
                   "ofType": null
                 }
               }
@@ -771,7 +771,7 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": null,
+              "description": "Category of the feed",
               "isDeprecated": false,
               "name": "category",
               "type": {
@@ -826,6 +826,16 @@
           "interfaces": null,
           "kind": "ENUM",
           "name": "FeedType",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "SCALAR",
+          "name": "FeedUrl",
           "possibleTypes": null
         },
         {
@@ -1504,7 +1514,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "FeedUrl",
                   "ofType": null
                 }
               }
@@ -1741,7 +1751,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "String",
+                  "name": "FeedUrl",
                   "ofType": null
                 }
               }

@@ -16,6 +16,7 @@ pub mod subscribe_feed {
     #[allow(dead_code)]
     type ID = String;
     type Category = crate::client::scalar::Category;
+    type FeedUrl = crate::client::scalar::FeedUrl;
     type Rfc3339Time = crate::client::scalar::Rfc3339Time;
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum FeedType {
@@ -112,7 +113,7 @@ pub mod subscribe_feed {
     }
     #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct SubscribeFeedInput {
-        pub url: String,
+        pub url: FeedUrl,
         pub requirement: Option<Requirement>,
         pub category: Option<Category>,
     }
@@ -128,7 +129,7 @@ pub mod subscribe_feed {
         #[serde(rename = "type")]
         pub type_: FeedType,
         pub title: Option<String>,
-        pub url: String,
+        pub url: FeedUrl,
         pub updated: Option<Rfc3339Time>,
         #[serde(rename = "websiteUrl")]
         pub website_url: Option<String>,
@@ -227,6 +228,7 @@ pub mod unsubscribe_feed {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
+    type FeedUrl = crate::client::scalar::FeedUrl;
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum ResponseCode {
         OK,
@@ -260,7 +262,7 @@ pub mod unsubscribe_feed {
     }
     #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct UnsubscribeFeedInput {
-        pub url: String,
+        pub url: FeedUrl,
     }
     #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub struct Variables {

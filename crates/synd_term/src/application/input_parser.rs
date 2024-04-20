@@ -76,7 +76,8 @@ mod feed {
         sequence::{delimited, Tuple},
         Finish, IResult, Parser,
     };
-    use synd_feed::types::Category;
+    use synd_feed::types::{Category, FeedUrl};
+    use url::Url;
 
     use super::NomError;
     use crate::{
@@ -129,11 +130,22 @@ mod feed {
         ))
     }
 
-    fn url(s: &str) -> IResult<&str, String> {
-        map(take_while(|c: char| !c.is_whitespace()), |s: &str| {
+    fn url(s: &str) -> IResult<&str, FeedUrl> {
+        let (remain, url) = map(take_while(|c: char| !c.is_whitespace()), |s: &str| {
             s.to_owned()
         })
-        .parse(s)
+        .parse(s)?;
+        match Url::parse(&url) {
+            Ok(url) => Ok((remain, FeedUrl::from(url))),
+            Err(err) => {
+                // TODO: represents parse error as type
+                tracing::warn!("Invalid url: {err}");
+                Err(nom::Err::Failure(nom::error::Error::new(
+                    remain,
+                    nom::error::ErrorKind::TakeWhile1,
+                )))
+            }
+        }
     }
 
     #[cfg(test)]
@@ -166,7 +178,7 @@ mod feed {
                 Ok((
                     "",
                     SubscribeFeedInput {
-                        url: "https://example.ymgyt.io/atom.xml".into(),
+                        url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
                         requirement: Some(Requirement::MUST),
                         category: Some(Category::new("rust").unwrap())
                     }

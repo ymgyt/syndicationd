@@ -11,7 +11,7 @@ use ratatui::{
         ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
 };
-use synd_feed::types::FeedType;
+use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::{Direction, IndexOutOfRange, ListAction},
@@ -45,8 +45,8 @@ impl Subscription {
         !self.feeds.is_empty()
     }
 
-    pub fn is_already_subscribed(&self, url: &str) -> bool {
-        self.feeds.iter().any(|feed| feed.url == url)
+    pub fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
+        self.feeds.iter().any(|feed| &feed.url == url)
     }
 
     pub fn selected_feed(&self) -> Option<&types::Feed> {
@@ -87,8 +87,8 @@ impl Subscription {
         self.apply_filter();
     }
 
-    pub fn remove_unsubscribed_feed(&mut self, url: &str) {
-        self.feeds.retain(|feed_meta| feed_meta.url != url);
+    pub fn remove_unsubscribed_feed(&mut self, url: &FeedUrl) {
+        self.feeds.retain(|feed_meta| &feed_meta.url != url);
         self.apply_filter();
         self.move_selection(&Direction::Up);
     }

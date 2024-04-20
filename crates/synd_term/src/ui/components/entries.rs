@@ -18,6 +18,7 @@ use ratatui::{
         ScrollbarState, StatefulWidget, Table, TableState, Widget, Wrap,
     },
 };
+use synd_feed::types::FeedUrl;
 
 pub struct Entries {
     selected_entry_index: usize,
@@ -59,8 +60,8 @@ impl Entries {
             .collect();
     }
 
-    pub fn remove_unsubscribed_entries(&mut self, url: &str) {
-        self.entries.retain(|entry| entry.feed_url != url);
+    pub fn remove_unsubscribed_entries(&mut self, url: &FeedUrl) {
+        self.entries.retain(|entry| &entry.feed_url != url);
         self.apply_filter();
     }
 

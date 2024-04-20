@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::Serialize;
-use synd_feed::types::{Category, FeedType, Requirement};
+use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
 
 use crate::{
     client::{
@@ -92,7 +92,7 @@ impl EntryMeta {
 pub struct Feed {
     pub r#type: Option<FeedType>,
     pub title: Option<String>,
-    pub url: String,
+    pub url: FeedUrl,
     pub updated: Option<Time>,
     pub links: Vec<Link>,
     pub website_url: Option<String>,
@@ -184,7 +184,7 @@ pub struct Entry {
     pub website_url: Option<String>,
     pub summary: Option<String>,
     pub feed_title: Option<String>,
-    pub feed_url: String,
+    pub feed_url: FeedUrl,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
 }
@@ -238,7 +238,7 @@ impl From<query::export_subscription::ExportSubscriptionOutputFeedsNodes> for Ex
     fn from(v: query::export_subscription::ExportSubscriptionOutputFeedsNodes) -> Self {
         Self {
             title: v.title,
-            url: v.url,
+            url: v.url.to_string(),
         }
     }
 }

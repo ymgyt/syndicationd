@@ -1,6 +1,6 @@
 use std::fmt::Display;
 use synd_auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
-use synd_feed::types::Category;
+use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
     application::{Direction, ListAction, RequestSequence},
@@ -48,14 +48,14 @@ pub enum Command {
         input: SubscribeFeedInput,
     },
     UnsubscribeFeed {
-        url: String,
+        url: FeedUrl,
     },
     CompleteSubscribeFeed {
         feed: Feed,
         request_seq: RequestSequence,
     },
     CompleteUnsubscribeFeed {
-        url: String,
+        url: FeedUrl,
         request_seq: RequestSequence,
     },
     FetchSubscription {

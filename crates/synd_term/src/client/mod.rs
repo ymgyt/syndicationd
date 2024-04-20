@@ -27,7 +27,7 @@ pub mod query;
 #[derive(Error, Debug)]
 pub enum SubscribeFeedError {
     #[error("invalid feed url: `{feed_url}` ({message})`")]
-    InvalidFeedUrl { feed_url: String, message: String },
+    InvalidFeedUrl { feed_url: FeedUrl, message: String },
     #[error("internal error: {0}")]
     Internal(anyhow::Error),
 }
@@ -118,7 +118,7 @@ impl Client {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn unsubscribe_feed(&self, url: String) -> anyhow::Result<()> {
+    pub async fn unsubscribe_feed(&self, url: FeedUrl) -> anyhow::Result<()> {
         let var = mutation::unsubscribe_feed::Variables {
             unsubscribe_input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
         };

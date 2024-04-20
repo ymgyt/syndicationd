@@ -6,6 +6,7 @@ use ratatui::{style::palette::tailwind, widgets::Widget};
 use synd_auth::device_flow::{
     self, DeviceAccessTokenResponse, DeviceAuthorizationResponse, DeviceFlow,
 };
+use synd_feed::types::FeedUrl;
 use tokio::time::{Instant, Sleep};
 
 use crate::{
@@ -630,7 +631,7 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
-    fn unsubscribe_feed(&mut self, url: String) {
+    fn unsubscribe_feed(&mut self, url: FeedUrl) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::UnsubscribeFeed);
         let fut = async move {
