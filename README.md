@@ -4,14 +4,25 @@
 
 </div>
 
-[![CI](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml)
-[![Release](https://github.com/ymgyt/syndicationd/actions/workflows/release.yml/badge.svg)](https://github.com/ymgyt/syndicationd/actions/workflows/release.yml)
+[![Crates.io Version][crates-badge]][crates-url]
+![License][license-badge]
+[![CI][workflow-ci-badge]][workflow-ci-url]
+[![Release][workflow-release-badge]][workflow-release-url]
+
+[crates-badge]: https://img.shields.io/crates/v/synd-term?style=for-the-badge&logo=rust
+[crates-url]: https://crates.io/crates/synd-term
+[license-badge]: https://img.shields.io/badge/license-MIT%2FApache--2.0-blue?style=for-the-badge
+[workflow-ci-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/ci.yaml?style=for-the-badge&logo=github&label=CI
+[workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
+[workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
+[workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
+[website-badge]: https://img.shields.io/badge/website-blue?style=for-the-badge
+[website]: https://docs.syndicationd.ymgyt.io/synd-term/
 
 ![Demo](./assets/demo.gif)
 
 Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
-[Website](https://docs.syndicationd.ymgyt.io/synd-term/)
 
 ## Features
 
