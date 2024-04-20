@@ -73,10 +73,11 @@ async fn run(
         serve,
         tls,
         o11y,
+        cache,
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
-    let dep = Dependency::new(kvsd, tls, serve).await?;
+    let dep = Dependency::new(kvsd, tls, serve, cache).await?;
 
     info!(
         version = config::VERSION,

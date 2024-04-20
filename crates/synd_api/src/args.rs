@@ -20,6 +20,8 @@ pub struct Args {
     pub tls: TlsOptions,
     #[command(flatten)]
     pub o11y: ObservabilityOptions,
+    #[command(flatten)]
+    pub cache: CacheOptions,
 }
 
 #[derive(clap::Args, Debug)]
@@ -86,6 +88,18 @@ pub struct ObservabilityOptions {
     /// Opentelemetry trace sampler ratio
     #[arg(long, env = "OTEL_TRACES_SAMPLER_ARG", default_value_t = 1.0)]
     pub trace_sampler_ratio: f64,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Cache options")]
+pub struct CacheOptions {
+    /// Max feed cache size in MiB
+    #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_SIZE_MB, env = env_key!("FEED_CACHE_SIZE") )]
+    pub feed_cache_size_mb: u64,
+    #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_TTL_MINUTES, env = env_key!("FEED_CACHE_TTL_MINUTES"))]
+    pub feed_cache_ttl_minutes: u64,
+    #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL_MINUTES, env = env_key!("FEED_CACHE_REFRESH_INTERVAL_MINUTES"))]
+    pub feed_cache_refresh_interval_minutes: u64,
 }
 
 #[must_use]

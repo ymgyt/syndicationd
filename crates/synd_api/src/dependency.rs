@@ -8,7 +8,7 @@ use synd_feed::feed::{
 };
 
 use crate::{
-    args::{self, KvsdOptions, TlsOptions},
+    args::{self, CacheOptions, KvsdOptions, TlsOptions},
     config,
     monitor::Monitors,
     repository::kvsd::KvsdClient,
@@ -29,29 +29,48 @@ impl Dependency {
         kvsd: KvsdOptions,
         tls: TlsOptions,
         serve_options: args::ServeOptions,
+        cache: CacheOptions,
     ) -> anyhow::Result<Self> {
-        let KvsdOptions {
-            kvsd_host,
-            kvsd_port,
-            kvsd_username,
-            kvsd_password,
-        } = kvsd;
-        let kvsd = KvsdClient::connect(
-            kvsd_host,
-            kvsd_port,
-            kvsd_username,
-            kvsd_password,
-            Duration::from_secs(10),
-        )
-        .await?;
+        let kvsd = {
+            let KvsdOptions {
+                kvsd_host,
+                kvsd_port,
+                kvsd_username,
+                kvsd_password,
+            } = kvsd;
+            KvsdClient::connect(
+                kvsd_host,
+                kvsd_port,
+                kvsd_username,
+                kvsd_password,
+                Duration::from_secs(10),
+            )
+            .await?
+        };
 
-        let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
-        let cache_feed_service = CacheLayer::with(
-            feed_service,
-            CacheConfig::default()
-                .with_max_cache_size(100 * 1024 * 1024)
-                .with_time_to_live(Duration::from_secs(60 * 60 * 3)),
-        );
+        let cache_feed_service = {
+            let CacheOptions {
+                feed_cache_size_mb,
+                feed_cache_ttl_minutes,
+                feed_cache_refresh_interval_minutes,
+            } = cache;
+            let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
+            let cache_feed_service = CacheLayer::with(
+                feed_service,
+                CacheConfig::default()
+                    .with_max_cache_size(feed_cache_size_mb * 1024 * 1024)
+                    .with_time_to_live(Duration::from_secs(feed_cache_ttl_minutes * 60)),
+            );
+            let periodic_refresher = cache_feed_service
+                .periodic_refresher()
+                .with_emit_metrics(true);
+
+            tokio::spawn(periodic_refresher.run(Duration::from_secs(
+                feed_cache_refresh_interval_minutes * 60,
+            )));
+
+            cache_feed_service
+        };
 
         let make_usecase = MakeUsecase {
             subscription_repo: Arc::new(kvsd),
