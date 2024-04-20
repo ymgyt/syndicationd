@@ -1,4 +1,7 @@
 {
+  "project": {
+    "name": "synd"
+  },
   "build": {
     "static_dir": "assets",
     "dist_dir": "website"
