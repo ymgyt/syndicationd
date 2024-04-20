@@ -98,7 +98,7 @@ async fn main() {
 
     if let Some(command) = command {
         let exit_code = match command {
-            cli::Command::Clear(clear) => clear.run(),
+            cli::Command::Clean(clean) => clean.run(),
             cli::Command::Check(check) => check.run(endpoint).await,
             cli::Command::Export(export) => export.run(endpoint).await,
         };

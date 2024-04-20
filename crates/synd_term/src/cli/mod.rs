@@ -7,7 +7,7 @@ use url::Url;
 use crate::config;
 
 mod check;
-mod clear;
+mod clean;
 mod export;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
@@ -88,7 +88,8 @@ pub struct Args {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    Clear(clear::ClearCommand),
+    #[command(alias = "clear")]
+    Clean(clean::CleanCommand),
     Check(check::CheckCommand),
     Export(export::ExportCommand),
 }

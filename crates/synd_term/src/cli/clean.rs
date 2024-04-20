@@ -5,14 +5,14 @@ use clap::Args;
 
 use crate::config;
 
-/// Clear cache, log
+/// Clean cache and logs
 #[derive(Args, Debug)]
-pub struct ClearCommand {}
+pub struct CleanCommand {}
 
-impl ClearCommand {
+impl CleanCommand {
     #[allow(clippy::unused_self)]
     pub fn run(self) -> i32 {
-        if let Err(err) = Self::clear() {
+        if let Err(err) = Self::clean() {
             tracing::error!("{err}");
             1
         } else {
@@ -20,12 +20,12 @@ impl ClearCommand {
         }
     }
 
-    fn clear() -> anyhow::Result<()> {
+    fn clean() -> anyhow::Result<()> {
         // remove cache
         let cache_dir = config::cache_dir();
         match std::fs::remove_dir_all(cache_dir) {
             Ok(()) => {
-                tracing::info!("Clear {}", cache_dir.display());
+                tracing::info!("Remove {}", cache_dir.display());
             }
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => {}
@@ -40,7 +40,7 @@ impl ClearCommand {
         let log_file = config::log_path();
         match std::fs::remove_file(&log_file) {
             Ok(()) => {
-                tracing::info!("Clear {}", log_file.display());
+                tracing::info!("Remove {}", log_file.display());
             }
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => {}
