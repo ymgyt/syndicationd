@@ -21,6 +21,20 @@ By executing `nix develop`, the necessary tools for development can be prepared.
 
 To test code, execute `just check`
 
+### Launching Develop Environment
+
+Launch three terminals.  
+
+1. the first one is for synd-api
+1. the second one is for kvsd, which serves as the persistent backend used by synd-api
+1. the last one is for synd.
+
+Execute in the following order: `just kvsd`, `just api`, `j term`
+
+### Updating GraphQL Schema
+
+If you have updated the GraphQL schema of synd-api, execute `just update-gql-schema` This command updates the GraphQL schema of synd-term.   
+To generate synd-term's GraphQL client code, execute `just gen-gql`.
 
 ## License
 
