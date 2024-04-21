@@ -18,11 +18,11 @@ use crate::{
 
 use super::tabs::Tab;
 
-pub struct Prompt {
+pub struct StatusLine {
     error_message: Option<String>,
 }
 
-impl Prompt {
+impl StatusLine {
     pub fn new() -> Self {
         Self {
             error_message: None,
@@ -38,7 +38,7 @@ impl Prompt {
     }
 }
 
-impl Prompt {
+impl StatusLine {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
         match self.error_message.as_ref() {
             Some(error_message) => Self::render_error(area, buf, cx, error_message),
