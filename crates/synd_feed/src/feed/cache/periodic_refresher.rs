@@ -35,8 +35,8 @@ impl<S> PeriodicRefresher<S> {
         let entry_count = self.cache.entry_count();
         let size = self.cache.weighted_size();
 
-        metric!(counter_cache.feed.count = entry_count);
-        metric!(counter_cache.feed.size = size);
+        metric!(counter.cache.feed.count = entry_count);
+        metric!(counter.cache.feed.size = size);
     }
 }
 
