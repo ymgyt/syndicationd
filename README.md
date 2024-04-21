@@ -8,6 +8,8 @@
 ![License][license-badge]
 [![CI][workflow-ci-badge]][workflow-ci-url]
 [![Release][workflow-release-badge]][workflow-release-url]
+[![Website][website-badge]][website]
+[![Grafana][grafana-badge]][grafana-url]
 
 [crates-badge]: https://img.shields.io/crates/v/synd-term?style=for-the-badge&logo=rust
 [crates-url]: https://crates.io/crates/synd-term
@@ -16,8 +18,10 @@
 [workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
 [workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
 [workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
-[website-badge]: https://img.shields.io/badge/website-blue?style=for-the-badge
+[website-badge]: https://img.shields.io/badge/Docs-Website-8cf?style=for-the-badge&logo=book
 [website]: https://docs.syndicationd.ymgyt.io/synd-term/
+[grafana-badge]: https://img.shields.io/badge/Grafana-Dashboard-orange?style=for-the-badge&logo=grafana
+[grafana-url]: https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now
 
 ![Demo](./assets/demo.gif)
 
@@ -291,6 +295,9 @@ Some tips about feed that I know.
 
 If you're looking for feeds, here are my recommendations.
 
+<details>
+<summary>Click to show a list</summary>
+
 ### For Rust users
 
 <details>
@@ -360,4 +367,5 @@ If you're looking for feeds, here are my recommendations.
 | ---  | --- |
 | [Terminal Trove](https://terminaltrove.com/) | `https://terminaltrove.com/blog.xml` |
 
+</details>
 </details>
