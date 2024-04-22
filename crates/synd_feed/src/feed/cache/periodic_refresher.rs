@@ -30,13 +30,20 @@ impl<S> PeriodicRefresher<S> {
         }
     }
 
-    fn emit_metrics(&self) {
+    fn emit_metrics(&self, prev: &Metrics) -> Metrics {
         // Should call cache.run_pending_tasks() ?
-        let entry_count = self.cache.entry_count();
-        let size = self.cache.weighted_size();
+        let current = Metrics {
+            cache_count: self.cache.entry_count().try_into().unwrap_or(0),
+            cache_size: self.cache.weighted_size().try_into().unwrap_or(0),
+        };
 
-        metric!(counter.cache.feed.count = entry_count);
-        metric!(counter.cache.feed.size = size);
+        metric!(counter.cache.feed.count = current.cache_count - prev.cache_count);
+        metric!(
+            counter.cache.feed.size = current.cache_size,
+            prev.cache_size
+        );
+
+        current
     }
 }
 
@@ -68,6 +75,7 @@ where
         info!(?interval, "Run periodic feed cache refresher");
 
         let mut interval = tokio::time::interval(interval);
+        let mut prev = Metrics::default();
 
         // Consume initial tick which return ready immediately
         interval.tick().await;
@@ -76,7 +84,7 @@ where
             interval.tick().await;
 
             if self.emit_metrics {
-                self.emit_metrics();
+                prev = self.emit_metrics(&prev);
             }
             if let Err(err) = self.refresh().await {
                 error!("Periodic refresh error: {err}");
@@ -85,4 +93,10 @@ where
             }
         }
     }
+}
+
+#[derive(Default)]
+struct Metrics {
+    cache_count: i64,
+    cache_size: i64,
 }
