@@ -4,12 +4,8 @@
 
 </div>
 
-[![Crates.io Version][crates-badge]][crates-url]
-![License][license-badge]
 [![CI][workflow-ci-badge]][workflow-ci-url]
 [![Release][workflow-release-badge]][workflow-release-url]
-[![Website][website-badge]][website]
-[![Grafana][grafana-badge]][grafana-url]
 
 [crates-badge]: https://img.shields.io/crates/v/synd-term?style=for-the-badge&logo=rust
 [crates-url]: https://crates.io/crates/synd-term
@@ -27,6 +23,7 @@
 
 Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
+[![Website][website-badge]][website]
 
 ## Features
 
@@ -253,7 +250,7 @@ The theme can be changed using the `--theme` flag. Please refer to the help for 
 By default, `synd` use `https://api.syndicationd.ymgyt.io` as the [backend api](./crates/synd_api)([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
 To change the endpoint, specify the `--endpoint` flag
 
-The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [Grafana dashboard](https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now)
+The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [![Grafana][grafana-badge]][grafana-url]
 
 
 ### Remove cache and logs
