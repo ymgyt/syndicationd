@@ -132,6 +132,7 @@ Currently, GitHub and Google are supported as authorize server/id provider. The 
 | `c`     | Activate category filiter(Esc to deactivate)  |
 | `+`     | Activate all category(on Category filter)     |
 | `-`     | Deactivate all category(on Category filter)   |
+| `/`     | Activate keyword search(Esc to deactivate)    |
 | `q`     | Quit app                                      |
 
 </details>
