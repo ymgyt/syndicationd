@@ -7,7 +7,7 @@ mod default;
 
 pub mod macros;
 
-use crate::command::Command;
+use crate::{application::event::KeyEventResult, command::Command};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeymapId {
@@ -125,13 +125,13 @@ impl Keymaps {
         self.keymaps[id as usize] = keymap;
     }
 
-    pub fn search(&mut self, event: KeyEvent) -> Option<Command> {
+    pub fn search(&mut self, event: &KeyEvent) -> KeyEventResult {
         for keymap in self.keymaps.iter_mut().rev().filter(|k| k.enable) {
-            if let Some(cmd) = keymap.search(&event) {
-                return Some(cmd);
+            if let Some(cmd) = keymap.search(event) {
+                return KeyEventResult::Consumed(Some(cmd));
             }
         }
-        None
+        KeyEventResult::Ignored
     }
 }
 

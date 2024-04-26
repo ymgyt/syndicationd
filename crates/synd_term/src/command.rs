@@ -89,7 +89,9 @@ pub enum Command {
     // Filter
     MoveFilterRequirement(Direction),
     ActivateCategoryFilterling,
-    DeactivateCategoryFiltering,
+    ActivateSearchFiltering,
+    PromptChanged,
+    DeactivateFiltering,
     ToggleFilterCategory {
         category: Category<'static>,
     },
@@ -188,7 +190,10 @@ impl Command {
     pub fn activate_category_filtering() -> Self {
         Command::ActivateCategoryFilterling
     }
-    pub fn deactivate_category_filtering() -> Self {
-        Command::DeactivateCategoryFiltering
+    pub fn activate_search_filtering() -> Self {
+        Command::ActivateSearchFiltering
+    }
+    pub fn deactivate_filtering() -> Self {
+        Command::DeactivateFiltering
     }
 }

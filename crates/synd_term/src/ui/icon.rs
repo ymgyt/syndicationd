@@ -8,6 +8,9 @@ macro_rules! icon {
     (requirement) => {
         ""
     };
+    (search) => {
+        ""
+    };
 }
 
 pub(crate) use icon;

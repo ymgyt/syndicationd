@@ -37,7 +37,8 @@ pub fn default() -> KeymapsConfig {
        "h" | "left" => move_filter_requirement_left,
        "l" | "right" => move_filter_requirement_right,
        "c" => activate_category_filtering,
-       "esc" => deactivate_category_filtering,
+       "/" => activate_search_filtering,
+       "esc" => deactivate_filtering,
     });
     let global = keymap!({
         "q" | "C-c" =>  quit ,

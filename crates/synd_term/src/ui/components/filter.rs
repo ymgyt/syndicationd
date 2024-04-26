@@ -1,9 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
+    layout::{Constraint, Layout, Rect},
     style::Stylize,
     text::{Line, Span},
     widgets::{Block, Padding, Widget},
@@ -15,8 +19,13 @@ use crate::{
     command::Command,
     config::{Categories, Icon},
     keymap::{KeyTrie, Keymap},
+    matcher::Matcher,
     types::{self, RequirementExt},
-    ui::{self, icon, Context},
+    ui::{
+        self, icon,
+        widgets::prompt::{Prompt, RenderCursor},
+        Context,
+    },
 };
 
 #[allow(dead_code)]
@@ -35,6 +44,7 @@ pub enum FilterResult {
 pub struct FeedFilter {
     requirement: Requirement,
     categories: HashMap<Category<'static>, FilterCategoryState>,
+    matcher: Matcher,
 }
 
 impl Default for FeedFilter {
@@ -42,6 +52,7 @@ impl Default for FeedFilter {
         Self {
             requirement: Filter::INITIAL_REQUIREMENT,
             categories: HashMap::new(),
+            matcher: Matcher::new(),
         }
     }
 }
@@ -54,7 +65,17 @@ impl FeedFilter {
         if let Some(FilterCategoryState::Inactive) = self.categories.get(entry.category()) {
             return FilterResult::Discard;
         }
-        FilterResult::Use
+        if self
+            .matcher
+            .r#match(entry.title.as_deref().unwrap_or_default())
+            || self
+                .matcher
+                .r#match(entry.feed_title.as_deref().unwrap_or_default())
+        {
+            FilterResult::Use
+        } else {
+            FilterResult::Discard
+        }
     }
 
     pub fn feed(&self, feed: &types::Feed) -> FilterResult {
@@ -62,6 +83,12 @@ impl FeedFilter {
             return FilterResult::Discard;
         }
         if let Some(FilterCategoryState::Inactive) = self.categories.get(feed.category()) {
+            return FilterResult::Discard;
+        }
+        if !self
+            .matcher
+            .r#match(feed.title.as_deref().unwrap_or_default())
+        {
             return FilterResult::Discard;
         }
         FilterResult::Use
@@ -74,12 +101,16 @@ pub struct Filter {
     requirement: Requirement,
     categories: Vec<Category<'static>>,
     categoris_state: HashMap<Category<'static>, CategoryState>,
+
+    prompt: Rc<RefCell<Prompt>>,
+    matcher: Matcher,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 enum State {
     Normal,
     CategoryFiltering,
+    SearchFiltering,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -110,10 +141,22 @@ impl Filter {
     pub fn new() -> Self {
         Self {
             state: State::Normal,
+            prompt: Rc::new(RefCell::new(Prompt::new())),
             requirement: Self::INITIAL_REQUIREMENT,
             categories: Vec::new(),
             categoris_state: HashMap::new(),
+            matcher: Matcher::new(),
         }
+    }
+
+    #[must_use]
+    pub fn activate_search_filtering(&mut self) -> Rc<RefCell<Prompt>> {
+        self.state = State::SearchFiltering;
+        self.prompt.clone()
+    }
+
+    pub fn is_search_active(&self) -> bool {
+        self.state == State::SearchFiltering
     }
 
     #[must_use]
@@ -141,7 +184,7 @@ impl Filter {
         Keymap::from_map(crate::keymap::KeymapId::CategoryFiltering, map)
     }
 
-    pub fn deactivate_category_filtering(&mut self) {
+    pub fn deactivate_filtering(&mut self) {
         self.state = State::Normal;
     }
 
@@ -195,7 +238,14 @@ impl Filter {
         self.feed_filter()
     }
 
+    #[must_use]
+    pub fn filter(&self) -> FeedFilter {
+        self.feed_filter()
+    }
+
     fn feed_filter(&self) -> FeedFilter {
+        let mut matcher = self.matcher.clone();
+        matcher.update_needle(self.prompt.borrow().line());
         FeedFilter {
             requirement: self.requirement,
             categories: self
@@ -203,6 +253,7 @@ impl Filter {
                 .iter()
                 .map(|(c, state)| (c.clone(), state.state))
                 .collect(),
+            matcher,
         }
     }
 
@@ -283,6 +334,14 @@ impl Filter {
                 bottom: 0,
             })
             .inner(area);
+        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]);
+        let [filter_area, search_area] = vertical.areas(area);
+
+        self.render_filter(filter_area, buf, cx);
+        self.render_search(search_area, buf, cx);
+    }
+
+    fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let mut spans = vec![
             Span::from(concat!(icon!(filter), " Filter")),
             Span::from("     "),
@@ -329,7 +388,29 @@ impl Filter {
             spans.push(Span::from("(Esc/+/-)").dim());
         }
 
-        let filter = Line::from(spans);
-        filter.render(area, buf);
+        Line::from(spans).render(area, buf);
+    }
+    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
+        let mut spans = vec![Span::from("             ")];
+
+        let mut label = Span::from(concat!(icon!(search), " Search"));
+
+        if self.state != State::SearchFiltering {
+            label = label.dim();
+        }
+        spans.push(label);
+
+        Line::from(spans).render(area, buf);
+
+        let prompt_area = Rect {
+            x: area.x + 22, // TODO: handle edge case
+            ..area
+        };
+        let render_cursor = if self.state == State::SearchFiltering {
+            RenderCursor::Enable
+        } else {
+            RenderCursor::Disable
+        };
+        self.prompt.borrow().render(prompt_area, buf, render_cursor);
     }
 }

@@ -10,6 +10,7 @@ use synd_feed::types::FeedUrl;
 use tokio::time::{Instant, Sleep};
 
 use crate::{
+    application::event::KeyEventResult,
     auth::{AuthenticationProvider, Credential},
     client::{mutation::subscribe_feed::SubscribeFeedInput, Client},
     command::Command,
@@ -40,6 +41,8 @@ use input_parser::InputParser;
 
 mod authenticator;
 pub use authenticator::{Authenticator, DeviceFlows, JwtService};
+
+pub(crate) mod event;
 
 enum Screen {
     Login,
@@ -82,7 +85,7 @@ pub struct Application {
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
-    keymaps: Keymaps,
+    key_handlers: event::KeyHandlers,
     categories: Categories,
 
     screen: Screen,
@@ -105,6 +108,9 @@ impl Application {
         keymaps.enable(KeymapId::Global);
         keymaps.enable(KeymapId::Login);
 
+        let mut key_handlers = event::KeyHandlers::new();
+        key_handlers.push(event::KeyHandler::Keymaps(keymaps));
+
         Self {
             terminal,
             client,
@@ -117,7 +123,7 @@ impl Application {
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
             config,
-            keymaps,
+            key_handlers,
             categories,
             should_quit: false,
             should_render: false,
@@ -141,13 +147,17 @@ impl Application {
         &self.authenticator.jwt_service
     }
 
+    fn keymaps(&mut self) -> &mut Keymaps {
+        self.key_handlers.keymaps_mut().unwrap()
+    }
+
     pub fn set_credential(&mut self, cred: Credential) {
         self.client.set_credential(cred);
         self.components.auth.authenticated();
-        self.keymaps.disable(KeymapId::Login);
-        self.keymaps.enable(KeymapId::Tabs);
-        self.keymaps.enable(KeymapId::Entries);
-        self.keymaps.enable(KeymapId::Filter);
+        self.keymaps().disable(KeymapId::Login);
+        self.keymaps().enable(KeymapId::Tabs);
+        self.keymaps().enable(KeymapId::Entries);
+        self.keymaps().enable(KeymapId::Filter);
         self.initial_fetch();
         self.screen = Screen::Browse;
         self.should_render = true;
@@ -300,8 +310,8 @@ impl Application {
                     self.complete_device_authroize_flow(provider, device_access_token);
                 }
                 Command::MoveTabSelection(direction) => {
-                    self.keymaps.toggle(KeymapId::Entries);
-                    self.keymaps.toggle(KeymapId::Subscription);
+                    self.keymaps().toggle(KeymapId::Entries);
+                    self.keymaps().toggle(KeymapId::Subscription);
 
                     match self.components.tabs.move_selection(&direction) {
                         Tab::Feeds if !self.components.subscription.has_subscription() => {
@@ -439,12 +449,25 @@ impl Application {
                 }
                 Command::ActivateCategoryFilterling => {
                     let keymap = self.components.filter.activate_category_filtering();
-                    self.keymaps.update(KeymapId::CategoryFiltering, keymap);
+                    self.keymaps().update(KeymapId::CategoryFiltering, keymap);
                     self.should_render = true;
                 }
-                Command::DeactivateCategoryFiltering => {
-                    self.components.filter.deactivate_category_filtering();
-                    self.keymaps.disable(KeymapId::CategoryFiltering);
+                Command::ActivateSearchFiltering => {
+                    let prompt = self.components.filter.activate_search_filtering();
+                    self.key_handlers.push(event::KeyHandler::Prompt(prompt));
+                    self.should_render = true;
+                }
+                Command::PromptChanged => {
+                    if self.components.filter.is_search_active() {
+                        let filter = self.components.filter.filter();
+                        self.apply_feed_filter(filter);
+                        self.should_render = true;
+                    }
+                }
+                Command::DeactivateFiltering => {
+                    self.components.filter.deactivate_filtering();
+                    self.keymaps().disable(KeymapId::CategoryFiltering);
+                    self.key_handlers.remove_prompt();
                     self.should_render = true;
                 }
                 Command::ToggleFilterCategory { category } => {
@@ -504,7 +527,14 @@ impl Application {
                 tracing::debug!("Handle key event: {key:?}");
 
                 self.reset_idle_timer();
-                self.keymaps.search(key)
+
+                match self.key_handlers.handle(key) {
+                    KeyEventResult::Consumed(cmd) => {
+                        self.should_render = true;
+                        cmd
+                    }
+                    KeyEventResult::Ignored => None,
+                }
             }
             _ => None,
         }

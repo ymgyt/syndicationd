@@ -55,6 +55,7 @@ impl StatusLine {
             ("ge", "󱞥"),
             ("h/l", icon!(requirement)),
             ("c", icon!(category)),
+            ("/", icon!(search)),
             ("r", "󰑓"),
         ][..];
         let suf_keys = &[("q", "")][..];

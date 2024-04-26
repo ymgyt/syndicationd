@@ -9,6 +9,7 @@ pub mod config;
 pub mod interact;
 pub mod job;
 pub mod keymap;
+pub mod matcher;
 pub mod terminal;
 pub mod types;
 pub mod ui;
