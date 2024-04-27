@@ -239,11 +239,7 @@ impl Filter {
     }
 
     #[must_use]
-    pub fn filter(&self) -> FeedFilter {
-        self.feed_filter()
-    }
-
-    fn feed_filter(&self) -> FeedFilter {
+    pub fn feed_filter(&self) -> FeedFilter {
         let mut matcher = self.matcher.clone();
         matcher.update_needle(self.prompt.borrow().line());
         FeedFilter {

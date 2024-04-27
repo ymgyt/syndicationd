@@ -95,23 +95,5 @@ impl Prompt {
             spans.push(Span::from(" ").reversed());
         };
         Line::from(spans).render(area, buf);
-        /*
-        let text = Text::from(self.line.clone());
-        text.render(area, buf);
-
-        if cursor == RenderCursor::Enable {
-            let cursor_pos = self.line.graphemes(true).count();
-            let area = Rect {
-                #[allow(clippy::cast_possible_truncation)]
-                x: area.x + cursor_pos as u16,
-                y: area.y,
-                width: 1,
-                height: 1,
-            };
-
-            let cursor = Text::from(" ").reversed();
-            cursor.render(area, buf);
-        }
-        */
     }
 }

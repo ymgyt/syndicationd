@@ -459,7 +459,7 @@ impl Application {
                 }
                 Command::PromptChanged => {
                     if self.components.filter.is_search_active() {
-                        let filter = self.components.filter.filter();
+                        let filter = self.components.filter.feed_filter();
                         self.apply_feed_filter(filter);
                         self.should_render = true;
                     }
