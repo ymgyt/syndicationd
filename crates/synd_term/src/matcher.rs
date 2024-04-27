@@ -58,3 +58,25 @@ impl fmt::Debug for Matcher {
             .finish_non_exhaustive()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_match() {
+        let mut m = Matcher::new();
+
+        let cases = vec![
+            ("rustsec", "rustsec"),
+            ("rustsec", "RUSTSEC"),
+            ("rustsec", "RustSec"),
+            ("this week in rust", "This Week in Rust"),
+        ];
+
+        for case in cases {
+            m.update_needle(case.0);
+            assert!(m.r#match(case.1));
+        }
+    }
+}
