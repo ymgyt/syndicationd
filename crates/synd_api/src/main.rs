@@ -77,7 +77,7 @@ async fn run(
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
-    let dep = Dependency::new(kvsd, tls, serve, cache).await?;
+    let dep = Dependency::new(kvsd, tls, serve, cache.clone()).await?;
 
     info!(
         version = config::VERSION,
@@ -85,6 +85,8 @@ async fn run(
         request_timeout=?dep.serve_options.timeout,
         request_body_limit_bytes=dep.serve_options.body_limit_bytes,
         concurrency_limit=?dep.serve_options.concurrency_limit,
+        feed_cache_ttl_minutes=?cache.feed_cache_ttl.as_secs() / 60,
+        feed_cache_refresh_interval_minutes=?cache.feed_cache_refresh_interval.as_secs() / 60,
         "Runinng...",
     );
 

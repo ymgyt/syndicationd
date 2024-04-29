@@ -90,16 +90,16 @@ pub struct ObservabilityOptions {
     pub trace_sampler_ratio: f64,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Clone)]
 #[command(next_help_heading = "Cache options")]
 pub struct CacheOptions {
     /// Max feed cache size in MiB
     #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_SIZE_MB, env = env_key!("FEED_CACHE_SIZE") )]
     pub feed_cache_size_mb: u64,
-    #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_TTL_MINUTES, env = env_key!("FEED_CACHE_TTL_MINUTES"))]
-    pub feed_cache_ttl_minutes: u64,
-    #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL_MINUTES, env = env_key!("FEED_CACHE_REFRESH_INTERVAL_MINUTES"))]
-    pub feed_cache_refresh_interval_minutes: u64,
+    #[arg(long, value_parser = parse_duration::parse, default_value = config::cache::DEFAULT_FEED_CACHE_TTL, env = env_key!("FEED_CACHE_TTL"))]
+    pub feed_cache_ttl: Duration,
+    #[arg(long, value_parser = parse_duration::parse, default_value = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL, env = env_key!("FEED_CACHE_REFRESH_INTERVAL"))]
+    pub feed_cache_refresh_interval: Duration,
 }
 
 #[must_use]
