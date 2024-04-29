@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased] __release_date__
+
+### Features
+
+- Parse entry cache flags as duration by [@ymgyt](https://github.com/ymgyt) ([39067498](https://github.com/ymgyt/syndicationd/commit/39067498148becdf8baf33ba41ca5a64f1338daa))
+
 ## [v0.2.1] - 2024-04-20
 
 ### Features
