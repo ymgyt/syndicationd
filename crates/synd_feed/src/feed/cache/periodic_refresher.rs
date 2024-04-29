@@ -38,10 +38,7 @@ impl<S> PeriodicRefresher<S> {
         };
 
         metric!(counter.cache.feed.count = current.cache_count - prev.cache_count);
-        metric!(
-            counter.cache.feed.size = current.cache_size,
-            prev.cache_size
-        );
+        metric!(counter.cache.feed.size = current.cache_size - prev.cache_size);
 
         current
     }
