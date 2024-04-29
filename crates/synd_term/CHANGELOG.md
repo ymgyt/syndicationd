@@ -2,7 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.2] 2024-04-18
+## [unreleased] __release_date__
+
+### Features
+
+- Add search by [@ymgyt](https://github.com/ymgyt) ([ad68a603](https://github.com/ymgyt/syndicationd/commit/ad68a603161f3ed0d0722eccb010851b82b6276e))
+
+### Miscellaneous Tasks
+
+- Change oranda project name from synd-term to synd by [@ymgyt](https://github.com/ymgyt) ([802892ad](https://github.com/ymgyt/syndicationd/commit/802892ad8351c546e5a80b6edeeba981a515a526))
+- Rename clear command to clean by [@ymgyt](https://github.com/ymgyt) ([767adc34](https://github.com/ymgyt/syndicationd/commit/767adc34460a06dc8771fba55f7b2affd2da994c))
+
+### Refactor
+
+- Use FeedUrl instead of String by [@ymgyt](https://github.com/ymgyt) ([7503ae0e](https://github.com/ymgyt/syndicationd/commit/7503ae0e8c72061ce1f1bcb01112b55c744beac6))
+- Make tests module consistent by [@ymgyt](https://github.com/ymgyt) ([a0c2c530](https://github.com/ymgyt/syndicationd/commit/a0c2c5300372f9a7d9e7f96c3a2bda5a620e755f))
+- Rename prompt to status line by [@ymgyt](https://github.com/ymgyt) ([6e3c8850](https://github.com/ymgyt/syndicationd/commit/6e3c885057729f2e08c524224584c097f72a3f59))
+- Rename filter method by [@ymgyt](https://github.com/ymgyt) ([4cc525fc](https://github.com/ymgyt/syndicationd/commit/4cc525fc6d5644783c9f93cbd60ffc65a0a8cb52))
+
+### Testing
+
+- Add matcher test by [@ymgyt](https://github.com/ymgyt) ([f1dc9564](https://github.com/ymgyt/syndicationd/commit/f1dc9564a371fee96b0b8a742eeb87cf8474397e))
+
+## [v0.2.2] - 2024-04-18
 
 ### Bug Fixes
 

@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.3.0] 2024-04-20
+## [unreleased] __release_date__
+
+### Bug Fixes
+
+- Fix cache metrics name prefix by [@ymgyt](https://github.com/ymgyt) ([7e48a11e](https://github.com/ymgyt/syndicationd/commit/7e48a11e4a07ac67ba3e9cb8deac05f69abb626f))
+- Emit cache metrics of the differences from the last time by [@ymgyt](https://github.com/ymgyt) ([5ea57aff](https://github.com/ymgyt/syndicationd/commit/5ea57aff46a149b69b5bfe814f13bd8c24f209b9))
+
+## [v0.3.0] - 2024-04-20
 
 ### Features
 
