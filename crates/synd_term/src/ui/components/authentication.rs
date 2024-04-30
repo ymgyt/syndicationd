@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Modifier, Style, Stylize},
     text::{Line, Span, Text},
     widgets::{
         Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph, StatefulWidget,
@@ -8,6 +8,7 @@ use ratatui::{
     },
 };
 use synd_auth::device_flow::DeviceAuthorizationResponse;
+use tui_big_text::{BigText, PixelSize};
 
 use crate::{
     application::Direction,
@@ -84,8 +85,24 @@ impl Authentication {
     fn render_login(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = area.centered(40, 50);
 
-        let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]);
-        let [title_area, methods_area] = vertical.areas(area);
+        let vertical = Layout::vertical([
+            Constraint::Length(9),
+            Constraint::Length(2),
+            Constraint::Min(2),
+        ]);
+
+        let [big_text_area, title_area, methods_area] = vertical.areas(area);
+
+        // Render big "syndicationd"
+        if let Ok(big_text) = BigText::builder()
+            .pixel_size(PixelSize::HalfWidth)
+            .style(Style::new().white())
+            .alignment(Alignment::Center)
+            .lines(vec!["Syndicationd".into()])
+            .build()
+        {
+            big_text.render(big_text_area, buf);
+        }
 
         let title = Self::login_title(cx);
 
