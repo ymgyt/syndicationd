@@ -65,7 +65,7 @@ axum-server  = { workspace = true }
 kvsd         = { workspace = true }
 serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }
 tempfile     = "3"
-tokio-stream = "0.1.14"
+tokio-stream = "0.1.15"
 
 [lints]
 workspace = true
