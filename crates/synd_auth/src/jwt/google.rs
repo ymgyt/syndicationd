@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use jsonwebtoken::{DecodingKey, Validation};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -43,8 +43,16 @@ pub struct Claims {
 }
 
 impl Claims {
-    pub fn is_expired(&self, t: DateTime<Utc>) -> bool {
+    /// Return this `Claims` expire at given `DateTime`
+    pub fn is_expired_at(&self, t: DateTime<Utc>) -> bool {
         self.exp < t.timestamp()
+    }
+
+    /// Return `DateTime` at when `Claims` expire
+    pub fn expired_at(&self) -> DateTime<Utc> {
+        Utc.timestamp_opt(self.exp, 0)
+            .single()
+            .unwrap_or_else(Utc::now)
     }
 }
 
