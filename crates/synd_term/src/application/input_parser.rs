@@ -1,3 +1,4 @@
+use nom::error::VerboseErrorKind;
 use thiserror::Error;
 
 use crate::{
@@ -8,7 +9,13 @@ use crate::{
 
 pub use feed::requirement as parse_requirement;
 
-type NomError<'s> = nom::error::Error<&'s str>;
+// type NomError<'s> = nom::error::Error<&'s str>;
+type NomError<'s> = nom::error::VerboseError<&'s str>;
+
+const CTX_REQUIREMENT: &str = "requirement";
+const CTX_CATEGORY: &str = "category";
+const CTX_CATEGORY_POST: &str = "category_post";
+const CTX_URL: &str = "url";
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub(super) enum ParseFeedError {
@@ -53,7 +60,24 @@ impl<'a> InputParser<'a> {
                 }
                 input
             })
-            .map_err(|e| ParseFeedError::Parse(e.to_string()))
+            .map_err(|mut verbose_err: NomError| {
+                let msg = match verbose_err.errors.pop() {
+                    Some((input, VerboseErrorKind::Context(CTX_REQUIREMENT))) => {
+                        format!(
+                            "Invalid requirement: must be one of 'MUST' 'SHOULD' 'MAY'. {input}"
+                        )
+                    }
+                    Some((input, VerboseErrorKind::Context(CTX_CATEGORY_POST))) => {
+                        format!("Invalid category: {input}",)
+                    }
+                    Some((input, VerboseErrorKind::Context(CTX_URL))) => {
+                        format!("Invalid url: {input}")
+                    }
+                    Some((input, _)) => format!("Failed to parse input: {input}"),
+                    None => "Failed to parse input".to_owned(),
+                };
+                ParseFeedError::Parse(msg)
+            })
     }
 
     pub(super) fn edit_feed_prompt(feed: &types::Feed) -> String {
@@ -73,15 +97,18 @@ mod feed {
         bytes::complete::{tag_no_case, take_while, take_while_m_n},
         character::complete::{multispace0, multispace1},
         combinator::{map, value},
+        error::context,
         sequence::{delimited, Tuple},
-        Finish, IResult, Parser,
+        AsChar, Finish, IResult, Parser,
     };
     use synd_feed::types::{Category, FeedUrl};
     use url::Url;
 
     use super::NomError;
     use crate::{
-        application::input_parser::comment,
+        application::input_parser::{
+            comment, CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REQUIREMENT, CTX_URL,
+        },
         client::mutation::subscribe_feed::{Requirement, SubscribeFeedInput},
     };
 
@@ -92,13 +119,13 @@ mod feed {
             .map(|(_, input)| input)
     }
 
-    fn feed_input(s: &str) -> IResult<&str, SubscribeFeedInput> {
+    fn feed_input(s: &str) -> IResult<&str, SubscribeFeedInput, NomError> {
         let (remain, (_, requirement, _, category, _, feed_url, _)) = (
             multispace0,
             requirement,
             multispace1,
             category,
-            multispace1,
+            context(CTX_CATEGORY_POST, multispace1),
             url,
             multispace0,
         )
@@ -113,43 +140,55 @@ mod feed {
         ))
     }
 
-    pub fn requirement(s: &str) -> IResult<&str, Requirement> {
-        alt((
-            value(Requirement::MUST, tag_no_case("MUST")),
-            value(Requirement::SHOULD, tag_no_case("SHOULD")),
-            value(Requirement::MAY, tag_no_case("MAY")),
-        ))
+    pub fn requirement(s: &str) -> IResult<&str, Requirement, NomError> {
+        context(
+            CTX_REQUIREMENT,
+            alt((
+                value(Requirement::MUST, tag_no_case("MUST")),
+                value(Requirement::SHOULD, tag_no_case("SHOULD")),
+                value(Requirement::MAY, tag_no_case("MAY")),
+            )),
+        )
         .parse(s)
     }
 
-    fn category(s: &str) -> IResult<&str, Category<'static>> {
-        let (remain, category) = take_while_m_n(1, 20, |c| c != ' ').parse(s)?;
+    fn category(s: &str) -> IResult<&str, Category<'static>, NomError> {
+        let (remain, category) = context(
+            CTX_CATEGORY,
+            take_while_m_n(1, 20, |c: char| c.is_alphanum()),
+        )
+        .parse(s)?;
+
         Ok((
             remain,
             Category::new(category.to_owned()).expect("this is a bug"),
         ))
     }
 
-    fn url(s: &str) -> IResult<&str, FeedUrl> {
-        let (remain, url) = map(take_while(|c: char| !c.is_whitespace()), |s: &str| {
-            s.to_owned()
-        })
+    fn url(s: &str) -> IResult<&str, FeedUrl, NomError> {
+        let (remain, url) = context(
+            CTX_URL,
+            map(take_while(|c: char| !c.is_whitespace()), |s: &str| {
+                s.to_owned()
+            }),
+        )
         .parse(s)?;
         match Url::parse(&url) {
             Ok(url) => Ok((remain, FeedUrl::from(url))),
             Err(err) => {
-                // TODO: represents parse error as type
                 tracing::warn!("Invalid url: {err}");
-                Err(nom::Err::Failure(nom::error::Error::new(
-                    remain,
-                    nom::error::ErrorKind::TakeWhile1,
-                )))
+                let nom_err = nom::error::VerboseError {
+                    errors: vec![(s, nom::error::VerboseErrorKind::Context("url"))],
+                };
+                Err(nom::Err::Failure(nom_err))
             }
         }
     }
 
     #[cfg(test)]
     mod tests {
+        use nom::error::VerboseErrorKind;
+
         use super::*;
 
         #[test]
@@ -185,6 +224,36 @@ mod feed {
                 ))
             );
         }
+
+        #[test]
+        fn parse_feed_input_error() {
+            let tests = vec![
+                (
+                    "foo rust https://example.ymgyt.io/atom.xml",
+                    CTX_REQUIREMENT,
+                ),
+                (
+                    "should https://example.ymgyt.io/atom.xml",
+                    CTX_CATEGORY_POST,
+                ),
+            ];
+
+            for test in tests {
+                let (_, kind) = feed_input(test.0)
+                    .finish()
+                    .unwrap_err()
+                    .errors
+                    .pop()
+                    .unwrap();
+                assert_eq!(kind, VerboseErrorKind::Context(test.1));
+            }
+
+            let err = feed_input("should https://example.ymgyt.io/atom.xml")
+                .finish()
+                .unwrap_err()
+                .errors;
+            println!("{err:?}");
+        }
     }
 }
 
@@ -198,11 +267,13 @@ mod comment {
         IResult, Parser,
     };
 
-    pub(super) fn comments(s: &str) -> IResult<&str, ()> {
+    use crate::application::input_parser::NomError;
+
+    pub(super) fn comments(s: &str) -> IResult<&str, (), NomError> {
         fold_many0(comment, || (), |acc, ()| acc).parse(s)
     }
 
-    pub(super) fn comment(s: &str) -> IResult<&str, ()> {
+    pub(super) fn comment(s: &str) -> IResult<&str, (), NomError> {
         value((), delimited(tag("#"), take_until("\n"), line_ending)).parse(s)
     }
 
