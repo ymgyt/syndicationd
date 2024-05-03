@@ -136,11 +136,11 @@ pub struct DeviceAuthorizationResponse {
     /// Google use verification_"url"
     #[serde(with = "http_serde_ext::uri::option", default)]
     pub verification_url: Option<Uri>,
-    /// a verification uri that includes user_code which is designed for non-textual transmission.
+    /// a verification uri that includes `user_code` which is designed for non-textual transmission.
     #[allow(unused)]
     #[serde(with = "http_serde_ext::uri::option", default)]
     pub verification_uri_complete: Option<Uri>,
-    /// the lifetime in seconds of the device_code and user_code
+    /// the lifetime in seconds of the `device_code` and `user_code`
     #[allow(unused)]
     pub expires_in: i64,
     /// the minimum amount of time in seconds that the client should wait between polling requests to the token endpoint
@@ -161,7 +161,7 @@ impl DeviceAuthorizationResponse {
 pub struct DeviceAccessTokenRequest<'s> {
     /// Value MUST be set to "urn:ietf:params:oauth:grant-type:device_code"
     grant_type: Cow<'static, str>,
-    /// The device verification code, "device_code" from the device authorization response
+    /// The device verification code, `device_code` from the device authorization response
     pub device_code: Cow<'s, str>,
     pub client_id: Cow<'s, str>,
 }
