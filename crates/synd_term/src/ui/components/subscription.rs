@@ -14,7 +14,7 @@ use ratatui::{
 use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
-    application::{Direction, IndexOutOfRange, ListAction},
+    application::{Direction, IndexOutOfRange, Populate},
     client::query::subscription::SubscriptionOutput,
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{
@@ -55,11 +55,11 @@ impl Subscription {
             .map(|&idx| self.feeds.get(idx).unwrap())
     }
 
-    pub fn update_subscription(&mut self, action: ListAction, subscription: SubscriptionOutput) {
+    pub fn update_subscription(&mut self, populate: Populate, subscription: SubscriptionOutput) {
         let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
-        match action {
-            ListAction::Append => self.feeds.extend(feed_metas),
-            ListAction::Replace => self.feeds = feed_metas.collect(),
+        match populate {
+            Populate::Append => self.feeds.extend(feed_metas),
+            Populate::Replace => self.feeds = feed_metas.collect(),
         }
         self.apply_filter();
     }

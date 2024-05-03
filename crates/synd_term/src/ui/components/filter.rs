@@ -15,7 +15,7 @@ use ratatui::{
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
-    application::{Direction, ListAction},
+    application::{Direction, Populate},
     command::Command,
     config::{Categories, Icon},
     keymap::{KeyTrie, Keymap},
@@ -256,7 +256,7 @@ impl Filter {
     pub fn update_categories(
         &mut self,
         config: &Categories,
-        action: ListAction,
+        populate: Populate,
         entries: &[types::Entry],
     ) {
         let new = entries
@@ -265,8 +265,8 @@ impl Filter {
             .collect::<HashSet<_>>();
         let prev = self.categories.drain(..).collect::<HashSet<_>>();
 
-        let mut new_categories = match action {
-            ListAction::Replace => {
+        let mut new_categories = match populate {
+            Populate::Replace => {
                 let should_remove = prev.difference(&new);
                 let should_create = new.difference(&prev);
 
@@ -286,7 +286,7 @@ impl Filter {
 
                 new.into_iter().collect::<Vec<_>>()
             }
-            ListAction::Append => {
+            Populate::Append => {
                 let should_create = new.difference(&prev);
                 for c in should_create {
                     self.categoris_state.insert(

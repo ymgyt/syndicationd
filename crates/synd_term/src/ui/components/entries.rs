@@ -1,5 +1,5 @@
 use crate::{
-    application::{Direction, IndexOutOfRange, ListAction},
+    application::{Direction, IndexOutOfRange, Populate},
     client::payload,
     types::{self, RequirementExt, TimeExt},
     ui::{
@@ -37,10 +37,10 @@ impl Entries {
         }
     }
 
-    pub fn update_entries(&mut self, action: ListAction, payload: payload::FetchEntriesPayload) {
+    pub fn update_entries(&mut self, action: Populate, payload: payload::FetchEntriesPayload) {
         match action {
-            ListAction::Append => self.entries.extend(payload.entries),
-            ListAction::Replace => self.entries = payload.entries,
+            Populate::Append => self.entries.extend(payload.entries),
+            Populate::Replace => self.entries = payload.entries,
         }
         self.apply_filter();
     }

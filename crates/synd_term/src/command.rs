@@ -3,7 +3,7 @@ use synd_auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationRespo
 use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
-    application::{Direction, ListAction, RequestSequence},
+    application::{Direction, Populate, RequestSequence},
     auth::{AuthenticationProvider, Credential},
     client::{
         mutation::subscribe_feed::SubscribeFeedInput, payload,
@@ -64,8 +64,8 @@ pub enum Command {
         after: Option<String>,
         first: i64,
     },
-    UpdateSubscriptionState {
-        action: ListAction,
+    PopulateFetchedSubscription {
+        populate: Populate,
         subscription: SubscriptionOutput,
         request_seq: RequestSequence,
     },
@@ -77,8 +77,8 @@ pub enum Command {
         after: Option<String>,
         first: i64,
     },
-    UpdateEntriesState {
-        action: ListAction,
+    PopulateFetchedEntries {
+        populate: Populate,
         payload: payload::FetchEntriesPayload,
         request_seq: RequestSequence,
     },
@@ -109,8 +109,10 @@ pub enum Command {
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::UpdateSubscriptionState { .. } => f.write_str("UpdateSubscription"),
-            Command::UpdateEntriesState { .. } => f.write_str("UpdateEntries"),
+            Command::PopulateFetchedSubscription { .. } => {
+                f.write_str("PopulateFetchedSubscription")
+            }
+            Command::PopulateFetchedEntries { .. } => f.write_str("PopulateFetchedEntries"),
             Command::CompleteDevieAuthorizationFlow { .. } => {
                 f.write_str("CompleteDeviceAuthorizationFlow")
             }

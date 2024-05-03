@@ -64,7 +64,7 @@ pub enum EventLoopControlFlow {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ListAction {
+pub enum Populate {
     Append,
     Replace,
 }
@@ -388,22 +388,29 @@ impl Application {
                     self.should_render = true;
                 }
                 Command::FetchSubscription { after, first } => {
-                    self.fetch_subscription(ListAction::Append, after, first);
+                    self.fetch_subscription(Populate::Append, after, first);
                 }
-                Command::UpdateSubscriptionState {
-                    action,
+                Command::PopulateFetchedSubscription {
+                    populate,
                     subscription,
                     request_seq,
                 } => {
                     self.in_flight.remove(request_seq);
+                    // paginate
+                    if subscription.feeds.page_info.has_next_page {
+                        next = Some(Command::FetchSubscription {
+                            after: subscription.feeds.page_info.end_cursor.clone(),
+                            first: config::client::INITIAL_FEEDS_TO_FETCH,
+                        });
+                    }
                     self.components
                         .subscription
-                        .update_subscription(action, subscription);
+                        .update_subscription(populate, subscription);
                     self.should_render = true;
                 }
                 Command::ReloadSubscription => {
                     self.fetch_subscription(
-                        ListAction::Replace,
+                        Populate::Replace,
                         None,
                         config::client::INITIAL_FEEDS_TO_FETCH,
                     );
@@ -413,7 +420,7 @@ impl Application {
                     self.in_flight.remove(request_seq);
                     self.components.subscription.upsert_subscribed_feed(feed);
                     self.fetch_entries(
-                        ListAction::Replace,
+                        Populate::Replace,
                         None,
                         config::client::INITIAL_ENTRIES_TO_FETCH,
                     );
@@ -425,7 +432,7 @@ impl Application {
                     self.components.entries.remove_unsubscribed_entries(&url);
                     self.components.filter.update_categories(
                         &self.categories,
-                        ListAction::Replace,
+                        Populate::Replace,
                         self.components.entries.entries(),
                     );
                     self.should_render = true;
@@ -434,25 +441,32 @@ impl Application {
                     self.open_feed();
                 }
                 Command::FetchEntries { after, first } => {
-                    self.fetch_entries(ListAction::Append, after, first);
+                    self.fetch_entries(Populate::Append, after, first);
                 }
-                Command::UpdateEntriesState {
-                    action,
+                Command::PopulateFetchedEntries {
+                    populate,
                     payload,
                     request_seq,
                 } => {
                     self.in_flight.remove(request_seq);
                     self.components.filter.update_categories(
                         &self.categories,
-                        action,
+                        populate,
                         payload.entries.as_slice(),
                     );
-                    self.components.entries.update_entries(action, payload);
+                    // paginate
+                    if payload.page_info.has_next_page {
+                        next = Some(Command::FetchEntries {
+                            after: payload.page_info.end_cursor.clone(),
+                            first: config::client::INITIAL_ENTRIES_TO_FETCH,
+                        });
+                    }
+                    self.components.entries.update_entries(populate, payload);
                     self.should_render = true;
                 }
                 Command::ReloadEntries => {
                     self.fetch_entries(
-                        ListAction::Replace,
+                        Populate::Replace,
                         None,
                         config::client::INITIAL_ENTRIES_TO_FETCH,
                     );
@@ -573,13 +587,13 @@ impl Application {
 }
 
 impl Application {
-    fn fetch_subscription(&mut self, action: ListAction, after: Option<String>, first: i64) {
+    fn fetch_subscription(&mut self, populate: Populate, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {
             match client.fetch_subscription(after, Some(first)).await {
-                Ok(subscription) => Ok(Command::UpdateSubscriptionState {
-                    action,
+                Ok(subscription) => Ok(Command::PopulateFetchedSubscription {
+                    populate,
                     subscription,
                     request_seq,
                 }),
@@ -732,13 +746,13 @@ impl Application {
 
 impl Application {
     #[tracing::instrument(skip(self))]
-    fn fetch_entries(&mut self, action: ListAction, after: Option<String>, first: i64) {
+    fn fetch_entries(&mut self, populate: Populate, after: Option<String>, first: i64) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
         let fut = async move {
             match client.fetch_entries(after, first).await {
-                Ok(payload) => Ok(Command::UpdateEntriesState {
-                    action,
+                Ok(payload) => Ok(Command::PopulateFetchedEntries {
+                    populate,
                     payload,
                     request_seq,
                 }),
