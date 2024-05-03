@@ -1,6 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::{
+    cmp::Ordering,
+    fmt,
+    ops::Sub,
+    path::{Path, PathBuf},
+};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use synd_auth::jwt::google::JwtError;
@@ -41,13 +46,21 @@ pub enum Credential {
     Google {
         id_token: String,
         refresh_token: String,
+        expired_at: DateTime<Utc>,
     },
+}
+
+impl fmt::Debug for Credential {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Credential").finish_non_exhaustive()
+    }
 }
 
 impl Credential {
     async fn restore_from_path(
         path: &Path,
         jwt_service: &JwtService,
+        now: DateTime<Utc>,
     ) -> Result<Self, CredentialError> {
         debug!(
             path = path.display().to_string(),
@@ -61,6 +74,7 @@ impl Credential {
             Credential::Google {
                 id_token,
                 refresh_token,
+                ..
             } => {
                 let claims = jwt_service
                     .google
@@ -69,27 +83,26 @@ impl Credential {
                 if !claims.email_verified {
                     return Err(CredentialError::GoogleJwtEmailNotVerified);
                 }
-                if !claims.is_expired(Utc::now()) {
-                    return Ok(credential);
-                }
+                let credential = match claims
+                    .expired_at()
+                    .sub(config::credential::EXPIRE_MARGIN)
+                    .cmp(&now)
+                {
+                    // expired
+                    Ordering::Less | Ordering::Equal => {
+                        debug!("Google jwt expired, trying to refresh");
 
-                debug!("Google jwt expired, trying to refresh");
+                        let credential = jwt_service.refresh_google_id_token(refresh_token).await?;
 
-                let id_token = jwt_service
-                    .google
-                    .refresh_id_token(refresh_token)
-                    .await
-                    .map_err(CredentialError::RefreshJwt)?;
+                        persist_credential(&credential)
+                            .map_err(CredentialError::PersistCredential)?;
 
-                let credential = Credential::Google {
-                    id_token,
-                    refresh_token: refresh_token.clone(),
+                        debug!("Persist refreshed credential");
+                        credential
+                    }
+                    // not expired
+                    Ordering::Greater => credential,
                 };
-
-                persist_credential(&credential).map_err(CredentialError::PersistCredential)?;
-
-                debug!("Persist refreshed credential");
-
                 Ok(credential)
             }
         }
@@ -114,8 +127,11 @@ fn cred_file() -> PathBuf {
     config::cache_dir().join("credential.json")
 }
 
-pub async fn credential_from_cache(jwt_service: &JwtService) -> Option<Credential> {
-    Credential::restore_from_path(cred_file().as_path(), jwt_service)
+pub async fn credential_from_cache(
+    jwt_service: &JwtService,
+    now: DateTime<Utc>,
+) -> Option<Credential> {
+    Credential::restore_from_path(cred_file().as_path(), jwt_service, now)
         .inspect_err(|err| {
             tracing::error!("Restore credential from cache: {err}");
         })

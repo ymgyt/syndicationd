@@ -6,7 +6,12 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use url::Url;
 
-use crate::{application::JwtService, auth, client::Client, types::ExportedFeed};
+use crate::{
+    application::{Clock, JwtService, SystemClock},
+    auth,
+    client::Client,
+    types::ExportedFeed,
+};
 
 #[derive(Serialize, JsonSchema)]
 struct Export {
@@ -51,7 +56,7 @@ impl ExportCommand {
         let mut client = Client::new(endpoint, Duration::from_secs(10))?;
         let jwt_service = JwtService::new();
 
-        let credentials = auth::credential_from_cache(&jwt_service)
+        let credentials = auth::credential_from_cache(&jwt_service, SystemClock.now())
             .await
             .ok_or_else(|| anyhow!("You are not authenticated, try login in first"))?;
         client.set_credential(credentials);

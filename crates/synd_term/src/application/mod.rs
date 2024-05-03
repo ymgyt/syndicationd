@@ -1,5 +1,11 @@
-use std::{future, pin::Pin, time::Duration};
+use std::{
+    future,
+    ops::{Add, Sub},
+    pin::Pin,
+    time::Duration,
+};
 
+use chrono::{DateTime, Utc};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
 use ratatui::{style::palette::tailwind, widgets::Widget};
@@ -11,7 +17,7 @@ use tokio::time::{Instant, Sleep};
 
 use crate::{
     application::event::KeyEventResult,
-    auth::{AuthenticationProvider, Credential},
+    auth::{self, AuthenticationProvider, Credential},
     client::{mutation::subscribe_feed::SubscribeFeedInput, Client},
     command::Command,
     config::{self, Categories},
@@ -41,6 +47,9 @@ use input_parser::InputParser;
 
 mod authenticator;
 pub use authenticator::{Authenticator, DeviceFlows, JwtService};
+
+mod clock;
+pub use clock::{Clock, SystemClock};
 
 pub(crate) mod event;
 
@@ -75,6 +84,7 @@ impl Default for Config {
 }
 
 pub struct Application {
+    clock: Box<dyn Clock>,
     terminal: Terminal,
     client: Client,
     jobs: Jobs,
@@ -112,6 +122,7 @@ impl Application {
         key_handlers.push(event::KeyHandler::Keymaps(keymaps));
 
         Self {
+            clock: Box::new(SystemClock),
             terminal,
             client,
             jobs: Jobs::new(),
@@ -143,25 +154,42 @@ impl Application {
         }
     }
 
-    pub fn jwt_service(&self) -> &JwtService {
+    fn now(&self) -> DateTime<Utc> {
+        self.clock.now()
+    }
+
+    fn jwt_service(&self) -> &JwtService {
         &self.authenticator.jwt_service
+    }
+
+    pub fn jobs_mut(&mut self) -> &mut Jobs {
+        &mut self.jobs
     }
 
     fn keymaps(&mut self) -> &mut Keymaps {
         self.key_handlers.keymaps_mut().unwrap()
     }
 
-    pub fn set_credential(&mut self, cred: Credential) {
-        self.client.set_credential(cred);
+    pub async fn restore_credential(&self) -> Option<Credential> {
+        auth::credential_from_cache(self.jwt_service(), self.now()).await
+    }
+
+    pub fn handle_initial_credential(&mut self, cred: Credential) {
+        self.set_credential(cred);
+        self.initial_fetch();
         self.components.auth.authenticated();
         self.keymaps().disable(KeymapId::Login);
         self.keymaps().enable(KeymapId::Tabs);
         self.keymaps().enable(KeymapId::Entries);
         self.keymaps().enable(KeymapId::Filter);
-        self.initial_fetch();
         self.screen = Screen::Browse;
-        self.should_render = true;
         self.reset_idle_timer();
+        self.should_render = true;
+    }
+
+    fn set_credential(&mut self, cred: Credential) {
+        self.schedule_credential_refreshing(&cred);
+        self.client.set_credential(cred);
     }
 
     fn initial_fetch(&mut self) {
@@ -308,6 +336,9 @@ impl Application {
                     device_access_token,
                 } => {
                     self.complete_device_authroize_flow(provider, device_access_token);
+                }
+                Command::RefreshCredential { credential } => {
+                    self.set_credential(credential);
                 }
                 Command::MoveTabSelection(direction) => {
                     self.keymaps().toggle(KeymapId::Entries);
@@ -794,12 +825,25 @@ impl Application {
             AuthenticationProvider::Github => Credential::Github {
                 access_token: device_access_token.access_token,
             },
-            AuthenticationProvider::Google => Credential::Google {
-                id_token: device_access_token.id_token.expect("id token not found"),
-                refresh_token: device_access_token
-                    .refresh_token
-                    .expect("refresh token not found"),
-            },
+            AuthenticationProvider::Google => {
+                let id_token = device_access_token.id_token.expect("id token not found");
+                let expired_at = self
+                    .jwt_service()
+                    .google
+                    .decode_id_token_insecure(&id_token, false)
+                    .ok()
+                    .map_or(
+                        self.now().add(config::credential::FALLBACK_EXPIRE),
+                        |claims| claims.expired_at(),
+                    );
+                Credential::Google {
+                    id_token,
+                    refresh_token: device_access_token
+                        .refresh_token
+                        .expect("refresh token not found"),
+                    expired_at,
+                }
+            }
         };
 
         // should test with tmp file?
@@ -810,7 +854,40 @@ impl Application {
             }
         }
 
-        self.set_credential(auth);
+        self.handle_initial_credential(auth);
+    }
+
+    fn schedule_credential_refreshing(&mut self, cred: &Credential) {
+        match cred {
+            Credential::Github { .. } => {}
+            Credential::Google {
+                refresh_token,
+                expired_at,
+                ..
+            } => {
+                let until_expire = expired_at
+                    .sub(config::credential::EXPIRE_MARGIN)
+                    .sub(self.now())
+                    .to_std()
+                    .unwrap_or(config::credential::FALLBACK_EXPIRE);
+                let jwt_service = self.jwt_service().clone();
+                let refresh_token = refresh_token.clone();
+                let fut = async move {
+                    tokio::time::sleep(until_expire).await;
+
+                    tracing::debug!("Refresh google credential");
+                    match jwt_service.refresh_google_id_token(&refresh_token).await {
+                        Ok(credential) => Ok(Command::RefreshCredential { credential }),
+                        Err(err) => Ok(Command::HandleError {
+                            message: err.to_string(),
+                            request_seq: None,
+                        }),
+                    }
+                }
+                .boxed();
+                self.jobs.futures.push(fut);
+            }
+        }
     }
 }
 

@@ -2,9 +2,9 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Context as _;
 use crossterm::event::EventStream;
+use futures_util::TryFutureExt;
 use synd_term::{
     application::Application,
-    auth,
     cli::{self, Args, Palette},
     client::Client,
     config::{self, Categories},
@@ -75,9 +75,9 @@ async fn init_app(
     let mut app = Application::new(terminal, client, categories)
         .with_theme(Theme::with_palette(&palette.into()));
 
-    if let Some(auth) = auth::credential_from_cache(app.jwt_service()).await {
+    if let Some(cred) = app.restore_credential().await {
         info!("Use authentication cache");
-        app.set_credential(auth);
+        app.handle_initial_credential(cred);
     }
     Ok(app)
 }
@@ -106,18 +106,16 @@ async fn main() {
         std::process::exit(exit_code);
     };
 
-    let app = match init_app(endpoint, timeout, palette, categories).await {
-        Ok(app) => app,
-        Err(err) => {
-            error!("{err:?}");
-            std::process::exit(1);
-        }
-    };
+    let mut event_stream = EventStream::new();
 
-    info!("Running...");
-
-    if let Err(err) = app.run(&mut EventStream::new()).await {
-        error!("{err}");
+    if let Err(err) = init_app(endpoint, timeout, palette, categories)
+        .and_then(|app| {
+            tracing::info!("Running...");
+            app.run(&mut event_stream)
+        })
+        .await
+    {
+        error!("{err:?}");
         std::process::exit(1);
     }
 }

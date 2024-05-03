@@ -36,6 +36,13 @@ pub mod client {
     pub const INITIAL_FEEDS_TO_FETCH: i64 = 50;
 }
 
+pub mod credential {
+    use std::time::Duration;
+    /// The `Duration` considered as expired before actually performing the refresh process
+    pub const EXPIRE_MARGIN: Duration = Duration::from_secs(60);
+    pub const FALLBACK_EXPIRE: Duration = Duration::from_secs(60 * 15);
+}
+
 pub fn cache_dir() -> &'static Path {
     project_dirs().cache_dir()
 }

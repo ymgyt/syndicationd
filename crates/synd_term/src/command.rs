@@ -4,7 +4,7 @@ use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
     application::{Direction, ListAction, RequestSequence},
-    auth::AuthenticationProvider,
+    auth::{AuthenticationProvider, Credential},
     client::{
         mutation::subscribe_feed::SubscribeFeedInput, payload,
         query::subscription::SubscriptionOutput,
@@ -23,7 +23,6 @@ pub enum Command {
     Idle,
 
     Authenticate,
-    // Authenticate(AuthenticationProvider),
     MoveAuthenticationProvider(Direction),
 
     DeviceAuthorizationFlow {
@@ -33,6 +32,9 @@ pub enum Command {
     CompleteDevieAuthorizationFlow {
         provider: AuthenticationProvider,
         device_access_token: DeviceAccessTokenResponse,
+    },
+    RefreshCredential {
+        credential: Credential,
     },
 
     MoveTabSelection(Direction),
