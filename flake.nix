@@ -29,7 +29,7 @@
         pkgs = import nixpkgs { inherit system overlays; };
         rustToolchain = fenix.packages.${system}.fromToolchainFile {
           file = ./rust-toolchain.toml;
-          sha256 = "sha256-+syqAd2kX8KVa8/U2gz3blIQTTsYYt3U63xBWaGOSc8=";
+          sha256 = "sha256-opUgs6ckUQCyDxcB9Wy51pqhd0MPGHUVbwRKKPGiwZU=";
         };
 
         craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
