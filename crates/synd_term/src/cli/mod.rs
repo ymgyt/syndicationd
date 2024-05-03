@@ -67,7 +67,7 @@ impl From<Palette> for tailwind::Palette {
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, name = "synd")]
 pub struct Args {
-    /// synd_api endpoint
+    /// `synd_api` endpoint
     #[arg(long, global = true, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
     pub endpoint: Url,
     /// Log file path
