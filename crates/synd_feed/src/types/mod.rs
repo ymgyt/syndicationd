@@ -265,8 +265,10 @@ mod link {
                 })
                 .map(|link| link.href.as_str()),
 
-            // TODO
-            FeedType::RSS0 => todo!(),
+            FeedType::RSS0 => {
+                tracing::warn!("RSS0 is used! {:?}", links.collect::<Vec<_>>());
+                None
+            }
 
             // Use the first link whose rel is not "self"
             FeedType::RSS1 | FeedType::RSS2 => links
