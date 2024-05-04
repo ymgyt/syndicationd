@@ -72,6 +72,7 @@ pub enum Populate {
 pub struct Config {
     pub idle_timer_interval: Duration,
     pub throbber_timer_interval: Duration,
+    pub entries_limit: usize,
 }
 
 impl Default for Config {
@@ -79,6 +80,7 @@ impl Default for Config {
         Self {
             idle_timer_interval: Duration::from_secs(250),
             throbber_timer_interval: Duration::from_millis(250),
+            entries_limit: config::feed::DEFAULT_ENTRIES_LIMIT,
         }
     }
 }
@@ -455,12 +457,21 @@ impl Application {
                         payload.entries.as_slice(),
                     );
                     // paginate
-                    if payload.page_info.has_next_page {
-                        next = Some(Command::FetchEntries {
+                    next = payload
+                        .page_info
+                        .has_next_page
+                        .then(|| Command::FetchEntries {
                             after: payload.page_info.end_cursor.clone(),
-                            first: config::client::INITIAL_ENTRIES_TO_FETCH,
+                            first: self
+                                .config
+                                .entries_limit
+                                .saturating_sub(
+                                    self.components.entries.count() + payload.entries.len(),
+                                )
+                                .min(payload.entries.len())
+                                .try_into()
+                                .unwrap_or(0),
                         });
-                    }
                     self.components.entries.update_entries(populate, payload);
                     self.should_render = true;
                 }
@@ -747,6 +758,9 @@ impl Application {
 impl Application {
     #[tracing::instrument(skip(self))]
     fn fetch_entries(&mut self, populate: Populate, after: Option<String>, first: i64) {
+        if first <= 0 {
+            return;
+        }
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
         let fut = async move {

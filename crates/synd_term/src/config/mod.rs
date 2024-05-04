@@ -22,7 +22,7 @@ pub mod env {
     pub const LOG_DIRECTIVE: &str = env_key!("LOG");
 
     pub const ENDPOINT: &str = env_key!("ENDPOINT");
-    pub const LOG_PATH: &str = env_key!("LOG");
+    pub const LOG_PATH: &str = env_key!("LOG_PATH");
     pub const THEME: &str = env_key!("THEME");
 }
 
@@ -41,6 +41,11 @@ pub mod credential {
     /// The `Duration` considered as expired before actually performing the refresh process
     pub const EXPIRE_MARGIN: Duration = Duration::from_secs(60);
     pub const FALLBACK_EXPIRE: Duration = Duration::from_secs(60 * 15);
+}
+
+pub mod feed {
+    /// Default entries limit to fetch
+    pub const DEFAULT_ENTRIES_LIMIT: usize = 200;
 }
 
 pub fn cache_dir() -> &'static Path {

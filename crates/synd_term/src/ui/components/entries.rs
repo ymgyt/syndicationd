@@ -37,6 +37,11 @@ impl Entries {
         }
     }
 
+    /// Return entries count
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+
     pub fn update_entries(&mut self, action: Populate, payload: payload::FetchEntriesPayload) {
         match action {
             Populate::Append => self.entries.extend(payload.entries),

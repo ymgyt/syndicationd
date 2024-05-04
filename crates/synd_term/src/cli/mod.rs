@@ -67,23 +67,40 @@ impl From<Palette> for tailwind::Palette {
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, name = "synd")]
 pub struct Args {
-    /// `synd_api` endpoint
-    #[arg(long, global = true, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
-    pub endpoint: Url,
     /// Log file path
     #[arg(long, default_value = config::log_path().into_os_string(), env = config::env::LOG_PATH)]
     pub log: PathBuf,
     /// Color palette
     #[arg(value_enum, long = "theme", default_value_t = Palette::Slate, env = config::env::THEME)]
     pub palette: Palette,
+    #[command(subcommand)]
+    pub command: Option<Command>,
+    #[command(flatten)]
+    pub api: ApiOptions,
+    #[command(flatten)]
+    pub feed: FeedOptions,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Api options")]
+pub struct ApiOptions {
+    /// `synd_api` endpoint
+    #[arg(long, global = true, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
+    pub endpoint: Url,
     /// Client timeout
     #[arg(long, value_parser = parse_duration::parse, default_value = config::client::DEFAULT_TIMEOUT)]
-    pub timeout: Duration,
+    pub client_timeout: Duration,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Feed options")]
+pub struct FeedOptions {
     /// categories.toml path
     #[arg(long,aliases = ["category"],value_name = "CATEGORIES TOML PATH")]
     pub categories: Option<PathBuf>,
-    #[command(subcommand)]
-    pub command: Option<Command>,
+    /// Feed entries limit to fetch
+    #[arg(long, aliases = ["max-entries"], default_value_t = config::feed::DEFAULT_ENTRIES_LIMIT)]
+    pub entries_limit: usize,
 }
 
 #[derive(Subcommand, Debug)]

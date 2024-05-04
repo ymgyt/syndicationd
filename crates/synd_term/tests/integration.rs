@@ -60,6 +60,7 @@ mod test {
         let config = Config {
             idle_timer_interval: Duration::from_millis(1000),
             throbber_timer_interval: Duration::from_secs(3600), // disable throbber
+            ..Default::default()
         };
         // or mpsc and tokio_stream ReceiverStream
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();

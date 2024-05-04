@@ -4,8 +4,8 @@ use anyhow::Context as _;
 use crossterm::event::EventStream;
 use futures_util::TryFutureExt;
 use synd_term::{
-    application::Application,
-    cli::{self, Args, Palette},
+    application::{Application, Config},
+    cli::{self, ApiOptions, Args, FeedOptions, Palette},
     client::Client,
     config::{self, Categories},
     terminal::Terminal,
@@ -64,7 +64,10 @@ async fn init_app(
     endpoint: Url,
     timeout: Duration,
     palette: Palette,
-    categories: Option<PathBuf>,
+    FeedOptions {
+        categories,
+        entries_limit,
+    }: FeedOptions,
 ) -> anyhow::Result<Application> {
     let terminal = Terminal::new().context("Failed to construct terminal")?;
     let client = Client::new(endpoint, timeout).context("Failed to construct client")?;
@@ -72,7 +75,11 @@ async fn init_app(
         .map(Categories::load)
         .transpose()?
         .unwrap_or_else(Categories::default_toml);
-    let mut app = Application::new(terminal, client, categories)
+    let config = Config {
+        entries_limit,
+        ..Default::default()
+    };
+    let mut app = Application::with(terminal, client, categories, config)
         .with_theme(Theme::with_palette(&palette.into()));
 
     if let Some(cred) = app.restore_credential().await {
@@ -85,12 +92,14 @@ async fn init_app(
 #[tokio::main]
 async fn main() {
     let Args {
-        endpoint,
+        api: ApiOptions {
+            endpoint,
+            client_timeout,
+        },
+        feed,
         log,
         command,
         palette,
-        categories,
-        timeout,
     } = cli::parse();
 
     let log = if command.is_some() { None } else { Some(log) };
@@ -108,7 +117,7 @@ async fn main() {
 
     let mut event_stream = EventStream::new();
 
-    if let Err(err) = init_app(endpoint, timeout, palette, categories)
+    if let Err(err) = init_app(endpoint, client_timeout, palette, feed)
         .and_then(|app| {
             tracing::info!("Running...");
             app.run(&mut event_stream)
