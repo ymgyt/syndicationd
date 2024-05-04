@@ -51,6 +51,9 @@ pub use authenticator::{Authenticator, DeviceFlows, JwtService};
 mod clock;
 pub use clock::{Clock, SystemClock};
 
+mod flags;
+use flags::Should;
+
 pub(crate) mod event;
 
 enum Screen {
@@ -101,8 +104,7 @@ pub struct Application {
     categories: Categories,
 
     screen: Screen,
-    should_render: bool,
-    should_quit: bool,
+    flags: Should,
 }
 
 impl Application {
@@ -138,8 +140,7 @@ impl Application {
             config,
             key_handlers,
             categories,
-            should_quit: false,
-            should_render: false,
+            flags: Should::empty(),
         }
     }
 
@@ -186,7 +187,7 @@ impl Application {
         self.keymaps().enable(KeymapId::Filter);
         self.screen = Screen::Browse;
         self.reset_idle_timer();
-        self.should_render = true;
+        self.should_render();
     }
 
     fn set_credential(&mut self, cred: Credential) {
@@ -258,14 +259,14 @@ impl Application {
                 self.apply(command);
             }
 
-            if self.should_render {
+            if self.flags.contains(Should::Render) {
                 self.render();
-                self.should_render = false;
+                self.flags.remove(Should::Render);
                 self.components.prompt.clear_error_message();
             }
 
-            if self.should_quit {
-                self.should_quit = false; // for testing
+            if self.flags.contains(Should::Quit) {
+                self.flags.remove(Should::Quit); // for testing
                 break EventLoopControlFlow::Quit;
             }
         }
@@ -278,14 +279,14 @@ impl Application {
         // should detect infinite loop ?
         while let Some(command) = next.take() {
             match command {
-                Command::Quit => self.should_quit = true,
+                Command::Quit => self.flags.insert(Should::Quit),
                 Command::ResizeTerminal { .. } => {
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::RenderThrobber => {
                     self.in_flight.reset_throbber_timer();
                     self.in_flight.inc_throbber_step();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::Idle => {
                     self.handle_idle();
@@ -312,7 +313,7 @@ impl Application {
                 }
                 Command::MoveAuthenticationProvider(direction) => {
                     self.components.auth.move_selection(&direction);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::DeviceAuthorizationFlow {
                     provider,
@@ -355,39 +356,39 @@ impl Application {
                         }
                         _ => {}
                     }
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::MoveSubscribedFeed(direction) => {
                     self.components.subscription.move_selection(&direction);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::MoveSubscribedFeedFirst => {
                     self.components.subscription.move_first();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::MoveSubscribedFeedLast => {
                     self.components.subscription.move_last();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::PromptFeedSubscription => {
                     self.prompt_feed_subscription();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::PromptFeedEdition => {
                     self.prompt_feed_edition();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::PromptFeedUnsubscription => {
                     self.prompt_feed_unsubscription();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::SubscribeFeed { input } => {
                     self.subscribe_feed(input);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::UnsubscribeFeed { url } => {
                     self.unsubscribe_feed(url);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::FetchSubscription { after, first } => {
                     self.fetch_subscription(Populate::Append, after, first);
@@ -408,7 +409,7 @@ impl Application {
                     self.components
                         .subscription
                         .update_subscription(populate, subscription);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::ReloadSubscription => {
                     self.fetch_subscription(
@@ -416,7 +417,7 @@ impl Application {
                         None,
                         config::client::INITIAL_FEEDS_TO_FETCH,
                     );
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
                     self.in_flight.remove(request_seq);
@@ -426,7 +427,7 @@ impl Application {
                         None,
                         config::client::INITIAL_ENTRIES_TO_FETCH,
                     );
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::CompleteUnsubscribeFeed { url, request_seq } => {
                     self.in_flight.remove(request_seq);
@@ -437,7 +438,7 @@ impl Application {
                         Populate::Replace,
                         self.components.entries.entries(),
                     );
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::OpenFeed => {
                     self.open_feed();
@@ -473,7 +474,7 @@ impl Application {
                                 .unwrap_or(0),
                         });
                     self.components.entries.update_entries(populate, payload);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::ReloadEntries => {
                     self.fetch_entries(
@@ -481,19 +482,19 @@ impl Application {
                         None,
                         config::client::INITIAL_ENTRIES_TO_FETCH,
                     );
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::MoveEntry(direction) => {
                     self.components.entries.move_selection(&direction);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::MoveEntryFirst => {
                     self.components.entries.move_first();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::MoveEntryLast => {
                     self.components.entries.move_last();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::OpenEntry => {
                     self.open_entry();
@@ -501,45 +502,45 @@ impl Application {
                 Command::MoveFilterRequirement(direction) => {
                     let filter = self.components.filter.move_requirement(direction);
                     self.apply_feed_filter(filter);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::ActivateCategoryFilterling => {
                     let keymap = self.components.filter.activate_category_filtering();
                     self.keymaps().update(KeymapId::CategoryFiltering, keymap);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::ActivateSearchFiltering => {
                     let prompt = self.components.filter.activate_search_filtering();
                     self.key_handlers.push(event::KeyHandler::Prompt(prompt));
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::PromptChanged => {
                     if self.components.filter.is_search_active() {
                         let filter = self.components.filter.feed_filter();
                         self.apply_feed_filter(filter);
-                        self.should_render = true;
+                        self.should_render();
                     }
                 }
                 Command::DeactivateFiltering => {
                     self.components.filter.deactivate_filtering();
                     self.keymaps().disable(KeymapId::CategoryFiltering);
                     self.key_handlers.remove_prompt();
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::ToggleFilterCategory { category } => {
                     let filter = self.components.filter.toggle_category_state(&category);
                     self.apply_feed_filter(filter);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::ActivateAllFilterCategories => {
                     let filter = self.components.filter.activate_all_categories_state();
                     self.apply_feed_filter(filter);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::DeactivateAllFilterCategories => {
                     let filter = self.components.filter.deactivate_all_categories_state();
                     self.apply_feed_filter(filter);
-                    self.should_render = true;
+                    self.should_render();
                 }
                 Command::HandleError {
                     message,
@@ -551,10 +552,15 @@ impl Application {
                         self.in_flight.remove(request_seq);
                     }
                     self.components.prompt.set_error_message(message);
-                    self.should_render = true;
+                    self.should_render();
                 }
             }
         }
+    }
+
+    #[inline]
+    fn should_render(&mut self) {
+        self.flags.insert(Should::Render);
     }
 
     fn render(&mut self) {
@@ -586,7 +592,7 @@ impl Application {
 
                 match self.key_handlers.handle(key) {
                     KeyEventResult::Consumed(cmd) => {
-                        self.should_render = true;
+                        self.should_render();
                         cmd
                     }
                     KeyEventResult::Ignored => None,
@@ -819,7 +825,7 @@ impl Application {
         self.components
             .auth
             .set_device_authorization_response(device_authorization.clone());
-        self.should_render = true;
+        self.should_render();
         // try to open input screen in the browser
         self.interactor
             .open_browser(device_authorization.verification_uri().to_string());
@@ -936,8 +942,8 @@ impl Application {
         #[cfg(feature = "integration")]
         {
             tracing::debug!("Quit for idle");
-            self.should_render = true;
-            self.should_quit = true;
+            self.should_render();
+            self.flags.insert(Should::Quit);
         }
     }
 
