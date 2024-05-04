@@ -22,7 +22,6 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[file_serial(a)]
     async fn hello_world() -> anyhow::Result<()> {
-        // TODO: wrap once
         tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .with_line_number(true)
