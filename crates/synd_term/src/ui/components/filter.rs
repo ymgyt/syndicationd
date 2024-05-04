@@ -263,7 +263,7 @@ impl Filter {
             .iter()
             .map(|entry| entry.category().clone())
             .collect::<HashSet<_>>();
-        let prev = self.categories.drain(..).collect::<HashSet<_>>();
+        let mut prev = self.categories.drain(..).collect::<HashSet<_>>();
 
         let mut new_categories = match populate {
             Populate::Replace => {
@@ -299,9 +299,8 @@ impl Filter {
                     );
                 }
 
-                let mut new_categories = prev.into_iter().collect::<Vec<_>>();
-                new_categories.extend(new);
-                new_categories
+                prev.extend(new);
+                prev.into_iter().collect::<Vec<_>>()
             }
         };
 
