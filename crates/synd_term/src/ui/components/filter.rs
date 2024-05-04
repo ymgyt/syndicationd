@@ -395,10 +395,13 @@ impl Filter {
         }
         spans.push(label);
 
-        Line::from(spans).render(area, buf);
+        let search = Line::from(spans);
+        let margin = search.width() + 1;
+        search.render(area, buf);
 
         let prompt_area = Rect {
-            x: area.x + 22, // TODO: handle edge case
+            #[allow(clippy::cast_possible_truncation)]
+            x: area.x + margin as u16,
             ..area
         };
         let render_cursor = if self.state == State::SearchFiltering {

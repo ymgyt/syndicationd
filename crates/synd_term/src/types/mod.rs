@@ -191,9 +191,11 @@ pub struct Entry {
 
 impl Entry {
     pub fn summary_text(&self, width: usize) -> Option<String> {
-        self.summary
-            .as_deref()
-            .map(|summary| html2text::from_read(summary.as_bytes(), width))
+        self.summary.as_deref().map(|summary| {
+            html2text::config::plain()
+                .string_from_read(summary.as_bytes(), width)
+                .unwrap_or_default()
+        })
     }
 
     pub fn requirement(&self) -> Requirement {
