@@ -22,7 +22,7 @@ fragment Feed on Feed {
   generator
   requirement
   category
-  entries(first: 20) {
+  entries(first: 10) {
     nodes {
       ...EntryMeta
     }
