@@ -399,12 +399,12 @@ impl Application {
                 } => {
                     self.in_flight.remove(request_seq);
                     // paginate
-                    if subscription.feeds.page_info.has_next_page {
-                        next = Some(Command::FetchSubscription {
+                    next = subscription.feeds.page_info.has_next_page.then(|| {
+                        Command::FetchSubscription {
                             after: subscription.feeds.page_info.end_cursor.clone(),
-                            first: config::client::INITIAL_FEEDS_TO_FETCH,
-                        });
-                    }
+                            first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
+                        }
+                    });
                     self.components
                         .subscription
                         .update_subscription(populate, subscription);
@@ -599,6 +599,9 @@ impl Application {
 
 impl Application {
     fn fetch_subscription(&mut self, populate: Populate, after: Option<String>, first: i64) {
+        if first <= 0 {
+            return;
+        }
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{
     application::{Direction, IndexOutOfRange, Populate},
     client::payload,
@@ -164,9 +166,19 @@ impl Entries {
         impl IntoIterator<Item = Constraint>,
         impl IntoIterator<Item = Row<'a>>,
     ) {
+        let (n, m) = {
+            if self.effective_entries.is_empty() {
+                (Cow::Borrowed("-"), Cow::Borrowed("-"))
+            } else {
+                (
+                    Cow::Owned((self.selected_entry_index + 1).to_string()),
+                    Cow::Owned(self.effective_entries.len().to_string()),
+                )
+            }
+        };
         let header = Row::new([
             Cell::from(" Published"),
-            Cell::from("󰯂 Entry"),
+            Cell::from(format!("󰯂 Entry {n}/{m}")),
             Cell::from("󰑫 Feed"),
             Cell::from(concat!(icon!(requirement), " Req")),
         ]);

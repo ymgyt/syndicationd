@@ -178,8 +178,18 @@ impl Subscription {
         impl IntoIterator<Item = Constraint>,
         impl IntoIterator<Item = Row<'a>>,
     ) {
+        let (n, m) = {
+            if self.effective_feeds.is_empty() {
+                (Cow::Borrowed("-"), Cow::Borrowed("-"))
+            } else {
+                (
+                    Cow::Owned((self.selected_feed_index + 1).to_string()),
+                    Cow::Owned(self.effective_feeds.len().to_string()),
+                )
+            }
+        };
         let header = Row::new([
-            Cell::from("󰑫 Feed"),
+            Cell::from(format!("󰑫 Feed {n}/{m}")),
             Cell::from(" Updated"),
             Cell::from(" URL"),
             Cell::from("󰎞 Description"),
