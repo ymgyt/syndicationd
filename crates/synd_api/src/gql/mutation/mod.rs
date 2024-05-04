@@ -23,7 +23,6 @@ pub enum ResponseCode {
 #[derive(SimpleObject, Clone)]
 pub struct ResponseStatus {
     code: ResponseCode,
-    // TODO: add message
 }
 
 impl ResponseStatus {

@@ -140,7 +140,6 @@ impl Runtime {
                 Ok(output)
             }
             Err(err) => {
-                // TODO: match or method
                 audit!({ Audit::RESULT } = "error");
                 error!("{err:?}");
                 Err(err)
