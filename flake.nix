@@ -90,13 +90,6 @@
           cargoExtraArgs = "--package ${syndApiCrate.pname}";
         });
 
-        # TODO: should parse .cargo/audit.toml
-        ignoreAdvisories = pkgs.lib.concatStrings
-          (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}") [
-            "RUSTSEC-2024-0320"
-            "RUSTSEC-2021-0041"
-          ]));
-
         checks = {
           inherit syndTerm syndApi;
 
@@ -115,7 +108,12 @@
 
           audit = craneLib.cargoAudit {
             inherit src advisory-db;
-            cargoAuditExtraArgs = "--ignore yanked ${ignoreAdvisories}";
+            cargoAuditExtraArgs = let
+              ignoreAdvisories = pkgs.lib.concatStrings
+                (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}")
+                  (builtins.fromTOML (builtins.readFile
+                    ./.cargo/audit.toml)).advisories.ignore));
+            in "--ignore yanked ${ignoreAdvisories}";
           };
 
           fmt = craneLib.cargoFmt commonArgs;
