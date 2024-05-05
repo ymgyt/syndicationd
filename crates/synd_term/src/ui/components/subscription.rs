@@ -245,16 +245,16 @@ impl Subscription {
             }
         };
         let header = Row::new([
-            Cell::from(format!("󰑫 Feed {n}/{m}")),
             Cell::from(" Updated"),
+            Cell::from(format!("󰑫 Feed {n}/{m}")),
             Cell::from(" URL"),
             Cell::from("󰎞 Description"),
             Cell::from(" Req"),
         ]);
 
         let constraints = [
+            Constraint::Length(11),
             Constraint::Fill(1),
-            Constraint::Length(10),
             Constraint::Fill(1),
             Constraint::Fill(2),
             Constraint::Length(5),
@@ -286,13 +286,18 @@ impl Subscription {
                 .unwrap_or_else(|| ui::default_icon());
 
             Row::new([
+                Cell::from(Span::from(updated)),
                 Cell::from(Line::from(vec![
                     Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
                     Span::from(" "),
                     Span::from(title),
                 ])),
-                Cell::from(Span::from(updated)),
-                Cell::from(Span::from(website_url)),
+                Cell::from(Span::from(
+                    website_url
+                        .trim_start_matches("http://")
+                        .trim_start_matches("https://")
+                        .trim_end_matches('/'),
+                )),
                 Cell::from(Span::from(desc)),
                 Cell::from(Line::from(requirement)),
             ])
@@ -317,7 +322,7 @@ impl Subscription {
                 bottom: 0,
             })
             .title(
-                Title::from(" Feed Detail ")
+                Title::from(" Detail ")
                     .position(Position::Top)
                     .alignment(Alignment::Center),
             )
