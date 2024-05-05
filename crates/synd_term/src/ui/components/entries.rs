@@ -65,6 +65,10 @@ impl Entries {
             .filter(|(_idx, entry)| self.filter.entry(entry) == FilterResult::Use)
             .map(|(idx, _)| idx)
             .collect();
+        // prevent selection from out of index
+        self.selected_entry_index = self
+            .selected_entry_index
+            .min(self.effective_entries.len().saturating_sub(1));
     }
 
     pub fn remove_unsubscribed_entries(&mut self, url: &FeedUrl) {

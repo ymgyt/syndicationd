@@ -119,6 +119,10 @@ impl Subscription {
             .filter(|(_idx, feed)| self.filter.feed(feed) == FilterResult::Use)
             .map(|(idx, _)| idx)
             .collect();
+        // prevent selection from out of index
+        self.selected_feed_index = self
+            .selected_feed_index
+            .min(self.effective_feeds.len().saturating_sub(1));
     }
 
     pub fn upsert_subscribed_feed(&mut self, feed: types::Feed) {
