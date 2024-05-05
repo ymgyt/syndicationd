@@ -28,8 +28,8 @@ use crate::{
     ui::{
         self,
         components::{
-            authentication::AuthenticateState, filter::FeedFilter, root::Root, tabs::Tab,
-            Components,
+            authentication::AuthenticateState, filter::FeedFilter, root::Root,
+            subscription::UnsubscribeSelection, tabs::Tab, Components,
         },
         theme::Theme,
     },
@@ -379,7 +379,30 @@ impl Application {
                     self.should_render();
                 }
                 Command::PromptFeedUnsubscription => {
-                    self.prompt_feed_unsubscription();
+                    if self.components.subscription.selected_feed().is_some() {
+                        self.components.subscription.show_unsubscribe_popup(true);
+                        self.keymaps().enable(KeymapId::UnsubscribePopupSelection);
+                        self.should_render();
+                    }
+                }
+                Command::MoveFeedUnsubscriptionPopupSelection(direction) => {
+                    self.components
+                        .subscription
+                        .move_unsubscribe_popup_selection(direction);
+                    self.should_render();
+                }
+                Command::SelectFeedUnsubscriptionPopup => {
+                    if let (UnsubscribeSelection::Yes, Some(feed)) =
+                        self.components.subscription.unsubscribe_popup_selection()
+                    {
+                        self.unsubscribe_feed(feed.url.clone());
+                    }
+                    next = Some(Command::CancelFeedUnsubscriptionPopup);
+                    self.should_render();
+                }
+                Command::CancelFeedUnsubscriptionPopup => {
+                    self.components.subscription.show_unsubscribe_popup(false);
+                    self.keymaps().disable(KeymapId::UnsubscribePopupSelection);
                     self.should_render();
                 }
                 Command::SubscribeFeed { input } => {
@@ -693,20 +716,6 @@ impl Application {
             .boxed(),
         };
 
-        self.jobs.futures.push(fut);
-    }
-
-    fn prompt_feed_unsubscription(&mut self) {
-        // TODO: prompt deletion confirm
-        let Some(url) = self
-            .components
-            .subscription
-            .selected_feed()
-            .map(|feed| feed.url.clone())
-        else {
-            return;
-        };
-        let fut = async move { Ok(Command::UnsubscribeFeed { url }) }.boxed();
         self.jobs.futures.push(fut);
     }
 

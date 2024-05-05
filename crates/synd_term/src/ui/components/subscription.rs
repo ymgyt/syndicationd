@@ -7,8 +7,8 @@ use ratatui::{
     text::{Line, Span},
     widgets::{
         block::{Position, Title},
-        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Row, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Tabs, Widget,
     },
 };
 use synd_feed::types::{FeedType, FeedUrl};
@@ -20,6 +20,7 @@ use crate::{
     ui::{
         self,
         components::filter::{FeedFilter, FilterResult},
+        extension::RectExt,
         Context,
     },
 };
@@ -29,6 +30,28 @@ pub struct Subscription {
     feeds: Vec<types::Feed>,
     effective_feeds: Vec<usize>,
     filter: FeedFilter,
+
+    unsubscribe_popup: UnsubscribePopup,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum UnsubscribeSelection {
+    Yes,
+    No,
+}
+
+impl UnsubscribeSelection {
+    fn toggle(self) -> Self {
+        match self {
+            UnsubscribeSelection::Yes => UnsubscribeSelection::No,
+            UnsubscribeSelection::No => UnsubscribeSelection::Yes,
+        }
+    }
+}
+
+struct UnsubscribePopup {
+    selection: UnsubscribeSelection,
+    selected_feed: Option<types::Feed>,
 }
 
 impl Subscription {
@@ -38,6 +61,10 @@ impl Subscription {
             feeds: Vec::new(),
             effective_feeds: Vec::new(),
             filter: FeedFilter::default(),
+            unsubscribe_popup: UnsubscribePopup {
+                selection: UnsubscribeSelection::Yes,
+                selected_feed: None,
+            },
         }
     }
 
@@ -53,6 +80,21 @@ impl Subscription {
         self.effective_feeds
             .get(self.selected_feed_index)
             .map(|&idx| self.feeds.get(idx).unwrap())
+    }
+
+    pub fn show_unsubscribe_popup(&mut self, show: bool) {
+        if show {
+            self.unsubscribe_popup.selected_feed = self.selected_feed().cloned();
+        } else {
+            self.unsubscribe_popup.selected_feed = None;
+        }
+    }
+
+    pub fn unsubscribe_popup_selection(&self) -> (UnsubscribeSelection, Option<&types::Feed>) {
+        (
+            self.unsubscribe_popup.selection,
+            self.unsubscribe_popup.selected_feed.as_ref(),
+        )
     }
 
     pub fn update_subscription(&mut self, populate: Populate, subscription: SubscriptionOutput) {
@@ -110,6 +152,12 @@ impl Subscription {
             self.selected_feed_index = self.effective_feeds.len() - 1;
         }
     }
+
+    pub fn move_unsubscribe_popup_selection(&mut self, direction: Direction) {
+        if matches!(direction, Direction::Left | Direction::Right) {
+            self.unsubscribe_popup.selection = self.unsubscribe_popup.selection.toggle();
+        }
+    }
 }
 
 impl Subscription {
@@ -119,6 +167,10 @@ impl Subscription {
 
         self.render_feeds(feeds_area, buf, cx);
         self.render_feed_detail(feed_detail_area, buf, cx);
+
+        if let Some(feed) = self.unsubscribe_popup.selected_feed.as_ref() {
+            self.render_unsubscribe_popup(area, buf, cx, feed);
+        }
     }
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -374,5 +426,87 @@ impl Subscription {
             .style(cx.theme.subscription.background);
 
         Widget::render(table, entries_area, buf);
+    }
+
+    fn render_unsubscribe_popup(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        cx: &Context<'_>,
+        feed: &types::Feed,
+    ) {
+        let area = {
+            let area = area.centered(60, 60);
+            let vertical = Layout::vertical([
+                Constraint::Fill(1),
+                Constraint::Min(12),
+                Constraint::Fill(2),
+            ]);
+            let [_, area, _] = vertical.areas(area);
+            area.reset(buf);
+            area
+        };
+
+        let block = Block::new()
+            .title_top("Unsubscribe")
+            .title_alignment(Alignment::Center)
+            .title_style(Style::new().add_modifier(Modifier::BOLD))
+            .padding(Padding {
+                left: 1,
+                right: 1,
+                top: 1,
+                bottom: 1,
+            })
+            .borders(Borders::ALL)
+            .style(cx.theme.background);
+
+        let inner_area = block.inner(area);
+        let vertical = Layout::vertical([Constraint::Length(6), Constraint::Fill(1)]);
+        let [info_area, selection_area] = vertical.areas(inner_area);
+
+        block.render(area, buf);
+
+        // for align line
+        let feed_n = "Feed: ".len() + feed.title.as_deref().unwrap_or("-").len();
+        let url_n = "URL : ".len() + feed.url.as_str().len();
+
+        Paragraph::new(vec![
+            Line::from("Do you unsubscribe from this feed?"),
+            Line::from(""),
+            Line::from(vec![
+                Span::from("Feed: "),
+                Span::from(feed.title.as_deref().unwrap_or("-")).bold(),
+                Span::from(" ".repeat(url_n.saturating_sub(feed_n))),
+            ]),
+            Line::from(vec![
+                Span::from("URL : "),
+                Span::from(feed.url.to_string()).bold(),
+                Span::from(" ".repeat(feed_n.saturating_sub(url_n))),
+            ]),
+        ])
+        .alignment(Alignment::Center)
+        .block(
+            Block::new()
+                .borders(Borders::BOTTOM)
+                .border_type(BorderType::Plain)
+                .border_style(Style::new().add_modifier(Modifier::DIM)),
+        )
+        .render(info_area, buf);
+
+        // align center
+        let horizontal =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Min(1), Constraint::Fill(1)]);
+        let [_, selection_area, _] = horizontal.areas(selection_area);
+
+        Tabs::new([" Yes ", " No "])
+            .style(cx.theme.tabs)
+            .divider("")
+            .padding("  ", "  ")
+            .select(match self.unsubscribe_popup.selection {
+                UnsubscribeSelection::Yes => 0,
+                UnsubscribeSelection::No => 1,
+            })
+            .highlight_style(cx.theme.selection_popup.highlight)
+            .render(selection_area, buf);
     }
 }

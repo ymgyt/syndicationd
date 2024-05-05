@@ -40,6 +40,12 @@ pub fn default() -> KeymapsConfig {
        "/" => activate_search_filtering,
        "esc" => deactivate_filtering,
     });
+    let unsubscribe_popup = keymap!({
+        "h" | "left" => move_feed_unsubscription_popup_selection_left,
+        "l" | "right" => move_feed_unsubscription_popup_selection_right,
+        "enter" => select_feed_unsubscription_popup,
+        "esc" => cancel_feed_unsubscription_popup,
+    });
     let global = keymap!({
         "q" | "C-c" =>  quit ,
     });
@@ -50,6 +56,7 @@ pub fn default() -> KeymapsConfig {
         entries,
         subscription,
         filter,
+        unsubscribe_popup,
         global,
     }
 }

@@ -16,6 +16,7 @@ pub struct Theme {
     pub error: ErrorTheme,
     pub default_icon_fg: Color,
     pub requirement: RequirementLabelTheme,
+    pub selection_popup: SelectionPopup,
 }
 
 #[derive(Clone)]
@@ -56,6 +57,11 @@ pub struct RequirementLabelTheme {
     pub should: Color,
     pub may: Color,
     pub fg: Color,
+}
+
+#[derive(Clone)]
+pub struct SelectionPopup {
+    pub highlight: Style,
 }
 
 impl Theme {
@@ -100,6 +106,9 @@ impl Theme {
                 should: Color::Rgb(243, 201, 105),
                 may: Color::Rgb(35, 57, 91),
                 fg: bg,
+            },
+            selection_popup: SelectionPopup {
+                highlight: Style::new().bg(Color::Yellow).fg(bg),
             },
         }
     }

@@ -18,6 +18,7 @@ pub enum KeymapId {
     Subscription = 4,
     Filter = 5,
     CategoryFiltering = 6,
+    UnsubscribePopupSelection = 7,
 }
 
 #[derive(Debug)]
@@ -76,6 +77,7 @@ pub struct KeymapsConfig {
     pub entries: KeyTrie,
     pub subscription: KeyTrie,
     pub filter: KeyTrie,
+    pub unsubscribe_popup: KeyTrie,
     pub global: KeyTrie,
 }
 
@@ -101,6 +103,10 @@ impl Keymaps {
             Keymap::new(KeymapId::Subscription, config.subscription),
             Keymap::new(KeymapId::Filter, config.filter),
             Keymap::new(KeymapId::CategoryFiltering, KeyTrie::default()),
+            Keymap::new(
+                KeymapId::UnsubscribePopupSelection,
+                config.unsubscribe_popup,
+            ),
         ];
 
         Self { keymaps }

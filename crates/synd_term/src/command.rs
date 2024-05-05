@@ -46,6 +46,9 @@ pub enum Command {
     PromptFeedSubscription,
     PromptFeedEdition,
     PromptFeedUnsubscription,
+    MoveFeedUnsubscriptionPopupSelection(Direction),
+    SelectFeedUnsubscriptionPopup,
+    CancelFeedUnsubscriptionPopup,
     SubscribeFeed {
         input: SubscribeFeedInput,
     },
@@ -166,6 +169,18 @@ impl Command {
     }
     pub fn prompt_feed_unsubscription() -> Self {
         Command::PromptFeedUnsubscription
+    }
+    pub fn move_feed_unsubscription_popup_selection_left() -> Self {
+        Command::MoveFeedUnsubscriptionPopupSelection(Direction::Left)
+    }
+    pub fn move_feed_unsubscription_popup_selection_right() -> Self {
+        Command::MoveFeedUnsubscriptionPopupSelection(Direction::Right)
+    }
+    pub fn select_feed_unsubscription_popup() -> Self {
+        Command::SelectFeedUnsubscriptionPopup
+    }
+    pub fn cancel_feed_unsubscription_popup() -> Self {
+        Command::CancelFeedUnsubscriptionPopup
     }
     pub fn move_up_subscribed_feed() -> Self {
         Command::MoveSubscribedFeed(Direction::Up)
