@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use synd_feed::{
-    feed::cache::FetchCachedFeed,
-    types::{self, Annotated},
+    feed::{cache::FetchCachedFeed, parser::FetchFeedError},
+    types::{self, Annotated, FeedUrl},
 };
 use thiserror::Error;
 
 use crate::{
     principal::Principal,
-    repository::SubscriptionRepository,
+    repository::{types::SubscribedFeeds, SubscriptionRepository},
     usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
 };
 
@@ -24,7 +24,8 @@ pub struct FetchSubscribedFeedsInput {
 
 #[derive(Default)]
 pub struct FetchSubscribedFeedsOutput {
-    pub feeds: Vec<Annotated<Arc<types::Feed>>>,
+    #[allow(clippy::type_complexity)]
+    pub feeds: Vec<Result<Annotated<Arc<types::Feed>>, (FeedUrl, FetchFeedError)>>,
 }
 
 #[derive(Error, Debug)]
@@ -61,43 +62,59 @@ impl Usecase for FetchSubscribedFeeds {
     ) -> Result<Output<Self::Output>, Error<Self::Error>> {
         let user_id = principal.user_id().unwrap();
 
-        let feeds = self.repository.fetch_subscribed_feeds(user_id).await?;
+        let SubscribedFeeds {
+            mut urls,
+            mut annotations,
+        } = self.repository.fetch_subscribed_feeds(user_id).await?;
 
         // paginate
         let urls = {
             let start = after
                 .and_then(|after| {
-                    feeds
-                        .urls
-                        .iter()
+                    urls.iter()
                         .position(|url| url.as_str() == after)
                         .map(|p| p + 1)
                 })
                 .unwrap_or(0);
-            if start >= feeds.urls.len() {
+            if start >= urls.len() {
                 return Ok(Output {
                     output: FetchSubscribedFeedsOutput::default(),
                 });
             }
-            let urls = &feeds.urls[start..];
-            let end = (start + first).min(urls.len());
-            &urls[..end]
+            let mut urls = urls.split_off(start);
+            urls.truncate(first);
+            urls
         };
 
         // fetch feeds
-        let fetched_feeds = self.fetch_feed.fetch_feeds_parallel(urls).await;
+        let fetched_feeds = self.fetch_feed.fetch_feeds_parallel(&urls).await;
 
-        // TODO: return failed feeds
-        let (fetched_feeds, errors): (Vec<_>, Vec<_>) =
-            fetched_feeds.into_iter().partition(Result::is_ok);
-
-        if !errors.is_empty() {
-            tracing::error!("{errors:?}");
-        }
-
-        let feeds = feeds
-            .annotate(fetched_feeds.into_iter().map(Result::unwrap))
-            .collect();
+        // annotate fetched feeds
+        let feeds = fetched_feeds
+            .into_iter()
+            .zip(urls)
+            .map(|(result, url)| {
+                result
+                    .map(|feed| {
+                        match annotations
+                            .as_mut()
+                            .and_then(|annotations| annotations.remove(feed.meta().url()))
+                        {
+                            Some(annotations) => Annotated {
+                                feed,
+                                requirement: annotations.requirement,
+                                category: annotations.category,
+                            },
+                            None => Annotated {
+                                feed,
+                                requirement: None,
+                                category: None,
+                            },
+                        }
+                    })
+                    .map_err(|err| (url.clone(), err))
+            })
+            .collect::<Vec<_>>();
 
         Ok(Output {
             output: FetchSubscribedFeedsOutput { feeds },

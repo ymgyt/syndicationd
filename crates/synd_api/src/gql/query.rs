@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use async_graphql::{
     connection::{Connection, Edge},
-    Context, Object, Result,
+    Context, Object, Result, SimpleObject,
 };
+use synd_feed::types::FeedUrl;
 
 use crate::{
     gql::{
@@ -17,6 +18,17 @@ use crate::{
     },
 };
 
+#[derive(SimpleObject)]
+struct FeedsConnectionFields {
+    errors: Vec<FetchFeedError>,
+}
+
+#[derive(SimpleObject)]
+struct FetchFeedError {
+    url: FeedUrl,
+    error_message: String,
+}
+
 struct Subscription;
 
 #[Object]
@@ -27,7 +39,7 @@ impl Subscription {
         cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, object::Feed>> {
+    ) -> Result<Connection<String, object::Feed, FeedsConnectionFields>> {
         #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(10).min(100) as usize;
         let has_prev = after.is_some();
@@ -45,11 +57,26 @@ impl Subscription {
         )?;
 
         let has_next = feeds.len() > first;
-        let mut connection = Connection::new(has_prev, has_next);
+
+        let (feeds, errors): (Vec<_>, Vec<_>) = feeds.into_iter().partition(Result::is_ok);
+        let fields = FeedsConnectionFields {
+            errors: errors
+                .into_iter()
+                .map(|err| {
+                    let (url, fetch_err) = err.unwrap_err();
+                    FetchFeedError {
+                        url,
+                        error_message: fetch_err.to_string(),
+                    }
+                })
+                .collect::<Vec<_>>(),
+        };
+        let mut connection = Connection::with_additional_fields(has_prev, has_next, fields);
 
         let edges = feeds
             .into_iter()
             .take(first)
+            .map(Result::unwrap)
             .map(|feed| (feed.feed.meta().url().as_str().to_owned(), feed))
             .map(|(cursor, feed)| (cursor, object::Feed::from(feed)))
             .map(|(cursor, feed)| Edge::new(cursor, feed));
