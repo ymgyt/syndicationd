@@ -429,6 +429,10 @@ impl Application {
                             first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
                         }
                     });
+                    // how we show fetched errors in ui?
+                    if !subscription.feeds.errors.is_empty() {
+                        tracing::warn!("Failed fetched feeds: {:?}", subscription.feeds.errors);
+                    }
                     self.components
                         .subscription
                         .update_subscription(populate, subscription);

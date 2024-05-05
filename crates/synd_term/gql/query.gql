@@ -7,6 +7,10 @@ query Subscription($after: String, $first: Int) {
       pageInfo {
         ...PageInfo
       }
+      errors {
+        url
+        errorMessage
+      }
     }
   }
 }
@@ -38,10 +42,10 @@ fragment Feed on Feed {
 }
 
 fragment EntryMeta on Entry {
-    title,
-    published,
-    updated,
-    summary,
+    title
+    published
+    updated
+    summary
 }
 
 fragment Link on Link {
