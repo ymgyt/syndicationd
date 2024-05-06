@@ -1,15 +1,10 @@
 use opentelemetry::propagation::TextMapCompositePropagator;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 
-pub mod extension {
-    pub use opentelemetry::baggage::BaggageExt as _;
-    pub use tracing_opentelemetry::OpenTelemetrySpanExt as _;
-}
-
 /// Currently axum and reqwest have different http crate versions.
 /// axum is ver 1, reqwest ver 0.2, therefore, we use each type in inject and extract.
 pub mod http {
-    use super::extension::*;
+    use crate::opentelemetry::extension::*;
     use opentelemetry::propagation::Extractor;
     use opentelemetry_http::HeaderInjector;
 
@@ -56,6 +51,7 @@ pub mod http {
     }
 }
 
+/// Configure `TraceContext` and Baggage propagator then set as global propagator
 pub fn init_propagation() {
     let trace_propagator = TraceContextPropagator::new();
     let baggage_propagator = BaggagePropagator::new();

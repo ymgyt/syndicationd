@@ -1,11 +1,15 @@
 use opentelemetry::KeyValue;
-use opentelemetry_sdk::{resource::EnvResourceDetector, Resource};
+use opentelemetry_sdk::resource::EnvResourceDetector;
 use opentelemetry_semantic_conventions::{
     resource::{SERVICE_NAME, SERVICE_NAMESPACE, SERVICE_VERSION},
     SCHEMA_URL,
 };
 use std::{borrow::Cow, time::Duration};
 
+pub use opentelemetry_sdk::Resource;
+
+/// Return the [`Resource`] of opentelemetry.
+/// Check and merge the environment variables specified in the specification.
 pub fn resource(
     service_name: impl Into<Cow<'static, str>>,
     service_version: impl Into<Cow<'static, str>>,

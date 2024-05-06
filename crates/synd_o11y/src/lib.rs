@@ -1,3 +1,8 @@
+//! syndicationd observability crate providing features
+//! related to tracing, opentelemetry, and other observability
+//! functionalities.
+#![warn(rustdoc::broken_intra_doc_links)]
+
 use ::opentelemetry::KeyValue;
 
 pub mod health_check;

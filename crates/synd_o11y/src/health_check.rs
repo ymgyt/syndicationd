@@ -28,6 +28,7 @@ impl fmt::Display for Status {
     }
 }
 
+/// Represents Api Health
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Health {
     pub status: Status,

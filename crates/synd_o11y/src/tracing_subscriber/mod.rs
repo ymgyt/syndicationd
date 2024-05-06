@@ -8,6 +8,8 @@ pub mod otel_log;
 pub mod otel_metrics;
 pub mod otel_trace;
 
+/// Return a composed layer that exports traces, metrics, and logs of opentelemetry.
+/// The exported telemetry will be accompanied by a `Resource`.
 pub fn opentelemetry_layer<S>(
     endpoint: impl Into<String>,
     service_name: impl Into<Cow<'static, str>>,
