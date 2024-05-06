@@ -2,7 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.2] 2024-04-29
+## [unreleased] __release_date__
+
+### Features
+
+- Return feeds that failed to fetch by [@ymgyt](https://github.com/ymgyt) ([4810372b](https://github.com/ymgyt/syndicationd/commit/4810372b8bee7c881c80a18a1514cdb7bf7e520e))
+
+### Miscellaneous Tasks
+
+- Remove comment by [@ymgyt](https://github.com/ymgyt) ([55d37643](https://github.com/ymgyt/syndicationd/commit/55d37643fadb4aeb125bb68dbc8cc4792e5193da))
+
+### Refactor
+
+- Refactor fetch entries usecase by [@ymgyt](https://github.com/ymgyt) ([8f5e0040](https://github.com/ymgyt/syndicationd/commit/8f5e0040488552cad9ddf6cf06db924ab67ec2b5))
+- Rename parse module to service by [@ymgyt](https://github.com/ymgyt) ([256542d9](https://github.com/ymgyt/syndicationd/commit/256542d9955811eac0c26b350f528cce1106dd50))
+
+### Choore
+
+- Reduce visibility by [@ymgyt](https://github.com/ymgyt) ([ddf2eb12](https://github.com/ymgyt/syndicationd/commit/ddf2eb12e5f746ae6d608ff308a07e4a8c6db29e))
+
+## [v0.2.2] - 2024-04-29
 
 ### Features
 

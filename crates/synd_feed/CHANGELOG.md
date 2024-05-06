@@ -2,7 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.3.1] 2024-04-29
+## [unreleased] __release_date__
+
+### Features
+
+- Impl Borrow<Url> for FeedUrl by [@ymgyt](https://github.com/ymgyt) ([d733b165](https://github.com/ymgyt/syndicationd/commit/d733b16533821b0bbb94b2fc51683109fd710d92))
+
+### Bug Fixes
+
+- Fix cache size metrics emission by [@ymgyt](https://github.com/ymgyt) ([4396f9fc](https://github.com/ymgyt/syndicationd/commit/4396f9fc7583c55a94064675aa24049cb1e1d83d))
+
+### Miscellaneous Tasks
+
+- Remove comment outed code by [@ymgyt](https://github.com/ymgyt) ([f10f7913](https://github.com/ymgyt/syndicationd/commit/f10f79134a433f5c08d14a568945facd59fa393a))
+
+### Refactor
+
+- Remove todo! macro by [@ymgyt](https://github.com/ymgyt) ([ebc2090d](https://github.com/ymgyt/syndicationd/commit/ebc2090dfcba6a9cba5758deecfd4f8b6d993df0))
+- Rename parse module to service by [@ymgyt](https://github.com/ymgyt) ([256542d9](https://github.com/ymgyt/syndicationd/commit/256542d9955811eac0c26b350f528cce1106dd50))
+
+## [v0.3.1] - 2024-04-29
 
 ### Bug Fixes
 

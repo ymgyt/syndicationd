@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.5] 2024-04-17
+## [unreleased] __release_date__
+
+### Documentation
+
+- Add comments to public api by [@ymgyt](https://github.com/ymgyt) ([41588384](https://github.com/ymgyt/syndicationd/commit/41588384a0344a3befc473b9ca45abe6be2054ac))
+
+## [v0.1.5] - 2024-04-17
 
 ### Features
 

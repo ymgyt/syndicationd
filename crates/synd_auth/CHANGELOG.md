@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.1] 2024-03-23
+## [unreleased] __release_date__
+
+### Features
+
+- Add expired_at to Claims by [@ymgyt](https://github.com/ymgyt) ([f1075202](https://github.com/ymgyt/syndicationd/commit/f10752025fd13903cc1bdcefd489fcf71d681f80))
+
+### Refactor
+
+- Clippy by [@ymgyt](https://github.com/ymgyt) ([f62c5ef2](https://github.com/ymgyt/syndicationd/commit/f62c5ef2b93cd129ca844ef43492acb7c3b9786d))
+- Seal Provider trait by [@ymgyt](https://github.com/ymgyt) ([b0514e8f](https://github.com/ymgyt/syndicationd/commit/b0514e8f934682ecb77ae87603bcd278b4a5ce0b))
+
+## [v0.2.1] - 2024-03-23
 
 ### Refactor
 

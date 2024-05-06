@@ -2,7 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.3] 2024-04-29
+## [unreleased] __release_date__
+
+### Features
+
+- Show big text on login by [@ymgyt](https://github.com/ymgyt) ([d4a5b18e](https://github.com/ymgyt/syndicationd/commit/d4a5b18e7d9771a4ff5647da059f187ce0c240b6))
+- Refresh google id token periodically by [@ymgyt](https://github.com/ymgyt) ([b5e0ae1f](https://github.com/ymgyt/syndicationd/commit/b5e0ae1f22f0a4c14479fe55caf11c4d4d0e6a22))
+- Friendly nom parse error by [@ymgyt](https://github.com/ymgyt) ([8664e3d7](https://github.com/ymgyt/syndicationd/commit/8664e3d71ab21fd0b34515bef4efd6d9d595b11e))
+- Paginate entries and feeds by [@ymgyt](https://github.com/ymgyt) ([794f65da](https://github.com/ymgyt/syndicationd/commit/794f65dabb114d7f80069b6d65813a39560ffc40))
+- Make entries limit configurable by [@ymgyt](https://github.com/ymgyt) ([206bbad7](https://github.com/ymgyt/syndicationd/commit/206bbad791f5c4dc3800af8bfd190cc9ad1469e5))
+- Show entries count indicator by [@ymgyt](https://github.com/ymgyt) ([fa4abc7e](https://github.com/ymgyt/syndicationd/commit/fa4abc7e0961844bede78595dbca06fd37dcbe28))
+- Add unsubscribe popup by [@ymgyt](https://github.com/ymgyt) ([d7db5140](https://github.com/ymgyt/syndicationd/commit/d7db51402c940c4fce41bf9b2c9fd18b08aef25b))
+
+### Bug Fixes
+
+- Filter categories duplication by [@ymgyt](https://github.com/ymgyt) ([60ec0f7a](https://github.com/ymgyt/syndicationd/commit/60ec0f7a592519404bec74006db35059e73baae7))
+- Handle too small width case by [@ymgyt](https://github.com/ymgyt) ([62b5b336](https://github.com/ymgyt/syndicationd/commit/62b5b3365b341432aaf0e5fc7cf1dc970e49646c))
+
+### Miscellaneous Tasks
+
+- Change feed entries count to fetch by [@ymgyt](https://github.com/ymgyt) ([979231e9](https://github.com/ymgyt/syndicationd/commit/979231e9761bc3b4a041648155018fd7077456d6))
+- Prevent selection out of index by [@ymgyt](https://github.com/ymgyt) ([1cf01601](https://github.com/ymgyt/syndicationd/commit/1cf01601325b671e62ef4398d73e4aa61c9cffbc))
+- Make column order consistent by [@ymgyt](https://github.com/ymgyt) ([fecafd98](https://github.com/ymgyt/syndicationd/commit/fecafd988b937d57a7a62cc8c1abc6dd903e4141))
+- Logging feeds that failed to fetch by [@ymgyt](https://github.com/ymgyt) ([425548cb](https://github.com/ymgyt/syndicationd/commit/425548cbab0728ac54d28c30e5e76ba384e50c78))
+
+### Refactor
+
+- Clippy by [@ymgyt](https://github.com/ymgyt) ([ddc8fa66](https://github.com/ymgyt/syndicationd/commit/ddc8fa66d5d6d7b4dcb3892a147bf90552080cbf))
+- Use bitflags to manage app flags by [@ymgyt](https://github.com/ymgyt) ([aa2d6c49](https://github.com/ymgyt/syndicationd/commit/aa2d6c491c591e4f966c87d2489395f6f96cf3fb))
+- Count keymap capacity by [@ymgyt](https://github.com/ymgyt) ([466368f4](https://github.com/ymgyt/syndicationd/commit/466368f46b65b325959e740358d816fb9d602dd7))
+- Rename parse module to service by [@ymgyt](https://github.com/ymgyt) ([256542d9](https://github.com/ymgyt/syndicationd/commit/256542d9955811eac0c26b350f528cce1106dd50))
+- Reduce visibility by [@ymgyt](https://github.com/ymgyt) ([08df3e55](https://github.com/ymgyt/syndicationd/commit/08df3e55dd3deac1ef7f7445a2cedaa9b8d20bdb))
+
+## [v0.2.3] - 2024-04-29
 
 ### Features
 
