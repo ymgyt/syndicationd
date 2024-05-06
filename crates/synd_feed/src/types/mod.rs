@@ -6,7 +6,6 @@ use feed_rs::model::{self as feedrs, Generator, Link, Person, Text};
 pub use feedrs::FeedType;
 
 pub type Time = DateTime<Utc>;
-// pub type FeedUrl = String;
 
 mod requirement;
 pub use requirement::Requirement;

@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Borrow;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -13,6 +14,12 @@ pub enum FeedUrlError {
 /// Feed Url which serve rss or atom
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FeedUrl(Url);
+
+impl Borrow<Url> for FeedUrl {
+    fn borrow(&self) -> &Url {
+        &self.0
+    }
+}
 
 impl TryFrom<&str> for FeedUrl {
     type Error = FeedUrlError;
