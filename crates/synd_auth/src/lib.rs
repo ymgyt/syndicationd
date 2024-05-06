@@ -1,4 +1,8 @@
-pub mod config;
+//! syndicationd authentication crate providing features
+//! related OAuth and JWT.
+#![warn(rustdoc::broken_intra_doc_links)]
+
+mod config;
 pub mod device_flow;
 pub mod jwt;
 

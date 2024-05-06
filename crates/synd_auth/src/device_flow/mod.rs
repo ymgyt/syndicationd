@@ -9,7 +9,7 @@ use crate::USER_AGENT;
 
 pub mod provider;
 
-pub trait Provider {
+pub trait Provider: private::Sealed {
     type DeviceAccessTokenRequest<'d>: Serialize + Send
     where
         Self: 'd;
@@ -21,6 +21,15 @@ pub trait Provider {
         &'p self,
         device_code: &'d str,
     ) -> Self::DeviceAccessTokenRequest<'d>;
+}
+
+mod private {
+    use crate::device_flow::provider;
+
+    pub trait Sealed {}
+
+    impl Sealed for provider::Github {}
+    impl Sealed for provider::Google {}
 }
 
 #[derive(Clone)]
