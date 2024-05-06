@@ -40,7 +40,7 @@ fmt: fmt-toml
 
 # Run linter
 lint:
-    cargo clippy
+    cargo clippy --all-features
 
 # Format toml files
 fmt-toml:
@@ -185,3 +185,7 @@ oranda-dev:
 oranda-gen:
     oranda generate ci --output-path .github/workflows/website.yaml --ci github
     echo "Make sure cp CNAME job add to workflow!!"
+
+# Build and open rustdoc
+doc:
+    cargo doc --open --no-deps
