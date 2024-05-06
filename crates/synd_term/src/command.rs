@@ -13,11 +13,11 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Command {
+pub(crate) enum Command {
     Quit,
     ResizeTerminal {
-        columns: u16,
-        rows: u16,
+        _columns: u16,
+        _rows: u16,
     },
     RenderThrobber,
     Idle,
@@ -51,9 +51,6 @@ pub enum Command {
     CancelFeedUnsubscriptionPopup,
     SubscribeFeed {
         input: SubscribeFeedInput,
-    },
-    UnsubscribeFeed {
-        url: FeedUrl,
     },
     CompleteSubscribeFeed {
         feed: Feed,

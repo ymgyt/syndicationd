@@ -18,13 +18,13 @@ use crate::{
 
 /// Handle user authentication
 #[derive(PartialEq, Eq)]
-pub enum AuthenticateState {
+pub(crate) enum AuthenticateState {
     NotAuthenticated,
     DeviceFlow(DeviceAuthorizationResponse),
     Authenticated,
 }
 
-pub struct Authentication {
+pub(crate) struct Authentication {
     state: AuthenticateState,
     providers: Vec<AuthenticationProvider>,
     selected_provider_index: usize,
@@ -49,7 +49,7 @@ impl Authentication {
         self.providers[self.selected_provider_index]
     }
 
-    pub fn move_selection(&mut self, direction: &Direction) {
+    pub fn move_selection(&mut self, direction: Direction) {
         self.selected_provider_index = direction.apply(
             self.selected_provider_index,
             self.providers.len(),

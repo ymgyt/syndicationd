@@ -6,15 +6,15 @@ use crate::{
     },
 };
 
-pub mod authentication;
-pub mod entries;
-pub mod filter;
-pub mod root;
-pub mod status;
-pub mod subscription;
-pub mod tabs;
+pub(crate) mod authentication;
+pub(crate) mod entries;
+pub(crate) mod filter;
+pub(crate) mod root;
+pub(crate) mod status;
+pub(crate) mod subscription;
+pub(crate) mod tabs;
 
-pub struct Components {
+pub(crate) struct Components {
     pub tabs: Tabs,
     pub filter: Filter,
     pub prompt: StatusLine,

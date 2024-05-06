@@ -16,7 +16,7 @@ enum Move {
 }
 
 #[derive(Debug)]
-pub struct Prompt {
+pub(crate) struct Prompt {
     line: String,
     cursor: usize,
 }
@@ -43,7 +43,7 @@ impl Prompt {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RenderCursor {
+pub(crate) enum RenderCursor {
     Enable,
     Disable,
 }

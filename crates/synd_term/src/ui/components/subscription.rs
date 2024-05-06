@@ -136,10 +136,10 @@ impl Subscription {
     pub fn remove_unsubscribed_feed(&mut self, url: &FeedUrl) {
         self.feeds.retain(|feed_meta| &feed_meta.url != url);
         self.apply_filter();
-        self.move_selection(&Direction::Up);
+        self.move_selection(Direction::Up);
     }
 
-    pub fn move_selection(&mut self, direction: &Direction) {
+    pub fn move_selection(&mut self, direction: Direction) {
         self.selected_feed_index = direction.apply(
             self.selected_feed_index,
             self.effective_feeds.len(),

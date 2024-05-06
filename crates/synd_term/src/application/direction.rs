@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Direction {
+pub(crate) enum Direction {
     Up,
     Down,
     Left,
@@ -7,8 +7,9 @@ pub enum Direction {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
-pub enum IndexOutOfRange {
+pub(crate) enum IndexOutOfRange {
     Wrapping,
+    #[allow(dead_code)]
     Saturating,
 }
 
@@ -18,7 +19,7 @@ impl Direction {
         clippy::cast_possible_truncation,
         clippy::cast_possible_wrap
     )]
-    pub fn apply(&self, index: usize, len: usize, out: IndexOutOfRange) -> usize {
+    pub(crate) fn apply(self, index: usize, len: usize, out: IndexOutOfRange) -> usize {
         if len == 0 {
             return index;
         }

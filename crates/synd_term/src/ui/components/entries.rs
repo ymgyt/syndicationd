@@ -22,7 +22,8 @@ use ratatui::{
 };
 use synd_feed::types::FeedUrl;
 
-pub struct Entries {
+#[allow(clippy::struct_field_names)]
+pub(crate) struct Entries {
     selected_entry_index: usize,
     entries: Vec<types::Entry>,
     effective_entries: Vec<usize>,
@@ -76,7 +77,7 @@ impl Entries {
         self.apply_filter();
     }
 
-    pub fn move_selection(&mut self, direction: &Direction) {
+    pub fn move_selection(&mut self, direction: Direction) {
         self.selected_entry_index = direction.apply(
             self.selected_entry_index,
             self.effective_entries.len(),

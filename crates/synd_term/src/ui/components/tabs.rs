@@ -36,7 +36,7 @@ impl Tabs {
         }
     }
 
-    pub fn move_selection(&mut self, direction: &Direction) -> Tab {
+    pub fn move_selection(&mut self, direction: Direction) -> Tab {
         self.selected = direction.apply(self.selected, self.tabs.len(), IndexOutOfRange::Wrapping);
         self.current()
     }

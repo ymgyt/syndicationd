@@ -36,20 +36,19 @@ use crate::{
 };
 
 mod direction;
-pub use direction::{Direction, IndexOutOfRange};
+pub(crate) use direction::{Direction, IndexOutOfRange};
 
 mod in_flight;
-pub use in_flight::{InFlight, RequestId, RequestSequence};
+pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
 
 mod input_parser;
-pub use input_parser::parse_requirement;
 use input_parser::InputParser;
 
 mod authenticator;
 pub use authenticator::{Authenticator, DeviceFlows, JwtService};
 
 mod clock;
-pub use clock::{Clock, SystemClock};
+pub(crate) use clock::{Clock, SystemClock};
 
 mod flags;
 use flags::Should;
@@ -163,10 +162,6 @@ impl Application {
 
     fn jwt_service(&self) -> &JwtService {
         &self.authenticator.jwt_service
-    }
-
-    pub fn jobs_mut(&mut self) -> &mut Jobs {
-        &mut self.jobs
     }
 
     fn keymaps(&mut self) -> &mut Keymaps {
@@ -312,7 +307,7 @@ impl Application {
                     }
                 }
                 Command::MoveAuthenticationProvider(direction) => {
-                    self.components.auth.move_selection(&direction);
+                    self.components.auth.move_selection(direction);
                     self.should_render();
                 }
                 Command::DeviceAuthorizationFlow {
@@ -347,7 +342,7 @@ impl Application {
                     self.keymaps().toggle(KeymapId::Entries);
                     self.keymaps().toggle(KeymapId::Subscription);
 
-                    match self.components.tabs.move_selection(&direction) {
+                    match self.components.tabs.move_selection(direction) {
                         Tab::Feeds if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
@@ -359,7 +354,7 @@ impl Application {
                     self.should_render();
                 }
                 Command::MoveSubscribedFeed(direction) => {
-                    self.components.subscription.move_selection(&direction);
+                    self.components.subscription.move_selection(direction);
                     self.should_render();
                 }
                 Command::MoveSubscribedFeedFirst => {
@@ -407,10 +402,6 @@ impl Application {
                 }
                 Command::SubscribeFeed { input } => {
                     self.subscribe_feed(input);
-                    self.should_render();
-                }
-                Command::UnsubscribeFeed { url } => {
-                    self.unsubscribe_feed(url);
                     self.should_render();
                 }
                 Command::FetchSubscription { after, first } => {
@@ -512,7 +503,7 @@ impl Application {
                     self.should_render();
                 }
                 Command::MoveEntry(direction) => {
-                    self.components.entries.move_selection(&direction);
+                    self.components.entries.move_selection(direction);
                     self.should_render();
                 }
                 Command::MoveEntryFirst => {
@@ -605,9 +596,10 @@ impl Application {
 
     fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) -> Option<Command> {
         match event.unwrap() {
-            CrosstermEvent::Resize(columns, rows) => {
-                Some(Command::ResizeTerminal { columns, rows })
-            }
+            CrosstermEvent::Resize(columns, rows) => Some(Command::ResizeTerminal {
+                _columns: columns,
+                _rows: rows,
+            }),
             CrosstermEvent::Key(KeyEvent {
                 kind: KeyEventKind::Release,
                 ..

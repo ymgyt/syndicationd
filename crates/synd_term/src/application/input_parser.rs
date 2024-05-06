@@ -7,9 +7,6 @@ use crate::{
     types::{self},
 };
 
-pub use feed::requirement as parse_requirement;
-
-// type NomError<'s> = nom::error::Error<&'s str>;
 type NomError<'s> = nom::error::VerboseError<&'s str>;
 
 const CTX_REQUIREMENT: &str = "requirement";

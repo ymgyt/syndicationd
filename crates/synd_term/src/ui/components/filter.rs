@@ -35,13 +35,13 @@ static LABELS: &[char] = &[
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum FilterResult {
+pub(crate) enum FilterResult {
     Use,
     Discard,
 }
 
 #[derive(Clone)]
-pub struct FeedFilter {
+pub(crate) struct FeedFilter {
     requirement: Requirement,
     categories: HashMap<Category<'static>, FilterCategoryState>,
     matcher: Matcher,
@@ -96,7 +96,7 @@ impl FeedFilter {
 }
 
 #[derive(Debug)]
-pub struct Filter {
+pub(crate) struct Filter {
     state: State,
     requirement: Requirement,
     categories: Vec<Category<'static>>,
@@ -114,7 +114,7 @@ enum State {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum FilterCategoryState {
+pub(crate) enum FilterCategoryState {
     Active,
     Inactive,
 }

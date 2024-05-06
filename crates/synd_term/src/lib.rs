@@ -2,10 +2,10 @@
 #![warn(rustdoc::broken_intra_doc_links)]
 
 pub mod application;
-pub mod auth;
+pub(crate) mod auth;
 pub mod cli;
 pub mod client;
-pub mod command;
+pub(crate) mod command;
 pub mod config;
 pub mod interact;
 pub mod job;

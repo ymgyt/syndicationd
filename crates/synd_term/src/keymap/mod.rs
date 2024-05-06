@@ -10,7 +10,7 @@ pub mod macros;
 use crate::{application::event::KeyEventResult, command::Command};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeymapId {
+pub(crate) enum KeymapId {
     Global = 0,
     Login = 1,
     Tabs = 2,
@@ -22,7 +22,8 @@ pub enum KeymapId {
 }
 
 #[derive(Debug)]
-pub struct Keymap {
+pub(crate) struct Keymap {
+    #[allow(dead_code)]
     id: KeymapId,
     enable: bool,
     trie: KeyTrie,
@@ -42,10 +43,6 @@ impl Keymap {
 
     pub fn from_map(id: KeymapId, map: HashMap<KeyEvent, KeyTrie>) -> Self {
         Self::new(id, KeyTrie::Node(KeyTrieNode { map }))
-    }
-
-    pub fn id(&self) -> KeymapId {
-        self.id
     }
 
     fn search(&mut self, event: &KeyEvent) -> Option<Command> {
@@ -71,7 +68,7 @@ impl Keymap {
     }
 }
 
-pub struct KeymapsConfig {
+pub(crate) struct KeymapsConfig {
     pub login: KeyTrie,
     pub tabs: KeyTrie,
     pub entries: KeyTrie,
@@ -88,7 +85,7 @@ impl Default for KeymapsConfig {
 }
 
 #[derive(Debug)]
-pub struct Keymaps {
+pub(crate) struct Keymaps {
     keymaps: Vec<Keymap>,
 }
 
@@ -148,7 +145,7 @@ impl Default for Keymaps {
 }
 
 #[derive(Clone, Debug)]
-pub enum KeyTrie {
+pub(crate) enum KeyTrie {
     Command(Command),
     Node(KeyTrieNode),
 }
