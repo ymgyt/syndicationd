@@ -14,7 +14,7 @@ version     = "0.2.1"
 
 [dependencies]
 anyhow         = { workspace = true }
-chrono         = { workspace = true }
+chrono         = { workspace = true, features = ["now"] }
 http           = { workspace = true }
 http-serde-ext = "0.1"
 jsonwebtoken   = "9.3.0"
