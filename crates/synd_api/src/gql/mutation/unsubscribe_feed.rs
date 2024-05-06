@@ -17,12 +17,12 @@ impl From<UnsubscribeFeedInput> for usecase::UnsubscribeFeedInput {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Union)]
-pub enum UnsubscribeFeedResponse {
+pub(crate) enum UnsubscribeFeedResponse {
     Success(UnsubscribeFeedSuccess),
     Error(UnsubscribeFeedError),
 }
 
-pub struct UnsubscribeFeedSuccess {
+pub(crate) struct UnsubscribeFeedSuccess {
     pub status: ResponseStatus,
 }
 
@@ -33,7 +33,7 @@ impl UnsubscribeFeedSuccess {
     }
 }
 
-pub struct UnsubscribeFeedError {
+pub(crate) struct UnsubscribeFeedError {
     pub status: ResponseStatus,
     pub message: String,
 }

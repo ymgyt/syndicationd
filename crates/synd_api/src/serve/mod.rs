@@ -40,7 +40,7 @@ pub struct ServeOptions {
 }
 
 #[derive(Clone)]
-pub struct Context {
+pub(crate) struct Context {
     pub gql_monitor: TaskMonitor,
     pub schema: SyndSchema,
 }

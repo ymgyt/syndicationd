@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(InputObject, Debug)]
-pub struct SubscribeFeedInput {
+pub(crate) struct SubscribeFeedInput {
     /// Feed url to subscribe
     pub url: FeedUrl,
     /// Requirement level for feed
@@ -34,12 +34,12 @@ impl From<SubscribeFeedInput> for usecase::SubscribeFeedInput {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Union)]
-pub enum SubscribeFeedResponse {
+pub(crate) enum SubscribeFeedResponse {
     Success(SubscribeFeedSuccess),
     Error(SubscribeFeedError),
 }
 
-pub struct SubscribeFeedSuccess {
+pub(crate) struct SubscribeFeedSuccess {
     pub status: ResponseStatus,
     /// Subscribed feed
     pub feed: object::Feed,
@@ -56,7 +56,7 @@ impl SubscribeFeedSuccess {
     }
 }
 
-pub struct SubscribeFeedError {
+pub(crate) struct SubscribeFeedError {
     pub status: ResponseStatus,
     pub message: String,
 }

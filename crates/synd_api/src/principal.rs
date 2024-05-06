@@ -9,6 +9,7 @@ pub enum Principal {
 }
 
 impl Principal {
+    #[allow(clippy::unnecessary_wraps)]
     pub fn user_id(&self) -> Option<&str> {
         match self {
             Principal::User(User { id, .. }) => Some(id.as_str()),

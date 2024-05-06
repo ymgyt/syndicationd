@@ -1,18 +1,18 @@
 mod query;
-pub use query::Query;
+pub(crate) use query::Query;
 
 mod mutation;
 use async_graphql::{EmptySubscription, Schema, SchemaBuilder};
-pub use mutation::Mutation;
+pub(crate) use mutation::Mutation;
 
 use crate::{gql::mutation::ResponseCode, principal::Principal, usecase};
 
-pub mod object;
-pub mod scalar;
+pub(crate) mod object;
+pub(crate) mod scalar;
 
-pub type SyndSchema = Schema<Query, Mutation, EmptySubscription>;
+pub(crate) type SyndSchema = Schema<Query, Mutation, EmptySubscription>;
 
-pub mod handler {
+pub(crate) mod handler {
     use async_graphql::http::GraphiQLSource;
     use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
     use axum::{response::IntoResponse, Extension};
@@ -22,11 +22,11 @@ pub mod handler {
 
     use crate::{principal::Principal, serve::Context};
 
-    pub async fn graphiql() -> impl IntoResponse {
+    pub(crate) async fn graphiql() -> impl IntoResponse {
         axum::response::Html(GraphiQLSource::build().endpoint("/graphql").finish())
     }
 
-    pub async fn graphql(
+    pub(crate) async fn graphql(
         Extension(Context {
             schema,
             gql_monitor,
@@ -43,7 +43,7 @@ pub mod handler {
 }
 
 #[must_use]
-pub fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
+pub(crate) fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscription> {
     let schema = Schema::build(Query, Mutation, EmptySubscription);
 
     if cfg!(not(feature = "introspection")) {

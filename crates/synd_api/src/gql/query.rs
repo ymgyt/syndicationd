@@ -128,7 +128,7 @@ impl Subscription {
     }
 }
 
-pub struct Query;
+pub(crate) struct Query;
 
 #[Object]
 impl Query {

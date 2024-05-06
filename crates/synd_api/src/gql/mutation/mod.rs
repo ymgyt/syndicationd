@@ -9,7 +9,7 @@ pub mod subscribe_feed;
 pub mod unsubscribe_feed;
 
 #[derive(Enum, PartialEq, Eq, Clone, Copy)]
-pub enum ResponseCode {
+pub(crate) enum ResponseCode {
     /// Operation success
     Ok,
     /// Principal does not have enough permissions
@@ -21,7 +21,7 @@ pub enum ResponseCode {
 }
 
 #[derive(SimpleObject, Clone)]
-pub struct ResponseStatus {
+pub(crate) struct ResponseStatus {
     code: ResponseCode,
 }
 
@@ -70,7 +70,7 @@ enum ErrorResponse {
     UnsubscribeFeed(unsubscribe_feed::UnsubscribeFeedError),
 }
 
-pub struct Mutation;
+pub(crate) struct Mutation;
 
 #[Object]
 impl Mutation {

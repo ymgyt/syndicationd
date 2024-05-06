@@ -14,7 +14,7 @@ use self::id::FeedIdV1;
 pub mod id;
 
 #[derive(SimpleObject)]
-pub struct Link {
+pub(crate) struct Link {
     pub href: String,
     pub rel: Option<String>,
     pub media_type: Option<String>,
@@ -34,7 +34,7 @@ impl From<feedrs::Link> for Link {
     }
 }
 
-pub struct Entry<'a> {
+pub(crate) struct Entry<'a> {
     meta: Cow<'a, Annotated<types::FeedMeta>>,
     entry: types::Entry,
 }
@@ -84,6 +84,7 @@ pub enum FeedType {
     RSS1,
     RSS2,
     RSS0,
+    #[allow(clippy::upper_case_acronyms)]
     JSON,
 }
 

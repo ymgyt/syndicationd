@@ -3,15 +3,7 @@ use std::convert::Infallible;
 use async_graphql::connection::CursorType;
 use synd_feed::types;
 
-pub enum Id {
-    V1(IdV1),
-}
-
-pub enum IdV1 {
-    Feed(FeedIdV1),
-}
-
-pub struct FeedIdV1(String);
+pub(crate) struct FeedIdV1(String);
 
 impl FeedIdV1 {
     pub fn new(url: impl AsRef<str>) -> Self {
