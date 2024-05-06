@@ -4,7 +4,7 @@ use anyhow::Context;
 use axum_server::tls_rustls::RustlsConfig;
 use synd_feed::feed::{
     cache::{CacheConfig, CacheLayer},
-    parser::FeedService,
+    service::FeedService,
 };
 
 use crate::{

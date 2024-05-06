@@ -1,6 +1,6 @@
 use async_graphql::{InputObject, Object, Union};
 use synd_feed::{
-    feed::parser::FetchFeedError,
+    feed::service::FetchFeedError,
     types::{Category, FeedUrl, Requirement},
 };
 

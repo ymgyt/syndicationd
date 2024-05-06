@@ -4,7 +4,7 @@ use async_trait::async_trait;
 // use moka::future::Cache;
 
 use crate::{
-    feed::parser::{FetchFeed, FetchFeedResult},
+    feed::service::{FetchFeed, FetchFeedResult},
     types::{self, FeedUrl},
 };
 

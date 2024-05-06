@@ -12,7 +12,7 @@ use synd_api::{
     shutdown::Shutdown,
     usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
-use synd_feed::feed::{cache::CacheLayer, parser::FeedService};
+use synd_feed::feed::{cache::CacheLayer, service::FeedService};
 use synd_term::terminal::Terminal;
 use tokio::net::{TcpListener, TcpStream};
 

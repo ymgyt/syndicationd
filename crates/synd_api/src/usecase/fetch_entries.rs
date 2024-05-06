@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use synd_feed::{
-    feed::{cache::FetchCachedFeed, parser::FetchFeedError},
+    feed::{cache::FetchCachedFeed, service::FetchFeedError},
     types::{self, Annotated, Entry, EntryId, FeedMeta, FeedUrl},
 };
 use thiserror::Error;

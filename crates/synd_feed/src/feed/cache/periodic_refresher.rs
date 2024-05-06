@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use synd_o11y::metric;
 use tracing::{error, info, warn};
 
-use crate::feed::parser::FetchFeed;
+use crate::feed::service::FetchFeed;
 
 use super::Cache;
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use synd_feed::{
-    feed::{cache::FetchCachedFeed, parser::FetchFeedError},
+    feed::{cache::FetchCachedFeed, service::FetchFeedError},
     types::{Annotated, Category, Feed, FeedUrl, Requirement},
 };
 use synd_o11y::metric;

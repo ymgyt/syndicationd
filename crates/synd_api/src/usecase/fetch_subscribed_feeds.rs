@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use synd_feed::{
-    feed::{cache::FetchCachedFeed, parser::FetchFeedError},
+    feed::{cache::FetchCachedFeed, service::FetchFeedError},
     types::{self, Annotated, FeedUrl},
 };
 use thiserror::Error;
