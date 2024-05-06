@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Add expired_at to Claims by [@ymgyt](https://github.com/ymgyt) ([f1075202](https://github.com/ymgyt/syndicationd/commit/f10752025fd13903cc1bdcefd489fcf71d681f80))
 
+### Miscellaneous Tasks
+
+- Enable chrono now feature by [@ymgyt](https://github.com/ymgyt) ([162e74e6](https://github.com/ymgyt/syndicationd/commit/162e74e648108da9f678af69c784e9b0030b1d5b))
+
 ### Refactor
 
 - Clippy by [@ymgyt](https://github.com/ymgyt) ([f62c5ef2](https://github.com/ymgyt/syndicationd/commit/f62c5ef2b93cd129ca844ef43492acb7c3b9786d))
