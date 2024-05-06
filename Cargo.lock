@@ -3073,7 +3073,7 @@ checksum = "384595c11a4e2969895cad5a8c4029115f5ab956a9e5ef4de79d11a426e5f20c"
 
 [[package]]
 name = "synd-api"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "async-graphql",
