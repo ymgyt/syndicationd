@@ -123,6 +123,7 @@
           just
           nushell # just set nu as shell
           typos
+          cargo-bundle-licenses
         ];
 
         # Inherits from checks cargo-nextest, cargo-audit

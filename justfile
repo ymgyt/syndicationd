@@ -14,13 +14,14 @@ api_dir := "crates/synd_api"
 alias format := fmt
 alias integration := integration-test
 alias unused := machete
+alias licenses := license
 
 # List recipe
 default:
     just --list
 
 # Run check
-check: typo
+check: typo license-check
     nix flake check --all-systems --accept-flake-config
 
 # Run cargo check
@@ -189,3 +190,12 @@ oranda-gen:
 # Build and open rustdoc
 doc:
     cargo doc --open --no-deps
+
+# Generate dependencies licenses
+license: 
+    cargo bundle-licenses --format toml --output THIRDPARTY.toml
+
+# Check dependencies licenses
+license-check:
+    RUST_LOG=error cargo bundle-licenses --format toml --output __CHECK --previous THIRDPARTY.toml --check-previous
+    try {rm __CHECK}

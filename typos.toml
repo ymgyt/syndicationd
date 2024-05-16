@@ -4,6 +4,8 @@ extend-exclude = [
   "crates/synd_api/src/client/github/schema.json",
   # Ignore commit message typo
   "CHANGELOG.md",
+  # Ignore dependencies LICENSES
+  "THIRDPARTY.toml",
 ]
 
 [default.extend-words]
