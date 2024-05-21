@@ -1,6 +1,6 @@
 use std::{
     future,
-    ops::{Add, Sub},
+    ops::{Add, ControlFlow, Sub},
     pin::Pin,
     time::Duration,
 };
@@ -222,13 +222,13 @@ impl Application {
         self.render();
 
         loop {
-            if self.event_loop_until_idle(input).await == EventLoopControlFlow::Quit {
+            if self.event_loop_until_idle(input).await.is_break() {
                 break;
             }
         }
     }
 
-    pub async fn event_loop_until_idle<S>(&mut self, input: &mut S) -> EventLoopControlFlow
+    pub async fn event_loop_until_idle<S>(&mut self, input: &mut S) -> ControlFlow<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
@@ -262,7 +262,7 @@ impl Application {
 
             if self.flags.contains(Should::Quit) {
                 self.flags.remove(Should::Quit); // for testing
-                break EventLoopControlFlow::Quit;
+                break ControlFlow::Break(());
             }
         }
     }
