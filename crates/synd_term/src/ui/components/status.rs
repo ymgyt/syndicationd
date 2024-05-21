@@ -74,9 +74,8 @@ impl StatusLine {
 
         let spans = per_screen_keys
             .flat_map(|(key, desc)| {
-                let desc = Span::styled(format!(" {key} {desc} "), cx.theme.prompt.key_desc);
-                let sep = Span::styled("", cx.theme.prompt.key);
-                [desc, sep]
+                let desc = Span::styled(format!("{key}:{desc}  "), cx.theme.prompt.key_desc);
+                [desc]
             })
             .collect::<Vec<_>>();
 

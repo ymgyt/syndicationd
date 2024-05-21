@@ -84,7 +84,7 @@ impl Theme {
             tabs_selected: Style::new().fg(fg).bg(bg).add_modifier(Modifier::BOLD),
             prompt: PromptTheme {
                 key: Style::new().fg(fg_dark).bg(bg),
-                key_desc: Style::new().fg(bg).bg(fg_dark),
+                key_desc: Style::new().fg(fg_dark).bg(bg).add_modifier(Modifier::DIM),
                 background: Style::new().bg(bg),
             },
             subscription: SubscriptionTheme {

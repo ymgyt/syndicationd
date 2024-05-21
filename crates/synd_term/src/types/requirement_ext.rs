@@ -15,9 +15,9 @@ impl RequirementExt for Requirement {
             Requirement::May => ("MAY", theme.may),
         };
         [
-            Span::styled("", Style::default().fg(color)),
+            Span::styled(" ", Style::default().bg(color)),
             Span::styled(label, Style::default().bg(color).fg(theme.fg)),
-            Span::styled("", Style::default().fg(color)),
+            Span::styled(" ", Style::default().bg(color)),
         ]
     }
 }
