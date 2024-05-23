@@ -128,6 +128,13 @@ demo2gif *flags:
     LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast assets/demo.gif --renderer=resvg {{ flags }}
     rm demo.cast
 
+demo-vhs-record *flags:
+    cat assets/vhs_settings.tape out>> assets/demo.tape
+    nix run nixpkgs#vhs -- record --shell nu out>> assets/demo.tape
+
+demo-vhs-gif:
+    nix run nixpkgs#vhs -- assets/demo.tape
+
 changelog-auth:
     GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
     git cliff --include-path "{{ auth_dir }}/**" --include-path "crates/synd_authn/**" out> {{ auth_dir }}/CHANGELOG.md
