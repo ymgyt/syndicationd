@@ -12,7 +12,7 @@ use crate::{
 };
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
-    style::{Modifier, Style, Stylize},
+    style::Stylize,
     text::{Line, Span, Text},
     widgets::{
         block::{Position, Title},
@@ -136,7 +136,6 @@ impl Entries {
         let entries = Table::new(rows, widths)
             .header(header.style(cx.theme.entries.header))
             .column_spacing(2)
-            .style(cx.theme.entries.background)
             .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
             .highlight_style(cx.theme.entries.selected_entry)
             .highlight_spacing(ratatui::widgets::HighlightSpacing::WhenSelected);
@@ -209,7 +208,7 @@ impl Entries {
                 .unwrap_or_else(|| ui::default_icon());
 
             let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let requirement = entry.requirement().label(&cx.theme.requirement).to_vec();
+            let requirement = entry.requirement().label(&cx.theme.requirement);
 
             Row::new([
                 Cell::from(Span::from(published)),
@@ -219,7 +218,11 @@ impl Entries {
                     Span::from(title),
                 ])),
                 Cell::from(Span::from(feed_title)),
-                Cell::from(Line::from(requirement)),
+                Cell::from(Line::from(vec![
+                    Span::from(" "),
+                    requirement,
+                    Span::from(" "),
+                ])),
             ])
         };
 
@@ -232,7 +235,7 @@ impl Entries {
         )
     }
 
-    fn render_summary(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
+    fn render_summary(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding {
                 left: 3,
@@ -260,7 +263,7 @@ impl Entries {
         // should to Lines?
         let paragraph = Paragraph::new(Text::from(summary))
             .wrap(Wrap { trim: false })
-            .style(Style::default().add_modifier(Modifier::DIM))
+            .style(cx.theme.entries.summary)
             .alignment(Alignment::Center);
 
         Widget::render(paragraph, inner, buf);

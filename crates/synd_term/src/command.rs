@@ -100,6 +100,9 @@ pub(crate) enum Command {
     ActivateAllFilterCategories,
     DeactivateAllFilterCategories,
 
+    // Theme
+    RotateTheme,
+
     HandleError {
         message: String,
         request_seq: Option<RequestSequence>,
@@ -211,5 +214,8 @@ impl Command {
     }
     pub fn deactivate_filtering() -> Self {
         Command::DeactivateFiltering
+    }
+    pub fn rotate_theme() -> Self {
+        Command::RotateTheme
     }
 }

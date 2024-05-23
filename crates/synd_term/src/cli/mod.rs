@@ -1,10 +1,9 @@
 use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
-use ratatui::style::palette::tailwind;
 use url::Url;
 
-use crate::config;
+use crate::{config, ui::theme};
 
 mod check;
 mod clean;
@@ -12,54 +11,17 @@ mod export;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
 pub enum Palette {
-    Slate,
-    Gray,
-    Zinc,
-    Neutral,
-    Stone,
-    Red,
-    Orange,
-    Amber,
-    Yellow,
-    Lime,
-    Green,
-    Emerald,
-    Teal,
-    Cyan,
-    Sky,
-    Blue,
-    Indigo,
-    Violet,
-    Purple,
-    Fuchsia,
-    Pink,
+    Ferra,
+    SolarizedDark,
+    Helix,
 }
 
-impl From<Palette> for tailwind::Palette {
-    fn from(t: Palette) -> Self {
-        #[allow(clippy::wildcard_imports)]
-        match t {
-            Palette::Slate => tailwind::SLATE,
-            Palette::Gray => tailwind::GRAY,
-            Palette::Zinc => tailwind::ZINC,
-            Palette::Neutral => tailwind::NEUTRAL,
-            Palette::Stone => tailwind::STONE,
-            Palette::Red => tailwind::RED,
-            Palette::Orange => tailwind::ORANGE,
-            Palette::Amber => tailwind::AMBER,
-            Palette::Yellow => tailwind::YELLOW,
-            Palette::Lime => tailwind::LIME,
-            Palette::Green => tailwind::GREEN,
-            Palette::Emerald => tailwind::EMERALD,
-            Palette::Teal => tailwind::TEAL,
-            Palette::Cyan => tailwind::CYAN,
-            Palette::Sky => tailwind::SKY,
-            Palette::Blue => tailwind::BLUE,
-            Palette::Indigo => tailwind::INDIGO,
-            Palette::Violet => tailwind::VIOLET,
-            Palette::Purple => tailwind::PURPLE,
-            Palette::Fuchsia => tailwind::FUCHSIA,
-            Palette::Pink => tailwind::PINK,
+impl From<Palette> for theme::Palette {
+    fn from(p: Palette) -> Self {
+        match p {
+            Palette::Ferra => theme::Palette::ferra(),
+            Palette::SolarizedDark => theme::Palette::solarized_dark(),
+            Palette::Helix => theme::Palette::helix(),
         }
     }
 }
@@ -70,8 +32,8 @@ pub struct Args {
     /// Log file path
     #[arg(long, default_value = config::log_path().into_os_string(), env = config::env::LOG_PATH)]
     pub log: PathBuf,
-    /// Color palette
-    #[arg(value_enum, long = "theme", default_value_t = Palette::Slate, env = config::env::THEME)]
+    /// Color theme
+    #[arg(value_enum, long = "theme", default_value_t = Palette::Ferra, env = config::env::THEME, value_name = "THEME")]
     pub palette: Palette,
     #[command(subcommand)]
     pub command: Option<Command>,

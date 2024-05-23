@@ -195,6 +195,7 @@ fn parse(s: &str) -> anyhow::Result<KeyEvent> {
     for token in tokens {
         let modifier = match token {
             "C" => KeyModifiers::CONTROL,
+            "S" => KeyModifiers::SHIFT,
             undefined => bail!("`{undefined}` modifier is not implemented yet"),
         };
         modifiers.insert(modifier);

@@ -1,11 +1,9 @@
-use ratatui::style::{
-    palette::tailwind::{self, Palette},
-    Color, Modifier, Style,
-};
+use ratatui::style::{Color, Modifier, Style, Stylize};
 
 #[derive(Clone)]
 pub struct Theme {
-    pub background: Style,
+    pub name: &'static str,
+    pub base: Style,
     pub application_title: Style,
     pub login: LoginTheme,
     pub tabs: Style,
@@ -46,9 +44,9 @@ pub struct SubscriptionTheme {
 
 #[derive(Clone)]
 pub struct EntriesTheme {
-    pub background: Style,
     pub header: Style,
     pub selected_entry: Style,
+    pub summary: Style,
 }
 
 #[derive(Clone)]
@@ -64,55 +62,105 @@ pub struct SelectionPopup {
     pub highlight: Style,
 }
 
+pub struct Palette {
+    name: &'static str,
+    bg: Color,
+    fg: Color,
+    fg_inactive: Color,
+    fg_focus: Color,
+    error: Color,
+}
+
+impl Palette {
+    pub fn helix() -> Self {
+        Self {
+            name: "helix",
+            bg: Color::Rgb(0x3b, 0x22, 0x4c),
+            fg: Color::Rgb(0xa4, 0xa0, 0xe8),
+            fg_inactive: Color::Rgb(0x69, 0x7c, 0x81),
+            fg_focus: Color::Rgb(0xff, 0xff, 0xff),
+            error: Color::Rgb(0xf4, 0x78, 0x68),
+        }
+    }
+
+    pub fn ferra() -> Self {
+        Self {
+            name: "ferra",
+            bg: Color::Rgb(0x2b, 0x29, 0x2d),
+            fg: Color::Rgb(0xfe, 0xcd, 0xb2),
+            fg_inactive: Color::Rgb(0x6F, 0x5D, 0x63),
+            fg_focus: Color::Rgb(0xff, 0xa0, 0x7a),
+            error: Color::Rgb(0xe0, 0x6b, 0x75),
+        }
+    }
+
+    pub fn solarized_dark() -> Self {
+        Self {
+            name: "solarized_dark",
+            bg: Color::Rgb(0x00, 0x2b, 0x36),
+            fg: Color::Rgb(0x93, 0xa1, 0xa1),
+            fg_inactive: Color::Rgb(0x58, 0x6e, 0x75),
+            fg_focus: Color::Rgb(0x26, 0x8b, 0xd2),
+            error: Color::Rgb(0xdc, 0x32, 0x2f),
+        }
+    }
+}
+
 impl Theme {
     pub fn with_palette(p: &Palette) -> Self {
-        let gray = tailwind::ZINC;
-
-        let bg = p.c950;
-        let fg = p.c100;
-        let fg_dark = gray.c400;
-        let err = tailwind::RED.c600;
+        let Palette {
+            name,
+            bg,
+            fg,
+            fg_inactive,
+            fg_focus,
+            error,
+        } = *p;
 
         Self {
-            background: Style::new().bg(bg),
+            name,
+            base: Style::new().bg(bg).fg(fg),
             application_title: Style::new().fg(fg).bg(bg).add_modifier(Modifier::BOLD),
             login: LoginTheme {
                 title: Style::new().add_modifier(Modifier::BOLD),
                 selected_auth_provider_item: Style::new().add_modifier(Modifier::BOLD),
             },
-            tabs: Style::new().fg(gray.c600).bg(bg),
-            tabs_selected: Style::new().fg(fg).bg(bg).add_modifier(Modifier::BOLD),
+            tabs: Style::new().fg(fg),
+            tabs_selected: Style::new().fg(fg_focus).bold(),
             prompt: PromptTheme {
-                key: Style::new().fg(fg_dark).bg(bg),
-                key_desc: Style::new().fg(fg_dark).bg(bg).add_modifier(Modifier::DIM),
+                key: Style::new().fg(fg_inactive).bg(bg),
+                key_desc: Style::new().fg(fg_inactive).bg(bg),
                 background: Style::new().bg(bg),
             },
             subscription: SubscriptionTheme {
                 background: Style::new().bg(bg),
                 header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                selected_feed: Style::new().add_modifier(Modifier::BOLD),
+                selected_feed: Style::new().fg(fg_focus).add_modifier(Modifier::BOLD),
             },
             entries: EntriesTheme {
-                background: Style::new().bg(bg),
                 header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                selected_entry: Style::new().add_modifier(Modifier::BOLD),
+                selected_entry: Style::new().fg(fg_focus).add_modifier(Modifier::BOLD),
+                summary: Style::new().fg(fg),
             },
             error: ErrorTheme {
-                message: Style::new().fg(err).bg(bg),
+                message: Style::new().fg(error).bg(bg),
             },
             default_icon_fg: fg,
             requirement: RequirementLabelTheme {
-                must: Color::Rgb(154, 4, 4),
-                should: Color::Rgb(243, 201, 105),
-                may: Color::Rgb(35, 57, 91),
-                fg: bg,
+                must: bg,
+                should: bg,
+                may: bg,
+                fg,
             },
             selection_popup: SelectionPopup {
                 highlight: Style::new().bg(Color::Yellow).fg(bg),
             },
         }
     }
-    pub fn new() -> Self {
-        Self::with_palette(&tailwind::SLATE)
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme::with_palette(&Palette::ferra())
     }
 }

@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
-use ratatui::{style::palette::tailwind, widgets::Widget};
+use ratatui::widgets::Widget;
 use synd_auth::device_flow::{
     self, DeviceAccessTokenResponse, DeviceAuthorizationResponse, DeviceFlow,
 };
@@ -31,7 +31,7 @@ use crate::{
             authentication::AuthenticateState, filter::FeedFilter, root::Root,
             subscription::UnsubscribeSelection, tabs::Tab, Components,
         },
-        theme::Theme,
+        theme::{Palette, Theme},
     },
 };
 
@@ -133,7 +133,7 @@ impl Application {
             interactor: Interactor::new(),
             authenticator: Authenticator::new(),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
-            theme: Theme::with_palette(&tailwind::BLUE),
+            theme: Theme::default(),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
             config,
@@ -560,6 +560,10 @@ impl Application {
                     self.apply_feed_filter(filter);
                     self.should_render();
                 }
+                Command::RotateTheme => {
+                    self.rotate_theme();
+                    self.should_render();
+                }
                 Command::HandleError {
                     message,
                     request_seq,
@@ -937,6 +941,15 @@ impl Application {
     fn apply_feed_filter(&mut self, filter: FeedFilter) {
         self.components.entries.update_filter(filter.clone());
         self.components.subscription.update_filter(filter);
+    }
+
+    fn rotate_theme(&mut self) {
+        let p = match self.theme.name {
+            "ferra" => Palette::solarized_dark(),
+            "solarized_dark" => Palette::helix(),
+            _ => Palette::ferra(),
+        };
+        self.theme = Theme::with_palette(&p);
     }
 }
 

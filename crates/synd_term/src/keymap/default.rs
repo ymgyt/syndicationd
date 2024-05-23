@@ -48,6 +48,7 @@ pub fn default() -> KeymapsConfig {
     });
     let global = keymap!({
         "q" | "C-c" =>  quit ,
+        "S-t" => rotate_theme,
     });
 
     KeymapsConfig {

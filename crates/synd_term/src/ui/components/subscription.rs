@@ -275,10 +275,7 @@ impl Subscription {
                 .as_deref()
                 .unwrap_or(ui::UNKNOWN_SYMBOL);
             let desc = feed_meta.description.as_deref().unwrap_or("");
-            let requirement = feed_meta
-                .requirement()
-                .label(&cx.theme.requirement)
-                .to_vec();
+            let requirement = feed_meta.requirement().label(&cx.theme.requirement);
             let category = feed_meta.category();
             let icon = cx
                 .categories
@@ -299,7 +296,11 @@ impl Subscription {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
-                Cell::from(Line::from(requirement)),
+                Cell::from(Line::from(vec![
+                    Span::from(" "),
+                    requirement,
+                    Span::from(" "),
+                ])),
             ])
         };
 
@@ -467,7 +468,7 @@ impl Subscription {
                 bottom: 1,
             })
             .borders(Borders::ALL)
-            .style(cx.theme.background);
+            .style(cx.theme.base);
 
         let inner_area = block.inner(area);
         let vertical = Layout::vertical([Constraint::Length(6), Constraint::Fill(1)]);

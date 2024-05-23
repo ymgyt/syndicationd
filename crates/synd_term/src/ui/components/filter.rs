@@ -343,11 +343,19 @@ impl Filter {
             Span::from(concat!(icon!(requirement), " Requirement")).dim(),
             Span::from(" "),
         ];
-        spans.extend(self.requirement.label(&cx.theme.requirement));
+        spans.push(self.requirement.label(&cx.theme.requirement).bold());
 
         spans.extend([
             Span::from(" "),
-            Span::from(concat!(icon!(category), " Categories")).dim(),
+            {
+                let s = Span::from(concat!(icon!(category), " Categories"));
+
+                if self.state == State::CategoryFiltering {
+                    s
+                } else {
+                    s.dim()
+                }
+            },
             Span::from("  "),
         ]);
 

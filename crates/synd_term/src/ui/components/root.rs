@@ -46,9 +46,7 @@ impl<'a> Root<'a> {
 impl<'a> Widget for Root<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Background
-        Block::new()
-            .style(self.cx.theme.background)
-            .render(area, buf);
+        Block::new().style(self.cx.theme.base).render(area, buf);
 
         if self.components.auth.should_render() {
             let [auth_area, prompt_area] =

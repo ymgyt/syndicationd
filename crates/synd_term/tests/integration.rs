@@ -64,7 +64,7 @@ mod test {
         // or mpsc and tokio_stream ReceiverStream
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let mut event_stream = UnboundedReceiverStream::new(rx);
-        let theme = Theme::new();
+        let theme = Theme::default();
         // let bg = theme.background.bg.unwrap_or_default();
 
         let mut application =

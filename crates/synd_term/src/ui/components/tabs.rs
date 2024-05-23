@@ -49,7 +49,7 @@ impl Tabs {
             width: area.width.saturating_sub(5),
             ..area
         };
-        // left padding * 2 + len("Entries" + "Feeds") = 20
+
         let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(24)]);
         let [title, tabs] = horizontal.areas(area);
 
