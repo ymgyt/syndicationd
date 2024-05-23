@@ -6,6 +6,8 @@ Set Width 1200
 Set Height 1000
 Set PlaybackSpeed 1
 Set TypingSpeed 0.2
+Set Margin 0
+Set Padding 0
 
 Sleep 1s
 Type "synd"
