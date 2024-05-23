@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.4] 2024-05-06
+## [unreleased] __release_date__
+
+### Features
+
+- Add ferra, solarized_dark, helix themes by [@ymgyt](https://github.com/ymgyt) ([d463de09](https://github.com/ymgyt/syndicationd/commit/d463de090b91d792aed28d3d4a1e423989281a4c))
+
+### Miscellaneous Tasks
+
+- Avoid using fonts that cause issues when terminal opacity is enabled by [@ymgyt](https://github.com/ymgyt) ([13c7b8d5](https://github.com/ymgyt/syndicationd/commit/13c7b8d506cecad3f255f22809eacdee2419db2a))
+
+### Refactor
+
+- Use std::ops::ControlFlow for app loop control by [@ymgyt](https://github.com/ymgyt) ([99423986](https://github.com/ymgyt/syndicationd/commit/9942398608c174c1ff41b7c18f1e3169fc857c7d))
+
+## [v0.2.4] - 2024-05-06
 
 ### Features
 
