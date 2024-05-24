@@ -32,11 +32,7 @@
           sha256 = "sha256-opUgs6ckUQCyDxcB9Wy51pqhd0MPGHUVbwRKKPGiwZU=";
         };
 
-        # `crane.lib.${system}` is deprecated. please use `(crane.mkLib nixpkgs.legacyPackages.${system})` instead        
-        # craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
-        craneLib =
-          (crane.mkLib nixpkgs.legacyPackages.${system}).overrideToolchain
-          rustToolchain;
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         src = pkgs.lib.cleanSourceWith {
           src = ./.; # The original, unfiltered source
@@ -68,31 +64,29 @@
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        syndTermCrate = craneLib.crateNameFromCargoToml {
-          cargoToml = ./crates/synd_term/Cargo.toml;
-        };
-        syndTerm = craneLib.buildPackage (commonArgs // {
+        individualCrateArgs = commonArgs // {
           inherit cargoArtifacts;
-          inherit (syndTermCrate) pname version;
-          cargoExtraArgs = "--package ${syndTermCrate.pname}";
-        });
-        syndTermOnly = craneLib.buildPackage (commonArgs // {
-          inherit (syndTermCrate) pname version;
-          cargoExtraArgs = "--package ${syndTermCrate.pname}";
-        });
+          # NB: we disable tests since we will run them all via cargo-nextest
+          doCheck = false;
+        };
 
-        syndApiCrate = craneLib.crateNameFromCargoToml {
-          cargoToml = ./crates/synd_api/Cargo.toml;
-        };
-        syndApi = craneLib.buildPackage (commonArgs // {
-          inherit cargoArtifacts;
-          inherit (syndApiCrate) pname version;
-          cargoExtraArgs = "--package ${syndApiCrate.pname}";
-        });
-        syndApiOnly = craneLib.buildPackage (commonArgs // {
-          inherit (syndApiCrate) pname version;
-          cargoExtraArgs = "--package ${syndApiCrate.pname}";
-        });
+        syndTerm = craneLib.buildPackage (individualCrateArgs // (let
+          crate = craneLib.crateNameFromCargoToml {
+            cargoToml = ./crates/synd_term/Cargo.toml;
+          };
+        in {
+          inherit (crate) pname version;
+          cargoExtraArgs = "--package ${crate.pname}";
+        }));
+
+        syndApi = craneLib.buildPackage (individualCrateArgs // (let
+          crate = craneLib.crateNameFromCargoToml {
+            cargoToml = ./crates/synd_api/Cargo.toml;
+          };
+        in {
+          inherit (crate) pname version;
+          cargoExtraArgs = "--package ${crate.pname}";
+        }));
 
         checks = {
           inherit syndTerm syndApi;
@@ -150,12 +144,14 @@
       in {
         inherit checks;
 
-        packages.default = self.packages."${system}".synd;
-        packages.synd = syndTermOnly;
-        packages.synd-api = syndApiOnly;
+        packages = {
+          default = self.packages."${system}".synd;
+          synd = syndTerm;
+          synd-api = syndApi;
+        };
 
         apps.default = flake-utils.lib.mkApp {
-          drv = syndTermOnly;
+          drv = syndTerm;
           name = "synd";
         };
 
