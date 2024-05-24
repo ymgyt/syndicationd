@@ -148,6 +148,14 @@
           default = self.packages."${system}".synd;
           synd = syndTerm;
           synd-api = syndApi;
+        } // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          coverage = craneLib.cargoLlvmCov (commonArgs // {
+            inherit cargoArtifacts;
+            # not supported yet in crane
+            # cargoLlvmCovCommand = "nextest";
+            cargoLlvmCovExtraArgs =
+              "--codecov --all-features --output-path $out";
+          });
         };
 
         apps.default = flake-utils.lib.mkApp {
