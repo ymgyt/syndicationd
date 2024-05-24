@@ -2,7 +2,7 @@
   description = "syndicationd";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
     fenix = {
       url = "github:nix-community/fenix";
@@ -10,7 +10,7 @@
     };
 
     crane = {
-      url = "github:ipetkov/crane";
+      url = "github:ipetkov/crane/v0.17.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -32,7 +32,11 @@
           sha256 = "sha256-opUgs6ckUQCyDxcB9Wy51pqhd0MPGHUVbwRKKPGiwZU=";
         };
 
-        craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
+        # `crane.lib.${system}` is deprecated. please use `(crane.mkLib nixpkgs.legacyPackages.${system})` instead        
+        # craneLib = crane.lib.${system}.overrideToolchain rustToolchain;
+        craneLib =
+          (crane.mkLib nixpkgs.legacyPackages.${system}).overrideToolchain
+          rustToolchain;
 
         src = pkgs.lib.cleanSourceWith {
           src = ./.; # The original, unfiltered source
@@ -101,7 +105,7 @@
 
           nextest = craneLib.cargoNextest (commonArgs // {
             inherit cargoArtifacts;
-            cargoExtraArgs = "--features integration --no-capture";
+            cargoNextestExtraArgs = "--features integration --no-capture";
             CARGO_PROFILE = "";
             RUST_LOG = "synd,integration=debug";
           });
@@ -130,12 +134,12 @@
         dev_packages = with pkgs;
           [
             graphql-client
-            nixfmt
             opentelemetry-collector-contrib
             git-cliff
             cargo-release
             cargo-machete
-            cargo-llvm-cov
+            # cargo-llvm-cov-0.6.9 is marked as broken,
+            # cargo-llvm-cov
             # We need latest cargo-dist which is not available in nixpkgs-unstable now
             # cargo-dist
             oranda

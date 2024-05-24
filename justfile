@@ -62,7 +62,7 @@ integration-test:
         
 # Generate test coverage
 coverage *flags:
-    cargo llvm-cov nextest --all-features {{ flags }}
+    nix run nixpkgs#cargo-llvm-cov -- nextest --all-features {{ flags }}
 
 # Update synd_api graphql schema
 update-gql-schema:
