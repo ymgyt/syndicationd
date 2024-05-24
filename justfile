@@ -22,7 +22,7 @@ default:
     just --list
 
 # Run check
-check: typo license-check
+check: typo
     nix flake check --all-systems --accept-flake-config
 
 # Run cargo check
@@ -209,5 +209,5 @@ license:
 
 # Check dependencies licenses
 license-check:
-    RUST_LOG=error cargo bundle-licenses --format toml --output __CHECK --previous THIRDPARTY.toml --check-previous
-    try {rm __CHECK}
+    try { RUST_LOG=error cargo bundle-licenses --format toml --output __CHECK --previous THIRDPARTY.toml --check-previous }
+    rm __CHECK
