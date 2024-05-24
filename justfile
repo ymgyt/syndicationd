@@ -15,6 +15,7 @@ alias format := fmt
 alias integration := integration-test
 alias unused := machete
 alias licenses := license
+alias cov := coverage
 
 # List recipe
 default:
@@ -57,7 +58,11 @@ test *flags:
 
 # Run integration test
 integration-test:
-    RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd-term --features integration --test integration --no-capture 
+    RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd-term --features integration --test integration --no-capture
+        
+# Generate test coverage
+coverage *flags:
+    cargo llvm-cov nextest --all-features {{ flags }}
 
 # Update synd_api graphql schema
 update-gql-schema:

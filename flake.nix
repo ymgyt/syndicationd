@@ -131,12 +131,11 @@
           [
             graphql-client
             nixfmt
-            # Failed to run proc-macro server from path /nix/store/z1vlkv6nccjd523iwp5p6pdkr2abm9jq-rust-1.76.0/libexec/rust-analyzer-proc-macro-srv,
-            # rust-analyzer
             opentelemetry-collector-contrib
             git-cliff
             cargo-release
             cargo-machete
+            cargo-llvm-cov
             # We need latest cargo-dist which is not available in nixpkgs-unstable now
             # cargo-dist
             oranda
