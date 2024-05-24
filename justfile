@@ -11,6 +11,8 @@ feed_dir := "crates/synd_feed"
 o11y_dir := "crates/synd_o11y"
 api_dir := "crates/synd_api"
 
+demo_tape := "assets/demo.tape"
+
 alias format := fmt
 alias integration := integration-test
 alias unused := machete
@@ -134,11 +136,11 @@ demo2gif *flags:
     rm demo.cast
 
 demo-vhs-record *flags:
-    cat assets/vhs_settings.tape out>> assets/demo.tape
-    nix run nixpkgs#vhs -- record --shell nu out>> assets/demo.tape
+    cat assets/vhs_settings.tape out> {{ demo_tape }}
+    nix run nixpkgs#vhs -- record --shell nu out>> {{ demo_tape }}
 
 demo-vhs-gif:
-    nix run nixpkgs#vhs -- assets/demo.tape
+    nix run nixpkgs#vhs -- {{ demo_tape }}
 
 changelog-auth:
     GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
