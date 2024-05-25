@@ -39,6 +39,8 @@
           filter = path: type:
             # Load self signed certs to test
             (pkgs.lib.hasSuffix ".pem" path)
+            # insta snapshots
+            || (pkgs.lib.hasSuffix ".snap" path)
             || (pkgs.lib.hasSuffix "categories.toml" path) ||
             # Default filter from crane (allow .rs files)
             (craneLib.filterCargoSources path type);
@@ -132,6 +134,7 @@
             git-cliff
             cargo-release
             cargo-machete
+            cargo-insta
             # cargo-llvm-cov-0.6.9 is marked as broken,
             # cargo-llvm-cov
             # We need latest cargo-dist which is not available in nixpkgs-unstable now

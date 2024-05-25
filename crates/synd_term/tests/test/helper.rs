@@ -16,8 +16,8 @@ use synd_feed::feed::{cache::CacheLayer, service::FeedService};
 use synd_term::terminal::Terminal;
 use tokio::net::{TcpListener, TcpStream};
 
-pub fn new_test_terminal() -> Terminal {
-    let backend = TestBackend::new(80, 20);
+pub fn new_test_terminal(width: u16, height: u16) -> Terminal {
+    let backend = TestBackend::new(width, height);
     let terminal = ratatui::Terminal::new(backend).unwrap();
     Terminal::with(terminal)
 }

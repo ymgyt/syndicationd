@@ -75,7 +75,7 @@ impl Terminal {
     }
 
     #[cfg(feature = "integration")]
-    pub fn assert_buffer(&self, expected: &Buffer) {
-        self.backend.backend().assert_buffer(expected);
+    pub fn buffer(&self) -> &Buffer {
+        self.backend.backend().buffer()
     }
 }

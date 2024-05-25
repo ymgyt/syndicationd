@@ -1,0 +1,50 @@
+---
+source: crates/synd_term/tests/integration.rs
+expression: application.buffer()
+---
+Buffer {
+    area: Rect { x: 0, y: 0, width: 120, height: 30 },
+    content: [
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                          Login                                                         ",
+        "                                    ────────────────────────────────────────────────                                    ",
+        "                                    Open the following URL and Enter the code                                           ",
+        "                                                                                                                        ",
+        "                                    URL:  https://syndicationd.ymgyt.io/test                                            ",
+        "                                    Code: UC123456                                                                      ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                   j/k:󰹹  Ent:󰏌  q:                                                    ",
+    ],
+    styles: [
+        x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 58, y: 7, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD,
+        x: 63, y: 7, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 42, y: 11, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD,
+        x: 76, y: 11, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 42, y: 12, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD,
+        x: 50, y: 12, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 51, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 70, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+    ]
+}

@@ -61,10 +61,14 @@ test *flags:
 # Run integration test
 integration-test:
     RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd-term --features integration --test integration --no-capture
+
+# Run cargo insta review
+review:
+    cargo insta review
         
 # Generate test coverage
 coverage *flags:
-    nix run nixpkgs#cargo-llvm-cov -- nextest --all-features {{ flags }}
+    nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest --all-features --open {{ flags }}
 
 # Update synd_api graphql schema
 update-gql-schema:

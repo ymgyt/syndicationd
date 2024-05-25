@@ -981,7 +981,7 @@ impl Application {
 
 #[cfg(feature = "integration")]
 impl Application {
-    pub fn assert_buffer(&self, expected: &ratatui::buffer::Buffer) {
-        self.terminal.assert_buffer(expected);
+    pub fn buffer(&self) -> &ratatui::buffer::Buffer {
+        self.terminal.buffer()
     }
 }
