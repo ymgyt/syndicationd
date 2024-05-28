@@ -2,11 +2,10 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
-    prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
+    prelude::{Alignment, Buffer, Constraint, Layout, Rect},
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
-        block::{Position, Title},
         Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row, Scrollbar,
         ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Tabs, Widget,
     },
@@ -178,11 +177,14 @@ impl Subscription {
     }
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        // padding
-        let feeds_area = area.inner(&Margin {
-            vertical: 1,
-            horizontal: 1,
-        });
+        let feeds_area = Block::new()
+            .padding(Padding {
+                top: 1,
+                left: 0,
+                right: 1,
+                bottom: 0,
+            })
+            .inner(area);
 
         let mut feeds_state = TableState::new()
             .with_offset(0)
@@ -208,7 +210,7 @@ impl Subscription {
 
         let scrollbar_area = Rect {
             y: area.y + 2, // table header
-            height: area.height.saturating_sub(3),
+            height: area.height.saturating_sub(1),
             ..area
         };
 
@@ -317,16 +319,11 @@ impl Subscription {
     fn render_feed_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding {
-                left: 3,
-                right: 3,
-                top: 1,
+                left: 2,
+                right: 2,
+                top: 0,
                 bottom: 0,
             })
-            .title(
-                Title::from(" Detail ")
-                    .position(Position::Top)
-                    .alignment(Alignment::Center),
-            )
             .borders(Borders::TOP)
             .border_type(BorderType::Plain);
 
@@ -339,10 +336,7 @@ impl Subscription {
 
         let vertical = Layout::vertical([Constraint::Length(3), Constraint::Min(0)]);
         let [meta_area, entries_area] = vertical.areas(inner);
-        let entries_area = entries_area.inner(&Margin {
-            vertical: 1,
-            horizontal: 0,
-        });
+        let entries_area = Block::new().padding(Padding::top(1)).inner(entries_area);
 
         let widths = [
             Constraint::Length(11),
@@ -393,10 +387,7 @@ impl Subscription {
                 )),
                 Cell::new(Span::from(feed.category().as_str())),
                 Cell::new(Line::from(vec![
-                    Span::styled(
-                        " Requirement ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
+                    Span::styled(" Req  ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::from(feed.requirement().to_string()),
                 ])),
             ]),

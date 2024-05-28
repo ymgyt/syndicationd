@@ -45,8 +45,8 @@ impl Tabs {
 impl Tabs {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = Rect {
-            x: area.x + 3,
-            width: area.width.saturating_sub(5),
+            x: area.x + 2,
+            width: area.width.saturating_sub(3),
             ..area
         };
 

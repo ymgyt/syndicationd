@@ -323,13 +323,13 @@ impl Filter {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = Block::new()
             .padding(Padding {
-                left: 3,
+                left: 2,
                 right: 1,
                 top: 0,
                 bottom: 0,
             })
             .inner(area);
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]);
+        let vertical = Layout::vertical([Constraint::Length(2), Constraint::Length(1)]);
         let [filter_area, search_area] = vertical.areas(area);
 
         self.render_filter(filter_area, buf, cx);
@@ -338,26 +338,18 @@ impl Filter {
 
     fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let mut spans = vec![
-            Span::from(concat!(icon!(filter), " Filter")),
-            Span::from("     "),
-            Span::from(concat!(icon!(requirement), " Requirement")).dim(),
-            Span::from(" "),
-        ];
-        spans.push(self.requirement.label(&cx.theme.requirement).bold());
-
-        spans.extend([
+            Span::from(concat!(icon!(filter), " Filter")).dim(),
             Span::from(" "),
             {
-                let s = Span::from(concat!(icon!(category), " Categories"));
-
-                if self.state == State::CategoryFiltering {
-                    s
+                let r = self.requirement.label(&cx.theme.requirement);
+                if r.content == "MAY" {
+                    r.dim()
                 } else {
-                    s.dim()
+                    r
                 }
             },
-            Span::from("  "),
-        ]);
+            Span::from(" | ").dim(),
+        ];
 
         for c in &self.categories {
             let state = self
@@ -390,18 +382,16 @@ impl Filter {
         if self.state == State::CategoryFiltering {
             spans.push(Span::from("(Esc/+/-)").dim());
         }
-
         Line::from(spans).render(area, buf);
     }
     fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
-        let mut spans = vec![Span::from("             ")];
-
+        let mut spans = vec![];
         let mut label = Span::from(concat!(icon!(search), " Search"));
-
         if self.state != State::SearchFiltering {
             label = label.dim();
         }
         spans.push(label);
+        spans.push(Span::from(""));
 
         let search = Line::from(spans);
         let margin = search.width() + 1;

@@ -11,11 +11,10 @@ use crate::{
     },
 };
 use ratatui::{
-    prelude::{Alignment, Buffer, Constraint, Layout, Margin, Rect},
+    prelude::{Alignment, Buffer, Constraint, Layout, Rect},
     style::Stylize,
     text::{Line, Span, Text},
     widgets::{
-        block::{Position, Title},
         Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Scrollbar, ScrollbarOrientation,
         ScrollbarState, StatefulWidget, Table, TableState, Widget, Wrap,
     },
@@ -121,11 +120,14 @@ impl Entries {
     }
 
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        // padding
-        let entries_area = area.inner(&Margin {
-            vertical: 1,
-            horizontal: 1,
-        });
+        let entries_area = Block::new()
+            .padding(Padding {
+                top: 1,
+                left: 0,
+                right: 1,
+                bottom: 0,
+            })
+            .inner(area);
 
         let mut entries_state = TableState::new()
             .with_offset(0)
@@ -144,7 +146,7 @@ impl Entries {
 
         let scrollbar_area = Rect {
             y: area.y + 2, // table header
-            height: area.height.saturating_sub(3),
+            height: area.height.saturating_sub(1),
             ..area
         };
 
@@ -237,17 +239,7 @@ impl Entries {
 
     fn render_summary(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
-            .padding(Padding {
-                left: 3,
-                right: 3,
-                top: 1,
-                bottom: 1,
-            })
-            .title(
-                Title::from(" Summary ")
-                    .position(Position::Top)
-                    .alignment(Alignment::Center),
-            )
+            .padding(Padding::horizontal(2))
             .borders(Borders::TOP)
             .border_type(BorderType::Plain);
 
@@ -264,7 +256,7 @@ impl Entries {
         let paragraph = Paragraph::new(Text::from(summary))
             .wrap(Wrap { trim: false })
             .style(cx.theme.entries.summary)
-            .alignment(Alignment::Center);
+            .alignment(Alignment::Left);
 
         Widget::render(paragraph, inner, buf);
     }
