@@ -337,9 +337,12 @@ impl Filter {
     }
 
     fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let mut spans = vec![
+        let horizontal = Layout::horizontal([Constraint::Length(18), Constraint::Fill(1)]);
+        let [requirement_area, categories_area] = horizontal.areas(area);
+
+        let spans = vec![
             Span::from(concat!(icon!(filter), " Filter")).dim(),
-            Span::from(" "),
+            Span::from("     "),
             {
                 let r = self.requirement.label(&cx.theme.requirement);
                 if r.content == "MAY" {
@@ -348,8 +351,11 @@ impl Filter {
                     r
                 }
             },
-            Span::from(" | ").dim(),
+            Span::from("  "),
         ];
+        Line::from(spans).render(requirement_area, buf);
+
+        let mut spans = vec![];
 
         for c in &self.categories {
             let state = self
@@ -382,8 +388,9 @@ impl Filter {
         if self.state == State::CategoryFiltering {
             spans.push(Span::from("(Esc/+/-)").dim());
         }
-        Line::from(spans).render(area, buf);
+        Line::from(spans).render(categories_area, buf);
     }
+
     fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
         let mut spans = vec![];
         let mut label = Span::from(concat!(icon!(search), " Search"));
@@ -391,7 +398,7 @@ impl Filter {
             label = label.dim();
         }
         spans.push(label);
-        spans.push(Span::from(""));
+        spans.push(Span::from("    "));
 
         let search = Line::from(spans);
         let margin = search.width() + 1;
