@@ -14,6 +14,7 @@ use synd_auth::device_flow::{
 };
 use synd_feed::types::FeedUrl;
 use tokio::time::{Instant, Sleep};
+use update_informer::Version;
 
 use crate::{
     application::event::KeyEventResult,
@@ -101,6 +102,7 @@ pub struct Application {
     config: Config,
     key_handlers: event::KeyHandlers,
     categories: Categories,
+    latest_release: Option<Version>,
 
     screen: Screen,
     flags: Should,
@@ -139,6 +141,7 @@ impl Application {
             config,
             key_handlers,
             categories,
+            latest_release: None,
             flags: Should::empty(),
         }
     }
@@ -175,6 +178,7 @@ impl Application {
     pub fn handle_initial_credential(&mut self, cred: Credential) {
         self.set_credential(cred);
         self.initial_fetch();
+        self.check_latest_release();
         self.components.auth.authenticated();
         self.keymaps().disable(KeymapId::Login);
         self.keymaps().enable(KeymapId::Tabs);
@@ -211,6 +215,8 @@ impl Application {
         self.event_loop(input).await;
 
         self.terminal.restore()?;
+
+        self.inform_latest_release();
 
         Ok(())
     }
@@ -274,6 +280,7 @@ impl Application {
         // should detect infinite loop ?
         while let Some(command) = next.take() {
             match command {
+                Command::Nop => {}
                 Command::Quit => self.flags.insert(Should::Quit),
                 Command::ResizeTerminal { .. } => {
                     self.should_render();
@@ -563,6 +570,9 @@ impl Application {
                 Command::RotateTheme => {
                     self.rotate_theme();
                     self.should_render();
+                }
+                Command::InformLatestRelease(version) => {
+                    self.latest_release = Some(version);
                 }
                 Command::HandleError {
                     message,
@@ -950,6 +960,42 @@ impl Application {
             _ => Palette::ferra(),
         };
         self.theme = Theme::with_palette(&p);
+    }
+}
+
+impl Application {
+    fn check_latest_release(&mut self) {
+        use update_informer::{registry, Check};
+
+        // update informer use reqwest::blocking
+        let check = tokio::task::spawn_blocking(|| {
+            let name = env!("CARGO_PKG_NAME");
+            let version = env!("CARGO_PKG_VERSION");
+            #[cfg(not(test))]
+            let informer = update_informer::new(registry::Crates, name, version)
+                .interval(Duration::from_secs(60 * 60 * 24))
+                .timeout(Duration::from_secs(5));
+
+            #[cfg(test)]
+            let informer = update_informer::fake(registry::Crates, name, version, "v1.0.0");
+
+            informer.check_version().ok().flatten()
+        });
+        let fut = async move {
+            match check.await {
+                Ok(Some(version)) => Ok(Command::InformLatestRelease(version)),
+                _ => Ok(Command::Nop),
+            }
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
+
+    fn inform_latest_release(&self) {
+        let current_version = env!("CARGO_PKG_VERSION");
+        if let Some(new_version) = &self.latest_release {
+            println!("A new release of synd is available: v{current_version} -> {new_version}");
+        }
     }
 }
 

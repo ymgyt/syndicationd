@@ -14,6 +14,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
+    Nop,
     Quit,
     ResizeTerminal {
         _columns: u16,
@@ -102,6 +103,9 @@ pub(crate) enum Command {
 
     // Theme
     RotateTheme,
+
+    // Latest release check
+    InformLatestRelease(update_informer::Version),
 
     HandleError {
         message: String,

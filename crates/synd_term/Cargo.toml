@@ -50,6 +50,7 @@ tracing-appender     = "0.2.3"
 tracing-subscriber   = { workspace = true }
 tui-big-text         = "0.4.3"
 unicode-segmentation = "1.10.1"
+update-informer      = { version = "1.1.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 url                  = { workspace = true }
 # https://github.com/arkbig/throbber-widgets-tui/pull/5
 # throbber-widgets-tui = "0.3.0"
