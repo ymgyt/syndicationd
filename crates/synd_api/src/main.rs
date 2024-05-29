@@ -1,3 +1,5 @@
+use std::env;
+
 use fdlimit::Outcome;
 use synd_o11y::{
     opentelemetry::OpenTelemetryGuard, tracing_subscriber::otel_metrics::metrics_event_filter,
@@ -109,7 +111,10 @@ fn init_file_descriptor_limit() {
 
 #[tokio::main]
 async fn main() {
-    let args = args::parse();
+    let args = match args::try_parse(env::args_os()) {
+        Ok(args) => args,
+        Err(err) => err.exit(),
+    };
     let _guard = init_tracing(&args.o11y);
     let shutdown = Shutdown::watch_signal();
 

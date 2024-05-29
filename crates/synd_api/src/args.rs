@@ -1,4 +1,4 @@
-use std::{net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
+use std::{ffi::OsString, net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
 use clap::{ArgAction, Parser};
 
@@ -24,7 +24,7 @@ pub struct Args {
     pub cache: CacheOptions,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Clone)]
 #[command(next_help_heading = "Kvsd options")]
 pub struct KvsdOptions {
     #[arg(long = "kvsd-host", env = env_key!("KVSD_HOST"))]
@@ -37,7 +37,7 @@ pub struct KvsdOptions {
     pub kvsd_password: String,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Clone)]
 #[command(next_help_heading = "Bind options")]
 pub struct BindOptions {
     #[arg(long, value_parser = IpAddr::from_str, default_value = config::serve::DEFAULT_ADDR, env = env_key!("BIND_ADDR"))]
@@ -46,7 +46,7 @@ pub struct BindOptions {
     pub port: u16,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Clone)]
 #[command(next_help_heading = "Serve options")]
 pub struct ServeOptions {
     /// Request timeout duration
@@ -102,9 +102,12 @@ pub struct CacheOptions {
     pub feed_cache_refresh_interval: Duration,
 }
 
-#[must_use]
-pub fn parse() -> Args {
-    Args::parse()
+pub fn try_parse<I, T>(iter: I) -> Result<Args, clap::Error>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    Args::try_parse_from(iter)
 }
 
 impl From<BindOptions> for serve::BindOptions {
@@ -126,5 +129,35 @@ impl From<ServeOptions> for serve::ServeOptions {
             body_limit_bytes,
             concurrency_limit,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_parse() {
+        assert_eq!(
+            try_parse(["synd-api", "--version"]).unwrap_err().kind(),
+            clap::error::ErrorKind::DisplayVersion
+        );
+        assert_eq!(
+            try_parse(["synd-api", "--help"]).unwrap_err().kind(),
+            clap::error::ErrorKind::DisplayHelp,
+        );
+        let args = try_parse([
+            "synd-api",
+            "--kvsd-host=foo",
+            "--kvsd-port=3000",
+            "--kvsd-username=me",
+            "--kvsd-password=secret",
+            "--tls-cert=path/to/cert",
+            "--tls-key=path/to/key",
+        ])
+        .unwrap();
+        let _ = serve::BindOptions::from(args.bind.clone());
+        let _ = serve::ServeOptions::from(args.serve.clone());
+        insta::assert_debug_snapshot!(args);
     }
 }
