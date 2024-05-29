@@ -107,7 +107,7 @@ kvsd:
 
 # Run api
 api *flags:
-    do -i { ps | where name =~ "synd_api$" | first | kill $in.pid }
+    try { ps | where name =~ "synd_api$" | first | kill $in.pid }
     cd crates/synd_api; \
       SYND_LOG="info,synd_api=debug" \
       OTEL_EXPORTER_OTLP_ENDPOINT={{ otlp_endpoint }} \
