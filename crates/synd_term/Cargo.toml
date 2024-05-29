@@ -63,6 +63,7 @@ integration = []
 synd-api  = { path = "../synd_api" }
 synd-test = { path = "../synd_test" }
 
+assert_cmd   = { workspace = true }
 axum-server  = { workspace = true }
 insta        = { workspace = true }
 kvsd         = { workspace = true }

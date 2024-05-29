@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Rect},
-    style::{Modifier, Style, Stylize},
+    style::{Modifier, Style},
     text::{Line, Span, Text},
     widgets::{
         Block, Borders, HighlightSpacing, List, ListItem, ListState, Paragraph, StatefulWidget,
@@ -96,7 +96,7 @@ impl Authentication {
         // Render big "syndicationd"
         if let Ok(big_text) = BigText::builder()
             .pixel_size(PixelSize::HalfWidth)
-            .style(Style::new().white())
+            .style(cx.theme.base)
             .alignment(Alignment::Center)
             .lines(vec!["Syndicationd".into()])
             .build()

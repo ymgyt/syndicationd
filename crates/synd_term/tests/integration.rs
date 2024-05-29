@@ -21,7 +21,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[file_serial(a)]
-    async fn hello_world() -> anyhow::Result<()> {
+    async fn happy() -> anyhow::Result<()> {
         tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .with_line_number(true)
@@ -29,14 +29,14 @@ mod test {
             .with_target(false)
             .init();
 
-        tracing::info!("TEST hello_world run");
-
         let mock_port = 6000;
         let api_port = 6001;
         let oauth_addr = ("127.0.0.1", mock_port);
         let oauth_listener = TcpListener::bind(oauth_addr).await?;
         tokio::spawn(synd_test::mock::serve(oauth_listener));
         helper::serve_api(mock_port, api_port).await?;
+
+        check_command_test(api_port);
 
         let endpoint = format!("https://localhost:{api_port}/graphql")
             .parse()
@@ -57,7 +57,7 @@ mod test {
         };
         let authenticator = Authenticator::new().with_device_flows(device_flows);
         let config = Config {
-            idle_timer_interval: Duration::from_millis(1000),
+            idle_timer_interval: Duration::from_millis(2000),
             throbber_timer_interval: Duration::from_secs(3600), // disable throbber
             ..Default::default()
         };
@@ -90,6 +90,43 @@ mod test {
         // polling device access token complete
         application.event_loop_until_idle(&mut event_stream).await;
 
+        export_command_test(api_port);
+        clean_command_test();
+
         Ok(())
+    }
+
+    fn check_command_test(api_port: u16) {
+        let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
+
+        cmd.args([
+            "--endpoint",
+            &format!("https://localhost:{api_port}"),
+            "check",
+        ])
+        .assert()
+        .success();
+
+        cmd.arg("--format=json").assert().success();
+    }
+
+    fn export_command_test(api_port: u16) {
+        let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
+
+        // TODO: export case
+        cmd.args([
+            "--endpoint",
+            &format!("https://localhost:{api_port}"),
+            "export",
+            "--print-schema",
+        ])
+        .assert()
+        .success();
+    }
+
+    fn clean_command_test() {
+        let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
+
+        cmd.args(["clean"]).assert().success();
     }
 }

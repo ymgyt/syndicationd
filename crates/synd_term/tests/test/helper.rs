@@ -1,18 +1,14 @@
-use std::{future::pending, path::PathBuf, sync::Arc, time::Duration};
+use std::{future::pending, path::PathBuf, time::Duration};
 
-use axum_server::tls_rustls::RustlsConfig;
 use futures_util::TryFutureExt;
 use ratatui::backend::TestBackend;
 use synd_api::{
+    args::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
-    monitor::Monitors,
     repository::kvsd::KvsdClient,
-    serve::{auth::Authenticator, ServeOptions},
     shutdown::Shutdown,
-    usecase::{authorize::Authorizer, MakeUsecase, Runtime},
 };
-use synd_feed::feed::{cache::CacheLayer, service::FeedService};
 use synd_term::terminal::Terminal;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -23,47 +19,51 @@ pub fn new_test_terminal(width: u16, height: u16) -> Terminal {
 }
 
 pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
-    let github_endpoint: &'static str =
-        format!("http://localhost:{mock_port}/github/graphql").leak();
-    let github_client = GithubClient::new()?.with_endpoint(github_endpoint);
-    let authenticator = Authenticator::new()?.with_client(github_client);
-
-    let kvsd_client = run_kvsd().await.map(KvsdClient::new)?;
-    let feed_service = FeedService::new("synd_term_test", 1024 * 1024);
-    let feed_service = CacheLayer::new(feed_service);
-    let make_usecase = MakeUsecase {
-        subscription_repo: Arc::new(kvsd_client),
-        fetch_feed: Arc::new(feed_service),
+    let kvsd_options = KvsdOptions {
+        kvsd_host: "localhost".into(),
+        kvsd_port: 47379,
+        kvsd_username: "test".into(),
+        kvsd_password: "test".into(),
     };
-    let authorizer = Authorizer::new();
-    let runtime = Runtime::new(make_usecase, authorizer);
-    let tls_config = RustlsConfig::from_pem_file(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let tls_options = TlsOptions {
+        certificate: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..")
             .join(".dev")
             .join("self_signed_certs")
             .join("certificate.pem"),
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        private_key: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..")
             .join(".dev")
             .join("self_signed_certs")
             .join("private_key.pem"),
-    )
-    .await?;
+    };
     let serve_options = ServeOptions {
         timeout: Duration::from_secs(10),
         body_limit_bytes: 1024 * 2,
         concurrency_limit: 100,
     };
-    let dep = Dependency {
-        authenticator,
-        runtime,
-        tls_config,
-        serve_options,
-        monitors: Monitors::new(),
+    let cache_options = CacheOptions {
+        feed_cache_size_mb: 1,
+        feed_cache_ttl: Duration::from_secs(60),
+        feed_cache_refresh_interval: Duration::from_secs(3600),
     };
+
+    let _kvsd_client = run_kvsd(kvsd_options.clone()).await.map(KvsdClient::new)?;
+
+    let mut dep = Dependency::new(kvsd_options, tls_options, serve_options, cache_options)
+        .await
+        .unwrap();
+
+    {
+        let github_endpoint: &'static str =
+            format!("http://localhost:{mock_port}/github/graphql").leak();
+        let github_client = GithubClient::new()?.with_endpoint(github_endpoint);
+
+        dep.authenticator = dep.authenticator.with_client(github_client);
+    }
+
     let listener = TcpListener::bind(("localhost", api_port)).await?;
 
     tokio::spawn(synd_api::serve::serve(
@@ -75,24 +75,31 @@ pub async fn serve_api(mock_port: u16, api_port: u16) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn run_kvsd() -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> {
+pub async fn run_kvsd(
+    KvsdOptions {
+        kvsd_host,
+        kvsd_port,
+        kvsd_username,
+        kvsd_password,
+    }: KvsdOptions,
+) -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> {
     let root_dir = temp_dir();
     let mut config = kvsd::config::Config::default();
 
     // Setup user credential.
     config.kvsd.users = vec![kvsd::core::UserEntry {
-        username: "test".into(),
-        password: "test".into(),
+        username: kvsd_username,
+        password: kvsd_password,
     }];
     config.server.set_disable_tls(&mut Some(true));
 
     // Test Server listen addr
-    let addr = ("localhost", 47379);
+    let addr = (kvsd_host, kvsd_port);
 
     let mut initializer = kvsd::config::Initializer::from_config(config);
 
     initializer.set_root_dir(root_dir.path());
-    initializer.set_listener(TcpListener::bind(addr).await.unwrap());
+    initializer.set_listener(TcpListener::bind(addr.clone()).await.unwrap());
 
     initializer.init_dir().await.unwrap();
 
@@ -100,7 +107,7 @@ pub async fn run_kvsd() -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> 
 
     let handshake = async {
         loop {
-            match kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(addr.0, addr.1)
+            match kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(&addr.0, addr.1)
                 .and_then(|client| client.authenticate("test", "test"))
                 .await
             {

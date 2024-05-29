@@ -902,8 +902,6 @@ impl Application {
             }
         };
 
-        // should test with tmp file?
-        #[cfg(not(feature = "integration"))]
         {
             if let Err(err) = crate::auth::persist_credential(&auth) {
                 tracing::warn!("Failed to save credential cache: {err}");
