@@ -20,7 +20,7 @@ use crate::{
         self,
         components::filter::{FeedFilter, FilterResult},
         extension::RectExt,
-        Context,
+        icon, Context,
     },
 };
 
@@ -249,7 +249,7 @@ impl Subscription {
         let header = Row::new([
             Cell::from(" Updated"),
             Cell::from(format!("󰑫 Feed {n}/{m}")),
-            Cell::from(" URL"),
+            Cell::from(concat!(icon!(open), " URL")),
             Cell::from("󰎞 Description"),
             Cell::from(" Req"),
         ]);
@@ -415,9 +415,9 @@ impl Subscription {
         };
 
         let header = Row::new([
-            Cell::new(Span::from(" Published")),
-            Cell::new(Span::from("󰯂 Entry")),
-            Cell::new(Span::from("󱙓 Summary")),
+            Cell::new(Span::from(concat!(icon!(calendar), " Published"))),
+            Cell::new(Span::from(concat!(icon!(entry), " Entry"))),
+            Cell::new(Span::from(concat!(icon!(summary), " Summary"))),
         ]);
 
         let rows = feed.entries.iter().map(entry);

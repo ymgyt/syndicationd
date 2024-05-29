@@ -116,7 +116,7 @@ impl Entries {
         let [entries_area, summary_area] = vertical.areas(area);
 
         self.render_entries(entries_area, buf, cx);
-        self.render_summary(summary_area, buf, cx);
+        self.render_detail(summary_area, buf, cx);
     }
 
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -183,7 +183,7 @@ impl Entries {
             }
         };
         let header = Row::new([
-            Cell::from(" Published"),
+            Cell::from(concat!(icon!(calendar), " Published")),
             Cell::from(format!("󰯂 Entry {n}/{m}")),
             Cell::from("󰑫 Feed"),
             Cell::from(concat!(icon!(requirement), " Req")),
@@ -237,7 +237,7 @@ impl Entries {
         )
     }
 
-    fn render_summary(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+    fn render_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let block = Block::new()
             .padding(Padding::horizontal(2))
             .borders(Borders::TOP)
@@ -249,15 +249,61 @@ impl Entries {
         let Some(entry) = self.selected_entry() else {
             return;
         };
+
+        let vertical = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ]);
+        let [title_area, url_area, published_area, _, summary_heading_area, summary_area] =
+            vertical.areas(inner);
+
+        Line::from(vec![
+            Span::from(concat!(icon!(entry), " Entry")).bold(),
+            Span::from("      "),
+            Span::from(entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL)),
+        ])
+        .render(title_area, buf);
+
+        Line::from(vec![
+            Span::from(concat!(icon!(open), " URL")).bold(),
+            Span::from("        "),
+            Span::from(entry.website_url.as_deref().unwrap_or_default()),
+        ])
+        .render(url_area, buf);
+
+        Line::from(vec![
+            Span::from(concat!(icon!(calendar), " Published")).bold(),
+            Span::from("  "),
+            Span::from(
+                entry
+                    .published
+                    .as_ref()
+                    .or(entry.updated.as_ref())
+                    .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd_hm),
+            ),
+        ])
+        .render(published_area, buf);
+
         let Some(summary) = entry.summary_text(inner.width.into()) else {
             return;
         };
-        // should to Lines?
+
+        Line::from(
+            Span::from(concat!(icon!(summary), " Summary"))
+                .bold()
+                .underlined(),
+        )
+        .render(summary_heading_area, buf);
+
         let paragraph = Paragraph::new(Text::from(summary))
             .wrap(Wrap { trim: false })
             .style(cx.theme.entries.summary)
             .alignment(Alignment::Left);
 
-        Widget::render(paragraph, inner, buf);
+        Widget::render(paragraph, summary_area, buf);
     }
 }

@@ -62,7 +62,7 @@ impl StatusLine {
         let per_screen_keys = match tab {
             Some(Tab::Feeds) => pre_keys
                 .iter()
-                .chain(&[("Ent", "󰏌"), ("a", "󰑫"), ("e", ""), ("d", "󰼡")])
+                .chain(&[("Ent", icon!(open)), ("a", "󰑫"), ("e", ""), ("d", "󰼡")])
                 .chain(suf_keys),
             Some(Tab::Entries) => pre_keys.iter().chain(&[("Ent", "󰏌")]).chain(suf_keys),
             // Imply login
