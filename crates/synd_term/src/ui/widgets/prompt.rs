@@ -58,14 +58,14 @@ impl Prompt {
                 let pos = self.move_cursor(Move::BackwardChar(1));
                 self.line.replace_range(pos..self.cursor, "");
                 self.cursor = pos;
-                KeyEventResult::Consumed(Some(Command::PromptChanged))
+                KeyEventResult::consumed(Command::PromptChanged).should_render(true)
             }
             KeyEvent {
                 code: KeyCode::Char(c),
                 ..
             } => {
                 self.insert_char(*c);
-                KeyEventResult::Consumed(Some(Command::PromptChanged))
+                KeyEventResult::consumed(Command::PromptChanged).should_render(true)
             }
             _ => KeyEventResult::Ignored,
         }

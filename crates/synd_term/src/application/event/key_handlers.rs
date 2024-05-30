@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::ControlFlow, rc::Rc};
 
 use crossterm::event::KeyEvent;
 
@@ -49,11 +49,16 @@ impl KeyHandlers {
     }
 
     pub fn handle(&mut self, event: KeyEvent) -> KeyEventResult {
-        for handler in self.handlers.iter_mut().rev() {
-            if let KeyEventResult::Consumed(r) = handler.handle(&event) {
-                return KeyEventResult::Consumed(r);
+        match self.handlers.iter_mut().rev().try_for_each(|h| {
+            let result = h.handle(&event);
+            if result.is_consumed() {
+                ControlFlow::Break(result)
+            } else {
+                ControlFlow::Continue(())
             }
+        }) {
+            ControlFlow::Break(consumed) => consumed,
+            ControlFlow::Continue(()) => KeyEventResult::Ignored,
         }
-        KeyEventResult::Ignored
     }
 }

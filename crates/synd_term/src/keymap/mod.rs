@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::ControlFlow};
 
 use anyhow::{anyhow, bail};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -129,12 +129,20 @@ impl Keymaps {
     }
 
     pub fn search(&mut self, event: &KeyEvent) -> KeyEventResult {
-        for keymap in self.keymaps.iter_mut().rev().filter(|k| k.enable) {
-            if let Some(cmd) = keymap.search(event) {
-                return KeyEventResult::Consumed(Some(cmd));
-            }
+        match self
+            .keymaps
+            .iter_mut()
+            .rev()
+            .filter(|k| k.enable)
+            .try_for_each(|keymap| match keymap.search(event) {
+                Some(command) => {
+                    ControlFlow::Break(KeyEventResult::consumed(command).should_render(true))
+                }
+                None => ControlFlow::Continue(()),
+            }) {
+            ControlFlow::Break(r) => r,
+            ControlFlow::Continue(()) => KeyEventResult::Ignored,
         }
-        KeyEventResult::Ignored
     }
 }
 

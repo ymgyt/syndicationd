@@ -619,9 +619,12 @@ impl Application {
                 self.reset_idle_timer();
 
                 match self.key_handlers.handle(key) {
-                    KeyEventResult::Consumed(cmd) => {
-                        self.should_render();
-                        cmd
+                    KeyEventResult::Consumed {
+                        command,
+                        should_render,
+                    } => {
+                        should_render.then(|| self.should_render());
+                        command
                     }
                     KeyEventResult::Ignored => None,
                 }
