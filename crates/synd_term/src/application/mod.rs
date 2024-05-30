@@ -61,11 +61,6 @@ enum Screen {
     Browse,
 }
 
-#[derive(PartialEq, Eq)]
-pub enum EventLoopControlFlow {
-    Quit,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Populate {
     Append,
