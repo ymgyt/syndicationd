@@ -1,5 +1,6 @@
 ---
 source: crates/synd_term/tests/integration.rs
+description: show device flow code
 expression: application.buffer()
 ---
 Buffer {

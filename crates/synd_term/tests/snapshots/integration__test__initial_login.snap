@@ -1,0 +1,43 @@
+---
+source: crates/synd_term/tests/integration.rs
+description: initial login prompt
+expression: application.buffer()
+---
+Buffer {
+    area: Rect { x: 0, y: 0, width: 120, height: 30 },
+    content: [
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+    ],
+    styles: [
+        x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: NONE,
+    ]
+}

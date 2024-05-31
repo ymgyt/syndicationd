@@ -34,3 +34,12 @@ macro_rules! keymap {
 }
 
 pub(crate) use keymap;
+
+#[macro_export]
+macro_rules! key {
+    ( enter ) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
+            crossterm::event::KeyCode::Enter,
+        ))
+    };
+}

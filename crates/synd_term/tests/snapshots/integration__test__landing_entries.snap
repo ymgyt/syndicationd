@@ -1,5 +1,6 @@
 ---
 source: crates/synd_term/tests/integration.rs
+description: initial entries
 expression: application.buffer()
 ---
 Buffer {

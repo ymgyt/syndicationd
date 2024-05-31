@@ -1002,7 +1002,6 @@ impl Application {
         #[cfg(feature = "integration")]
         {
             tracing::debug!("Quit for idle");
-            self.should_render();
             self.flags.insert(Should::Quit);
         }
     }
@@ -1025,5 +1024,18 @@ impl Application {
 impl Application {
     pub fn buffer(&self) -> &ratatui::buffer::Buffer {
         self.terminal.buffer()
+    }
+
+    pub async fn wait_until_jobs_completed<S>(&mut self, input: &mut S)
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        loop {
+            self.event_loop_until_idle(input).await;
+            if self.jobs.futures.is_empty() {
+                break;
+            }
+            self.reset_idle_timer();
+        }
     }
 }
