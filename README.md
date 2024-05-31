@@ -302,6 +302,14 @@ Some tips about feed that I know.
 
 * Adding `.rss` to the end of a Reddit URL allows you to retrieve the feed. for example, for `https://www.reddit.com/r/HelixEditor/`, it would be `https://www.reddit.com/r/HelixEditor.rss`
 
+<details>
+<summary>Click to show more tips</summary>
+                       
+* Adding `.ja.atom` to the end of a connpass group URL to get the event feed. for exmaple, 
+
+* Adding `/feed` for Hatena blog
+</details>
+
 If you're looking for feeds, here are my recommendations.
 
 <details>
