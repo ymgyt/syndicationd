@@ -1,0 +1,3 @@
+# https://insta.rs/docs/settings/
+test.runner: nextest
+test.auto_review: true

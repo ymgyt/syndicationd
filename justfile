@@ -14,7 +14,6 @@ api_dir := "crates/synd_api"
 demo_tape := "assets/demo.tape"
 
 alias format := fmt
-alias integration := integration-test
 alias unused := machete
 alias licenses := license
 alias cov := coverage
@@ -58,9 +57,13 @@ machete:
 test *flags:
     cargo nextest run {{ flags }}
 
-# Run integration test
-integration-test:
-    RUST_LOG="synd,integration,kvsd=info,info" cargo nextest run --package synd-term --features integration --test integration --no-capture
+# Run integration test by insta
+integration:
+    RUST_LOG="synd,integration,kvsd=info,info" \
+    INSTA_OUTPUT=diff INSTA_UPDATE=new INSTA_TEST_RUNNER=nextest \
+    cargo insta test \
+        --package synd-term --features integration --test integration \
+        --review --unreferenced=delete
 
 # Run cargo insta review
 review:
