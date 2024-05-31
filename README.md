@@ -305,7 +305,7 @@ Some tips about feed that I know.
 <details>
 <summary>Click to show more tips</summary>
                        
-* Adding `.ja.atom` to the end of a connpass group URL to get the event feed. for exmaple, 
+* Adding `.ja.atom` to the end of a connpass group URL to get the event feed. for example, `https://opentelemetry.connpass.com/ja.atom` 
 
 * Adding `/feed` for Hatena blog
 </details>
