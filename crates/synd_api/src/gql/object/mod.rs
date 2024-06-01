@@ -2,10 +2,10 @@ use std::{borrow::Cow, sync::Arc};
 
 use async_graphql::{
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
-    Enum, Object, SimpleObject, ID,
+    Object, SimpleObject, ID,
 };
 use feed_rs::model as feedrs;
-use synd_feed::types::{self, Annotated, Category, FeedUrl, Requirement};
+use synd_feed::types::{self, Annotated, Category, FeedType, FeedUrl, Requirement};
 
 use crate::gql::scalar;
 
@@ -77,17 +77,6 @@ impl<'a> Entry<'a> {
     }
 }
 
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "synd_feed::types::FeedType")]
-pub enum FeedType {
-    Atom,
-    RSS1,
-    RSS2,
-    RSS0,
-    #[allow(clippy::upper_case_acronyms)]
-    JSON,
-}
-
 pub struct Feed(Annotated<Arc<types::Feed>>);
 
 #[Object]
@@ -99,7 +88,7 @@ impl Feed {
 
     /// Undering feed specification
     async fn r#type(&self) -> FeedType {
-        self.0.feed.meta().r#type().clone().into()
+        self.0.feed.meta().r#type()
     }
 
     /// Feed title
