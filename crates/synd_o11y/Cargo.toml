@@ -18,7 +18,7 @@ http                               = { workspace = true }
 opentelemetry                      = { version = "0.22.0" }
 opentelemetry-appender-tracing     = { version = "0.3.0", default-features = false }                                                         # disable logs_level_enabled which affect global filtering
 opentelemetry-http                 = { version = "0.11.1" }
-opentelemetry-otlp                 = { version = "0.15.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic"] }
+opentelemetry-otlp                 = { version = "0.16.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic"] }
 opentelemetry-semantic-conventions = { version = "0.14.0" }
 opentelemetry-stdout               = { version = "0.3.0", optional = true, default-features = false, features = ["metrics"] }
 opentelemetry_sdk                  = { version = "0.22.1", features = ["logs", "rt-tokio"] }
