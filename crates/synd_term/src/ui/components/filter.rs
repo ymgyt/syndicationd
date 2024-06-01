@@ -34,7 +34,7 @@ static LABELS: &[char] = &[
     't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub(crate) enum FilterResult {
     Use,
     Discard,
@@ -85,13 +85,16 @@ impl FeedFilter {
         if let Some(FilterCategoryState::Inactive) = self.categories.get(feed.category()) {
             return FilterResult::Discard;
         }
-        if !self
+        if self
             .matcher
             .r#match(feed.title.as_deref().unwrap_or_default())
+            || self
+                .matcher
+                .r#match(feed.website_url.as_deref().unwrap_or_default())
         {
-            return FilterResult::Discard;
+            return FilterResult::Use;
         }
-        FilterResult::Use
+        FilterResult::Discard
     }
 }
 
@@ -415,5 +418,32 @@ impl Filter {
             RenderCursor::Disable
         };
         self.prompt.borrow().render(prompt_area, buf, render_cursor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fake::{Fake, Faker};
+
+    use crate::types::Feed;
+
+    use super::*;
+
+    #[test]
+    fn filter_match_feed_url() {
+        let mut matcher = Matcher::new();
+        matcher.update_needle("ymgyt");
+        let filter = FeedFilter {
+            requirement: Requirement::May,
+            categories: HashMap::new(),
+            matcher,
+        };
+
+        let mut feed: Feed = Faker.fake();
+        // title does not match needle
+        feed.title = Some("ABC".into());
+        feed.website_url = Some("https://blog.ymgyt.io".into());
+
+        assert_eq!(filter.feed(&feed), FilterResult::Use);
     }
 }

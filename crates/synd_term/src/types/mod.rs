@@ -21,6 +21,7 @@ mod requirement_ext;
 pub use requirement_ext::RequirementExt;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(test, derive(fake::Dummy))]
 pub struct Link {
     pub href: String,
     pub rel: Option<String>,
@@ -51,6 +52,7 @@ impl From<mutation::subscribe_feed::Link> for Link {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(test, derive(fake::Dummy))]
 pub struct EntryMeta {
     pub title: Option<String>,
     pub published: Option<Time>,
@@ -89,8 +91,9 @@ impl EntryMeta {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(test, derive(fake::Dummy))]
 pub struct Feed {
-    pub r#type: Option<FeedType>,
+    pub feed_type: Option<FeedType>,
     pub title: Option<String>,
     pub url: FeedUrl,
     pub updated: Option<Time>,
@@ -117,7 +120,7 @@ impl Feed {
 impl From<query::subscription::Feed> for Feed {
     fn from(f: query::subscription::Feed) -> Self {
         Self {
-            r#type: match f.type_ {
+            feed_type: match f.type_ {
                 query::subscription::FeedType::ATOM => Some(FeedType::Atom),
                 query::subscription::FeedType::RSS1 => Some(FeedType::RSS1),
                 query::subscription::FeedType::RSS2 => Some(FeedType::RSS2),
@@ -148,7 +151,7 @@ impl From<query::subscription::Feed> for Feed {
 impl From<mutation::subscribe_feed::Feed> for Feed {
     fn from(f: mutation::subscribe_feed::Feed) -> Self {
         Self {
-            r#type: match f.type_ {
+            feed_type: match f.type_ {
                 mutation::subscribe_feed::FeedType::ATOM => Some(FeedType::Atom),
                 mutation::subscribe_feed::FeedType::RSS1 => Some(FeedType::RSS1),
                 mutation::subscribe_feed::FeedType::RSS2 => Some(FeedType::RSS2),

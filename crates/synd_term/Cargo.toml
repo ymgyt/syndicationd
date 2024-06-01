@@ -19,7 +19,7 @@ path = "src/main.rs"
 
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.2" }
-synd-feed = { path = "../synd_feed", version = "0.3.2" }
+synd-feed = { path = "../synd_feed", version = "0.3.2", features = ["fake"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.6" }
 
 anyhow               = { workspace = true }
@@ -65,6 +65,7 @@ synd-test = { path = "../synd_test" }
 
 assert_cmd   = { workspace = true }
 axum-server  = { workspace = true }
+fake         = { workspace = true }
 insta        = { workspace = true }
 kvsd         = { workspace = true }
 serial_test  = { version = "3.0.0", default_features = false, features = ["async", "file_locks"] }

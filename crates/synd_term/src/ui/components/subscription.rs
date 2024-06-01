@@ -370,7 +370,7 @@ impl Subscription {
                 )),
                 Cell::new(Line::from(vec![
                     Span::styled("󰈙 Type ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::from(match feed.r#type {
+                    Span::from(match feed.feed_type {
                         Some(FeedType::RSS0) => "RSS 0",
                         Some(FeedType::RSS1) => "RSS 1",
                         Some(FeedType::RSS2) => "RSS 2",
