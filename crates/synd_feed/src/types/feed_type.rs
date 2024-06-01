@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "graphql", derive(async_graphql::Enum))]
-#[cfg_attr(faeture = "fake", derive(fake::Dummy))]
+#[cfg_attr(feature = "fake", derive(fake::Dummy))]
 pub enum FeedType {
     Atom,
     #[allow(clippy::upper_case_acronyms)]
