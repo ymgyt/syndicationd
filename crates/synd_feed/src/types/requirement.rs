@@ -8,6 +8,7 @@ use std::{
 /// using an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "graphql", derive(async_graphql::Enum))]
+#[cfg_attr(feature = "fake", derive(fake::Dummy))]
 pub enum Requirement {
     /// `Must` indicates it must be read
     Must = 2,

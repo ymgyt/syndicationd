@@ -83,6 +83,13 @@ impl async_graphql::ScalarType for FeedUrl {
     }
 }
 
+#[cfg(feature = "fake")]
+impl fake::Dummy<fake::Faker> for FeedUrl {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &fake::Faker, _rng: &mut R) -> Self {
+        Url::parse("https://fake.ymgyt.io").unwrap().into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

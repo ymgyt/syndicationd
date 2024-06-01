@@ -65,3 +65,11 @@ impl<'s> async_graphql::ScalarType for Category<'s> {
         async_graphql::Value::String(self.0.clone().into_owned())
     }
 }
+
+#[cfg(feature = "fake")]
+impl<'a> fake::Dummy<fake::Faker> for Category<'a> {
+    fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &fake::Faker, rng: &mut R) -> Self {
+        let category: String = fake::Fake::fake_with_rng(&(1..31), rng);
+        Self::new(category).unwrap()
+    }
+}
