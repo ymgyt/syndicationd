@@ -3,8 +3,6 @@ use std::{borrow::Cow, fmt::Display};
 use chrono::{DateTime, Utc};
 use feed_rs::model::{self as feedrs, Generator, Link, Person, Text};
 
-pub use feedrs::FeedType;
-
 pub type Time = DateTime<Utc>;
 
 mod requirement;
@@ -15,6 +13,9 @@ pub use category::Category;
 
 mod url;
 pub use url::FeedUrl;
+
+mod feed_type;
+pub use feed_type::FeedType;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct EntryId<'a>(Cow<'a, str>);
@@ -69,7 +70,7 @@ impl Entry {
             .and_then(|content| content.body.as_deref())
     }
 
-    pub fn website_url(&self, feed_type: &FeedType) -> Option<&str> {
+    pub fn website_url(&self, feed_type: FeedType) -> Option<&str> {
         link::find_website_url(feed_type, &self.0.links)
     }
 
@@ -134,8 +135,8 @@ impl<T> Annotated<T> {
 }
 
 impl FeedMeta {
-    pub fn r#type(&self) -> &FeedType {
-        &self.feed_type
+    pub fn r#type(&self) -> FeedType {
+        self.feed_type
     }
 
     pub fn url(&self) -> &FeedUrl {
@@ -225,7 +226,7 @@ impl From<(FeedUrl, feed_rs::model::Feed)> for Feed {
         } = feed;
         let meta = FeedMeta {
             url,
-            feed_type,
+            feed_type: feed_type.into(),
             title,
             updated,
             authors,
@@ -241,10 +242,12 @@ impl From<(FeedUrl, feed_rs::model::Feed)> for Feed {
 }
 
 mod link {
-    use feed_rs::model::{FeedType, Link};
+    use feed_rs::model::Link;
+
+    use crate::types::FeedType;
 
     pub fn find_website_url<'a>(
-        feed_type: &FeedType,
+        feed_type: FeedType,
         links: impl IntoIterator<Item = &'a Link>,
     ) -> Option<&'a str> {
         let mut links = links.into_iter();
@@ -302,11 +305,11 @@ mod link {
             ];
 
             assert_eq!(
-                find_website_url(&FeedType::RSS1, &links),
+                find_website_url(FeedType::RSS1, &links),
                 Some("https://syndicationd.ymgyt.io/")
             );
             assert_eq!(
-                find_website_url(&FeedType::RSS2, &links),
+                find_website_url(FeedType::RSS2, &links),
                 Some("https://syndicationd.ymgyt.io/")
             );
         }
@@ -333,7 +336,7 @@ mod link {
             ];
 
             assert_eq!(
-                find_website_url(&FeedType::Atom, &links),
+                find_website_url(FeedType::Atom, &links),
                 Some("https://syndicationd.ymgyt.io/")
             );
         }
@@ -360,7 +363,7 @@ mod link {
             ];
 
             assert_eq!(
-                find_website_url(&FeedType::JSON, &links),
+                find_website_url(FeedType::JSON, &links),
                 Some("https://kubernetes.io")
             );
         }
