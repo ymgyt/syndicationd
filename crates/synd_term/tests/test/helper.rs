@@ -97,11 +97,13 @@ impl TestCase {
 }
 
 pub fn init_tracing() {
+    let show_code_location = false;
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
-        .with_line_number(true)
-        .with_file(true)
-        .with_target(false)
+        .with_line_number(show_code_location)
+        .with_file(show_code_location)
+        .with_target(true)
+        .without_time()
         .init();
 }
 

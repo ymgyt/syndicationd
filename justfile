@@ -59,7 +59,7 @@ test *flags:
 
 # Run integration test by insta
 integration:
-    RUST_LOG="synd,integration,kvsd=info,info" \
+    RUST_LOG="synd_term=info,integration=info,synd_test=info,kvsd=warn,metrics=warn,tower_http=warn,info" \
     INSTA_OUTPUT=diff INSTA_UPDATE=new INSTA_TEST_RUNNER=nextest \
     cargo insta test \
         --package synd-term --features integration --test integration \
