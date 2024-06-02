@@ -23,7 +23,7 @@ jobs:
       - name: Generate code coverage
         run: nix build .#coverage --accept-flake-config
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@v4.4.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: result
