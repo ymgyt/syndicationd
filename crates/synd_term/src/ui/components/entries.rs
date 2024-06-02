@@ -120,14 +120,7 @@ impl Entries {
     }
 
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let entries_area = Block::new()
-            .padding(Padding {
-                top: 1,
-                left: 0,
-                right: 1,
-                bottom: 0,
-            })
-            .inner(area);
+        let entries_area = Block::new().padding(Padding::top(1)).inner(area);
 
         let mut entries_state = TableState::new()
             .with_offset(0)
@@ -161,6 +154,7 @@ impl Entries {
             .end_symbol(None)
             .track_symbol(Some(" "))
             .thumb_symbol("▐")
+            .style(cx.theme.base)
             .render(scrollbar_area, buf, &mut scrollbar_state);
     }
 
