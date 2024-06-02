@@ -345,7 +345,7 @@ impl Filter {
 
         let spans = vec![
             Span::from(concat!(icon!(filter), " Filter")).dim(),
-            Span::from("     "),
+            Span::from("    "),
             {
                 let r = self.requirement.label(&cx.theme.requirement);
                 if r.content == "MAY" {

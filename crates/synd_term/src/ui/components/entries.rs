@@ -177,17 +177,17 @@ impl Entries {
             }
         };
         let header = Row::new([
-            Cell::from(concat!(icon!(calendar), " Published")),
-            Cell::from(format!("󰯂 Entry {n}/{m}")),
-            Cell::from("󰑫 Feed"),
-            Cell::from(concat!(icon!(requirement), " Req")),
+            Cell::from("Published"),
+            Cell::from(format!("Entry {n}/{m}")),
+            Cell::from("Feed"),
+            Cell::from("Req"),
         ]);
 
         let constraints = [
-            Constraint::Length(11),
+            Constraint::Length(10),
             Constraint::Fill(2),
             Constraint::Fill(1),
-            Constraint::Length(5),
+            Constraint::Length(4),
         ];
 
         let row = |entry: &'a types::Entry| {
@@ -214,11 +214,7 @@ impl Entries {
                     Span::from(title),
                 ])),
                 Cell::from(Span::from(feed_title)),
-                Cell::from(Line::from(vec![
-                    Span::from(" "),
-                    requirement,
-                    Span::from(" "),
-                ])),
+                Cell::from(Line::from(vec![requirement, Span::from(" ")])),
             ])
         };
 
@@ -257,21 +253,21 @@ impl Entries {
 
         Line::from(vec![
             Span::from(concat!(icon!(entry), " Entry")).bold(),
-            Span::from("      "),
+            Span::from("     "),
             Span::from(entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL)),
         ])
         .render(title_area, buf);
 
         Line::from(vec![
             Span::from(concat!(icon!(open), " URL")).bold(),
-            Span::from("        "),
+            Span::from("       "),
             Span::from(entry.website_url.as_deref().unwrap_or_default()),
         ])
         .render(url_area, buf);
 
         Line::from(vec![
             Span::from(concat!(icon!(calendar), " Published")).bold(),
-            Span::from("  "),
+            Span::from(" "),
             Span::from(
                 entry
                     .published

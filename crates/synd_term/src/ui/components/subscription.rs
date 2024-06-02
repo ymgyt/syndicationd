@@ -20,7 +20,7 @@ use crate::{
         self,
         components::filter::{FeedFilter, FilterResult},
         extension::RectExt,
-        icon, Context,
+        Context,
     },
 };
 
@@ -241,19 +241,19 @@ impl Subscription {
             }
         };
         let header = Row::new([
-            Cell::from(" Updated"),
-            Cell::from(format!("󰑫 Feed {n}/{m}")),
-            Cell::from(concat!(icon!(open), " URL")),
-            Cell::from("󰎞 Description"),
-            Cell::from(" Req"),
+            Cell::from("Updated"),
+            Cell::from(format!("Feed {n}/{m}")),
+            Cell::from("URL"),
+            Cell::from("Description"),
+            Cell::from("Req"),
         ]);
 
         let constraints = [
-            Constraint::Length(11),
+            Constraint::Length(10),
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(2),
-            Constraint::Length(5),
+            Constraint::Length(4),
         ];
 
         let row = |feed_meta: &'a Feed| {
@@ -292,11 +292,7 @@ impl Subscription {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
-                Cell::from(Line::from(vec![
-                    Span::from(" "),
-                    requirement,
-                    Span::from(" "),
-                ])),
+                Cell::from(Line::from(vec![requirement, Span::from(" ")])),
             ])
         };
 
@@ -388,7 +384,7 @@ impl Subscription {
         ];
 
         let table = Table::new(meta_rows, widths)
-            .column_spacing(2)
+            .column_spacing(1)
             .style(cx.theme.subscription.background);
         Widget::render(table, meta_area, buf);
 
@@ -409,15 +405,15 @@ impl Subscription {
         };
 
         let header = Row::new([
-            Cell::new(Span::from(concat!(icon!(calendar), " Published"))),
-            Cell::new(Span::from(concat!(icon!(entry), " Entry"))),
-            Cell::new(Span::from(concat!(icon!(summary), " Summary"))),
+            Cell::new(Span::from("Published")),
+            Cell::new(Span::from("Entry")),
+            Cell::new(Span::from("Summary")),
         ]);
 
         let rows = feed.entries.iter().map(entry);
         let table = Table::new(rows, widths)
             .header(header.style(cx.theme.subscription.header))
-            .column_spacing(2)
+            .column_spacing(1)
             .style(cx.theme.subscription.background);
 
         Widget::render(table, entries_area, buf);
