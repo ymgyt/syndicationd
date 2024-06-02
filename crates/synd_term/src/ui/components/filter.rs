@@ -401,7 +401,7 @@ impl Filter {
             label = label.dim();
         }
         spans.push(label);
-        spans.push(Span::from("    "));
+        spans.push(Span::from("   "));
 
         let search = Line::from(spans);
         let margin = search.width() + 1;
