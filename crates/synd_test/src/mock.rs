@@ -57,13 +57,13 @@ async fn device_access_token(
 
 async fn github_graphql_viewer(
     headers: HeaderMap,
-    query: String,
+    _query: String,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let auth = headers.get(Authorization::<Bearer>::name()).unwrap();
     let auth = Authorization::<Bearer>::decode(&mut std::iter::once(auth)).unwrap();
     let token = auth.token();
 
-    tracing::info!("Got token: `{token}` query: {query}");
+    tracing::debug!("Got token: `{token}`");
 
     let dummy_email = "ymgyt@ymgyt.io";
 
