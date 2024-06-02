@@ -6,6 +6,7 @@ type is one of the following.
 | commit type | description                         |
 |-------------|-------------------------------------|
 | `feat`      | add a new feature                   |
+| `style`     | tui style                           |
 | `fix`       | bug fix                             |
 | `perf`      | performance improvement             |
 | `doc`       | documentation                       |
