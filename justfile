@@ -187,11 +187,16 @@ release-term *flags: changelog-term
 release-api *flags: changelog-api
     cargo release --package synd-api {{ flags }}
 
+# Update Cargo.toml [metadata.dist] section
 dist-init:
     ~/.cargo/bin/cargo-dist dist init
 
 dist-plan version:
     ~/.cargo/bin/cargo-dist dist plan --tag=synd-term-{{version}} --output-format=json
+
+# Generate github action release workflow
+dist-generate:
+    ~/.cargo/bin/cargo-dist dist generate --mode ci
 
 retag tag:
     git tag --delete {{ tag }}

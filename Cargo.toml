@@ -79,11 +79,12 @@ tag-message = "chore: release {{crate_name}} version {{version}}"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.13.1"
+cargo-dist-version = "0.15.0"
+# Skip checking whether the specified configuration files are up to date
 # To configure RUSTFLAGS="--cfg tokio_unstable" for tokio metrics
 allow-dirty = ["ci"]
 # CI backends to support
-ci = ["github"]
+ci = "github"
 # The installers to generate for each app
 installers = ["shell", "powershell", "npm", "homebrew"]
 # A GitHub repo to push Homebrew formulas to
