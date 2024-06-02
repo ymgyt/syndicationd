@@ -48,7 +48,7 @@ impl Authenticator {
         match (split.next(), split.next()) {
             (Some("github"), Some(access_token)) => {
                 if let Some(principal) = self.cache.get(token).await {
-                    tracing::info!("Principal cache hit");
+                    tracing::debug!("Principal cache hit");
                     return Ok(principal);
                 }
 
@@ -68,7 +68,7 @@ impl Authenticator {
             }
             (Some("google"), Some(id_token)) => {
                 if let Some(principal) = self.cache.get(id_token).await {
-                    tracing::info!("Principal cache hit");
+                    tracing::debug!("Principal cache hit");
                     return Ok(principal);
                 }
 
