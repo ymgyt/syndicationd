@@ -1,7 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::OnceLock,
-};
+use std::{path::PathBuf, sync::OnceLock};
 
 use directories::ProjectDirs;
 
@@ -48,8 +45,15 @@ pub mod feed {
     pub const DEFAULT_ENTRIES_LIMIT: usize = 200;
 }
 
-pub fn cache_dir() -> &'static Path {
-    project_dirs().cache_dir()
+pub mod cache {
+    use std::path::Path;
+
+    /// Credential cache file name
+    pub const CREDENTIAL_FILE: &str = "credential.json";
+
+    pub fn dir() -> &'static Path {
+        super::project_dirs().cache_dir()
+    }
 }
 
 pub fn log_path() -> PathBuf {

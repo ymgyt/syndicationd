@@ -1,13 +1,13 @@
-use std::fmt::Display;
-use synd_auth::device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse};
+use std::{fmt::Display, sync::Arc};
+use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
     application::{Direction, Populate, RequestSequence},
-    auth::{AuthenticationProvider, Credential},
+    auth::{AuthenticationProvider, Credential, Verified},
     client::{
         mutation::subscribe_feed::SubscribeFeedInput, payload,
-        query::subscription::SubscriptionOutput,
+        query::subscription::SubscriptionOutput, SyndApiError,
     },
     types::Feed,
 };
@@ -26,16 +26,16 @@ pub(crate) enum Command {
     Authenticate,
     MoveAuthenticationProvider(Direction),
 
-    DeviceAuthorizationFlow {
+    HandleDeviceFlowAuthorizationResponse {
         provider: AuthenticationProvider,
         device_authorization: DeviceAuthorizationResponse,
     },
     CompleteDevieAuthorizationFlow {
-        provider: AuthenticationProvider,
-        device_access_token: DeviceAccessTokenResponse,
+        credential: Verified<Credential>,
+        request_seq: RequestSequence,
     },
     RefreshCredential {
-        credential: Credential,
+        credential: Verified<Credential>,
     },
 
     MoveTabSelection(Direction),
@@ -107,9 +107,19 @@ pub(crate) enum Command {
     // Latest release check
     InformLatestRelease(update_informer::Version),
 
+    // Error
     HandleError {
         message: String,
-        request_seq: Option<RequestSequence>,
+    },
+    HandleApiError {
+        // use Arc for impl Clone
+        error: Arc<SyndApiError>,
+        request_seq: RequestSequence,
+    },
+    HandleOauthApiError {
+        // use Arc for impl Clone
+        error: Arc<anyhow::Error>,
+        request_seq: RequestSequence,
     },
 }
 
@@ -124,6 +134,21 @@ impl Display for Command {
                 f.write_str("CompleteDeviceAuthorizationFlow")
             }
             cmd => write!(f, "{cmd:?}"),
+        }
+    }
+}
+
+impl Command {
+    pub(crate) fn api_error(error: SyndApiError, request_seq: RequestSequence) -> Self {
+        Command::HandleApiError {
+            error: Arc::new(error),
+            request_seq,
+        }
+    }
+    pub(crate) fn oauth_api_error(error: anyhow::Error, request_seq: RequestSequence) -> Self {
+        Command::HandleOauthApiError {
+            error: Arc::new(error),
+            request_seq,
         }
     }
 }

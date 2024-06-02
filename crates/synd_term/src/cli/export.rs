@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::anyhow;
 use clap::Args;
@@ -7,9 +7,10 @@ use serde::Serialize;
 use url::Url;
 
 use crate::{
-    application::{Clock, JwtService, SystemClock},
+    application::{Cache, Clock, JwtService, SystemClock},
     auth,
     client::Client,
+    config,
     types::ExportedFeed,
 };
 
@@ -29,6 +30,12 @@ pub struct ExportCommand {
         visible_alias = "print-json-schema",
     )]
     print_schema: bool,
+    /// Cache directory
+    #[arg(
+        long,
+        default_value = config::cache::dir().to_path_buf().into_os_string(),
+    )]
+    cache_dir: PathBuf,
 }
 
 impl ExportCommand {
@@ -55,17 +62,24 @@ impl ExportCommand {
     async fn export(self, endpoint: Url) -> anyhow::Result<()> {
         let mut client = Client::new(endpoint, Duration::from_secs(10))?;
         let jwt_service = JwtService::new();
-
-        let credentials = auth::credential_from_cache(&jwt_service, SystemClock.now())
+        let cache = Cache::new(self.cache_dir);
+        let restore = auth::Restore {
+            jwt_service: &jwt_service,
+            cache: &cache,
+            now: SystemClock.now(),
+            persist_when_refreshed: false,
+        };
+        let credential = restore
+            .restore()
             .await
-            .ok_or_else(|| anyhow!("You are not authenticated, try login in first"))?;
-        client.set_credential(credentials);
+            .map_err(|_| anyhow!("You are not authenticated, try login in first"))?;
+        client.set_credential(credential);
 
         let mut after = None;
         let mut exported_feeds = Vec::new();
 
         loop {
-            let response = client.export_subscription(after.take(), 1).await?;
+            let response = client.export_subscription(after.take(), 50).await?;
             exported_feeds.extend(response.feeds);
 
             if !response.page_info.has_next_page {

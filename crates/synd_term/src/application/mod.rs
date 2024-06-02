@@ -1,25 +1,25 @@
 use std::{
     future,
-    ops::{Add, ControlFlow, Sub},
+    ops::{ControlFlow, Sub},
     pin::Pin,
+    sync::Arc,
     time::Duration,
 };
 
 use chrono::{DateTime, Utc};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{FutureExt, Stream, StreamExt};
+use itertools::Itertools;
 use ratatui::widgets::Widget;
-use synd_auth::device_flow::{
-    self, DeviceAccessTokenResponse, DeviceAuthorizationResponse, DeviceFlow,
-};
+use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_feed::types::FeedUrl;
 use tokio::time::{Instant, Sleep};
 use update_informer::Version;
 
 use crate::{
     application::event::KeyEventResult,
-    auth::{self, AuthenticationProvider, Credential},
-    client::{mutation::subscribe_feed::SubscribeFeedInput, Client},
+    auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
+    client::{mutation::subscribe_feed::SubscribeFeedInput, Client, SyndApiError},
     command::Command,
     config::{self, Categories},
     interact::Interactor,
@@ -45,14 +45,16 @@ pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
 mod input_parser;
 use input_parser::InputParser;
 
-mod authenticator;
-pub use authenticator::{Authenticator, DeviceFlows, JwtService};
+pub use auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
 mod clock;
 pub(crate) use clock::{Clock, SystemClock};
 
 mod flags;
 use flags::Should;
+
+mod cache;
+pub use cache::Cache;
 
 pub(crate) mod event;
 
@@ -92,6 +94,7 @@ pub struct Application {
     interactor: Interactor,
     authenticator: Authenticator,
     in_flight: InFlight,
+    cache: Cache,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
     config: Config,
@@ -104,8 +107,8 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new(terminal: Terminal, client: Client, categories: Categories) -> Self {
-        Application::with(terminal, client, categories, Config::default())
+    pub fn new(terminal: Terminal, client: Client, categories: Categories, cache: Cache) -> Self {
+        Application::with(terminal, client, categories, Config::default(), cache)
     }
 
     pub fn with(
@@ -113,6 +116,7 @@ impl Application {
         client: Client,
         categories: Categories,
         config: Config,
+        cache: Cache,
     ) -> Self {
         let mut keymaps = Keymaps::default();
         keymaps.enable(KeymapId::Global);
@@ -130,6 +134,7 @@ impl Application {
             interactor: Interactor::new(),
             authenticator: Authenticator::new(),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
+            cache,
             theme: Theme::default(),
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
@@ -166,11 +171,40 @@ impl Application {
         self.key_handlers.keymaps_mut().unwrap()
     }
 
-    pub async fn restore_credential(&self) -> Option<Credential> {
-        auth::credential_from_cache(self.jwt_service(), self.now()).await
+    pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        self.init().await?;
+
+        self.event_loop(input).await;
+
+        self.cleanup()
     }
 
-    pub fn handle_initial_credential(&mut self, cred: Credential) {
+    /// Initialize application.
+    /// Setup terminal and handle cache.
+    async fn init(&mut self) -> anyhow::Result<()> {
+        self.terminal.init()?;
+
+        match self.restore_credential().await {
+            Ok(cred) => self.handle_initial_credential(cred),
+            Err(err) => tracing::warn!("Restore credential: {err}"),
+        }
+        Ok(())
+    }
+
+    async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
+        let restore = auth::Restore {
+            jwt_service: self.jwt_service(),
+            cache: &self.cache,
+            now: self.now(),
+            persist_when_refreshed: true,
+        };
+        restore.restore().await
+    }
+
+    fn handle_initial_credential(&mut self, cred: Verified<Credential>) {
         self.set_credential(cred);
         self.initial_fetch();
         self.check_latest_release();
@@ -184,35 +218,28 @@ impl Application {
         self.should_render();
     }
 
-    fn set_credential(&mut self, cred: Credential) {
+    fn set_credential(&mut self, cred: Verified<Credential>) {
         self.schedule_credential_refreshing(&cred);
         self.client.set_credential(cred);
     }
 
     fn initial_fetch(&mut self) {
         tracing::info!("Initial fetch");
-        let fut = async {
-            Ok(Command::FetchEntries {
+        self.jobs.futures.push(
+            future::ready(Ok(Command::FetchEntries {
                 after: None,
                 first: config::client::INITIAL_ENTRIES_TO_FETCH,
-            })
-        }
-        .boxed();
-        self.jobs.futures.push(fut);
+            }))
+            .boxed(),
+        );
     }
 
-    pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        self.terminal.init()?;
-
-        self.event_loop(input).await;
-
+    /// Restore terminal state and print something to console if necesseary
+    fn cleanup(&mut self) -> anyhow::Result<()> {
         self.terminal.restore()?;
 
+        // Make sure inform after terminal restored
         self.inform_latest_release();
-
         Ok(())
     }
 
@@ -293,49 +320,24 @@ impl Application {
                         continue;
                     }
                     let provider = self.components.auth.selected_provider();
-                    match provider {
-                        AuthenticationProvider::Github => {
-                            self.authenticate(
-                                provider,
-                                self.authenticator.device_flows.github.clone(),
-                            );
-                        }
-                        AuthenticationProvider::Google => {
-                            self.authenticate(
-                                provider,
-                                self.authenticator.device_flows.google.clone(),
-                            );
-                        }
-                    }
+                    self.init_device_flow(provider);
                 }
                 Command::MoveAuthenticationProvider(direction) => {
                     self.components.auth.move_selection(direction);
                     self.should_render();
                 }
-                Command::DeviceAuthorizationFlow {
+                Command::HandleDeviceFlowAuthorizationResponse {
                     provider,
                     device_authorization,
-                } => match provider {
-                    AuthenticationProvider::Github => {
-                        self.device_authorize_flow(
-                            provider,
-                            self.authenticator.device_flows.github.clone(),
-                            device_authorization,
-                        );
-                    }
-                    AuthenticationProvider::Google => {
-                        self.device_authorize_flow(
-                            provider,
-                            self.authenticator.device_flows.google.clone(),
-                            device_authorization,
-                        );
-                    }
-                },
-                Command::CompleteDevieAuthorizationFlow {
-                    provider,
-                    device_access_token,
                 } => {
-                    self.complete_device_authroize_flow(provider, device_access_token);
+                    self.handle_device_flow_authorization_response(provider, device_authorization);
+                }
+                Command::CompleteDevieAuthorizationFlow {
+                    credential,
+                    request_seq,
+                } => {
+                    self.in_flight.remove(request_seq);
+                    self.complete_device_authroize_flow(credential);
                 }
                 Command::RefreshCredential { credential } => {
                     self.set_credential(credential);
@@ -569,20 +571,55 @@ impl Application {
                 Command::InformLatestRelease(version) => {
                     self.latest_release = Some(version);
                 }
-                Command::HandleError {
-                    message,
-                    request_seq,
-                } => {
-                    tracing::error!("{message}");
+                Command::HandleError { message } => {
+                    self.handle_error_message(message, None);
+                }
+                Command::HandleApiError { error, request_seq } => {
+                    let message = match Arc::into_inner(error).expect("error never cloned") {
+                        SyndApiError::Unauthorized { url } => {
+                            tracing::warn!(
+                                "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
+                            );
+                            self.cache.clean().ok();
 
-                    if let Some(request_seq) = request_seq {
-                        self.in_flight.remove(request_seq);
-                    }
-                    self.components.prompt.set_error_message(message);
-                    self.should_render();
+                            format!(
+                                "{} unauthorized. please login again",
+                                url.map(|url| url.to_string()).unwrap_or_default(),
+                            )
+                        }
+                        SyndApiError::BuildRequest(err) => {
+                            format!("build request failed: {err} this is a BUG")
+                        }
+
+                        SyndApiError::Graphql { errors } => {
+                            errors.into_iter().map(|err| err.to_string()).join(", ")
+                        }
+                        SyndApiError::SubscribeFeed(err) => err.to_string(),
+
+                        SyndApiError::Internal(err) => format!("internal error: {err}"),
+                    };
+                    self.handle_error_message(message, Some(request_seq));
+                }
+                Command::HandleOauthApiError { error, request_seq } => {
+                    self.handle_error_message(error.to_string(), Some(request_seq));
                 }
             }
         }
+    }
+
+    fn handle_error_message(
+        &mut self,
+        error_message: String,
+        request_seq: Option<RequestSequence>,
+    ) {
+        tracing::error!("{error_message}");
+
+        if let Some(request_seq) = request_seq {
+            self.in_flight.remove(request_seq);
+        }
+
+        self.components.prompt.set_error_message(error_message);
+        self.should_render();
     }
 
     #[inline]
@@ -635,31 +672,6 @@ impl Application {
 }
 
 impl Application {
-    fn fetch_subscription(&mut self, populate: Populate, after: Option<String>, first: i64) {
-        if first <= 0 {
-            return;
-        }
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::FetchSubscription);
-        let fut = async move {
-            match client.fetch_subscription(after, Some(first)).await {
-                Ok(subscription) => Ok(Command::PopulateFetchedSubscription {
-                    populate,
-                    subscription,
-                    request_seq,
-                }),
-                Err(err) => Ok(Command::HandleError {
-                    message: format!("{err}"),
-                    request_seq: Some(request_seq),
-                }),
-            }
-        }
-        .boxed();
-        self.jobs.futures.push(fut);
-    }
-}
-
-impl Application {
     fn prompt_feed_subscription(&mut self) {
         let input = self
             .interactor
@@ -677,11 +689,7 @@ impl Application {
                     .is_already_subscribed(&input.url)
                 {
                     let message = format!("{} already subscribed", input.url);
-                    future::ready(Ok(Command::HandleError {
-                        message,
-                        request_seq: None,
-                    }))
-                    .boxed()
+                    future::ready(Ok(Command::HandleError { message })).boxed()
                 } else {
                     future::ready(Ok(Command::SubscribeFeed { input })).boxed()
                 }
@@ -690,7 +698,6 @@ impl Application {
             Err(err) => async move {
                 Ok(Command::HandleError {
                     message: err.to_string(),
-                    request_seq: None,
                 })
             }
             .boxed(),
@@ -718,7 +725,6 @@ impl Application {
             Err(err) => async move {
                 Ok(Command::HandleError {
                     message: err.to_string(),
-                    request_seq: None,
                 })
             }
             .boxed(),
@@ -733,10 +739,7 @@ impl Application {
         let fut = async move {
             match client.subscribe_feed(input).await {
                 Ok(feed) => Ok(Command::CompleteSubscribeFeed { feed, request_seq }),
-                Err(err) => Ok(Command::HandleError {
-                    message: format!("{err}"),
-                    request_seq: Some(request_seq),
-                }),
+                Err(error) => Ok(Command::api_error(error, request_seq)),
             }
         }
         .boxed();
@@ -749,10 +752,7 @@ impl Application {
         let fut = async move {
             match client.unsubscribe_feed(url.clone()).await {
                 Ok(()) => Ok(Command::CompleteUnsubscribeFeed { url, request_seq }),
-                Err(err) => Ok(Command::HandleError {
-                    message: format!("{err}"),
-                    request_seq: Some(request_seq),
-                }),
+                Err(err) => Ok(Command::api_error(err, request_seq)),
             }
         }
         .boxed();
@@ -783,6 +783,27 @@ impl Application {
 
 impl Application {
     #[tracing::instrument(skip(self))]
+    fn fetch_subscription(&mut self, populate: Populate, after: Option<String>, first: i64) {
+        if first <= 0 {
+            return;
+        }
+        let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::FetchSubscription);
+        let fut = async move {
+            match client.fetch_subscription(after, Some(first)).await {
+                Ok(subscription) => Ok(Command::PopulateFetchedSubscription {
+                    populate,
+                    subscription,
+                    request_seq,
+                }),
+                Err(err) => Ok(Command::api_error(err, request_seq)),
+            }
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
+
+    #[tracing::instrument(skip(self))]
     fn fetch_entries(&mut self, populate: Populate, after: Option<String>, first: i64) {
         if first <= 0 {
             return;
@@ -796,9 +817,9 @@ impl Application {
                     payload,
                     request_seq,
                 }),
-                Err(err) => Ok(Command::HandleError {
-                    message: format!("{err}"),
-                    request_seq: Some(request_seq),
+                Err(error) => Ok(Command::HandleApiError {
+                    error: Arc::new(error),
+                    request_seq,
                 }),
             }
         }
@@ -808,37 +829,30 @@ impl Application {
 }
 
 impl Application {
-    #[tracing::instrument(skip(self, device_flow))]
-    fn authenticate<P>(&mut self, provider: AuthenticationProvider, device_flow: DeviceFlow<P>)
-    where
-        P: device_flow::Provider + Sync + Send + 'static,
-    {
+    #[tracing::instrument(skip(self))]
+    fn init_device_flow(&mut self, provider: AuthenticationProvider) {
         tracing::info!("Start authenticate");
 
+        let authenticator = self.authenticator.clone();
+        let request_seq = self.in_flight.add(RequestId::DeviceFlowDeviceAuthorize);
         let fut = async move {
-            match device_flow.device_authorize_request().await {
-                Ok(device_authorization) => Ok(Command::DeviceAuthorizationFlow {
+            match authenticator.init_device_flow(provider).await {
+                Ok(device_authorization) => Ok(Command::HandleDeviceFlowAuthorizationResponse {
                     provider,
                     device_authorization,
                 }),
-                Err(err) => Ok(Command::HandleError {
-                    message: format!("{err}"),
-                    request_seq: None,
-                }),
+                Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
             }
         }
         .boxed();
         self.jobs.futures.push(fut);
     }
 
-    fn device_authorize_flow<P>(
+    fn handle_device_flow_authorization_response(
         &mut self,
         provider: AuthenticationProvider,
-        device_flow: DeviceFlow<P>,
         device_authorization: DeviceAuthorizationResponse,
-    ) where
-        P: device_flow::Provider + Sync + Send + 'static,
-    {
+    ) {
         self.components
             .auth
             .set_device_authorization_response(device_authorization.clone());
@@ -847,22 +861,19 @@ impl Application {
         self.interactor
             .open_browser(device_authorization.verification_uri().to_string());
 
+        let authenticator = self.authenticator.clone();
+        let now = self.now();
+        let request_seq = self.in_flight.add(RequestId::DeviceFlowPollAccessToken);
         let fut = async move {
-            match device_flow
-                .poll_device_access_token(
-                    device_authorization.device_code,
-                    device_authorization.interval,
-                )
+            match authenticator
+                .poll_device_flow_access_token(now, provider, device_authorization)
                 .await
             {
-                Ok(device_access_token) => Ok(Command::CompleteDevieAuthorizationFlow {
-                    provider,
-                    device_access_token,
+                Ok(credential) => Ok(Command::CompleteDevieAuthorizationFlow {
+                    credential,
+                    request_seq,
                 }),
-                Err(err) => Ok(Command::HandleError {
-                    message: format!("{err}"),
-                    request_seq: None,
-                }),
+                Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
             }
         }
         .boxed();
@@ -870,47 +881,16 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
-    fn complete_device_authroize_flow(
-        &mut self,
-        provider: AuthenticationProvider,
-        device_access_token: DeviceAccessTokenResponse,
-    ) {
-        let auth = match provider {
-            AuthenticationProvider::Github => Credential::Github {
-                access_token: device_access_token.access_token,
-            },
-            AuthenticationProvider::Google => {
-                let id_token = device_access_token.id_token.expect("id token not found");
-                let expired_at = self
-                    .jwt_service()
-                    .google
-                    .decode_id_token_insecure(&id_token, false)
-                    .ok()
-                    .map_or(
-                        self.now().add(config::credential::FALLBACK_EXPIRE),
-                        |claims| claims.expired_at(),
-                    );
-                Credential::Google {
-                    id_token,
-                    refresh_token: device_access_token
-                        .refresh_token
-                        .expect("refresh token not found"),
-                    expired_at,
-                }
-            }
-        };
-
-        {
-            if let Err(err) = crate::auth::persist_credential(&auth) {
-                tracing::warn!("Failed to save credential cache: {err}");
-            }
+    fn complete_device_authroize_flow(&mut self, cred: Verified<Credential>) {
+        if let Err(err) = self.cache.persist_credential(&cred) {
+            tracing::error!("Failed to save credential to cache: {err}");
         }
 
-        self.handle_initial_credential(auth);
+        self.handle_initial_credential(cred);
     }
 
-    fn schedule_credential_refreshing(&mut self, cred: &Credential) {
-        match cred {
+    fn schedule_credential_refreshing(&mut self, cred: &Verified<Credential>) {
+        match &**cred {
             Credential::Github { .. } => {}
             Credential::Google {
                 refresh_token,
@@ -932,7 +912,6 @@ impl Application {
                         Ok(credential) => Ok(Command::RefreshCredential { credential }),
                         Err(err) => Ok(Command::HandleError {
                             message: err.to_string(),
-                            request_seq: None,
                         }),
                     }
                 }

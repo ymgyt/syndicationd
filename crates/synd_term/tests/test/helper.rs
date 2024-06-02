@@ -11,7 +11,7 @@ use synd_api::{
 };
 use synd_auth::device_flow::{provider, DeviceFlow};
 use synd_term::{
-    application::{Application, Authenticator, Config, DeviceFlows},
+    application::{Application, Authenticator, Cache, Config, DeviceFlows},
     client::Client,
     config::Categories,
     terminal::Terminal,
@@ -27,6 +27,7 @@ pub struct TestCase {
     pub kvsd_port: u16,
     pub terminal_col_row: (u16, u16),
     pub device_flow_case: &'static str,
+    pub cache_dir: PathBuf,
 }
 
 impl TestCase {
@@ -37,6 +38,7 @@ impl TestCase {
             kvsd_port,
             terminal_col_row: (term_col, term_row),
             device_flow_case,
+            cache_dir,
         } = self.clone();
 
         // Start mock oauth server
@@ -76,7 +78,9 @@ impl TestCase {
                 throbber_timer_interval: Duration::from_secs(3600), // disable throbber
                 ..Default::default()
             };
-            Application::with(terminal, client, Categories::default_toml(), config)
+            // to isolate the state for each test
+            let cache = Cache::new(cache_dir);
+            Application::with(terminal, client, Categories::default_toml(), config, cache)
                 .with_theme(Theme::default())
                 .with_authenticator(authenticator)
         };

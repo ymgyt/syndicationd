@@ -1,18 +1,24 @@
 use std::{
+    borrow::Borrow,
     cmp::Ordering,
-    fmt,
-    ops::Sub,
-    path::{Path, PathBuf},
+    fmt, io,
+    ops::{Deref, Sub},
+    path::PathBuf,
 };
 
 use chrono::{DateTime, Utc};
-use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use synd_auth::jwt::google::JwtError;
 use thiserror::Error;
 use tracing::debug;
 
-use crate::{application::JwtService, config};
+use crate::{
+    application::{Cache, JwtService},
+    config,
+    types::Time,
+};
+
+pub mod authenticator;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AuthenticationProvider {
@@ -26,19 +32,29 @@ pub enum CredentialError {
     GoogleJwtExpired { refresh_token: String },
     #[error("google jwt email not verified")]
     GoogleJwtEmailNotVerified,
-    #[error("failed to open: {0}")]
-    Open(std::io::Error),
+    #[error("failed to open: {path} :{io_err}")]
+    Open {
+        #[source]
+        io_err: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("serialize credential: {0}")]
+    Serialize(serde_json::Error),
     #[error("deserialize credential: {0}")]
     Deserialize(serde_json::Error),
     #[error("decode jwt: {0}")]
     DecodeJwt(JwtError),
     #[error("refresh jwt id token: {0}")]
     RefreshJwt(JwtError),
-    #[error("persist credential: {0}")]
-    PersistCredential(anyhow::Error),
+    #[error("persist credential: {path} :{io_err}")]
+    PersistCredential {
+        #[source]
+        io_err: io::Error,
+        path: PathBuf,
+    },
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Credential {
     Github {
         access_token: String,
@@ -56,26 +72,59 @@ impl fmt::Debug for Credential {
     }
 }
 
-impl Credential {
-    async fn restore_from_path(
-        path: &Path,
+/// Represents expired state
+#[derive(PartialEq, Eq, Debug)]
+pub(super) struct Expired<C = Credential>(pub(super) C);
+
+/// Represents verified state
+#[derive(Debug, Clone)]
+pub(super) struct Verified<C = Credential>(C);
+
+impl Deref for Verified<Credential> {
+    type Target = Credential;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Borrow<Credential> for &Verified<Credential> {
+    fn borrow(&self) -> &Credential {
+        &self.0
+    }
+}
+
+impl<C> Verified<C> {
+    pub(super) fn into_inner(self) -> C {
+        self.0
+    }
+}
+
+/// Represents unverified state
+#[derive(PartialEq, Eq, Debug)]
+pub struct Unverified<C = Credential>(C);
+
+impl From<Credential> for Unverified<Credential> {
+    fn from(cred: Credential) -> Self {
+        Unverified(cred)
+    }
+}
+
+pub(super) enum VerifyResult {
+    Verified(Verified<Credential>),
+    Expired(Expired<Credential>),
+}
+
+impl Unverified<Credential> {
+    pub(super) fn verify(
+        self,
         jwt_service: &JwtService,
         now: DateTime<Utc>,
-    ) -> Result<Self, CredentialError> {
-        debug!(
-            path = path.display().to_string(),
-            "Restore credential from cache"
-        );
-        let mut f = std::fs::File::open(path).map_err(CredentialError::Open)?;
-        let credential = serde_json::from_reader(&mut f).map_err(CredentialError::Deserialize)?;
-
+    ) -> Result<VerifyResult, CredentialError> {
+        let credential = self.0;
         match &credential {
-            Credential::Github { .. } => Ok(credential),
-            Credential::Google {
-                id_token,
-                refresh_token,
-                ..
-            } => {
+            Credential::Github { .. } => Ok(VerifyResult::Verified(Verified(credential))),
+            Credential::Google { id_token, .. } => {
                 let claims = jwt_service
                     .google
                     .decode_id_token_insecure(id_token, false)
@@ -83,7 +132,7 @@ impl Credential {
                 if !claims.email_verified {
                     return Err(CredentialError::GoogleJwtEmailNotVerified);
                 }
-                let credential = match claims
+                match claims
                     .expired_at()
                     .sub(config::credential::EXPIRE_MARGIN)
                     .cmp(&now)
@@ -92,49 +141,46 @@ impl Credential {
                     Ordering::Less | Ordering::Equal => {
                         debug!("Google jwt expired, trying to refresh");
 
-                        let credential = jwt_service.refresh_google_id_token(refresh_token).await?;
-
-                        persist_credential(&credential)
-                            .map_err(CredentialError::PersistCredential)?;
-
-                        debug!("Persist refreshed credential");
-                        credential
+                        Ok(VerifyResult::Expired(Expired(credential)))
                     }
                     // not expired
-                    Ordering::Greater => credential,
-                };
-                Ok(credential)
+                    Ordering::Greater => Ok(VerifyResult::Verified(Verified(credential))),
+                }
             }
         }
     }
 }
 
-pub fn persist_credential(cred: &Credential) -> anyhow::Result<()> {
-    let cred_path = cred_file();
-    if let Some(parent) = cred_path.parent() {
-        std::fs::create_dir_all(parent)?;
+/// Process for restoring credential from cache
+pub(crate) struct Restore<'a> {
+    pub(crate) jwt_service: &'a JwtService,
+    pub(crate) cache: &'a Cache,
+    pub(crate) now: Time,
+    pub(crate) persist_when_refreshed: bool,
+}
+
+impl<'a> Restore<'a> {
+    pub(crate) async fn restore(self) -> Result<Verified<Credential>, CredentialError> {
+        let Restore {
+            jwt_service,
+            cache,
+            now,
+            persist_when_refreshed,
+        } = self;
+        let cred = cache.load_credential()?;
+
+        match cred.verify(jwt_service, now)? {
+            VerifyResult::Verified(cred) => Ok(cred),
+            VerifyResult::Expired(Expired(Credential::Google { refresh_token, .. })) => {
+                let cred = jwt_service.refresh_google_id_token(&refresh_token).await?;
+
+                if persist_when_refreshed {
+                    cache.persist_credential(&cred)?;
+                }
+
+                Ok(cred)
+            }
+            VerifyResult::Expired(_) => panic!("Unexpected verify result. this is bug"),
+        }
     }
-    let mut cred_file = std::fs::File::create(&cred_path)?;
-
-    debug!(path = ?cred_path.display(), "Create credential cache file");
-
-    serde_json::to_writer(&mut cred_file, &cred)?;
-
-    Ok(())
-}
-
-fn cred_file() -> PathBuf {
-    config::cache_dir().join("credential.json")
-}
-
-pub async fn credential_from_cache(
-    jwt_service: &JwtService,
-    now: DateTime<Utc>,
-) -> Option<Credential> {
-    Credential::restore_from_path(cred_file().as_path(), jwt_service, now)
-        .inspect_err(|err| {
-            tracing::error!("Restore credential from cache: {err}");
-        })
-        .await
-        .ok()
 }

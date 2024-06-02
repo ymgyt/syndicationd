@@ -35,7 +35,7 @@ Buffer {
         "                                                                                                                        ",
         "                                                                                                                        ",
         "                                                                                                                        ",
-        "                                                   j/k:󰹹  Ent:󰏌  q:                                                    ",
+        "⣧ Polling...                                            j/k:󰹹  Ent:󰏌  q:                                               ",
     ],
     styles: [
         x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
@@ -45,7 +45,7 @@ Buffer {
         x: 76, y: 11, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
         x: 42, y: 12, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD,
         x: 50, y: 12, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 51, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 70, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 56, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 75, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
     ]
 }

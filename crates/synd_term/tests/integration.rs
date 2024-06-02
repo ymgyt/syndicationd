@@ -1,5 +1,7 @@
 #[cfg(feature = "integration")]
 mod test {
+    use std::path::Path;
+
     use serial_test::file_serial;
     use synd_term::key;
     use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -18,6 +20,7 @@ mod test {
             kvsd_port: 47379,
             terminal_col_row: (120, 30),
             device_flow_case: "case1",
+            cache_dir: helper::temp_dir().into_path(),
         };
         let mut application = test_case.init_app().await?;
 
@@ -60,8 +63,8 @@ mod test {
 
         {
             check_command_test(test_case.synd_api_port);
-            export_command_test(test_case.synd_api_port);
-            clean_command_test();
+            export_command_test(test_case.synd_api_port, &test_case.cache_dir);
+            clean_command_test(&test_case.cache_dir);
         }
 
         Ok(())
@@ -71,9 +74,9 @@ mod test {
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args([
+            "check",
             "--endpoint",
             &format!("https://localhost:{api_port}"),
-            "check",
         ])
         .assert()
         .success();
@@ -81,24 +84,27 @@ mod test {
         cmd.arg("--format=json").assert().success();
     }
 
-    fn export_command_test(api_port: u16) {
+    fn export_command_test(api_port: u16, cache_dir: &Path) {
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
-        // TODO: export case
         cmd.args([
+            "export",
             "--endpoint",
             &format!("https://localhost:{api_port}"),
-            "export",
-            "--print-schema",
+            "--cache-dir",
+            &cache_dir.display().to_string(),
         ])
         .assert()
         .success();
+
+        cmd.arg("--print-schema").assert().success();
     }
 
-    fn clean_command_test() {
+    fn clean_command_test(cache_dir: &Path) {
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
-        // TODO: Currently clear real cache :(
-        cmd.args(["clean", "--help"]).assert().success();
+        cmd.args(["clean", "--cache-dir", &cache_dir.display().to_string()])
+            .assert()
+            .success();
     }
 }

@@ -32,6 +32,12 @@ pub struct Args {
     /// Log file path
     #[arg(long, default_value = config::log_path().into_os_string(), env = config::env::LOG_PATH)]
     pub log: PathBuf,
+    /// Cache directory
+    #[arg(
+        long,
+        default_value = config::cache::dir().to_path_buf().into_os_string(),
+    )]
+    pub cache_dir: PathBuf,
     /// Color theme
     #[arg(value_enum, long = "theme", default_value_t = Palette::Ferra, env = config::env::THEME, value_name = "THEME")]
     pub palette: Palette,

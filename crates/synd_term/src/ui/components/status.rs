@@ -82,6 +82,8 @@ impl StatusLine {
         let area = {
             if let Some(in_flight) = cx.in_flight.recent_in_flight() {
                 let label = match in_flight {
+                    RequestId::DeviceFlowDeviceAuthorize => "Request device authorization",
+                    RequestId::DeviceFlowPollAccessToken => "Polling...",
                     RequestId::FetchEntries => "Fetch entries...",
                     RequestId::FetchSubscription => "Fetch subscription...",
                     RequestId::SubscribeFeed => "Subscribe feed...",

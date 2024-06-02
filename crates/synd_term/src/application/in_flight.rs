@@ -11,6 +11,8 @@ pub type RequestSequence = u64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum RequestId {
+    DeviceFlowDeviceAuthorize,
+    DeviceFlowPollAccessToken,
     FetchEntries,
     FetchSubscription,
     SubscribeFeed,

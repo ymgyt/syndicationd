@@ -10,10 +10,9 @@ use tracing::{error, Span};
 use url::Url;
 
 use crate::{
-    auth::Credential,
+    auth::{Credential, Verified},
     client::payload::ExportSubscriptionPayload,
-    config,
-    types::{self},
+    config, types,
 };
 
 use self::query::subscription::SubscriptionOutput;
@@ -28,8 +27,20 @@ pub mod query;
 pub enum SubscribeFeedError {
     #[error("invalid feed url: `{feed_url}` ({message})`")]
     InvalidFeedUrl { feed_url: FeedUrl, message: String },
-    #[error("internal error: {0}")]
-    Internal(anyhow::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum SyndApiError {
+    #[error("unauthorized")]
+    Unauthorized { url: Option<Url> },
+    #[error(transparent)]
+    BuildRequest(#[from] reqwest::Error),
+    #[error("graphql error: {errors:?}")]
+    Graphql { errors: Vec<graphql_client::Error> },
+    #[error(transparent)]
+    SubscribeFeed(SubscribeFeedError),
+    #[error(transparent)]
+    Internal(#[from] anyhow::Error),
 }
 
 /// synd-api client
@@ -60,8 +71,8 @@ impl Client {
         })
     }
 
-    pub fn set_credential(&mut self, auth: Credential) {
-        let mut token = HeaderValue::try_from(match auth {
+    pub(crate) fn set_credential(&mut self, cred: Verified<Credential>) {
+        let mut token = HeaderValue::try_from(match cred.into_inner() {
             Credential::Github { access_token } => format!("github {access_token}"),
             Credential::Google { id_token, .. } => format!("google {id_token}"),
         })
@@ -75,7 +86,7 @@ impl Client {
         &self,
         after: Option<String>,
         first: Option<i64>,
-    ) -> anyhow::Result<SubscriptionOutput> {
+    ) -> Result<SubscriptionOutput, SyndApiError> {
         let var = query::subscription::Variables { after, first };
         let request = query::Subscription::build_query(var);
         let response: query::subscription::ResponseData = self.request(&request).await?;
@@ -86,17 +97,14 @@ impl Client {
     pub async fn subscribe_feed(
         &self,
         input: mutation::subscribe_feed::SubscribeFeedInput,
-    ) -> Result<types::Feed, SubscribeFeedError> {
+    ) -> Result<types::Feed, SyndApiError> {
         use crate::client::mutation::subscribe_feed::ResponseCode;
         let url = input.url.clone();
         let var = mutation::subscribe_feed::Variables {
             subscribe_input: input,
         };
         let request = mutation::SubscribeFeed::build_query(var);
-        let response: mutation::subscribe_feed::ResponseData = self
-            .request(&request)
-            .await
-            .map_err(SubscribeFeedError::Internal)?;
+        let response: mutation::subscribe_feed::ResponseData = self.request(&request).await?;
 
         match response.subscribe_feed {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedSuccess(success) => {
@@ -105,12 +113,14 @@ impl Client {
             mutation::subscribe_feed::SubscribeFeedSubscribeFeed::SubscribeFeedError(err) => {
                 match err.status.code {
                     ResponseCode::OK => unreachable!(),
-                    ResponseCode::INVALID_FEED_URL => Err(SubscribeFeedError::InvalidFeedUrl {
-                        feed_url: url,
-                        message: err.message,
-                    }),
-                    err_code => Err(SubscribeFeedError::Internal(anyhow::anyhow!(
-                        "{err_code:?}"
+                    ResponseCode::INVALID_FEED_URL => Err(SyndApiError::SubscribeFeed(
+                        SubscribeFeedError::InvalidFeedUrl {
+                            feed_url: url,
+                            message: err.message,
+                        },
+                    )),
+                    err_code => Err(SyndApiError::Internal(anyhow::anyhow!(
+                        "Unexpected subscribe_feed error code: {err_code:?}"
                     ))),
                 }
             }
@@ -118,7 +128,7 @@ impl Client {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn unsubscribe_feed(&self, url: FeedUrl) -> anyhow::Result<()> {
+    pub async fn unsubscribe_feed(&self, url: FeedUrl) -> Result<(), SyndApiError> {
         let var = mutation::unsubscribe_feed::Variables {
             unsubscribe_input: mutation::unsubscribe_feed::UnsubscribeFeedInput { url },
         };
@@ -131,7 +141,9 @@ impl Client {
             ) => Ok(()),
             mutation::unsubscribe_feed::UnsubscribeFeedUnsubscribeFeed::UnsubscribeFeedError(
                 err,
-            ) => Err(anyhow!("Failed to mutate unsubscribe_feed {err:?}")),
+            ) => Err(SyndApiError::Internal(anyhow!(
+                "Failed to mutate unsubscribe_feed {err:?}"
+            ))),
         }
     }
 
@@ -140,7 +152,7 @@ impl Client {
         &self,
         after: Option<String>,
         first: i64,
-    ) -> anyhow::Result<payload::FetchEntriesPayload> {
+    ) -> Result<payload::FetchEntriesPayload, SyndApiError> {
         tracing::debug!("Fetch entries...");
 
         let var = query::entries::Variables { after, first };
@@ -166,7 +178,7 @@ impl Client {
     }
 
     #[tracing::instrument(skip_all, err(Display))]
-    async fn request<Body, ResponseData>(&self, body: &Body) -> anyhow::Result<ResponseData>
+    async fn request<Body, ResponseData>(&self, body: &Body) -> Result<ResponseData, SyndApiError>
     where
         Body: Serialize + Debug + ?Sized,
         ResponseData: DeserializeOwned + Debug,
@@ -182,7 +194,8 @@ impl Client {
                     .clone(),
             )
             .json(body)
-            .build()?;
+            .build()
+            .map_err(SyndApiError::BuildRequest)?;
 
         synd_o11y::opentelemetry::http::inject_with_baggage(
             &Span::current().context(),
@@ -196,22 +209,22 @@ impl Client {
             .client
             .execute(request)
             .await?
-            .error_for_status()?
+            .error_for_status()
+            .map_err(|err| match err.status().map(|s| s.as_u16()) {
+                Some(401) => SyndApiError::Unauthorized {
+                    url: err.url().cloned(),
+                },
+                _ => SyndApiError::Internal(anyhow::Error::from(err)),
+            })?
             .json()
             .await?;
 
         match (response.data, response.errors) {
-            (_, Some(errs)) if !errs.is_empty() => {
-                for err in &errs {
-                    error!("{err:?}");
-                }
-                Err(anyhow::anyhow!(
-                    "failed to request synd api: {}",
-                    errs.first().unwrap()
-                ))
-            }
+            (_, Some(errors)) if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
             (Some(data), _) => Ok(data),
-            _ => Err(anyhow::anyhow!("unexpected response",)),
+            _ => Err(SyndApiError::Internal(anyhow!(
+                "Unexpected error. response does not contain data and errors"
+            ))),
         }
     }
 

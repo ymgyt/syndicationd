@@ -42,7 +42,7 @@ impl CheckCommand {
             .inspect_err(|err| eprintln!("{err:?}"))
             .ok();
 
-        let cache_dir = config::cache_dir();
+        let cache_dir = config::cache::dir();
         let log_path = config::log_path();
 
         match format {

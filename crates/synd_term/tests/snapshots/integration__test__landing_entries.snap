@@ -1,6 +1,6 @@
 ---
 source: crates/synd_term/tests/integration.rs
-description: initial entries
+description: initial landing entries
 expression: application.buffer()
 ---
 Buffer {
@@ -35,7 +35,7 @@ Buffer {
         "                                                                                                                        ",
         "                                                                                                                        ",
         "                                                                                                                        ",
-        "                              Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  h/l:  c:  /:  r:󰑓  Ent:󰏌  q:                                ",
+        "⣧ Request device authorization              Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  h/l:  c:  /:  r:󰑓  Ent:󰏌  q:                  ",
     ],
     styles: [
         x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
@@ -51,7 +51,7 @@ Buffer {
         x: 10, y: 2, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
         x: 0, y: 4, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD | UNDERLINED,
         x: 119, y: 4, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 30, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 90, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 44, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 104, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
     ]
 }

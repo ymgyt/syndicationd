@@ -1,18 +1,25 @@
-use std::io::ErrorKind;
+use std::{io::ErrorKind, path::PathBuf};
 
 use anyhow::Context;
 use clap::Args;
 
-use crate::config;
+use crate::{application::Cache, config};
 
 /// Clean cache and logs
 #[derive(Args, Debug)]
-pub struct CleanCommand {}
+pub struct CleanCommand {
+    /// Cache directory
+    #[arg(
+        long,
+        default_value = config::cache::dir().to_path_buf().into_os_string(),
+    )]
+    cache_dir: PathBuf,
+}
 
 impl CleanCommand {
     #[allow(clippy::unused_self)]
     pub fn run(self) -> i32 {
-        if let Err(err) = Self::clean() {
+        if let Err(err) = self.clean() {
             tracing::error!("{err}");
             1
         } else {
@@ -20,21 +27,14 @@ impl CleanCommand {
         }
     }
 
-    fn clean() -> anyhow::Result<()> {
-        // remove cache
-        let cache_dir = config::cache_dir();
-        match std::fs::remove_dir_all(cache_dir) {
-            Ok(()) => {
-                tracing::info!("Remove {}", cache_dir.display());
-            }
-            Err(err) => match err.kind() {
-                ErrorKind::NotFound => {}
-                _ => {
-                    return Err(anyhow::Error::from(err))
-                        .with_context(|| format!("path: {}", cache_dir.display()))
-                }
-            },
-        }
+    fn clean(self) -> anyhow::Result<()> {
+        let CleanCommand { cache_dir } = self;
+
+        let cache = Cache::new(&cache_dir);
+        cache
+            .clean()
+            .map_err(anyhow::Error::from)
+            .with_context(|| format!("path: {}", cache_dir.display()))?;
 
         // remove log
         let log_file = config::log_path();

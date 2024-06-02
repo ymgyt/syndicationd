@@ -4,14 +4,14 @@ use anyhow::Context as _;
 use crossterm::event::EventStream;
 use futures_util::TryFutureExt;
 use synd_term::{
-    application::{Application, Config},
+    application::{Application, Cache, Config},
     cli::{self, ApiOptions, Args, FeedOptions, Palette},
     client::Client,
     config::{self, Categories},
     terminal::Terminal,
     ui::theme::Theme,
 };
-use tracing::{error, info};
+use tracing::error;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use url::Url;
@@ -60,6 +60,7 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
 }
 
 // Construct and configure application
+#[allow(clippy::unused_async)]
 async fn init_app(
     endpoint: Url,
     timeout: Duration,
@@ -68,6 +69,7 @@ async fn init_app(
         categories,
         entries_limit,
     }: FeedOptions,
+    cache_dir: PathBuf,
 ) -> anyhow::Result<Application> {
     let terminal = Terminal::new().context("Failed to construct terminal")?;
     let client = Client::new(endpoint, timeout).context("Failed to construct client")?;
@@ -79,13 +81,10 @@ async fn init_app(
         entries_limit,
         ..Default::default()
     };
-    let mut app = Application::with(terminal, client, categories, config)
+    let cache = Cache::new(cache_dir);
+    let app = Application::with(terminal, client, categories, config, cache)
         .with_theme(Theme::with_palette(&palette.into()));
 
-    if let Some(cred) = app.restore_credential().await {
-        info!("Use authentication cache");
-        app.handle_initial_credential(cred);
-    }
     Ok(app)
 }
 
@@ -98,6 +97,7 @@ async fn main() {
         },
         feed,
         log,
+        cache_dir,
         command,
         palette,
     } = cli::parse();
@@ -117,7 +117,7 @@ async fn main() {
 
     let mut event_stream = EventStream::new();
 
-    if let Err(err) = init_app(endpoint, client_timeout, palette, feed)
+    if let Err(err) = init_app(endpoint, client_timeout, palette, feed, cache_dir)
         .and_then(|app| {
             tracing::info!("Running...");
             app.run(&mut event_stream)
