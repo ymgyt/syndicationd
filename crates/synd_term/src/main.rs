@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{future, path::PathBuf, time::Duration};
 
 use anyhow::Context as _;
 use crossterm::event::EventStream;
@@ -59,9 +59,7 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
     Ok(guard)
 }
 
-// Construct and configure application
-#[allow(clippy::unused_async)]
-async fn init_app(
+fn build_app(
     endpoint: Url,
     timeout: Duration,
     palette: Palette,
@@ -71,19 +69,22 @@ async fn init_app(
     }: FeedOptions,
     cache_dir: PathBuf,
 ) -> anyhow::Result<Application> {
-    let terminal = Terminal::new().context("Failed to construct terminal")?;
-    let client = Client::new(endpoint, timeout).context("Failed to construct client")?;
-    let categories = categories
-        .map(Categories::load)
-        .transpose()?
-        .unwrap_or_else(Categories::default_toml);
-    let config = Config {
-        entries_limit,
-        ..Default::default()
-    };
-    let cache = Cache::new(cache_dir);
-    let app = Application::with(terminal, client, categories, config, cache)
-        .with_theme(Theme::with_palette(&palette.into()));
+    let app = Application::builder()
+        .terminal(Terminal::new().context("Failed to construct terminal")?)
+        .client(Client::new(endpoint, timeout).context("Failed to construct client")?)
+        .categories(
+            categories
+                .map(Categories::load)
+                .transpose()?
+                .unwrap_or_else(Categories::default_toml),
+        )
+        .config(Config {
+            entries_limit,
+            ..Default::default()
+        })
+        .cache(Cache::new(cache_dir))
+        .theme(Theme::with_palette(&palette.into()))
+        .build();
 
     Ok(app)
 }
@@ -102,6 +103,7 @@ async fn main() {
         palette,
     } = cli::parse();
 
+    // Subcommand logs to the terminal, tui writes logs to a file.
     let log = if command.is_some() { None } else { Some(log) };
     let _guard = init_tracing(log).unwrap();
 
@@ -117,12 +119,18 @@ async fn main() {
 
     let mut event_stream = EventStream::new();
 
-    if let Err(err) = init_app(endpoint, client_timeout, palette, feed, cache_dir)
-        .and_then(|app| {
-            tracing::info!("Running...");
-            app.run(&mut event_stream)
-        })
-        .await
+    if let Err(err) = future::ready(build_app(
+        endpoint,
+        client_timeout,
+        palette,
+        feed,
+        cache_dir,
+    ))
+    .and_then(|app| {
+        tracing::info!("Running...");
+        app.run(&mut event_stream)
+    })
+    .await
     {
         error!("{err:?}");
         std::process::exit(1);

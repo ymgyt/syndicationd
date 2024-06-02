@@ -56,6 +56,9 @@ use flags::Should;
 mod cache;
 pub use cache::Cache;
 
+mod builder;
+pub use builder::ApplicationBuilder;
+
 pub(crate) mod event;
 
 enum Screen {
@@ -107,23 +110,35 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new(terminal: Terminal, client: Client, categories: Categories, cache: Cache) -> Self {
-        Application::with(terminal, client, categories, Config::default(), cache)
+    /// Construct `ApplicationBuilder`
+    pub fn builder() -> ApplicationBuilder {
+        ApplicationBuilder::default()
     }
 
-    pub fn with(
-        terminal: Terminal,
-        client: Client,
-        categories: Categories,
-        config: Config,
-        cache: Cache,
+    /// Construct `Application` from builder.
+    /// Configure keymaps for terminal use
+    fn new(
+        builder: ApplicationBuilder<Terminal, Client, Categories, Cache, Config, Theme>,
     ) -> Self {
-        let mut keymaps = Keymaps::default();
-        keymaps.enable(KeymapId::Global);
-        keymaps.enable(KeymapId::Login);
+        let ApplicationBuilder {
+            terminal,
+            client,
+            categories,
+            cache,
+            config,
+            theme,
+            authenticator,
+        } = builder;
 
-        let mut key_handlers = event::KeyHandlers::new();
-        key_handlers.push(event::KeyHandler::Keymaps(keymaps));
+        let key_handlers = {
+            let mut keymaps = Keymaps::default();
+            keymaps.enable(KeymapId::Global);
+            keymaps.enable(KeymapId::Login);
+
+            let mut key_handlers = event::KeyHandlers::new();
+            key_handlers.push(event::KeyHandler::Keymaps(keymaps));
+            key_handlers
+        };
 
         Self {
             clock: Box::new(SystemClock),
@@ -132,10 +147,10 @@ impl Application {
             jobs: Jobs::new(),
             components: Components::new(),
             interactor: Interactor::new(),
-            authenticator: Authenticator::new(),
+            authenticator: authenticator.unwrap_or_else(Authenticator::new),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             cache,
-            theme: Theme::default(),
+            theme,
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
             screen: Screen::Login,
             config,
@@ -143,19 +158,6 @@ impl Application {
             categories,
             latest_release: None,
             flags: Should::empty(),
-        }
-    }
-
-    #[must_use]
-    pub fn with_theme(self, theme: Theme) -> Self {
-        Self { theme, ..self }
-    }
-
-    #[must_use]
-    pub fn with_authenticator(self, authenticator: Authenticator) -> Self {
-        Self {
-            authenticator,
-            ..self
         }
     }
 

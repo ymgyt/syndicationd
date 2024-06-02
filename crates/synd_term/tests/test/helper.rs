@@ -80,9 +80,16 @@ impl TestCase {
             };
             // to isolate the state for each test
             let cache = Cache::new(cache_dir);
-            Application::with(terminal, client, Categories::default_toml(), config, cache)
-                .with_theme(Theme::default())
-                .with_authenticator(authenticator)
+
+            Application::builder()
+                .terminal(terminal)
+                .client(client)
+                .categories(Categories::default_toml())
+                .config(config)
+                .cache(cache)
+                .theme(Theme::default())
+                .authenticator(authenticator)
+                .build()
         };
 
         Ok(application)
