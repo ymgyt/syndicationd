@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use axum::{
     http::{HeaderMap, StatusCode},
-    routing::post,
+    routing::{get, post},
     Form, Json, Router,
 };
 use headers::{authorization::Bearer, Authorization, Header};
@@ -11,6 +11,8 @@ use synd_auth::device_flow::{
     DeviceAuthorizationResponse,
 };
 use tokio::net::TcpListener;
+
+mod feed;
 
 async fn device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
@@ -86,7 +88,8 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
         );
     let router = Router::new()
         .nest("/case1", case_1)
-        .route("/github/graphql", post(github_graphql_viewer));
+        .route("/github/graphql", post(github_graphql_viewer))
+        .route("/feed/:feed", get(feed::feed));
 
     axum::serve(listener, router).await?;
 

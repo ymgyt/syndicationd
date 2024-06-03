@@ -2,7 +2,7 @@
 #![warn(rustdoc::broken_intra_doc_links)]
 
 pub mod application;
-pub(crate) mod auth;
+pub mod auth;
 pub mod cli;
 pub mod client;
 pub(crate) mod command;

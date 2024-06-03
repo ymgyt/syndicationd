@@ -41,6 +41,7 @@
             (pkgs.lib.hasSuffix ".pem" path)
             # insta snapshots
             || (pkgs.lib.hasSuffix ".snap" path)
+            || (pkgs.lib.hasSuffix ".xml" path)
             || (pkgs.lib.hasSuffix "categories.toml" path) ||
             # Default filter from crane (allow .rs files)
             (craneLib.filterCargoSources path type);

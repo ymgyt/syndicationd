@@ -58,12 +58,8 @@ test *flags:
     cargo nextest run {{ flags }}
 
 # Run integration test by insta
-integration:
-    RUST_LOG="synd_term=info,integration=info,synd_test=info,kvsd=warn,metrics=warn,tower_http=warn,info" \
-    INSTA_OUTPUT=diff INSTA_UPDATE=new INSTA_TEST_RUNNER=nextest \
-    cargo insta test \
-        --package synd-term --features integration --test integration \
-        --review --unreferenced=delete
+integration *test_filter:
+    @nu scripts/integration.nu {{ test_filter }}
 
 # Run cargo insta review
 review:
@@ -71,7 +67,10 @@ review:
         
 # Generate test coverage
 coverage *flags:
-    nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest --all-features --open {{ flags }}
+    nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest \
+        --all-features --open \
+        --ignore-filename-regex integration_backend.rs \
+        {{ flags }}
 
 # Update synd_api graphql schema
 update-gql-schema:

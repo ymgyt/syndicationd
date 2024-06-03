@@ -3391,6 +3391,7 @@ dependencies = [
  "anyhow",
  "axum 0.7.5",
  "headers",
+ "serde",
  "serde_json",
  "synd-auth",
  "tokio",

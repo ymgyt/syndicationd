@@ -2,30 +2,26 @@
 mod test {
     use std::path::Path;
 
-    use serial_test::file_serial;
     use synd_term::key;
-    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     mod helper;
     use crate::test::helper::TestCase;
 
     #[tokio::test(flavor = "multi_thread")]
-    #[file_serial(a)]
-    async fn happy() -> anyhow::Result<()> {
+    async fn login() -> anyhow::Result<()> {
         helper::init_tracing();
 
         let test_case = TestCase {
-            oauth_provider_port: 6000,
+            mock_port: 6000,
             synd_api_port: 6001,
             kvsd_port: 47379,
             terminal_col_row: (120, 30),
             device_flow_case: "case1",
             cache_dir: helper::temp_dir().into_path(),
+            ..Default::default()
         };
         let mut application = test_case.init_app().await?;
-
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        let mut event_stream = UnboundedReceiverStream::new(rx);
+        let (tx, mut event_stream) = helper::event_stream();
 
         {
             application
@@ -40,7 +36,7 @@ mod test {
 
         {
             // push enter => start auth flow
-            tx.send(Ok(key!(enter))).unwrap();
+            tx.send(key!(enter));
             application.event_loop_until_idle(&mut event_stream).await;
             insta::with_settings!({
                 description => "show device flow code",
@@ -106,5 +102,77 @@ mod test {
         cmd.args(["clean", "--cache-dir", &cache_dir.display().to_string()])
             .assert()
             .success();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn subscribe_then_unsubscribe() -> anyhow::Result<()> {
+        helper::init_tracing();
+
+        let test_case = TestCase {
+            mock_port: 6010,
+            synd_api_port: 6011,
+            kvsd_port: 47389,
+            terminal_col_row: (120, 30),
+            interactor_buffer: Some("should rust http://localhost:6010/feed/twir_atom".into()),
+            ..Default::default()
+        }
+        .already_logined();
+
+        let mut application = test_case.init_app().await?;
+        let (tx, mut event_stream) = helper::event_stream();
+
+        {
+            // Move tab to feeds
+            tx.send(key!(tab));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "after feeds tab move",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_landing_feeds", application.buffer());
+            });
+        }
+
+        {
+            // Subscribe
+            tx.send(key!('a'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "after parsing editor buffer for subscribe",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_after_editor_parse", application.buffer());
+            });
+        }
+
+        {
+            // Unsubscribe popup
+            tx.send(key!('d'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "unsubscribe popup",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_unsubscribe_popup", application.buffer());
+            });
+        }
+
+        {
+            // Select Yes (assuming Yes is selected)
+            tx.send(key!(enter));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "after unsubscribe",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_unsubscribed", application.buffer());
+            });
+        }
+
+        Ok(())
     }
 }

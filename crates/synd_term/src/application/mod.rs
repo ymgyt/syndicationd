@@ -128,6 +128,7 @@ impl Application {
             config,
             theme,
             authenticator,
+            interactor,
         } = builder;
 
         let key_handlers = {
@@ -146,7 +147,7 @@ impl Application {
             client,
             jobs: Jobs::new(),
             components: Components::new(),
-            interactor: Interactor::new(),
+            interactor: interactor.unwrap_or_else(Interactor::new),
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             cache,
@@ -1018,5 +1019,13 @@ impl Application {
             }
             self.reset_idle_timer();
         }
+    }
+
+    pub async fn reload_cache(&mut self) -> anyhow::Result<()> {
+        match self.restore_credential().await {
+            Ok(cred) => self.handle_initial_credential(cred),
+            Err(err) => return Err(err.into()),
+        }
+        Ok(())
     }
 }

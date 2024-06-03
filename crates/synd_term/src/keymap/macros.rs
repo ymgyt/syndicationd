@@ -42,4 +42,14 @@ macro_rules! key {
             crossterm::event::KeyCode::Enter,
         ))
     };
+    ( tab ) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
+            crossterm::event::KeyCode::Tab,
+        ))
+    };
+    ( $char:literal ) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
+            crossterm::event::KeyCode::Char($char),
+        ))
+    };
 }

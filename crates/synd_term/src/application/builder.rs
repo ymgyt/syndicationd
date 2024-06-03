@@ -2,6 +2,7 @@ use crate::{
     application::{Application, Authenticator, Cache, Config},
     client::Client,
     config::Categories,
+    interact::Interactor,
     terminal::Terminal,
     ui::theme::Theme,
 };
@@ -22,6 +23,7 @@ pub struct ApplicationBuilder<
     pub(super) theme: Theme,
 
     pub(super) authenticator: Option<Authenticator>,
+    pub(super) interactor: Option<Interactor>,
 }
 
 impl Default for ApplicationBuilder {
@@ -34,6 +36,7 @@ impl Default for ApplicationBuilder {
             config: (),
             theme: (),
             authenticator: None,
+            interactor: None,
         }
     }
 }
@@ -49,6 +52,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
             config: self.config,
             theme: self.theme,
             authenticator: self.authenticator,
+            interactor: self.interactor,
         }
     }
 }
@@ -64,6 +68,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
             config: self.config,
             theme: self.theme,
             authenticator: self.authenticator,
+            interactor: self.interactor,
         }
     }
 }
@@ -82,6 +87,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
             config: self.config,
             theme: self.theme,
             authenticator: self.authenticator,
+            interactor: self.interactor,
         }
     }
 }
@@ -97,6 +103,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
             config: self.config,
             theme: self.theme,
             authenticator: self.authenticator,
+            interactor: self.interactor,
         }
     }
 }
@@ -112,6 +119,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
             config,
             theme: self.theme,
             authenticator: self.authenticator,
+            interactor: self.interactor,
         }
     }
 }
@@ -127,6 +135,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
             config: self.config,
             theme,
             authenticator: self.authenticator,
+            interactor: self.interactor,
         }
     }
 }
@@ -136,6 +145,14 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
     pub fn authenticator(self, authenticator: Authenticator) -> Self {
         Self {
             authenticator: Some(authenticator),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn interactor(self, interactor: Interactor) -> Self {
+        Self {
+            interactor: Some(interactor),
             ..self
         }
     }

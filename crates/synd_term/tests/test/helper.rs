@@ -1,4 +1,4 @@
-use std::{future::pending, path::PathBuf, time::Duration};
+use std::{future::pending, io, path::PathBuf, sync::Once, time::Duration};
 
 use futures_util::TryFutureExt;
 use ratatui::backend::TestBackend;
@@ -12,45 +12,80 @@ use synd_api::{
 use synd_auth::device_flow::{provider, DeviceFlow};
 use synd_term::{
     application::{Application, Authenticator, Cache, Config, DeviceFlows},
+    auth::Credential,
     client::Client,
     config::Categories,
+    interact::Interactor,
     terminal::Terminal,
     ui::theme::Theme,
 };
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::mpsc::UnboundedSender,
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Clone)]
 pub struct TestCase {
-    pub oauth_provider_port: u16,
+    pub mock_port: u16,
     pub synd_api_port: u16,
     pub kvsd_port: u16,
     pub terminal_col_row: (u16, u16),
     pub device_flow_case: &'static str,
     pub cache_dir: PathBuf,
+
+    pub login_credential: Option<Credential>,
+    pub interactor_buffer: Option<String>,
+}
+
+impl Default for TestCase {
+    fn default() -> Self {
+        Self {
+            mock_port: 0,
+            synd_api_port: 0,
+            kvsd_port: 0,
+            terminal_col_row: (120, 30),
+            device_flow_case: "case1",
+            cache_dir: temp_dir().into_path(),
+
+            login_credential: None,
+            interactor_buffer: None,
+        }
+    }
 }
 
 impl TestCase {
+    pub fn already_logined(mut self) -> Self {
+        let cred = Credential::Github {
+            access_token: "dummy_gh_token".into(),
+        };
+        self.login_credential = Some(cred);
+        self
+    }
+
     pub async fn init_app(&self) -> anyhow::Result<Application> {
         let TestCase {
-            oauth_provider_port,
+            mock_port,
             synd_api_port,
             kvsd_port,
             terminal_col_row: (term_col, term_row),
             device_flow_case,
             cache_dir,
+            login_credential,
+            interactor_buffer,
         } = self.clone();
 
-        // Start mock oauth server
+        // Start mock server
         {
-            let addr = ("127.0.0.1", oauth_provider_port);
+            let addr = ("127.0.0.1", mock_port);
             let listener = TcpListener::bind(addr).await?;
             tokio::spawn(synd_test::mock::serve(listener));
         }
 
         // Start synd api server
         {
-            serve_api(oauth_provider_port, synd_api_port, kvsd_port).await?;
+            serve_api(mock_port, synd_api_port, kvsd_port).await?;
         }
 
         // Configure application
@@ -64,10 +99,10 @@ impl TestCase {
                 github: DeviceFlow::new(
                     provider::Github::new("dummy")
                         .with_device_authorization_endpoint(format!(
-                            "http://localhost:{oauth_provider_port}/{device_flow_case}/github/login/device/code",
+                            "http://localhost:{mock_port}/{device_flow_case}/github/login/device/code",
                         ))
                         .with_token_endpoint(
-                            format!("http://localhost:{oauth_provider_port}/{device_flow_case}/github/login/oauth/access_token"),
+                            format!("http://localhost:{mock_port}/{device_flow_case}/github/login/oauth/access_token"),
                         ),
                 ),
                 google: DeviceFlow::new(provider::Google::new("dummy", "dummy")),
@@ -81,7 +116,16 @@ impl TestCase {
             // to isolate the state for each test
             let cache = Cache::new(cache_dir);
 
-            Application::builder()
+            let mut should_reload = false;
+            // Configure logined state
+            if let Some(cred) = login_credential {
+                cache
+                    .persist_credential(cred)
+                    .expect("failed to save credential to cache");
+                should_reload = true;
+            }
+
+            let mut app = Application::builder()
                 .terminal(terminal)
                 .client(client)
                 .categories(Categories::default_toml())
@@ -89,7 +133,14 @@ impl TestCase {
                 .cache(cache)
                 .theme(Theme::default())
                 .authenticator(authenticator)
-                .build()
+                .interactor(Interactor::new().with_buffer(interactor_buffer.unwrap_or_default()))
+                .build();
+
+            if should_reload {
+                app.reload_cache().await.unwrap();
+            }
+
+            app
         };
 
         Ok(application)
@@ -97,14 +148,18 @@ impl TestCase {
 }
 
 pub fn init_tracing() {
-    let show_code_location = false;
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_line_number(show_code_location)
-        .with_file(show_code_location)
-        .with_target(true)
-        .without_time()
-        .init();
+    static INIT_SUBSCRIBER: Once = Once::new();
+
+    INIT_SUBSCRIBER.call_once(|| {
+        let show_code_location = false;
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_line_number(show_code_location)
+            .with_file(show_code_location)
+            .with_target(true)
+            .without_time()
+            .init();
+    });
 }
 
 pub fn new_test_terminal(width: u16, height: u16) -> Terminal {
@@ -223,4 +278,24 @@ pub async fn run_kvsd(
 
 pub fn temp_dir() -> tempfile::TempDir {
     tempfile::TempDir::new().unwrap()
+}
+
+pub fn event_stream() -> (
+    UnboundedSenderWrapper,
+    UnboundedReceiverStream<io::Result<crossterm::event::Event>>,
+) {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let tx = UnboundedSenderWrapper { inner: tx };
+    let event_stream = UnboundedReceiverStream::new(rx);
+    (tx, event_stream)
+}
+
+pub struct UnboundedSenderWrapper {
+    inner: UnboundedSender<io::Result<crossterm::event::Event>>,
+}
+
+impl UnboundedSenderWrapper {
+    pub fn send(&self, event: crossterm::event::Event) {
+        self.inner.send(Ok(event)).unwrap();
+    }
 }

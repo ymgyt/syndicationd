@@ -6,6 +6,8 @@ extend-exclude = [
   "CHANGELOG.md",
   # Ignore dependencies LICENSES
   "THIRDPARTY.toml",
+  # Ignore snapshot
+  "crates/synd_test/src/mock/feeddata",
 ]
 
 [default.extend-words]
