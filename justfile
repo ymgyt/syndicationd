@@ -224,3 +224,7 @@ license:
 license-check:
     try { RUST_LOG=error cargo bundle-licenses --format toml --output __CHECK --previous THIRDPARTY.toml --check-previous }
     rm __CHECK
+
+# Validate codecov.yaml
+codecov-validate:
+    open codecov.yaml | to yaml | http post https://codecov.io/validate $in

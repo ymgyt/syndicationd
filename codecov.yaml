@@ -1,0 +1,7 @@
+# https://docs.codecov.com/docs/codecovyml-reference
+coverage:
+  round: down
+  range: 50..80
+ignore:
+  - "crates/synd_term/src/terminal/integration_backend.rs"
+  - "crates/synd_test/"
