@@ -77,4 +77,4 @@ workspace = true
 
 [package.metadata.dist]
 dist    = true
-formula = "synd"
+formula = "synd-term"
