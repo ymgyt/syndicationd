@@ -156,8 +156,8 @@
         inherit checks;
 
         packages = {
-          default = self.packages."${system}".synd;
-          synd = syndTerm;
+          default = self.packages."${system}".synd-term;
+          synd-term = syndTerm;
           synd-api = syndApi;
         } // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
           coverage = craneLib.cargoLlvmCov (commonArgs // {

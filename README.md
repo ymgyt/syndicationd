@@ -39,7 +39,7 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd
+nix profile install github:ymgyt/syndicationd#synd-term
 ```
 
 ### arch linux
@@ -51,9 +51,6 @@ pacman -S syndicationd
 ### brew
 
 ```sh
-brew tap ymgyt/syndicationd
-brew install synd
-# or
 brew install ymgyt/homebrew-syndicationd/synd
 ```
 
