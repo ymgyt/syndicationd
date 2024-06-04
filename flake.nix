@@ -120,11 +120,18 @@
           fmt = craneLib.cargoFmt commonArgs;
         };
 
+        syndApiImage = pkgs.dockerTools.buildImage {
+          name = "synd-api";
+          tag = "latest";
+          config = { Cmd = [ "${syndApi}/bin/synd-api" ]; };
+        };
+
         ci_packages = with pkgs; [
           just
           nushell # just set nu as shell
           typos
           cargo-bundle-licenses
+          docker
         ];
 
         # Inherits from checks cargo-nextest, cargo-audit
@@ -160,6 +167,8 @@
             cargoLlvmCovExtraArgs =
               "--codecov --all-features --output-path $out";
           });
+
+          synd-api-image = syndApiImage;
         };
 
         apps.default = flake-utils.lib.mkApp {
