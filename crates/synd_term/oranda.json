@@ -1,6 +1,6 @@
 {
   "project": {
-    "name": "synd"
+    "name": "synd-term"
   },
   "build": {
     "static_dir": "assets",
@@ -24,7 +24,7 @@
     "artifacts": {
       "package_managers": {
         "additional": {
-          "nix": "nix profile install github:ymgyt/syndicationd",
+          "nix": "nix profile install github:ymgyt/syndicationd#synd-term",
           "pacman": "pacman -S syndicationd",
           "cargo": "cargo install synd-term --locked",
           "docker": "docker run -it ghcr.io/ymgyt/synd-term"
