@@ -73,6 +73,11 @@
           doCheck = false;
         };
 
+        dockerImageLabels = {
+          "org.opencontainers.image.source" =
+            "https://github.com/ymgyt/syndicationd";
+        };
+
         syndTerm = craneLib.buildPackage (individualCrateArgs // (let
           crate = craneLib.crateNameFromCargoToml {
             cargoToml = ./crates/synd_term/Cargo.toml;
@@ -81,6 +86,14 @@
           inherit (crate) pname version;
           cargoExtraArgs = "--package ${crate.pname}";
         }));
+        syndTermImage = pkgs.dockerTools.buildImage {
+          name = "synd-term";
+          tag = "latest";
+          config = {
+            Cmd = [ "${syndTerm}/bin/synd" ];
+            Labels = dockerImageLabels;
+          };
+        };
 
         syndApi = craneLib.buildPackage (individualCrateArgs // (let
           crate = craneLib.crateNameFromCargoToml {
@@ -90,6 +103,14 @@
           inherit (crate) pname version;
           cargoExtraArgs = "--package ${crate.pname}";
         }));
+        syndApiImage = pkgs.dockerTools.buildImage {
+          name = "synd-api";
+          tag = "latest";
+          config = {
+            Cmd = [ "${syndApi}/bin/synd-api" ];
+            Labels = dockerImageLabels;
+          };
+        };
 
         checks = {
           inherit syndTerm syndApi;
@@ -118,12 +139,6 @@
           };
 
           fmt = craneLib.cargoFmt commonArgs;
-        };
-
-        syndApiImage = pkgs.dockerTools.buildImage {
-          name = "synd-api";
-          tag = "latest";
-          config = { Cmd = [ "${syndApi}/bin/synd-api" ]; };
         };
 
         ci_packages = with pkgs; [
@@ -168,6 +183,7 @@
               "--codecov --all-features --output-path $out";
           });
 
+          synd-term-image = syndTermImage;
           synd-api-image = syndApiImage;
         };
 

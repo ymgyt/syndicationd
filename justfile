@@ -228,3 +228,8 @@ license-check:
 # Validate codecov.yaml
 codecov-validate:
     open codecov.yaml | to yaml | http post https://codecov.io/validate $in
+
+# Login ghcr
+docker-login:
+    $env.GHCR_PAT | docker login ghcr.io -u USERNAME --password-stdin
+    

@@ -78,6 +78,12 @@ npm install @syndicationd/synd-term
 powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.2.5/synd-term-installer.ps1 | iex"
 ```
 
+### docker
+
+```sh
+docker run -it ghcr.io/ymgyt/synd-term
+```
+
 ## Usage
 
 `synd` will start the TUI application.

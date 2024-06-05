@@ -1,6 +1,14 @@
 name: Publish docker image
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "git tag"
+        required: true
+        type: string
+  push:
+    tags:
+      - '*-v[0-9]+.[0-9]+.[0-9]+*'
 jobs:
   publish-synd-api-image:
     runs-on: ubuntu-latest
@@ -20,7 +28,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: |
-          nix build .#synd-api-image --accept-flake-config
-          docker load --input result
-          docker tag synd-api:latest ghcr.io/ymgyt/synd-api:latest
-          docker image push ghcr.io/ymgyt/synd-api:latest
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_ENV
+          else
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_ENV
+          fi
+      - run: nix develop .#ci --accept-flake-config --command nu scripts/docker/build_and_push.nu ${{ env.tag }}
