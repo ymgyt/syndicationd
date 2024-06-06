@@ -15,7 +15,7 @@ use synd_api::{
     shutdown::Shutdown,
 };
 
-fn init_tracing(options: &ObservabilityOptions) -> OpenTelemetryGuard {
+fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     use synd_o11y::{opentelemetry::init_propagation, tracing_subscriber::audit};
     use tracing_subscriber::{
         filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
@@ -28,6 +28,21 @@ fn init_tracing(options: &ObservabilityOptions) -> OpenTelemetryGuard {
     };
     let show_src = options.show_code_location;
     let show_target = options.show_target;
+    let (otel_layer, otel_guard) = match options
+        .otlp_endpoint
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|endpoint| {
+            synd_o11y::opentelemetry_layer(
+                endpoint,
+                config::NAME,
+                config::VERSION,
+                options.trace_sampler_ratio,
+            )
+        }) {
+        Some((otel_layer, otel_guard)) => (Some(otel_layer), Some(otel_guard)),
+        _ => (None, None),
+    };
 
     Registry::default()
         .with(
@@ -38,20 +53,7 @@ fn init_tracing(options: &ObservabilityOptions) -> OpenTelemetryGuard {
                 .with_line_number(show_src)
                 .with_target(show_target)
                 .with_filter(metrics_event_filter())
-                .and_then(
-                    options
-                        .otlp_endpoint
-                        .as_deref()
-                        .filter(|s| !s.is_empty())
-                        .map(|endpoint| {
-                            synd_o11y::opentelemetry_layer(
-                                endpoint,
-                                config::NAME,
-                                config::VERSION,
-                                options.trace_sampler_ratio,
-                            )
-                        }),
-                )
+                .and_then(otel_layer)
                 .with_filter(
                     EnvFilter::try_from_env("SYND_LOG")
                         .or_else(|_| EnvFilter::try_new("info"))
@@ -65,7 +67,7 @@ fn init_tracing(options: &ObservabilityOptions) -> OpenTelemetryGuard {
     // Set text map propagator globally
     init_propagation();
 
-    synd_o11y::OpenTelemetryGuard
+    otel_guard
 }
 
 async fn run(
