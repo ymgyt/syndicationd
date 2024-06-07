@@ -2,6 +2,16 @@
 coverage:
   round: down
   range: 50..80
+  status: # https://docs.codecov.com/docs/commit-status
+    project:
+      default:
+        target: auto # use the coverage from the base commit 
+        threshold: 3% # allow the coverage to drop by
 ignore:
   - "crates/synd_term/src/terminal/integration_backend.rs"
   - "crates/synd_test/"
+comment: # https://docs.codecov.com/docs/pull-request-comments
+  # reach is not documented, but validator doesn't complain
+  layout: "condensed_header,reach,diff,condensed_files,condensed_footer"
+  hide_project_coverage: false
+  require_changes: true
