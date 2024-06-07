@@ -1,6 +1,5 @@
-use std::{future::pending, io, path::PathBuf, sync::Once, time::Duration};
+use std::{io, path::PathBuf, sync::Once, time::Duration};
 
-use futures_util::TryFutureExt;
 use ratatui::backend::TestBackend;
 use synd_api::{
     args::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
@@ -19,10 +18,7 @@ use synd_term::{
     terminal::Terminal,
     ui::theme::Theme,
 };
-use tokio::{
-    net::{TcpListener, TcpStream},
-    sync::mpsc::UnboundedSender,
-};
+use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing_subscriber::EnvFilter;
 
@@ -64,16 +60,12 @@ impl TestCase {
         self
     }
 
-    pub async fn init_app(&self) -> anyhow::Result<Application> {
+    pub async fn run_api(&self) -> anyhow::Result<()> {
         let TestCase {
             mock_port,
             synd_api_port,
             kvsd_port,
-            terminal_col_row: (term_col, term_row),
-            device_flow_case,
-            cache_dir,
-            login_credential,
-            interactor_buffer,
+            ..
         } = self.clone();
 
         // Start mock server
@@ -87,6 +79,23 @@ impl TestCase {
         {
             serve_api(mock_port, synd_api_port, kvsd_port).await?;
         }
+
+        Ok(())
+    }
+
+    pub async fn init_app(&self) -> anyhow::Result<Application> {
+        let TestCase {
+            mock_port,
+            synd_api_port,
+            terminal_col_row: (term_col, term_row),
+            device_flow_case,
+            cache_dir,
+            login_credential,
+            interactor_buffer,
+            ..
+        } = self.clone();
+
+        self.run_api().await?;
 
         // Configure application
         let application = {
@@ -180,18 +189,8 @@ pub async fn serve_api(
         kvsd_password: "test".into(),
     };
     let tls_options = TlsOptions {
-        certificate: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join(".dev")
-            .join("self_signed_certs")
-            .join("certificate.pem"),
-        private_key: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join(".dev")
-            .join("self_signed_certs")
-            .join("private_key.pem"),
+        certificate: synd_test::certificate(),
+        private_key: synd_test::private_key(),
     };
     let serve_options = ServeOptions {
         timeout: Duration::from_secs(10),
@@ -204,7 +203,14 @@ pub async fn serve_api(
         feed_cache_refresh_interval: Duration::from_secs(3600),
     };
 
-    let _kvsd_client = run_kvsd(kvsd_options.clone()).await.map(KvsdClient::new)?;
+    let _kvsd_client = synd_test::kvsd::run_kvsd(
+        kvsd_options.kvsd_host.clone(),
+        kvsd_options.kvsd_port,
+        kvsd_options.kvsd_password.clone(),
+        kvsd_options.kvsd_password.clone(),
+    )
+    .await
+    .map(KvsdClient::new)?;
 
     let mut dep = Dependency::new(kvsd_options, tls_options, serve_options, cache_options)
         .await
@@ -227,53 +233,6 @@ pub async fn serve_api(
     ));
 
     Ok(())
-}
-
-pub async fn run_kvsd(
-    KvsdOptions {
-        kvsd_host,
-        kvsd_port,
-        kvsd_username,
-        kvsd_password,
-    }: KvsdOptions,
-) -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> {
-    let root_dir = temp_dir();
-    let mut config = kvsd::config::Config::default();
-
-    // Setup user credential.
-    config.kvsd.users = vec![kvsd::core::UserEntry {
-        username: kvsd_username,
-        password: kvsd_password,
-    }];
-    config.server.set_disable_tls(&mut Some(true));
-
-    // Test Server listen addr
-    let addr = (kvsd_host, kvsd_port);
-
-    let mut initializer = kvsd::config::Initializer::from_config(config);
-
-    initializer.set_root_dir(root_dir.path());
-    initializer.set_listener(TcpListener::bind(addr.clone()).await.unwrap());
-
-    initializer.init_dir().await.unwrap();
-
-    let _server_handler = tokio::spawn(initializer.run_kvsd(pending::<()>()));
-
-    let handshake = async {
-        loop {
-            match kvsd::client::tcp::UnauthenticatedClient::insecure_from_addr(&addr.0, addr.1)
-                .and_then(|client| client.authenticate("test", "test"))
-                .await
-            {
-                Ok(client) => break client,
-                Err(_) => tokio::time::sleep(Duration::from_millis(500)).await,
-            }
-        }
-    };
-
-    let client = tokio::time::timeout(Duration::from_secs(5), handshake).await?;
-
-    Ok(client)
 }
 
 pub fn temp_dir() -> tempfile::TempDir {

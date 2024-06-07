@@ -3249,6 +3249,7 @@ name = "synd-api"
 version = "0.2.3"
 dependencies = [
  "anyhow",
+ "assert_cmd",
  "async-graphql",
  "async-graphql-axum",
  "async-trait",
@@ -3272,6 +3273,7 @@ dependencies = [
  "synd-auth",
  "synd-feed",
  "synd-o11y",
+ "synd-test",
  "thiserror",
  "tokio",
  "tokio-metrics",
@@ -3402,10 +3404,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum 0.7.5",
+ "futures-util",
  "headers",
+ "kvsd",
  "serde",
  "serde_json",
  "synd-auth",
+ "tempfile",
  "tokio",
  "tracing",
 ]

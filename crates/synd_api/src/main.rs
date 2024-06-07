@@ -78,6 +78,7 @@ async fn run(
         tls,
         o11y,
         cache,
+        dry_run,
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
@@ -93,6 +94,8 @@ async fn run(
         feed_cache_refresh_interval_minutes=?cache.feed_cache_refresh_interval.as_secs() / 60,
         "Runinng...",
     );
+
+    dry_run.then(|| shutdown.shutdown());
 
     listen_and_serve(dep, bind.into(), shutdown).await
 }

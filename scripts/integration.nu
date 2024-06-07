@@ -14,10 +14,9 @@ def main [filter?: string] {
   $env.INSTA_UPDATE = "new" 
   (
     cargo insta test 
-      --package "synd-term"
       --features "integration"
-      --test "integration"
       --unreferenced $unreferenced
+      --test-runner "nextest"
       --review
       --
       ($filter | into string)

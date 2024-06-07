@@ -22,6 +22,8 @@ pub struct Args {
     pub o11y: ObservabilityOptions,
     #[command(flatten)]
     pub cache: CacheOptions,
+    #[arg(hide = true, long = "dry-run", hide_long_help = true)]
+    pub dry_run: bool,
 }
 
 #[derive(clap::Args, Debug, Clone)]
@@ -146,18 +148,5 @@ mod tests {
             try_parse(["synd-api", "--help"]).unwrap_err().kind(),
             clap::error::ErrorKind::DisplayHelp,
         );
-        let args = try_parse([
-            "synd-api",
-            "--kvsd-host=foo",
-            "--kvsd-port=3000",
-            "--kvsd-username=me",
-            "--kvsd-password=secret",
-            "--tls-cert=path/to/cert",
-            "--tls-key=path/to/key",
-        ])
-        .unwrap();
-        let _ = serve::BindOptions::from(args.bind.clone());
-        let _ = serve::ServeOptions::from(args.serve.clone());
-        insta::assert_debug_snapshot!(args);
     }
 }

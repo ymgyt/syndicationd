@@ -29,7 +29,7 @@ clap                 = { workspace = true, features = ["derive", "string", "colo
 crossterm            = { version = "0.27.0", features = ["event-stream"] }
 directories          = "5.0.1"
 edit                 = "0.1.5"
-futures-util         = "0.3.30"
+futures-util         = { workspace = true }
 graphql_client       = { workspace = true }
 html2text            = { version = "0.12" }
 itertools            = { workspace = true }
@@ -69,7 +69,7 @@ fake         = { workspace = true }
 insta        = { workspace = true }
 kvsd         = { workspace = true }
 serial_test  = { version = "3.1.1", default_features = false, features = ["async", "file_locks"] }
-tempfile     = "3"
+tempfile     = { workspace = true }
 tokio-stream = "0.1.15"
 
 [lints]

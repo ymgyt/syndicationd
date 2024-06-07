@@ -49,14 +49,17 @@ tower-http         = { version = "0.5.1", default_features = false, features = [
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-[dev-dependencies]
-insta = { workspace = true }
-
 [features]
-
+# Integration test
+integration = []
 # Enable graphql introspection
 introspection        = []
 opentelemetry-stdout = ["synd-o11y/opentelemetry-stdout"]
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+insta      = { workspace = true }
+synd-test  = { path = "../synd_test" }
 
 [lints]
 workspace = true

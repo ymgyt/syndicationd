@@ -36,6 +36,10 @@ impl Shutdown {
     pub async fn notify(mut self) {
         self.rx.recv().await.ok();
     }
+
+    pub fn shutdown(&self) {
+        self.handle.shutdown();
+    }
 }
 
 impl Clone for Shutdown {

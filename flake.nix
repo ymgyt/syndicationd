@@ -123,7 +123,7 @@
 
           nextest = craneLib.cargoNextest (commonArgs // {
             inherit cargoArtifacts;
-            cargoNextestExtraArgs = "--features integration --no-capture";
+            cargoNextestExtraArgs = "--features integration";
             CARGO_PROFILE = "";
             RUST_LOG = "synd,integration=debug";
           });
