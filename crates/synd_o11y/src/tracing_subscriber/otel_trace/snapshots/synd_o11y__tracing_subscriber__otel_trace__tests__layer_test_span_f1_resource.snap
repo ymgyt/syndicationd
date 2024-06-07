@@ -1,0 +1,10 @@
+---
+source: crates/synd_o11y/src/tracing_subscriber/otel_trace/mod.rs
+description: span f1 resource
+expression: f1_span.resource
+---
+attributes:
+  - key: service.name
+    value:
+      stringValue: test
+droppedAttributesCount: 0

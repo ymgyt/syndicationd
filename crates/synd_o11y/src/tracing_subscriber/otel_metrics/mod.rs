@@ -4,7 +4,7 @@ use opentelemetry::{
     global,
     metrics::{MeterProvider, Unit},
 };
-use opentelemetry_otlp::WithExportConfig as _;
+use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     metrics::{
         reader::{DefaultAggregationSelector, DefaultTemporalitySelector},
@@ -24,14 +24,23 @@ pub fn metrics_event_filter<S: Subscriber>() -> impl Filter<S> {
     filter_fn(|metadata: &Metadata<'_>| metadata.target() != METRICS_EVENT_TARGET)
 }
 
-pub fn layer<S>(endpoint: impl Into<String>, resource: Resource) -> impl Layer<S>
+pub fn layer<S>(
+    endpoint: impl Into<String>,
+    resource: Resource,
+
+    interval: Duration,
+) -> impl Layer<S>
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    MetricsLayer::new(init_meter_provider(endpoint, resource))
+    MetricsLayer::new(init_meter_provider(endpoint, resource, interval))
 }
 
-fn init_meter_provider(endpoint: impl Into<String>, resource: Resource) -> impl MeterProvider {
+fn init_meter_provider(
+    endpoint: impl Into<String>,
+    resource: Resource,
+    interval: Duration,
+) -> impl MeterProvider {
     // Currently OtelpMetricPipeline does not provide a way to set up views.
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
@@ -43,7 +52,7 @@ fn init_meter_provider(endpoint: impl Into<String>, resource: Resource) -> impl 
         .unwrap();
 
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
-        .with_interval(Duration::from_secs(60))
+        .with_interval(interval)
         .build();
 
     let view = view();
@@ -102,5 +111,103 @@ fn view() -> impl View {
                 None
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::{net::SocketAddr, time::Duration};
+
+    use opentelemetry::KeyValue;
+    use opentelemetry_proto::tonic::{
+        collector::metrics::v1::{
+            metrics_service_server::{MetricsService, MetricsServiceServer},
+            ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+        },
+        metrics::v1::{metric::Data, number_data_point::Value, AggregationTemporality},
+    };
+    use tokio::sync::mpsc::UnboundedSender;
+    use tonic::transport::Server;
+    use tracing::dispatcher;
+    use tracing_subscriber::{layer::SubscriberExt, Registry};
+
+    use super::*;
+
+    type Request = tonic::Request<ExportMetricsServiceRequest>;
+
+    struct DumpMetrics {
+        tx: UnboundedSender<Request>,
+    }
+
+    #[tonic::async_trait]
+    impl MetricsService for DumpMetrics {
+        async fn export(
+            &self,
+            request: tonic::Request<ExportMetricsServiceRequest>,
+        ) -> Result<tonic::Response<ExportMetricsServiceResponse>, tonic::Status> {
+            self.tx.send(request).unwrap();
+
+            Ok(tonic::Response::new(ExportMetricsServiceResponse {
+                partial_success: None, // means success
+            }))
+        }
+    }
+
+    fn f1() {
+        tracing::info!(monotonic_counter.f1 = 1, key1 = "val1");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn layer_test() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let dump = MetricsServiceServer::new(DumpMetrics { tx });
+        let addr: SocketAddr = ([127, 0, 0, 1], 48101).into();
+        let server = Server::builder().add_service(dump).serve(addr);
+        let _server = tokio::task::spawn(server);
+        let resource = resource();
+        // The default interval is 60 seconds, which slows down the test
+        let interval = Duration::from_millis(100);
+        let layer = layer("https://localhost:48101", resource.clone(), interval);
+        let subscriber = Registry::default().with(layer);
+        let dispatcher = tracing::Dispatch::new(subscriber);
+
+        dispatcher::with_default(&dispatcher, || {
+            f1();
+        });
+
+        let req = rx.recv().await.unwrap().into_inner();
+        assert_eq!(req.resource_metrics.len(), 1);
+
+        let metric1 = req.resource_metrics[0].clone();
+        insta::with_settings!({
+            description => " metric 1 resource",
+        }, {
+            insta::assert_yaml_snapshot!("layer_test_metric_1_resource", metric1.resource);
+        });
+
+        let metric1 = metric1.scope_metrics[0].metrics[0].clone();
+        assert_eq!(&metric1.name, "f1");
+
+        let Some(Data::Sum(sum)) = metric1.data else {
+            panic!("metric1 data is not sum")
+        };
+        assert!(sum.is_monotonic);
+        assert_eq!(
+            sum.aggregation_temporality,
+            AggregationTemporality::Cumulative as i32
+        );
+
+        let data = sum.data_points[0].clone();
+        assert_eq!(data.value, Some(Value::AsInt(1)));
+        insta::with_settings!({
+            description => " metric 1 datapoint attributes",
+        }, {
+            insta::assert_yaml_snapshot!("layer_test_metric_1_datapoint_attributes", data.attributes);
+        });
+    }
+
+    fn resource() -> Resource {
+        Resource::new([KeyValue::new("service.name", "test")])
     }
 }

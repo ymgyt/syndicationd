@@ -1,0 +1,10 @@
+---
+source: crates/synd_o11y/src/tracing_subscriber/otel_metrics/mod.rs
+description: " metric 1 resource"
+expression: metric1.resource
+---
+attributes:
+  - key: service.name
+    value:
+      stringValue: test
+droppedAttributesCount: 0
