@@ -104,8 +104,9 @@ gen-gql:
 
 # Run kvsd
 kvsd:
-    cd ../kvsd; \
-    KVSD_LOG=info cargo run server --disable-tls --config ../syndicationd/.dev/kvsd_config.yaml --username {{ kvsd_user }} --kvsd-dir ../syndicationd/.kvsd
+    KVSD_LOG=info nix run github:ymgyt/kvsd/v0.1.3 -- server \
+        --disable-tls --config ../syndicationd/.dev/kvsd_config.yaml \
+        --username {{ kvsd_user }} --kvsd-dir ../syndicationd/.kvsd
 
 # Run api
 api *flags:
