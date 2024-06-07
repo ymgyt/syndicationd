@@ -15,10 +15,8 @@
 [workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
 [workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
 [workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
-[coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov&color=brightgreen
+[coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov
 [coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
-[website-badge]: https://img.shields.io/badge/Docs-Website-8cf?style=for-the-badge&logo=book
-[website]: https://docs.syndicationd.ymgyt.io/synd-term/
 [grafana-badge]: https://img.shields.io/badge/Grafana-Dashboard-orange?style=for-the-badge&logo=grafana
 [grafana-url]: https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now
 
@@ -26,7 +24,20 @@
 
 Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
-[![Website][website-badge]][website]
+**Table of Contents:**
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Authentication](#authentication)
+  - [Keymap](#keymap)
+  - [Subscribe Feed](#subscribe-feed)
+  - [Export Feeds](#export-subscribed-feeds)
+  - [Theme](#theme)
+  - [Backend API](#backend-api)
+  - [Log File](#log-file)
+  - [Clean](#remove-cache-and-logs)
+- [License](#license)
 
 ## Features
 
@@ -34,12 +45,12 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 * Open the entry in a browser
 * Filter entries by categories and [requirement](#requirement)
 
-## Install
+## Installation
 
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd#synd-term
+nix profile install github:ymgyt/syndicationd/synd-term-v0.2.5
 ```
 
 ### arch linux
@@ -83,6 +94,11 @@ powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-
 ```sh
 docker run -it ghcr.io/ymgyt/synd-term
 ```
+
+### pre-build binaries
+
+Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/syndicationd/releases).
+
 
 ## Usage
 
