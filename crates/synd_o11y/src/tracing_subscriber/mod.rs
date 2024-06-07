@@ -1,5 +1,6 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, time::Duration};
 
+use opentelemetry_sdk::{logs, trace};
 use tracing::Subscriber;
 use tracing_subscriber::{registry::LookupSpan, Layer};
 
@@ -23,14 +24,27 @@ where
 {
     let endpoint = endpoint.into();
     let resource = crate::opentelemetry::resource(service_name, service_version);
+    let trace_batch_config = trace::BatchConfigBuilder::default().build();
+    let log_batch_config = logs::BatchConfigBuilder::default().build();
+    let metrics_reader_interval = Duration::from_secs(60);
 
-    let (log_layer, logger_provider) = otel_log::layer(endpoint.clone(), resource.clone());
+    let (log_layer, logger_provider) =
+        otel_log::layer(endpoint.clone(), resource.clone(), log_batch_config);
     let guard = OpenTelemetryGuard { logger_provider };
 
     (
-        otel_trace::layer(endpoint.clone(), resource.clone(), trace_sampler_ratio)
-            .and_then(otel_metrics::layer(endpoint.clone(), resource.clone()))
-            .and_then(log_layer),
+        otel_trace::layer(
+            endpoint.clone(),
+            resource.clone(),
+            trace_sampler_ratio,
+            trace_batch_config,
+        )
+        .and_then(otel_metrics::layer(
+            endpoint.clone(),
+            resource.clone(),
+            metrics_reader_interval,
+        ))
+        .and_then(log_layer),
         guard,
     )
 }
