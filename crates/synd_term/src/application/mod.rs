@@ -332,7 +332,9 @@ impl Application {
                 Command::HandleDeviceFlowAuthorizationResponse {
                     provider,
                     device_authorization,
+                    request_seq,
                 } => {
+                    self.in_flight.remove(request_seq);
                     self.handle_device_flow_authorization_response(provider, device_authorization);
                 }
                 Command::CompleteDevieAuthorizationFlow {
@@ -843,6 +845,7 @@ impl Application {
                 Ok(device_authorization) => Ok(Command::HandleDeviceFlowAuthorizationResponse {
                     provider,
                     device_authorization,
+                    request_seq,
                 }),
                 Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
             }
@@ -919,7 +922,7 @@ impl Application {
                     }
                 }
                 .boxed();
-                self.jobs.futures.push(fut);
+                self.jobs.scheduled.push(fut);
             }
         }
     }
@@ -1014,6 +1017,10 @@ impl Application {
     {
         loop {
             self.event_loop_until_idle(input).await;
+            // In the current test implementation, we synchronie
+            // the assertion timing by waiting until jobs are empty.
+            // However the future of refreshing the id token sleeps until it expires and remains in the jobs for long time
+            // Therefore, we ignore scheduled jobs
             if self.jobs.futures.is_empty() {
                 break;
             }

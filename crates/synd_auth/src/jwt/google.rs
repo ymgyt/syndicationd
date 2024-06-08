@@ -6,8 +6,8 @@ use std::{
 };
 
 use chrono::{DateTime, TimeZone, Utc};
-use jsonwebtoken::{DecodingKey, Validation};
-use reqwest::Client;
+use jsonwebtoken::{Algorithm, DecodingKey, Validation};
+use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -27,19 +27,21 @@ pub enum JwtError {
     InvalidHeader(String),
     #[error("refresh id token: {0}")]
     RefreshToken(reqwest::Error),
+    #[error("unexpected algorithm: {0:?}")]
+    UnexpectedAlgorithm(Algorithm),
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    iss: String,
-    azp: String,
-    aud: String,
-    sub: String,
+    pub iss: String,
+    pub azp: String,
+    pub aud: String,
+    pub sub: String,
     pub email: String,
     pub email_verified: bool,
-    iat: i64,
-    exp: i64,
+    pub iat: i64,
+    pub exp: i64,
 }
 
 impl Claims {
@@ -61,6 +63,7 @@ pub struct JwtService {
     client: Client,
     client_id: Cow<'static, str>,
     client_secret: Cow<'static, str>,
+    pem_endpoint: Url,
     key_cache: Arc<RwLock<HashMap<Kid, Arc<DecodingKey>>>>,
 }
 
@@ -91,7 +94,16 @@ impl JwtService {
             client,
             client_id: client_id.into(),
             client_secret: client_secret.into(),
+            pem_endpoint: Url::parse(Self::PEM_ENDPOINT).unwrap(),
             key_cache: Arc::new(RwLock::default()),
+        }
+    }
+
+    #[must_use]
+    pub fn with_pem_endpoint(self, pem_endpoint: Url) -> Self {
+        Self {
+            pem_endpoint,
+            ..self
         }
     }
 
@@ -102,7 +114,7 @@ impl JwtService {
         let kid = header
             .kid
             .ok_or_else(|| JwtError::InvalidHeader("kid not found".into()))?;
-        let decoding_key = self.lookup_decoding_pem(&kid).await?;
+        let decoding_key = self.lookup_decoding_pem(&kid, header.alg).await?;
         let validation = {
             let mut v = Validation::new(header.alg);
             v.set_audience(&[self.client_id.as_ref()]);
@@ -139,12 +151,16 @@ impl JwtService {
             .map(|data| data.claims)
     }
 
-    async fn lookup_decoding_pem(&self, kid: &str) -> Result<Arc<DecodingKey>, JwtError> {
+    async fn lookup_decoding_pem(
+        &self,
+        kid: &str,
+        alg: Algorithm,
+    ) -> Result<Arc<DecodingKey>, JwtError> {
         if let Some(key) = self.key_cache.read().unwrap().get(kid) {
             return Ok(key.clone());
         }
 
-        self.refresh_key_cache().await?;
+        self.refresh_key_cache(alg).await?;
 
         self.key_cache
             .read()
@@ -154,16 +170,30 @@ impl JwtService {
             .ok_or(JwtError::DecodingKeyPemNotFound)
     }
 
-    async fn refresh_key_cache(&self) -> Result<(), JwtError> {
+    async fn refresh_key_cache(&self, alg: Algorithm) -> Result<(), JwtError> {
         let keys = self
             .fetch_decoding_key_pem()
             .await?
             .into_iter()
-            .filter_map(|key| match DecodingKey::from_rsa_pem(key.pem.as_bytes()) {
-                Ok(de_key) => Some((key.kid, Arc::new(de_key))),
-                Err(err) => {
-                    tracing::warn!("failed to create jwt decoding key from pem: {err}");
-                    None
+            .filter_map(|key| {
+                let result = match alg {
+                    Algorithm::ES256 => DecodingKey::from_ec_pem(key.pem.as_bytes()),
+                    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => {
+                        DecodingKey::from_rsa_pem(key.pem.as_bytes())
+                    }
+                    _ => {
+                        let err = JwtError::UnexpectedAlgorithm(alg);
+                        tracing::error!("{err:?}");
+                        return None;
+                    }
+                };
+
+                match result {
+                    Ok(de_key) => Some((key.kid, Arc::new(de_key))),
+                    Err(err) => {
+                        tracing::warn!("failed to create jwt decoding key from pem: {err}");
+                        None
+                    }
                 }
             });
 
@@ -178,7 +208,7 @@ impl JwtService {
     async fn fetch_decoding_key_pem(&self) -> Result<Vec<DecodingKeyPem>, JwtError> {
         async fn call(
             client: &Client,
-            endpoint: &str,
+            endpoint: Url,
         ) -> Result<HashMap<String, String>, reqwest::Error> {
             let payload = client
                 .get(endpoint)
@@ -191,7 +221,7 @@ impl JwtService {
             Ok(payload)
         }
 
-        let payload = call(&self.client, Self::PEM_ENDPOINT)
+        let payload = call(&self.client, self.pem_endpoint.clone())
             .await
             .map_err(JwtError::FetchPem)?;
 

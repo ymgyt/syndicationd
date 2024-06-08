@@ -1,6 +1,6 @@
 ---
 source: crates/synd_term/tests/integration.rs
-description: initial landing entries
+description: initial landing entries after google login
 expression: application.buffer()
 ---
 Buffer {

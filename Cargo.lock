@@ -3404,8 +3404,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum 0.7.5",
+ "chrono",
  "futures-util",
  "headers",
+ "jsonwebtoken",
  "kvsd",
  "serde",
  "serde_json",

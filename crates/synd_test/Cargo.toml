@@ -16,8 +16,10 @@ synd-auth = { path = "../synd_auth" }
 
 anyhow       = { workspace = true }
 axum         = { workspace = true }
+chrono       = { workspace = true }
 futures-util = { workspace = true }
 headers      = { workspace = true }
+jsonwebtoken = { workspace = true }
 kvsd         = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }

@@ -6,12 +6,14 @@ pub(crate) type JobFuture = BoxFuture<'static, anyhow::Result<Command>>;
 
 pub(crate) struct Jobs {
     pub futures: FuturesUnordered<JobFuture>,
+    pub scheduled: FuturesUnordered<JobFuture>,
 }
 
 impl Jobs {
     pub fn new() -> Self {
         Self {
             futures: FuturesUnordered::new(),
+            scheduled: FuturesUnordered::new(),
         }
     }
 }

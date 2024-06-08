@@ -30,7 +30,7 @@ Launch three terminals.
 1. the second one is for kvsd, which serves as the persistent backend used by synd-api
 1. the last one is for synd.
 
-Execute in the following order: `just kvsd`, `just api`, `j term`
+Execute in the following order: `just kvsd`, `just api`, `just term`
 
 ### Updating GraphQL Schema
 

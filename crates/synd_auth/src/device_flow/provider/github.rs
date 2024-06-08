@@ -10,8 +10,8 @@ use crate::{
 #[derive(Clone)]
 pub struct Github {
     client_id: Cow<'static, str>,
-    device_authorization_endpoint: Option<Cow<'static, str>>,
-    token_endpoint: Option<Cow<'static, str>>,
+    device_authorization_endpoint: Url,
+    token_endpoint: Url,
 }
 
 impl Default for Github {
@@ -29,26 +29,23 @@ impl Github {
     pub fn new(client_id: impl Into<Cow<'static, str>>) -> Self {
         Self {
             client_id: client_id.into(),
-            device_authorization_endpoint: None,
-            token_endpoint: None,
+            device_authorization_endpoint: Url::parse(Self::DEVICE_AUTHORIZATION_ENDPOINT).unwrap(),
+            token_endpoint: Url::parse(Self::TOKEN_ENDPOINT).unwrap(),
         }
     }
 
     #[must_use]
-    pub fn with_device_authorization_endpoint(
-        self,
-        endpoint: impl Into<Cow<'static, str>>,
-    ) -> Self {
+    pub fn with_device_authorization_endpoint(self, endpoint: Url) -> Self {
         Self {
-            device_authorization_endpoint: Some(endpoint.into()),
+            device_authorization_endpoint: endpoint,
             ..self
         }
     }
 
     #[must_use]
-    pub fn with_token_endpoint(self, endpoint: impl Into<Cow<'static, str>>) -> Self {
+    pub fn with_token_endpoint(self, endpoint: Url) -> Self {
         Self {
-            token_endpoint: Some(endpoint.into()),
+            token_endpoint: endpoint,
             ..self
         }
     }
@@ -57,17 +54,11 @@ impl Github {
 impl Provider for Github {
     type DeviceAccessTokenRequest<'d> = DeviceAccessTokenRequest<'d>;
     fn device_authorization_endpoint(&self) -> Url {
-        match self.device_authorization_endpoint.as_ref() {
-            Some(endpoint) => Url::parse(endpoint).unwrap(),
-            None => Url::parse(Self::DEVICE_AUTHORIZATION_ENDPOINT).unwrap(),
-        }
+        self.device_authorization_endpoint.clone()
     }
 
     fn token_endpoint(&self) -> reqwest::Url {
-        match self.token_endpoint.as_ref() {
-            Some(endpoint) => Url::parse(endpoint).unwrap(),
-            None => Url::parse(Self::TOKEN_ENDPOINT).unwrap(),
-        }
+        self.token_endpoint.clone()
     }
 
     fn device_authorization_request(&self) -> DeviceAuthorizationRequest {

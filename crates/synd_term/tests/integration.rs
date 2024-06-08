@@ -8,7 +8,7 @@ mod test {
     use crate::test::helper::TestCase;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn login() -> anyhow::Result<()> {
+    async fn login_with_github() -> anyhow::Result<()> {
         helper::init_tracing();
 
         let test_case = TestCase {
@@ -103,9 +103,8 @@ mod test {
             .assert()
             .success();
     }
-
     #[tokio::test(flavor = "multi_thread")]
-    async fn subscribe_then_unsubscribe() -> anyhow::Result<()> {
+    async fn login_with_google() -> anyhow::Result<()> {
         helper::init_tracing();
 
         let test_case = TestCase {
@@ -113,7 +112,54 @@ mod test {
             synd_api_port: 6011,
             kvsd_port: 47389,
             terminal_col_row: (120, 30),
-            interactor_buffer: Some("should rust http://localhost:6010/feed/twir_atom".into()),
+            device_flow_case: "case1",
+            cache_dir: helper::temp_dir().into_path(),
+            ..Default::default()
+        };
+        let mut application = test_case.init_app().await?;
+        let (tx, mut event_stream) = helper::event_stream();
+
+        {
+            // push enter => start auth flow
+            // Select google then select
+            tx.send_multi([key!('j'), key!(enter)]);
+            application.event_loop_until_idle(&mut event_stream).await;
+            insta::with_settings!({
+                description => "show google device flow code",
+            },{
+                insta::assert_debug_snapshot!("google_device_flow_prompt", application.buffer());
+            });
+        }
+
+        {
+            // polling device access token complete
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "initial landing entries after google login",
+            },{
+                insta::assert_debug_snapshot!("google_landing_entries", application.buffer());
+            });
+        }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn subscribe_then_unsubscribe() -> anyhow::Result<()> {
+        helper::init_tracing();
+
+        let test_case = TestCase {
+            mock_port: 6020,
+            synd_api_port: 6021,
+            kvsd_port: 47399,
+            terminal_col_row: (120, 30),
+            interactor_buffer_fn: Some(|case: &TestCase| {
+                format!(
+                    "should rust http://localhost:{mock_port}/feed/twir_atom",
+                    mock_port = case.mock_port
+                )
+            }),
             ..Default::default()
         }
         .already_logined();

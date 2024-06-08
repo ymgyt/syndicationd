@@ -29,6 +29,7 @@ pub(crate) enum Command {
     HandleDeviceFlowAuthorizationResponse {
         provider: AuthenticationProvider,
         device_authorization: DeviceAuthorizationResponse,
+        request_seq: RequestSequence,
     },
     CompleteDevieAuthorizationFlow {
         credential: Verified<Credential>,

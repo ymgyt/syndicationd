@@ -33,8 +33,13 @@ impl Authenticator {
     }
 
     #[must_use]
-    pub fn with_client(self, github: GithubClient) -> Self {
+    pub fn with_github_client(self, github: GithubClient) -> Self {
         Self { github, ..self }
+    }
+
+    #[must_use]
+    pub fn with_google_jwt(self, google: GoogleJwtService) -> Self {
+        Self { google, ..self }
     }
 
     /// Authenticate from given token
@@ -87,7 +92,7 @@ impl Authenticator {
                         Ok(principal)
                     }
                     Err(err) => {
-                        // Id a lot of intentional invalid id tokens are sent
+                        // If a lot of intentional invalid id tokens are sent
                         // google's api limit will be exceeded.
                         // To prevent this, it is necessary to cache the currently valid kids
                         // and discard jwt headers with other kids.

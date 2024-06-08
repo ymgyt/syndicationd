@@ -104,6 +104,8 @@ pub async fn serve(
         .layer(RequestMetricsLayer::new())
         .fallback(not_found);
 
+    tracing::info!("Serving...");
+
     axum_server::from_tcp_rustls(listener.into_std()?, tls_config)
         .handle(shutdown.into_handle())
         .serve(service.into_make_service())

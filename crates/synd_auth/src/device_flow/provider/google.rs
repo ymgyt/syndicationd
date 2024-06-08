@@ -10,8 +10,10 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Google {
-    pub client_id: Cow<'static, str>,
-    pub client_secret: Cow<'static, str>,
+    client_id: Cow<'static, str>,
+    client_secret: Cow<'static, str>,
+    device_authorization_endpoint: Url,
+    token_endpoint: Url,
 }
 
 impl Default for Google {
@@ -36,6 +38,24 @@ impl Google {
         Self {
             client_id: client_id.into(),
             client_secret: client_secret.into(),
+            device_authorization_endpoint: Url::parse(Self::DEVICE_AUTHORIZATION_ENDPOINT).unwrap(),
+            token_endpoint: Url::parse(Self::TOKEN_ENDPOINT).unwrap(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_device_authorization_endpoint(self, endpoint: Url) -> Self {
+        Self {
+            device_authorization_endpoint: endpoint,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_token_endpoint(self, endpoint: Url) -> Self {
+        Self {
+            token_endpoint: endpoint,
+            ..self
         }
     }
 }
@@ -52,11 +72,11 @@ impl Provider for Google {
     type DeviceAccessTokenRequest<'d> = DeviceAccessTokenRequest<'d>;
 
     fn device_authorization_endpoint(&self) -> Url {
-        Url::parse(Self::DEVICE_AUTHORIZATION_ENDPOINT).unwrap()
+        self.device_authorization_endpoint.clone()
     }
 
-    fn token_endpoint(&self) -> reqwest::Url {
-        Url::parse(Self::TOKEN_ENDPOINT).unwrap()
+    fn token_endpoint(&self) -> Url {
+        self.token_endpoint.clone()
     }
 
     fn device_authorization_request(&self) -> DeviceAuthorizationRequest {

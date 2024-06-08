@@ -8,7 +8,10 @@ use synd_api::{
     repository::kvsd::KvsdClient,
     shutdown::Shutdown,
 };
-use synd_auth::device_flow::{provider, DeviceFlow};
+use synd_auth::{
+    device_flow::{provider, DeviceFlow},
+    jwt,
+};
 use synd_term::{
     application::{Application, Authenticator, Cache, Config, DeviceFlows},
     auth::Credential,
@@ -21,6 +24,7 @@ use synd_term::{
 use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing_subscriber::EnvFilter;
+use url::Url;
 
 #[derive(Clone)]
 pub struct TestCase {
@@ -32,7 +36,7 @@ pub struct TestCase {
     pub cache_dir: PathBuf,
 
     pub login_credential: Option<Credential>,
-    pub interactor_buffer: Option<String>,
+    pub interactor_buffer_fn: Option<fn(&TestCase) -> String>,
 }
 
 impl Default for TestCase {
@@ -46,7 +50,7 @@ impl Default for TestCase {
             cache_dir: temp_dir().into_path(),
 
             login_credential: None,
-            interactor_buffer: None,
+            interactor_buffer_fn: None,
         }
     }
 }
@@ -91,7 +95,7 @@ impl TestCase {
             device_flow_case,
             cache_dir,
             login_credential,
-            interactor_buffer,
+            interactor_buffer_fn,
             ..
         } = self.clone();
 
@@ -107,14 +111,16 @@ impl TestCase {
             let device_flows = DeviceFlows {
                 github: DeviceFlow::new(
                     provider::Github::new("dummy")
-                        .with_device_authorization_endpoint(format!(
+                        .with_device_authorization_endpoint(Url::parse(&format!(
                             "http://localhost:{mock_port}/{device_flow_case}/github/login/device/code",
-                        ))
+                        )).unwrap())
                         .with_token_endpoint(
-                            format!("http://localhost:{mock_port}/{device_flow_case}/github/login/oauth/access_token"),
-                        ),
+                            Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/github/login/oauth/access_token")).unwrap()),
                 ),
-                google: DeviceFlow::new(provider::Google::new("dummy", "dummy")),
+                google: DeviceFlow::new(provider::Google::new("dummy", "dummy")
+                    .with_device_authorization_endpoint(Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/google/login/device/code")).unwrap())
+                    .with_token_endpoint(Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/google/login/oauth/access_token")).unwrap())
+                ),
             };
             let authenticator = Authenticator::new().with_device_flows(device_flows);
             let config = Config {
@@ -134,6 +140,15 @@ impl TestCase {
                 should_reload = true;
             }
 
+            let interactor = {
+                let buffer = if let Some(f) = interactor_buffer_fn {
+                    f(self)
+                } else {
+                    String::new()
+                };
+                Interactor::new().with_buffer(buffer)
+            };
+
             let mut app = Application::builder()
                 .terminal(terminal)
                 .client(client)
@@ -142,7 +157,7 @@ impl TestCase {
                 .cache(cache)
                 .theme(Theme::default())
                 .authenticator(authenticator)
-                .interactor(Interactor::new().with_buffer(interactor_buffer.unwrap_or_default()))
+                .interactor(interactor)
                 .build();
 
             if should_reload {
@@ -220,8 +235,19 @@ pub async fn serve_api(
         let github_endpoint: &'static str =
             format!("http://localhost:{oauth_provider_port}/github/graphql").leak();
         let github_client = GithubClient::new()?.with_endpoint(github_endpoint);
+        let google_jwt =
+            jwt::google::JwtService::new("dummy_google_client_id", "dummy_google_client_secret")
+                .with_pem_endpoint(
+                    Url::parse(&format!(
+                        "http://localhost:{oauth_provider_port}/google/oauth2/v1/certs"
+                    ))
+                    .unwrap(),
+                );
 
-        dep.authenticator = dep.authenticator.with_client(github_client);
+        dep.authenticator = dep
+            .authenticator
+            .with_github_client(github_client)
+            .with_google_jwt(google_jwt);
     }
 
     let listener = TcpListener::bind(("localhost", api_port)).await?;
@@ -256,5 +282,14 @@ pub struct UnboundedSenderWrapper {
 impl UnboundedSenderWrapper {
     pub fn send(&self, event: crossterm::event::Event) {
         self.inner.send(Ok(event)).unwrap();
+    }
+
+    pub fn send_multi<T>(&self, events: T)
+    where
+        T: IntoIterator<Item = crossterm::event::Event>,
+    {
+        events.into_iter().for_each(|event| {
+            self.send(event);
+        });
     }
 }
