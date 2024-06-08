@@ -111,7 +111,6 @@ mod tests {
                 ".attributes[0].value" => "[SOURCE_CODE_LOCATION]",
             });
         });
-        println!("{record:#?}");
     }
 
     fn resource() -> Resource {

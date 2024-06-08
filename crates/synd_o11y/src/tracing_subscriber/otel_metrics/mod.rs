@@ -158,6 +158,10 @@ mod tests {
         tracing::info!(monotonic_counter.f1 = 1, key1 = "val1");
     }
 
+    fn f2() {
+        tracing::info!(histogram.graphql.duration = 0.5);
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn layer_test() {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -204,6 +208,20 @@ mod tests {
             description => " metric 1 datapoint attributes",
         }, {
             insta::assert_yaml_snapshot!("layer_test_metric_1_datapoint_attributes", data.attributes);
+        });
+
+        dispatcher::with_default(&dispatcher, || {
+            f2();
+        });
+        let req = rx.recv().await.unwrap().into_inner();
+        insta::with_settings!({
+            description => "graphql duration histogram metrics",
+        }, {
+            insta::assert_yaml_snapshot!("layer_test_metrics_graphql_histogram", req, {
+                ".**.startTimeUnixNano" => "[UNIX_TIMESTAMP]",
+                ".**.timeUnixNano" => "[UNIX_TIMESTAMP]",
+                ".**.scope.version" => "[INSTRUMENT_LIB_VERSION]"
+            });
         });
     }
 

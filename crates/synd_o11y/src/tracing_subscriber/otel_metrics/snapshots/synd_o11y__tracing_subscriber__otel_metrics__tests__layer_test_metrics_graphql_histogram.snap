@@ -1,0 +1,88 @@
+---
+source: crates/synd_o11y/src/tracing_subscriber/otel_metrics/mod.rs
+description: graphql duration histogram metrics
+expression: req
+---
+resourceMetrics:
+  - resource:
+      attributes:
+        - key: service.name
+          value:
+            stringValue: test
+      droppedAttributesCount: 0
+    scopeMetrics:
+      - scope:
+          name: tracing/tracing-opentelemetry
+          version: "[INSTRUMENT_LIB_VERSION]"
+          attributes: []
+          droppedAttributesCount: 0
+        metrics:
+          - name: f1
+            description: ""
+            unit: ""
+            metadata: []
+            data:
+              sum:
+                dataPoints:
+                  - attributes:
+                      - key: key1
+                        value:
+                          stringValue: val1
+                    startTimeUnixNano: "[UNIX_TIMESTAMP]"
+                    timeUnixNano: "[UNIX_TIMESTAMP]"
+                    exemplars: []
+                    flags: 0
+                    value:
+                      asInt: 1
+                aggregationTemporality: 2
+                isMonotonic: true
+          - name: graphql.duration
+            description: graphql response duration
+            unit: s
+            metadata: []
+            data:
+              histogram:
+                dataPoints:
+                  - attributes: []
+                    startTimeUnixNano: "[UNIX_TIMESTAMP]"
+                    timeUnixNano: "[UNIX_TIMESTAMP]"
+                    count: 1
+                    sum: 0.5
+                    bucketCounts:
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 1
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                      - 0
+                    explicitBounds:
+                      - 0.005
+                      - 0.01
+                      - 0.025
+                      - 0.05
+                      - 0.075
+                      - 0.1
+                      - 0.25
+                      - 0.5
+                      - 0.75
+                      - 1
+                      - 2.5
+                      - 5
+                      - 7.5
+                      - 10
+                    exemplars: []
+                    flags: 0
+                    min: ~
+                    max: ~
+                aggregationTemporality: 2
+        schemaUrl: ""
+    schemaUrl: ""
