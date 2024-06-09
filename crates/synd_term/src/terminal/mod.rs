@@ -1,10 +1,11 @@
-use anyhow::Result;
 use crossterm::{
+    event::EventStream,
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use futures_util::{future::Either, stream, Stream};
 use ratatui::Frame;
-use std::io;
+use std::io::{self, IsTerminal};
 
 #[cfg(not(feature = "integration"))]
 mod backend;
@@ -33,7 +34,7 @@ impl Terminal {
     }
 
     /// Initialize terminal
-    pub fn init(&mut self) -> Result<()> {
+    pub fn init(&mut self) -> io::Result<()> {
         terminal::enable_raw_mode()?;
         crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
 
@@ -50,13 +51,13 @@ impl Terminal {
     }
 
     /// Reset terminal
-    pub fn restore(&mut self) -> Result<()> {
+    pub fn restore(&mut self) -> io::Result<()> {
         Self::restore_backend()?;
         self.backend.show_cursor()?;
         Ok(())
     }
 
-    fn restore_backend() -> Result<()> {
+    fn restore_backend() -> io::Result<()> {
         terminal::disable_raw_mode()?;
         io::stdout().execute(LeaveAlternateScreen)?;
         Ok(())
@@ -77,5 +78,20 @@ impl Terminal {
     #[cfg(feature = "integration")]
     pub fn buffer(&self) -> &Buffer {
         self.backend.backend().buffer()
+    }
+}
+
+pub fn event_stream() -> impl Stream<Item = std::io::Result<crossterm::event::Event>> + Unpin {
+    // When tests are run with nix(crane), /dev/tty is not available
+    // In such cases, executing `EventStream::new()` will cause a panic.
+    // Currently, this issue only arises during testing with nix, so an empty stream that does not panic is returned
+    // https://github.com/crossterm-rs/crossterm/blob/fce58c879a748f3159216f68833100aa16141ab0/src/terminal/sys/file_descriptor.rs#L74
+    // https://github.com/crossterm-rs/crossterm/blob/fce58c879a748f3159216f68833100aa16141ab0/src/event/read.rs#L39
+    let is_terminal = std::io::stdout().is_terminal();
+
+    if is_terminal {
+        Either::Left(EventStream::new())
+    } else {
+        Either::Right(stream::empty())
     }
 }

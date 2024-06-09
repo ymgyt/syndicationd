@@ -187,13 +187,25 @@ impl Application {
 
         self.event_loop(input).await;
 
-        self.cleanup()
+        self.cleanup().ok();
+
+        Ok(())
     }
 
     /// Initialize application.
     /// Setup terminal and handle cache.
     async fn init(&mut self) -> anyhow::Result<()> {
-        self.terminal.init()?;
+        match self.terminal.init() {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                if self.flags.contains(Should::Quit) {
+                    tracing::warn!("Failed to init terminal: {err}");
+                    Ok(())
+                } else {
+                    Err(err)
+                }
+            }
+        }?;
 
         match self.restore_credential().await {
             Ok(cred) => self.handle_initial_credential(cred),

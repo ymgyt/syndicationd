@@ -126,6 +126,7 @@
             cargoNextestExtraArgs = "--features integration";
             CARGO_PROFILE = "";
             RUST_LOG = "synd,integration=debug";
+            RUST_BACKTRACE = "1";
           });
 
           audit = craneLib.cargoAudit {

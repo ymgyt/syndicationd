@@ -1,14 +1,13 @@
 use std::{future, path::PathBuf, time::Duration};
 
 use anyhow::Context as _;
-use crossterm::event::EventStream;
 use futures_util::TryFutureExt;
 use synd_term::{
     application::{Application, Cache, Config},
     cli::{self, ApiOptions, Args, FeedOptions, Palette},
     client::Client,
     config::{self, Categories},
-    terminal::Terminal,
+    terminal::{self, Terminal},
     ui::theme::Theme,
 };
 use tracing::error;
@@ -120,7 +119,7 @@ async fn main() {
         std::process::exit(exit_code);
     };
 
-    let mut event_stream = EventStream::new();
+    let mut event_stream = terminal::event_stream();
 
     if let Err(err) = future::ready(build_app(
         endpoint,

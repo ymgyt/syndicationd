@@ -1,7 +1,7 @@
 # https://docs.codecov.com/docs/codecovyml-reference
 coverage:
   round: down
-  range: 50..70
+  range: 50..80
   status: # https://docs.codecov.com/docs/commit-status
     project:
       default:

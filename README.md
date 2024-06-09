@@ -15,7 +15,7 @@
 [workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
 [workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
 [workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
-[coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov
+[coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov&color=brightgreen
 [coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
 [grafana-badge]: https://img.shields.io/badge/Grafana-Dashboard-orange?style=for-the-badge&logo=grafana
 [grafana-url]: https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now

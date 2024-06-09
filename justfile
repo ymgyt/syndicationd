@@ -43,7 +43,7 @@ fmt: fmt-toml
 
 # Run linter
 lint:
-    cargo clippy --all-features
+    cargo clippy --all-features --tests
 
 # Format toml files
 fmt-toml:
