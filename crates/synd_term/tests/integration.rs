@@ -1,6 +1,6 @@
 #[cfg(feature = "integration")]
 mod test {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use synd_term::key;
 
@@ -219,6 +219,38 @@ mod test {
             });
         }
 
+        Ok(())
+    }
+    #[tokio::test(flavor = "multi_thread")]
+    async fn filter_entries() -> anyhow::Result<()> {
+        helper::init_tracing();
+
+        let test_case = TestCase {
+            // this port is hard coded in fixtures
+            mock_port: 6030,
+            synd_api_port: 6031,
+            kvsd_port: 47409,
+            kvsd_root_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/kvsd/20240609"),
+            terminal_col_row: (120, 30),
+            ..Default::default()
+        }
+        .already_logined();
+
+        let mut application = test_case.init_app().await?;
+        let (_tx, mut event_stream) = helper::event_stream();
+
+        // Initial fetch
+        {
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "filter entries after initial fetch",
+            },{
+                insta::assert_debug_snapshot!("filter_entries_initial_fetch", application.buffer());
+            });
+        }
         Ok(())
     }
 }

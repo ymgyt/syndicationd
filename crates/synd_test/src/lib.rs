@@ -3,6 +3,9 @@ use std::path::PathBuf;
 pub mod kvsd;
 pub mod mock;
 
+pub const TEST_EMAIL: &str = "ymgyt@ymgyt.io";
+pub const TEST_USER_ID: &str = "899cf3fa5afc0aa1";
+
 pub fn certificate() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -27,4 +30,8 @@ pub fn private_key() -> PathBuf {
 
 pub fn private_key_buff() -> Vec<u8> {
     std::fs::read(private_key()).unwrap()
+}
+
+pub fn temp_dir() -> tempfile::TempDir {
+    tempfile::TempDir::new().unwrap()
 }

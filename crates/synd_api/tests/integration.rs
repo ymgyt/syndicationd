@@ -3,9 +3,14 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn api_command_test() -> anyhow::Result<()> {
-        let _kvsd_client =
-            synd_test::kvsd::run_kvsd("localhost".into(), 45000, "test".into(), "test".into())
-                .await?;
+        let _kvsd_client = synd_test::kvsd::run_kvsd(
+            "localhost".into(),
+            45000,
+            "test".into(),
+            "test".into(),
+            synd_test::temp_dir().into_path(),
+        )
+        .await?;
 
         let mut cmd = assert_cmd::Command::cargo_bin("synd-api").unwrap();
 

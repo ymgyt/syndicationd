@@ -1,4 +1,4 @@
-use std::{future::pending, time::Duration};
+use std::{future::pending, path::PathBuf, time::Duration};
 
 use futures_util::TryFutureExt;
 use tokio::net::{TcpListener, TcpStream};
@@ -8,8 +8,8 @@ pub async fn run_kvsd(
     kvsd_port: u16,
     kvsd_username: String,
     kvsd_password: String,
+    root_dir: PathBuf,
 ) -> anyhow::Result<kvsd::client::tcp::Client<TcpStream>> {
-    let root_dir = temp_dir();
     let mut config = kvsd::config::Config::default();
 
     // Setup user credential.
@@ -24,7 +24,7 @@ pub async fn run_kvsd(
 
     let mut initializer = kvsd::config::Initializer::from_config(config);
 
-    initializer.set_root_dir(root_dir.path());
+    initializer.set_root_dir(root_dir);
     initializer.set_listener(TcpListener::bind(addr.clone()).await.unwrap());
 
     initializer.init_dir().await.unwrap();
@@ -46,8 +46,4 @@ pub async fn run_kvsd(
     let client = tokio::time::timeout(Duration::from_secs(5), handshake).await?;
 
     Ok(client)
-}
-
-pub fn temp_dir() -> tempfile::TempDir {
-    tempfile::TempDir::new().unwrap()
 }

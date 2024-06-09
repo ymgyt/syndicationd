@@ -31,7 +31,9 @@ pub struct TestCase {
     pub mock_port: u16,
     pub synd_api_port: u16,
     pub kvsd_port: u16,
+    pub kvsd_root_dir: PathBuf,
     pub terminal_col_row: (u16, u16),
+    pub idle_timer_interval: Duration,
     pub device_flow_case: &'static str,
     pub cache_dir: PathBuf,
 
@@ -45,7 +47,9 @@ impl Default for TestCase {
             mock_port: 0,
             synd_api_port: 0,
             kvsd_port: 0,
+            kvsd_root_dir: synd_test::temp_dir().into_path(),
             terminal_col_row: (120, 30),
+            idle_timer_interval: Duration::from_millis(1000),
             device_flow_case: "case1",
             cache_dir: temp_dir().into_path(),
 
@@ -69,6 +73,7 @@ impl TestCase {
             mock_port,
             synd_api_port,
             kvsd_port,
+            kvsd_root_dir,
             ..
         } = self.clone();
 
@@ -81,7 +86,7 @@ impl TestCase {
 
         // Start synd api server
         {
-            serve_api(mock_port, synd_api_port, kvsd_port).await?;
+            serve_api(mock_port, synd_api_port, kvsd_port, kvsd_root_dir).await?;
         }
 
         Ok(())
@@ -92,6 +97,7 @@ impl TestCase {
             mock_port,
             synd_api_port,
             terminal_col_row: (term_col, term_row),
+            idle_timer_interval,
             device_flow_case,
             cache_dir,
             login_credential,
@@ -124,7 +130,7 @@ impl TestCase {
             };
             let authenticator = Authenticator::new().with_device_flows(device_flows);
             let config = Config {
-                idle_timer_interval: Duration::from_millis(1000),
+                idle_timer_interval,
                 throbber_timer_interval: Duration::from_secs(3600), // disable throbber
                 ..Default::default()
             };
@@ -196,6 +202,7 @@ pub async fn serve_api(
     oauth_provider_port: u16,
     api_port: u16,
     kvsd_port: u16,
+    kvsd_root_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let kvsd_options = KvsdOptions {
         kvsd_host: "localhost".into(),
@@ -223,6 +230,7 @@ pub async fn serve_api(
         kvsd_options.kvsd_port,
         kvsd_options.kvsd_password.clone(),
         kvsd_options.kvsd_password.clone(),
+        kvsd_root_dir,
     )
     .await
     .map(KvsdClient::new)?;

@@ -273,6 +273,9 @@ impl Application {
                 Some(command) = self.jobs.futures.next() => {
                     Some(command.unwrap())
                 }
+                Some(command) = self.jobs.scheduled.next() => {
+                    Some(command.unwrap())
+                }
                 ()  = self.in_flight.throbber_timer() => {
                     Some(Command::RenderThrobber)
                 }
@@ -1017,6 +1020,8 @@ impl Application {
     {
         loop {
             self.event_loop_until_idle(input).await;
+            self.reset_idle_timer();
+
             // In the current test implementation, we synchronie
             // the assertion timing by waiting until jobs are empty.
             // However the future of refreshing the id token sleeps until it expires and remains in the jobs for long time
@@ -1024,7 +1029,6 @@ impl Application {
             if self.jobs.futures.is_empty() {
                 break;
             }
-            self.reset_idle_timer();
         }
     }
 

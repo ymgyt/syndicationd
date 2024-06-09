@@ -17,9 +17,11 @@ use synd_auth::{
 };
 use tokio::net::TcpListener;
 
-use crate::{certificate_buff, private_key_buff};
+use crate::{certificate_buff, private_key_buff, TEST_EMAIL};
 
 mod feed;
+
+const DUMMY_GOOGLE_JWT_KEY_ID: &str = "dummy-google-jwt-kid-1";
 
 async fn github_device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
@@ -104,7 +106,7 @@ async fn google_device_access_token(
             typ: Some("JST".into()),
             // google use Allgorithm::RS256, but our testing private key use ECDSA
             alg: jsonwebtoken::Algorithm::ES256,
-            kid: Some("dummy-google-jwt-kid-1".into()),
+            kid: Some(DUMMY_GOOGLE_JWT_KEY_ID.to_owned()),
             ..Default::default()
         };
         let encoding_key =
@@ -144,12 +146,10 @@ async fn github_graphql_viewer(
 
     tracing::debug!("Got token: `{token}`");
 
-    let dummy_email = "ymgyt@ymgyt.io";
-
     let response = serde_json::json!({
         "data": {
             "viewer": {
-                "email": dummy_email
+                "email": TEST_EMAIL,
             }
         }
     });
@@ -158,7 +158,7 @@ async fn github_graphql_viewer(
 
 // mock https://www.googleapis.com/oauth2/v1/certs
 async fn google_jwt_pem() -> Json<HashMap<String, String>> {
-    let key_id = "dummy-google-jwt-kid-1".to_owned();
+    let key_id = DUMMY_GOOGLE_JWT_KEY_ID.to_owned();
     let cert = certificate_buff();
     Json([(key_id, cert)].into_iter().collect())
 }

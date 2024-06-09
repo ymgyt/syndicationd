@@ -1,0 +1,798 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>observability news</title><link>https://buttondown.email/o11y.news</link><description>updates around observability (o11y) with a special focus on open source</description><atom:link href="https://buttondown.email/o11y.news/rss" rel="self"/><language>en-us</language><lastBuildDate>Mon, 03 Jun 2024 20:00:00 +0000</lastBuildDate><item><title>2024-06-03</title><link>https://buttondown.email/o11y.news/archive/2024-06-03/</link><description>&lt;h2&gt;Booking.com’s o11y platform&lt;/h2&gt;
+&lt;p&gt;Santanu Sahoo shared &lt;a href="https://medium.com/booking-com-development/events-as-the-4th-pillar-of-booking-observability-platform-f41480a68f5a" target="_blank"&gt;Events: The 4th pillar of Booking.com’s Observability platform&lt;/a&gt;
+where he describes Booking.com's proprietary solution for o11y events that allows
+them to generate traces, logs, and metrics to fulfil the majority of
+their observability needs, as well as why they are looking into moving to
+OpenTelemetry.&lt;/p&gt;
+&lt;h2&gt;OTel Java metrics performance&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://opentelemetry.io/blog/2024/java-metric-systems-compared/" target="_blank"&gt;OpenTelemetry Java Metrics Performance Comparison&lt;/a&gt; by Jack Berg, via
+the official OpenTelemetry blog. Contains a number of interesting benchmarks,
+recommend to take a look.&lt;/p&gt;
+&lt;h2&gt;Promxy + Cortex&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://itnext.io/prometheus-at-scale-with-promxy-cortex-41fa230dbbf5" target="_blank"&gt;Prometheus At Scale with Promxy + Cortex&lt;/a&gt; Mahdi Mallaki discusses a
+useful architectural pattern and shows it in action. Thanks!&lt;/p&gt;
+&lt;h2&gt;Debugging Langchain apps&lt;/h2&gt;
+&lt;p&gt;Yemi Adejumobi on &lt;a href="https://langtrace.ai/blog/debug-your-langchain-apps-using-langtrace" target="_blank"&gt;Tracing &amp;amp; Debugging your Langchain Apps using Langtrace&lt;/a&gt;.
+Langtrace is an open-source observability and evaluation tool for AI
+applications, especially of interest for you if you're handling LLMs.&lt;/p&gt;
+&lt;h2&gt;Test observability for Lambda&lt;/h2&gt;
+&lt;p&gt;Check out &lt;a href="https://tracetest.io/blog/test-observability-for-aws-lambda-with-grafana-tempo-and-opentelemetry-layers" target="_blank"&gt;Test Observability for AWS Lambda with Grafana Tempo and OpenTelemetry 
+Layers&lt;/a&gt; by Oscar Reyes, a hands-on deep dive on the topic.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 03 Jun 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-06-03/</guid></item><item><title>2024-05-27</title><link>https://buttondown.email/o11y.news/archive/2024-05-27/</link><description>&lt;h2&gt;New log parser for OTel collector&lt;/h2&gt;
+&lt;p&gt;In the post &lt;a href="https://opentelemetry.io/blog/2024/otel-collector-container-log-parser/" target="_blank"&gt;Introducing the new container log parser for OpenTelemetry
+Collector&lt;/a&gt; via the OpenTelemetry blog, Christos Markou of Elastic provides a
+detailed walkthrough on the motivation and implementation of a simplified and
+robust way for parsing container logs with the OpenTelemetry collector.&lt;/p&gt;
+&lt;h2&gt;AI-powered continuous profiling&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://grafana.com/blog/2024/05/15/ai-powered-insights-for-continuous-profiling-introducing-flame-graph-ai-in-grafana-cloud/?camp=blog&amp;amp;cnt=Stuck+in+flame+graph+anal&amp;amp;mdm=social&amp;amp;src=li" target="_blank"&gt;AI-powered insights for continuous profiling&lt;/a&gt; by the one and only Ryan Perry
+describes a really interesting use case for an LLM to assist with flame graph 
+data interpretation.&lt;/p&gt;
+&lt;h2&gt;Tracing to avoid breaking changes&lt;/h2&gt;
+&lt;p&gt;Check out &lt;a href="https://digma.ai/how-to-use-traces-to-avoid-breaking-changes/" target="_blank"&gt;How to use traces to avoid breaking changes&lt;/a&gt; by Nasim Salmany to
+learn about API observability using distributed traces with Digma. Thanks
+for sharing!&lt;/p&gt;
+&lt;h2&gt;MyDecisive Engine&lt;/h2&gt;
+&lt;p&gt;I stumbled upon &lt;a href="https://docs.mydecisive.ai/overview.html" target="_blank"&gt;MyDecisive Engine&lt;/a&gt;, an open-source project that allows you
+to manage observability data pipelines and associated vendor platform costs 
+through self-monitoring. It's early days, but looks promising …&lt;/p&gt;
+&lt;h2&gt;Observability stack&lt;/h2&gt;
+&lt;p&gt;Yeah, Reddit has its good and not so good corners, to say it politely. This
+conversation in &lt;code&gt;r/sre&lt;/code&gt; is something I found very informative: read 
+&lt;a href="https://www.reddit.com/r/sre/comments/1czsq4b/what_is_your_observability_stack/" target="_blank"&gt;What is your observability stack?&lt;/a&gt; and learn what other practioners are
+using.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 27 May 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-05-27/</guid></item><item><title>2024-05-20</title><link>https://buttondown.email/o11y.news/archive/2024-05-20/</link><description>&lt;h2&gt;OTel operator Q&amp;amp;A&lt;/h2&gt;
+&lt;p&gt;Check out Adriana Villela post via the OpenTelemetry blog:
+&lt;a href="https://opentelemetry.io/blog/2024/otel-operator-q-and-a/" target="_blank"&gt;Things You Might Not Have Known About the OpenTelemetry Operator -
+An OTel Operator Q&amp;amp;A&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;CI/CD observability&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.lucavall.in/blog/ci-cd-observability-on-github-actions-and-the-role-of-opentelemetry" target="_blank"&gt;CI/CD Observability on GitHub Actions and the Role of OpenTelemetry&lt;/a&gt; by
+Luca Cavallin is an excellent high-level overview with pointers to relevant
+resources/tooling.&lt;/p&gt;
+&lt;h2&gt;OTel at Skyscanner&lt;/h2&gt;
+&lt;p&gt;Learn from the amazing Dan Gomez Blanco all about &lt;a href="https://www.reddit.com/r/OpenTelemetry/comments/1csgpmg/implementing_opentelemetry_at_skyscanner/" target="_blank"&gt;Implementing
+OpenTelemetry at Skyscanner&lt;/a&gt;. This end-user perspective is something we
+need much more in OpenTelemetry. Thank you for sharing!&lt;/p&gt;
+&lt;h2&gt;Managed Grafana updates&lt;/h2&gt;
+&lt;p&gt;My colleagues Rodrigue Koffi, Dan Malloy, and Priyanka Verma shared an update:
+&lt;a href="https://aws.amazon.com/blogs/mt/amazon-managed-grafana-announces-support-for-grafana-version-10-4/" target="_blank"&gt;Amazon Managed Grafana announces support for Grafana version 10.4&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Prometheus histograms&lt;/h2&gt;
+&lt;p&gt;The one and only Julius Volz published another great video (22 min): check out
+&lt;a href="https://www.youtube.com/watch?v=yYbXak-1hew" target="_blank"&gt;Understanding Prometheus Histograms&lt;/a&gt; and learn everything about the classic
+histograms that have been around in Prometheus for more than 10 years.&lt;/p&gt;
+&lt;h2&gt;OpenShift and OTLP&lt;/h2&gt;
+&lt;p&gt;Stumbled upon &lt;a href="https://www.redhat.com/en/blog/red-hat-openshift-opentelemetry-otlp-native-platform" target="_blank"&gt;Red Hat OpenShift as OpenTelemetry (OTLP) native platform&lt;/a&gt;,
+written by Pavol Loffay and Simon Pasquier. They explore how you can use OTLP 
+in OpenShift to ingest in-cluster workload telemetry, and how you can export
+it from OpenShift, using OTLP.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 20 May 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-05-20/</guid></item><item><title>2024-05-13</title><link>https://buttondown.email/o11y.news/archive/2024-05-13/</link><description>&lt;h2&gt;OTel overview&lt;/h2&gt;
+&lt;p&gt;Akanksha Rana wrote &lt;a href="https://blog.kloudmate.com/opentelemetry-is-shaping-the-future-of-api-monitoring-b77e5b116931" target="_blank"&gt;OpenTelemetry Is Shaping the Future of API Monitoring&lt;/a&gt;,
+a nice high-level intro into the project.&lt;/p&gt;
+&lt;h2&gt;OTel collector news&lt;/h2&gt;
+&lt;p&gt;Two exciting OpenTelemetry blog posts in a single week:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://opentelemetry.io/blog/2024/collector-roadmap/" target="_blank"&gt;The roadmap to v1 for the OpenTelemetry Collector&lt;/a&gt; by Alex Boten.&lt;/li&gt;
+&lt;li&gt;Hope Oluwalolope sharing &lt;a href="https://opentelemetry.io/blog/2024/otel-collector-survey/" target="_blank"&gt;Insights from the OpenTelemetry Collector Survey&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Logs with Firehose&lt;/h2&gt;
+&lt;p&gt;Learn from Pablo Balbi about &lt;a href="https://grafana.com/blog/2024/05/07/logs-with-firehose-stream-logs-to-the-aws-observability-app-cheaper-and-easier/" target="_blank"&gt;Logs with Firehose: Stream logs to the AWS Observability
+app cheaper and easier&lt;/a&gt;, which can be used as a blueprint for other
+environments as well.&lt;/p&gt;
+&lt;h2&gt;Prometheus blackbox exporter&lt;/h2&gt;
+&lt;p&gt;Via the Squadcast blog:
+&lt;a href="https://medium.com/@squadcast/prometheus-blackbox-exporter-a-guide-for-monitoring-external-systems-a8fff19a8bd0" target="_blank"&gt;Prometheus Blackbox Exporter: A Guide for Monitoring External Systems&lt;/a&gt;,
+discussing use cases, best practices, and limitations. Thank you, folks!&lt;/p&gt;
+&lt;h2&gt;Distributed tracing intro&lt;/h2&gt;
+&lt;p&gt;A really excellent hands-on intro: check out &lt;a href="https://www.dash0.com/faq/what-is-distributed-tracing" target="_blank"&gt;What is Distributed Tracing?&lt;/a&gt;
+from the good folks at Dash0. KUTGW!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 13 May 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-05-13/</guid></item><item><title>2024-05-06</title><link>https://buttondown.email/o11y.news/archive/2024-05-06/</link><description>&lt;h2&gt;EKS o11y&lt;/h2&gt;
+&lt;p&gt;If you're looking for an AWS-supported &lt;a href="https://docs.aws.amazon.com/grafana/latest/userguide/solution-eks.html" target="_blank"&gt;solution for Amazon EKS infrastructure observability&lt;/a&gt;
+that is using managed Prometheus and managed Grafana, I highly recommend to
+check out what we launched last week. I'm super interested to learn about your
+feedback and where you think we should take this, next!&lt;/p&gt;
+&lt;h2&gt;OTel recipes&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://otelrecipes.com/" target="_blank"&gt;OTel recipes&lt;/a&gt; is a really cool site collecting hands-on recipes for
+concrete tasks you'd want to do with OpenTelemetry. Thanks a lot for kicking
+this off and hope others will start contributing as well.&lt;/p&gt;
+&lt;h2&gt;OTel &amp;amp; Prometheus&lt;/h2&gt;
+&lt;p&gt;On the topic of OTel &amp;amp; Prometheus: if you missed our &lt;a href="https://drive.google.com/drive/folders/1WxftFiHgEEElzKtU3ol1GRMqb2opG_VD" target="_blank"&gt;OpenTelemetry end-user
+panel&lt;/a&gt;, now the video recordings of this session is available for you to
+catch up on. And since you're reading this: I bet you also will want 
+to spend some 3 minutes on the &lt;a href="https://docs.google.com/forms/d/e/1FAIpQLSdQb-cWgZYA2zr6KSFe3Dcy2i8RcyFzW4mLon4bqz9vj5dbMQ/viewform" target="_blank"&gt;interoperability survey&lt;/a&gt;, pretty please?&lt;/p&gt;
+&lt;h2&gt;OTel demo deep dive&lt;/h2&gt;
+&lt;p&gt;Eromosele Akhigbe wrote &lt;a href="https://medium.com/aws-in-plain-english/a-deep-dive-into-opentelemetry-running-the-opentelemetry-demo-7ec4fd436136" target="_blank"&gt;A Deep Dive into OpenTelemetry: Running the OpenTelemetry
+Demo&lt;/a&gt;, showing set up in AWS and in-detail usage. Excellent work, thanks!&lt;/p&gt;
+&lt;h2&gt;OTel Python hands-on&lt;/h2&gt;
+&lt;p&gt;The &lt;a href="https://www.reddit.com/r/OpenTelemetry/s/vrBdMiIPWe" target="_blank"&gt;OpenTelemetry &amp;amp; Python Manual Tracing Tutorial Series&lt;/a&gt; by Adam Gardner
+is a collection of hands-on deep dives into the topic, augmented with YouTube videos.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 06 May 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-05-06/</guid></item><item><title>2024-04-29</title><link>https://buttondown.email/o11y.news/archive/2024-04-29/</link><description>&lt;h2&gt;MetricsHub and OTel&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://metricshub.com/blog/2024/04/exploring-the-landscape-of-observability-opentelemetry-metricshub-and-more/" target="_blank"&gt;Exploring the Landscape of Observability: OpenTelemetry, MetricsHub, and More&lt;/a&gt; 
+Sentry Software's Bertrand Martin explores the observability landscape and
+explains MetricsHub's role in the ecosystem.&lt;/p&gt;
+&lt;h2&gt;Artillery + Tracetest&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://tracetest.io/blog/tracetest-artillery-launch-week-recap" target="_blank"&gt;Tracetest + Artillery Launch Week Recap&lt;/a&gt; by Adnan Rahic is a short report
+on trace-based performance testing with Artillery, and open-source load
+testing platform.&lt;/p&gt;
+&lt;h2&gt;Observability stack&lt;/h2&gt;
+&lt;p&gt;Alireza Yavari wrote &lt;a href="https://medium.com/@aryalireza/the-observability-stack-part1-17929769c0df" target="_blank"&gt;The Observability Stack Part1&lt;/a&gt;, a hands-on article
+on setting up an open-source observability stack.&lt;/p&gt;
+&lt;h2&gt;OTel for mobiles&lt;/h2&gt;
+&lt;p&gt;Exciting development in the client-side instrumentation space: learn from Molly
+Moriarty about how &lt;a href="https://embrace.io/blog/embrace-opentelemetry-mobile-observability/" target="_blank"&gt;Embrace brings OpenTelemetry to mobile developers&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry SDK&lt;/h2&gt;
+&lt;p&gt;Roman Glushko sure likes short article titles and at the same time provide
+in-depth content: check out &lt;a href="https://www.romaglushko.com/blog/opentelemetry-sdk/#metrics" target="_blank"&gt;OTel SDK&lt;/a&gt;, a hands-on deep dive on
+how SDKs work in OTel and also see it in action with Python.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 29 Apr 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-04-29/</guid></item><item><title>2024-04-22</title><link>https://buttondown.email/o11y.news/archive/2024-04-22/</link><description>&lt;h2&gt;OTel resource attributes&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://tyk-1.wistia.com/medias/xu65xuqflo" target="_blank"&gt;OpenTelemetry Resources: What they are, why you need them, and why
+they are awesome&lt;/a&gt; the one and only Michele Mancioppi of Dash0 provides
+an excellent deep dive into OpenTelemetry resource attributes. Well done!&lt;/p&gt;
+&lt;h2&gt;ThanosCon retro&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.bwplotka.dev/2024/thanoscon2024/" target="_blank"&gt;ThanosCon Retrospective&lt;/a&gt; by Bartek Płotka is a very useful coverage of
+this recent event, including lessons learned. Thanks for sharing!&lt;/p&gt;
+&lt;h2&gt;Universal profiling agent for OTel&lt;/h2&gt;
+&lt;p&gt;Did you know that the &lt;a href="https://www.elastic.co/blog/elastic-universal-profiling-agent-open-source" target="_blank"&gt;Elastic Universal Profiling agent, a continuous profiling solution, 
+is now open source&lt;/a&gt;? In any case, check out this post by Israel Ogbole and
+Christos Kalkanis, and learn what that means for OpenTelemetry (and you ;)&lt;/p&gt;
+&lt;h2&gt;AWS o11y updates&lt;/h2&gt;
+&lt;p&gt;My colleagues Siva Guruvareddiar and Imaya Kumar Jagannathan wrote&lt;br /&gt;
+&lt;a href="https://aws.amazon.com/blogs/mt/autoscaling-kubernetes-workloads-with-keda-using-amazon-managed-service-for-prometheus-metrics/" target="_blank"&gt;Autoscaling Kubernetes workloads with KEDA using Amazon Managed Service for
+Prometheus metrics&lt;/a&gt;, demonstrating how to do event-driven autoscaling
+of EKS clusters with Kubernetes Event-driven Autoscaling (KEDA).&lt;/p&gt;
+&lt;p&gt;My colleagues Shubir Kapoor and Mihir Surani published 
+&lt;a href="https://aws.amazon.com/blogs/aws-cloud-financial-management/improve-cost-visibility-of-amazon-eks-with-aws-split-cost-allocation-data/" target="_blank"&gt;Improve cost visibility of Amazon EKS with AWS Split Cost Allocation Data&lt;/a&gt;,
+allowing you to gain cost insights down to the namespace and workload level.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 22 Apr 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-04-22/</guid></item><item><title>2024-04-15</title><link>https://buttondown.email/o11y.news/archive/2024-04-15/</link><description>&lt;h2&gt;KubeCon EU 2024 videos&lt;/h2&gt;
+&lt;p&gt;The &lt;a href="https://www.youtube.com/playlist?list=PLj6h78yzYM2N8nw1YcqqKveySH6_0VnI0" target="_blank"&gt;session recordings&lt;/a&gt; of the recent KubeCon EU 2024, including all the
+wonderful contributions from the observability space, are now available for you
+to watch on YouTube.&lt;/p&gt;
+&lt;h2&gt;OTel for Java&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://digma.ai/why-is-opentelemetry-important-for-java-applications/" target="_blank"&gt;Why is OpenTelemetry important for Java applications?&lt;/a&gt; asks Saeed Zarinfam
+and provides answers ranging from instrumentation to the collector. Thanks!&lt;/p&gt;
+&lt;h2&gt;eBPF top&lt;/h2&gt;
+&lt;p&gt;Are you using eBPF? I suppose, you may have a few eBPF programs running in
+your kernel then? Check out &lt;a href="https://github.com/Netflix/bpftop" target="_blank"&gt;Netflix/bpftop&lt;/a&gt;, a sort of &lt;code&gt;top&lt;/code&gt; for eBPF
+programs.&lt;/p&gt;
+&lt;h2&gt;Signals' gameday&lt;/h2&gt;
+&lt;p&gt;Danielle Leong wrote 
+&lt;a href="https://firehydrant.com/blog/improving-signals-speed-and-resilience-through-pressure-testing/" target="_blank"&gt;Inside the gamedays: how we tested Signals for reliability&lt;/a&gt; where they share
+some interesting, o11y-related insights.&lt;/p&gt;
+&lt;h2&gt;Ansible for OTel collectors&lt;/h2&gt;
+&lt;p&gt;Via the OpenTelemetry blog: &lt;a href="https://opentelemetry.io/blog/2024/scaling-collectors/" target="_blank"&gt;Manage OpenTelemetry Collectors at scale with Ansible&lt;/a&gt;
+by Ishan Jain, including hands-on steps using the resulting telemetry in an
+open-source stack.&lt;/p&gt;
+&lt;h2&gt;Fluent Bit 3.0&lt;/h2&gt;
+&lt;p&gt;The one and only Henrik Rexed strikes again: in the 20 min video 
+&lt;a href="https://www.youtube.com/watch?v=RWdXzgNpYNE" target="_blank"&gt;Fluent Bit 3.0 Observability: Elevating Logs, Metrics, and Traces!&lt;/a&gt; 
+he shows logs and metrics in action.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 15 Apr 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-04-15/</guid></item><item><title>2024-04-08</title><link>https://buttondown.email/o11y.news/archive/2024-04-08/</link><description>&lt;h2&gt;OTel getting started survey&lt;/h2&gt;
+&lt;p&gt;If you're using or evaluating OpenTelemetry, please consider investing some
+3 minutes to fill in the &lt;a href="https://docs.google.com/forms/d/e/1FAIpQLSfpxKvN3_5VN6FQ5dF5-XLfNdOhVYtjreetkxlRCF8qS7AW2w/viewform" target="_blank"&gt;Getting Started Survey&lt;/a&gt; by the OpenTelemetry
+Special Interest Group (SIG) End-User. This helps us to prioritize work
+and identify gaps.&lt;/p&gt;
+&lt;h2&gt;OTel error handling&lt;/h2&gt;
+&lt;p&gt;Adriana Villela and Reese Lee gave an awesome KubeCon EU 2024 talk on the topic
+of how OTel represents and handles errors and now they published the content
+as a blog post: check out &lt;a href="https://adri-v.medium.com/dude-wheres-my-error-52dc52b25909" target="_blank"&gt;Dude, Where’s My Error?&lt;/a&gt;&lt;/p&gt;
+&lt;h2&gt;How to embrace OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;If you only watch one video this week, make it Dan Gomez Blanco's 
+&lt;a href="https://www.youtube.com/watch?app=desktop&amp;amp;v=_0AorR5JUS8" target="_blank"&gt;Shift Into an Observability Mindset with OpenTelemetry&lt;/a&gt; session of the
+Observability Day Europe 2024.&lt;/p&gt;
+&lt;h2&gt;Correlating profiles and traces&lt;/h2&gt;
+&lt;p&gt;Joel Höner, Israel Ogbole, and Jonas Kunz of Elastic published 
+&lt;a href="https://www.elastic.co/blog/continuous-profiling-distributed-tracing-correlation" target="_blank"&gt;Beyond the trace: Pinpointing performance culprits with continuous profiling 
+and distributed tracing correlation&lt;/a&gt; where they demonstrate how to correlate
+profiles with distributed traces in OpenTelemetry.&lt;/p&gt;
+&lt;h2&gt;Prometheus alerting rule tips&lt;/h2&gt;
+&lt;p&gt;The one and only Julius Volz shared tips on &lt;a href="https://promlabs.com/blog/2024/04/04/using-metrics-based-custom-thresholds-in-prometheus-alerting-rules/" target="_blank"&gt;Using Metrics-Based Custom 
+Thresholds in Prometheus Alerting Rules&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;OTel async context propagation&lt;/h2&gt;
+&lt;p&gt;Daniel Dias wrote &lt;a href="https://tracetest.io/blog/opentelemetry-trace-context-propagation-with-message-brokers-and-go" target="_blank"&gt;OpenTelemetry Trace Context Propagation with Message Brokers
+and Go&lt;/a&gt; where he shows you hands-on how to tackle the tricky issue of
+async context propagation, using Go.&lt;/p&gt;
+&lt;h2&gt;MetricsHub&lt;/h2&gt;
+&lt;p&gt;A Sentry Software spin-off released &lt;a href="https://metricshub.com/" target="_blank"&gt;MetricsHub&lt;/a&gt;, positioned as a
+universal metrics collector for OpenTelemetry. Thanks for sharing!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 08 Apr 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-04-08/</guid></item><item><title>2024-04-01</title><link>https://buttondown.email/o11y.news/archive/2024-04-01/</link><description>&lt;h2&gt;Prometheus and OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;At the recent KubeCon EU 2024, Reese Lee and Adriana Villela gave an excellent talk
+on &lt;a href="https://github.com/avillela/otel-target-allocator-talk" target="_blank"&gt;Prometheus and OpenTelemetry: Better Together&lt;/a&gt;, which you now can
+not only watch but also you can follow along using a dedicated GitHub repo.&lt;/p&gt;
+&lt;h2&gt;O11y strategy&lt;/h2&gt;
+&lt;p&gt;Allan Mann published
+&lt;a href="https://mastering-observability.beehiiv.com/p/mastering-it-observability" target="_blank"&gt;Harmonising IT: Crafting an Observability Strategy Like a Symphony&lt;/a&gt;,
+a nice high-level piece on what to consider.&lt;/p&gt;
+&lt;h2&gt;Mobile data telemetry&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://www.cncf.io/blog/2024/03/25/why-you-may-be-dropping-key-mobile-data-from-your-observability-solution/" target="_blank"&gt;Why you may be dropping key mobile data from your observability solution&lt;/a&gt;
+Fredric Newberg of Embrace provides some interesting insights in the context
+of business-critical mobile apps.&lt;/p&gt;
+&lt;h2&gt;Improving Lambda collector&lt;/h2&gt;
+&lt;p&gt;The one and only Marcin Sodkiewicz of Ryanair strikes again: read
+&lt;a href="https://sodkiewiczm.medium.com/how-to-lower-down-aws-opentelemetry-lambda-collector-overhead-6d66b62fa1f7" target="_blank"&gt;How to: Lower down AWS OpenTelemetry Lambda Collector overhead&lt;/a&gt; to learn
+about the decouple processor.&lt;/p&gt;
+&lt;h2&gt;Monitoring async workflows&lt;/h2&gt;
+&lt;p&gt;Check out &lt;a href="https://www.youtube.com/watch?v=GvF1ivr7RlA" target="_blank"&gt;Disintegrated Telemetry: The Pains of Monitoring Asynchronous Workflows&lt;/a&gt;
+by Johannes Tax, a KubeCon EU 2024 session covering important developments in
+the OTel space from W3C context propagation for messaging protocols to 
+messaging semantic conventions.&lt;/p&gt;
+&lt;h2&gt;FluentBit v2 and OTel collector&lt;/h2&gt;
+&lt;p&gt;In the 20 min video &lt;a href="https://www.youtube.com/watch?v=7XaVJDADPiw" target="_blank"&gt;FluentBit v2.x vs. OpenTelemetry Collector&lt;/a&gt; Henrik Rexed
+compares these two telemetry agents, helping you understand capabilities
+and differences, with a focus on logging.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 01 Apr 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-04-01/</guid></item><item><title>2024-03-25</title><link>https://buttondown.email/o11y.news/archive/2024-03-25/</link><description>&lt;h2&gt;OTel support for profiling&lt;/h2&gt;
+&lt;p&gt;Via the CNCF blog: &lt;a href="https://www.cncf.io/blog/2024/03/19/opentelemetry-announces-support-for-profiling/" target="_blank"&gt;OpenTelemetry announces support for profiling&lt;/a&gt;,
+by the OpenTelemetry maintainers. More to come!&lt;/p&gt;
+&lt;h2&gt;RUM in Grafana&lt;/h2&gt;
+&lt;p&gt;My colleagues Ganesh Sambandan, Siva Guruvareddiar, and Munish Dabra published
+&lt;a href="https://aws.amazon.com/blogs/mt/real-user-monitoring-with-cloudwatch-rum-and-amazon-managed-grafana/" target="_blank"&gt;Real User Monitoring with Amazon CloudWatch RUM and Amazon Managed Grafana&lt;/a&gt;,
+showing client-side observability in action.&lt;/p&gt;
+&lt;h2&gt;Istio monitoring&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://anil-gudigar.medium.com/operational-efficiency-monitoring-and-analytics-setting-up-managed-metrics-using-prometheus-and-54d3cb86280e" target="_blank"&gt;Operational Efficiency-Monitoring and Analytics: setting up managed metrics
+using Prometheus and Grafana on Kubernetes with Service Mesh&lt;/a&gt; Anil Gudigar
+provides a hands-on introduction into using an open-source stack to monitor
+Istio.&lt;/p&gt;
+&lt;h2&gt;Kinesis and OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;Serkan Ozal shows
+&lt;a href="https://www.catchpoint.com/blog/how-to-propagate-opentelemetry-trace-headers-over-aws-kinesis-part-1" target="_blank"&gt;How to Propagate OpenTelemetry Trace Headers Over AWS Kinesis&lt;/a&gt;: in this
+three-part series you will learn both the theory and see different strategies
+implemented. Thanks a lot!&lt;/p&gt;
+&lt;h2&gt;OTel project updates&lt;/h2&gt;
+&lt;p&gt;Check out the 33 min video on &lt;a href="https://www.youtube.com/watch?v=wQ3ntXP8SSw" target="_blank"&gt;OpenTelemetry: Project Updates, Next Steps, and AMA&lt;/a&gt;
+from last week's KubeCon EU in Paris, with Severin Neumann, Austin Parker, 
+Trask Stalnaker, Daniel Gomez Blanco, and Alolita Sharma.&lt;/p&gt;
+&lt;h2&gt;SLOs with PromQL&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://mkaz.me/blog/2024/a-promql-query-for-slo-calculation-explained/" target="_blank"&gt;SLO formulas implementation in PromQL step by step&lt;/a&gt; Michal Kazmierczak
+provides a hands-on introduction on this important topic.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 25 Mar 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-03-25/</guid></item><item><title>2024-03-18</title><link>https://buttondown.email/o11y.news/archive/2024-03-18/</link><description>&lt;h2&gt;Managed Prometheus insights&lt;/h2&gt;
+&lt;p&gt;Gustavo Pantuza, Rodrigo Moraes, and Samuel D’Aquino JR of VTEX together with
+my colleague José Augusto Ferronato wrote about how 
+&lt;a href="https://aws.amazon.com/pt/blogs/mt/scaling-to-150-million-metrics-using-amazon-managed-service-for-prometheus/" target="_blank"&gt;VTEX scales to 150 million metrics using Amazon Managed Service for Prometheus&lt;/a&gt;,
+sharing useful insights.&lt;/p&gt;
+&lt;h2&gt;Trace-based testing Lambda&lt;/h2&gt;
+&lt;p&gt;Oscar Reyes (Tracetest) on &lt;a href="https://tracetest.io/blog/testing-aws-lambda-serverless-with-opentelemetry" target="_blank"&gt;Testing AWS Lambda &amp;amp; Serverless with OpenTelemetry&lt;/a&gt;,
+showing in a hands-on manner how to set up and run trace-based tests for
+a AWS Lambda Function.&lt;/p&gt;
+&lt;h2&gt;Prometheus commits to OTel&lt;/h2&gt;
+&lt;p&gt;I was very happy to find &lt;a href="https://prometheus.io/blog/2024/03/14/commitment-to-opentelemetry/" target="_blank"&gt;Our commitment to OpenTelemetry&lt;/a&gt; on the Prometheus blog.
+Learn from Goutham Veeramachaneni and Carrie Edwards what is planned for 2024,
+from GAing OTLP ingestion to native support for OTel resource attributes.
+Exciting times!&lt;/p&gt;
+&lt;h2&gt;SQS context propagation&lt;/h2&gt;
+&lt;p&gt;Marcin Sodkiewicz, observability expert at Ryanair, wrote about
+&lt;a href="https://sodkiewiczm.medium.com/aws-opentelemetry-sqs-instrumentation-50f2d0949825" target="_blank"&gt;AWS &amp;amp; OpenTelemetry: SQS context propagation&lt;/a&gt; where he provides a deep dive
+on the instrumentation of async communication, focusing on SQS this time (more
+to come in this series). Thanks a lot for sharing!&lt;/p&gt;
+&lt;h2&gt;Frame pointers&lt;/h2&gt;
+&lt;p&gt;The one and only Brendan Gregg, outstanding performance engineer and Flame Graph 
+inventor, published &lt;a href="https://www.brendangregg.com/blog//2024-03-17/the-return-of-the-frame-pointers.html" target="_blank"&gt;The Return of the Frame Pointers&lt;/a&gt; on his blog. He
+provides some historical context and future directions on this interesting
+topic, which, amongst other domains, is super relevant for the continuous profiling
+space.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 18 Mar 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-03-18/</guid></item><item><title>2024-03-11</title><link>https://buttondown.email/o11y.news/archive/2024-03-11/</link><description>&lt;h2&gt;Getting started with otelsql&lt;/h2&gt;
+&lt;p&gt;Via the OpenTelemetry blog: check out &lt;a href="https://opentelemetry.io/blog/2024/getting-started-with-otelsql/" target="_blank"&gt;Getting started with otelsql, the OpenTelemetry instrumentation for Go SQL&lt;/a&gt;,
+where Sam Xie explains how to use &lt;code&gt;otelsql&lt;/code&gt;, an instrumentation library for the
+Go &lt;code&gt;database/sql&lt;/code&gt; package.&lt;/p&gt;
+&lt;h2&gt;EC2 monitoring with OSS&lt;/h2&gt;
+&lt;p&gt;My colleague Jay Joshi published
+&lt;a href="https://aws.amazon.com/blogs/mt/automating-amazon-ec2-instance-monitoring-with-prometheus-ec2-service-discovery-and-aws-distro-for-opentelemetry/" target="_blank"&gt;Automating Amazon EC2 Instances Monitoring with Prometheus EC2 Service Discovery and AWS Distro for OpenTelemetry&lt;/a&gt;,
+showing OpenTelemetry and managed Prometheus &amp;amp; Grafana in action.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry in action&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://blog.johanol.com/opentelemetry-part-2-implementation/" target="_blank"&gt;OpenTelemetry Part 2 - Implementation&lt;/a&gt; Johan Olsson walks us through
+an OTel implementation using .NET, Node, Go, and Python along with
+MySQL, Postgres, and RabbitMQ. Thanks a lot!&lt;/p&gt;
+&lt;h2&gt;OTel embraces profiling&lt;/h2&gt;
+&lt;p&gt;Another great OpenObservability Talks episode: have a look at
+&lt;a href="https://www.youtube.com/watch?v=iGM67RT12gQ" target="_blank"&gt;Charting New Territory: OpenTelemetry Embraces Profiling&lt;/a&gt; where host
+Dotan Horovits and his guests Felix Geisendörfer and Ryan Perry discuss
+all things continuous profiling in and with OpenTelemetry.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry graduation&lt;/h2&gt;
+&lt;p&gt;The first step is done! Austin Parker's PR &lt;a href="https://github.com/cncf/toc/pull/1271" target="_blank"&gt;OpenTelemetry Graduation&lt;/a&gt; represents the
+formal proposal to move OpenTelemetry from Incubation to Graduation. Please 
+show your support.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 11 Mar 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-03-11/</guid></item><item><title>2024-03-04</title><link>https://buttondown.email/o11y.news/archive/2024-03-04/</link><description>&lt;h2&gt;Profiling Python with eBPF&lt;/h2&gt;
+&lt;p&gt;Check out &lt;a href="https://www.youtube.com/watch?v=y2IlRTT9wiw" target="_blank"&gt;Profiling Python with eBPF: A New Frontier in Performance Analysis&lt;/a&gt;,
+a 25 min video from Kemal Akkoyun's FOSDEM session. Well done!&lt;/p&gt;
+&lt;h2&gt;Decoupled monitoring with OTel&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://ivan-kurchenko.medium.com/building-decoupled-monitoring-with-opentelemetry-5d2755e15922" target="_blank"&gt;Building decoupled monitoring with OpenTelemetry&lt;/a&gt; by Ivan Kurchenko is a
+hands-on article showing open source and open standards in action.&lt;/p&gt;
+&lt;h2&gt;OTel Transform Language&lt;/h2&gt;
+&lt;p&gt;You might have asked yourself: &lt;a href="https://observiq.com/blog/what-is-the-opentelemetry-transform-language-ottl" target="_blank"&gt;What is the OpenTelemetry Transform Language (OTTL)?&lt;/a&gt;,
+and now, thanks to Joe Howell, you have an excellent answer. Thank you!&lt;/p&gt;
+&lt;h2&gt;OTel at KubeCon EU&lt;/h2&gt;
+&lt;p&gt;Come and &lt;a href="https://opentelemetry.io/blog/2024/kubecon-eu/" target="_blank"&gt;Join us for OpenTelemetry Talks and Activities at KubeCon + CloudNativeCon Europe 2024&lt;/a&gt;!
+In this post via the OpenTelemetry blog  Severin Neumann lists all relevant
+places and times where you can learn about and interact with this project.&lt;/p&gt;
+&lt;h2&gt;OpenLLMetry&lt;/h2&gt;
+&lt;p&gt;Stumbled upon &lt;a href="https://github.com/traceloop/openllmetry" target="_blank"&gt;OpenLLMetry&lt;/a&gt; on GitHub: a set of extensions built on top of 
+OpenTelemetry for LLM application observability, maintained by Traceloop.&lt;/p&gt;
+&lt;h2&gt;OTel collector antipatterns&lt;/h2&gt;
+&lt;p&gt;Via the OpenTelemetry blog: in &lt;a href="https://opentelemetry.io/blog/2024/otel-collector-anti-patterns/" target="_blank"&gt;OpenTelemetry Collector Antipatterns&lt;/a&gt; Adriana 
+Villela shares things you should be aware of and avoid doing when using this
+universal telemetry agent.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 04 Mar 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-03-04/</guid></item><item><title>2024-02-26</title><link>https://buttondown.email/o11y.news/archive/2024-02-26/</link><description>&lt;h2&gt;Thanos query performance&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://blog.devops.dev/streamlining-long-term-storage-query-performance-for-metrics-with-thanos-b44419c70cc4" target="_blank"&gt;Streamlining Long-Term Storage Query Performance for Metrics With Thanos&lt;/a&gt; 
+Hélia Barroso shares hands-on tips. Thanks!&lt;/p&gt;
+&lt;h2&gt;Karpenter monitoring&lt;/h2&gt;
+&lt;p&gt;If you're using Karpenter for EKS data plane auto-scaling, check out 
+&lt;a href="https://itnext.io/karpenter-its-monitoring-and-grafana-dashboard-for-kubernetes-workernodes-ee95e4ef8d0d" target="_blank"&gt;Karpenter: its monitoring, and Grafana dashboard for Kubernetes WorkerNodes&lt;/a&gt;
+by Arseny Zinchenko.&lt;/p&gt;
+&lt;h2&gt;Java metrics libraries&lt;/h2&gt;
+&lt;p&gt;Sameer Paradkar published &lt;a href="https://medium.com/oolooroo/state-of-the-metrics-libraries-in-the-java-ecosystem-dd169c5158e7" target="_blank"&gt;State of the Metrics Libraries in the Java Ecosystem&lt;/a&gt;,
+a deep-dive into the topic, comparing offerings and sharing best practices.&lt;/p&gt;
+&lt;h2&gt;ClickHouse in action&lt;/h2&gt;
+&lt;p&gt;Via TNS: &lt;a href="https://thenewstack.io/clickhouse-scaling-log-management-with-managed-services/" target="_blank"&gt;ClickHouse: Scaling Log Management with Managed Services&lt;/a&gt; by
+Valeriy Denisov is a nice hands-on article.&lt;/p&gt;
+&lt;h2&gt;Adopting OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.youtube.com/watch?v=o-1UE67l9q4" target="_blank"&gt;OpenTelemetry Orientation - How to Train Your Teams on Observability&lt;/a&gt; is
+a 55 min video up on YouTube where Paige Cruz provides excellent insights
+on how to help your organization to successfully adopt this open standard.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 26 Feb 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-02-26/</guid></item><item><title>2024-02-19</title><link>https://buttondown.email/o11y.news/archive/2024-02-19/</link><description>&lt;h2&gt;OpenTelemetry-native&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://www.dash0.com/blog/opentelemetry-native-the-future-of-observability" target="_blank"&gt;OpenTelemetry-native: The future of Observability&lt;/a&gt; Mirko Novakovic,
+Michele Mancioppi, and Ben Blackmore of Dash0 make the case what OTel-native
+means. Great article, thanks for sharing!&lt;/p&gt;
+&lt;h2&gt;Diagnostic observers&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://medium.com/@dmitry.slabko/using-diagnostic-observers-to-decouple-logging-and-observability-code-f97252030f98" target="_blank"&gt;Using Diagnostic Observers to Decouple Logging and Observability Code&lt;/a&gt; by 
+Dmitry Slabko is an interesting hands-on deep dive for .NET folks.&lt;/p&gt;
+&lt;h2&gt;Observability dev stack&lt;/h2&gt;
+&lt;p&gt;Daniel Dias of Tracetest wrote &lt;a href="https://tracetest.io/blog/building-an-observability-stack-with-docker" target="_blank"&gt;Building an Observability Stack with Docker&lt;/a&gt;,
+showing how to automate the setup of an open-source observability stack
+for local development. &lt;/p&gt;
+&lt;h2&gt;App monitoring in AWS&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.youtube.com/watch?v=tTzRW21IpPU" target="_blank"&gt;AWS Observability Application Monitoring&lt;/a&gt; is a 36 min video up on YouTube where
+my colleagues Lucy Hartung and Arun Chandapillai walk you through selected AWS
+observability offerings with lots of hands-on demos.&lt;/p&gt;
+&lt;h2&gt;Telemetry controller&lt;/h2&gt;
+&lt;p&gt;Kristof Gyuracz shared in &lt;a href="https://axoflow.com/reinvent-kubernetes-logging-with-telemetry-controller/" target="_blank"&gt;Reinvent Kubernetes Logging with Telemetry Controller&lt;/a&gt;
+details about this new open source project that allows you to turn telemetry 
+event streams into Kubernetes resources.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 19 Feb 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-02-19/</guid></item><item><title>2024-02-12</title><link>https://buttondown.email/o11y.news/archive/2024-02-12/</link><description>&lt;h2&gt;FOSDEM 24&lt;/h2&gt;
+&lt;p&gt;Check out the &lt;a href="https://fosdem.org/2024/schedule/track/monitoring-observability/" target="_blank"&gt;Monitoring &amp;amp; Observability devroom&lt;/a&gt; sessions of this
+year's FOSDEM with excellent content from "When Prometheus Met OpenTelemetry"
+to "What is CI/CD observability, and how to bring observability to CI/CD
+pipelines?".&lt;/p&gt;
+&lt;h2&gt;Introduction to observability&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://medium.com/beekeeper-technology-blog/introduction-to-observability-8ffb14bdc652" target="_blank"&gt;Introduction to Observability&lt;/a&gt; by Matei Tiloiu is a short high-level
+overview which includes some further reading.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry dog fooding&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://www.causely.io/blog/eating-our-own-dog-food-causelys-journey-with-opentelemetry-causal-ai/" target="_blank"&gt;Eating Our Own Dog Food: Causely’s Journey with OpenTelemetry &amp;amp; Causal AI&lt;/a&gt;,
+Endre Sara of Causely reports on experiences implementing OpenTelemetry 
+for their SaaS offering.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry in practice&lt;/h2&gt;
+&lt;p&gt;Sergii Bieliaievskyi published &lt;a href="https://medium.com/@magelan09/opentelemetry-the-domino-effect-how-a-minor-feature-redefined-the-game-my-story-83a0ff3f508b" target="_blank"&gt;OpenTelemetry. The Domino Effect: How a Minor
+Feature Redefined the Game. My story.&lt;/a&gt;, a hands-on piece where he shares his
+OTel story. Thanks for sharing!&lt;/p&gt;
+&lt;h2&gt;Fargate o11y&lt;/h2&gt;
+&lt;p&gt;My colleagues Elamaran Shanmugam, Ratnopam Chakrabarti, and Bhavye Sharma
+wrote &lt;a href="https://aws.amazon.com/blogs/mt/observability-on-eks-fargate-cluster-with-amazon-managed-service-for-prometheus-and-amazon-managed-grafana/" target="_blank"&gt;Observing Kubernetes workloads on AWS Fargate with AWS managed open-source services&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Playwright and OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://tracetest.io/blog/the-lord-of-playwright-the-two-traces" target="_blank"&gt;Test and Debug Critical End to End Flows with Playwright and OpenTelemetry&lt;/a&gt;
+Ken Hamric shows hands-on how trace-based testing can be achieved.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 12 Feb 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-02-12/</guid></item><item><title>2024-02-05</title><link>https://buttondown.email/o11y.news/archive/2024-02-05/</link><description>&lt;h2&gt;OTel collector survey&lt;/h2&gt;
+&lt;p&gt;If you're using the OpenTelemetry collector, please consider helping the SIG 
+Collector to prioritize their work by investing a few minutes: share your input
+via the &lt;a href="https://docs.google.com/forms/d/e/1FAIpQLScr5ts7mqauAraMZ5y-FxHzaP7EMGleGacSxmO21sQCQ8X3dg/viewform" target="_blank"&gt;OTel Collector Survey&lt;/a&gt; within the next month.&lt;/p&gt;
+&lt;h2&gt;Target allocator&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.youtube.com/watch?v=Uwq4EPaMJFM" target="_blank"&gt;Simplify Metric Collection with Target Allocator! Unleashing Prometheus Power with OpenTelemetry&lt;/a&gt;
+by Henrik Rexed is a really useful 23 min video where he explains the
+Prometheus receiver's role in the OTel collector and shows the Target Allocator 
+in action. Thanks!&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry tracing demo&lt;/h2&gt;
+&lt;p&gt;Nicolas Fränkel reports &lt;a href="https://blog.frankel.ch/improve-otel-demo/" target="_blank"&gt;Improving upon my OpenTelemetry Tracing demo&lt;/a&gt;, showing
+Kotlin, Python, and Rust and storage in action.&lt;/p&gt;
+&lt;h2&gt;Lossless log aggregation&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://bit.kevinslin.com/p/lossless-log-aggregation" target="_blank"&gt;Lossless Log Aggregation&lt;/a&gt; Kevin Lin dives into log aggregation and
+how to reduce the log volume without missing out. Interesting!&lt;/p&gt;
+&lt;h2&gt;New Relic Pathpoint&lt;/h2&gt;
+&lt;p&gt;Yoram Mireles wrote &lt;a href="https://newrelic.com/blog/how-to-relic/introducing-pathpoint" target="_blank"&gt;Introducing New Relic Pathpoint&lt;/a&gt;, a short piece on 
+business observability and how their new offering can help.&lt;/p&gt;
+&lt;h2&gt;Lambda Telemetry and OSS&lt;/h2&gt;
+&lt;p&gt;My colleagues Anton Aleksandrov, Kevin Shaw, and Shridhar Pandey published
+&lt;a href="https://aws.amazon.com/blogs/opensource/integrating-the-aws-lambda-telemetry-api-with-prometheus-and-opensearch/" target="_blank"&gt;Integrating the AWS Lambda Telemetry API with Prometheus and OpenSearch&lt;/a&gt;
+explaining how the AWS Lambda Telemetry API works and how to integrate it with 
+open source observability.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 05 Feb 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-02-05/</guid></item><item><title>2024-01-29</title><link>https://buttondown.email/o11y.news/archive/2024-01-29/</link><description>&lt;h2&gt;Shopify’s blueprint&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://logz.io/blog/scaling-platform-engineering-shopify-blueprint/" target="_blank"&gt;Scaling Platform Engineering: Shopify’s Blueprint&lt;/a&gt; is another great
+OpenObservability Talks episode where host Dotan Horovits and 
+Aparna Subramanian (Director of Production Engineering at Shopify)
+discuss, amongst other things, the shared responsibility model between 
+application developers and platform engineers in the context of
+observability.&lt;/p&gt;
+&lt;h2&gt;Modernizing o11y platforms&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://medium.com/oolooroo/modernizing-observability-platforms-part-1-de9174019ebc" target="_blank"&gt;Modernizing Observability Platforms&lt;/a&gt; Sameer Paradkar motivates the
+need for modernization, reviews trends, and provides some suggestions concerning
+building these platforms.&lt;/p&gt;
+&lt;h2&gt;OTel for Ruby on Rails&lt;/h2&gt;
+&lt;p&gt;Michal Kazmierczak presents a demo of an instrumented Rails app with 
+a self-hosted OSS observability stack. Check out &lt;a href="https://mkaz.me/blog/2024/self-hosted-overvability-stack-for-ruby-on-rails-apps/" target="_blank"&gt;Self-hosted observability 
+stack for Ruby on Rails apps&lt;/a&gt; and thanks for sharing!&lt;/p&gt;
+&lt;h2&gt;Instrumentation 101&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://aparker.io/2024/01/otel-til-what-the-heck-is-instrumentation-anyway/" target="_blank"&gt;What is instrumentation for observability?&lt;/a&gt; by the one and only 
+Austin Parker is a really useful piece, explaining different instrumentaiton 
+strategies and providing guidance.&lt;/p&gt;
+&lt;h2&gt;Optimizing observability&lt;/h2&gt;
+&lt;p&gt;Check out &lt;a href="https://www.youtube.com/watch?v=AbnD9lsHStU" target="_blank"&gt;Optimizing Observability with OpenTelemetry Collector&lt;/a&gt;, a 23 min
+video of the Conf42 DevOps 2024 talk by Bruno Ferreira, including tail sampling
+coverage.&lt;/p&gt;
+&lt;h2&gt;Books&lt;/h2&gt;
+&lt;p&gt;With observability going mainstream there is an increasing number of books
+available and this week I'd like to call out two books:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.manning.com/books/fluent-bit-with-kubernetes" target="_blank"&gt;Fluent Bit with Kubernetes&lt;/a&gt; by Phil Wilkins is an excellent resource,
+both for learning as well as a reference, covering everything you need to know
+from configuration to extending this popular agent. At time of writing the 
+first 5 chapters are available.&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.packtpub.com/product/observability-with-grafana/9781803248004" target="_blank"&gt;Observability with Grafana&lt;/a&gt; by Rob Chapman and Peter Holmes is a hands-on
+deep dive on the Grafana stack, covering logs, metrics, traces, and profiles 
+as well as operational topics.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 29 Jan 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-01-29/</guid></item><item><title>2024-01-22</title><link>https://buttondown.email/o11y.news/archive/2024-01-22/</link><description>&lt;h2&gt;OTel lessons learned&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://engineering.tomtom.com/opentelemetry-simpifying-observability/" target="_blank"&gt;OpenTelemetry - Simplifying Observability&lt;/a&gt; Magnus Holmstrom from TomTom
+engineering shares their lessons learned from a Proof of Concept with
+OpenTelemetry. The article covers both the technical as well as the human/team
+perspective. Thanks a lot for this and I'd love to see more of this kind of
+reporting!&lt;/p&gt;
+&lt;h2&gt;Outreachy&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://opentelemetry.io/blog/2024/outreachy-how-why-sakshi/" target="_blank"&gt;Outreachy - How, When &amp;amp; Why?&lt;/a&gt; by Sakshi Patle, a final-year Computer Science
+and Engineering student, is a short piece on their internship with the OTel SIG Security.
+Welcome aboard and hope a bunch more will consider the Outreachy program.&lt;/p&gt;
+&lt;h2&gt;On cardinality&lt;/h2&gt;
+&lt;p&gt;Devrim Demiroz strikes again, this time he wrote &lt;a href="https://tractatus.one/cardinality-of-observability-cardinality-management-configurations-57a199526061" target="_blank"&gt;Cardinality of Observability 
+Cardinality Management Configurations&lt;/a&gt;, contemplating the topic including
+some really interesting "further reading" material. Thank you!&lt;/p&gt;
+&lt;h2&gt;Testing front-ends&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://tracetest.io/blog/cloud-native-observability-and-cypress-an-unlikely-marriage" target="_blank"&gt;Cloud Native Observability and Cypress: An Unlikely Marriage&lt;/a&gt; by Ken Hamric
+shows how to do trace-based testing with Cypress, a tool for testing front-end apps.&lt;/p&gt;
+&lt;h2&gt;Kubernetes troubleshooting&lt;/h2&gt;
+&lt;p&gt;Maria of Kubeshop wrote &lt;a href="https://medium.com/kubeshop-i/5-essential-k8s-troubleshooting-monitoring-tasks-with-botkube-e1420bb5d49e" target="_blank"&gt;5 Essential K8s Troubleshooting + Monitoring Tasks&lt;/a&gt;,
+showing Botkube, a collaborative Kubernetes troubleshooting and monitoring tool,
+in action.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 22 Jan 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-01-22/</guid></item><item><title>2024-01-15</title><link>https://buttondown.email/o11y.news/archive/2024-01-15/</link><description>&lt;h2&gt;Cloudflare's logging pipeline&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://blog.cloudflare.com/an-overview-of-cloudflares-logging-pipeline/" target="_blank"&gt;An overview of Cloudflare's logging pipeline&lt;/a&gt; Colin Douch reports on
+how Cloudflare's Observability Platform team ships almost a million log lines
+per second in a reliable and sustainable fashion, allowing their internal
+customers to troubleshoot services from a central place. Always good to read
+about lessons learned and plans (which, as you may have guessed, include OpenTelemetry
+;) from end-users.&lt;/p&gt;
+&lt;h2&gt;Vercel trace-based testing&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://tracetest.io/blog/integration-testing-vercel-serverless-functions-with-opentelemetry" target="_blank"&gt;Integration Testing Vercel Serverless Functions with OpenTelemetry&lt;/a&gt;
+by Adnan Rahic is a detailed hands-on piece, showing how to do trace-based
+testing in the context of Vercel serverless functions, including how to
+locally test functions and how to create integration tests for them.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry updates&lt;/h2&gt;
+&lt;p&gt;Via TNS: Andy Hoffman reviewes in &lt;a href="https://thenewstack.io/why-the-latest-advances-in-opentelemetry-are-significant/" target="_blank"&gt;Why the Latest Advances in OpenTelemetry Are Significant&lt;/a&gt; 
+some of the most recent additions and improvements in the OTel project including
+Logs GA and semantic conventions. Thanks!&lt;/p&gt;
+&lt;h2&gt;Sampling guide&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://logz.io/learn/sampling-in-distributed-tracing-guide/" target="_blank"&gt;The Complete Guide to Sampling in Distributed Tracing&lt;/a&gt; by Dotan Horovits
+is a really useful resource you may wish to bookmark. He's covering the benefits,
+different strategies, as well as a best practices summary for sampling of
+traces.&lt;/p&gt;
+&lt;h2&gt;AWS o11y updates&lt;/h2&gt;
+&lt;p&gt;My colleagues Vicky Whittingham and Abhi Khanna teamed up with Nicolas Fournier 
+of Unitary to share &lt;a href="https://aws.amazon.com/blogs/mt/how-unitary-achieved-automatic-metric-collection-with-amazon-managed-service-for-prometheus-collector/" target="_blank"&gt;How Unitary achieved automatic metric collection with Amazon Managed
+Service for Prometheus collector&lt;/a&gt;. Further, in &lt;a href="https://aws.amazon.com/blogs/mt/multi-tenant-monitoring-across-accounts-and-regions-using-amazon-managed-for-prometheus/" target="_blank"&gt;Multi-tenant monitoring
+across accounts and regions using Amazon Managed Service for Prometheus&lt;/a&gt;
+my colleagues Manjit Chakraborty and Jatinder Singh worked together with
+Nauman Noor, Fabio Dias, and Dylan Alibay of State Street. Exciting times!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 15 Jan 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-01-15/</guid></item><item><title>2024-01-08</title><link>https://buttondown.email/o11y.news/archive/2024-01-08/</link><description>&lt;p&gt;Happy New Year to you and welcome back to o11y.news!&lt;/p&gt;
+&lt;h2&gt;Revolution in o11y&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://www.linkedin.com/pulse/unveiling-causal-revolution-observability-andrew-mallaband-vihje/" target="_blank"&gt;Unveiling the Causal Revolution in Observability&lt;/a&gt; Andrew Mallaband
+writes about the importance of open standards, unsurprisingly, in o11y land
+focusing on OpenTelemetry.&lt;/p&gt;
+&lt;h2&gt;Performance profiling&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.polarsignals.com/blog/posts/2023/12/13/embracing-frame-pointers-in-ubuntu-24-04-lts" target="_blank"&gt;Embracing performance profiling: Canonical enables frame pointers in Ubuntu 24.04 LTS&lt;/a&gt;
+by Frederic Branczyk is a short but important status update.&lt;/p&gt;
+&lt;h2&gt;Applied OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;Krisztian Fekete wrote &lt;a href="https://krisztianfekete.org/opentelemetry-internals-adding-node-name-as-a-label-to-kubelet-metrics/" target="_blank"&gt;OpenTelemetry Internals: Adding Node Name as a Label to Kubelet Metrics&lt;/a&gt; 
+where he shows how to use a processor in a collector pipeline to tackle a
+challenge he faced using the Kubelet Stats receiver. Nice!&lt;/p&gt;
+&lt;h2&gt;Restricting Prometheus queries&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://faun.pub/restricting-label-values-in-prometheus-via-prom-label-proxy-fdb1fca8f599" target="_blank"&gt;Restricting Label Values in Prometheus via prom-label-proxy&lt;/a&gt; by Tanmay Bhat
+is a nice hands-on piece on how to use the &lt;code&gt;prom-label-proxy&lt;/code&gt; to restrict 
+PromQL queries.&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry review&lt;/h2&gt;
+&lt;p&gt;Via TNS: &lt;a href="https://thenewstack.io/opentelemetry-and-observability-looking-forward/" target="_blank"&gt;OpenTelemetry and Observability: Looking Forward&lt;/a&gt; by Ken Hamric 
+reviews 2023 and glances into 2024.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 08 Jan 2024 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2024-01-08/</guid></item><item><title>2023-12-25</title><link>https://buttondown.email/o11y.news/archive/2023-12-25/</link><description>&lt;h2&gt;OTel Q&amp;amp;A&lt;/h2&gt;
+&lt;p&gt;Check out the &lt;a href="https://www.youtube.com/watch?v=HRIx9gJtECU" target="_blank"&gt;OTel Q&amp;amp;A Feat. Luiz Aoqui of HashiCorp&lt;/a&gt; up on YouTube and
+learn about challenges and wins when instrumenting a distributed system (Nomad).&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry best practices&lt;/h2&gt;
+&lt;p&gt;Ashley Somerville and Heds Simons wrote &lt;a href="https://grafana.com/blog/2023/12/18/opentelemetry-best-practices-a-users-guide-to-getting-started-with-opentelemetry/" target="_blank"&gt;OpenTelemetry best practices: A user's
+guide to getting started with OpenTelemetry&lt;/a&gt;, providing a list of useful tips
+and tricks, from metadata generation to context propagation.&lt;/p&gt;
+&lt;h2&gt;Profiling Rust&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.polarsignals.com/blog/posts/2023/12/20/rust-memory-profiling" target="_blank"&gt;Announcing Continuous Memory Profiling for Rust&lt;/a&gt; by Frederic Branczyk and
+Brennan Vincent is an important announcement in the continuous profiling space:
+learn about &lt;code&gt;rust-jemalloc-pprof&lt;/code&gt;, a library allowing you to export jemalloc's 
+heap profiling capabilities in &lt;code&gt;pprof&lt;/code&gt; format.&lt;/p&gt;
+&lt;h2&gt;Explain observability?&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://medium.com/@sebastianperna/observability-and-the-quest-to-explain-it-to-other-people-a46f83b8ce2e" target="_blank"&gt;Observability, and the quest to explain it to other people&lt;/a&gt; Sebastian Perna
+shares their thoughts on the topic, with some useful insights you might be able
+to use in your environment.&lt;/p&gt;
+&lt;h2&gt;The Humans of OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;Via the OpenTelemetry blog: &lt;a href="https://opentelemetry.io/blog/2023/humans-of-otel/" target="_blank"&gt;The Humans of OpenTelemetry&lt;/a&gt; by Adriana Villela 
+(Lightstep) is an exciting interview, with both the transcript and the video available,
+showing the people behind the technology. Thanks a lot for doing this Adriana and Reese!&lt;/p&gt;
+&lt;p&gt;That was it for 2023. Thank you for joining me on a weekly basis exploring the
+depths of observability and see you in 2024!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 25 Dec 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-12-25/</guid></item><item><title>2023-12-18</title><link>https://buttondown.email/o11y.news/archive/2023-12-18/</link><description>&lt;h2&gt;Observability at Julius Baer&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://medium.com/juliusbaerengineering/observability-at-julius-baer-4846dddcf6a0" target="_blank"&gt;Observability at Julius Baer&lt;/a&gt; by Nick Wallner is an incredibly useful and
+clear end-user contribution why observability matters and how to prioritize
+things.&lt;/p&gt;
+&lt;h2&gt;OTel 101&lt;/h2&gt;
+&lt;p&gt;Ruturaj Shitole wrote &lt;a href="https://medium.com/incerto-technologies/simple-opentelemetry-setup-in-a-kubernetes-environment-aa7dc3e3fcf9" target="_blank"&gt;Simple OpenTelemetry setup in a Kubernetes environment&lt;/a&gt;,
+providing a nice overview and end-to-end introduction into OpenTelemetry using
+a simple Python app.&lt;/p&gt;
+&lt;h2&gt;Trace-based test &amp;amp; filtering&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://tracetest.io/blog/opentelemetry-collectors-new-filter-processor" target="_blank"&gt;OpenTelemetry Collector's New Filter Processors&lt;/a&gt; by Matheus Nogueira is a
+short but interesting article discussing filtering in the context of trace-based tests.&lt;/p&gt;
+&lt;h2&gt;AWS o11y updates&lt;/h2&gt;
+&lt;p&gt;My colleague Amer Al Okeh shows how to &lt;a href="https://aws.amazon.com/blogs/mt/automate-the-creation-of-aws-support-cases-using-amazon-cloudwatch-alarms-and-amazon-bedrock/" target="_blank"&gt;Automate the creation of AWS Support cases 
+using Amazon CloudWatch alarms and Amazon Bedrock&lt;/a&gt; and in
+&lt;a href="https://aws.amazon.com/blogs/mt/how-to-monitor-application-health-using-slos-with-amazon-cloudwatch-application-signals/" target="_blank"&gt;How to monitor application health using SLOs with Amazon CloudWatch Application Signals&lt;/a&gt; 
+my colleagues Megan Velez Rivera, Andreas Bloomquist, and Garret Johnson 
+cover in detail the new SLO offering in CloudWatch.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 18 Dec 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-12-18/</guid></item><item><title>2023-12-11</title><link>https://buttondown.email/o11y.news/archive/2023-12-11/</link><description>&lt;h2&gt;OTel Q &amp;amp; A&lt;/h2&gt;
+&lt;p&gt;Check out this awesome &lt;a href="https://www.youtube.com/watch?v=ztrknOWIUh8" target="_blank"&gt;OTel Q&amp;amp;A Feat. Jennifer Moore&lt;/a&gt; via the official
+OTel YouTube channel and learn from a practioner about OpenTelemetry.&lt;/p&gt;
+&lt;h2&gt;AWS o11y use cases&lt;/h2&gt;
+&lt;p&gt;I love it when end-users share their use cases, requirements, and lessons learned. 
+Two excellent examples are the AWS re:Invent 2023 session
+&lt;a href="https://www.youtube.com/watch?v=gNCKJUg8qEo" target="_blank"&gt;Stripe: Architecting for observability at massive scale&lt;/a&gt; and 
+&lt;a href="https://www.youtube.com/watch?v=aDysORX1zIs" target="_blank"&gt;Ingesting 6.5 Tb of Telemetry Data Daily Through Open Telemetry Protocol and
+Collector&lt;/a&gt; at VTEX, from the Observability Day at KubeCon EU, earlier in
+the year.&lt;/p&gt;
+&lt;h2&gt;Naming OTel attributes&lt;/h2&gt;
+&lt;p&gt;Via TNS: &lt;a href="https://thenewstack.io/top-5-best-practices-for-naming-opentelemetry-attributes/" target="_blank"&gt;Top 5 Best Practices for Naming OpenTelemetry Attributes&lt;/a&gt; by Carl Brahms
+of Chronosphere is a short but useful contribution.&lt;/p&gt;
+&lt;h2&gt;Frontend observability&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://medium.com/bazaar-tech/frontend-observability-explained-d12a37fc6595" target="_blank"&gt;Frontend Observability Explained&lt;/a&gt; Asim Iqbal Siddiqui provides a quick
+overview and intro on the topic.&lt;/p&gt;
+&lt;h2&gt;AI goes profiling&lt;/h2&gt;
+&lt;p&gt;Ryan Perry of Grafana Labs on &lt;a href="https://pyroscope.io/blog/ai-powered-flamegraph-interpreter/" target="_blank"&gt;AI-Powered Flamegraph Interpreter in Grafana Pyroscope&lt;/a&gt;.
+Really well done deep dive including an honest take on what AI, in this context,
+can contribute. Exciting times!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 11 Dec 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-12-11/</guid></item><item><title>2023-12-04</title><link>https://buttondown.email/o11y.news/archive/2023-12-04/</link><description>&lt;h2&gt;Pipelines o11y&lt;/h2&gt;
+&lt;p&gt;Via TNS, Adriana Villela (ServiceNow) and Reese Lee (New Relic) explain what 
+o11y in the context of pipelines is and why it matters, so check out
+&lt;a href="https://thenewstack.io/how-to-observe-your-ci-cd-pipelines-with-opentelemetry/" target="_blank"&gt;How to Observe Your CI/CD Pipelines with OpenTelemetry&lt;/a&gt; to learn more.&lt;/p&gt;
+&lt;h2&gt;CloudWatch Logs patterns&lt;/h2&gt;
+&lt;p&gt;My colleague Danilo Poccia on one of the many exciting re:Invent 23 launches in the
+observability domain: &lt;a href="https://aws.amazon.com/blogs/aws/amazon-cloudwatch-logs-now-offers-automated-pattern-analytics-and-anomaly-detection/" target="_blank"&gt;Amazon CloudWatch Logs now offers automated pattern 
+analytics and anomaly detection&lt;/a&gt;. Excellent set of features added to CW Logs!&lt;/p&gt;
+&lt;h2&gt;Agentless collection&lt;/h2&gt;
+&lt;p&gt;My colleague Donnie Prakoso published &lt;a href="https://aws.amazon.com/blogs/aws/amazon-managed-service-for-prometheus-collector-provides-agentless-metric-collection-for-amazon-eks/" target="_blank"&gt;Amazon Managed Service for Prometheus
+collector provides agentless metric collection for Amazon EKS&lt;/a&gt;, a feature
+we launched just before re:Invent and that I believe has huge potential.&lt;/p&gt;
+&lt;h2&gt;OTel client-side&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://jessitron.com/2023/11/28/opentelemetry-in-a-script-tag/" target="_blank"&gt;OpenTelemetry in a script tag&lt;/a&gt; the one and only Jessica Joy Kerr shares
+a super interesting experiment for a client-side (in-browser) OpenTelemetry 
+experience. Thanks!&lt;/p&gt;
+&lt;h2&gt;Collect logs with OTel&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.youtube.com/watch?v=lRggiTbvUsc" target="_blank"&gt;How to collect logs with OpenTelemetry&lt;/a&gt; by Henrik Rexed of Dynatrace is a really
+well done hands-on 30min video on YouTube. Congrats and KUTGW!&lt;/p&gt;
+&lt;h2&gt;Migrating to OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;My colleague Veliswa Boya on &lt;a href="https://aws.amazon.com/blogs/aws/amazon-cloudwatch-application-signals-for-automatic-instrumentation-of-your-applications-preview/" target="_blank"&gt;Amazon CloudWatch Application Signals for automatic 
+instrumentation of your applications (preview)&lt;/a&gt;, which was launched during
+the Thursday keynote at re:Invent and provides you with SLOs + tracing
+drill-down.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 04 Dec 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-12-04/</guid></item><item><title>2023-11-27</title><link>https://buttondown.email/o11y.news/archive/2023-11-27/</link><description>&lt;h2&gt;OTel and Prometheus&lt;/h2&gt;
+&lt;p&gt;Watch Krisztian Fekete's SREcon23 Europe/Middle East/Africa session on
+&lt;a href="https://www.youtube.com/watch?v=gDN9CHUx4yw" target="_blank"&gt;Should I Use OTel (collectors), or Is Prometheus Good Enough?&lt;/a&gt; available
+via YouTube and learn about metrics collection and processing from a practitioner.&lt;/p&gt;
+&lt;h2&gt;Metrics temporality&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://sodkiewiczm.medium.com/opentelemetry-parameter-that-might-ruin-your-flexibility-edf3aa0d290a" target="_blank"&gt;OpenTelemetry parameter that might ruin your flexibility&lt;/a&gt; by Marcin Sodkiewicz
+of Ryanair is an excellent piece on how to handle metrics temporality. Thank
+you!&lt;/p&gt;
+&lt;h2&gt;OTel logs are stable&lt;/h2&gt;
+&lt;p&gt;In case you missed it: logs are stable in OTel. To learn more, I recommend the
+InfoQ article &lt;a href="https://www.infoq.com/news/2023/11/otel-logging-stable/" target="_blank"&gt;OpenTelemetry Logging Marked Stable: Morgan McClean at KubeCon NA&lt;/a&gt;
+and if you want to see it in action (or maybe even try it out yourself) then
+check out my post &lt;a href="https://opentelemetry.io/blog/2023/logs-collection/" target="_blank"&gt;Collecting Logs with OpenTelemetry Python&lt;/a&gt; via the
+OpenTelemetry blog.&lt;/p&gt;
+&lt;h2&gt;Recursion&lt;/h2&gt;
+&lt;p&gt;Via the Skyscanner engineering blog: &lt;a href="https://medium.com/@SkyscannerEng/what-happened-f7c06f078a64" target="_blank"&gt;How recursion brought down flight search
+at Skyscanner&lt;/a&gt;. Scary but insightful end-user report, thanks for sharing!&lt;/p&gt;
+&lt;h2&gt;OTel in 7min&lt;/h2&gt;
+&lt;p&gt;Are you new to OTel? Check out &lt;a href="https://www.youtube.com/watch?v=A0ISrPo3Uao" target="_blank"&gt;OpenTelemtry's Vision of Ubiquitous Observability
+explained in 7 minutes&lt;/a&gt;, a nice high-level intro.&lt;/p&gt;
+&lt;h2&gt;Unifying alerts&lt;/h2&gt;
+&lt;p&gt;Shahar Glazner wrote &lt;a href="https://www.keephq.dev/post/unifying-alerts-from-various-sources" target="_blank"&gt;Unifying alerts from various sources&lt;/a&gt;, showing their
+open-source alert management and automation platform Keep in action.&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 27 Nov 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-11-27/</guid></item><item><title>2023-11-20</title><link>https://buttondown.email/o11y.news/archive/2023-11-20/</link><description>&lt;h2&gt;Exploring the OTel collector&lt;/h2&gt;
+&lt;p&gt;Nicolas Fränkel &lt;a href="https://blog.frankel.ch/opentelemetry-collector/" target="_blank"&gt;explores the OpenTelemetry Collector&lt;/a&gt;: this very nicely done
+hands-on walkthrough takes you from 0 to 1 and gives a good overview on what
+this universal telemetry agent can do.&lt;/p&gt;
+&lt;h2&gt;Kubernetes event tracking&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://ntakashi.com/blog/efficient_kubernetes_event_tracking_a_hands-on_guide_to_opentelemetry_integration/" target="_blank"&gt;Efficient Kubernetes Event Tracking: A Hands-On Guide to Seamless OpenTelemetry Integration&lt;/a&gt;
+by Nicolas Takashi is a short but sweet article which you, as a Kubernetes head,
+should bookmark.&lt;/p&gt;
+&lt;h2&gt;New Relic's AI monitoring&lt;/h2&gt;
+&lt;p&gt;Learn from Lavanya Chockalingam of New Relic in &lt;a href="https://newrelic.com/blog/how-to-relic/ai-monitoring" target="_blank"&gt;Introducing New Relic AI monitoring, 
+the industry’s first APM for AI&lt;/a&gt; all about this new feature.&lt;/p&gt;
+&lt;h2&gt;Contributing to the OTel demo&lt;/h2&gt;
+&lt;p&gt;In &lt;a href="https://tracetest.io/blog/the-power-of-traces-learn-by-contributing-to-opentelemetry" target="_blank"&gt;The Power of Traces: Learn by Contributing to OpenTelemetry&lt;/a&gt; Adnan Rahic
+provides context on the OTel demo and how you can get started using and even
+contributing to it. Well done!&lt;/p&gt;
+&lt;h2&gt;Grafana community plugins&lt;/h2&gt;
+&lt;p&gt;My colleagues Arun Chandapillai, Imaya Kumar Jagannathan, and Priyanka Verma on
+&lt;a href="https://aws.amazon.com/blogs/mt/extend-your-amazon-managed-grafana-experience-with-grafana-community-plugins/" target="_blank"&gt;Extend your Amazon Managed Grafana experience with Grafana community plugins&lt;/a&gt;.
+Congrats on the launch!&lt;/p&gt;
+&lt;h2&gt;Migrating to OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;Benjamin Yolken of Airplane shares their story of &lt;a href="https://www.airplane.dev/blog/migrating-to-opentelemetry" target="_blank"&gt;Migrating to OpenTelemetry&lt;/a&gt;.
+Thanks a lot!&lt;/p&gt;
+&lt;h2&gt;Serverless OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;The one and only (rather vocal) Luc van Donkersgoed on 
+&lt;a href="https://lucvandonkersgoed.com/2023/11/10/serverless-opentelemetry-at-scale-the-postnl-context/" target="_blank"&gt;Serverless OpenTelemetry at scale: the PostNL context&lt;/a&gt;, the first
+installment of what looks like an exciting series of posts!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 20 Nov 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-11-20/</guid></item><item><title>2023-11-13</title><link>https://buttondown.email/o11y.news/archive/2023-11-13/</link><description>&lt;h2&gt;Observability Day NA 2023&lt;/h2&gt;
+&lt;p&gt;The recordings of the &lt;a href="https://www.youtube.com/playlist?list=PLj6h78yzYM2N60fCRNLBL7ymUHg7fFbDZ" target="_blank"&gt;Observability Day NA 2023&lt;/a&gt; are now available for you
+to binge-watch and I can tell you that you won't get bored too quickly: overall
+we're talking 15 sessions here ;)&lt;/p&gt;
+&lt;h2&gt;AWS o11y updates&lt;/h2&gt;
+&lt;p&gt;My colleagues Ashish Bhatia and David Kilze wrote &lt;a href="https://aws.amazon.com/blogs/dotnet/net-observability-with-opentelemetry-part-1-metrics-using-amazon-prometheus-and-amazon-grafana/" target="_blank"&gt;.NET Observability with
+OpenTelemetry – Part 1: Metrics using Amazon Managed Prometheus and Grafana&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;Further, I can recommend &lt;a href="https://aws.amazon.com/blogs/mt/monitoring-gpu-workloads-on-amazon-eks-using-aws-managed-open-source-services/" target="_blank"&gt;Monitoring GPU workloads on Amazon EKS using AWS 
+managed open-source services&lt;/a&gt; by my colleagues Riccardo Freschi, Elamaran 
+Shanmugam, and Imaya Kumar Jagannathan.&lt;/p&gt;
+&lt;h2&gt;Observability with ES|QL&lt;/h2&gt;
+&lt;p&gt;&lt;a href="https://www.elastic.co/blog/opentelemetry-kubernetes-problem-resolution-elastic-observability-esql" target="_blank"&gt;Optimizing Observability with ES|QL: Streamlining SRE operations and issue
+resolution for Kubernetes and OTel&lt;/a&gt; by Bahubali Shetti is an interesting
+article about applying Elastic’s new piped query language ES|QL 
+(Elasticsearch Query Language) in a specific area.&lt;/p&gt;
+&lt;h2&gt;Advanced Grafana use cases&lt;/h2&gt;
+&lt;p&gt;Learn from Slimaine Bensadoun about how to use Grafana for advanced use cases
+in &lt;a href="https://medium.com/@slimaine.bensadoun/unlocking-dynamic-text-monitoring-integrating-external-application-data-into-grafana-da0db54fee9f" target="_blank"&gt;“Unlocking Dynamic Text Monitoring: Integrating External Application Data
+into Grafana”&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;Some context on OTelBin&lt;/h2&gt;
+&lt;p&gt;Mirko Novakovic of Dash0 shares some context on the online tool/OSS offering
+they launched last week: &lt;a href="https://www.dash0.com/blog/otelbin-visualizing-and-improving-opentelemetry-collector-configurations" target="_blank"&gt;OTelBin - Visualizing and improving OpenTelemetry 
+Collector Configurations&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;o11y theory: instrumentation&lt;/h2&gt;
+&lt;p&gt;Yours truly's thoughts on &lt;a href="https://mhausenblas.medium.com/o11y-theory-instrumentation-46e7a5111e5e" target="_blank"&gt;instrumentation&lt;/a&gt;. Heads-up: I'm working
+on a hands-on piece that shows instrumentation in practice (using OTel for
+log collection), so stay tuned!&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 13 Nov 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-11-13/</guid></item><item><title>2023-11-06</title><link>https://buttondown.email/o11y.news/archive/2023-11-06/</link><description>&lt;h2&gt;Visualize and validate OTel&lt;/h2&gt;
+&lt;p&gt;The wonderful folks from Dash0 launched &lt;a href="https://www.otelbin.io/" target="_blank"&gt;OTelBin&lt;/a&gt;. You can use it either
+as an online tool or run it yourself as OSS: OTelBin allows you to edit, 
+validate, and visualize your OpenTelemetry configurations. Thanks so much!&lt;/p&gt;
+&lt;h2&gt;OpenTelemetry metrics in Go&lt;/h2&gt;
+&lt;p&gt;Are you a Gopher and want to add metrics using OTel to your Go apps? Well,
+then I've go something for you: &lt;a href="https://tracetest.io/blog/adding-opentelemetry-metrics-in-your-go-app" target="_blank"&gt;Adding OpenTelemetry Metrics in Your Go App&lt;/a&gt;
+by Matheus Nogueira is a really nice article on the topic.&lt;/p&gt;
+&lt;h2&gt;Reducing MTTR in serverless&lt;/h2&gt;
+&lt;p&gt;My colleague Erich Wolz wrote &lt;a href="https://aws.amazon.com/blogs/mt/lowering-mttr-with-amazon-cloudwatch-and-aws-x-ray/" target="_blank"&gt;Lowering MTTR with Amazon CloudWatch and AWS X-Ray&lt;/a&gt;,
+where you can learn about good practices for serverless workloads.&lt;/p&gt;
+&lt;h2&gt;Spring Boot &amp;amp; OpenTelemetry&lt;/h2&gt;
+&lt;p&gt;Adam Waniak and Maciej Nawrocki of Bright Inventions shared
+&lt;a href="https://grafana.com/blog/2023/10/30/how-to-integrate-a-spring-boot-app-with-grafana-using-opentelemetry-standards/" target="_blank"&gt;How to integrate a Spring Boot app with Grafana using OpenTelemetry
+standards&lt;/a&gt;, a great in-depth end user contribution.&lt;/p&gt;
+&lt;h2&gt;Observability vendor lock-in&lt;/h2&gt;
+&lt;p&gt;Tal Borenstein published
+&lt;a href="https://www.keephq.dev/post/vendor-lock-in-is-in-the-small-details" target="_blank"&gt;Observability vendor lock-in is in the small details&lt;/a&gt; and makes the
+case that their offering is different. Not sure I agree with all points but
+thanks for sharing.&lt;/p&gt;
+&lt;h2&gt;OTel HTTP semconv stable&lt;/h2&gt;
+&lt;p&gt;Hot off the OpenTelemetry blog, learn from Trask Stalnaker (Microsoft) 
+everything you need to know about this important chapter: &lt;a href="https://opentelemetry.io/blog/2023/http-conventions-declared-stable/" target="_blank"&gt;HTTP semantic 
+conventions declared stable&lt;/a&gt;. Just in time for KubeCon ;)&lt;/p&gt;
+&lt;hr /&gt;
+&lt;p&gt;&lt;em&gt;That was it for this edition of the o11y newsletter. 
+Feel free to share news items with me via &lt;a href="https://twitter.com/mhausenblas" target="_blank"&gt;Twitter&lt;/a&gt;—DMs are
+open if you like to share something in private. Stay safe and hope to see
+you around next week!&lt;/em&gt;&lt;/p&gt;</description><pubDate>Mon, 06 Nov 2023 20:00:00 +0000</pubDate><guid>https://buttondown.email/o11y.news/archive/2023-11-06/</guid></item></channel></rss>
