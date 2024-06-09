@@ -27,3 +27,16 @@ impl From<synd_feed::types::Time> for Rfc3339Time {
         Self(value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_rfc3339_time() {
+        assert!(Rfc3339Time::parse(async_graphql::Value::Null).is_err());
+        assert!(
+            Rfc3339Time::parse(async_graphql::Value::String("2024-06-09T01:02:03Z".into())).is_ok()
+        );
+    }
+}
