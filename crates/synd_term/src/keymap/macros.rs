@@ -47,9 +47,28 @@ macro_rules! key {
             crossterm::event::KeyCode::Tab,
         ))
     };
+    ( esc ) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
+            crossterm::event::KeyCode::Esc,
+        ))
+    };
+    ( backspace ) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
+            crossterm::event::KeyCode::Backspace,
+        ))
+    };
     ( $char:literal ) => {
         crossterm::event::Event::Key(crossterm::event::KeyEvent::from(
             crossterm::event::KeyCode::Char($char),
         ))
     };
+}
+
+#[macro_export]
+macro_rules! shift {
+    ( $char:literal ) => {{
+        let mut k = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Char($char));
+        k.modifiers.insert(crossterm::event::KeyModifiers::SHIFT);
+        crossterm::event::Event::Key(k)
+    }};
 }

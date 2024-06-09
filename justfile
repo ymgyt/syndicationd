@@ -28,7 +28,7 @@ check: typo
 
 # Run cargo check
 c:
-    cargo check --all-features
+    cargo check --all-features --tests
 
 # Run spell checker
 typo:

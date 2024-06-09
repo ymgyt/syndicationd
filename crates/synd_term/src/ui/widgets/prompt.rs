@@ -97,3 +97,45 @@ impl Prompt {
         Line::from(spans).render(area, buf);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_ascii() {
+        let mut p = Prompt::new();
+        assert!(matches!(
+            p.handle_key_event(&KeyEvent::from(KeyCode::Char('a'))),
+            KeyEventResult::Consumed { .. }
+        ));
+
+        p.handle_key_event(&KeyEvent::from(KeyCode::Char('b')));
+        p.handle_key_event(&KeyEvent::from(KeyCode::Char('c')));
+        assert_eq!(p.line(), "abc");
+
+        assert!(matches!(
+            p.handle_key_event(&KeyEvent::from(KeyCode::Enter)),
+            KeyEventResult::Ignored
+        ));
+    }
+
+    #[test]
+    fn prompt_grapheme() {
+        let mut p = Prompt::new();
+        // insert multi byte
+        p.handle_key_event(&KeyEvent::from(KeyCode::Char('山')));
+        p.handle_key_event(&KeyEvent::from(KeyCode::Char('口')));
+        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+
+        assert_eq!(p.line(), "山");
+
+        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        assert_eq!(p.line(), "");
+
+        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        assert_eq!(p.line(), "");
+    }
+}

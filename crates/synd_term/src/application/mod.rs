@@ -129,6 +129,7 @@ impl Application {
             theme,
             authenticator,
             interactor,
+            dry_run,
         } = builder;
 
         let key_handlers = {
@@ -158,7 +159,11 @@ impl Application {
             key_handlers,
             categories,
             latest_release: None,
-            flags: Should::empty(),
+            flags: if dry_run {
+                Should::Quit
+            } else {
+                Should::empty()
+            },
         }
     }
 

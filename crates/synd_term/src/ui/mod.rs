@@ -40,3 +40,13 @@ pub struct Context<'a> {
     pub in_flight: &'a InFlight,
     pub categories: &'a Categories,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_icon_is_not_empty() {
+        assert!(!default_icon().symbol().is_empty());
+    }
+}

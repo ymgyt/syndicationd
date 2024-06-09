@@ -24,6 +24,7 @@ pub struct ApplicationBuilder<
 
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Option<Interactor>,
+    pub(super) dry_run: bool,
 }
 
 impl Default for ApplicationBuilder {
@@ -37,6 +38,7 @@ impl Default for ApplicationBuilder {
             theme: (),
             authenticator: None,
             interactor: None,
+            dry_run: false,
         }
     }
 }
@@ -53,6 +55,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            dry_run: self.dry_run,
         }
     }
 }
@@ -69,6 +72,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            dry_run: self.dry_run,
         }
     }
 }
@@ -88,6 +92,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            dry_run: self.dry_run,
         }
     }
 }
@@ -104,6 +109,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            dry_run: self.dry_run,
         }
     }
 }
@@ -120,6 +126,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            dry_run: self.dry_run,
         }
     }
 }
@@ -136,6 +143,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
             theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            dry_run: self.dry_run,
         }
     }
 }
@@ -155,6 +163,11 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
             interactor: Some(interactor),
             ..self
         }
+    }
+
+    #[must_use]
+    pub fn dry_run(self, dry_run: bool) -> Self {
+        Self { dry_run, ..self }
     }
 }
 

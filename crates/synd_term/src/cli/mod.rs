@@ -47,6 +47,8 @@ pub struct Args {
     pub api: ApiOptions,
     #[command(flatten)]
     pub feed: FeedOptions,
+    #[arg(hide = true, long = "dry-run", hide_long_help = true)]
+    pub dry_run: bool,
 }
 
 #[derive(clap::Args, Debug)]

@@ -14,14 +14,6 @@ pub struct ThrobberState {
 }
 
 impl ThrobberState {
-    /// Get a index.
-    pub fn index(&self) -> i8 {
-        self.index
-    }
-    pub fn calc_next(&mut self) {
-        self.calc_step(1);
-    }
-
     pub fn calc_step(&mut self, step: i8) {
         self.index = self.index.saturating_add(step);
     }
@@ -69,18 +61,6 @@ impl<'a> Throbber<'a> {
         T: Into<Span<'a>>,
     {
         self.label = Some(label.into());
-        self
-    }
-
-    #[must_use]
-    pub fn style(mut self, style: Style) -> Self {
-        self.style = style;
-        self
-    }
-
-    #[must_use]
-    pub fn throbber_style(mut self, style: Style) -> Self {
-        self.throbber_style = style;
         self
     }
 
@@ -205,9 +185,16 @@ pub mod throbber {
     };
 
     /// ["⣧", "⣏", "⡟", "⠿", "⢻", "⣹", "⣼", "⣶"]
+    #[cfg(not(feature = "integration"))]
     pub const BRAILLE_EIGHT_DOUBLE: Set = Set {
         full: "⣿",
         empty: "　",
         symbols: &["⣧", "⣏", "⡟", "⠿", "⢻", "⣹", "⣼", "⣶"],
+    };
+    #[cfg(feature = "integration")]
+    pub const BRAILLE_EIGHT_DOUBLE: Set = Set {
+        full: "⣿",
+        empty: "　",
+        symbols: &["⣧", "⣧", "⣧", "⣧", "⣧", "⣧", "⣧", "⣧"],
     };
 }

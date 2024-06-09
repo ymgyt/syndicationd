@@ -68,6 +68,7 @@ fn build_app(
         entries_limit,
     }: FeedOptions,
     cache_dir: PathBuf,
+    dry_run: bool,
 ) -> anyhow::Result<Application> {
     let app = Application::builder()
         .terminal(Terminal::new().context("Failed to construct terminal")?)
@@ -84,6 +85,7 @@ fn build_app(
         })
         .cache(Cache::new(cache_dir))
         .theme(Theme::with_palette(&palette.into()))
+        .dry_run(dry_run)
         .build();
 
     Ok(app)
@@ -101,6 +103,7 @@ async fn main() {
         cache_dir,
         command,
         palette,
+        dry_run,
     } = cli::parse();
 
     // Subcommand logs to the terminal, tui writes logs to a file.
@@ -125,6 +128,7 @@ async fn main() {
         palette,
         feed,
         cache_dir,
+        dry_run,
     ))
     .and_then(|app| {
         tracing::info!("Running...");

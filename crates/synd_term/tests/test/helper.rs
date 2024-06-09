@@ -21,6 +21,7 @@ use synd_term::{
     terminal::Terminal,
     ui::theme::Theme,
 };
+use synd_test::temp_dir;
 use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing_subscriber::EnvFilter;
@@ -36,6 +37,7 @@ pub struct TestCase {
     pub idle_timer_interval: Duration,
     pub device_flow_case: &'static str,
     pub cache_dir: PathBuf,
+    pub log_path: PathBuf,
 
     pub login_credential: Option<Credential>,
     pub interactor_buffer_fn: Option<fn(&TestCase) -> String>,
@@ -52,6 +54,7 @@ impl Default for TestCase {
             idle_timer_interval: Duration::from_millis(1000),
             device_flow_case: "case1",
             cache_dir: temp_dir().into_path(),
+            log_path: temp_dir().into_path().join("synd.log"),
 
             login_credential: None,
             interactor_buffer_fn: None,
@@ -131,7 +134,6 @@ impl TestCase {
             let authenticator = Authenticator::new().with_device_flows(device_flows);
             let config = Config {
                 idle_timer_interval,
-                throbber_timer_interval: Duration::from_secs(3600), // disable throbber
                 ..Default::default()
             };
             // to isolate the state for each test
@@ -267,10 +269,6 @@ pub async fn serve_api(
     ));
 
     Ok(())
-}
-
-pub fn temp_dir() -> tempfile::TempDir {
-    tempfile::TempDir::new().unwrap()
 }
 
 pub fn event_stream() -> (
