@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use kvsd::Value;
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{self, Annotated, Category, FeedUrl, Requirement};
+use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::repository::RepositoryError;
 
@@ -46,32 +46,5 @@ impl TryFrom<SubscribedFeeds> for Value {
     fn try_from(value: SubscribedFeeds) -> Result<Self, Self::Error> {
         let value = serde_json::to_vec(&value).map_err(RepositoryError::internal)?;
         Ok(Value::new(value).unwrap())
-    }
-}
-
-impl SubscribedFeeds {
-    pub fn annotate<Iter>(self, feeds: Iter) -> impl Iterator<Item = Annotated<Arc<types::Feed>>>
-    where
-        Iter: IntoIterator<Item = Arc<types::Feed>>,
-    {
-        let mut annotations = self.annotations;
-
-        feeds.into_iter().map(move |feed| {
-            match annotations
-                .as_mut()
-                .and_then(|annotations| annotations.remove(feed.meta().url()))
-            {
-                Some(annotations) => Annotated {
-                    feed,
-                    requirement: annotations.requirement,
-                    category: annotations.category,
-                },
-                None => Annotated {
-                    feed,
-                    requirement: None,
-                    category: None,
-                },
-            }
-        })
     }
 }
