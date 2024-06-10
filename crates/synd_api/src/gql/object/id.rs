@@ -18,6 +18,7 @@ impl From<FeedIdV1> for async_graphql::ID {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub(in crate::gql) struct EntryId<'a>(types::EntryId<'a>);
 
 impl<'a> CursorType for EntryId<'a> {
@@ -36,5 +37,17 @@ impl<'a> CursorType for EntryId<'a> {
 impl<'a> From<types::EntryId<'a>> for EntryId<'a> {
     fn from(value: types::EntryId<'a>) -> Self {
         Self(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn entry_id_decode() {
+        let id: EntryId = types::EntryId::from("123").into();
+
+        assert_eq!(EntryId::decode_cursor(&id.encode_cursor()), Ok(id));
     }
 }
