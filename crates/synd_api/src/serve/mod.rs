@@ -136,3 +136,31 @@ async fn handle_middleware_error(err: BoxError) -> (StatusCode, String) {
 async fn not_found() -> impl IntoResponse {
     StatusCode::NOT_FOUND
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn error_mapping() {
+        assert_eq!(
+            handle_middleware_error(Box::new(tower::timeout::error::Elapsed::new()))
+                .await
+                .0,
+            StatusCode::REQUEST_TIMEOUT
+        );
+        assert_eq!(
+            handle_middleware_error(Box::new(std::io::Error::from(
+                std::io::ErrorKind::OutOfMemory
+            )))
+            .await
+            .0,
+            StatusCode::INTERNAL_SERVER_ERROR,
+        );
+
+        assert_eq!(
+            not_found().await.into_response().status(),
+            StatusCode::NOT_FOUND
+        );
+    }
+}
