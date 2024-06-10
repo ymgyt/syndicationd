@@ -27,6 +27,20 @@ pub enum FetchFeedError {
     Other(#[from] anyhow::Error),
 }
 
+impl From<ParseFeedError> for FetchFeedError {
+    fn from(err: ParseFeedError) -> Self {
+        match err {
+            ParseFeedError::ParseError(kind) => FetchFeedError::InvalidFeed(kind),
+            ParseFeedError::IoError(io_err) => FetchFeedError::Io(io_err),
+            ParseFeedError::JsonSerde(json_err) => FetchFeedError::JsonFormat(json_err),
+            ParseFeedError::JsonUnsupportedVersion(version) => {
+                FetchFeedError::JsonUnsupportedVersion(version)
+            }
+            ParseFeedError::XmlReader(xml_err) => FetchFeedError::XmlFormat(format!("{xml_err}")),
+        }
+    }
+}
+
 #[async_trait]
 pub trait FetchFeed: Send + Sync {
     async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed>;
@@ -98,22 +112,35 @@ impl FeedService {
         parser
             .parse(source)
             .map(|feed| Feed::from((url, feed)))
-            .map_err(|err| match err {
-                ParseFeedError::ParseError(kind) => FetchFeedError::InvalidFeed(kind),
-                ParseFeedError::IoError(io_err) => FetchFeedError::Io(io_err),
-                ParseFeedError::JsonSerde(json_err) => FetchFeedError::JsonFormat(json_err),
-                ParseFeedError::JsonUnsupportedVersion(version) => {
-                    FetchFeedError::JsonUnsupportedVersion(version)
-                }
-                ParseFeedError::XmlReader(xml_err) => {
-                    FetchFeedError::XmlFormat(format!("{xml_err}"))
-                }
-            })
+            .map_err(FetchFeedError::from)
     }
 
     fn build_parser(base_uri: impl AsRef<str>) -> Parser {
         feed_rs::parser::Builder::new()
             .base_uri(Some(base_uri))
             .build()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_feed_rs_parse_feed_error() {
+        assert!(matches!(
+            FetchFeedError::from(ParseFeedError::ParseError(ParseErrorKind::NoFeedRoot)),
+            FetchFeedError::InvalidFeed(_)
+        ));
+        assert!(matches!(
+            FetchFeedError::from(ParseFeedError::IoError(std::io::Error::from(
+                std::io::ErrorKind::UnexpectedEof
+            ))),
+            FetchFeedError::Io(_)
+        ));
+        assert!(matches!(
+            FetchFeedError::from(ParseFeedError::JsonUnsupportedVersion("dummy".into())),
+            FetchFeedError::JsonUnsupportedVersion(_)
+        ));
     }
 }
