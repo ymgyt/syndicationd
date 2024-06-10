@@ -121,7 +121,7 @@ async fn main() {
         Err(err) => err.exit(),
     };
     let _guard = init_tracing(&args.o11y);
-    let shutdown = Shutdown::watch_signal();
+    let shutdown = Shutdown::watch_signal(tokio::signal::ctrl_c(), || {});
 
     init_file_descriptor_limit();
 

@@ -1,5 +1,6 @@
 use std::{io, path::PathBuf, sync::Once, time::Duration};
 
+use futures_util::future;
 use ratatui::backend::TestBackend;
 use synd_api::{
     args::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
@@ -265,7 +266,7 @@ pub async fn serve_api(
     tokio::spawn(synd_api::serve::serve(
         listener,
         dep,
-        Shutdown::watch_signal(),
+        Shutdown::watch_signal(future::pending(), || {}),
     ));
 
     Ok(())
