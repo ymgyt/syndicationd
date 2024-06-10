@@ -49,6 +49,23 @@ pub mod http {
                 .collect::<Vec<_>>()
         }
     }
+    #[cfg(test)]
+    mod tests {
+        use axum::http::HeaderValue;
+
+        use super::*;
+
+        #[test]
+        fn header_extractor() {
+            let mut h = axum::http::HeaderMap::new();
+            h.insert("traceparent", HeaderValue::from_static("foo"));
+
+            let e = HeaderExtractor(&h);
+
+            assert_eq!(e.get("traceparent").unwrap(), "foo");
+            assert_eq!(e.keys(), vec!["traceparent"]);
+        }
+    }
 }
 
 /// Configure `TraceContext` and Baggage propagator then set as global propagator
