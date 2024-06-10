@@ -77,11 +77,14 @@ pub async fn serve(
     } = dep;
 
     let cx = Context {
-        gql_monitor: monitors.gql.clone(),
+        gql_monitor: monitors.graphql_task_monitor(),
         schema: gql::schema_builder().data(runtime).finish(),
     };
 
-    tokio::spawn(monitors.monitor(config::metrics::MONITOR_INTERVAL));
+    tokio::spawn(monitors.emit_metrics(
+        config::metrics::MONITOR_INTERVAL,
+        shutdown.cancellation_token(),
+    ));
 
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))

@@ -59,7 +59,7 @@ opentelemetry-stdout = ["synd-o11y/opentelemetry-stdout"]
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
-insta      = { workspace = true }
+insta      = { workspace = true, features = ["yaml"] }
 synd-test  = { path = "../synd_test" }
 
 [lints]

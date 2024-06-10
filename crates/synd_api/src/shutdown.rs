@@ -42,6 +42,7 @@ impl Shutdown {
         Self { root, handle }
     }
 
+    /// Request shutdown
     pub fn shutdown(&self) {
         self.root.cancel();
     }
@@ -50,6 +51,7 @@ impl Shutdown {
         self.handle
     }
 
+    /// Return `CancellationToken which is cancelled at shutdown`
     pub fn cancellation_token(&self) -> CancellationToken {
         self.root.clone()
     }
