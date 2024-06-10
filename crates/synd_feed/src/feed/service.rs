@@ -30,8 +30,6 @@ pub enum FetchFeedError {
 #[async_trait]
 pub trait FetchFeed: Send + Sync {
     async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed>;
-    /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[FeedUrl]) -> FetchFeedResult<Vec<Feed>>;
 }
 
 #[async_trait]
@@ -41,10 +39,6 @@ where
 {
     async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed> {
         self.fetch_feed(url).await
-    }
-    /// Fetch feeds by spawning tasks
-    async fn fetch_feeds_parallel(&self, urls: &[FeedUrl]) -> FetchFeedResult<Vec<Feed>> {
-        self.fetch_feeds_parallel(urls).await
     }
 }
 
@@ -80,26 +74,6 @@ impl FetchFeed for FeedService {
         }
 
         self.parse(url, buff.as_slice())
-    }
-
-    async fn fetch_feeds_parallel(&self, urls: &[FeedUrl]) -> FetchFeedResult<Vec<Feed>> {
-        // Order is matter, so we could not use tokio JoinSet or futures FuturesUnordered
-        // should use FuturesOrders ?
-        let mut handles = Vec::with_capacity(urls.len());
-        for url in urls {
-            let this = self.clone();
-            let url = url.clone();
-            handles.push(tokio::task::spawn(
-                async move { this.fetch_feed(url).await },
-            ));
-        }
-
-        let mut feeds = Vec::with_capacity(handles.len());
-        for handle in handles {
-            feeds.push(handle.await.expect("tokio spawn join error")?);
-        }
-
-        Ok(feeds)
     }
 }
 
