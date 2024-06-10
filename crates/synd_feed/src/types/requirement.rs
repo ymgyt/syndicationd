@@ -66,3 +66,16 @@ impl Requirement {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse() {
+        assert_eq!("must".parse(), Ok(Requirement::Must));
+        assert_eq!("should".parse(), Ok(Requirement::Should));
+        assert_eq!("may".parse(), Ok(Requirement::May));
+        assert!("unexpected".parse::<Requirement>().is_err());
+    }
+}

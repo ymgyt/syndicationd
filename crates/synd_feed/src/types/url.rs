@@ -120,4 +120,20 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn url() {
+        let u = FeedUrl::from(Url::parse("https://blog.ymgyt.io/atom.xml").unwrap());
+
+        assert_eq!(Borrow::<Url>::borrow(&u), &Url::from(u.clone()));
+    }
+
+    #[test]
+    #[cfg(feature = "graphql")]
+    fn scalar() {
+        use async_graphql::ScalarType;
+
+        assert!(FeedUrl::parse(async_graphql::Value::Null).is_err());
+        assert!(FeedUrl::parse(async_graphql::Value::String("invalid".into())).is_err());
+    }
 }

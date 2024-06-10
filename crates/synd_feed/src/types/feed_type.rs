@@ -21,3 +21,32 @@ impl From<feed_rs::model::FeedType> for FeedType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn feed_rs_compatible() {
+        assert_eq!(
+            FeedType::from(feed_rs::model::FeedType::Atom),
+            FeedType::Atom
+        );
+        assert_eq!(
+            FeedType::from(feed_rs::model::FeedType::JSON),
+            FeedType::JSON
+        );
+        assert_eq!(
+            FeedType::from(feed_rs::model::FeedType::RSS0),
+            FeedType::RSS0
+        );
+        assert_eq!(
+            FeedType::from(feed_rs::model::FeedType::RSS1),
+            FeedType::RSS1
+        );
+        assert_eq!(
+            FeedType::from(feed_rs::model::FeedType::RSS2),
+            FeedType::RSS2
+        );
+    }
+}

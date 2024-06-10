@@ -6,7 +6,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum CategoryError {
     #[error("not empty validation is violated")]
     NotEmptyViolated,
@@ -71,5 +71,47 @@ impl<'a> fake::Dummy<fake::Faker> for Category<'a> {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &fake::Faker, rng: &mut R) -> Self {
         let category: String = fake::Fake::fake_with_rng(&(1..31), rng);
         Self::new(category).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn category_spec() {
+        assert_eq!(Category::new(""), Err(CategoryError::NotEmptyViolated));
+        assert_eq!(
+            Category::new("a".repeat(Category::MAX_LEN + 1)),
+            Err(CategoryError::LenMaxViolated)
+        );
+
+        assert!(Category::new("a".repeat(Category::MAX_LEN) + "  ").is_ok(),);
+
+        assert_eq!(
+            Category::new("rust").unwrap().into_inner(),
+            format!("{}", Category::new("rust").unwrap()),
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "graphql")]
+    fn scalar() {
+        use async_graphql::ScalarType;
+
+        assert!(Category::parse(async_graphql::Value::Null).is_err());
+        assert!(Category::parse(async_graphql::Value::String(
+            "a".repeat(Category::MAX_LEN + 1)
+        ))
+        .is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "fake")]
+    fn fake() {
+        use fake::Fake;
+
+        let c: Category = fake::Faker.fake();
+        assert!(!c.as_str().is_empty());
     }
 }
