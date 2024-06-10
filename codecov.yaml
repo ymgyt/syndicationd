@@ -8,8 +8,9 @@ coverage:
         target: auto # use the coverage from the base commit 
         threshold: 3% # allow the coverage to drop by
 ignore:
-  - "crates/synd_term/src/terminal/integration_backend.rs"
-  - "crates/synd_test/"
+  # On Codecov, it shows 300 lines being tracked, but in reality, there are only 3 lines.
+  # These can be excluded in the report on llvm-cov.
+  - "crates/synd_api/src/serve/layer/mod.rs"
 comment: # https://docs.codecov.com/docs/pull-request-comments
   # reach is not documented, but validator doesn't complain
   layout: "condensed_header,reach,diff,condensed_files,condensed_footer"
