@@ -14,7 +14,7 @@ use synd_auth::{
     jwt,
 };
 use synd_term::{
-    application::{Application, Authenticator, Cache, Config, DeviceFlows},
+    application::{Application, Authenticator, Cache, Config, DeviceFlows, JwtService},
     auth::Credential,
     client::Client,
     config::Categories,
@@ -65,10 +65,14 @@ impl Default for TestCase {
 }
 
 impl TestCase {
-    pub fn already_logined(mut self) -> Self {
+    pub fn already_logined(self) -> Self {
         let cred = Credential::Github {
             access_token: "dummy_gh_token".into(),
         };
+        self.with_credential(cred)
+    }
+
+    pub fn with_credential(mut self, cred: Credential) -> Self {
         self.login_credential = Some(cred);
         self
     }
@@ -133,7 +137,21 @@ impl TestCase {
                     .with_token_endpoint(Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/google/login/oauth/access_token")).unwrap())
                 ),
             };
-            let authenticator = Authenticator::new().with_device_flows(device_flows);
+            let jwt_service = {
+                // client_id is used for verify jwt
+                let google_jwt_service = jwt::google::JwtService::new(
+                    synd_test::jwt::DUMMY_GOOGLE_CLIENT_ID,
+                    synd_test::jwt::DUMMY_GOOGLE_CLIENT_ID,
+                )
+                .with_token_endpoint(
+                    Url::parse(&format!("http://localhost:{mock_port}/google/oauth2/token"))
+                        .unwrap(),
+                );
+                JwtService::new().with_google_jwt_service(google_jwt_service)
+            };
+            let authenticator = Authenticator::new()
+                .with_device_flows(device_flows)
+                .with_jwt_service(jwt_service);
             let config = Config {
                 idle_timer_interval,
                 ..Default::default()

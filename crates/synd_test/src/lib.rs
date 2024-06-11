@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+pub mod jwt;
 pub mod kvsd;
 pub mod mock;
 

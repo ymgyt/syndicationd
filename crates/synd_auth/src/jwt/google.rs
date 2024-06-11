@@ -45,11 +45,6 @@ pub struct Claims {
 }
 
 impl Claims {
-    /// Return this `Claims` expire at given `DateTime`
-    pub fn is_expired_at(&self, t: DateTime<Utc>) -> bool {
-        self.exp < t.timestamp()
-    }
-
     /// Return `DateTime` at when `Claims` expire
     pub fn expired_at(&self) -> DateTime<Utc> {
         Utc.timestamp_opt(self.exp, 0)
@@ -64,6 +59,7 @@ pub struct JwtService {
     client_id: Cow<'static, str>,
     client_secret: Cow<'static, str>,
     pem_endpoint: Url,
+    token_endpoint: Url,
     key_cache: Arc<RwLock<HashMap<Kid, Arc<DecodingKey>>>>,
 }
 
@@ -95,6 +91,7 @@ impl JwtService {
             client_id: client_id.into(),
             client_secret: client_secret.into(),
             pem_endpoint: Url::parse(Self::PEM_ENDPOINT).unwrap(),
+            token_endpoint: Url::parse(Self::TOKEN_ENDPOINT).unwrap(),
             key_cache: Arc::new(RwLock::default()),
         }
     }
@@ -103,6 +100,14 @@ impl JwtService {
     pub fn with_pem_endpoint(self, pem_endpoint: Url) -> Self {
         Self {
             pem_endpoint,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_token_endpoint(self, token_endpoint: Url) -> Self {
+        Self {
+            token_endpoint,
             ..self
         }
     }
@@ -251,7 +256,7 @@ impl JwtService {
 
         async fn call<'s>(
             client: &Client,
-            endpoint: &str,
+            endpoint: Url,
             payload: &Request<'s>,
         ) -> Result<Response, reqwest::Error> {
             client
@@ -272,7 +277,7 @@ impl JwtService {
             refresh_token,
             grant_type: "refresh_token",
         };
-        let response = call(&self.client, Self::TOKEN_ENDPOINT, request)
+        let response = call(&self.client, self.token_endpoint.clone(), request)
             .await
             .map_err(JwtError::RefreshToken)?;
 

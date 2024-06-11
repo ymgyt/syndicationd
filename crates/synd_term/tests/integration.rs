@@ -2,7 +2,7 @@
 mod test {
     use std::path::{Path, PathBuf};
 
-    use synd_term::{key, shift};
+    use synd_term::{auth::Credential, key, shift};
     use synd_test::temp_dir;
 
     mod helper;
@@ -108,6 +108,41 @@ mod test {
                 insta::assert_debug_snapshot!("google_landing_entries", application.buffer());
             });
         }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn refresh_expired_google_jwt() -> anyhow::Result<()> {
+        let (expired_jwt, expired_at) = synd_test::jwt::google_expired_jwt();
+        let test_case = TestCase {
+            mock_port: 6040,
+            synd_api_port: 6041,
+            kvsd_port: 6042,
+            terminal_col_row: (120, 30),
+            device_flow_case: "case1",
+            cache_dir: temp_dir().into_path(),
+            ..Default::default()
+        }
+        .with_credential(Credential::Google {
+            id_token: expired_jwt,
+            refresh_token: "dummy".into(),
+            expired_at,
+        });
+
+        let mut application = test_case.init_app().await?;
+        let (_tx, mut event_stream) = helper::event_stream();
+
+        {
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "after_refreshing_expired_google_jwt",
+            },{
+                insta::assert_debug_snapshot!("refresh_expired_google_jwt_landing", application.buffer());
+            });
+        }
+
         Ok(())
     }
 

@@ -1,27 +1,22 @@
-use std::{collections::HashMap, ops::Add, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use axum::{
     http::{HeaderMap, StatusCode},
     routing::{get, post},
     Form, Json, Router,
 };
-use chrono::Utc;
 use headers::{authorization::Bearer, Authorization, Header};
-use synd_auth::{
-    device_flow::{
-        provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
-        DeviceAccessTokenRequest, DeviceAccessTokenResponse, DeviceAuthorizationRequest,
-        DeviceAuthorizationResponse,
-    },
-    jwt,
+use serde::Serialize;
+use synd_auth::device_flow::{
+    provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
+    DeviceAccessTokenRequest, DeviceAccessTokenResponse, DeviceAuthorizationRequest,
+    DeviceAuthorizationResponse,
 };
 use tokio::net::TcpListener;
 
-use crate::{certificate_buff, private_key_buff, TEST_EMAIL};
+use crate::{certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID, TEST_EMAIL};
 
 mod feed;
-
-const DUMMY_GOOGLE_JWT_KEY_ID: &str = "dummy-google-jwt-kid-1";
 
 async fn github_device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
@@ -101,29 +96,7 @@ async fn google_device_access_token(
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Generate jwt
-    let jwt = {
-        let header = jsonwebtoken::Header {
-            typ: Some("JST".into()),
-            // google use Allgorithm::RS256, but our testing private key use ECDSA
-            alg: jsonwebtoken::Algorithm::ES256,
-            kid: Some(DUMMY_GOOGLE_JWT_KEY_ID.to_owned()),
-            ..Default::default()
-        };
-        let encoding_key =
-            jsonwebtoken::EncodingKey::from_ec_pem(private_key_buff().as_slice()).unwrap();
-        let claims = jwt::google::Claims {
-            iss: "https://accounts.google.com".into(),
-            azp: "dummy_google_client_id".into(),
-            aud: "dummy_google_client_id".into(),
-            sub: "123456789".into(),
-            email: "ymgyt@ymgyt.io".into(),
-            email_verified: true,
-            iat: Utc::now().timestamp(),
-            exp: Utc::now().add(Duration::from_secs(60 * 60)).timestamp(),
-        };
-
-        jsonwebtoken::encode(&header, &claims, &encoding_key).unwrap()
-    };
+    let jwt = crate::jwt::google_test_jwt();
 
     let res = DeviceAccessTokenResponse {
         access_token: "gh_dummy_access_token".into(),
@@ -163,6 +136,21 @@ async fn google_jwt_pem() -> Json<HashMap<String, String>> {
     Json([(key_id, cert)].into_iter().collect())
 }
 
+#[derive(Serialize)]
+struct GoogleOauth2TokenResponse {
+    expires_in: i64,
+    id_token: String,
+}
+// mock https://oauth2.googleapis.com/token
+async fn google_oauth2_token() -> Json<GoogleOauth2TokenResponse> {
+    let id_token = crate::jwt::google_test_jwt();
+    let expires_in = 60 * 30;
+    Json(GoogleOauth2TokenResponse {
+        expires_in,
+        id_token,
+    })
+}
+
 pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
     let case_1 = Router::new()
         .route(
@@ -185,6 +173,7 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
         .nest("/case1", case_1)
         .route("/github/graphql", post(github_graphql_viewer))
         .route("/google/oauth2/v1/certs", get(google_jwt_pem))
+        .route("/google/oauth2/token", post(google_oauth2_token))
         .route("/feed/:feed", get(feed::feed));
 
     axum::serve(listener, router).await?;
