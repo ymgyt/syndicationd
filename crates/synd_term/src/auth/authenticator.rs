@@ -28,6 +28,11 @@ impl JwtService {
         }
     }
 
+    #[must_use]
+    pub fn with_google_jwt_service(self, google: jwt::google::JwtService) -> Self {
+        Self { google }
+    }
+
     pub(crate) async fn refresh_google_id_token(
         &self,
         refresh_token: &str,
@@ -72,6 +77,14 @@ impl Authenticator {
     pub fn with_device_flows(self, device_flows: DeviceFlows) -> Self {
         Self {
             device_flows,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_jwt_service(self, jwt_service: JwtService) -> Self {
+        Self {
+            jwt_service,
             ..self
         }
     }
