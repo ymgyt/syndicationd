@@ -71,6 +71,7 @@ kvsd         = { workspace = true }
 serial_test  = { version = "3.1.1", default_features = false, features = ["async", "file_locks"] }
 tempfile     = { workspace = true }
 tokio-stream = "0.1.15"
+tokio-util   = { workspace = true }
 
 [lints]
 workspace = true

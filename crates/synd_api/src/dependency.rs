@@ -6,6 +6,7 @@ use synd_feed::feed::{
     cache::{CacheConfig, CacheLayer},
     service::FeedService,
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     args::{self, CacheOptions, KvsdOptions, TlsOptions},
@@ -30,6 +31,7 @@ impl Dependency {
         tls: TlsOptions,
         serve_options: args::ServeOptions,
         cache: CacheOptions,
+        ct: CancellationToken,
     ) -> anyhow::Result<Self> {
         let kvsd = {
             let KvsdOptions {
@@ -65,7 +67,7 @@ impl Dependency {
                 .periodic_refresher()
                 .with_emit_metrics(true);
 
-            tokio::spawn(periodic_refresher.run(feed_cache_refresh_interval));
+            tokio::spawn(periodic_refresher.run(feed_cache_refresh_interval, ct));
 
             cache_feed_service
         };

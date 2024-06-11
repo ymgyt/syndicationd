@@ -3320,6 +3320,7 @@ dependencies = [
  "synd-o11y",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
  "url",
 ]
@@ -3389,6 +3390,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "toml",
  "tracing",
  "tracing-appender",

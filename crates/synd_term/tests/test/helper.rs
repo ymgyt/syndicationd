@@ -25,6 +25,7 @@ use synd_term::{
 use synd_test::temp_dir;
 use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -238,9 +239,15 @@ pub async fn serve_api(
     .await
     .map(KvsdClient::new)?;
 
-    let mut dep = Dependency::new(kvsd_options, tls_options, serve_options, cache_options)
-        .await
-        .unwrap();
+    let mut dep = Dependency::new(
+        kvsd_options,
+        tls_options,
+        serve_options,
+        cache_options,
+        CancellationToken::new(),
+    )
+    .await
+    .unwrap();
 
     {
         let github_endpoint: &'static str =
