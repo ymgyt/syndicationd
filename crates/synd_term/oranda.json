@@ -21,6 +21,9 @@
     "changelog": {
       "read_changelog_file": false
     },
+    "mdbook": {
+      "path": "../../docs"
+    },
     "artifacts": {
       "package_managers": {
         "additional": {
