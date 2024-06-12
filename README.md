@@ -140,7 +140,7 @@ Feed options:
 ### Authentication
 
 syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
-Currently, GitHub and Google are supported as authorize server/id provider. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to authenticate the user's email address. The user's email address is used only as an identifier after being hashed and never stored.
+Currently, GitHub and Google are supported as authorize server/id provider. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to authenticate the user's email address. The user's email address is used only as an identifier after being hashed and never stored. for more info, please refer to the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html)
 
 ### Keymap
 
