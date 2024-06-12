@@ -107,7 +107,7 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 <details>
 <summary>Click to show a complete list of options</summary>
 
-```console
+```sh
 Usage: synd [OPTIONS] [COMMAND]
 
 Commands:
@@ -292,7 +292,7 @@ Authentication credentials are cached. to remove them, execute `synd clean`.
 
 `synd check [--format (human|json)]` return current application status.
 
-```console
+```sh
 synd check --format json | from json
 ╭───────┬─────────────────────────────────────────╮
 │       │ ╭─────────────┬────────────────────╮    │
