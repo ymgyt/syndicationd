@@ -48,7 +48,7 @@ mod tests {
     #[test]
     fn user_from_email() {
         let u = User::from_email("foo@ymgyt.io");
-        assert_eq!(u.id.len(), 16);
-        assert_eq!(u.id, "585779d8c9b2e06d");
+        assert_eq!(u.id().len(), 16);
+        assert_eq!(u.id(), "585779d8c9b2e06d");
     }
 }
