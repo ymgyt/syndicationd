@@ -69,7 +69,7 @@ review:
 coverage *flags:
     nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest \
         --all-features --open \
-        --ignore-filename-regex integration_backend.rs \
+        --ignore-filename-regex '(integration_backend.rs|client/generated/.*.rs)' \
         {{ flags }}
 
 # Update synd_api graphql schema
@@ -81,7 +81,7 @@ update-gql-schema:
 gen-gql:
     graphql-client generate \
       --schema-path crates/synd_term/gql/schema.json \
-      --output-directory crates/synd_term/src/client \
+      --output-directory crates/synd_term/src/client/generated \
       --variables-derives "Debug,Clone,PartialEq,Eq" \
       --response-derives "Debug,Clone,PartialEq,Eq" \
       --custom-scalars-module "crate::client::scalar" \
@@ -89,7 +89,7 @@ gen-gql:
 
     graphql-client generate \
       --schema-path crates/synd_term/gql/schema.json \
-      --output-directory crates/synd_term/src/client \
+      --output-directory crates/synd_term/src/client/generated \
       --variables-derives "Debug,Clone,PartialEq,Eq" \
       --response-derives "Debug,Clone,PartialEq,Eq" \
       --custom-scalars-module "crate::client::scalar" \

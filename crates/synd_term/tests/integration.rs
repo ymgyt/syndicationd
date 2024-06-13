@@ -223,8 +223,8 @@ mod test {
         }
 
         {
-            // Unsubscribe popup
-            tx.send(key!('d'));
+            // Prompt unsubscribe popup and move selection
+            tx.send_multi([key!('d'), key!('l'), key!('h')]);
             application
                 .wait_until_jobs_completed(&mut event_stream)
                 .await;
@@ -286,6 +286,8 @@ mod test {
             },{
                 insta::assert_debug_snapshot!("filter_entries_initial_fetch", application.buffer());
             });
+            // Cover move
+            tx.send_multi([key!('j'), key!('g'), key!('e'), key!('g'), key!('g')]);
         }
 
         // Move Feed tab
@@ -299,6 +301,8 @@ mod test {
             },{
                 insta::assert_debug_snapshot!("filter_entries_initial_fetch_feed", application.buffer());
             });
+            // Cover move_last and move_first
+            tx.send_multi([key!('g'), key!('e'), key!('g'), key!('g')]);
             // Move back
             tx.send(key!(tab));
         }

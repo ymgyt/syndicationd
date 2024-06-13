@@ -19,8 +19,10 @@ use self::query::subscription::SubscriptionOutput;
 
 mod scalar;
 pub use scalar::*;
+#[path = "generated/mutation.rs"]
 pub mod mutation;
 pub mod payload;
+#[path = "generated/query.rs"]
 pub mod query;
 
 #[derive(Error, Debug)]

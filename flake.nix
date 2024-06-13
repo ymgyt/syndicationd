@@ -181,7 +181,7 @@
             # not supported yet in crane
             # cargoLlvmCovCommand = "nextest";
             cargoLlvmCovExtraArgs =
-              "--codecov --all-features --output-path $out";
+              "--codecov --all-features --output-path $out  --ignore-filename-regex '(client/generated/*.rs)'";
           });
 
           synd-term-image = syndTermImage;
