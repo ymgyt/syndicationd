@@ -36,13 +36,17 @@ pub struct TestCase {
     pub kvsd_port: u16,
     pub kvsd_root_dir: PathBuf,
     pub terminal_col_row: (u16, u16),
-    pub idle_timer_interval: Duration,
+    pub config: Config,
     pub device_flow_case: &'static str,
     pub cache_dir: PathBuf,
     pub log_path: PathBuf,
 
     pub login_credential: Option<Credential>,
-    pub interactor_buffer_fn: Option<fn(&TestCase) -> String>,
+    pub interactor_buffer_fn: Option<fn(&TestCase) -> Vec<String>>,
+}
+
+pub fn test_config() -> Config {
+    Config::default().with_idle_timer_interval(Duration::from_millis(1000))
 }
 
 impl Default for TestCase {
@@ -53,7 +57,7 @@ impl Default for TestCase {
             kvsd_port: 0,
             kvsd_root_dir: synd_test::temp_dir().into_path(),
             terminal_col_row: (120, 30),
-            idle_timer_interval: Duration::from_millis(1000),
+            config: test_config(),
             device_flow_case: "case1",
             cache_dir: temp_dir().into_path(),
             log_path: temp_dir().into_path().join("synd.log"),
@@ -106,7 +110,7 @@ impl TestCase {
             mock_port,
             synd_api_port,
             terminal_col_row: (term_col, term_row),
-            idle_timer_interval,
+            config,
             device_flow_case,
             cache_dir,
             login_credential,
@@ -152,10 +156,6 @@ impl TestCase {
             let authenticator = Authenticator::new()
                 .with_device_flows(device_flows)
                 .with_jwt_service(jwt_service);
-            let config = Config {
-                idle_timer_interval,
-                ..Default::default()
-            };
             // to isolate the state for each test
             let cache = Cache::new(cache_dir);
 
@@ -172,7 +172,7 @@ impl TestCase {
                 let buffer = if let Some(f) = interactor_buffer_fn {
                     f(self)
                 } else {
-                    String::new()
+                    Vec::new()
                 };
                 Interactor::new().with_buffer(buffer)
             };

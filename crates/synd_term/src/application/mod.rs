@@ -59,6 +59,9 @@ pub use cache::Cache;
 mod builder;
 pub use builder::ApplicationBuilder;
 
+mod app_config;
+pub use app_config::Config;
+
 pub(crate) mod event;
 
 enum Screen {
@@ -70,22 +73,6 @@ enum Screen {
 pub enum Populate {
     Append,
     Replace,
-}
-
-pub struct Config {
-    pub idle_timer_interval: Duration,
-    pub throbber_timer_interval: Duration,
-    pub entries_limit: usize,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            idle_timer_interval: Duration::from_secs(250),
-            throbber_timer_interval: Duration::from_millis(250),
-            entries_limit: config::feed::DEFAULT_ENTRIES_LIMIT,
-        }
-    }
 }
 
 pub struct Application {
@@ -248,7 +235,7 @@ impl Application {
         self.jobs.futures.push(
             future::ready(Ok(Command::FetchEntries {
                 after: None,
-                first: config::client::INITIAL_ENTRIES_TO_FETCH,
+                first: self.config.entries_per_pagination,
             }))
             .boxed(),
         );
@@ -375,7 +362,7 @@ impl Application {
                         Tab::Feeds if !self.components.subscription.has_subscription() => {
                             next = Some(Command::FetchSubscription {
                                 after: None,
-                                first: config::client::INITIAL_FEEDS_TO_FETCH,
+                                first: self.config.feeds_per_pagination,
                             });
                         }
                         _ => {}
@@ -462,18 +449,14 @@ impl Application {
                     self.fetch_subscription(
                         Populate::Replace,
                         None,
-                        config::client::INITIAL_FEEDS_TO_FETCH,
+                        self.config.feeds_per_pagination,
                     );
                     self.should_render();
                 }
                 Command::CompleteSubscribeFeed { feed, request_seq } => {
                     self.in_flight.remove(request_seq);
                     self.components.subscription.upsert_subscribed_feed(feed);
-                    self.fetch_entries(
-                        Populate::Replace,
-                        None,
-                        config::client::INITIAL_ENTRIES_TO_FETCH,
-                    );
+                    self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
                     self.should_render();
                 }
                 Command::CompleteUnsubscribeFeed { url, request_seq } => {
@@ -524,11 +507,7 @@ impl Application {
                     self.should_render();
                 }
                 Command::ReloadEntries => {
-                    self.fetch_entries(
-                        Populate::Replace,
-                        None,
-                        config::client::INITIAL_ENTRIES_TO_FETCH,
-                    );
+                    self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
                     self.should_render();
                 }
                 Command::MoveEntry(direction) => {

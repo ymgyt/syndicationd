@@ -14,7 +14,7 @@ use synd_auth::device_flow::{
 };
 use tokio::net::TcpListener;
 
-use crate::{certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID, TEST_EMAIL};
+use crate::{certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID, GITHUB_INVALID_TOKEN, TEST_EMAIL};
 
 mod feed;
 
@@ -119,14 +119,18 @@ async fn github_graphql_viewer(
 
     tracing::debug!("Got token: `{token}`");
 
-    let response = serde_json::json!({
-        "data": {
-            "viewer": {
-                "email": TEST_EMAIL,
+    if token == GITHUB_INVALID_TOKEN {
+        Err(StatusCode::UNAUTHORIZED)
+    } else {
+        let response = serde_json::json!({
+            "data": {
+                "viewer": {
+                    "email": TEST_EMAIL,
+                }
             }
-        }
-    });
-    Ok(Json(response))
+        });
+        Ok(Json(response))
+    }
 }
 
 // mock https://www.googleapis.com/oauth2/v1/certs

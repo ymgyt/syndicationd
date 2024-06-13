@@ -2,11 +2,11 @@
 mod test {
     use std::path::{Path, PathBuf};
 
-    use synd_term::{auth::Credential, key, shift};
+    use synd_term::{application::Config, auth::Credential, key, shift};
     use synd_test::temp_dir;
 
     mod helper;
-    use crate::test::helper::{resize_event, TestCase};
+    use crate::test::helper::{resize_event, test_config, TestCase};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn login_with_github() -> anyhow::Result<()> {
@@ -156,10 +156,17 @@ mod test {
             kvsd_port: 47399,
             terminal_col_row: (120, 30),
             interactor_buffer_fn: Some(|case: &TestCase| {
-                format!(
-                    "should rust http://localhost:{mock_port}/feed/twir_atom",
-                    mock_port = case.mock_port
-                )
+                vec![
+                    format!(
+                        "should rust http://localhost:{mock_port}/feed/twir_atom",
+                        mock_port = case.mock_port
+                    ),
+                    // edit requirement from should to must
+                    format!(
+                        "must rust http://localhost:{mock_port}/feed/twir_atom",
+                        mock_port = case.mock_port
+                    ),
+                ]
             }),
             ..Default::default()
         }
@@ -195,6 +202,27 @@ mod test {
         }
 
         {
+            // Open feed. TODO: assert interactor
+            tx.send(key!(enter));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+        }
+
+        {
+            // Edit feed
+            tx.send(key!('e'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "after edit requirement from should to must",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_after_edit", application.buffer());
+            });
+        }
+
+        {
             // Unsubscribe popup
             tx.send(key!('d'));
             application
@@ -223,6 +251,7 @@ mod test {
         Ok(())
     }
     #[tokio::test(flavor = "multi_thread")]
+    #[allow(clippy::too_many_lines)]
     async fn filter_entries() -> anyhow::Result<()> {
         helper::init_tracing();
 
@@ -234,6 +263,12 @@ mod test {
             kvsd_root_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("tests/fixtures/kvsd/20240609"),
             terminal_col_row: (120, 30),
+            config: Config {
+                // To test pagination
+                entries_per_pagination: 1,
+                feeds_per_pagination: 1,
+                ..test_config()
+            },
             ..Default::default()
         }
         .already_logined();
@@ -264,12 +299,22 @@ mod test {
             },{
                 insta::assert_debug_snapshot!("filter_entries_initial_fetch_feed", application.buffer());
             });
+            // Move back
+            tx.send(key!(tab));
+        }
+
+        {
+            // Open entry. TODO: assert interactor
+            tx.send(key!(enter));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
         }
 
         // Filter by requirement
         {
-            // Move back then, change requirement to MUST
-            tx.send_multi([key!(tab), key!('h'), key!('h')]);
+            // Change requirement to MUST
+            tx.send_multi([key!('h'), key!('h')]);
             application
                 .wait_until_jobs_completed(&mut event_stream)
                 .await;
@@ -363,6 +408,38 @@ mod test {
                 .wait_until_jobs_completed(&mut event_stream)
                 .await;
         }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unauthorized() -> anyhow::Result<()> {
+        let test_case = TestCase {
+            mock_port: 6060,
+            synd_api_port: 6061,
+            kvsd_port: 6062,
+            terminal_col_row: (120, 30),
+            ..Default::default()
+        }
+        .with_credential(Credential::Github {
+            // Use invalid token to mock unauthorized
+            access_token: synd_test::GITHUB_INVALID_TOKEN.to_owned(),
+        });
+
+        let mut application = test_case.init_app().await?;
+        let (_tx, mut event_stream) = helper::event_stream();
+
+        // Assert unauthorized error message
+        {
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "unauthorized error message(port is ignorable)",
+            },{
+                insta::assert_debug_snapshot!("unauthorized_error_message", application.buffer());
+            });
+        }
+
         Ok(())
     }
 

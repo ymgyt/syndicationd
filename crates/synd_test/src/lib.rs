@@ -6,6 +6,7 @@ pub mod mock;
 
 pub const TEST_EMAIL: &str = "ymgyt@ymgyt.io";
 pub const TEST_USER_ID: &str = "899cf3fa5afc0aa1";
+pub const GITHUB_INVALID_TOKEN: &str = "github_invalid_token";
 
 pub fn certificate() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
