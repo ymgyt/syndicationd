@@ -23,7 +23,7 @@ impl Cache {
         std::fs::create_dir_all(self.dir.as_path()).map_err(|err| {
             CredentialError::PersistCredential {
                 io_err: err,
-                path: path.clone(),
+                path: self.dir.clone(),
             }
         })?;
 
@@ -64,12 +64,6 @@ impl Cache {
     }
 }
 
-// impl Default for Cache {
-//     fn default() -> Self {
-//         Self::new(config::cache::dir())
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
 
@@ -88,6 +82,16 @@ mod tests {
 
         let loaded = cache.load_credential().unwrap();
         assert_eq!(loaded, Unverified::from(cred),);
+    }
+
+    #[test]
+    fn filesystem_error() {
+        let cache = Cache::new("/dev/null");
+        assert!(cache
+            .persist_credential(Credential::Github {
+                access_token: "dummy".into(),
+            })
+            .is_err());
     }
 
     fn temp_dir() -> PathBuf {

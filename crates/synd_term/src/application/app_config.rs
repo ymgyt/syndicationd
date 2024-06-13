@@ -31,27 +31,4 @@ impl Config {
             ..self
         }
     }
-
-    #[must_use]
-    pub fn with_throbber_timer_interval(self, throbber_timer_interval: Duration) -> Self {
-        Self {
-            throbber_timer_interval,
-            ..self
-        }
-    }
-    #[must_use]
-    pub fn with_entries_per_pagination(self, entries_per_pagination: u16) -> Self {
-        Self {
-            entries_per_pagination: i64::from(entries_per_pagination),
-            ..self
-        }
-    }
-
-    #[must_use]
-    pub fn with_feeds_per_pagination(self, feeds_per_pagination: u16) -> Self {
-        Self {
-            feeds_per_pagination: i64::from(feeds_per_pagination),
-            ..self
-        }
-    }
 }
