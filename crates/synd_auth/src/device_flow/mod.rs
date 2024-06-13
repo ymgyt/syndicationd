@@ -82,6 +82,7 @@ impl<P: Provider> DeviceFlow<P> {
 
                     let interval = interval.unwrap_or(5);
 
+                    #[allow(clippy::cast_sign_loss)]
                     tokio::time::sleep(Duration::from_secs(interval as u64)).await;
                 } else {
                     anyhow::bail!(
