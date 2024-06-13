@@ -27,7 +27,6 @@ pub fn metrics_event_filter<S: Subscriber>() -> impl Filter<S> {
 pub fn layer<S>(
     endpoint: impl Into<String>,
     resource: Resource,
-
     interval: Duration,
 ) -> impl Layer<S>
 where
