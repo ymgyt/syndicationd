@@ -22,3 +22,19 @@ impl From<KvsdError> for RepositoryError {
         RepositoryError::Internal(value.into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error() {
+        assert!(!RepositoryError::internal(anyhow::anyhow!("error"))
+            .to_string()
+            .is_empty());
+
+        assert!(!RepositoryError::from(KvsdError::Unauthenticated)
+            .to_string()
+            .is_empty());
+    }
+}
