@@ -325,3 +325,7 @@ impl UnboundedSenderWrapper {
         });
     }
 }
+
+pub fn resize_event(columns: u16, rows: u16) -> crossterm::event::Event {
+    crossterm::event::Event::Resize(columns, rows)
+}

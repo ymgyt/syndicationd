@@ -6,7 +6,7 @@ mod test {
     use synd_test::temp_dir;
 
     mod helper;
-    use crate::test::helper::TestCase;
+    use crate::test::helper::{resize_event, TestCase};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn login_with_github() -> anyhow::Result<()> {
@@ -332,6 +332,36 @@ mod test {
                 key!(backspace),
                 key!(esc),
             ]);
+        }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn resize_terminal_to_zero() -> anyhow::Result<()> {
+        let (mut col, mut row) = (120, 30);
+        let test_case = TestCase {
+            mock_port: 6050,
+            synd_api_port: 6051,
+            kvsd_port: 6052,
+            terminal_col_row: (col, row),
+            ..Default::default()
+        }
+        .already_logined();
+
+        let mut application = test_case.init_app().await?;
+        let (tx, mut event_stream) = helper::event_stream();
+
+        loop {
+            col /= 2;
+            row /= 2;
+            if col == 0 && row == 0 {
+                break;
+            }
+            // Assert that app do not panic
+            tx.send(resize_event(col, row));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
         }
         Ok(())
     }
