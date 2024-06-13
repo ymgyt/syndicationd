@@ -1,7 +1,8 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::atomic::AtomicUsize, time::Duration};
 
 use axum::{
     http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Form, Json, Router,
 };
@@ -9,8 +10,8 @@ use headers::{authorization::Bearer, Authorization, Header};
 use serde::Serialize;
 use synd_auth::device_flow::{
     provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
-    DeviceAccessTokenRequest, DeviceAccessTokenResponse, DeviceAuthorizationRequest,
-    DeviceAuthorizationResponse,
+    DeviceAccessTokenErrorResponse, DeviceAccessTokenRequest, DeviceAccessTokenResponse,
+    DeviceAuthorizationRequest, DeviceAuthorizationResponse,
 };
 use tokio::net::TcpListener;
 
@@ -33,7 +34,7 @@ async fn github_device_authorization(
         verification_url: None,
         verification_uri_complete: None,
         expires_in: 3600,
-        interval: None,
+        interval: Some(1), // for test speed
     };
 
     Ok(Json(res))
@@ -54,7 +55,7 @@ async fn google_device_authorization(
         verification_url: None,
         verification_uri_complete: None,
         expires_in: 3600,
-        interval: None,
+        interval: Some(1), // for test speed
     };
 
     Ok(Json(res))
@@ -62,24 +63,48 @@ async fn google_device_authorization(
 
 async fn github_device_access_token(
     Form(DeviceAccessTokenRequest { device_code, .. }): Form<DeviceAccessTokenRequest<'static>>,
-) -> Result<Json<DeviceAccessTokenResponse>, StatusCode> {
+) -> Response {
+    // Check error handling
+    static TRY: AtomicUsize = AtomicUsize::new(0);
+    let count = TRY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
     tracing::debug!("Handle device access token request");
 
     if device_code != "DC001" {
-        return Err(StatusCode::BAD_REQUEST);
+        return StatusCode::BAD_REQUEST.into_response();
     }
-    // mock user input duration
-    tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let res = DeviceAccessTokenResponse {
-        access_token: "gh_dummy_access_token".into(),
-        token_type: String::new(),
-        expires_in: None,
-        refresh_token: None,
-        id_token: None,
-    };
+    match count {
+        0 => (
+            StatusCode::BAD_REQUEST,
+            Json(DeviceAccessTokenErrorResponse {
+                error: synd_auth::device_flow::DeviceAccessTokenErrorCode::AuthorizationPending,
+                error_description: None,
+                error_uri: None,
+            }),
+        )
+            .into_response(),
+        1 => (
+            StatusCode::PRECONDITION_REQUIRED,
+            Json(DeviceAccessTokenErrorResponse {
+                error: synd_auth::device_flow::DeviceAccessTokenErrorCode::SlowDown,
+                error_description: None,
+                error_uri: None,
+            }),
+        )
+            .into_response(),
+        _ => {
+            let res = DeviceAccessTokenResponse {
+                access_token: "gh_dummy_access_token".into(),
+                token_type: String::new(),
+                expires_in: None,
+                refresh_token: None,
+                id_token: None,
+            };
 
-    Ok(Json(res))
+            Json(res).into_response()
+        }
+    }
 }
 
 async fn google_device_access_token(

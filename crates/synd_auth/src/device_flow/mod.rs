@@ -204,7 +204,7 @@ pub struct DeviceAccessTokenResponse {
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.2>
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DeviceAccessTokenErrorResponse {
     pub error: DeviceAccessTokenErrorCode,
     #[allow(unused)]
@@ -215,7 +215,7 @@ pub struct DeviceAccessTokenErrorResponse {
     pub error_uri: Option<Uri>,
 }
 
-#[derive(PartialEq, Eq, Debug, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceAccessTokenErrorCode {
     AuthorizationPending,
