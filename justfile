@@ -24,7 +24,7 @@ default:
 
 # Run check
 check: typo
-    nix flake check --all-systems --accept-flake-config
+    nix flake check --all-systems --accept-flake-config --print-build-logs
 
 # Run cargo check
 c:
