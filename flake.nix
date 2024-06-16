@@ -139,7 +139,7 @@
 
           fmt = craneLib.cargoFmt commonArgs;
 
-          typo = import ./nix/typo.nix { inherit pkgs; };
+          typo = pkgs.callPackage ./nix/typo.nix { };
         };
 
         ci_packages = with pkgs; [
