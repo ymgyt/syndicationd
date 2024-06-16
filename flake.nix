@@ -57,8 +57,7 @@
           inherit src;
           strictDeps = true;
 
-          # pname and version required, so set dummpy values
-          pname = "syndicationd-workspace";
+          pname = "syndicationd";
           version = "0.1";
 
           buildInputs = [ ]
@@ -113,8 +112,6 @@
         };
 
         checks = {
-          inherit syndTerm syndApi;
-
           clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
             cargoExtraArgs = "--features integration";
@@ -140,12 +137,13 @@
           };
 
           fmt = craneLib.cargoFmt commonArgs;
+
+          typo = import ./nix/typo.nix { inherit pkgs; };
         };
 
         ci_packages = with pkgs; [
           just
           nushell # just set nu as shell
-          typos
           cargo-bundle-licenses
           docker
         ];
@@ -153,6 +151,7 @@
         # Inherits from checks cargo-nextest, cargo-audit
         dev_packages = with pkgs;
           [
+            typos
             graphql-client
             opentelemetry-collector-contrib
             git-cliff

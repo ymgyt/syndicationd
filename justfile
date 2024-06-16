@@ -23,16 +23,21 @@ default:
     just --list
 
 # Run check
-check: typo
-    nix flake check --all-systems --accept-flake-config --print-build-logs
+check:
+    nix flake check --all-systems --accept-flake-config --print-build-logs --verbose
 
 # Run cargo check
 c:
     cargo check --all-features --tests
 
 # Run spell checker
+[linux]
 typo:
-    typos
+    nix build .#checks.x86_64-linux.typo --print-build-logs
+    
+[macos]
+typo:
+    nix build .#checks.aarch64-darwin.typo --print-build-logs
 
 # Run audit
 audit:
