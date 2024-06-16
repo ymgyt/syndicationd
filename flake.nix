@@ -56,10 +56,6 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
-
-          pname = "syndicationd";
-          version = "0.1";
-
           buildInputs = [ ]
             ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
         };

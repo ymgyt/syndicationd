@@ -70,6 +70,11 @@ missing_panics_doc      = "allow"
 module_name_repetitions = "allow"
 must_use_candidate      = "allow"
 
+[workspace.metadata.crane]
+# Required in crane buildDepsOnly derivation
+name    = "synd"
+version = "1"
+
 [workspace.metadata.release]
 allow-branch = ["main"]
 pre-release-commit-message = "chore: release"
