@@ -10,7 +10,7 @@
     };
 
     crane = {
-      url = "github:ipetkov/crane/v0.17.1";
+      url = "github:ipetkov/crane/v0.17.3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -56,8 +56,12 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
+
+          # Cargo.toml workspace.metadata.crane.version does not work
+          version = "1";
           buildInputs = [ ]
             ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
+          CARGO_PROFILE = "dev";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -66,6 +70,7 @@
           inherit cargoArtifacts;
           # NB: we disable tests since we will run them all via cargo-nextest
           doCheck = false;
+          CARGO_PROFILE = "release";
         };
 
         dockerImageLabels = {

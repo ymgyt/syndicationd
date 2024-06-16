@@ -72,8 +72,7 @@ must_use_candidate      = "allow"
 
 [workspace.metadata.crane]
 # Required in crane buildDepsOnly derivation
-name    = "synd"
-version = "1"
+name = "synd"
 
 [workspace.metadata.release]
 allow-branch = ["main"]
