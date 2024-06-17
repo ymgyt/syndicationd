@@ -83,7 +83,7 @@ in {
         ignoreAdvisories = lib.concatStrings (lib.strings.intersperse " "
           (map (x: "--ignore ${x}") (builtins.fromTOML
             (builtins.readFile ../.cargo/audit.toml)).advisories.ignore));
-      in "--ignore yanked ${ignoreAdvisories}";
+      in "${ignoreAdvisories}";
     };
 
     fmt = craneLib.cargoFmt commonArgs;

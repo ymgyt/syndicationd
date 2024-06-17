@@ -1,0 +1,18 @@
+name: Audit
+on:
+  schedule:
+    # https://crontab.guru/
+    - cron: '0 1 * * 1-5'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: "Update advisory db"
+        run: nix develop .#ci --accept-flake-config --command just update-advisory-db
+      - name: "Run cargo-audit"
+        run: nix develop .#ci --accept-flake-config --command just audit

@@ -13,6 +13,9 @@ api_dir := "crates/synd_api"
 
 demo_tape := "assets/demo.tape"
 
+arch := arch()
+os := if os() == "macos" { "darwin" } else { "linux" }
+
 alias format := fmt
 alias unused := machete
 alias licenses := license
@@ -31,17 +34,16 @@ c:
     cargo check --all-features --tests
 
 # Run spell checker
-[linux]
 typo:
-    nix build .#checks.x86_64-linux.typo --print-build-logs
-    
-[macos]
-typo:
-    nix build .#checks.aarch64-darwin.typo --print-build-logs
+    nix build .#checks.{{arch}}-{{os}}.typo --print-build-logs
 
 # Run audit
 audit:
-    cargo audit
+    nix build .#checks.{{arch}}-{{os}}.audit --print-build-logs 
+    
+# Update advisory db
+update-advisory-db:
+    nix flake lock --update-input advisory-db
 
 # Format files
 fmt: fmt-toml

@@ -7,3 +7,9 @@ ignore = [
   # No fixed upgrade available
   "RUSTSEC-2021-0041",
 ]
+
+[yanked]
+# in derivations we could not connect net
+# crate-audit> error: couldn't check if the package is yanked: not found: No such crate in crates.io index: foo
+enabled      = false
+update_index = false
