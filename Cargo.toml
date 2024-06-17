@@ -38,7 +38,7 @@ moka               = { version = "0.12.7", features = ["future"] }
 parse_duration     = { version = "2.1.1" }
 proptest           = { version = "1.4.0" }
 rand               = { version = "0.8.5" }
-reqwest            = { version = "0.11.24", default-features = false, features = ["rustls-tls", "json"] }
+reqwest            = { version = "0.11.27", default-features = false, features = ["rustls-tls", "json"] }
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.117" }
 tempfile           = { version = "3" }
