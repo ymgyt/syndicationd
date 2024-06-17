@@ -203,6 +203,7 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
         .route("/github/graphql", post(github_graphql_viewer))
         .route("/google/oauth2/v1/certs", get(google_jwt_pem))
         .route("/google/oauth2/token", post(google_oauth2_token))
+        .route("/feed/error/:error", get(feed::feed_error))
         .route("/feed/:feed", get(feed::feed));
 
     axum::serve(listener, router).await?;

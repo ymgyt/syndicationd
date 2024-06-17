@@ -824,13 +824,7 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "RSS1"
-            },
-            {
-              "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
-              "name": "RSS2"
+              "name": "JSON"
             },
             {
               "deprecationReason": null,
@@ -842,7 +836,13 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "JSON"
+              "name": "RSS1"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "RSS2"
             }
           ],
           "fields": null,
@@ -1344,6 +1344,12 @@
               "description": "Given url is not valid feed url",
               "isDeprecated": false,
               "name": "INVALID_FEED_URL"
+            },
+            {
+              "deprecationReason": null,
+              "description": "The feed server returned a status other than 200",
+              "isDeprecated": false,
+              "name": "FEED_UNAVAILABLE"
             },
             {
               "deprecationReason": null,

@@ -1,4 +1,8 @@
-use axum::{extract::Path, response::IntoResponse};
+use axum::{
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -14,4 +18,17 @@ pub(super) async fn feed(Path(FeedParams { feed }): Path<FeedParams>) -> impl In
     };
 
     content.into_response()
+}
+
+#[derive(Deserialize)]
+pub(super) struct FeedErrorParams {
+    error: String,
+}
+
+pub(super) async fn feed_error(Path(FeedErrorParams { error }): Path<FeedErrorParams>) -> Response {
+    match error.as_str() {
+        "internal" => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        "malformed" => "malformed xml".into_response(),
+        _ => unreachable!("undefined feed fixture posted"),
+    }
 }

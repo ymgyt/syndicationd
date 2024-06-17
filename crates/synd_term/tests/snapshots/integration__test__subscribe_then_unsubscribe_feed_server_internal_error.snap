@@ -1,0 +1,56 @@
+---
+source: crates/synd_term/tests/integration.rs
+description: handle internal error of the feed server
+expression: application.buffer()
+---
+Buffer {
+    area: Rect { x: 0, y: 0, width: 120, height: 30 },
+    content: [
+        "  Syndicationd                                                                                     󱉯 Entries    󰑫 Feeds ",
+        "  󰈶 Filter    MAY                                                                                                       ",
+        "   Search                                                                                                              ",
+        "                                                                                                                        ",
+        "  Updated     Feed -/-                  URL                       Description                                       Req ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "                                                                                                                        ",
+        "http://localhost:6020/feed/error/internal feed unavailable: HTTP status server error (500 Internal Server Error) for url",
+    ],
+    styles: [
+        x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 2, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD,
+        x: 14, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 112, y: 0, fg: Rgb(255, 160, 122), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD,
+        x: 119, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 2, y: 1, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: DIM,
+        x: 10, y: 1, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 14, y: 1, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: DIM,
+        x: 17, y: 1, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 2, y: 2, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: DIM,
+        x: 10, y: 2, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 0, y: 4, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD | UNDERLINED,
+        x: 0, y: 5, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 0, y: 29, fg: Rgb(224, 107, 117), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+    ]
+}

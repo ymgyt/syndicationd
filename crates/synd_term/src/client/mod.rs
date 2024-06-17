@@ -29,6 +29,8 @@ pub mod query;
 pub enum SubscribeFeedError {
     #[error("invalid feed url: `{feed_url}` ({message})`")]
     InvalidFeedUrl { feed_url: FeedUrl, message: String },
+    #[error("{feed_url} {message}")]
+    FeedUnavailable { feed_url: FeedUrl, message: String },
 }
 
 #[derive(Error, Debug)]
@@ -117,6 +119,12 @@ impl Client {
                     ResponseCode::OK => unreachable!(),
                     ResponseCode::INVALID_FEED_URL => Err(SyndApiError::SubscribeFeed(
                         SubscribeFeedError::InvalidFeedUrl {
+                            feed_url: url,
+                            message: err.message,
+                        },
+                    )),
+                    ResponseCode::FEED_UNAVAILABLE => Err(SyndApiError::SubscribeFeed(
+                        SubscribeFeedError::FeedUnavailable {
                             feed_url: url,
                             message: err.message,
                         },

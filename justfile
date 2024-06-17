@@ -111,7 +111,7 @@ gen-gql:
 
 # Run kvsd
 kvsd:
-    KVSD_LOG=info nix run ../kvsd -- server \
+    KVSD_LOG=info nix run github:ymgyt/kvsd/2dbed99870c87304e04c7c0e63acac249f30df0 -- server \
         --disable-tls --config .dev/kvsd_config.yaml \
         --username {{ kvsd_user }} \
         --kvsd-dir .kvsd

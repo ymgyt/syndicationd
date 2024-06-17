@@ -147,6 +147,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[allow(clippy::too_many_lines)]
     async fn subscribe_then_unsubscribe() -> anyhow::Result<()> {
         helper::init_tracing();
 
@@ -164,6 +165,15 @@ mod test {
                     // edit requirement from should to must
                     format!(
                         "must rust http://localhost:{mock_port}/feed/twir_atom",
+                        mock_port = case.mock_port
+                    ),
+                    // internal error
+                    format!(
+                        "may rust http://localhost:{mock_port}/feed/error/internal",
+                        mock_port = case.mock_port
+                    ),
+                    format!(
+                        "may rust http://localhost:{mock_port}/feed/error/malformed",
                         mock_port = case.mock_port
                     ),
                 ]
@@ -245,6 +255,32 @@ mod test {
                 description => "after unsubscribe",
             },{
                 insta::assert_debug_snapshot!("subscribe_then_unsubscribe_unsubscribed", application.buffer());
+            });
+        }
+
+        {
+            // Handle the case that the server of the feed user tried to subscribe to is returning a internal error.
+            tx.send(key!('a'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "handle internal error of the feed server",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_feed_server_internal_error", application.buffer());
+            });
+        }
+
+        {
+            // Handle the case that the server of the feed user tried to subscribe to is returning a internal error.
+            tx.send(key!('a'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "handle malformed xml error ",
+            },{
+                insta::assert_debug_snapshot!("subscribe_then_unsubscribe_malformed_xml_error", application.buffer());
             });
         }
 

@@ -21,20 +21,20 @@ pub mod subscribe_feed {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum FeedType {
         ATOM,
+        JSON,
+        RSS0,
         RSS1,
         RSS2,
-        RSS0,
-        JSON,
         Other(String),
     }
     impl ::serde::Serialize for FeedType {
         fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
             ser.serialize_str(match *self {
                 FeedType::ATOM => "ATOM",
+                FeedType::JSON => "JSON",
+                FeedType::RSS0 => "RSS0",
                 FeedType::RSS1 => "RSS1",
                 FeedType::RSS2 => "RSS2",
-                FeedType::RSS0 => "RSS0",
-                FeedType::JSON => "JSON",
                 FeedType::Other(ref s) => &s,
             })
         }
@@ -44,10 +44,10 @@ pub mod subscribe_feed {
             let s: String = ::serde::Deserialize::deserialize(deserializer)?;
             match s.as_str() {
                 "ATOM" => Ok(FeedType::ATOM),
+                "JSON" => Ok(FeedType::JSON),
+                "RSS0" => Ok(FeedType::RSS0),
                 "RSS1" => Ok(FeedType::RSS1),
                 "RSS2" => Ok(FeedType::RSS2),
-                "RSS0" => Ok(FeedType::RSS0),
-                "JSON" => Ok(FeedType::JSON),
                 _ => Ok(FeedType::Other(s)),
             }
         }
@@ -85,6 +85,7 @@ pub mod subscribe_feed {
         OK,
         UNAUTHORIZED,
         INVALID_FEED_URL,
+        FEED_UNAVAILABLE,
         INTERNAL_ERROR,
         Other(String),
     }
@@ -94,6 +95,7 @@ pub mod subscribe_feed {
                 ResponseCode::OK => "OK",
                 ResponseCode::UNAUTHORIZED => "UNAUTHORIZED",
                 ResponseCode::INVALID_FEED_URL => "INVALID_FEED_URL",
+                ResponseCode::FEED_UNAVAILABLE => "FEED_UNAVAILABLE",
                 ResponseCode::INTERNAL_ERROR => "INTERNAL_ERROR",
                 ResponseCode::Other(ref s) => &s,
             })
@@ -106,6 +108,7 @@ pub mod subscribe_feed {
                 "OK" => Ok(ResponseCode::OK),
                 "UNAUTHORIZED" => Ok(ResponseCode::UNAUTHORIZED),
                 "INVALID_FEED_URL" => Ok(ResponseCode::INVALID_FEED_URL),
+                "FEED_UNAVAILABLE" => Ok(ResponseCode::FEED_UNAVAILABLE),
                 "INTERNAL_ERROR" => Ok(ResponseCode::INTERNAL_ERROR),
                 _ => Ok(ResponseCode::Other(s)),
             }
@@ -234,6 +237,7 @@ pub mod unsubscribe_feed {
         OK,
         UNAUTHORIZED,
         INVALID_FEED_URL,
+        FEED_UNAVAILABLE,
         INTERNAL_ERROR,
         Other(String),
     }
@@ -243,6 +247,7 @@ pub mod unsubscribe_feed {
                 ResponseCode::OK => "OK",
                 ResponseCode::UNAUTHORIZED => "UNAUTHORIZED",
                 ResponseCode::INVALID_FEED_URL => "INVALID_FEED_URL",
+                ResponseCode::FEED_UNAVAILABLE => "FEED_UNAVAILABLE",
                 ResponseCode::INTERNAL_ERROR => "INTERNAL_ERROR",
                 ResponseCode::Other(ref s) => &s,
             })
@@ -255,6 +260,7 @@ pub mod unsubscribe_feed {
                 "OK" => Ok(ResponseCode::OK),
                 "UNAUTHORIZED" => Ok(ResponseCode::UNAUTHORIZED),
                 "INVALID_FEED_URL" => Ok(ResponseCode::INVALID_FEED_URL),
+                "FEED_UNAVAILABLE" => Ok(ResponseCode::FEED_UNAVAILABLE),
                 "INTERNAL_ERROR" => Ok(ResponseCode::INTERNAL_ERROR),
                 _ => Ok(ResponseCode::Other(s)),
             }
