@@ -37,8 +37,7 @@
         src = pkgs.lib.cleanSourceWith {
           src = ./.; # The original, unfiltered source
           filter = path: type:
-            # Load self signed certs to test
-            (pkgs.lib.hasSuffix ".pem" path)
+            (pkgs.lib.hasSuffix ".pem" path) # Load self signed certs to test
             || (pkgs.lib.hasSuffix ".snap" path) # insta snapshots
             || (pkgs.lib.hasSuffix ".kvsd" path) # kvsd fixtures
             || (pkgs.lib.hasSuffix ".xml" path) # rss fixtures
@@ -47,99 +46,8 @@
             (craneLib.filterCargoSources path type);
         };
 
-        darwinDeps = [
-          pkgs.libiconv
-          pkgs.darwin.apple_sdk.frameworks.Security
-          pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-        ];
-
-        commonArgs = {
-          inherit src;
-          strictDeps = true;
-
-          # Cargo.toml workspace.metadata.crane.version does not work
-          version = "1";
-          buildInputs = [ ]
-            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
-          CARGO_PROFILE = "dev";
-        };
-
-        cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-        individualCrateArgs = commonArgs // {
-          inherit cargoArtifacts;
-          # NB: we disable tests since we will run them all via cargo-nextest
-          doCheck = false;
-          CARGO_PROFILE = "release";
-        };
-
-        dockerImageLabels = {
-          "org.opencontainers.image.source" =
-            "https://github.com/ymgyt/syndicationd";
-        };
-
-        syndTerm = craneLib.buildPackage (individualCrateArgs // (let
-          crate = craneLib.crateNameFromCargoToml {
-            cargoToml = ./crates/synd_term/Cargo.toml;
-          };
-        in {
-          inherit (crate) pname version;
-          cargoExtraArgs = "--package ${crate.pname}";
-        }));
-        syndTermImage = pkgs.dockerTools.buildImage {
-          name = "synd-term";
-          tag = "latest";
-          config = {
-            Cmd = [ "${syndTerm}/bin/synd" ];
-            Labels = dockerImageLabels;
-          };
-        };
-
-        syndApi = craneLib.buildPackage (individualCrateArgs // (let
-          crate = craneLib.crateNameFromCargoToml {
-            cargoToml = ./crates/synd_api/Cargo.toml;
-          };
-        in {
-          inherit (crate) pname version;
-          cargoExtraArgs = "--package ${crate.pname}";
-        }));
-        syndApiImage = pkgs.dockerTools.buildImage {
-          name = "synd-api";
-          tag = "latest";
-          config = {
-            Cmd = [ "${syndApi}/bin/synd-api" ];
-            Labels = dockerImageLabels;
-          };
-        };
-
-        checks = {
-          clippy = craneLib.cargoClippy (commonArgs // {
-            inherit cargoArtifacts;
-            cargoExtraArgs = "--features integration";
-            cargoClippyExtraArgs = "--workspace -- --deny warnings";
-          });
-
-          nextest = craneLib.cargoNextest (commonArgs // {
-            inherit cargoArtifacts;
-            cargoNextestExtraArgs = "--features integration";
-            CARGO_PROFILE = "";
-            RUST_LOG = "synd,integration=debug";
-            RUST_BACKTRACE = "1";
-          });
-
-          audit = craneLib.cargoAudit {
-            inherit src advisory-db;
-            cargoAuditExtraArgs = let
-              ignoreAdvisories = pkgs.lib.concatStrings
-                (pkgs.lib.strings.intersperse " " (map (x: "--ignore ${x}")
-                  (builtins.fromTOML (builtins.readFile
-                    ./.cargo/audit.toml)).advisories.ignore));
-            in "--ignore yanked ${ignoreAdvisories}";
-          };
-
-          fmt = craneLib.cargoFmt commonArgs;
-
-          typo = pkgs.callPackage ./nix/typo.nix { };
+        synd = pkgs.callPackage ./nix/crane.nix {
+          inherit src craneLib advisory-db;
         };
 
         ci_packages = with pkgs; [
@@ -159,37 +67,28 @@
             cargo-release
             cargo-machete
             cargo-insta
-            # cargo-llvm-cov-0.6.9 is marked as broken,
-            # cargo-llvm-cov
-            # We need latest cargo-dist which is not available in nixpkgs-unstable now
-            # cargo-dist
             oranda
           ] ++ ci_packages
           ## For cargo-release build
-          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin darwinDeps;
+          ++ pkgs.lib.optionals pkgs.stdenv.isDarwin synd.darwinDeps;
 
       in {
-        inherit checks;
+        checks = {
+          inherit (synd.checks) clippy nextest audit fmt;
+          typo = pkgs.callPackage ./nix/typo.nix { };
+        };
 
         packages = {
           default = self.packages."${system}".synd-term;
-          synd-term = syndTerm;
-          synd-api = syndApi;
-        } // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          coverage = craneLib.cargoLlvmCov (commonArgs // {
-            inherit cargoArtifacts;
-            # not supported yet in crane
-            # cargoLlvmCovCommand = "nextest";
-            cargoLlvmCovExtraArgs =
-              "--codecov --all-features --output-path $out  --ignore-filename-regex '(client/generated/.*.rs)'";
-          });
+          inherit (synd.packages) synd-term synd-api;
 
-          synd-term-image = syndTermImage;
-          synd-api-image = syndApiImage;
+        } // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          inherit (synd.packages) coverage synd-term-image synd-api-image;
+
         };
 
         apps.default = flake-utils.lib.mkApp {
-          drv = syndTerm;
+          drv = synd.packages.synd-term;
           name = "synd";
         };
 

@@ -23,8 +23,8 @@ default:
     just --list
 
 # Run check
-check:
-    nix flake check --all-systems --accept-flake-config --print-build-logs --verbose
+check *flags:
+    nix flake check --all-systems --accept-flake-config --print-build-logs --verbose {{ flags }}
 
 # Run cargo check
 c:
