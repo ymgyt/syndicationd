@@ -1,0 +1,7 @@
+---
+source: crates/synd_api/src/gql/mod.rs
+expression: "usecase::Error::<String>::Unauthorized(Unauthorized).extend()"
+---
+message: unauthorized error
+extensions:
+  code: UNAUTHORIZED

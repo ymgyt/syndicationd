@@ -73,15 +73,6 @@ impl SubscribeFeedError {
     }
 }
 
-impl From<ResponseStatus> for SubscribeFeedResponse {
-    fn from(status: ResponseStatus) -> Self {
-        SubscribeFeedResponse::Error(SubscribeFeedError {
-            status,
-            message: "Unauthorized".into(),
-        })
-    }
-}
-
 impl From<usecase::Output<usecase::SubscribeFeedOutput>> for SubscribeFeedResponse {
     fn from(output: usecase::Output<usecase::SubscribeFeedOutput>) -> Self {
         SubscribeFeedResponse::Success(SubscribeFeedSuccess {
@@ -105,11 +96,29 @@ impl From<UsecaseSubscribeFeedError> for SubscribeFeedError {
                     status: ResponseStatus::invalid_feed_url(),
                     message: format!("{kind}"),
                 },
+                FetchFeedError::Fetch(request_err) => Self {
+                    status: ResponseStatus::feed_unavailable(),
+                    message: format!("feed unavailable: {request_err}"),
+                },
                 fetch_err => Self {
                     status: ResponseStatus::internal(),
                     message: format!("{fetch_err}"),
                 },
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal_error() {
+        let r = SubscribeFeedError::from(UsecaseSubscribeFeedError::FetchFeed(
+            FetchFeedError::Other(anyhow::anyhow!("error")),
+        ));
+
+        assert_eq!(r.status, ResponseStatus::internal());
     }
 }

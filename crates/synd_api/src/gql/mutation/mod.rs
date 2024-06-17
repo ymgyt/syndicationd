@@ -8,7 +8,7 @@ use crate::{
 pub mod subscribe_feed;
 pub mod unsubscribe_feed;
 
-#[derive(Enum, PartialEq, Eq, Clone, Copy)]
+#[derive(Enum, PartialEq, Eq, Clone, Copy, Debug)]
 pub(crate) enum ResponseCode {
     /// Operation success
     Ok,
@@ -16,11 +16,13 @@ pub(crate) enum ResponseCode {
     Unauthorized,
     /// Given url is not valid feed url
     InvalidFeedUrl,
+    /// The feed server returned a status other than 200
+    FeedUnavailable,
     /// Something went wrong
     InternalError,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject, Clone, PartialEq, Eq, Debug)]
 pub(crate) struct ResponseStatus {
     code: ResponseCode,
 }
@@ -32,16 +34,15 @@ impl ResponseStatus {
         }
     }
 
-    #[allow(unused)]
-    fn unauthorized() -> Self {
-        ResponseStatus {
-            code: ResponseCode::Unauthorized,
-        }
-    }
-
     fn invalid_feed_url() -> Self {
         Self {
             code: ResponseCode::InvalidFeedUrl,
+        }
+    }
+
+    fn feed_unavailable() -> Self {
+        Self {
+            code: ResponseCode::FeedUnavailable,
         }
     }
 

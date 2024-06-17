@@ -1,0 +1,7 @@
+---
+source: crates/synd_api/src/gql/mod.rs
+expression: "usecase::FetchSubscribedFeedsError {}.extend()"
+---
+message: fetch subscribed feeds error
+extensions:
+  code: INTERNAL_ERROR

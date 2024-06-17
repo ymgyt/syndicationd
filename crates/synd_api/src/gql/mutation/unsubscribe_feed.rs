@@ -50,15 +50,6 @@ impl UnsubscribeFeedError {
     }
 }
 
-impl From<ResponseStatus> for UnsubscribeFeedResponse {
-    fn from(status: ResponseStatus) -> Self {
-        UnsubscribeFeedResponse::Error(UnsubscribeFeedError {
-            status,
-            message: "Unauthorized".into(),
-        })
-    }
-}
-
 impl From<anyhow::Error> for UnsubscribeFeedResponse {
     fn from(err: anyhow::Error) -> Self {
         UnsubscribeFeedResponse::Error(UnsubscribeFeedError {
@@ -73,5 +64,18 @@ impl From<usecase::Output<usecase::UnsubscribeFeedOutput>> for UnsubscribeFeedRe
         UnsubscribeFeedResponse::Success(UnsubscribeFeedSuccess {
             status: ResponseStatus::ok(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal_error() {
+        let r = UnsubscribeFeedResponse::from(anyhow::anyhow!("error"));
+        assert!(
+            matches!(r, UnsubscribeFeedResponse::Error(UnsubscribeFeedError { status, ..}) if status == ResponseStatus::internal())
+        );
     }
 }

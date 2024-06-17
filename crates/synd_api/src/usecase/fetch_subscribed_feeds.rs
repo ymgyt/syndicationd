@@ -29,7 +29,8 @@ pub struct FetchSubscribedFeedsOutput {
 }
 
 #[derive(Error, Debug)]
-pub enum FetchSubscribedFeedsError {}
+#[error("fetch subscribed feeds error")]
+pub struct FetchSubscribedFeedsError {}
 
 impl Usecase for FetchSubscribedFeeds {
     type Input = FetchSubscribedFeedsInput;

@@ -105,3 +105,32 @@ macro_rules! run_usecase {
 }
 
 pub(super) use run_usecase;
+
+#[cfg(test)]
+mod tests {
+    use async_graphql::ErrorExtensions;
+
+    use crate::usecase::authorize::Unauthorized;
+
+    use super::*;
+
+    #[test]
+    fn usecase_error_impl_gql_error() {
+        insta::assert_yaml_snapshot!(
+            "unauthorized",
+            usecase::Error::<String>::Unauthorized(Unauthorized).extend()
+        );
+        insta::assert_yaml_snapshot!(
+            "repository",
+            usecase::Error::<String>::Repository(crate::repository::RepositoryError::Internal(
+                anyhow::anyhow!("error")
+            ))
+            .extend()
+        );
+        insta::assert_yaml_snapshot!("fetch_entries", usecase::FetchEntriesError {}.extend());
+        insta::assert_yaml_snapshot!(
+            "fetch_subscribed_feeds",
+            usecase::FetchSubscribedFeedsError {}.extend()
+        );
+    }
+}

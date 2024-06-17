@@ -33,7 +33,8 @@ pub struct FetchEntriesOutput {
 }
 
 #[derive(Error, Debug)]
-pub enum FetchEntriesError {}
+#[error("fetch entries error")]
+pub struct FetchEntriesError {}
 
 impl Usecase for FetchEntries {
     type Input = FetchEntriesInput;

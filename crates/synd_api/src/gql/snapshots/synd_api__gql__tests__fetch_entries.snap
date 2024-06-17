@@ -1,0 +1,7 @@
+---
+source: crates/synd_api/src/gql/mod.rs
+expression: "usecase::FetchEntriesError {}.extend()"
+---
+message: fetch entries error
+extensions:
+  code: INTERNAL_ERROR
