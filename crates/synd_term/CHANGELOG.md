@@ -2,7 +2,65 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.5] 2024-05-23
+## [unreleased] __release_date__
+
+### Features
+
+- Simplify ui by [@ymgyt](https://github.com/ymgyt) ([b2fa928d](https://github.com/ymgyt/syndicationd/commit/b2fa928de37cf0c431d63e2e2f2b17e6dee19250))
+- Show entry detail by [@ymgyt](https://github.com/ymgyt) ([e9162afa](https://github.com/ymgyt/syndicationd/commit/e9162afa903277d751ed8abf964a275668f6096c))
+- Inform latest release by [@ymgyt](https://github.com/ymgyt) ([a65eb66c](https://github.com/ymgyt/syndicationd/commit/a65eb66ccedd737f95dcea78c0e12770016ffade))
+- Match feed url by [@ymgyt](https://github.com/ymgyt) ([d077a320](https://github.com/ymgyt/syndicationd/commit/d077a320226e26a7cba928c619822c8509b7548b))
+
+### Documentation
+
+- Use oranda mdbook component for rendering privacy policy by [@ymgyt](https://github.com/ymgyt) ([c91bc08c](https://github.com/ymgyt/syndicationd/commit/c91bc08ce4cf92629ca3438be0dabe5f97263fa9))
+
+### Miscellaneous Tasks
+
+- Update ratatui from 0.26.1 to 0.26.3 by [@ymgyt](https://github.com/ymgyt) ([5260fc8b](https://github.com/ymgyt/syndicationd/commit/5260fc8b18dcd268ec2f912f9d7ac88e7de214fd))
+- Simplyfi fileter ui by [@ymgyt](https://github.com/ymgyt) ([e7815ada](https://github.com/ymgyt/syndicationd/commit/e7815adaeff96171e9f6ab825591dc12794d08a2))
+- Rename homebrew formula from synd to synd-term by [@ymgyt](https://github.com/ymgyt) ([79ca0f87](https://github.com/ymgyt/syndicationd/commit/79ca0f87bb69b9aa9e093a41c5667251f86c56fc))
+- Add docker description by [@ymgyt](https://github.com/ymgyt) ([a7ab8ae2](https://github.com/ymgyt/syndicationd/commit/a7ab8ae22f71b955def42a9b306b6ee1a42c8d9e))
+- Rename oranda project from synd to synd-term by [@ymgyt](https://github.com/ymgyt) ([383a3592](https://github.com/ymgyt/syndicationd/commit/383a3592d764482e11f3c65b3afaea607d2b9acb))
+- Use default-features instead of default_features by [@ymgyt](https://github.com/ymgyt) ([fd827f4c](https://github.com/ymgyt/syndicationd/commit/fd827f4cba9e576a9342e1115fdf7e804471d438))
+
+### Refactor
+
+- Remove unused code by [@ymgyt](https://github.com/ymgyt) ([bd428f17](https://github.com/ymgyt/syndicationd/commit/bd428f1724e2e97b6fbd97dad4d1e539b2e9420d))
+- Avoid rendering during key event handling if possible by [@ymgyt](https://github.com/ymgyt) ([db42f5c7](https://github.com/ymgyt/syndicationd/commit/db42f5c7236495bdde39160774e8286d809a844b))
+- Abstract cache access by [@ymgyt](https://github.com/ymgyt) ([32ae36e0](https://github.com/ymgyt/syndicationd/commit/32ae36e05eafcb649df3c4fcdd9dac4f33272e9c))
+- Use ApplicationBuilder to construct Application by [@ymgyt](https://github.com/ymgyt) ([985edfd9](https://github.com/ymgyt/syndicationd/commit/985edfd9304e748f9f21a93b6f771b652a9ea67a))
+- Use tokio_util CancellationToken instead of mpsc channel by [@ymgyt](https://github.com/ymgyt) ([3ca15bf8](https://github.com/ymgyt/syndicationd/commit/3ca15bf854882d64b51b825bbeff6db6f2c66ae0))
+- Remove unused code by [@ymgyt](https://github.com/ymgyt) ([a46f99fd](https://github.com/ymgyt/syndicationd/commit/a46f99fdda7d3eed9a847bf53f2add980884d699))
+- Move generated gql client code to generated dir by [@ymgyt](https://github.com/ymgyt) ([8600f559](https://github.com/ymgyt/syndicationd/commit/8600f559909ba39da7881d0f6d68dfab664fb7d4))
+- Remove duplicate processing in InFlight::remove by [@ymgyt](https://github.com/ymgyt) ([0b9c8b0c](https://github.com/ymgyt/syndicationd/commit/0b9c8b0c4c40f00eccbe6592eafdd9be04b9fa4c))
+
+### Styling
+
+- Remove right padding for consistency by [@ymgyt](https://github.com/ymgyt) ([79b59ca5](https://github.com/ymgyt/syndicationd/commit/79b59ca520c11041f1b68dd146751d2c91a3de32))
+- Remove icon from table header for alignment by [@ymgyt](https://github.com/ymgyt) ([ef156c94](https://github.com/ymgyt/syndicationd/commit/ef156c9407a219b4fbe47dca9c067773153a4614))
+- Fix search alignment by [@ymgyt](https://github.com/ymgyt) ([43f30fc6](https://github.com/ymgyt/syndicationd/commit/43f30fc6c7848e581af766320162abbfd7800ead))
+
+### Testing
+
+- Use insta for buffer assersions by [@ymgyt](https://github.com/ymgyt) ([72f90cb3](https://github.com/ymgyt/syndicationd/commit/72f90cb347422a464c3cd29ce27586107544871f))
+- Add command test by [@ymgyt](https://github.com/ymgyt) ([b07b0707](https://github.com/ymgyt/syndicationd/commit/b07b07074308f234feb4444e6d0d2252c56befcf))
+- Setup application in helper method by [@ymgyt](https://github.com/ymgyt) ([489bd75f](https://github.com/ymgyt/syndicationd/commit/489bd75f29f348cf60fb61468dbb7c8ab2844663))
+- Filtered out non-test-related events during integration by [@ymgyt](https://github.com/ymgyt) ([eafc1e4f](https://github.com/ymgyt/syndicationd/commit/eafc1e4fadbe4cdd0c5198c08754e2dbdb469e54))
+- Add subscribe integration test case by [@ymgyt](https://github.com/ymgyt) ([8d9a30db](https://github.com/ymgyt/syndicationd/commit/8d9a30dbf0ed713c4efc0c1c9718465a848c6980))
+- Add command test by [@ymgyt](https://github.com/ymgyt) ([53a16c71](https://github.com/ymgyt/syndicationd/commit/53a16c715705d1d2968c7a9d12033837b8451cc7))
+- Add google authentication test case by [@ymgyt](https://github.com/ymgyt) ([7590f197](https://github.com/ymgyt/syndicationd/commit/7590f197e1aea294b04f56b6fd370e8e6086f1c9))
+- Add fetch entries fixture test by [@ymgyt](https://github.com/ymgyt) ([4f3b8e23](https://github.com/ymgyt/syndicationd/commit/4f3b8e232085cf904fd02d6105bd8bf6eb63bcc1))
+- Add filter entries integration test case by [@ymgyt](https://github.com/ymgyt) ([d005d0d2](https://github.com/ymgyt/syndicationd/commit/d005d0d2822960ae12190b822b3c1e4a16aa4c29))
+- Handle not tty case by [@ymgyt](https://github.com/ymgyt) ([b3ada7c0](https://github.com/ymgyt/syndicationd/commit/b3ada7c068cbb04230715e1764535768715a6613))
+- Add pperiodic refresher test case by [@ymgyt](https://github.com/ymgyt) ([6e9a19da](https://github.com/ymgyt/syndicationd/commit/6e9a19da92dfe5d006756d19d8c4ed1bdd9690c5))
+- Add refreshing expired jwt test case (#53) by [@Yuta Yamaguchi](https://github.com/Yuta Yamaguchi) ([ffd73907](https://github.com/ymgyt/syndicationd/commit/ffd73907b88aab2c044362c0debdfa9b012571bd))
+- Add test to direction by [@ymgyt](https://github.com/ymgyt) ([90f8492a](https://github.com/ymgyt/syndicationd/commit/90f8492a7450f6cc2b4a025d451a9d15144e0ee5))
+- Add test case that resize terminal by [@ymgyt](https://github.com/ymgyt) ([05251ee4](https://github.com/ymgyt/syndicationd/commit/05251ee4fbfc776c0acaa0980e8c44b84038fa28))
+- Add test case that edit and open feed by [@ymgyt](https://github.com/ymgyt) ([a2e99d98](https://github.com/ymgyt/syndicationd/commit/a2e99d98d2fed6497ba783aeba273218a1c21cfc))
+- Add error handling test case by [@ymgyt](https://github.com/ymgyt) ([25641b2c](https://github.com/ymgyt/syndicationd/commit/25641b2c4a4aff371254531f0104cf477a24fc2b))
+
+## [v0.2.5] - 2024-05-23
 
 ### Features
 

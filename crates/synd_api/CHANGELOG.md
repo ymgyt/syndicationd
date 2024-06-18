@@ -2,7 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.3] 2024-05-06
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Change event level from info to debug for principal cache hit by [@ymgyt](https://github.com/ymgyt) ([0107299c](https://github.com/ymgyt/syndicationd/commit/0107299cf916607697ff916bb6ef82547d35aacf))
+- Update opentelemetry from 0.22.0 to 0.23.0 by [@ymgyt](https://github.com/ymgyt) ([1f291fc3](https://github.com/ymgyt/syndicationd/commit/1f291fc31ec07d5f84565518d848b0822cccb879))
+- Use default-features instead of default_features by [@ymgyt](https://github.com/ymgyt) ([d9a6f432](https://github.com/ymgyt/syndicationd/commit/d9a6f43288f4d06ac26bf8b9f056aae1cc689e87))
+
+### Refactor
+
+- Use synd_feed FeedType by [@ymgyt](https://github.com/ymgyt) ([745a43a2](https://github.com/ymgyt/syndicationd/commit/745a43a2a16056ec7b7c0d9313165b3cebdadee0))
+- Remove unused code by [@ymgyt](https://github.com/ymgyt) ([ef8bfa48](https://github.com/ymgyt/syndicationd/commit/ef8bfa484b5d72c5c8044e0b2bfdb7825b6aab5b))
+- Restrict layer module visibility by [@ymgyt](https://github.com/ymgyt) ([8c1b1749](https://github.com/ymgyt/syndicationd/commit/8c1b1749af398c90c0f7852b311715f3a6d8524e))
+- Use tokio_util CancellationToken instead of mpsc channel by [@ymgyt](https://github.com/ymgyt) ([3ca15bf8](https://github.com/ymgyt/syndicationd/commit/3ca15bf854882d64b51b825bbeff6db6f2c66ae0))
+- Remove unused code by [@ymgyt](https://github.com/ymgyt) ([523f5821](https://github.com/ymgyt/syndicationd/commit/523f58219a833d9572c7025aa01d8907e60dc4b6))
+
+### Testing
+
+- Add cli test by [@ymgyt](https://github.com/ymgyt) ([d056f262](https://github.com/ymgyt/syndicationd/commit/d056f262976c002812a27e66a7a59f1ea25f6167))
+- Add command test by [@ymgyt](https://github.com/ymgyt) ([53a16c71](https://github.com/ymgyt/syndicationd/commit/53a16c715705d1d2968c7a9d12033837b8451cc7))
+- Add google authentication test case by [@ymgyt](https://github.com/ymgyt) ([7590f197](https://github.com/ymgyt/syndicationd/commit/7590f197e1aea294b04f56b6fd370e8e6086f1c9))
+- Add fetch entries fixture test by [@ymgyt](https://github.com/ymgyt) ([4f3b8e23](https://github.com/ymgyt/syndicationd/commit/4f3b8e232085cf904fd02d6105bd8bf6eb63bcc1))
+- Add scalar unit test by [@ymgyt](https://github.com/ymgyt) ([659aa81d](https://github.com/ymgyt/syndicationd/commit/659aa81db0f8788f0cdd9e2cc3d5798ee3f088b2))
+- Add task monitor test case by [@ymgyt](https://github.com/ymgyt) ([ae40f861](https://github.com/ymgyt/syndicationd/commit/ae40f861e16f76c3201fc34fa243932d813e3a4b))
+- Add entry id cursor test case by [@ymgyt](https://github.com/ymgyt) ([bfcb5609](https://github.com/ymgyt/syndicationd/commit/bfcb5609e98bd9fc187ac5639dab0c03d43d6b94))
+- Add middleware error mapping test case by [@ymgyt](https://github.com/ymgyt) ([e7934249](https://github.com/ymgyt/syndicationd/commit/e7934249e7bd8f462fa127ddd49bd79ef1593a26))
+- Add pperiodic refresher test case by [@ymgyt](https://github.com/ymgyt) ([6e9a19da](https://github.com/ymgyt/syndicationd/commit/6e9a19da92dfe5d006756d19d8c4ed1bdd9690c5))
+- Use id method instead of field by [@ymgyt](https://github.com/ymgyt) ([30137461](https://github.com/ymgyt/syndicationd/commit/30137461823a47112824cd893a3f7c0421ce08de))
+- Add repository error case for coverage by [@ymgyt](https://github.com/ymgyt) ([d1034f68](https://github.com/ymgyt/syndicationd/commit/d1034f6884f567c04338cdc2a2bcc4fff60f1443))
+- Add error handling test case by [@ymgyt](https://github.com/ymgyt) ([bbc5465d](https://github.com/ymgyt/syndicationd/commit/bbc5465d0de86d811536700ca5d0b741fd4d7307))
+
+## [v0.2.3] - 2024-05-06
 
 ### Features
 

@@ -2,7 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.1.6] 2024-05-06
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Update opentelemetry from 0.22.0 to 0.23.0 by [@ymgyt](https://github.com/ymgyt) ([1f291fc3](https://github.com/ymgyt/syndicationd/commit/1f291fc31ec07d5f84565518d848b0822cccb879))
+
+### Refactor
+
+- Remove empty line by [@ymgyt](https://github.com/ymgyt) ([ebafc736](https://github.com/ymgyt/syndicationd/commit/ebafc7364333e212bbd56e5e536c7717a96c749b))
+
+### Testing
+
+- Add tracing opentelemetry layer tests (#50) by [@Yuta Yamaguchi](https://github.com/Yuta Yamaguchi) ([9739b518](https://github.com/ymgyt/syndicationd/commit/9739b5189bdeaedd458771a92a04e416f1af08fd))
+- Add metrics view test case by [@ymgyt](https://github.com/ymgyt) ([9384adf3](https://github.com/ymgyt/syndicationd/commit/9384adf336db680e50a380ab2f42b4113108f691))
+- Add http extractor test case by [@ymgyt](https://github.com/ymgyt) ([87cbd5f1](https://github.com/ymgyt/syndicationd/commit/87cbd5f1d817f0e48f570b895d6c533b99172e30))
+
+## [v0.1.6] - 2024-05-06
 
 ### Documentation
 

@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.2] 2024-05-06
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Clippy cast_sign_loss by [@ymgyt](https://github.com/ymgyt) ([7018e1ae](https://github.com/ymgyt/syndicationd/commit/7018e1ae0604cb236bb79dcda3d43d3dfd17ecaa))
+
+### Testing
+
+- Add google authentication test case by [@ymgyt](https://github.com/ymgyt) ([7590f197](https://github.com/ymgyt/syndicationd/commit/7590f197e1aea294b04f56b6fd370e8e6086f1c9))
+- Add refreshing expired jwt test case (#53) by [@Yuta Yamaguchi](https://github.com/Yuta Yamaguchi) ([ffd73907](https://github.com/ymgyt/syndicationd/commit/ffd73907b88aab2c044362c0debdfa9b012571bd))
+- Add test case for device flow error handling by [@ymgyt](https://github.com/ymgyt) ([708cbf4b](https://github.com/ymgyt/syndicationd/commit/708cbf4b0877ca5c75b9dcfc8496aefc2b63bed3))
+
+## [v0.2.2] - 2024-05-06
 
 ### Features
 

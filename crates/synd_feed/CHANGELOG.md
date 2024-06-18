@@ -2,7 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.3.2] 2024-05-06
+## [unreleased] __release_date__
+
+### Features
+
+- Use own FeedType instead of feed_rs by [@ymgyt](https://github.com/ymgyt) ([2321e4aa](https://github.com/ymgyt/syndicationd/commit/2321e4aa21c071edd4cd79b1d1b3627ac994c68d))
+- Impl FeedUrl::parse by [@ymgyt](https://github.com/ymgyt) ([6db51268](https://github.com/ymgyt/syndicationd/commit/6db512681009eb8b9c19d20bc69d4bf74f383920))
+
+### Bug Fixes
+
+- Typo by [@ymgyt](https://github.com/ymgyt) ([63660624](https://github.com/ymgyt/syndicationd/commit/63660624c52631531634bb7d4c470a984de1eb90))
+
+### Refactor
+
+- Remove fetch_feeds_parallel from FetchFeed trait by [@ymgyt](https://github.com/ymgyt) ([a18efcea](https://github.com/ymgyt/syndicationd/commit/a18efceadb71577387696c5970ffcc07cc950fa9))
+
+### Testing
+
+- Impl fake::Dummy by [@ymgyt](https://github.com/ymgyt) ([5917e31c](https://github.com/ymgyt/syndicationd/commit/5917e31c722c6d7e20d26e8f8ec4ea20337881a2))
+- Add types test cases by [@ymgyt](https://github.com/ymgyt) ([9cfd8a6b](https://github.com/ymgyt/syndicationd/commit/9cfd8a6bef188a5c92fafd89316b71aeb5209ddd))
+- Add feed_rs error mapping test case by [@ymgyt](https://github.com/ymgyt) ([e3f8c75f](https://github.com/ymgyt/syndicationd/commit/e3f8c75fa4198ccb51d8bbe8e2881e1ff98b5d3a))
+- Add pperiodic refresher test case by [@ymgyt](https://github.com/ymgyt) ([6e9a19da](https://github.com/ymgyt/syndicationd/commit/6e9a19da92dfe5d006756d19d8c4ed1bdd9690c5))
+
+## [v0.3.2] - 2024-05-06
 
 ### Features
 
