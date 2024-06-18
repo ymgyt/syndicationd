@@ -50,7 +50,7 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd/synd-term-v0.2.5
+nix profile install github:ymgyt/syndicationd/synd-term-v0.2.6
 ```
 
 ### arch linux
