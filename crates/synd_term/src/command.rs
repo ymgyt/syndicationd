@@ -13,6 +13,43 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+pub(crate) enum ApiResponse {
+    DeviceFlowAuthorization {
+        provider: AuthenticationProvider,
+        device_authorization: DeviceAuthorizationResponse,
+    },
+    DeviceFlowCredential {
+        credential: Verified<Credential>,
+    },
+    SubscribeFeed {
+        feed: Box<Feed>,
+    },
+    UnsubscribeFeed {
+        url: FeedUrl,
+    },
+    FetchSubscription {
+        populate: Populate,
+        subscription: SubscriptionOutput,
+    },
+    FetchEntries {
+        populate: Populate,
+        payload: payload::FetchEntriesPayload,
+    },
+}
+
+impl Display for ApiResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApiResponse::DeviceFlowCredential { .. } => f.write_str("DeviceFlowCredential"),
+            ApiResponse::FetchSubscription { .. } => f.write_str("FetchSubscription"),
+            ApiResponse::FetchEntries { .. } => f.write_str("FetchEntries"),
+
+            cmd => write!(f, "{cmd:?}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum Command {
     Nop,
     Quit,
@@ -26,15 +63,11 @@ pub(crate) enum Command {
     Authenticate,
     MoveAuthenticationProvider(Direction),
 
-    HandleDeviceFlowAuthorizationResponse {
-        provider: AuthenticationProvider,
-        device_authorization: DeviceAuthorizationResponse,
+    HandleApiResponse {
         request_seq: RequestSequence,
+        response: ApiResponse,
     },
-    CompleteDevieAuthorizationFlow {
-        credential: Verified<Credential>,
-        request_seq: RequestSequence,
-    },
+
     RefreshCredential {
         credential: Verified<Credential>,
     },
@@ -54,22 +87,9 @@ pub(crate) enum Command {
     SubscribeFeed {
         input: SubscribeFeedInput,
     },
-    CompleteSubscribeFeed {
-        feed: Feed,
-        request_seq: RequestSequence,
-    },
-    CompleteUnsubscribeFeed {
-        url: FeedUrl,
-        request_seq: RequestSequence,
-    },
     FetchSubscription {
         after: Option<String>,
         first: i64,
-    },
-    PopulateFetchedSubscription {
-        populate: Populate,
-        subscription: SubscriptionOutput,
-        request_seq: RequestSequence,
     },
     ReloadSubscription,
     OpenFeed,
@@ -78,11 +98,6 @@ pub(crate) enum Command {
     FetchEntries {
         after: Option<String>,
         first: i64,
-    },
-    PopulateFetchedEntries {
-        populate: Populate,
-        payload: payload::FetchEntriesPayload,
-        request_seq: RequestSequence,
     },
     ReloadEntries,
     MoveEntry(Direction),
@@ -126,16 +141,7 @@ pub(crate) enum Command {
 
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::PopulateFetchedSubscription { .. } => {
-                f.write_str("PopulateFetchedSubscription")
-            }
-            Command::PopulateFetchedEntries { .. } => f.write_str("PopulateFetchedEntries"),
-            Command::CompleteDevieAuthorizationFlow { .. } => {
-                f.write_str("CompleteDeviceAuthorizationFlow")
-            }
-            cmd => write!(f, "{cmd:?}"),
-        }
+        write!(f, "{self:?}")
     }
 }
 

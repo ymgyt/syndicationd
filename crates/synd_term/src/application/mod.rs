@@ -20,7 +20,7 @@ use crate::{
     application::event::KeyEventResult,
     auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
     client::{mutation::subscribe_feed::SubscribeFeedInput, Client, SyndApiError},
-    command::Command,
+    command::{ApiResponse, Command},
     config::{self, Categories},
     interact::Interactor,
     job::Jobs,
@@ -336,20 +336,93 @@ impl Application {
                     self.components.auth.move_selection(direction);
                     self.should_render();
                 }
-                Command::HandleDeviceFlowAuthorizationResponse {
-                    provider,
-                    device_authorization,
+                Command::HandleApiResponse {
                     request_seq,
+                    response,
                 } => {
                     self.in_flight.remove(request_seq);
-                    self.handle_device_flow_authorization_response(provider, device_authorization);
-                }
-                Command::CompleteDevieAuthorizationFlow {
-                    credential,
-                    request_seq,
-                } => {
-                    self.in_flight.remove(request_seq);
-                    self.complete_device_authroize_flow(credential);
+
+                    match response {
+                        ApiResponse::DeviceFlowAuthorization {
+                            provider,
+                            device_authorization,
+                        } => {
+                            self.handle_device_flow_authorization_response(
+                                provider,
+                                device_authorization,
+                            );
+                        }
+                        ApiResponse::DeviceFlowCredential { credential } => {
+                            self.complete_device_authroize_flow(credential);
+                        }
+                        ApiResponse::SubscribeFeed { feed } => {
+                            self.components.subscription.upsert_subscribed_feed(*feed);
+                            self.fetch_entries(
+                                Populate::Replace,
+                                None,
+                                self.config.entries_per_pagination,
+                            );
+                            self.should_render();
+                        }
+                        ApiResponse::UnsubscribeFeed { url } => {
+                            self.components.subscription.remove_unsubscribed_feed(&url);
+                            self.components.entries.remove_unsubscribed_entries(&url);
+                            self.components.filter.update_categories(
+                                &self.categories,
+                                Populate::Replace,
+                                self.components.entries.entries(),
+                            );
+                            self.should_render();
+                        }
+                        ApiResponse::FetchSubscription {
+                            populate,
+                            subscription,
+                        } => {
+                            // paginate
+                            next = subscription.feeds.page_info.has_next_page.then(|| {
+                                Command::FetchSubscription {
+                                    after: subscription.feeds.page_info.end_cursor.clone(),
+                                    first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
+                                }
+                            });
+                            // how we show fetched errors in ui?
+                            if !subscription.feeds.errors.is_empty() {
+                                tracing::warn!(
+                                    "Failed fetched feeds: {:?}",
+                                    subscription.feeds.errors
+                                );
+                            }
+                            self.components
+                                .subscription
+                                .update_subscription(populate, subscription);
+                            self.should_render();
+                        }
+                        ApiResponse::FetchEntries { populate, payload } => {
+                            self.components.filter.update_categories(
+                                &self.categories,
+                                populate,
+                                payload.entries.as_slice(),
+                            );
+                            // paginate
+                            next = payload
+                                .page_info
+                                .has_next_page
+                                .then(|| Command::FetchEntries {
+                                    after: payload.page_info.end_cursor.clone(),
+                                    first: self
+                                        .config
+                                        .entries_limit
+                                        .saturating_sub(
+                                            self.components.entries.count() + payload.entries.len(),
+                                        )
+                                        .min(payload.entries.len())
+                                        .try_into()
+                                        .unwrap_or(0),
+                                });
+                            self.components.entries.update_entries(populate, payload);
+                            self.should_render();
+                        }
+                    }
                 }
                 Command::RefreshCredential { credential } => {
                     self.set_credential(credential);
@@ -423,28 +496,6 @@ impl Application {
                 Command::FetchSubscription { after, first } => {
                     self.fetch_subscription(Populate::Append, after, first);
                 }
-                Command::PopulateFetchedSubscription {
-                    populate,
-                    subscription,
-                    request_seq,
-                } => {
-                    self.in_flight.remove(request_seq);
-                    // paginate
-                    next = subscription.feeds.page_info.has_next_page.then(|| {
-                        Command::FetchSubscription {
-                            after: subscription.feeds.page_info.end_cursor.clone(),
-                            first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
-                        }
-                    });
-                    // how we show fetched errors in ui?
-                    if !subscription.feeds.errors.is_empty() {
-                        tracing::warn!("Failed fetched feeds: {:?}", subscription.feeds.errors);
-                    }
-                    self.components
-                        .subscription
-                        .update_subscription(populate, subscription);
-                    self.should_render();
-                }
                 Command::ReloadSubscription => {
                     self.fetch_subscription(
                         Populate::Replace,
@@ -453,58 +504,11 @@ impl Application {
                     );
                     self.should_render();
                 }
-                Command::CompleteSubscribeFeed { feed, request_seq } => {
-                    self.in_flight.remove(request_seq);
-                    self.components.subscription.upsert_subscribed_feed(feed);
-                    self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
-                    self.should_render();
-                }
-                Command::CompleteUnsubscribeFeed { url, request_seq } => {
-                    self.in_flight.remove(request_seq);
-                    self.components.subscription.remove_unsubscribed_feed(&url);
-                    self.components.entries.remove_unsubscribed_entries(&url);
-                    self.components.filter.update_categories(
-                        &self.categories,
-                        Populate::Replace,
-                        self.components.entries.entries(),
-                    );
-                    self.should_render();
-                }
                 Command::OpenFeed => {
                     self.open_feed();
                 }
                 Command::FetchEntries { after, first } => {
                     self.fetch_entries(Populate::Append, after, first);
-                }
-                Command::PopulateFetchedEntries {
-                    populate,
-                    payload,
-                    request_seq,
-                } => {
-                    self.in_flight.remove(request_seq);
-                    self.components.filter.update_categories(
-                        &self.categories,
-                        populate,
-                        payload.entries.as_slice(),
-                    );
-                    // paginate
-                    next = payload
-                        .page_info
-                        .has_next_page
-                        .then(|| Command::FetchEntries {
-                            after: payload.page_info.end_cursor.clone(),
-                            first: self
-                                .config
-                                .entries_limit
-                                .saturating_sub(
-                                    self.components.entries.count() + payload.entries.len(),
-                                )
-                                .min(payload.entries.len())
-                                .try_into()
-                                .unwrap_or(0),
-                        });
-                    self.components.entries.update_entries(populate, payload);
-                    self.should_render();
                 }
                 Command::ReloadEntries => {
                     self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
@@ -742,7 +746,12 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
         let fut = async move {
             match client.subscribe_feed(input).await {
-                Ok(feed) => Ok(Command::CompleteSubscribeFeed { feed, request_seq }),
+                Ok(feed) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::SubscribeFeed {
+                        feed: Box::new(feed),
+                    },
+                }),
                 Err(error) => Ok(Command::api_error(error, request_seq)),
             }
         }
@@ -755,7 +764,10 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::UnsubscribeFeed);
         let fut = async move {
             match client.unsubscribe_feed(url.clone()).await {
-                Ok(()) => Ok(Command::CompleteUnsubscribeFeed { url, request_seq }),
+                Ok(()) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::UnsubscribeFeed { url },
+                }),
                 Err(err) => Ok(Command::api_error(err, request_seq)),
             }
         }
@@ -795,10 +807,12 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::FetchSubscription);
         let fut = async move {
             match client.fetch_subscription(after, Some(first)).await {
-                Ok(subscription) => Ok(Command::PopulateFetchedSubscription {
-                    populate,
-                    subscription,
+                Ok(subscription) => Ok(Command::HandleApiResponse {
                     request_seq,
+                    response: ApiResponse::FetchSubscription {
+                        populate,
+                        subscription,
+                    },
                 }),
                 Err(err) => Ok(Command::api_error(err, request_seq)),
             }
@@ -816,10 +830,9 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
         let fut = async move {
             match client.fetch_entries(after, first).await {
-                Ok(payload) => Ok(Command::PopulateFetchedEntries {
-                    populate,
-                    payload,
+                Ok(payload) => Ok(Command::HandleApiResponse {
                     request_seq,
+                    response: ApiResponse::FetchEntries { populate, payload },
                 }),
                 Err(error) => Ok(Command::HandleApiError {
                     error: Arc::new(error),
@@ -841,10 +854,12 @@ impl Application {
         let request_seq = self.in_flight.add(RequestId::DeviceFlowDeviceAuthorize);
         let fut = async move {
             match authenticator.init_device_flow(provider).await {
-                Ok(device_authorization) => Ok(Command::HandleDeviceFlowAuthorizationResponse {
-                    provider,
-                    device_authorization,
+                Ok(device_authorization) => Ok(Command::HandleApiResponse {
                     request_seq,
+                    response: ApiResponse::DeviceFlowAuthorization {
+                        provider,
+                        device_authorization,
+                    },
                 }),
                 Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
             }
@@ -874,9 +889,9 @@ impl Application {
                 .poll_device_flow_access_token(now, provider, device_authorization)
                 .await
             {
-                Ok(credential) => Ok(Command::CompleteDevieAuthorizationFlow {
-                    credential,
+                Ok(credential) => Ok(Command::HandleApiResponse {
                     request_seq,
+                    response: ApiResponse::DeviceFlowCredential { credential },
                 }),
                 Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
             }
