@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Miscellaneous Tasks
 
-- Enable tokio macros feature by [@ymgyt](https://github.com/ymgyt) ([0e9fa81b](https://github.com/ymgyt/syndicationd/commit/0e9fa81b49c3c15a69332a541b184e3fe30b4e20))
+- Enable tokio macros feature by [@ymgyt](https://github.com/ymgyt) ([3eef2e71](https://github.com/ymgyt/syndicationd/commit/3eef2e71566c98693467bc7ece64fd43f325d954))
 
 ### Refactor
 
