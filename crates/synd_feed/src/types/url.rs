@@ -1,5 +1,4 @@
-use core::fmt;
-use std::borrow::Borrow;
+use std::{borrow::Borrow, fmt};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -61,6 +60,10 @@ impl FeedUrl {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    pub fn parse(input: &str) -> Result<Self, url::ParseError> {
+        Url::parse(input).map(FeedUrl)
+    }
 }
 
 #[cfg(feature = "graphql")]
@@ -97,7 +100,7 @@ mod tests {
     #[test]
     fn backward_compatible() {
         let org = "https://blog.ymgyt.io/atom.xml";
-        let u = FeedUrl::from(Url::parse(org).unwrap());
+        let u = FeedUrl::parse(org).unwrap();
 
         assert_eq!(u.as_str(), org);
         assert_eq!(format!("{u}").as_str(), org);
@@ -115,15 +118,15 @@ mod tests {
         assert_eq!(
             deserialized,
             vec![
-                FeedUrl::from(Url::parse("https://blog.ymgyt.io/atom.xml").unwrap()),
-                FeedUrl::from(Url::parse("https://blog.ymgyt.io/atom2.xml").unwrap()),
+                FeedUrl::parse("https://blog.ymgyt.io/atom.xml").unwrap(),
+                FeedUrl::parse("https://blog.ymgyt.io/atom2.xml").unwrap(),
             ],
         );
     }
 
     #[test]
     fn url() {
-        let u = FeedUrl::from(Url::parse("https://blog.ymgyt.io/atom.xml").unwrap());
+        let u = FeedUrl::parse("https://blog.ymgyt.io/atom.xml").unwrap();
 
         assert_eq!(Borrow::<Url>::borrow(&u), &Url::from(u.clone()));
     }
@@ -133,7 +136,9 @@ mod tests {
     fn scalar() {
         use async_graphql::ScalarType;
 
-        assert!(FeedUrl::parse(async_graphql::Value::Null).is_err());
-        assert!(FeedUrl::parse(async_graphql::Value::String("invalid".into())).is_err());
+        assert!(<FeedUrl as ScalarType>::parse(async_graphql::Value::Null).is_err());
+        assert!(
+            <FeedUrl as ScalarType>::parse(async_graphql::Value::String("invalid".into())).is_err()
+        );
     }
 }

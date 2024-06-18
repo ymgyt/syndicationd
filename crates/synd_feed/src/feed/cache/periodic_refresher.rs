@@ -151,9 +151,7 @@ mod tests {
     }
 
     fn feed() -> (FeedUrl, Feed) {
-        let url: FeedUrl = Url::parse("https://example.ymgyt.io/atom.xml")
-            .unwrap()
-            .into();
+        let url = FeedUrl::parse("https://example.ymgyt.io/atom.xml").unwrap();
         let feed = feed_rs::model::Feed {
             feed_type: feed_rs::model::FeedType::RSS1,
             id: "ID".into(),
