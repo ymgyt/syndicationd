@@ -22,9 +22,14 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | upper_first }}
     {% for commit in commits %}
-        - {{ commit.message | upper_first }} by [@{{ commit.author.name}}](https://github.com/{{ commit.author.name }}) ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/ymgyt/syndicationd/commit/{{ commit.id }}))
+        - {{ commit.message | upper_first }} by [@{{ commit.github.username}}](https://github.com/{{ commit.github.username }}) ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/ymgyt/syndicationd/commit/{{ commit.id }}))
     {%- endfor %}
-{% endfor %}\n
+{% endfor %}
+https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/compare/{{ previous.version }}...{{ version }}\n
+
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+  * @{{ contributor.username }} made their first contribution in #{{ contributor.pr_number }}
+{%- endfor %}
 """
 # remove the leading and trailing whitespace from the template
 trim = true
