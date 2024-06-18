@@ -62,7 +62,7 @@ pacman -S syndicationd
 ### brew
 
 ```sh
-brew install ymgyt/homebrew-syndicationd/synd
+brew install ymgyt/homebrew-syndicationd/synd-term
 ```
 
 ### shell
