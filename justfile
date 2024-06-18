@@ -242,3 +242,6 @@ codecov-validate:
 docker-login:
     $env.GHCR_PAT | docker login ghcr.io -u USERNAME --password-stdin
     
+# Reinstall synd-term
+reinstall:
+    @nu scripts/reinstall.nu
