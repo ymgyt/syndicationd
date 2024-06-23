@@ -196,7 +196,12 @@ impl Subscription {
             .column_spacing(2)
             .style(cx.theme.subscription.background)
             .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .highlight_style(cx.theme.subscription.selected_feed)
+            .highlight_style(
+                cx.theme
+                    .subscription
+                    .selected_feed
+                    .add_modifier(cx.table_highlight_modifier()),
+            )
             .highlight_spacing(HighlightSpacing::WhenSelected);
 
         StatefulWidget::render(feeds, feeds_area, buf, &mut feeds_state);

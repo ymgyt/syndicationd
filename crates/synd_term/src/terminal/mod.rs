@@ -1,5 +1,5 @@
 use crossterm::{
-    event::EventStream,
+    event::{EnableFocusChange, EventStream},
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -36,7 +36,7 @@ impl Terminal {
     /// Initialize terminal
     pub fn init(&mut self) -> io::Result<()> {
         terminal::enable_raw_mode()?;
-        crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
+        crossterm::execute!(io::stdout(), EnterAlternateScreen, EnableFocusChange)?;
 
         let panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |panic| {

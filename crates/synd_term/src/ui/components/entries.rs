@@ -132,7 +132,12 @@ impl Entries {
             .header(header.style(cx.theme.entries.header))
             .column_spacing(2)
             .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .highlight_style(cx.theme.entries.selected_entry)
+            .highlight_style(
+                cx.theme
+                    .entries
+                    .selected_entry
+                    .add_modifier(cx.table_highlight_modifier()),
+            )
             .highlight_spacing(ratatui::widgets::HighlightSpacing::WhenSelected);
 
         StatefulWidget::render(entries, entries_area, buf, &mut entries_state);

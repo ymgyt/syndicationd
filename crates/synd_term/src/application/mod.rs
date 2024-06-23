@@ -50,9 +50,6 @@ pub use auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 mod clock;
 pub(crate) use clock::{Clock, SystemClock};
 
-mod flags;
-use flags::Should;
-
 mod cache;
 pub use cache::Cache;
 
@@ -64,10 +61,9 @@ pub use app_config::Config;
 
 pub(crate) mod event;
 
-enum Screen {
-    Login,
-    Browse,
-}
+mod state;
+pub(crate) use state::TerminalFocus;
+use state::{Should, State};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Populate {
@@ -92,8 +88,7 @@ pub struct Application {
     categories: Categories,
     latest_release: Option<Version>,
 
-    screen: Screen,
-    flags: Should,
+    state: State,
 }
 
 impl Application {
@@ -128,6 +123,10 @@ impl Application {
             key_handlers.push(event::KeyHandler::Keymaps(keymaps));
             key_handlers
         };
+        let mut state = State::new();
+        if dry_run {
+            state.flags = Should::Quit;
+        }
 
         Self {
             clock: Box::new(SystemClock),
@@ -141,16 +140,11 @@ impl Application {
             cache,
             theme,
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
-            screen: Screen::Login,
             config,
             key_handlers,
             categories,
             latest_release: None,
-            flags: if dry_run {
-                Should::Quit
-            } else {
-                Should::empty()
-            },
+            state,
         }
     }
 
@@ -185,7 +179,7 @@ impl Application {
         match self.terminal.init() {
             Ok(()) => Ok(()),
             Err(err) => {
-                if self.flags.contains(Should::Quit) {
+                if self.state.flags.contains(Should::Quit) {
                     tracing::warn!("Failed to init terminal: {err}");
                     Ok(())
                 } else {
@@ -220,7 +214,6 @@ impl Application {
         self.keymaps().enable(KeymapId::Tabs);
         self.keymaps().enable(KeymapId::Entries);
         self.keymaps().enable(KeymapId::Filter);
-        self.screen = Screen::Browse;
         self.reset_idle_timer();
         self.should_render();
     }
@@ -292,14 +285,14 @@ impl Application {
                 self.apply(command);
             }
 
-            if self.flags.contains(Should::Render) {
+            if self.state.flags.contains(Should::Render) {
                 self.render();
-                self.flags.remove(Should::Render);
+                self.state.flags.remove(Should::Render);
                 self.components.prompt.clear_error_message();
             }
 
-            if self.flags.contains(Should::Quit) {
-                self.flags.remove(Should::Quit); // for testing
+            if self.state.flags.contains(Should::Quit) {
+                self.state.flags.remove(Should::Quit); // for testing
                 break ControlFlow::Break(());
             }
         }
@@ -313,7 +306,7 @@ impl Application {
         while let Some(command) = next.take() {
             match command {
                 Command::Nop => {}
-                Command::Quit => self.flags.insert(Should::Quit),
+                Command::Quit => self.state.flags.insert(Should::Quit),
                 Command::ResizeTerminal { .. } => {
                     self.should_render();
                 }
@@ -632,7 +625,7 @@ impl Application {
 
     #[inline]
     fn should_render(&mut self) {
-        self.flags.insert(Should::Render);
+        self.state.flags.insert(Should::Render);
     }
 
     fn render(&mut self) {
@@ -640,6 +633,7 @@ impl Application {
             theme: &self.theme,
             in_flight: &self.in_flight,
             categories: &self.categories,
+            focus: self.state.focus(),
         };
         let root = Root::new(&self.components, cx);
 
@@ -654,6 +648,14 @@ impl Application {
                 _columns: columns,
                 _rows: rows,
             }),
+            CrosstermEvent::FocusGained => {
+                self.should_render();
+                self.state.focus_gained()
+            }
+            CrosstermEvent::FocusLost => {
+                self.should_render();
+                self.state.focus_lost()
+            }
             CrosstermEvent::Key(KeyEvent {
                 kind: KeyEventKind::Release,
                 ..
@@ -1001,7 +1003,7 @@ impl Application {
         #[cfg(feature = "integration")]
         {
             tracing::debug!("Quit for idle");
-            self.flags.insert(Should::Quit);
+            self.state.flags.insert(Should::Quit);
         }
     }
 

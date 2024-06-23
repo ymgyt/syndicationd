@@ -1,10 +1,10 @@
 use std::{str::FromStr, sync::OnceLock};
 
-use ratatui::style::Color;
+use ratatui::style::{Color, Modifier};
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
-    application::InFlight,
+    application::{InFlight, TerminalFocus},
     config::{Categories, Icon, IconColor},
     ui::theme::Theme,
 };
@@ -39,6 +39,16 @@ pub struct Context<'a> {
     pub theme: &'a Theme,
     pub in_flight: &'a InFlight,
     pub categories: &'a Categories,
+    pub(crate) focus: TerminalFocus,
+}
+
+impl<'a> Context<'a> {
+    fn table_highlight_modifier(&self) -> Modifier {
+        match self.focus {
+            TerminalFocus::Gained => Modifier::empty(),
+            TerminalFocus::Lost => Modifier::DIM,
+        }
+    }
 }
 
 #[cfg(test)]
