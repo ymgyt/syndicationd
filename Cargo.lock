@@ -1028,18 +1028,17 @@ dependencies = [
 
 [[package]]
 name = "feed-rs"
-version = "1.4.0"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ebf574f2f8a63948eae0d786c1fe339d71b6c98e735d58c81c85d93c8a66edf"
+checksum = "e02a15dbb4ba5223a427ec7c678c47e295ec9ecd48cd15ab015a205d15388a43"
 dependencies = [
  "chrono",
- "lazy_static",
  "mime",
  "quick-xml",
  "regex",
  "serde",
  "serde_json",
- "siphasher 1.0.0",
+ "siphasher 1.0.1",
  "url",
  "uuid",
 ]
@@ -3288,9 +3287,9 @@ checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "siphasher"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54ac45299ccbd390721be55b412d41931911f654fa99e2cb8bfb57184b2061fe"
+checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
 name = "slab"
@@ -4274,9 +4273,9 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "uuid"
-version = "1.7.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f00cc9702ca12d3c81455259621e676d0f7251cec66a21e98fe2e9a37db93b2a"
+checksum = "3ea73390fe27785838dcbf75b91b1d84799e28f1ce71e6f372a5dc2200c80de5"
 dependencies = [
  "getrandom",
 ]
