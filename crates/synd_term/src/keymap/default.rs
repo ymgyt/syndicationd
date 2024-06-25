@@ -33,6 +33,18 @@ pub fn default() -> KeymapsConfig {
             "e" => move_subscribed_feed_last,
         },
     });
+    let notification = keymap!({
+        "k" | "up" => move_up_notification,
+        "j" | "down" => move_down_notification,
+        "enter" => open_notification,
+        "r" => reload_notifications,
+        "d" => mark_notification_as_done,
+        "u" => unsubscribe_thread,
+        "g" => {
+            "g" => move_notification_first,
+            "e" => move_notification_last,
+        },
+    });
     let filter = keymap!({
        "h" | "left" => move_filter_requirement_left,
        "l" | "right" => move_filter_requirement_right,
@@ -56,6 +68,7 @@ pub fn default() -> KeymapsConfig {
         tabs,
         entries,
         subscription,
+        notification,
         filter,
         unsubscribe_popup,
         global,

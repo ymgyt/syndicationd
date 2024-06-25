@@ -1,0 +1,29 @@
+query IssueQuery($repositoryOwner: String!, $repositoryName: String!, $issueNumber: Int!) {
+  repository(owner: $repositoryOwner, name: $repositoryName, followRenames: true) {
+    repositoryTopics(first: 10) {
+      nodes {
+        topic {
+          name
+        }
+      }
+    }
+    issue(number: $issueNumber) {
+      author {
+        __typename
+        login
+      }
+      state
+      stateReason
+      bodyText
+      comments(first: 1, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        nodes {
+          bodyText
+          author {
+            __typename
+            login
+          }
+        }
+      }
+    }
+  }
+}

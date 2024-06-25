@@ -1,0 +1,461 @@
+use std::ops::Deref;
+
+use either::Either;
+use octocrab::models::{self, activity::Subject};
+use ratatui::{style::Stylize, text::Span};
+use synd_feed::types::Category;
+use url::Url;
+
+use crate::{
+    client::github::{issue_query, pull_request_query},
+    types::Time,
+    ui::icon,
+};
+
+pub(crate) type ThreadId = octocrab::models::ThreadId;
+
+pub(crate) type NotificationId = octocrab::models::NotificationId;
+
+#[derive(Debug, Clone)]
+pub(crate) struct IssueId(i64);
+
+impl IssueId {
+    pub(crate) fn into_inner(self) -> i64 {
+        self.0
+    }
+}
+
+impl Deref for IssueId {
+    type Target = i64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PullRequestId(i64);
+
+impl PullRequestId {
+    pub(crate) fn into_inner(self) -> i64 {
+        self.0
+    }
+}
+
+impl Deref for PullRequestId {
+    type Target = i64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Repository {
+    pub(crate) name: String,
+    pub(crate) owner: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct NotificationContext<ID> {
+    pub(crate) id: ID,
+    pub(crate) notification_id: NotificationId,
+    pub(crate) repository_key: Repository,
+}
+
+pub(crate) type IssueOrPullRequest =
+    Either<NotificationContext<IssueId>, NotificationContext<PullRequestId>>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SubjectType {
+    Issue,
+    PullRequest,
+}
+
+/// Additional information fetched from api
+#[derive(Debug, Clone)]
+pub(crate) enum SubjectContext {
+    Issue(IssueContext),
+    PullRequest(PullRequestContext),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Notification {
+    pub(crate) id: NotificationId,
+    pub(crate) thread_id: Option<ThreadId>,
+    pub(crate) reason: String,
+    #[allow(unused)]
+    pub(crate) unread: bool,
+    pub(crate) updated_at: Time,
+    pub(crate) last_read_at: Option<Time>,
+    pub(crate) repository: Repository,
+    pub(crate) subject_context: Option<SubjectContext>,
+    subject_type: Option<SubjectType>,
+    subject: Subject,
+}
+
+impl From<models::activity::Notification> for Notification {
+    fn from(
+        models::activity::Notification {
+            id,
+            repository,
+            subject,
+            reason,
+            unread,
+            updated_at,
+            last_read_at,
+            url,
+            ..
+        }: models::activity::Notification,
+    ) -> Self {
+        let (owner, name) = if let Some(full_name) = repository.full_name {
+            let mut s = full_name.splitn(2, '/');
+            if let (Some(owner), Some(repo)) = (s.next(), s.next()) {
+                (owner.to_owned(), repo.to_owned())
+            } else {
+                tracing::warn!("Unexpected repository full_name: `{full_name}`");
+                (String::new(), repository.name)
+            }
+        } else {
+            tracing::warn!("Repository full_name not found");
+            (String::new(), repository.name)
+        };
+        let repository = Repository { name, owner };
+
+        // Assume url is like "https://api.github.com/notifications/threads/11122223333"
+        let thread_id = url
+            .path_segments()
+            .and_then(|mut seg| seg.nth(2))
+            .and_then(|id| id.parse::<u64>().ok())
+            .map(ThreadId::from);
+
+        let subject_type = match subject.r#type.as_str() {
+            typ if typ.eq_ignore_ascii_case("issue") => Some(SubjectType::Issue),
+            typ if typ.eq_ignore_ascii_case("pullrequest") => Some(SubjectType::PullRequest),
+            _ => None,
+        };
+
+        Self {
+            id,
+            thread_id,
+            reason,
+            unread,
+            updated_at,
+            last_read_at,
+            repository,
+            subject,
+            subject_type,
+            subject_context: None,
+        }
+    }
+}
+
+impl Notification {
+    pub(crate) fn subject_type(&self) -> Option<SubjectType> {
+        self.subject_type
+    }
+
+    pub(crate) fn subject_icon(&self) -> Span {
+        match self.subject_type() {
+            Some(SubjectType::Issue) => match self.subject_context {
+                Some(SubjectContext::Issue(ref issue)) => match issue.state {
+                    IssueState::Open => {
+                        if matches!(issue.state_reason, Some(IssueStateReason::ReOpened)) {
+                            Span::from(icon!(issuereopened)).green()
+                        } else {
+                            Span::from(icon!(issueopen)).green()
+                        }
+                    }
+                    IssueState::Closed => {
+                        if matches!(issue.state_reason, Some(IssueStateReason::NotPlanned)) {
+                            Span::from(icon!(issuenotplanned)).gray()
+                        } else {
+                            Span::from(icon!(issueclosed)).light_magenta()
+                        }
+                    }
+                },
+                _ => Span::from(icon!(issueopen)),
+            },
+            Some(SubjectType::PullRequest) => match self.subject_context {
+                Some(SubjectContext::PullRequest(ref pr)) => match pr.state {
+                    PullRequestState::Open => {
+                        if pr.is_draft {
+                            Span::from(icon!(pullrequestdraft)).gray()
+                        } else {
+                            Span::from(icon!(pullrequest)).green()
+                        }
+                    }
+                    PullRequestState::Merged => {
+                        Span::from(icon!(pullrequestmerged)).light_magenta()
+                    }
+                    PullRequestState::Closed => Span::from(icon!(pullrequestclosed)).red(),
+                },
+                _ => Span::from(icon!(pullrequest)),
+            },
+            None => Span::from(" "),
+        }
+    }
+
+    pub(crate) fn title(&self) -> &str {
+        &self.subject.title
+    }
+
+    pub(crate) fn browser_url(&self) -> Option<Url> {
+        let mut url = self.base_url();
+        match self.subject_type()? {
+            SubjectType::Issue => {
+                // construct like "https://github.com/ymgyt/syndicationd/issues/{issue-id}#issumecomment-{commentid}"
+
+                url.path_segments_mut()
+                    .unwrap()
+                    .extend(["issues", &self.issue_id()?.to_string()]);
+                if let Some(commend_id) = self.comment_id() {
+                    url.set_fragment(Some(&format!("issuecomment-{commend_id}")));
+                }
+                Some(url)
+            }
+            SubjectType::PullRequest => {
+                // construct like "https://github.com/ymgyt/syndicationd/pull/{pr-id}#pullrequestreview-123"
+                url.path_segments_mut()
+                    .unwrap()
+                    .extend(["pull", &self.pull_request_id()?.to_string()]);
+
+                // How to get PR review comment id?
+                Some(url)
+            }
+        }
+    }
+
+    pub(crate) fn context(&self) -> Option<IssueOrPullRequest> {
+        match self.subject_type()? {
+            SubjectType::Issue => Some(Either::Left(NotificationContext {
+                id: self.issue_id()?,
+                notification_id: self.id,
+                repository_key: self.repository().clone(),
+            })),
+            SubjectType::PullRequest => Some(Either::Right(NotificationContext {
+                id: self.pull_request_id()?,
+                notification_id: self.id,
+                repository_key: self.repository().clone(),
+            })),
+        }
+    }
+
+    pub(crate) fn author(&self) -> Option<String> {
+        match self.subject_context {
+            Some(SubjectContext::Issue(ref issue)) => issue.author.clone(),
+            Some(SubjectContext::PullRequest(ref pr)) => pr.author.clone(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn body(&self) -> Option<String> {
+        match self.subject_context {
+            Some(SubjectContext::Issue(ref issue)) => Some(issue.body.clone()),
+            Some(SubjectContext::PullRequest(ref pr)) => Some(pr.body.clone()),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn last_comment(&self) -> Option<Comment> {
+        match self.subject_context {
+            Some(SubjectContext::Issue(ref issue)) => issue.last_comment.clone(),
+            Some(SubjectContext::PullRequest(ref pr)) => pr.last_comment.clone(),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn issue_id(&self) -> Option<IssueId> {
+        // Assume url is like "https://api.github.com/repos/ymgyt/synd/issues/123"
+        let mut segments = self.subject.url.as_ref()?.path_segments()?.skip(3);
+        (segments.next() == Some("issues"))
+            .then(|| segments.next())?
+            .and_then(|id| id.parse().ok())
+            .map(IssueId)
+    }
+
+    pub(crate) fn pull_request_id(&self) -> Option<PullRequestId> {
+        // Assume url is like "https://api.github.com/repos/ymgyt/synd/pulls/123"
+        let mut segments = self.subject.url.as_ref()?.path_segments()?.skip(3);
+        (segments.next() == Some("pulls"))
+            .then(|| segments.next())?
+            .and_then(|id| id.parse().ok())
+            .map(PullRequestId)
+    }
+
+    fn repository(&self) -> &Repository {
+        &self.repository
+    }
+
+    fn comment_id(&self) -> Option<String> {
+        // Assume url is like "https://api.github.com/repos/ymgyt/synd/issues/comments/123"
+        let mut segments = self
+            .subject
+            .latest_comment_url
+            .as_ref()?
+            .path_segments()?
+            .skip(4);
+        (segments.next() == Some("comments"))
+            .then(|| segments.next())?
+            .map(ToString::to_string)
+    }
+
+    // Return https://github.com/{owner}/{repo}
+    fn base_url(&self) -> Url {
+        let mut url = Url::parse("https://github.com").unwrap();
+        url.path_segments_mut().unwrap().extend([
+            self.repository.owner.as_str(),
+            self.repository.name.as_str(),
+        ]);
+
+        url
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Comment {
+    pub(crate) author: String,
+    pub(crate) body: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum IssueState {
+    Open,
+    Closed,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum IssueStateReason {
+    ReOpened,
+    NotPlanned,
+    Completed,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct IssueContext {
+    author: Option<String>,
+    #[allow(unused)]
+    categories: Vec<Category<'static>>,
+    state: IssueState,
+    state_reason: Option<IssueStateReason>,
+    body: String,
+    last_comment: Option<Comment>,
+}
+
+impl From<issue_query::ResponseData> for IssueContext {
+    fn from(data: issue_query::ResponseData) -> Self {
+        let repo = data
+            .repository
+            .expect("ResponseData does not have repository");
+        let categories: Vec<Category> = repo
+            .repository_topics
+            .nodes
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|node| node.map(|node| node.topic.name))
+            .filter_map(|topic| Category::new(topic).ok())
+            .collect();
+
+        let issue = repo.issue.expect("ResponseData does not have issue");
+        let author: Option<String> = issue.author.map(|author| author.login);
+        let state = match issue.state {
+            issue_query::IssueState::OPEN | issue_query::IssueState::Other(_) => IssueState::Open,
+            issue_query::IssueState::CLOSED => IssueState::Closed,
+        };
+        let state_reason = match issue.state_reason {
+            Some(issue_query::IssueStateReason::REOPENED) => Some(IssueStateReason::ReOpened),
+            Some(issue_query::IssueStateReason::NOT_PLANNED) => Some(IssueStateReason::NotPlanned),
+            Some(issue_query::IssueStateReason::COMPLETED) => Some(IssueStateReason::Completed),
+            _ => None,
+        };
+        let body = issue.body_text;
+        let last_comment: Option<Comment> = issue
+            .comments
+            .nodes
+            .unwrap_or_default()
+            .into_iter()
+            .find_map(|node| {
+                node.map(|node| Comment {
+                    author: node.author.map(|author| author.login).unwrap_or_default(),
+                    body: node.body_text,
+                })
+            });
+
+        Self {
+            author,
+            categories,
+            state,
+            state_reason,
+            body,
+            last_comment,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PullRequestState {
+    Open,
+    Merged,
+    Closed,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PullRequestContext {
+    author: Option<String>,
+    #[allow(unused)]
+    categories: Vec<Category<'static>>,
+    state: PullRequestState,
+    is_draft: bool,
+    body: String,
+    last_comment: Option<Comment>,
+}
+
+impl From<pull_request_query::ResponseData> for PullRequestContext {
+    fn from(data: pull_request_query::ResponseData) -> Self {
+        let repo = data
+            .repository
+            .expect("ResponseData does not have repository");
+
+        let categories: Vec<Category> = repo
+            .repository_topics
+            .nodes
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|node| node.map(|node| node.topic.name))
+            .filter_map(|topic| Category::new(topic).ok())
+            .collect();
+
+        let pr = repo
+            .pull_request
+            .expect("ResponseData does not have pull request");
+        let author: Option<String> = pr.author.map(|author| author.login);
+        let state = match pr.state {
+            pull_request_query::PullRequestState::OPEN
+            | pull_request_query::PullRequestState::Other(_) => PullRequestState::Open,
+            pull_request_query::PullRequestState::CLOSED => PullRequestState::Closed,
+            pull_request_query::PullRequestState::MERGED => PullRequestState::Merged,
+        };
+        let is_draft = pr.is_draft;
+        let body = pr.body_text;
+        let last_comment: Option<Comment> = pr
+            .comments
+            .nodes
+            .unwrap_or_default()
+            .into_iter()
+            .find_map(|node| {
+                node.map(|node| Comment {
+                    author: node.author.map(|author| author.login).unwrap_or_default(),
+                    body: node.body_text,
+                })
+            });
+
+        Self {
+            author,
+            categories,
+            state,
+            is_draft,
+            body,
+            last_comment,
+        }
+    }
+}

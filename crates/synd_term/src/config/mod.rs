@@ -56,6 +56,12 @@ pub mod cache {
     }
 }
 
+pub(crate) mod github {
+    /// GitHub pagination rest api is 1 origin
+    pub(crate) const INITIAL_PAGE_NUM: u8 = 1;
+    pub(crate) const NOTIFICATION_PER_PAGE: u8 = 40;
+}
+
 pub fn log_path() -> PathBuf {
     project_dirs().data_dir().join("synd.log")
 }

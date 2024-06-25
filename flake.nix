@@ -38,6 +38,8 @@
           src = ./.; # The original, unfiltered source
           filter = path: type:
             (pkgs.lib.hasSuffix ".pem" path) # Load self signed certs to test
+            || (pkgs.lib.hasSuffix ".gql" path) # graphql query
+            || (pkgs.lib.hasSuffix "schema.json" path) # graphql schema
             || (pkgs.lib.hasSuffix ".snap" path) # insta snapshots
             || (pkgs.lib.hasSuffix ".kvsd" path) # kvsd fixtures
             || (pkgs.lib.hasSuffix ".xml" path) # rss fixtures
@@ -60,6 +62,7 @@
         # Inherits from checks cargo-nextest, cargo-audit
         dev_packages = with pkgs;
           [
+            rust-analyzer-nightly
             typos
             graphql-client
             opentelemetry-collector-contrib

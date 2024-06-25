@@ -6,8 +6,8 @@ use ratatui::{
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Tabs, Widget,
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row,
+        StatefulWidget, Table, TableState, Tabs, Widget,
     },
 };
 use synd_feed::types::{FeedType, FeedUrl};
@@ -20,6 +20,7 @@ use crate::{
         self,
         components::filter::{FeedFilter, FilterResult},
         extension::RectExt,
+        widgets::scrollbar::Scrollbar,
         Context,
     },
 };
@@ -206,25 +207,22 @@ impl Subscription {
 
         StatefulWidget::render(feeds, feeds_area, buf, &mut feeds_state);
 
+        let header_rows = 2;
+        #[allow(clippy::cast_possible_truncation)]
         let scrollbar_area = Rect {
-            y: area.y + 2, // table header
-            height: area.height.saturating_sub(1),
+            y: area.y + header_rows,
+            height: area
+                .height
+                .saturating_sub(header_rows)
+                .min(self.effective_feeds.len() as u16),
             ..area
         };
 
-        // https://github.com/ratatui-org/ratatui/pull/911
-        // passing None to track_symbol cause incorrect rendering
-        let mut scrollbar_state = ScrollbarState::default()
-            .content_length(self.feeds.len())
-            .position(self.selected_feed_index);
-        Scrollbar::default()
-            .orientation(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(None)
-            .end_symbol(None)
-            .track_symbol(Some(" "))
-            .thumb_symbol("▐")
-            .style(cx.theme.base)
-            .render(scrollbar_area, buf, &mut scrollbar_state);
+        Scrollbar {
+            content_length: self.effective_feeds.len(),
+            position: self.selected_feed_index,
+        }
+        .render(scrollbar_area, buf, cx);
     }
 
     fn feed_rows<'a>(

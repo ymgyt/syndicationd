@@ -64,7 +64,14 @@ impl StatusLine {
                 .iter()
                 .chain(&[("Ent", icon!(open)), ("a", "󰑫"), ("e", ""), ("d", "󰼡")])
                 .chain(suf_keys),
-            Some(Tab::Entries) => pre_keys.iter().chain(&[("Ent", "󰏌")]).chain(suf_keys),
+            Some(Tab::Entries) => pre_keys
+                .iter()
+                .chain(&[("Ent", icon!(open))])
+                .chain(suf_keys),
+            Some(Tab::GitHub) => pre_keys
+                .iter()
+                .chain(&[("Ent", icon!(open)), ("d", icon!(check)), ("u", "")])
+                .chain(suf_keys),
             // Imply login
             None => [("j/k", "󰹹")][..]
                 .iter()
@@ -86,8 +93,11 @@ impl StatusLine {
                     RequestId::DeviceFlowPollAccessToken => "Polling...",
                     RequestId::FetchEntries => "Fetch entries...",
                     RequestId::FetchSubscription => "Fetch subscription...",
+                    RequestId::FetchGithubNotifications => "Fetch github notifications...",
                     RequestId::SubscribeFeed => "Subscribe feed...",
                     RequestId::UnsubscribeFeed => "Unsubscribe feed...",
+                    RequestId::MarkGithubNotificationAsDone => "Mark notification as done...",
+                    RequestId::UnsubscribeGithubThread => "Unsubscribe thread...",
                 };
                 let horizontal = Layout::horizontal([
                     Constraint::Length(label.len() as u16 + 1),

@@ -25,6 +25,8 @@ pub mod payload;
 #[path = "generated/query.rs"]
 pub mod query;
 
+pub mod github;
+
 #[derive(Error, Debug)]
 pub enum SubscribeFeedError {
     #[error("invalid feed url: `{feed_url}` ({message})`")]

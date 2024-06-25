@@ -3,9 +3,9 @@ use std::{future, path::PathBuf, time::Duration};
 use anyhow::Context as _;
 use futures_util::TryFutureExt;
 use synd_term::{
-    application::{Application, Cache, Config},
-    cli::{self, ApiOptions, Args, FeedOptions, Palette},
-    client::Client,
+    application::{Application, Cache, Config, Features},
+    cli::{self, ApiOptions, Args, ExperimentalOptions, FeedOptions, Palette},
+    client::{github::GithubClient, Client},
     config::{self, Categories},
     terminal::{self, Terminal},
     ui::theme::Theme,
@@ -67,9 +67,13 @@ fn build_app(
         entries_limit,
     }: FeedOptions,
     cache_dir: PathBuf,
+    ExperimentalOptions {
+        github_pat,
+        enable_github_notification,
+    }: ExperimentalOptions,
     dry_run: bool,
 ) -> anyhow::Result<Application> {
-    let app = Application::builder()
+    let mut builder = Application::builder()
         .terminal(Terminal::new().context("Failed to construct terminal")?)
         .client(Client::new(endpoint, timeout).context("Failed to construct client")?)
         .categories(
@@ -80,14 +84,20 @@ fn build_app(
         )
         .config(Config {
             entries_limit,
+            features: Features {
+                enable_github_notification,
+            },
             ..Default::default()
         })
         .cache(Cache::new(cache_dir))
         .theme(Theme::with_palette(&palette.into()))
-        .dry_run(dry_run)
-        .build();
+        .dry_run(dry_run);
 
-    Ok(app)
+    if enable_github_notification {
+        builder = builder.github_client(GithubClient::new(github_pat.unwrap()));
+    }
+
+    Ok(builder.build())
 }
 
 #[tokio::main]
@@ -103,6 +113,7 @@ async fn main() {
         command,
         palette,
         dry_run,
+        experimental,
     } = cli::parse();
 
     // Subcommand logs to the terminal, tui writes logs to a file.
@@ -127,6 +138,7 @@ async fn main() {
         palette,
         feed,
         cache_dir,
+        experimental,
         dry_run,
     ))
     .and_then(|app| {

@@ -16,9 +16,10 @@ pub(crate) enum KeymapId {
     Tabs = 2,
     Entries = 3,
     Subscription = 4,
-    Filter = 5,
-    CategoryFiltering = 6,
-    UnsubscribePopupSelection = 7,
+    Notification = 5,
+    Filter = 6,
+    CategoryFiltering = 7,
+    UnsubscribePopupSelection = 8,
 }
 
 #[derive(Debug)]
@@ -73,6 +74,7 @@ pub(crate) struct KeymapsConfig {
     pub tabs: KeyTrie,
     pub entries: KeyTrie,
     pub subscription: KeyTrie,
+    pub notification: KeyTrie,
     pub filter: KeyTrie,
     pub unsubscribe_popup: KeyTrie,
     pub global: KeyTrie,
@@ -98,6 +100,7 @@ impl Keymaps {
             Keymap::new(KeymapId::Tabs, config.tabs),
             Keymap::new(KeymapId::Entries, config.entries),
             Keymap::new(KeymapId::Subscription, config.subscription),
+            Keymap::new(KeymapId::Notification, config.notification),
             Keymap::new(KeymapId::Filter, config.filter),
             Keymap::new(KeymapId::CategoryFiltering, KeyTrie::default()),
             Keymap::new(
@@ -109,17 +112,14 @@ impl Keymaps {
         Self { keymaps }
     }
 
-    pub fn enable(&mut self, id: KeymapId) {
+    pub fn enable(&mut self, id: KeymapId) -> &mut Self {
         self.keymaps[id as usize].enable = true;
+        self
     }
 
-    pub fn disable(&mut self, id: KeymapId) {
+    pub fn disable(&mut self, id: KeymapId) -> &mut Self {
         self.keymaps[id as usize].enable = false;
-    }
-
-    pub fn toggle(&mut self, id: KeymapId) {
-        let enable = self.keymaps[id as usize].enable;
-        self.keymaps[id as usize].enable = !enable;
+        self
     }
 
     pub fn update(&mut self, id: KeymapId, keymap: Keymap) {
@@ -207,6 +207,10 @@ fn parse(s: &str) -> anyhow::Result<KeyEvent> {
             undefined => bail!("`{undefined}` modifier is not implemented yet"),
         };
         modifiers.insert(modifier);
+    }
+    // Handling special case
+    if code == KeyCode::BackTab {
+        modifiers.insert(KeyModifiers::SHIFT);
     }
     Ok(KeyEvent::new(code, modifiers))
 }

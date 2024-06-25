@@ -25,16 +25,19 @@ synd-o11y = { path = "../synd_o11y", version = "0.1.7" }
 anyhow               = { workspace = true }
 bitflags             = { workspace = true }
 chrono               = { workspace = true, features = ["std", "now", "serde", "clock"] }
+chrono-humanize      = "0.2.3"
 clap                 = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env", "std"] }
 crossterm            = { version = "0.27.0", features = ["event-stream"] }
 directories          = "5.0.1"
 edit                 = "0.1.5"
+either               = { workspace = true }
 futures-util         = { workspace = true }
-graphql_client       = { workspace = true }
+graphql_client       = { workspace = true, features = ["graphql_query_derive"] }
 html2text            = { version = "0.12" }
 itertools            = { workspace = true }
 nom                  = { version = "7.1.3", default-features = false, features = ["std"] }
 nucleo               = "0.5.0"
+octocrab             = "0.38.0"
 open                 = "5.1.4"
 parse_duration       = { workspace = true }
 ratatui              = { version = "0.26.3" }

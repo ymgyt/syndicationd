@@ -1,6 +1,6 @@
 use crate::{
     application::{Application, Authenticator, Cache, Config},
-    client::Client,
+    client::{github::GithubClient, Client},
     config::Categories,
     interact::Interactor,
     terminal::Terminal,
@@ -24,6 +24,7 @@ pub struct ApplicationBuilder<
 
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Option<Interactor>,
+    pub(super) github_client: Option<GithubClient>,
     pub(super) dry_run: bool,
 }
 
@@ -38,6 +39,7 @@ impl Default for ApplicationBuilder {
             theme: (),
             authenticator: None,
             interactor: None,
+            github_client: None,
             dry_run: false,
         }
     }
@@ -55,6 +57,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            github_client: self.github_client,
             dry_run: self.dry_run,
         }
     }
@@ -72,6 +75,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            github_client: self.github_client,
             dry_run: self.dry_run,
         }
     }
@@ -92,6 +96,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            github_client: self.github_client,
             dry_run: self.dry_run,
         }
     }
@@ -109,6 +114,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            github_client: self.github_client,
             dry_run: self.dry_run,
         }
     }
@@ -126,6 +132,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
             theme: self.theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            github_client: self.github_client,
             dry_run: self.dry_run,
         }
     }
@@ -143,6 +150,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
             theme,
             authenticator: self.authenticator,
             interactor: self.interactor,
+            github_client: self.github_client,
             dry_run: self.dry_run,
         }
     }
@@ -161,6 +169,14 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
     pub fn interactor(self, interactor: Interactor) -> Self {
         Self {
             interactor: Some(interactor),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn github_client(self, github_client: GithubClient) -> Self {
+        Self {
+            github_client: Some(github_client),
             ..self
         }
     }

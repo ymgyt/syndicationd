@@ -33,6 +33,7 @@ impl ThrobberState {
     }
 }
 
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone)]
 pub struct Throbber<'a> {
     label: Option<Span<'a>>,
@@ -48,7 +49,7 @@ impl<'a> Default for Throbber<'a> {
             label: None,
             style: Style::default(),
             throbber_style: Style::default(),
-            throbber_set: throbber::BRAILLE_SIX,
+            throbber_set: throbber::BRAILLE_EIGHT_DOUBLE,
             use_type: throbber::WhichUse::Spin,
         }
     }
@@ -92,8 +93,6 @@ impl<'a> StatefulWidget for Throbber<'a> {
 
         // render a symbol.
         let symbol = match self.use_type {
-            throbber::WhichUse::Full => self.throbber_set.full,
-            throbber::WhichUse::Empty => self.throbber_set.empty,
             throbber::WhichUse::Spin => {
                 state.normalize(&self);
                 let len = self.throbber_set.symbols.len() as i8;
@@ -127,7 +126,6 @@ pub mod throbber {
     /// A set of symbols to be rendered by throbber.
     #[derive(Debug, Clone)]
     pub struct Set {
-        pub full: &'static str,
         pub empty: &'static str,
         pub symbols: &'static [&'static str],
     }
@@ -137,63 +135,17 @@ pub mod throbber {
     /// If Spin is specified, ThrobberState.index is used.
     #[derive(Debug, Clone)]
     pub enum WhichUse {
-        Full,
-        Empty,
         Spin,
     }
 
-    /// ["|", "/", "-", "\\"]
-    pub const ASCII: Set = Set {
-        full: "*",
-        empty: " ",
-        symbols: &["|", "/", "-", "\\"],
-    };
-
-    /// ["│", "╱", "─", "╲"]
-    pub const BOX_DRAWING: Set = Set {
-        full: "┼",
-        empty: "　",
-        symbols: &["│", "╱", "─", "╲"],
-    };
-
-    /// ["⠘", "⠰", "⠤", "⠆", "⠃", "⠉"]
-    pub const BRAILLE_DOUBLE: Set = Set {
-        full: "⠿",
-        empty: "　",
-        symbols: &["⠘", "⠰", "⠤", "⠆", "⠃", "⠉"],
-    };
-
-    /// ["⠷", "⠯", "⠟", "⠻", "⠽", "⠾"]
-    pub const BRAILLE_SIX: Set = Set {
-        full: "⠿",
-        empty: "　",
-        symbols: &["⠷", "⠯", "⠟", "⠻", "⠽", "⠾"],
-    };
-
-    /// ["⠧", "⠏", "⠛", "⠹", "⠼", "⠶"]
-    pub const BRAILLE_SIX_DOUBLE: Set = Set {
-        full: "⠿",
-        empty: "　",
-        symbols: &["⠧", "⠏", "⠛", "⠹", "⠼", "⠶"],
-    };
-
-    /// ["⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽", "⣾"]
-    pub const BRAILLE_EIGHT: Set = Set {
-        full: "⣿",
-        empty: "　",
-        symbols: &["⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽", "⣾"],
-    };
-
-    /// ["⣧", "⣏", "⡟", "⠿", "⢻", "⣹", "⣼", "⣶"]
     #[cfg(not(feature = "integration"))]
     pub const BRAILLE_EIGHT_DOUBLE: Set = Set {
-        full: "⣿",
         empty: "　",
         symbols: &["⣧", "⣏", "⡟", "⠿", "⢻", "⣹", "⣼", "⣶"],
     };
+
     #[cfg(feature = "integration")]
     pub const BRAILLE_EIGHT_DOUBLE: Set = Set {
-        full: "⣿",
         empty: "　",
         symbols: &["⣧", "⣧", "⣧", "⣧", "⣧", "⣧", "⣧", "⣧"],
     };

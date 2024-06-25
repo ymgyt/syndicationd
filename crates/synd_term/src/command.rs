@@ -9,7 +9,12 @@ use crate::{
         mutation::subscribe_feed::SubscribeFeedInput, payload,
         query::subscription::SubscriptionOutput, SyndApiError,
     },
-    types::Feed,
+    types::{
+        github::{
+            IssueContext, IssueOrPullRequest, Notification, NotificationId, PullRequestContext,
+        },
+        Feed,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -35,6 +40,22 @@ pub(crate) enum ApiResponse {
         populate: Populate,
         payload: payload::FetchEntriesPayload,
     },
+    FetchGithubNotifications {
+        populate: Populate,
+        notifications: Vec<Notification>,
+    },
+    FetchGithubIssue {
+        notification_id: NotificationId,
+        issue: IssueContext,
+    },
+    FetchGithubPullRequest {
+        notification_id: NotificationId,
+        pull_request: PullRequestContext,
+    },
+    MarkGithubNotificationAsDone {
+        notification_id: NotificationId,
+    },
+    UnsubscribeGithubThread {},
 }
 
 impl Display for ApiResponse {
@@ -123,6 +144,22 @@ pub(crate) enum Command {
     // Latest release check
     InformLatestRelease(update_informer::Version),
 
+    // Github notifications
+    FetchGithubNotifications {
+        populate: Populate,
+        page: u8,
+    },
+    MoveNotification(Direction),
+    MoveNotificationFirst,
+    MoveNotificationLast,
+    OpenNotification,
+    ReloadNotifications,
+    FetchNotificationDetails {
+        contexts: Vec<IssueOrPullRequest>,
+    },
+    MarkNotificationAsDone,
+    UnsubscribeThread,
+
     // Error
     HandleError {
         message: String,
@@ -135,6 +172,11 @@ pub(crate) enum Command {
     HandleOauthApiError {
         // use Arc for impl Clone
         error: Arc<anyhow::Error>,
+        request_seq: RequestSequence,
+    },
+    HandleGithubApiError {
+        // use Arc for impl Clone
+        error: Arc<octocrab::Error>,
         request_seq: RequestSequence,
     },
 }
@@ -253,5 +295,29 @@ impl Command {
     }
     pub fn rotate_theme() -> Self {
         Command::RotateTheme
+    }
+    pub fn move_up_notification() -> Self {
+        Command::MoveNotification(Direction::Up)
+    }
+    pub fn move_down_notification() -> Self {
+        Command::MoveNotification(Direction::Down)
+    }
+    pub fn move_notification_first() -> Self {
+        Command::MoveNotificationFirst
+    }
+    pub fn move_notification_last() -> Self {
+        Command::MoveNotificationLast
+    }
+    pub fn open_notification() -> Self {
+        Command::OpenNotification
+    }
+    pub fn reload_notifications() -> Self {
+        Command::ReloadNotifications
+    }
+    pub fn mark_notification_as_done() -> Self {
+        Command::MarkNotificationAsDone
+    }
+    pub fn unsubscribe_thread() -> Self {
+        Command::UnsubscribeThread
     }
 }
