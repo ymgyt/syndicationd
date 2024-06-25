@@ -16,12 +16,24 @@ pub enum Tab {
     GitHub,
 }
 
+impl Tab {
+    fn width(self) -> u16 {
+        match self {
+            Tab::Entries => 7,
+            Tab::Feeds => 5,
+            Tab::GitHub => 6,
+        }
+    }
+}
+
 pub struct Tabs {
     pub selected: usize,
     pub tabs: Vec<Tab>,
 }
 
 impl Tabs {
+    const PADDING: &'static str = "    ";
+
     pub fn new(features: &'_ Features) -> Self {
         let mut tabs = vec![Tab::Entries, Tab::Feeds];
         if features.enable_github_notification {
@@ -38,6 +50,13 @@ impl Tabs {
         self.selected = direction.apply(self.selected, self.tabs.len(), IndexOutOfRange::Wrapping);
         self.current()
     }
+
+    fn width(&self) -> u16 {
+        #[allow(clippy::cast_possible_truncation)]
+        self.tabs.iter().fold(0, |width, tab| {
+            width + tab.width() + (Self::PADDING.len() as u16) + 2
+        })
+    }
 }
 
 impl Tabs {
@@ -48,8 +67,8 @@ impl Tabs {
             ..area
         };
 
-        // TODO: query length to tabs
-        let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(36)]);
+        tracing::info!("width: {}", self.width());
+        let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(self.width())]);
         let [title, tabs] = horizontal.areas(area);
 
         Paragraph::new(Span::styled("Syndicationd", cx.theme.application_title)).render(title, buf);
@@ -61,7 +80,7 @@ impl Tabs {
         }))
         .style(cx.theme.tabs)
         .divider("")
-        .padding("    ", "")
+        .padding(Self::PADDING, "")
         .select(self.selected)
         .highlight_style(cx.theme.tabs_selected)
         .render(tabs, buf);
