@@ -2,6 +2,11 @@ use std::time::Duration;
 
 use crate::config;
 
+#[derive(Debug, Clone, Default)]
+pub struct Features {
+    pub enable_github_notification: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub idle_timer_interval: Duration,
@@ -9,6 +14,7 @@ pub struct Config {
     pub entries_limit: usize,
     pub entries_per_pagination: i64,
     pub feeds_per_pagination: i64,
+    pub features: Features,
 }
 
 impl Default for Config {
@@ -19,6 +25,7 @@ impl Default for Config {
             entries_limit: config::feed::DEFAULT_ENTRIES_LIMIT,
             entries_per_pagination: config::client::DEFAULT_ENTRIES_PER_PAGINATION,
             feeds_per_pagination: config::client::DEFAULT_FEEDS_PER_PAGINATION,
+            features: Features::default(),
         }
     }
 }

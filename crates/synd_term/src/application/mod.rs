@@ -8,6 +8,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
+use either::Either;
 use futures_util::{FutureExt, Stream, StreamExt};
 use itertools::Itertools;
 use ratatui::widgets::Widget;
@@ -19,13 +20,18 @@ use update_informer::Version;
 use crate::{
     application::event::KeyEventResult,
     auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
-    client::{mutation::subscribe_feed::SubscribeFeedInput, Client, SyndApiError},
+    client::{
+        github::{FetchNotificationInclude, FetchNotificationsParams, GithubClient},
+        mutation::subscribe_feed::SubscribeFeedInput,
+        Client, SyndApiError,
+    },
     command::{ApiResponse, Command},
     config::{self, Categories},
     interact::Interactor,
     job::Jobs,
     keymap::{KeymapId, Keymaps},
     terminal::Terminal,
+    types::github::{IssueOrPullRequest, Notification},
     ui::{
         self,
         components::{
@@ -57,7 +63,7 @@ mod builder;
 pub use builder::ApplicationBuilder;
 
 mod app_config;
-pub use app_config::Config;
+pub use app_config::{Config, Features};
 
 pub(crate) mod event;
 
@@ -75,6 +81,7 @@ pub struct Application {
     clock: Box<dyn Clock>,
     terminal: Terminal,
     client: Client,
+    github_client: Option<GithubClient>,
     jobs: Jobs,
     components: Components,
     interactor: Interactor,
@@ -105,6 +112,7 @@ impl Application {
         let ApplicationBuilder {
             terminal,
             client,
+            github_client,
             categories,
             cache,
             config,
@@ -132,8 +140,9 @@ impl Application {
             clock: Box::new(SystemClock),
             terminal,
             client,
+            github_client,
             jobs: Jobs::new(),
-            components: Components::new(),
+            components: Components::new(&config.features),
             interactor: interactor.unwrap_or_else(Interactor::new),
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
@@ -210,12 +219,17 @@ impl Application {
         self.initial_fetch();
         self.check_latest_release();
         self.components.auth.authenticated();
-        self.keymaps().disable(KeymapId::Login);
-        self.keymaps().enable(KeymapId::Tabs);
-        self.keymaps().enable(KeymapId::Entries);
-        self.keymaps().enable(KeymapId::Filter);
         self.reset_idle_timer();
         self.should_render();
+        self.keymaps()
+            .disable(KeymapId::Login)
+            .enable(KeymapId::Tabs)
+            .enable(KeymapId::Entries)
+            .enable(KeymapId::Filter);
+        self.config
+            .features
+            .enable_github_notification
+            .then(|| self.keymaps().enable(KeymapId::Notification));
     }
 
     fn set_credential(&mut self, cred: Verified<Credential>) {
@@ -232,6 +246,15 @@ impl Application {
             }))
             .boxed(),
         );
+        if self.config.features.enable_github_notification {
+            self.jobs.futures.push(
+                future::ready(Ok(Command::FetchGithubNotifications {
+                    page: config::github::INITIAL_PAGE_NUM,
+                    populate: Populate::Replace,
+                }))
+                .boxed(),
+            );
+        }
     }
 
     /// Restore terminal state and print something to console if necesseary
@@ -415,23 +438,71 @@ impl Application {
                             self.components.entries.update_entries(populate, payload);
                             self.should_render();
                         }
+                        ApiResponse::FetchGithubNotifications {
+                            notifications,
+                            populate,
+                        } => {
+                            next = Some(
+                                self.components
+                                    .notifications
+                                    .update_notifications(populate, notifications),
+                            );
+                            self.should_render();
+                        }
+                        ApiResponse::FetchGithubIssue {
+                            notification_id,
+                            issue,
+                        } => {
+                            self.components
+                                .notifications
+                                .update_issue(notification_id, issue);
+                            self.should_render();
+                        }
+                        ApiResponse::FetchGithubPullRequest {
+                            notification_id,
+                            pull_request,
+                        } => {
+                            self.components
+                                .notifications
+                                .update_pull_request(notification_id, pull_request);
+                            self.should_render();
+                        }
+                        ApiResponse::MarkGithubNotificationAsDone { notification_id } => {
+                            self.components
+                                .notifications
+                                .marked_as_done(notification_id);
+                            self.should_render();
+                        }
+                        ApiResponse::UnsubscribeGithubThread { .. } => {
+                            // do nothing
+                        }
                     }
                 }
                 Command::RefreshCredential { credential } => {
                     self.set_credential(credential);
                 }
                 Command::MoveTabSelection(direction) => {
-                    self.keymaps().toggle(KeymapId::Entries);
-                    self.keymaps().toggle(KeymapId::Subscription);
+                    self.keymaps()
+                        .disable(KeymapId::Subscription)
+                        .disable(KeymapId::Entries)
+                        .disable(KeymapId::Notification);
 
                     match self.components.tabs.move_selection(direction) {
-                        Tab::Feeds if !self.components.subscription.has_subscription() => {
-                            next = Some(Command::FetchSubscription {
-                                after: None,
-                                first: self.config.feeds_per_pagination,
-                            });
+                        Tab::Feeds => {
+                            self.keymaps().enable(KeymapId::Subscription);
+                            if !self.components.subscription.has_subscription() {
+                                next = Some(Command::FetchSubscription {
+                                    after: None,
+                                    first: self.config.feeds_per_pagination,
+                                });
+                            }
                         }
-                        _ => {}
+                        Tab::Entries => {
+                            self.keymaps().enable(KeymapId::Entries);
+                        }
+                        Tab::GitHub => {
+                            self.keymaps().enable(KeymapId::Notification);
+                        }
                     }
                     self.should_render();
                 }
@@ -565,6 +636,44 @@ impl Application {
                     self.apply_feed_filter(filter);
                     self.should_render();
                 }
+                Command::FetchGithubNotifications { page, populate } => {
+                    self.fetch_gh_notifications(populate, page);
+                }
+                Command::MoveNotification(direction) => {
+                    self.components.notifications.move_selection(direction);
+                    self.should_render();
+                }
+                Command::MoveNotificationFirst => {
+                    self.components.notifications.move_first();
+                    self.should_render();
+                }
+                Command::MoveNotificationLast => {
+                    self.components.notifications.move_last();
+                    self.should_render();
+                }
+                Command::OpenNotification => {
+                    self.open_notification();
+                }
+                Command::ReloadNotifications => {
+                    self.fetch_gh_notifications(
+                        Populate::Replace,
+                        config::github::INITIAL_PAGE_NUM,
+                    );
+                }
+                Command::FetchNotificationDetails { contexts } => {
+                    self.fetch_gh_notification_details(contexts);
+                }
+                Command::MarkNotificationAsDone => {
+                    self.mark_gh_notification_as_done();
+                }
+                Command::UnsubscribeThread => {
+                    // Unlike the web UI, simply unsubscribing does not mark it as done
+                    // and it remains as unread.
+                    // Therefore, when reloading, the unsubscribed notification is displayed again.
+                    // To address this, we will implicitly mark it as done when unsubscribing.
+                    self.unsubscribe_gh_thread();
+                    self.mark_gh_notification_as_done();
+                }
                 Command::RotateTheme => {
                     self.rotate_theme();
                     self.should_render();
@@ -604,6 +713,9 @@ impl Application {
                 Command::HandleOauthApiError { error, request_seq } => {
                     self.handle_error_message(error.to_string(), Some(request_seq));
                 }
+                Command::HandleGithubApiError { error, request_seq } => {
+                    self.handle_error_message(error.to_string(), Some(request_seq));
+                }
             }
         }
     }
@@ -634,6 +746,7 @@ impl Application {
             in_flight: &self.in_flight,
             categories: &self.categories,
             focus: self.state.focus(),
+            now: self.now(),
         };
         let root = Root::new(&self.components, cx);
 
@@ -776,6 +889,57 @@ impl Application {
         .boxed();
         self.jobs.futures.push(fut);
     }
+
+    fn mark_gh_notification_as_done(&mut self) {
+        let Some(id) = self.components.notifications.marking_as_done() else {
+            return;
+        };
+        let client = self.github_client.as_ref().unwrap().clone();
+        let request_seq = self.in_flight.add(RequestId::MarkGithubNotificationAsDone);
+        let fut = async move {
+            match client.mark_thread_as_done(id).await {
+                Ok(()) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::MarkGithubNotificationAsDone {
+                        notification_id: id,
+                    },
+                }),
+                Err(error) => Ok(Command::HandleGithubApiError {
+                    error: Arc::new(error),
+                    request_seq,
+                }),
+            }
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
+
+    fn unsubscribe_gh_thread(&mut self) {
+        let Some(id) = self
+            .components
+            .notifications
+            .selected_notification()
+            .and_then(|n| n.thread_id)
+        else {
+            return;
+        };
+        let client = self.github_client.as_ref().unwrap().clone();
+        let request_seq = self.in_flight.add(RequestId::UnsubscribeGithubThread);
+        let fut = async move {
+            match client.unsubscribe_thread(id).await {
+                Ok(()) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::UnsubscribeGithubThread {},
+                }),
+                Err(error) => Ok(Command::HandleGithubApiError {
+                    error: Arc::new(error),
+                    request_seq,
+                }),
+            }
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
 }
 
 impl Application {
@@ -796,6 +960,18 @@ impl Application {
             return;
         };
         self.interactor.open_browser(entry_website_url);
+    }
+
+    fn open_notification(&mut self) {
+        let Some(notification_url) = self
+            .components
+            .notifications
+            .selected_notification()
+            .and_then(Notification::browser_url)
+        else {
+            return;
+        };
+        self.interactor.open_browser(notification_url.as_str());
     }
 }
 
@@ -844,6 +1020,93 @@ impl Application {
         }
         .boxed();
         self.jobs.futures.push(fut);
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn fetch_gh_notifications(&mut self, populate: Populate, page: u8) {
+        let client = self
+            .github_client
+            .clone()
+            .expect("Github client not found, this is a BUG");
+        let request_seq = self.in_flight.add(RequestId::FetchGithubNotifications);
+        let fut = async move {
+            match client
+                .fetch_notifications(FetchNotificationsParams {
+                    page,
+                    include: FetchNotificationInclude::Unread,
+                })
+                .await
+            {
+                Ok(notifications) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::FetchGithubNotifications {
+                        populate,
+                        notifications,
+                    },
+                }),
+                Err(error) => Ok(Command::HandleGithubApiError {
+                    error: Arc::new(error),
+                    request_seq,
+                }),
+            }
+        }
+        .boxed();
+        self.jobs.futures.push(fut);
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn fetch_gh_notification_details(&mut self, contexts: Vec<IssueOrPullRequest>) {
+        let client = self
+            .github_client
+            .clone()
+            .expect("Github client not found, this is a BUG");
+
+        for context in contexts {
+            let request_seq = self.in_flight.add(RequestId::FetchGithubNotifications);
+            let client = client.clone();
+
+            let fut = match context {
+                Either::Left(issue) => {
+                    let notification_id = issue.notification_id;
+                    async move {
+                        match client.fetch_issue(issue).await {
+                            Ok(issue) => Ok(Command::HandleApiResponse {
+                                request_seq,
+                                response: ApiResponse::FetchGithubIssue {
+                                    notification_id,
+                                    issue,
+                                },
+                            }),
+                            Err(error) => Ok(Command::HandleGithubApiError {
+                                error: Arc::new(error),
+                                request_seq,
+                            }),
+                        }
+                    }
+                    .boxed()
+                }
+                Either::Right(pull_request) => {
+                    let notification_id = pull_request.notification_id;
+                    async move {
+                        match client.fetch_pull_request(pull_request).await {
+                            Ok(pull_request) => Ok(Command::HandleApiResponse {
+                                request_seq,
+                                response: ApiResponse::FetchGithubPullRequest {
+                                    notification_id,
+                                    pull_request,
+                                },
+                            }),
+                            Err(error) => Ok(Command::HandleGithubApiError {
+                                error: Arc::new(error),
+                                request_seq,
+                            }),
+                        }
+                    }
+                    .boxed()
+                }
+            };
+            self.jobs.futures.push(fut);
+        }
     }
 }
 

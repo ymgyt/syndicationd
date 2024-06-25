@@ -47,6 +47,8 @@ pub struct Args {
     pub api: ApiOptions,
     #[command(flatten)]
     pub feed: FeedOptions,
+    #[command(flatten)]
+    pub experimental: ExperimentalOptions,
     #[arg(hide = true, long = "dry-run", hide_long_help = true)]
     pub dry_run: bool,
 }
@@ -71,6 +73,26 @@ pub struct FeedOptions {
     /// Feed entries limit to fetch
     #[arg(long, aliases = ["max-entries"], default_value_t = config::feed::DEFAULT_ENTRIES_LIMIT)]
     pub entries_limit: usize,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct ExperimentalOptions {
+    /// GitHub Personal Access Token
+    #[arg(
+        long,
+        hide = true,
+        hide_long_help = true,
+        env = "SYND_GH_PAT",
+        required_if_eq("enable_github_notification", "true")
+    )]
+    pub github_pat: Option<String>,
+    #[arg(
+        action = clap::ArgAction::SetTrue,
+        long,
+        hide = true, hide_long_help = true,
+        default_value_t = false,
+    )]
+    pub enable_github_notification: bool,
 }
 
 #[derive(Subcommand, Debug)]

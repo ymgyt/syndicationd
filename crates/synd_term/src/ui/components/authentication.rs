@@ -13,7 +13,7 @@ use tui_big_text::{BigText, PixelSize};
 use crate::{
     application::Direction,
     auth::AuthenticationProvider,
-    ui::{self, extension::RectExt, Context},
+    ui::{self, extension::RectExt, icon, Context},
 };
 
 /// Handle user authentication
@@ -111,8 +111,8 @@ impl Authentication {
                 .providers
                 .iter()
                 .map(|provider| match provider {
-                    AuthenticationProvider::Github => Text::from("󰊤 GitHub"),
-                    AuthenticationProvider::Google => Text::from("󰊭 Google"),
+                    AuthenticationProvider::Github => Text::from(concat!(icon!(github), " GitHub")),
+                    AuthenticationProvider::Google => Text::from(concat!(icon!(google), "Google")),
                 })
                 .map(ListItem::new);
 

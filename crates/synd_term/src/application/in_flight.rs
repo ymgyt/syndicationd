@@ -15,8 +15,11 @@ pub enum RequestId {
     DeviceFlowPollAccessToken,
     FetchEntries,
     FetchSubscription,
+    FetchGithubNotifications,
     SubscribeFeed,
     UnsubscribeFeed,
+    MarkGithubNotificationAsDone,
+    UnsubscribeGithubThread,
 }
 
 /// Mangae in flight requests state

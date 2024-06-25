@@ -1,0 +1,30 @@
+query PullRequestQuery($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!) {
+   repository(owner: $repositoryOwner, name: $repositoryName, followRenames: true) {
+    repositoryTopics(first: 10) {
+      nodes {
+        topic {
+          name
+        }
+      }
+    }
+    pullRequest(number: $pullRequestNumber) {
+      totalCommentsCount
+      state
+      isDraft
+      bodyText
+      author {
+        __typename
+        login
+      }
+      comments(first: 1, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        nodes {
+          bodyText
+          author {
+            __typename
+            login
+          }
+        }
+      }
+    }
+  }
+}

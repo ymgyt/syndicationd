@@ -20,6 +20,8 @@ pub use page_info::PageInfo;
 mod requirement_ext;
 pub use requirement_ext::RequirementExt;
 
+pub(crate) mod github;
+
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Link {

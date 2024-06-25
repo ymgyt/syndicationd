@@ -111,7 +111,7 @@ gen-gql:
 
 # Run kvsd
 kvsd:
-    KVSD_LOG=info nix run github:ymgyt/kvsd/2dbed99870c87304e04c7c0e63acac249f30df0 -- server \
+    KVSD_LOG=info nix run github:ymgyt/kvsd/426ddaf5a6356551f0945b7ca3c48366580928d9 -- server \
         --disable-tls --config .dev/kvsd_config.yaml \
         --username {{ kvsd_user }} \
         --kvsd-dir .kvsd
@@ -130,7 +130,7 @@ api *flags:
 
 # Run term
 term *flags:
-    cd crates/synd_term; SYND_LOG=info SYND_ENDPOINT={{ synd_endpoint }} cargo run -- --log /tmp/syndterm.log {{ flags }}
+    cd crates/synd_term; SYND_ENDPOINT={{ synd_endpoint }} cargo run -- --log /tmp/syndterm.log {{ flags }}
 
 # Run opentelemetry-collector-contrib
 @otelcol config:

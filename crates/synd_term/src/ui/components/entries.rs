@@ -7,7 +7,9 @@ use crate::{
     ui::{
         self,
         components::filter::{FeedFilter, FilterResult},
-        icon, Context,
+        icon,
+        widgets::scrollbar::Scrollbar,
+        Context,
     },
 };
 use ratatui::{
@@ -15,8 +17,8 @@ use ratatui::{
     style::Stylize,
     text::{Line, Span, Text},
     widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, StatefulWidget, Table, TableState, Widget, Wrap,
+        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, StatefulWidget, Table,
+        TableState, Widget, Wrap,
     },
 };
 use synd_feed::types::FeedUrl;
@@ -113,10 +115,10 @@ impl Entries {
 impl Entries {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
-        let [entries_area, summary_area] = vertical.areas(area);
+        let [entries_area, detail_area] = vertical.areas(area);
 
         self.render_entries(entries_area, buf, cx);
-        self.render_detail(summary_area, buf, cx);
+        self.render_detail(detail_area, buf, cx);
     }
 
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -142,25 +144,22 @@ impl Entries {
 
         StatefulWidget::render(entries, entries_area, buf, &mut entries_state);
 
+        let header_rows = 2;
+        #[allow(clippy::cast_possible_truncation)]
         let scrollbar_area = Rect {
-            y: area.y + 2, // table header
-            height: area.height.saturating_sub(1),
+            y: area.y + header_rows, // table header
+            height: area
+                .height
+                .saturating_sub(header_rows)
+                .min(self.effective_entries.len() as u16),
             ..area
         };
 
-        // https://github.com/ratatui-org/ratatui/pull/911
-        // passing None to track_symbol cause incorrect rendering
-        let mut scrollbar_state = ScrollbarState::default()
-            .content_length(self.effective_entries.len())
-            .position(self.selected_entry_index);
-        Scrollbar::default()
-            .orientation(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(None)
-            .end_symbol(None)
-            .track_symbol(Some(" "))
-            .thumb_symbol("▐")
-            .style(cx.theme.base)
-            .render(scrollbar_area, buf, &mut scrollbar_state);
+        Scrollbar {
+            content_length: self.effective_entries.len(),
+            position: self.selected_entry_index,
+        }
+        .render(scrollbar_area, buf, cx);
     }
 
     fn entry_rows<'a>(

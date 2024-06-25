@@ -6,6 +6,7 @@ use synd_feed::types::{Category, Requirement};
 use crate::{
     application::{InFlight, TerminalFocus},
     config::{Categories, Icon, IconColor},
+    types::Time,
     ui::theme::Theme,
 };
 
@@ -39,6 +40,7 @@ pub struct Context<'a> {
     pub theme: &'a Theme,
     pub in_flight: &'a InFlight,
     pub categories: &'a Categories,
+    pub(crate) now: Time,
     pub(crate) focus: TerminalFocus,
 }
 

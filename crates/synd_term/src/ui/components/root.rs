@@ -35,6 +35,7 @@ impl<'a> Root<'a> {
         match self.components.tabs.current() {
             Tab::Feeds => self.components.subscription.render(content_area, buf, cx),
             Tab::Entries => self.components.entries.render(content_area, buf, cx),
+            Tab::GitHub => self.components.notifications.render(content_area, buf, cx),
         };
 
         self.components
