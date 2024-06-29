@@ -15,6 +15,7 @@ macro_rules! icon {
     (issuereopened) => { "" };
     (issuenotplanned) => { "" };
     (issueclosed) => { "" };
+    (label) => { "󱍵" };
     (requirement) => { "" };
     (open) => { "󰏌" };
     (pullrequest) => { "" };

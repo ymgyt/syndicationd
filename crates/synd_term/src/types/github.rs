@@ -1,8 +1,11 @@
-use std::ops::Deref;
+use std::{ops::Deref, str::FromStr};
 
 use either::Either;
 use octocrab::models::{self, activity::Subject};
-use ratatui::{style::Stylize, text::Span};
+use ratatui::{
+    style::{Color, Stylize},
+    text::Span,
+};
 use synd_feed::types::Category;
 use url::Url;
 
@@ -378,12 +381,39 @@ impl Notification {
             _ => None,
         }
     }
+
+    pub(crate) fn labels(&self) -> Option<impl Iterator<Item = &Label>> {
+        match self.subject_context {
+            Some(SubjectContext::Issue(ref issue)) => {
+                if issue.labels.is_empty() {
+                    None
+                } else {
+                    Some(issue.labels.iter())
+                }
+            }
+            Some(SubjectContext::PullRequest(ref pr)) => {
+                if pr.labels.is_empty() {
+                    None
+                } else {
+                    Some(pr.labels.iter())
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Comment {
     pub(crate) author: String,
     pub(crate) body: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Label {
+    pub(crate) name: String,
+    pub(crate) color: Option<Color>,
+    pub(crate) luminance: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -408,6 +438,7 @@ pub(crate) struct IssueContext {
     state_reason: Option<IssueStateReason>,
     body: String,
     last_comment: Option<Comment>,
+    labels: Vec<Label>,
 }
 
 impl From<issue_query::ResponseData> for IssueContext {
@@ -422,7 +453,6 @@ impl From<issue_query::ResponseData> for IssueContext {
             .into_iter()
             .filter_map(|node| node.map(|node| node.topic.name))
             .collect();
-
         let issue = repo.issue.expect("ResponseData does not have issue");
         let author: Option<String> = issue.author.map(|author| author.login);
         let state = match issue.state {
@@ -447,6 +477,18 @@ impl From<issue_query::ResponseData> for IssueContext {
                     body: node.body_text,
                 })
             });
+        let labels = issue
+            .labels
+            .and_then(|labels| labels.nodes)
+            .unwrap_or_default()
+            .into_iter()
+            .flatten()
+            .map(|label| Label {
+                name: label.name,
+                color: Color::from_str(&format!("#{}", label.color)).ok(),
+                luminance: luminance(&label.color),
+            })
+            .collect();
 
         Self {
             author,
@@ -455,6 +497,7 @@ impl From<issue_query::ResponseData> for IssueContext {
             state_reason,
             body,
             last_comment,
+            labels,
         }
     }
 }
@@ -475,6 +518,7 @@ pub(crate) struct PullRequestContext {
     is_draft: bool,
     body: String,
     last_comment: Option<Comment>,
+    labels: Vec<Label>,
 }
 
 impl From<pull_request_query::ResponseData> for PullRequestContext {
@@ -514,6 +558,20 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
                     body: node.body_text,
                 })
             });
+        let labels = pr
+            .labels
+            .and_then(|labels| labels.nodes)
+            .unwrap_or_default()
+            .into_iter()
+            .flatten()
+            .map(|label| Label {
+                name: label.name,
+                color: Color::from_str(&format!("#{}", label.color)).ok(),
+                luminance: luminance(&label.color),
+            })
+            .collect();
+
+        tracing::debug!("{labels:?}");
 
         Self {
             author,
@@ -522,6 +580,20 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
             is_draft,
             body,
             last_comment,
+            labels,
         }
     }
+}
+
+// Assume color is "RRGGBB" in hex format
+#[allow(clippy::cast_lossless)]
+fn luminance(color: &str) -> Option<f64> {
+    if color.len() != 6 {
+        return None;
+    }
+    let r = u8::from_str_radix(&color[..2], 16).ok()? as f64;
+    let g = u8::from_str_radix(&color[2..4], 16).ok()? as f64;
+    let b = u8::from_str_radix(&color[4..], 16).ok()? as f64;
+
+    Some((0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.)
 }

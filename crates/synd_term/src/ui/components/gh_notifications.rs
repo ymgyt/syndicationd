@@ -1,10 +1,11 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use chrono_humanize::{Accuracy, HumanTime, Tense};
+use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Modifier, Stylize},
+    style::{Modifier, Style, Styled, Stylize},
     text::{Line, Span},
     widgets::{
         Block, BorderType, Borders, Cell, Padding, Paragraph, Row, StatefulWidget, Table,
@@ -82,6 +83,7 @@ impl GhNotifications {
             .iter()
             .filter_map(Notification::context)
             .collect();
+
         self.max_repository_name = self.max_repository_name.max(
             notifications
                 .iter()
@@ -97,13 +99,14 @@ impl GhNotifications {
     }
 
     pub(crate) fn fetch_next_if_needed(&self) -> Option<Command> {
-        if self.notifications.len() < self.limit && self.next_page.is_some() {
-            Some(Command::FetchGhNotifications {
-                populate: Populate::Append,
-                page: self.next_page.unwrap(),
-            })
-        } else {
-            None
+        match self.next_page {
+            Some(page) if self.notifications.len() < self.limit => {
+                Some(Command::FetchGhNotifications {
+                    populate: Populate::Append,
+                    page,
+                })
+            }
+            _ => None,
         }
     }
 
@@ -393,6 +396,45 @@ impl GhNotifications {
             .wrap(Wrap { trim: true })
             .alignment(Alignment::Left);
         let last_comment = notification.last_comment();
+
+        // Render labels if exists
+        let content_area = {
+            let labels = notification.labels().map(|labels| {
+                #[allow(unstable_name_collisions)]
+                let labels = labels
+                    .map(|label| {
+                        let span = Span::from(&label.name);
+                        if let Some(color) = label.color {
+                            span.set_style(
+                                Style::default().bg(color).fg(
+                                    // Depending on the background color of the label
+                                    // the foreground may become difficult to read
+                                    cx.theme
+                                        .contrast_fg_from_luminance(label.luminance.unwrap_or(0.5)),
+                                ),
+                            )
+                        } else {
+                            span
+                        }
+                    })
+                    .intersperse(Span::from(" "));
+                let mut line = vec![
+                    Span::from(concat!(icon!(label), " Labels")).bold(),
+                    Span::from("     "),
+                ];
+                line.extend(labels);
+                Line::from(line)
+            });
+            if labels.is_none() {
+                content_area
+            } else {
+                let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]);
+                let [labels_area, content_area] = vertical.areas(content_area);
+
+                labels.unwrap().render(labels_area, buf);
+                content_area
+            }
+        };
 
         if last_comment.is_none() {
             let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]);

@@ -16,6 +16,12 @@ query PullRequestQuery($repositoryOwner: String!, $repositoryName: String!, $pul
         __typename
         login
       }
+      labels(first: 10, orderBy: {field: NAME, direction: ASC}) {
+        nodes {
+          color
+          name
+        }
+      }
       comments(first: 1, orderBy: {field: UPDATED_AT, direction: DESC}) {
         nodes {
           bodyText

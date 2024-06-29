@@ -164,3 +164,13 @@ impl Default for Theme {
         Theme::with_palette(&Palette::ferra())
     }
 }
+
+impl Theme {
+    pub(crate) fn contrast_fg_from_luminance(&self, luminance: f64) -> Color {
+        if luminance > 0.5 {
+            self.base.bg.unwrap_or_default()
+        } else {
+            self.base.fg.unwrap_or_default()
+        }
+    }
+}
