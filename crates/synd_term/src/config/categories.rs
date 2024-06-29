@@ -55,6 +55,19 @@ impl Categories {
 
         self.aliases = new_map;
     }
+
+    pub(crate) fn lookup(&self, category: &str) -> Option<Category<'static>> {
+        let normalized = match self.aliases.get(category) {
+            Some(normalized) => normalized,
+            None => category,
+        };
+
+        if self.categories.contains_key(normalized) {
+            Category::new(normalized.to_owned()).ok()
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Deserialize)]

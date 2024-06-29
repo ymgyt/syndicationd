@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{borrow::Cow, collections::HashMap};
 
 use chrono_humanize::{Accuracy, HumanTime, Tense};
 use ratatui::{
@@ -11,11 +11,11 @@ use ratatui::{
         TableState, Widget, Wrap,
     },
 };
-use synd_feed::types::Category;
 
 use crate::{
-    application::{Direction, IndexOutOfRange, Populate},
+    application::{Direction, Populate},
     command::Command,
+    config::{self, Categories},
     types::{
         github::{
             Comment, IssueContext, Notification, NotificationId, PullRequestContext,
@@ -23,7 +23,13 @@ use crate::{
         },
         TimeExt,
     },
-    ui::{self, icon, widgets::scrollbar::Scrollbar, Context},
+    ui::{
+        self,
+        components::{collections::FilterableVec, filter::GhNotificationFilterer},
+        icon,
+        widgets::scrollbar::Scrollbar,
+        Context,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,92 +37,106 @@ enum NotificationStatus {
     MarkingAsDone,
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-struct Annotated<T> {
-    category: Option<Category<'static>>,
-    inner: T,
-}
-
-impl<T> Deref for Annotated<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
 #[allow(clippy::struct_field_names)]
-pub(crate) struct Notifications {
-    selected_notification_index: usize,
+pub(crate) struct GhNotifications {
     max_repository_name: usize,
-    // notifications: Vec<Annotated<Notification>>,
-    notifications: Vec<Notification>,
+    notifications: FilterableVec<Notification, GhNotificationFilterer>,
+
     #[allow(clippy::zero_sized_map_values)]
     status: HashMap<NotificationId, NotificationStatus>,
+    limit: usize,
+    next_page: Option<u8>,
 }
 
-impl Notifications {
+impl GhNotifications {
     pub(crate) fn new() -> Self {
         Self {
-            selected_notification_index: 0,
+            notifications: FilterableVec::new(),
             max_repository_name: 0,
-            notifications: Vec::new(),
             #[allow(clippy::zero_sized_map_values)]
             status: HashMap::new(),
+            limit: config::github::NOTIFICATION_PER_PAGE as usize,
+            next_page: Some(config::github::INITIAL_PAGE_NUM),
         }
+    }
+
+    pub(crate) fn update_filterer(&mut self, filterer: GhNotificationFilterer) {
+        self.notifications.update_filter(filterer);
     }
 
     pub(crate) fn update_notifications(
         &mut self,
         populate: Populate,
         notifications: Vec<Notification>,
-    ) -> Command {
-        match populate {
-            Populate::Replace => {
-                self.notifications = notifications;
-            }
-            Populate::Append => {
-                self.notifications.extend(notifications);
-            }
+    ) -> Option<Command> {
+        if notifications.is_empty() {
+            self.next_page = None;
+            return None;
         }
-        self.max_repository_name = self
-            .notifications
-            .iter()
-            .map(|n| n.repository.name.as_str().len())
-            .max()
-            .unwrap_or(0)
-            .min(30);
 
-        let contexts = self
-            .notifications
+        match populate {
+            Populate::Replace => self.next_page = Some(config::github::INITIAL_PAGE_NUM + 1),
+            Populate::Append => self.next_page = self.next_page.map(|next| next.saturating_add(1)),
+        }
+        let contexts = notifications
             .iter()
             .filter_map(Notification::context)
             .collect();
+        self.max_repository_name = self.max_repository_name.max(
+            notifications
+                .iter()
+                .map(|n| n.repository.name.as_str().len())
+                .max()
+                .unwrap_or(0)
+                .min(30),
+        );
 
-        Command::FetchNotificationDetails { contexts }
+        self.notifications.update(populate, notifications);
+
+        Some(Command::FetchGhNotificationDetails { contexts })
     }
 
-    pub(crate) fn update_issue(&mut self, notification_id: NotificationId, issue: IssueContext) {
-        for n in &mut self.notifications {
+    pub(crate) fn fetch_next_if_needed(&self) -> Option<Command> {
+        if self.notifications.len() < self.limit && self.next_page.is_some() {
+            Some(Command::FetchGhNotifications {
+                populate: Populate::Append,
+                page: self.next_page.unwrap(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn update_issue(
+        &mut self,
+        notification_id: NotificationId,
+        issue: IssueContext,
+        config: &Categories,
+    ) -> Option<&Notification> {
+        for n in self.notifications.unfiltered_iter_mut() {
             if n.id == notification_id {
                 n.subject_context = Some(SubjectContext::Issue(issue));
-                break;
+                n.update_categories(config);
+                return Some(n);
             }
         }
+        None
     }
 
     pub(crate) fn update_pull_request(
         &mut self,
         notification_id: NotificationId,
         pull_request: PullRequestContext,
-    ) {
-        for n in &mut self.notifications {
+        config: &Categories,
+    ) -> Option<&Notification> {
+        for n in self.notifications.unfiltered_iter_mut() {
             if n.id == notification_id {
                 n.subject_context = Some(SubjectContext::PullRequest(pull_request));
-                break;
+                n.update_categories(config);
+                return Some(n);
             }
         }
+        None
     }
 
     pub(crate) fn marking_as_done(&mut self) -> Option<NotificationId> {
@@ -130,29 +150,23 @@ impl Notifications {
     }
 
     pub(crate) fn move_selection(&mut self, direction: Direction) {
-        self.selected_notification_index = direction.apply(
-            self.selected_notification_index,
-            self.notifications.len(),
-            IndexOutOfRange::Wrapping,
-        );
+        self.notifications.move_selection(direction);
     }
 
     pub(crate) fn move_first(&mut self) {
-        self.selected_notification_index = 0;
+        self.notifications.move_first();
     }
 
     pub(crate) fn move_last(&mut self) {
-        if !self.notifications.is_empty() {
-            self.selected_notification_index = self.notifications.len() - 1;
-        }
+        self.notifications.move_last();
     }
 
     pub(crate) fn selected_notification(&self) -> Option<&Notification> {
-        self.notifications.get(self.selected_notification_index)
+        self.notifications.selected()
     }
 }
 
-impl Notifications {
+impl GhNotifications {
     pub(crate) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [notifications_area, detail_area] = vertical.areas(area);
@@ -166,7 +180,7 @@ impl Notifications {
 
         let mut notifications_state = TableState::new()
             .with_offset(0)
-            .with_selected(self.selected_notification_index);
+            .with_selected(self.notifications.selected_index());
         let (header, widths, rows) = self.notification_rows(cx);
         let notifications = Table::new(rows, widths)
             .header(header.style(cx.theme.entries.header))
@@ -195,7 +209,7 @@ impl Notifications {
 
         Scrollbar {
             content_length: self.notifications.len(),
-            position: self.selected_notification_index,
+            position: self.notifications.selected_index(),
         }
         .render(scrollbar_area, buf, cx);
     }
@@ -213,7 +227,7 @@ impl Notifications {
                 (Cow::Borrowed("-"), Cow::Borrowed("-"))
             } else {
                 (
-                    Cow::Owned((self.selected_notification_index + 1).to_string()),
+                    Cow::Owned((self.notifications.selected_index() + 1).to_string()),
                     Cow::Owned(self.notifications.len().to_string()),
                 )
             }
@@ -320,6 +334,9 @@ impl Notifications {
                                 .unwrap_or_default()
                         )
                     }
+                    Some(SubjectType::Ci) => "ci".to_owned(),
+                    Some(SubjectType::Release) => "release".to_owned(),
+                    Some(SubjectType::Discussion) => "discussion".to_owned(),
                     None => String::new(),
                 };
 
@@ -464,6 +481,7 @@ fn short_human_time(s: &str) -> String {
         "minutes" | "minute" => "m",
         "hours" | "hour" => "h",
         "days" | "day" => "d",
+        "weeks" | "week" => "w",
         "months" | "month" => "mo",
         "years" | "year" => "y",
         _ => "",
@@ -473,6 +491,9 @@ fn short_human_time(s: &str) -> String {
         "an" | "a" => "1",
         n => n,
     };
-
-    format!("{n: >2}{u} ago")
+    if u == "mo" {
+        format!("{n}{u} ago")
+    } else {
+        format!("{n: >2}{u} ago")
+    }
 }

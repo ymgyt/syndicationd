@@ -67,7 +67,6 @@ impl Tabs {
             ..area
         };
 
-        tracing::info!("width: {}", self.width());
         let horizontal = Layout::horizontal([Constraint::Min(0), Constraint::Length(self.width())]);
         let [title, tabs] = horizontal.areas(area);
 

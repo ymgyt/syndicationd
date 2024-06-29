@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use crate::{
-    application::{Direction, IndexOutOfRange, Populate},
+    application::{Direction, Populate},
     client::payload,
     types::{self, RequirementExt, TimeExt},
     ui::{
         self,
-        components::filter::{FeedFilter, FilterResult},
+        components::{collections::FilterableVec, filter::FeedFilterer},
         icon,
         widgets::scrollbar::Scrollbar,
         Context,
@@ -25,90 +25,61 @@ use synd_feed::types::FeedUrl;
 
 #[allow(clippy::struct_field_names)]
 pub(crate) struct Entries {
-    selected_entry_index: usize,
-    entries: Vec<types::Entry>,
-    effective_entries: Vec<usize>,
-    filter: FeedFilter,
+    entries: FilterableVec<types::Entry, FeedFilterer>,
 }
 
 impl Entries {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            selected_entry_index: 0,
-            entries: Vec::new(),
-            effective_entries: Vec::new(),
-            filter: FeedFilter::default(),
+            entries: FilterableVec::new(),
         }
     }
 
     /// Return entries count
-    pub fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> usize {
         self.entries.len()
     }
 
-    pub fn update_entries(&mut self, action: Populate, payload: payload::FetchEntriesPayload) {
-        match action {
-            Populate::Append => self.entries.extend(payload.entries),
-            Populate::Replace => self.entries = payload.entries,
-        }
-        self.apply_filter();
+    pub(crate) fn update_entries(
+        &mut self,
+        populate: Populate,
+        payload: payload::FetchEntriesPayload,
+    ) {
+        self.entries.update(populate, payload.entries);
     }
 
-    pub fn update_filter(&mut self, filter: FeedFilter) {
-        self.filter = filter;
-        self.apply_filter();
+    pub(crate) fn update_filterer(&mut self, filterer: FeedFilterer) {
+        self.entries.update_filter(filterer);
     }
 
-    fn apply_filter(&mut self) {
-        self.effective_entries = self
-            .entries
-            .iter()
-            .enumerate()
-            .filter(|(_idx, entry)| self.filter.entry(entry) == FilterResult::Use)
-            .map(|(idx, _)| idx)
-            .collect();
-        // prevent selection from out of index
-        self.selected_entry_index = self
-            .selected_entry_index
-            .min(self.effective_entries.len().saturating_sub(1));
-    }
-
-    pub fn remove_unsubscribed_entries(&mut self, url: &FeedUrl) {
+    pub(crate) fn remove_unsubscribed_entries(&mut self, url: &FeedUrl) {
         self.entries.retain(|entry| &entry.feed_url != url);
-        self.apply_filter();
     }
 
-    pub fn move_selection(&mut self, direction: Direction) {
-        self.selected_entry_index = direction.apply(
-            self.selected_entry_index,
-            self.effective_entries.len(),
-            IndexOutOfRange::Wrapping,
-        );
+    pub(crate) fn move_selection(&mut self, direction: Direction) {
+        self.entries.move_selection(direction);
     }
 
-    pub fn move_first(&mut self) {
-        self.selected_entry_index = 0;
+    pub(crate) fn move_first(&mut self) {
+        self.entries.move_first();
     }
 
-    pub fn move_last(&mut self) {
-        if !self.entries.is_empty() {
-            self.selected_entry_index = self.effective_entries.len() - 1;
-        }
+    pub(crate) fn move_last(&mut self) {
+        self.entries.move_last();
     }
 
-    pub fn entries(&self) -> &[types::Entry] {
-        self.entries.as_slice()
+    pub(crate) fn entries(&self) -> &[types::Entry] {
+        self.entries.as_unfiltered_slice()
     }
 
-    pub fn selected_entry_website_url(&self) -> Option<&str> {
-        self.selected_entry()
+    pub(crate) fn selected_entry_website_url(&self) -> Option<&str> {
+        self.entries
+            .selected()
             .and_then(|entry| entry.website_url.as_deref())
     }
 
     fn selected_entry(&self) -> Option<&types::Entry> {
-        self.effective_entries
-            .get(self.selected_entry_index)
-            .map(|&idx| self.entries.get(idx).unwrap())
+        self.entries.selected()
     }
 }
 
@@ -126,7 +97,7 @@ impl Entries {
 
         let mut entries_state = TableState::new()
             .with_offset(0)
-            .with_selected(self.selected_entry_index);
+            .with_selected(self.entries.selected_index());
 
         let (header, widths, rows) = self.entry_rows(cx);
 
@@ -151,13 +122,13 @@ impl Entries {
             height: area
                 .height
                 .saturating_sub(header_rows)
-                .min(self.effective_entries.len() as u16),
+                .min(self.entries.len() as u16),
             ..area
         };
 
         Scrollbar {
-            content_length: self.effective_entries.len(),
-            position: self.selected_entry_index,
+            content_length: self.entries.len(),
+            position: self.entries.selected_index(),
         }
         .render(scrollbar_area, buf, cx);
     }
@@ -171,12 +142,12 @@ impl Entries {
         impl IntoIterator<Item = Row<'a>>,
     ) {
         let (n, m) = {
-            if self.effective_entries.is_empty() {
+            if self.entries.is_empty() {
                 (Cow::Borrowed("-"), Cow::Borrowed("-"))
             } else {
                 (
-                    Cow::Owned((self.selected_entry_index + 1).to_string()),
-                    Cow::Owned(self.effective_entries.len().to_string()),
+                    Cow::Owned((self.entries.selected_index() + 1).to_string()),
+                    Cow::Owned(self.entries.len().to_string()),
                 )
             }
         };
@@ -222,13 +193,7 @@ impl Entries {
             ])
         };
 
-        (
-            header,
-            constraints,
-            self.effective_entries
-                .iter()
-                .map(move |&idx| row(self.entries.get(idx).unwrap())),
-        )
+        (header, constraints, self.entries.iter().map(row))
     }
 
     fn render_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {

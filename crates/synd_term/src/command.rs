@@ -15,6 +15,7 @@ use crate::{
         },
         Feed,
     },
+    ui::components::filter::FilterLane,
 };
 
 #[derive(Debug, Clone)]
@@ -64,7 +65,9 @@ impl Display for ApiResponse {
             ApiResponse::DeviceFlowCredential { .. } => f.write_str("DeviceFlowCredential"),
             ApiResponse::FetchSubscription { .. } => f.write_str("FetchSubscription"),
             ApiResponse::FetchEntries { .. } => f.write_str("FetchEntries"),
-
+            ApiResponse::FetchGithubNotifications { .. } => f.write_str("FetchGithubNotifications"),
+            ApiResponse::FetchGithubIssue { .. } => f.write_str("FetchGithubIssue"),
+            ApiResponse::FetchGithubPullRequest { .. } => f.write_str("FetchGithubPullRequest"),
             cmd => write!(f, "{cmd:?}"),
         }
     }
@@ -133,10 +136,15 @@ pub(crate) enum Command {
     PromptChanged,
     DeactivateFiltering,
     ToggleFilterCategory {
+        lane: FilterLane,
         category: Category<'static>,
     },
-    ActivateAllFilterCategories,
-    DeactivateAllFilterCategories,
+    ActivateAllFilterCategories {
+        lane: FilterLane,
+    },
+    DeactivateAllFilterCategories {
+        lane: FilterLane,
+    },
 
     // Theme
     RotateTheme,
@@ -145,20 +153,20 @@ pub(crate) enum Command {
     InformLatestRelease(update_informer::Version),
 
     // Github notifications
-    FetchGithubNotifications {
+    FetchGhNotifications {
         populate: Populate,
         page: u8,
     },
-    MoveNotification(Direction),
-    MoveNotificationFirst,
-    MoveNotificationLast,
-    OpenNotification,
-    ReloadNotifications,
-    FetchNotificationDetails {
+    MoveGhNotification(Direction),
+    MoveGhNotificationFirst,
+    MoveGhNotificationLast,
+    OpenGhNotification,
+    ReloadGhNotifications,
+    FetchGhNotificationDetails {
         contexts: Vec<IssueOrPullRequest>,
     },
-    MarkNotificationAsDone,
-    UnsubscribeThread,
+    MarkGhNotificationAsDone,
+    UnsubscribeGhThread,
 
     // Error
     HandleError {
@@ -183,7 +191,10 @@ pub(crate) enum Command {
 
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+        match self {
+            Command::HandleApiResponse { response, .. } => response.fmt(f),
+            _ => write!(f, "{self:?}"),
+        }
     }
 }
 
@@ -297,27 +308,27 @@ impl Command {
         Command::RotateTheme
     }
     pub fn move_up_notification() -> Self {
-        Command::MoveNotification(Direction::Up)
+        Command::MoveGhNotification(Direction::Up)
     }
     pub fn move_down_notification() -> Self {
-        Command::MoveNotification(Direction::Down)
+        Command::MoveGhNotification(Direction::Down)
     }
     pub fn move_notification_first() -> Self {
-        Command::MoveNotificationFirst
+        Command::MoveGhNotificationFirst
     }
     pub fn move_notification_last() -> Self {
-        Command::MoveNotificationLast
+        Command::MoveGhNotificationLast
     }
     pub fn open_notification() -> Self {
-        Command::OpenNotification
+        Command::OpenGhNotification
     }
     pub fn reload_notifications() -> Self {
-        Command::ReloadNotifications
+        Command::ReloadGhNotifications
     }
     pub fn mark_notification_as_done() -> Self {
-        Command::MarkNotificationAsDone
+        Command::MarkGhNotificationAsDone
     }
     pub fn unsubscribe_thread() -> Self {
-        Command::UnsubscribeThread
+        Command::UnsubscribeGhThread
     }
 }

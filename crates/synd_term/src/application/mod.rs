@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     future,
     ops::{ControlFlow, Sub},
     pin::Pin,
@@ -35,7 +36,7 @@ use crate::{
     ui::{
         self,
         components::{
-            authentication::AuthenticateState, filter::FeedFilter, root::Root,
+            authentication::AuthenticateState, filter::Filterer, root::Root,
             subscription::UnsubscribeSelection, tabs::Tab, Components,
         },
         theme::{Palette, Theme},
@@ -248,7 +249,7 @@ impl Application {
         );
         if self.config.features.enable_github_notification {
             self.jobs.futures.push(
-                future::ready(Ok(Command::FetchGithubNotifications {
+                future::ready(Ok(Command::FetchGhNotifications {
                     page: config::github::INITIAL_PAGE_NUM,
                     populate: Populate::Replace,
                 }))
@@ -283,6 +284,8 @@ impl Application {
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
+        let mut queue = VecDeque::with_capacity(2);
+
         loop {
             let command = tokio::select! {
                 biased;
@@ -305,7 +308,8 @@ impl Application {
             };
 
             if let Some(command) = command {
-                self.apply(command);
+                queue.push_back(command);
+                self.apply(&mut queue);
             }
 
             if self.state.flags.contains(Should::Render) {
@@ -321,12 +325,11 @@ impl Application {
         }
     }
 
-    #[tracing::instrument(skip_all,fields(%command))]
-    fn apply(&mut self, command: Command) {
-        let mut next = Some(command);
+    #[tracing::instrument(skip_all)]
+    fn apply(&mut self, queue: &mut VecDeque<Command>) {
+        while let Some(command) = queue.pop_front() {
+            let _guard = tracing::info_span!("apply", %command).entered();
 
-        // should detect infinite loop ?
-        while let Some(command) = next.take() {
             match command {
                 Command::Nop => {}
                 Command::Quit => self.state.flags.insert(Should::Quit),
@@ -395,11 +398,11 @@ impl Application {
                             subscription,
                         } => {
                             // paginate
-                            next = subscription.feeds.page_info.has_next_page.then(|| {
-                                Command::FetchSubscription {
+                            subscription.feeds.page_info.has_next_page.then(|| {
+                                queue.push_back(Command::FetchSubscription {
                                     after: subscription.feeds.page_info.end_cursor.clone(),
                                     first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
-                                }
+                                });
                             });
                             // how we show fetched errors in ui?
                             if !subscription.feeds.errors.is_empty() {
@@ -420,10 +423,8 @@ impl Application {
                                 payload.entries.as_slice(),
                             );
                             // paginate
-                            next = payload
-                                .page_info
-                                .has_next_page
-                                .then(|| Command::FetchEntries {
+                            payload.page_info.has_next_page.then(|| {
+                                queue.push_back(Command::FetchEntries {
                                     after: payload.page_info.end_cursor.clone(),
                                     first: self
                                         .config
@@ -435,6 +436,7 @@ impl Application {
                                         .try_into()
                                         .unwrap_or(0),
                                 });
+                            });
                             self.components.entries.update_entries(populate, payload);
                             self.should_render();
                         }
@@ -442,34 +444,62 @@ impl Application {
                             notifications,
                             populate,
                         } => {
-                            next = Some(
-                                self.components
-                                    .notifications
-                                    .update_notifications(populate, notifications),
-                            );
+                            self.components
+                                .gh_notifications
+                                .update_notifications(populate, notifications)
+                                .into_iter()
+                                .for_each(|command| queue.push_back(command));
+                            self.components
+                                .gh_notifications
+                                .fetch_next_if_needed()
+                                .into_iter()
+                                .for_each(|command| queue.push_back(command));
+                            if populate == Populate::Replace {
+                                self.components.filter.clear_gh_notifications_categories();
+                            }
                             self.should_render();
                         }
                         ApiResponse::FetchGithubIssue {
                             notification_id,
                             issue,
                         } => {
-                            self.components
-                                .notifications
-                                .update_issue(notification_id, issue);
+                            if let Some(notification) = self
+                                .components
+                                .gh_notifications
+                                .update_issue(notification_id, issue, &self.categories)
+                            {
+                                let categories = notification.categories().cloned();
+                                self.components.filter.update_gh_notification_categories(
+                                    &self.categories,
+                                    Populate::Append,
+                                    categories,
+                                );
+                            }
                             self.should_render();
                         }
                         ApiResponse::FetchGithubPullRequest {
                             notification_id,
                             pull_request,
                         } => {
-                            self.components
-                                .notifications
-                                .update_pull_request(notification_id, pull_request);
+                            if let Some(notification) =
+                                self.components.gh_notifications.update_pull_request(
+                                    notification_id,
+                                    pull_request,
+                                    &self.categories,
+                                )
+                            {
+                                let categories = notification.categories().cloned();
+                                self.components.filter.update_gh_notification_categories(
+                                    &self.categories,
+                                    Populate::Append,
+                                    categories,
+                                );
+                            }
                             self.should_render();
                         }
                         ApiResponse::MarkGithubNotificationAsDone { notification_id } => {
                             self.components
-                                .notifications
+                                .gh_notifications
                                 .marked_as_done(notification_id);
                             self.should_render();
                         }
@@ -491,7 +521,7 @@ impl Application {
                         Tab::Feeds => {
                             self.keymaps().enable(KeymapId::Subscription);
                             if !self.components.subscription.has_subscription() {
-                                next = Some(Command::FetchSubscription {
+                                queue.push_back(Command::FetchSubscription {
                                     after: None,
                                     first: self.config.feeds_per_pagination,
                                 });
@@ -545,7 +575,7 @@ impl Application {
                     {
                         self.unsubscribe_feed(feed.url.clone());
                     }
-                    next = Some(Command::CancelFeedUnsubscriptionPopup);
+                    queue.push_back(Command::CancelFeedUnsubscriptionPopup);
                     self.should_render();
                 }
                 Command::CancelFeedUnsubscriptionPopup => {
@@ -594,12 +624,15 @@ impl Application {
                     self.open_entry();
                 }
                 Command::MoveFilterRequirement(direction) => {
-                    let filter = self.components.filter.move_requirement(direction);
-                    self.apply_feed_filter(filter);
+                    let filterer = self.components.filter.move_requirement(direction);
+                    self.apply_filterer(filterer);
                     self.should_render();
                 }
                 Command::ActivateCategoryFilterling => {
-                    let keymap = self.components.filter.activate_category_filtering();
+                    let keymap = self
+                        .components
+                        .filter
+                        .activate_category_filtering(self.components.tabs.current().into());
                     self.keymaps().update(KeymapId::CategoryFiltering, keymap);
                     self.should_render();
                 }
@@ -610,8 +643,11 @@ impl Application {
                 }
                 Command::PromptChanged => {
                     if self.components.filter.is_search_active() {
-                        let filter = self.components.filter.feed_filter();
-                        self.apply_feed_filter(filter);
+                        let filterer = self
+                            .components
+                            .filter
+                            .filterer(self.components.tabs.current().into());
+                        self.apply_filterer(filterer);
                         self.should_render();
                     }
                 }
@@ -621,52 +657,57 @@ impl Application {
                     self.key_handlers.remove_prompt();
                     self.should_render();
                 }
-                Command::ToggleFilterCategory { category } => {
-                    let filter = self.components.filter.toggle_category_state(&category);
-                    self.apply_feed_filter(filter);
+                Command::ToggleFilterCategory { category, lane } => {
+                    let filter = self
+                        .components
+                        .filter
+                        .toggle_category_state(&category, lane);
+                    self.apply_filterer(filter)
+                        .into_iter()
+                        .for_each(|command| queue.push_back(command));
                     self.should_render();
                 }
-                Command::ActivateAllFilterCategories => {
-                    let filter = self.components.filter.activate_all_categories_state();
-                    self.apply_feed_filter(filter);
+                Command::ActivateAllFilterCategories { lane } => {
+                    let filterer = self.components.filter.activate_all_categories_state(lane);
+                    self.apply_filterer(filterer);
                     self.should_render();
                 }
-                Command::DeactivateAllFilterCategories => {
-                    let filter = self.components.filter.deactivate_all_categories_state();
-                    self.apply_feed_filter(filter);
+                Command::DeactivateAllFilterCategories { lane } => {
+                    let filterer = self.components.filter.deactivate_all_categories_state(lane);
+                    self.apply_filterer(filterer);
                     self.should_render();
                 }
-                Command::FetchGithubNotifications { page, populate } => {
+                Command::FetchGhNotifications { page, populate } => {
                     self.fetch_gh_notifications(populate, page);
                 }
-                Command::MoveNotification(direction) => {
-                    self.components.notifications.move_selection(direction);
+                Command::MoveGhNotification(direction) => {
+                    self.components.gh_notifications.move_selection(direction);
                     self.should_render();
                 }
-                Command::MoveNotificationFirst => {
-                    self.components.notifications.move_first();
+                Command::MoveGhNotificationFirst => {
+                    self.components.gh_notifications.move_first();
                     self.should_render();
                 }
-                Command::MoveNotificationLast => {
-                    self.components.notifications.move_last();
+                Command::MoveGhNotificationLast => {
+                    self.components.gh_notifications.move_last();
                     self.should_render();
                 }
-                Command::OpenNotification => {
+                Command::OpenGhNotification => {
                     self.open_notification();
                 }
-                Command::ReloadNotifications => {
+                Command::ReloadGhNotifications => {
                     self.fetch_gh_notifications(
                         Populate::Replace,
                         config::github::INITIAL_PAGE_NUM,
                     );
                 }
-                Command::FetchNotificationDetails { contexts } => {
+                Command::FetchGhNotificationDetails { contexts } => {
                     self.fetch_gh_notification_details(contexts);
                 }
-                Command::MarkNotificationAsDone => {
+                Command::MarkGhNotificationAsDone => {
                     self.mark_gh_notification_as_done();
                 }
-                Command::UnsubscribeThread => {
+                Command::UnsubscribeGhThread => {
                     // Unlike the web UI, simply unsubscribing does not mark it as done
                     // and it remains as unread.
                     // Therefore, when reloading, the unsubscribed notification is displayed again.
@@ -747,6 +788,7 @@ impl Application {
             categories: &self.categories,
             focus: self.state.focus(),
             now: self.now(),
+            tab: self.components.tabs.current(),
         };
         let root = Root::new(&self.components, cx);
 
@@ -891,7 +933,7 @@ impl Application {
     }
 
     fn mark_gh_notification_as_done(&mut self) {
-        let Some(id) = self.components.notifications.marking_as_done() else {
+        let Some(id) = self.components.gh_notifications.marking_as_done() else {
             return;
         };
         let client = self.github_client.as_ref().unwrap().clone();
@@ -917,7 +959,7 @@ impl Application {
     fn unsubscribe_gh_thread(&mut self) {
         let Some(id) = self
             .components
-            .notifications
+            .gh_notifications
             .selected_notification()
             .and_then(|n| n.thread_id)
         else {
@@ -965,7 +1007,7 @@ impl Application {
     fn open_notification(&mut self) {
         let Some(notification_url) = self
             .components
-            .notifications
+            .gh_notifications
             .selected_notification()
             .and_then(Notification::browser_url)
         else {
@@ -1028,12 +1070,14 @@ impl Application {
             .github_client
             .clone()
             .expect("Github client not found, this is a BUG");
-        let request_seq = self.in_flight.add(RequestId::FetchGithubNotifications);
+        let request_seq = self
+            .in_flight
+            .add(RequestId::FetchGithubNotifications { page });
         let fut = async move {
             match client
                 .fetch_notifications(FetchNotificationsParams {
                     page,
-                    include: FetchNotificationInclude::Unread,
+                    include: FetchNotificationInclude::OnlyUnread,
                 })
                 .await
             {
@@ -1062,7 +1106,7 @@ impl Application {
             .expect("Github client not found, this is a BUG");
 
         for context in contexts {
-            let request_seq = self.in_flight.add(RequestId::FetchGithubNotifications);
+            let request_seq = self.in_flight.add(RequestId::FetchGithubSubject);
             let client = client.clone();
 
             let fut = match context {
@@ -1208,9 +1252,18 @@ impl Application {
 }
 
 impl Application {
-    fn apply_feed_filter(&mut self, filter: FeedFilter) {
-        self.components.entries.update_filter(filter.clone());
-        self.components.subscription.update_filter(filter);
+    fn apply_filterer(&mut self, filterer: Filterer) -> Option<Command> {
+        match filterer {
+            Filterer::Feed(filterer) => {
+                self.components.entries.update_filterer(filterer.clone());
+                self.components.subscription.update_filterer(filterer);
+                None
+            }
+            Filterer::GhNotification(filterer) => {
+                self.components.gh_notifications.update_filterer(filterer);
+                self.components.gh_notifications.fetch_next_if_needed()
+            }
+        }
     }
 
     fn rotate_theme(&mut self) {
