@@ -112,7 +112,7 @@ impl Authentication {
                 .iter()
                 .map(|provider| match provider {
                     AuthenticationProvider::Github => Text::from(concat!(icon!(github), " GitHub")),
-                    AuthenticationProvider::Google => Text::from(concat!(icon!(google), "Google")),
+                    AuthenticationProvider::Google => Text::from(concat!(icon!(google), " Google")),
                 })
                 .map(ListItem::new);
 

@@ -13,12 +13,12 @@ use ratatui::{
 use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
-    application::{Direction, IndexOutOfRange, Populate},
+    application::{Direction, Populate},
     client::query::subscription::SubscriptionOutput,
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{
         self,
-        components::filter::{FeedFilter, FilterResult},
+        components::{collections::FilterableVec, filter::FeedFilterer},
         extension::RectExt,
         widgets::scrollbar::Scrollbar,
         Context,
@@ -26,10 +26,7 @@ use crate::{
 };
 
 pub struct Subscription {
-    selected_feed_index: usize,
-    feeds: Vec<types::Feed>,
-    effective_feeds: Vec<usize>,
-    filter: FeedFilter,
+    feeds: FilterableVec<types::Feed, FeedFilterer>,
 
     unsubscribe_popup: UnsubscribePopup,
 }
@@ -55,12 +52,9 @@ struct UnsubscribePopup {
 }
 
 impl Subscription {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            selected_feed_index: 0,
-            feeds: Vec::new(),
-            effective_feeds: Vec::new(),
-            filter: FeedFilter::default(),
+            feeds: FilterableVec::new(),
             unsubscribe_popup: UnsubscribePopup {
                 selection: UnsubscribeSelection::Yes,
                 selected_feed: None,
@@ -68,21 +62,19 @@ impl Subscription {
         }
     }
 
-    pub fn has_subscription(&self) -> bool {
+    pub(crate) fn has_subscription(&self) -> bool {
         !self.feeds.is_empty()
     }
 
-    pub fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
+    pub(crate) fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
         self.feeds.iter().any(|feed| &feed.url == url)
     }
 
-    pub fn selected_feed(&self) -> Option<&types::Feed> {
-        self.effective_feeds
-            .get(self.selected_feed_index)
-            .map(|&idx| self.feeds.get(idx).unwrap())
+    pub(crate) fn selected_feed(&self) -> Option<&types::Feed> {
+        self.feeds.selected()
     }
 
-    pub fn show_unsubscribe_popup(&mut self, show: bool) {
+    pub(crate) fn show_unsubscribe_popup(&mut self, show: bool) {
         if show {
             self.unsubscribe_popup.selected_feed = self.selected_feed().cloned();
         } else {
@@ -90,74 +82,55 @@ impl Subscription {
         }
     }
 
-    pub fn unsubscribe_popup_selection(&self) -> (UnsubscribeSelection, Option<&types::Feed>) {
+    pub(crate) fn unsubscribe_popup_selection(
+        &self,
+    ) -> (UnsubscribeSelection, Option<&types::Feed>) {
         (
             self.unsubscribe_popup.selection,
             self.unsubscribe_popup.selected_feed.as_ref(),
         )
     }
 
-    pub fn update_subscription(&mut self, populate: Populate, subscription: SubscriptionOutput) {
-        let feed_metas = subscription.feeds.nodes.into_iter().map(types::Feed::from);
-        match populate {
-            Populate::Append => self.feeds.extend(feed_metas),
-            Populate::Replace => self.feeds = feed_metas.collect(),
-        }
-        self.apply_filter();
-    }
-
-    pub fn update_filter(&mut self, filter: FeedFilter) {
-        self.filter = filter;
-        self.apply_filter();
-    }
-
-    fn apply_filter(&mut self) {
-        self.effective_feeds = self
+    pub(crate) fn update_subscription(
+        &mut self,
+        populate: Populate,
+        subscription: SubscriptionOutput,
+    ) {
+        let feeds = subscription
             .feeds
-            .iter()
-            .enumerate()
-            .filter(|(_idx, feed)| self.filter.feed(feed) == FilterResult::Use)
-            .map(|(idx, _)| idx)
+            .nodes
+            .into_iter()
+            .map(types::Feed::from)
             .collect();
-        // prevent selection from out of index
-        self.selected_feed_index = self
-            .selected_feed_index
-            .min(self.effective_feeds.len().saturating_sub(1));
+        FilterableVec::update(&mut self.feeds, populate, feeds);
     }
 
-    pub fn upsert_subscribed_feed(&mut self, feed: types::Feed) {
-        match self.feeds.iter_mut().find(|x| x.url == feed.url) {
-            Some(x) => *x = feed,
-            None => self.feeds.insert(0, feed),
-        }
-        self.apply_filter();
+    pub(crate) fn update_filterer(&mut self, filterer: FeedFilterer) {
+        self.feeds.update_filter(filterer);
     }
 
-    pub fn remove_unsubscribed_feed(&mut self, url: &FeedUrl) {
-        self.feeds.retain(|feed_meta| &feed_meta.url != url);
-        self.apply_filter();
-        self.move_selection(Direction::Up);
+    pub(crate) fn upsert_subscribed_feed(&mut self, feed: types::Feed) {
+        let url = feed.url.clone();
+        self.feeds.upsert_first(feed, |x| x.url == url);
     }
 
-    pub fn move_selection(&mut self, direction: Direction) {
-        self.selected_feed_index = direction.apply(
-            self.selected_feed_index,
-            self.effective_feeds.len(),
-            IndexOutOfRange::Wrapping,
-        );
+    pub(crate) fn remove_unsubscribed_feed(&mut self, url: &FeedUrl) {
+        self.feeds.retain(|feed| &feed.url != url);
     }
 
-    pub fn move_first(&mut self) {
-        self.selected_feed_index = 0;
+    pub(crate) fn move_selection(&mut self, direction: Direction) {
+        self.feeds.move_selection(direction);
     }
 
-    pub fn move_last(&mut self) {
-        if !self.feeds.is_empty() {
-            self.selected_feed_index = self.effective_feeds.len() - 1;
-        }
+    pub(crate) fn move_first(&mut self) {
+        self.feeds.move_first();
     }
 
-    pub fn move_unsubscribe_popup_selection(&mut self, direction: Direction) {
+    pub(crate) fn move_last(&mut self) {
+        self.feeds.move_first();
+    }
+
+    pub(crate) fn move_unsubscribe_popup_selection(&mut self, direction: Direction) {
         if matches!(direction, Direction::Left | Direction::Right) {
             self.unsubscribe_popup.selection = self.unsubscribe_popup.selection.toggle();
         }
@@ -182,7 +155,7 @@ impl Subscription {
 
         let mut feeds_state = TableState::new()
             .with_offset(0)
-            .with_selected(self.selected_feed_index);
+            .with_selected(self.feeds.selected_index());
 
         let (header, widths, rows) = self.feed_rows(cx);
 
@@ -214,13 +187,13 @@ impl Subscription {
             height: area
                 .height
                 .saturating_sub(header_rows)
-                .min(self.effective_feeds.len() as u16),
+                .min(self.feeds.len() as u16),
             ..area
         };
 
         Scrollbar {
-            content_length: self.effective_feeds.len(),
-            position: self.selected_feed_index,
+            content_length: self.feeds.len(),
+            position: self.feeds.selected_index(),
         }
         .render(scrollbar_area, buf, cx);
     }
@@ -234,12 +207,12 @@ impl Subscription {
         impl IntoIterator<Item = Row<'a>>,
     ) {
         let (n, m) = {
-            if self.effective_feeds.is_empty() {
+            if self.feeds.is_empty() {
                 (Cow::Borrowed("-"), Cow::Borrowed("-"))
             } else {
                 (
-                    Cow::Owned((self.selected_feed_index + 1).to_string()),
-                    Cow::Owned(self.effective_feeds.len().to_string()),
+                    Cow::Owned((self.feeds.selected_index() + 1).to_string()),
+                    Cow::Owned(self.feeds.len().to_string()),
                 )
             }
         };
@@ -299,13 +272,7 @@ impl Subscription {
             ])
         };
 
-        (
-            header,
-            constraints,
-            self.effective_feeds
-                .iter()
-                .map(move |&idx| row(self.feeds.get(idx).unwrap())),
-        )
+        (header, constraints, self.feeds.iter().map(row))
     }
 
     #[allow(clippy::too_many_lines)]

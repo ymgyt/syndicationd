@@ -8,8 +8,9 @@ use url::Url;
 
 use crate::{
     client::github::{issue_query, pull_request_query},
+    config::Categories,
     types::Time,
-    ui::icon,
+    ui::{self, icon},
 };
 
 pub(crate) type ThreadId = octocrab::models::ThreadId;
@@ -70,6 +71,9 @@ pub(crate) type IssueOrPullRequest =
 pub(crate) enum SubjectType {
     Issue,
     PullRequest,
+    Ci,
+    Release,
+    Discussion,
 }
 
 /// Additional information fetched from api
@@ -90,6 +94,7 @@ pub(crate) struct Notification {
     pub(crate) last_read_at: Option<Time>,
     pub(crate) repository: Repository,
     pub(crate) subject_context: Option<SubjectContext>,
+    categories: Vec<Category<'static>>,
     subject_type: Option<SubjectType>,
     subject: Subject,
 }
@@ -129,10 +134,20 @@ impl From<models::activity::Notification> for Notification {
             .and_then(|id| id.parse::<u64>().ok())
             .map(ThreadId::from);
 
+        let categories = vec![ui::default_category().clone()];
+
         let subject_type = match subject.r#type.as_str() {
             typ if typ.eq_ignore_ascii_case("issue") => Some(SubjectType::Issue),
             typ if typ.eq_ignore_ascii_case("pullrequest") => Some(SubjectType::PullRequest),
-            _ => None,
+            typ if typ.eq_ignore_ascii_case("checksuite") && reason == "ci_activity" => {
+                Some(SubjectType::Ci)
+            }
+            typ if typ.eq_ignore_ascii_case("release") => Some(SubjectType::Release),
+            typ if typ.eq_ignore_ascii_case("discussion") => Some(SubjectType::Discussion),
+            _ => {
+                tracing::warn!("Unknown url: {url:?} reason: {reason} subject: `{subject:?}`");
+                None
+            }
         };
 
         Self {
@@ -143,6 +158,7 @@ impl From<models::activity::Notification> for Notification {
             updated_at,
             last_read_at,
             repository,
+            categories,
             subject,
             subject_type,
             subject_context: None,
@@ -192,6 +208,9 @@ impl Notification {
                 },
                 _ => Span::from(icon!(pullrequest)),
             },
+            Some(SubjectType::Ci) => Span::from(icon!(cross)).red(),
+            Some(SubjectType::Release) => Span::from(icon!(tag)).green(),
+            Some(SubjectType::Discussion) => Span::from(icon!(discussion)),
             None => Span::from(" "),
         }
     }
@@ -223,6 +242,21 @@ impl Notification {
                 // How to get PR review comment id?
                 Some(url)
             }
+            SubjectType::Ci => {
+                // In th UI, it transitions to the failed actions
+                // but I don't know how to identify which action failed
+                url.path_segments_mut().unwrap().extend(["actions"]);
+                Some(url)
+            }
+            SubjectType::Release => {
+                // Since the release ID is stored in the subject.url, obtaining the release information might help determine the specific destination
+                url.path_segments_mut().unwrap().extend(["releases"]);
+                Some(url)
+            }
+            SubjectType::Discussion => {
+                url.path_segments_mut().unwrap().extend(["discussions"]);
+                Some(url)
+            }
         }
     }
 
@@ -238,6 +272,8 @@ impl Notification {
                 notification_id: self.id,
                 repository_key: self.repository().clone(),
             })),
+            // Currently ignore ci, release, discussion
+            _ => None,
         }
     }
 
@@ -310,6 +346,38 @@ impl Notification {
 
         url
     }
+
+    pub(crate) fn categories(&self) -> impl Iterator<Item = &Category<'static>> {
+        self.categories.iter()
+    }
+
+    pub(crate) fn update_categories(&mut self, config: &Categories) {
+        self.categories.clear();
+        if let Some(category) = config.lookup(&self.repository.owner) {
+            self.categories.push(category);
+        }
+        if let Some(category) = config.lookup(&self.repository.name) {
+            self.categories.push(category);
+        }
+        if let Some(topics) = self.topics().map(|topics| {
+            topics
+                .filter_map(|topic| config.lookup(topic))
+                .collect::<Vec<_>>()
+        }) {
+            self.categories.extend(topics);
+        }
+        if self.categories.is_empty() {
+            self.categories.push(ui::default_category().clone());
+        }
+    }
+
+    fn topics(&self) -> Option<impl Iterator<Item = &str>> {
+        match self.subject_context {
+            Some(SubjectContext::Issue(ref issue)) => Some(issue.topics.iter().map(String::as_str)),
+            Some(SubjectContext::PullRequest(ref pr)) => Some(pr.topics.iter().map(String::as_str)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -335,7 +403,7 @@ pub(crate) enum IssueStateReason {
 pub(crate) struct IssueContext {
     author: Option<String>,
     #[allow(unused)]
-    categories: Vec<Category<'static>>,
+    topics: Vec<String>,
     state: IssueState,
     state_reason: Option<IssueStateReason>,
     body: String,
@@ -347,13 +415,12 @@ impl From<issue_query::ResponseData> for IssueContext {
         let repo = data
             .repository
             .expect("ResponseData does not have repository");
-        let categories: Vec<Category> = repo
+        let topics: Vec<String> = repo
             .repository_topics
             .nodes
             .unwrap_or_default()
             .into_iter()
             .filter_map(|node| node.map(|node| node.topic.name))
-            .filter_map(|topic| Category::new(topic).ok())
             .collect();
 
         let issue = repo.issue.expect("ResponseData does not have issue");
@@ -383,7 +450,7 @@ impl From<issue_query::ResponseData> for IssueContext {
 
         Self {
             author,
-            categories,
+            topics,
             state,
             state_reason,
             body,
@@ -403,7 +470,7 @@ pub(crate) enum PullRequestState {
 pub(crate) struct PullRequestContext {
     author: Option<String>,
     #[allow(unused)]
-    categories: Vec<Category<'static>>,
+    topics: Vec<String>,
     state: PullRequestState,
     is_draft: bool,
     body: String,
@@ -416,13 +483,12 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
             .repository
             .expect("ResponseData does not have repository");
 
-        let categories: Vec<Category> = repo
+        let topics: Vec<String> = repo
             .repository_topics
             .nodes
             .unwrap_or_default()
             .into_iter()
             .filter_map(|node| node.map(|node| node.topic.name))
-            .filter_map(|topic| Category::new(topic).ok())
             .collect();
 
         let pr = repo
@@ -451,7 +517,7 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
 
         Self {
             author,
-            categories,
+            topics,
             state,
             is_draft,
             body,

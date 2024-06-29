@@ -2,19 +2,22 @@ use crate::{
     application::Features,
     auth::AuthenticationProvider,
     ui::components::{
-        authentication::Authentication, entries::Entries, filter::Filter, github::Notifications,
-        status::StatusLine, subscription::Subscription, tabs::Tabs,
+        authentication::Authentication, entries::Entries, filter::Filter,
+        gh_notifications::GhNotifications, status::StatusLine, subscription::Subscription,
+        tabs::Tabs,
     },
 };
 
 pub(crate) mod authentication;
 pub(crate) mod entries;
 pub(crate) mod filter;
-pub(crate) mod github;
+pub(crate) mod gh_notifications;
 pub(crate) mod root;
 pub(crate) mod status;
 pub(crate) mod subscription;
 pub(crate) mod tabs;
+
+mod collections;
 
 pub(crate) struct Components {
     pub tabs: Tabs,
@@ -22,7 +25,7 @@ pub(crate) struct Components {
     pub prompt: StatusLine,
     pub subscription: Subscription,
     pub entries: Entries,
-    pub notifications: Notifications,
+    pub gh_notifications: GhNotifications,
     pub auth: Authentication,
 }
 
@@ -34,7 +37,7 @@ impl Components {
             prompt: StatusLine::new(),
             subscription: Subscription::new(),
             entries: Entries::new(),
-            notifications: Notifications::new(),
+            gh_notifications: GhNotifications::new(),
             auth: Authentication::new(vec![
                 AuthenticationProvider::Github,
                 AuthenticationProvider::Google,

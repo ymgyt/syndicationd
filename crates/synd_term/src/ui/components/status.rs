@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Rect},
     text::{Line, Span},
@@ -89,15 +91,22 @@ impl StatusLine {
         let area = {
             if let Some(in_flight) = cx.in_flight.recent_in_flight() {
                 let label = match in_flight {
-                    RequestId::DeviceFlowDeviceAuthorize => "Request device authorization",
-                    RequestId::DeviceFlowPollAccessToken => "Polling...",
-                    RequestId::FetchEntries => "Fetch entries...",
-                    RequestId::FetchSubscription => "Fetch subscription...",
-                    RequestId::FetchGithubNotifications => "Fetch github notifications...",
-                    RequestId::SubscribeFeed => "Subscribe feed...",
-                    RequestId::UnsubscribeFeed => "Unsubscribe feed...",
-                    RequestId::MarkGithubNotificationAsDone => "Mark notification as done...",
-                    RequestId::UnsubscribeGithubThread => "Unsubscribe thread...",
+                    RequestId::DeviceFlowDeviceAuthorize => {
+                        Cow::Borrowed("Request device authorization")
+                    }
+                    RequestId::DeviceFlowPollAccessToken => Cow::Borrowed("Polling..."),
+                    RequestId::FetchEntries => Cow::Borrowed("Fetch entries..."),
+                    RequestId::FetchSubscription => Cow::Borrowed("Fetch subscription..."),
+                    RequestId::FetchGithubNotifications { page } => {
+                        Cow::Owned(format!("Fetch github notifications(page: {page})..."))
+                    }
+                    RequestId::FetchGithubSubject => Cow::Borrowed("Fetch github subject..."),
+                    RequestId::SubscribeFeed => Cow::Borrowed("Subscribe feed..."),
+                    RequestId::UnsubscribeFeed => Cow::Borrowed("Unsubscribe feed..."),
+                    RequestId::MarkGithubNotificationAsDone => {
+                        Cow::Borrowed("Mark notification as done...")
+                    }
+                    RequestId::UnsubscribeGithubThread => Cow::Borrowed("Unsubscribe thread..."),
                 };
                 let horizontal = Layout::horizontal([
                     Constraint::Length(label.len() as u16 + 1),

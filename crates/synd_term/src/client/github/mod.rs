@@ -62,7 +62,7 @@ impl GithubClient {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FetchNotificationInclude {
     /// Fetch only unread notifications
-    Unread,
+    OnlyUnread,
     All,
 }
 
@@ -87,11 +87,16 @@ impl GithubClient {
             .per_page(config::github::NOTIFICATION_PER_PAGE)
             .send()
             .await?;
-        let notifications = page
+        let notifications: Vec<_> = page
             .take_items()
             .into_iter()
             .map(Notification::from)
             .collect();
+
+        tracing::debug!(
+            "Fetch {} github notifications: {page:?}",
+            notifications.len()
+        );
 
         Ok(notifications)
     }

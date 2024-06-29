@@ -62,7 +62,7 @@
         # Inherits from checks cargo-nextest, cargo-audit
         dev_packages = with pkgs;
           [
-            rust-analyzer-nightly
+            # rust-analyzer-nightly
             typos
             graphql-client
             opentelemetry-collector-contrib

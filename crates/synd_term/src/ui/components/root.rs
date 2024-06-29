@@ -32,10 +32,13 @@ impl<'a> Root<'a> {
         self.components.tabs.render(tabs_area, buf, cx);
         self.components.filter.render(filter_area, buf, cx);
 
-        match self.components.tabs.current() {
+        match cx.tab {
             Tab::Feeds => self.components.subscription.render(content_area, buf, cx),
             Tab::Entries => self.components.entries.render(content_area, buf, cx),
-            Tab::GitHub => self.components.notifications.render(content_area, buf, cx),
+            Tab::GitHub => self
+                .components
+                .gh_notifications
+                .render(content_area, buf, cx),
         };
 
         self.components

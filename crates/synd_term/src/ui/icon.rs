@@ -7,6 +7,8 @@ macro_rules! icon {
     (calendar) => { "" };
     (check) => { "" };
     (comment) => { "" };
+    (cross) => { "" };
+    (discussion) => { "" };
     (entry) => { "󰯂" };
     (filter) => { "󰈶" };
     (issueopen) => { "" };
@@ -21,6 +23,7 @@ macro_rules! icon {
     (pullrequestdraft) => { "" };
     (repository) => { "" };
     (search) => { "" };
+    (tag) => { "󰓹" };
     (summary) => { "󱙓" };
     (github) => { "󰊤" };
     (google) => { "󰊭" };
