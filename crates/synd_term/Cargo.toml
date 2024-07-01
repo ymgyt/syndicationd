@@ -40,7 +40,7 @@ nucleo               = "0.5.0"
 octocrab             = "0.38.0"
 open                 = "5.1.4"
 parse_duration       = { workspace = true }
-ratatui              = { version = "0.26.3" }
+ratatui              = { version = "0.27.0" }
 reqwest              = { workspace = true }
 schemars             = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
