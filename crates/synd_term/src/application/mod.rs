@@ -558,7 +558,7 @@ impl Application {
                 }
                 Command::PromptFeedUnsubscription => {
                     if self.components.subscription.selected_feed().is_some() {
-                        self.components.subscription.show_unsubscribe_popup(true);
+                        self.components.subscription.open_unsubscribe_popup(true);
                         self.keymaps().enable(KeymapId::UnsubscribePopupSelection);
                         self.should_render();
                     }
@@ -579,7 +579,7 @@ impl Application {
                     self.should_render();
                 }
                 Command::CancelFeedUnsubscriptionPopup => {
-                    self.components.subscription.show_unsubscribe_popup(false);
+                    self.components.subscription.open_unsubscribe_popup(false);
                     self.keymaps().disable(KeymapId::UnsubscribePopupSelection);
                     self.should_render();
                 }
@@ -714,6 +714,14 @@ impl Application {
                     // To address this, we will implicitly mark it as done when unsubscribing.
                     self.unsubscribe_gh_thread();
                     self.mark_gh_notification_as_done();
+                }
+                Command::OpenGhNotificationFilterPopup => {
+                    self.components.gh_notifications.open_filter_popup();
+                    self.should_render();
+                }
+                Command::CloseGhNotificationFilterPopup => {
+                    self.components.gh_notifications.close_filter_popup();
+                    self.should_render();
                 }
                 Command::RotateTheme => {
                     self.rotate_theme();

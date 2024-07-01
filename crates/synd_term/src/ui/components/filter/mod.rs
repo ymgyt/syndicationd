@@ -295,26 +295,30 @@ impl Filter {
         self.render_search(search_area, buf, cx);
     }
 
+    // TODO: split method by lane
     fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let horizontal = Layout::horizontal([Constraint::Length(18), Constraint::Fill(1)]);
         let [requirement_area, categories_area] = horizontal.areas(area);
 
-        let spans = vec![
+        let lane = cx.tab.into();
+
+        let mut spans = vec![
             Span::from(concat!(icon!(filter), " Filter")).dim(),
             Span::from("    "),
-            {
-                let r = self.feed.requirement.label(&cx.theme.requirement);
-                if r.content == "MAY" {
-                    r.dim()
-                } else {
-                    r
-                }
-            },
-            Span::from("  "),
         ];
+
+        match lane {
+            FilterLane::Feed => {
+                let mut r = self.feed.requirement.label(&cx.theme.requirement);
+                if r.content == "MAY" {
+                    r = r.dim();
+                }
+                spans.extend([r, Span::from("  ")]);
+            }
+            FilterLane::GhNotification => {}
+        }
         Line::from(spans).render(requirement_area, buf);
 
-        let lane = cx.tab.into();
         let (categories, categories_state) = match lane {
             FilterLane::Feed => (
                 &self.feed.categories_state.categories,

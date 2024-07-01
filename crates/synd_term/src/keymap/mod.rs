@@ -74,7 +74,7 @@ pub(crate) struct KeymapsConfig {
     pub tabs: KeyTrie,
     pub entries: KeyTrie,
     pub subscription: KeyTrie,
-    pub notification: KeyTrie,
+    pub gh_notification: KeyTrie,
     pub filter: KeyTrie,
     pub unsubscribe_popup: KeyTrie,
     pub global: KeyTrie,
@@ -100,7 +100,7 @@ impl Keymaps {
             Keymap::new(KeymapId::Tabs, config.tabs),
             Keymap::new(KeymapId::Entries, config.entries),
             Keymap::new(KeymapId::Subscription, config.subscription),
-            Keymap::new(KeymapId::Notification, config.notification),
+            Keymap::new(KeymapId::Notification, config.gh_notification),
             Keymap::new(KeymapId::Filter, config.filter),
             Keymap::new(KeymapId::CategoryFiltering, KeyTrie::default()),
             Keymap::new(

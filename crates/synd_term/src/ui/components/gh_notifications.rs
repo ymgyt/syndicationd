@@ -27,6 +27,7 @@ use crate::{
     ui::{
         self,
         components::{collections::FilterableVec, filter::GhNotificationFilterer},
+        extension::RectExt,
         icon,
         widgets::scrollbar::Scrollbar,
         Context,
@@ -38,6 +39,10 @@ enum NotificationStatus {
     MarkingAsDone,
 }
 
+struct FilterPopup {
+    is_active: bool,
+}
+
 #[allow(clippy::struct_field_names)]
 pub(crate) struct GhNotifications {
     max_repository_name: usize,
@@ -47,6 +52,7 @@ pub(crate) struct GhNotifications {
     status: HashMap<NotificationId, NotificationStatus>,
     limit: usize,
     next_page: Option<u8>,
+    filter_popup: FilterPopup,
 }
 
 impl GhNotifications {
@@ -58,6 +64,7 @@ impl GhNotifications {
             status: HashMap::new(),
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
+            filter_popup: FilterPopup { is_active: false },
         }
     }
 
@@ -164,6 +171,14 @@ impl GhNotifications {
         self.notifications.move_last();
     }
 
+    pub(crate) fn open_filter_popup(&mut self) {
+        self.filter_popup.is_active = true;
+    }
+
+    pub(crate) fn close_filter_popup(&mut self) {
+        self.filter_popup.is_active = false;
+    }
+
     pub(crate) fn selected_notification(&self) -> Option<&Notification> {
         self.notifications.selected()
     }
@@ -176,6 +191,10 @@ impl GhNotifications {
 
         self.render_notifications(notifications_area, buf, cx);
         self.render_detail(detail_area, buf, cx);
+
+        if self.filter_popup.is_active {
+            self.render_filter_popup(area, buf, cx);
+        }
     }
 
     fn render_notifications(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -469,6 +488,30 @@ impl GhNotifications {
                 .alignment(Alignment::Left)
                 .render(comment_area, buf);
         }
+    }
+
+    fn render_filter_popup(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+        let area = {
+            let area = area.centered(60, 60);
+            area.reset(buf);
+            area
+        };
+
+        let block = Block::new()
+            .title_top("Filter")
+            .title_alignment(Alignment::Center)
+            .title_style(Style::new().add_modifier(Modifier::BOLD))
+            .padding(Padding {
+                left: 1,
+                right: 1,
+                top: 1,
+                bottom: 1,
+            })
+            .borders(Borders::ALL)
+            .style(cx.theme.base);
+
+        let inner_area = block.inner(area);
+        block.render(area, buf);
     }
 }
 

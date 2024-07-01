@@ -157,16 +157,18 @@ pub(crate) enum Command {
         populate: Populate,
         page: u8,
     },
+    FetchGhNotificationDetails {
+        contexts: Vec<IssueOrPullRequest>,
+    },
     MoveGhNotification(Direction),
     MoveGhNotificationFirst,
     MoveGhNotificationLast,
     OpenGhNotification,
     ReloadGhNotifications,
-    FetchGhNotificationDetails {
-        contexts: Vec<IssueOrPullRequest>,
-    },
     MarkGhNotificationAsDone,
     UnsubscribeGhThread,
+    OpenGhNotificationFilterPopup,
+    CloseGhNotificationFilterPopup,
 
     // Error
     HandleError {
@@ -307,28 +309,34 @@ impl Command {
     pub fn rotate_theme() -> Self {
         Command::RotateTheme
     }
-    pub fn move_up_notification() -> Self {
+    pub fn move_up_gh_notification() -> Self {
         Command::MoveGhNotification(Direction::Up)
     }
-    pub fn move_down_notification() -> Self {
+    pub fn move_down_gh_notification() -> Self {
         Command::MoveGhNotification(Direction::Down)
     }
-    pub fn move_notification_first() -> Self {
+    pub fn move_gh_notification_first() -> Self {
         Command::MoveGhNotificationFirst
     }
-    pub fn move_notification_last() -> Self {
+    pub fn move_gh_notification_last() -> Self {
         Command::MoveGhNotificationLast
     }
-    pub fn open_notification() -> Self {
+    pub fn open_gh_notification() -> Self {
         Command::OpenGhNotification
     }
-    pub fn reload_notifications() -> Self {
+    pub fn reload_gh_notifications() -> Self {
         Command::ReloadGhNotifications
     }
-    pub fn mark_notification_as_done() -> Self {
+    pub fn mark_gh_notification_as_done() -> Self {
         Command::MarkGhNotificationAsDone
     }
-    pub fn unsubscribe_thread() -> Self {
+    pub fn unsubscribe_gh_thread() -> Self {
         Command::UnsubscribeGhThread
+    }
+    pub fn open_gh_notification_filter_popup() -> Self {
+        Command::OpenGhNotificationFilterPopup
+    }
+    pub fn close_gh_notification_filter_popup() -> Self {
+        Command::CloseGhNotificationFilterPopup
     }
 }

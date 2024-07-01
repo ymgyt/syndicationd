@@ -35,7 +35,7 @@ Buffer {
         "  2024-05-29  This Week in Rust 549              Hello and welcome to another issue of *This Week in Rust*! [Rust][1]   ",
         "  2024-05-22  This Week in Rust 548              Hello and welcome to another issue of *This Week in Rust*! [Rust][1]   ",
         "  2024-05-15  This Week in Rust 547              Hello and welcome to another issue of *This Week in Rust*! [Rust][1]   ",
-        "                       Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  h/l:  c:  /:  r:󰑓  Ent:󰏌  a:󰑫  e:  d:󰼡  q:                        ",
+        "                       Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  c:  /:  h/l:  Ent:󰏌  a:󰑫  e:  d:󰼡  r:󰑓  q:                        ",
     ],
     styles: [
         x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,

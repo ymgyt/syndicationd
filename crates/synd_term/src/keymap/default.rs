@@ -33,17 +33,18 @@ pub fn default() -> KeymapsConfig {
             "e" => move_subscribed_feed_last,
         },
     });
-    let notification = keymap!({
-        "k" | "up" => move_up_notification,
-        "j" | "down" => move_down_notification,
-        "enter" => open_notification,
-        "r" => reload_notifications,
-        "d" => mark_notification_as_done,
-        "u" => unsubscribe_thread,
+    let gh_notification = keymap!({
+        "k" | "up" => move_up_gh_notification,
+        "j" | "down" => move_down_gh_notification,
+        "enter" => open_gh_notification,
+        "r" => reload_gh_notifications,
+        "d" => mark_gh_notification_as_done,
+        "u" => unsubscribe_gh_thread,
         "g" => {
-            "g" => move_notification_first,
-            "e" => move_notification_last,
+            "g" => move_gh_notification_first,
+            "e" => move_gh_notification_last,
         },
+        "f" => open_gh_notification_filter_popup,
     });
     let filter = keymap!({
        "h" | "left" => move_filter_requirement_left,
@@ -68,7 +69,7 @@ pub fn default() -> KeymapsConfig {
         tabs,
         entries,
         subscription,
-        notification,
+        gh_notification,
         filter,
         unsubscribe_popup,
         global,
