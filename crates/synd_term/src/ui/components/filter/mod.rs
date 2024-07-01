@@ -12,17 +12,19 @@ use synd_feed::types::{Category, Requirement};
 
 use crate::{
     application::{Direction, Populate},
+    client::github::{FetchNotificationInclude, FetchNotificationParticipating},
     command::Command,
     config::Categories,
     keymap::{KeyTrie, Keymap},
     matcher::Matcher,
-    types::{self, RequirementExt},
+    types::{self, github::RepoVisibility, RequirementExt},
     ui::{
         components::{
             filter::{
                 category::{CategoriesState, FilterCategoryState},
                 github::GhNotificationHandler,
             },
+            gh_notifications::GhNotificationFilterOptions,
             tabs::Tab,
         },
         icon,
@@ -246,6 +248,7 @@ impl Filter {
                 .iter()
                 .map(|(c, state)| (c.clone(), state.state))
                 .collect(),
+            options: self.gh_notification.filter_options.clone(),
         }
     }
 
@@ -273,13 +276,22 @@ impl Filter {
             .update(config, populate, categories);
     }
 
+    #[must_use]
+    pub(crate) fn update_gh_notification_filter_options(
+        &mut self,
+        options: GhNotificationFilterOptions,
+    ) -> Filterer {
+        self.gh_notification.filter_options = options;
+        self.filterer(FilterLane::GhNotification)
+    }
+
     pub(crate) fn clear_gh_notifications_categories(&mut self) {
         self.gh_notification.categories_state.clear();
     }
 }
 
 impl Filter {
-    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+    pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = Block::new()
             .padding(Padding {
                 left: 2,
@@ -297,15 +309,9 @@ impl Filter {
 
     // TODO: split method by lane
     fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let horizontal = Layout::horizontal([Constraint::Length(18), Constraint::Fill(1)]);
-        let [requirement_area, categories_area] = horizontal.areas(area);
-
         let lane = cx.tab.into();
 
-        let mut spans = vec![
-            Span::from(concat!(icon!(filter), " Filter")).dim(),
-            Span::from("    "),
-        ];
+        let mut spans = vec![Span::from(concat!(icon!(filter), " Filter")).dim()];
 
         match lane {
             FilterLane::Feed => {
@@ -313,11 +319,47 @@ impl Filter {
                 if r.content == "MAY" {
                     r = r.dim();
                 }
-                spans.extend([r, Span::from("  ")]);
+                spans.extend([Span::from("    "), r, Span::from("  ")]);
             }
-            FilterLane::GhNotification => {}
+            FilterLane::GhNotification => {
+                let options = &self.gh_notification.filter_options;
+                let mut unread = Span::from("Unread");
+                if options.include == FetchNotificationInclude::All {
+                    unread = unread.dim();
+                };
+
+                let mut participating = Span::from("Participating");
+                if options.participating == FetchNotificationParticipating::All {
+                    participating = participating.dim();
+                }
+
+                let visibility = match options.visibility {
+                    Some(RepoVisibility::Public) => Some(Span::from("Public")),
+                    Some(RepoVisibility::Private) => Some(Span::from("Private")),
+                    None => None,
+                };
+
+                spans.extend([
+                    Span::from("  "),
+                    unread,
+                    Span::from("  "),
+                    participating,
+                    Span::from("  "),
+                ]);
+                if let Some(visibility) = visibility {
+                    spans.extend([visibility, Span::from("  ")]);
+                }
+            }
         }
-        Line::from(spans).render(requirement_area, buf);
+        let status_line = Line::from(spans);
+        #[allow(clippy::cast_possible_truncation)]
+        let horizontal = Layout::horizontal([
+            Constraint::Length(status_line.width() as u16),
+            Constraint::Fill(1),
+        ]);
+        let [status_area, categories_area] = horizontal.areas(area);
+
+        status_line.render(status_area, buf);
 
         let (categories, categories_state) = match lane {
             FilterLane::Feed => (

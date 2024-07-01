@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 use chrono_humanize::{Accuracy, HumanTime, Tense};
 use itertools::Itertools;
@@ -15,12 +15,15 @@ use ratatui::{
 
 use crate::{
     application::{Direction, Populate},
+    client::github::{
+        FetchNotificationInclude, FetchNotificationParticipating, FetchNotificationsParams,
+    },
     command::Command,
     config::{self, Categories},
     types::{
         github::{
             Comment, IssueContext, Notification, NotificationId, PullRequestContext,
-            SubjectContext, SubjectType,
+            RepoVisibility, SubjectContext, SubjectType,
         },
         TimeExt,
     },
@@ -34,13 +37,45 @@ use crate::{
     },
 };
 
+mod filter_popup;
+use filter_popup::FilterPopup;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NotificationStatus {
     MarkingAsDone,
 }
 
-struct FilterPopup {
-    is_active: bool,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GhNotificationFilterOptionsState {
+    Unchanged,
+    Changed(GhNotificationFilterOptions),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GhNotificationFilterOptions {
+    pub(crate) include: FetchNotificationInclude,
+    pub(crate) participating: FetchNotificationParticipating,
+    pub(crate) visibility: Option<RepoVisibility>,
+}
+
+impl Default for GhNotificationFilterOptions {
+    fn default() -> Self {
+        Self {
+            include: FetchNotificationInclude::OnlyUnread,
+            participating: FetchNotificationParticipating::All,
+            visibility: None,
+        }
+    }
+}
+
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct GhNotificationFilterUpdater {
+    pub(crate) toggle_include: bool,
+    pub(crate) toggle_participating: bool,
+    pub(crate) toggle_visilibty_all: bool,
+    pub(crate) toggle_visilibty_public: bool,
+    pub(crate) toggle_visilibty_private: bool,
 }
 
 #[allow(clippy::struct_field_names)]
@@ -64,8 +99,12 @@ impl GhNotifications {
             status: HashMap::new(),
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
-            filter_popup: FilterPopup { is_active: false },
+            filter_popup: FilterPopup::new(GhNotificationFilterOptions::default()),
         }
+    }
+
+    pub(crate) fn update_filter_options(&mut self, updater: &GhNotificationFilterUpdater) {
+        self.filter_popup.update_options(updater);
     }
 
     pub(crate) fn update_filterer(&mut self, filterer: GhNotificationFilterer) {
@@ -108,12 +147,38 @@ impl GhNotifications {
     pub(crate) fn fetch_next_if_needed(&self) -> Option<Command> {
         match self.next_page {
             Some(page) if self.notifications.len() < self.limit => {
+                tracing::debug!(
+                    "Should fetch more. notifications: {} next_page {:?}",
+                    self.notifications.len(),
+                    self.next_page
+                );
                 Some(Command::FetchGhNotifications {
                     populate: Populate::Append,
-                    page,
+                    params: self.next_fetch_params(page),
                 })
             }
-            _ => None,
+            _ => {
+                tracing::debug!(
+                    "Nothing to fetch. notifications: {} next_page {:?}",
+                    self.notifications.len(),
+                    self.next_page
+                );
+                None
+            }
+        }
+    }
+
+    pub(crate) fn reload(&mut self) -> FetchNotificationsParams {
+        self.next_page = Some(config::github::INITIAL_PAGE_NUM);
+        self.next_fetch_params(config::github::INITIAL_PAGE_NUM)
+    }
+
+    fn next_fetch_params(&self, page: u8) -> FetchNotificationsParams {
+        let options = self.filter_popup.applied_options();
+        FetchNotificationsParams {
+            page,
+            include: options.include,
+            participating: options.participating,
         }
     }
 
@@ -175,8 +240,10 @@ impl GhNotifications {
         self.filter_popup.is_active = true;
     }
 
-    pub(crate) fn close_filter_popup(&mut self) {
+    #[must_use]
+    pub(crate) fn close_filter_popup(&mut self) -> GhNotificationFilterOptionsState {
         self.filter_popup.is_active = false;
+        self.filter_popup.commit()
     }
 
     pub(crate) fn selected_notification(&self) -> Option<&Notification> {
@@ -496,22 +563,7 @@ impl GhNotifications {
             area.reset(buf);
             area
         };
-
-        let block = Block::new()
-            .title_top("Filter")
-            .title_alignment(Alignment::Center)
-            .title_style(Style::new().add_modifier(Modifier::BOLD))
-            .padding(Padding {
-                left: 1,
-                right: 1,
-                top: 1,
-                bottom: 1,
-            })
-            .borders(Borders::ALL)
-            .style(cx.theme.base);
-
-        let inner_area = block.inner(area);
-        block.render(area, buf);
+        self.filter_popup.render(area, buf, cx);
     }
 }
 

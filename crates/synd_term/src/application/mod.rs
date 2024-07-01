@@ -22,7 +22,7 @@ use crate::{
     application::event::KeyEventResult,
     auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
     client::{
-        github::{FetchNotificationInclude, FetchNotificationsParams, GithubClient},
+        github::{FetchNotificationsParams, GithubClient},
         mutation::subscribe_feed::SubscribeFeedInput,
         Client, SyndApiError,
     },
@@ -36,7 +36,8 @@ use crate::{
     ui::{
         self,
         components::{
-            authentication::AuthenticateState, filter::Filterer, root::Root,
+            authentication::AuthenticateState, filter::Filterer,
+            gh_notifications::GhNotificationFilterOptionsState, root::Root,
             subscription::UnsubscribeSelection, tabs::Tab, Components,
         },
         theme::{Palette, Theme},
@@ -230,7 +231,7 @@ impl Application {
         self.config
             .features
             .enable_github_notification
-            .then(|| self.keymaps().enable(KeymapId::Notification));
+            .then(|| self.keymaps().enable(KeymapId::GhNotification));
     }
 
     fn set_credential(&mut self, cred: Verified<Credential>) {
@@ -248,13 +249,9 @@ impl Application {
             .boxed(),
         );
         if self.config.features.enable_github_notification {
-            self.jobs.futures.push(
-                future::ready(Ok(Command::FetchGhNotifications {
-                    page: config::github::INITIAL_PAGE_NUM,
-                    populate: Populate::Replace,
-                }))
-                .boxed(),
-            );
+            if let Some(fetch) = self.components.gh_notifications.fetch_next_if_needed() {
+                self.jobs.futures.push(future::ready(Ok(fetch)).boxed());
+            }
         }
     }
 
@@ -515,7 +512,7 @@ impl Application {
                     self.keymaps()
                         .disable(KeymapId::Subscription)
                         .disable(KeymapId::Entries)
-                        .disable(KeymapId::Notification);
+                        .disable(KeymapId::GhNotification);
 
                     match self.components.tabs.move_selection(direction) {
                         Tab::Feeds => {
@@ -531,7 +528,7 @@ impl Application {
                             self.keymaps().enable(KeymapId::Entries);
                         }
                         Tab::GitHub => {
-                            self.keymaps().enable(KeymapId::Notification);
+                            self.keymaps().enable(KeymapId::GhNotification);
                         }
                     }
                     self.should_render();
@@ -558,7 +555,7 @@ impl Application {
                 }
                 Command::PromptFeedUnsubscription => {
                     if self.components.subscription.selected_feed().is_some() {
-                        self.components.subscription.open_unsubscribe_popup(true);
+                        self.components.subscription.toggle_unsubscribe_popup(true);
                         self.keymaps().enable(KeymapId::UnsubscribePopupSelection);
                         self.should_render();
                     }
@@ -579,7 +576,7 @@ impl Application {
                     self.should_render();
                 }
                 Command::CancelFeedUnsubscriptionPopup => {
-                    self.components.subscription.open_unsubscribe_popup(false);
+                    self.components.subscription.toggle_unsubscribe_popup(false);
                     self.keymaps().disable(KeymapId::UnsubscribePopupSelection);
                     self.should_render();
                 }
@@ -625,7 +622,9 @@ impl Application {
                 }
                 Command::MoveFilterRequirement(direction) => {
                     let filterer = self.components.filter.move_requirement(direction);
-                    self.apply_filterer(filterer);
+                    self.apply_filterer(filterer)
+                        .into_iter()
+                        .for_each(|command| queue.push_back(command));
                     self.should_render();
                 }
                 Command::ActivateCategoryFilterling => {
@@ -647,7 +646,9 @@ impl Application {
                             .components
                             .filter
                             .filterer(self.components.tabs.current().into());
-                        self.apply_filterer(filterer);
+                        self.apply_filterer(filterer)
+                            .into_iter()
+                            .for_each(|command| queue.push_back(command));
                         self.should_render();
                     }
                 }
@@ -669,16 +670,20 @@ impl Application {
                 }
                 Command::ActivateAllFilterCategories { lane } => {
                     let filterer = self.components.filter.activate_all_categories_state(lane);
-                    self.apply_filterer(filterer);
+                    self.apply_filterer(filterer)
+                        .into_iter()
+                        .for_each(|command| queue.push_back(command));
                     self.should_render();
                 }
                 Command::DeactivateAllFilterCategories { lane } => {
                     let filterer = self.components.filter.deactivate_all_categories_state(lane);
-                    self.apply_filterer(filterer);
+                    self.apply_filterer(filterer)
+                        .into_iter()
+                        .for_each(|command| queue.push_back(command));
                     self.should_render();
                 }
-                Command::FetchGhNotifications { page, populate } => {
-                    self.fetch_gh_notifications(populate, page);
+                Command::FetchGhNotifications { populate, params } => {
+                    self.fetch_gh_notifications(populate, params);
                 }
                 Command::MoveGhNotification(direction) => {
                     self.components.gh_notifications.move_selection(direction);
@@ -696,10 +701,8 @@ impl Application {
                     self.open_notification();
                 }
                 Command::ReloadGhNotifications => {
-                    self.fetch_gh_notifications(
-                        Populate::Replace,
-                        config::github::INITIAL_PAGE_NUM,
-                    );
+                    let params = self.components.gh_notifications.reload();
+                    self.fetch_gh_notifications(Populate::Replace, params);
                 }
                 Command::FetchGhNotificationDetails { contexts } => {
                     self.fetch_gh_notification_details(contexts);
@@ -717,10 +720,28 @@ impl Application {
                 }
                 Command::OpenGhNotificationFilterPopup => {
                     self.components.gh_notifications.open_filter_popup();
+                    self.keymaps().enable(KeymapId::GhNotificationFilterPopup);
                     self.should_render();
                 }
                 Command::CloseGhNotificationFilterPopup => {
-                    self.components.gh_notifications.close_filter_popup();
+                    if let GhNotificationFilterOptionsState::Changed(options) =
+                        self.components.gh_notifications.close_filter_popup()
+                    {
+                        queue.push_back(Command::ReloadGhNotifications);
+                        let filterer = self
+                            .components
+                            .filter
+                            .update_gh_notification_filter_options(options);
+                        // We will reload after this, so ignore update
+                        let _ = self.apply_filterer(filterer);
+                    }
+                    self.keymaps().disable(KeymapId::GhNotificationFilterPopup);
+                    self.should_render();
+                }
+                Command::UpdateGhnotificationFilterPopupOptions(updater) => {
+                    self.components
+                        .gh_notifications
+                        .update_filter_options(&updater);
                     self.should_render();
                 }
                 Command::RotateTheme => {
@@ -1073,22 +1094,16 @@ impl Application {
     }
 
     #[tracing::instrument(skip(self))]
-    fn fetch_gh_notifications(&mut self, populate: Populate, page: u8) {
+    fn fetch_gh_notifications(&mut self, populate: Populate, params: FetchNotificationsParams) {
         let client = self
             .github_client
             .clone()
             .expect("Github client not found, this is a BUG");
         let request_seq = self
             .in_flight
-            .add(RequestId::FetchGithubNotifications { page });
+            .add(RequestId::FetchGithubNotifications { page: params.page });
         let fut = async move {
-            match client
-                .fetch_notifications(FetchNotificationsParams {
-                    page,
-                    include: FetchNotificationInclude::OnlyUnread,
-                })
-                .await
-            {
+            match client.fetch_notifications(params).await {
                 Ok(notifications) => Ok(Command::HandleApiResponse {
                     request_seq,
                     response: ApiResponse::FetchGithubNotifications {
@@ -1260,6 +1275,7 @@ impl Application {
 }
 
 impl Application {
+    #[must_use]
     fn apply_filterer(&mut self, filterer: Filterer) -> Option<Command> {
         match filterer {
             Filterer::Feed(filterer) => {

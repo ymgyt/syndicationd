@@ -5,7 +5,7 @@ use crate::{
     config,
     types::github::{
         IssueContext, IssueId, Notification, NotificationContext, NotificationId,
-        PullRequestContext, PullRequestId, Repository, ThreadId,
+        PullRequestContext, PullRequestId, RepositoryKey, ThreadId,
     },
 };
 
@@ -66,22 +66,36 @@ pub(crate) enum FetchNotificationInclude {
     All,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FetchNotificationParticipating {
+    /// Fetch only participating notifications
+    OnlyParticipating,
+    All,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct FetchNotificationsParams {
     pub(crate) page: u8,
     pub(crate) include: FetchNotificationInclude,
+    pub(crate) participating: FetchNotificationParticipating,
 }
 
 impl GithubClient {
     #[tracing::instrument(skip(self))]
     pub(crate) async fn fetch_notifications(
         &self,
-        FetchNotificationsParams { page, include }: FetchNotificationsParams,
+        FetchNotificationsParams {
+            page,
+            include,
+            participating,
+        }: FetchNotificationsParams,
     ) -> octocrab::Result<Vec<Notification>> {
         let mut page = self
             .client
             .activity()
             .notifications()
             .list()
+            .participating(participating == FetchNotificationParticipating::OnlyParticipating)
             .all(include == FetchNotificationInclude::All)
             .page(page) // 1 Origin
             .per_page(config::github::NOTIFICATION_PER_PAGE)
@@ -116,7 +130,7 @@ impl GithubClient {
         &self,
         NotificationContext {
             id,
-            repository_key: Repository { name, owner },
+            repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<IssueId>,
     ) -> octocrab::Result<IssueContext> {
@@ -158,7 +172,7 @@ impl GithubClient {
         &self,
         NotificationContext {
             id,
-            repository_key: Repository { name, owner },
+            repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<PullRequestId>,
     ) -> octocrab::Result<PullRequestContext> {

@@ -6,7 +6,7 @@ use crate::{
     application::{Direction, Populate, RequestSequence},
     auth::{AuthenticationProvider, Credential, Verified},
     client::{
-        mutation::subscribe_feed::SubscribeFeedInput, payload,
+        github::FetchNotificationsParams, mutation::subscribe_feed::SubscribeFeedInput, payload,
         query::subscription::SubscriptionOutput, SyndApiError,
     },
     types::{
@@ -15,7 +15,7 @@ use crate::{
         },
         Feed,
     },
-    ui::components::filter::FilterLane,
+    ui::components::{filter::FilterLane, gh_notifications::GhNotificationFilterUpdater},
 };
 
 #[derive(Debug, Clone)]
@@ -155,7 +155,7 @@ pub(crate) enum Command {
     // Github notifications
     FetchGhNotifications {
         populate: Populate,
-        page: u8,
+        params: FetchNotificationsParams,
     },
     FetchGhNotificationDetails {
         contexts: Vec<IssueOrPullRequest>,
@@ -169,6 +169,7 @@ pub(crate) enum Command {
     UnsubscribeGhThread,
     OpenGhNotificationFilterPopup,
     CloseGhNotificationFilterPopup,
+    UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater),
 
     // Error
     HandleError {
@@ -338,5 +339,35 @@ impl Command {
     }
     pub fn close_gh_notification_filter_popup() -> Self {
         Command::CloseGhNotificationFilterPopup
+    }
+    pub fn toggle_gh_notification_filter_popup_include_unread() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_include: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_participating() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_participating: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_visibility_all() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_visilibty_all: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_visibility_public() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_visilibty_public: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_visibility_private() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_visilibty_private: true,
+            ..Default::default()
+        })
     }
 }

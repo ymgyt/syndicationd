@@ -46,6 +46,16 @@ pub fn default() -> KeymapsConfig {
         },
         "f" => open_gh_notification_filter_popup,
     });
+    let gh_notification_filter_popup = keymap!({
+        "u" => toggle_gh_notification_filter_popup_include_unread,
+        "p" => toggle_gh_notification_filter_popup_participating,
+        "v" => {
+            "a" => toggle_gh_notification_filter_popup_visibility_all,
+            "b" => toggle_gh_notification_filter_popup_visibility_public,
+            "c" => toggle_gh_notification_filter_popup_visibility_private,
+        },
+        "esc" | "enter" => close_gh_notification_filter_popup,
+    });
     let filter = keymap!({
        "h" | "left" => move_filter_requirement_left,
        "l" | "right" => move_filter_requirement_right,
@@ -70,6 +80,7 @@ pub fn default() -> KeymapsConfig {
         entries,
         subscription,
         gh_notification,
+        gh_notification_filter_popup,
         filter,
         unsubscribe_popup,
         global,
