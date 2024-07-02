@@ -84,7 +84,9 @@ pub struct GithubOptions {
         long,
         short = 'G',
         visible_alias = "enable-gh",
+        env = "SYND_ENABLE_GH",
         default_value_t = false,
+        default_missing_value = "true",
     )]
     pub enable_github_notification: bool,
     /// GitHub personal access token to fetch notifications

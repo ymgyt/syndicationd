@@ -63,7 +63,8 @@ impl Default for GhNotificationFilterOptions {
         Self {
             include: FetchNotificationInclude::OnlyUnread,
             participating: FetchNotificationParticipating::All,
-            visibility: None,
+            // for demo
+            visibility: Some(RepoVisibility::Public),
         }
     }
 }
