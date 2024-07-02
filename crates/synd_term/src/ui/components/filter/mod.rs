@@ -240,6 +240,8 @@ impl Filter {
 
     #[must_use]
     fn gh_notification_filterer(&self) -> GhNotificationFilterer {
+        let mut matcher = self.matcher.clone();
+        matcher.update_needle(self.prompt.borrow().line());
         GhNotificationFilterer {
             categories: self
                 .gh_notification
@@ -249,6 +251,7 @@ impl Filter {
                 .map(|(c, state)| (c.clone(), state.state))
                 .collect(),
             options: self.gh_notification.filter_options.clone(),
+            matcher,
         }
     }
 
@@ -303,14 +306,12 @@ impl Filter {
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Length(1)]);
         let [filter_area, search_area] = vertical.areas(area);
 
-        self.render_filter(filter_area, buf, cx);
-        self.render_search(search_area, buf, cx);
+        let lane = cx.tab.into();
+        self.render_filter(filter_area, buf, cx, lane);
+        self.render_search(search_area, buf, cx, lane);
     }
 
-    // TODO: split method by lane
-    fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let lane = cx.tab.into();
-
+    fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, lane: FilterLane) {
         let mut spans = vec![Span::from(concat!(icon!(filter), " Filter")).dim()];
 
         match lane {
@@ -408,14 +409,20 @@ impl Filter {
         Line::from(spans).render(categories_area, buf);
     }
 
-    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
+    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>, lane: FilterLane) {
         let mut spans = vec![];
         let mut label = Span::from(concat!(icon!(search), " Search"));
         if self.state != State::SearchFiltering {
             label = label.dim();
         }
         spans.push(label);
-        spans.push(Span::from("   "));
+        {
+            let padding = match lane {
+                FilterLane::Feed => "   ",
+                FilterLane::GhNotification => " ",
+            };
+            spans.push(Span::from(padding));
+        }
 
         let search = Line::from(spans);
         let margin = search.width() + 1;

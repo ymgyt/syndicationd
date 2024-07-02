@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use synd_feed::types::Category;
 
 use crate::{
+    matcher::Matcher,
     types::github::Notification,
     ui::components::{
         filter::{
@@ -31,6 +32,7 @@ impl GhNotificationHandler {
 pub(crate) struct GhNotificationFilterer {
     pub(super) categories: HashMap<Category<'static>, FilterCategoryState>,
     pub(super) options: GhNotificationFilterOptions,
+    pub(super) matcher: Matcher,
 }
 
 impl Filterable<Notification> for GhNotificationFilterer {
@@ -50,6 +52,13 @@ impl Filterable<Notification> for GhNotificationFilterer {
             }
         }
 
-        FilterResult::Use
+        if self.matcher.r#match(n.title())
+            || self.matcher.r#match(&n.repository.owner)
+            || self.matcher.r#match(&n.repository.name)
+        {
+            FilterResult::Use
+        } else {
+            FilterResult::Discard
+        }
     }
 }
