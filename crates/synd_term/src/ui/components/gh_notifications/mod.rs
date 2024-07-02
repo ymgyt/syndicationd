@@ -559,7 +559,7 @@ impl GhNotifications {
 
     fn render_filter_popup(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = {
-            let area = area.centered(60, 60);
+            let area = area.centered(60, 30);
             area.reset(buf);
             area
         };

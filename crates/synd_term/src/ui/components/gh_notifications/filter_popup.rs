@@ -1,6 +1,6 @@
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Padding, Widget},
@@ -107,7 +107,8 @@ impl FilterPopup {
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
-        ]);
+        ])
+        .flex(Flex::SpaceBetween);
         let [status_area, participating_area, visibility_area] = vertical.areas(area);
         let options = self.pending_options.as_ref().unwrap_or(&self.options);
 
