@@ -74,7 +74,7 @@ impl Subscription {
         self.feeds.selected()
     }
 
-    pub(crate) fn show_unsubscribe_popup(&mut self, show: bool) {
+    pub(crate) fn toggle_unsubscribe_popup(&mut self, show: bool) {
         if show {
             self.unsubscribe_popup.selected_feed = self.selected_feed().cloned();
         } else {

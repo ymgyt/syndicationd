@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug};
 
 use chrono_humanize::{Accuracy, HumanTime, Tense};
 use itertools::Itertools;
@@ -15,38 +15,112 @@ use ratatui::{
 
 use crate::{
     application::{Direction, Populate},
+    client::github::{
+        FetchNotificationInclude, FetchNotificationParticipating, FetchNotificationsParams,
+    },
     command::Command,
     config::{self, Categories},
     types::{
         github::{
             Comment, IssueContext, Notification, NotificationId, PullRequestContext,
-            SubjectContext, SubjectType,
+            PullRequestState, Reason, RepoVisibility, SubjectContext, SubjectType,
         },
         TimeExt,
     },
     ui::{
         self,
-        components::{collections::FilterableVec, filter::GhNotificationFilterer},
+        components::{
+            collections::FilterableVec,
+            filter::{CategoryFilterer, ComposedFilterer, MatcherFilterer},
+        },
+        extension::RectExt,
         icon,
         widgets::scrollbar::Scrollbar,
         Context,
     },
 };
 
+mod filter_popup;
+use filter_popup::{FilterPopup, OptionFilterer};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NotificationStatus {
     MarkingAsDone,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GhNotificationFilterOptionsState {
+    Unchanged,
+    Changed(GhNotificationFilterOptions),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GhNotificationFilterOptions {
+    pub(crate) include: FetchNotificationInclude,
+    pub(crate) participating: FetchNotificationParticipating,
+    pub(crate) visibility: Option<RepoVisibility>,
+    pub(crate) pull_request_conditions: Vec<PullRequestState>,
+    pub(crate) reasons: Vec<Reason>,
+}
+
+impl Default for GhNotificationFilterOptions {
+    fn default() -> Self {
+        Self {
+            include: FetchNotificationInclude::OnlyUnread,
+            participating: FetchNotificationParticipating::All,
+            visibility: None,
+            pull_request_conditions: Vec::new(),
+            reasons: Vec::new(),
+        }
+    }
+}
+
+impl GhNotificationFilterOptions {
+    fn toggle_pull_request_condition(&mut self, pr_state: PullRequestState) {
+        if let Some(idx) = self
+            .pull_request_conditions
+            .iter()
+            .position(|cond| cond == &pr_state)
+        {
+            self.pull_request_conditions.swap_remove(idx);
+        } else {
+            self.pull_request_conditions.push(pr_state);
+        }
+    }
+
+    fn toggle_reason(&mut self, reason: &Reason) {
+        if let Some(idx) = self.reasons.iter().position(|r| r == reason) {
+            self.reasons.swap_remove(idx);
+        } else {
+            self.reasons.push(reason.clone());
+        }
+    }
+}
+
+#[allow(clippy::struct_excessive_bools, clippy::struct_field_names)]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct GhNotificationFilterUpdater {
+    pub(crate) toggle_include: bool,
+    pub(crate) toggle_participating: bool,
+    pub(crate) toggle_visilibty_public: bool,
+    pub(crate) toggle_visilibty_private: bool,
+    pub(crate) toggle_pull_request_condition: Option<PullRequestState>,
+    pub(crate) toggle_reason: Option<Reason>,
+}
+
+type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
+
 #[allow(clippy::struct_field_names)]
 pub(crate) struct GhNotifications {
     max_repository_name: usize,
-    notifications: FilterableVec<Notification, GhNotificationFilterer>,
+    notifications:
+        FilterableVec<Notification, ComposedFilterer<CategoryAndMatcherFilterer, OptionFilterer>>,
 
     #[allow(clippy::zero_sized_map_values)]
     status: HashMap<NotificationId, NotificationStatus>,
     limit: usize,
     next_page: Option<u8>,
+    filter_popup: FilterPopup,
 }
 
 impl GhNotifications {
@@ -58,11 +132,21 @@ impl GhNotifications {
             status: HashMap::new(),
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
+            filter_popup: FilterPopup::new(GhNotificationFilterOptions::default()),
         }
     }
 
-    pub(crate) fn update_filterer(&mut self, filterer: GhNotificationFilterer) {
-        self.notifications.update_filter(filterer);
+    pub(crate) fn filter_options(&self) -> &GhNotificationFilterOptions {
+        self.filter_popup.applied_options()
+    }
+
+    pub(crate) fn update_filter_options(&mut self, updater: &GhNotificationFilterUpdater) {
+        self.filter_popup.update_options(updater);
+    }
+
+    pub(crate) fn update_filterer(&mut self, filterer: CategoryAndMatcherFilterer) {
+        self.notifications
+            .with_filter(|composed| composed.update_left(filterer));
     }
 
     pub(crate) fn update_notifications(
@@ -101,12 +185,38 @@ impl GhNotifications {
     pub(crate) fn fetch_next_if_needed(&self) -> Option<Command> {
         match self.next_page {
             Some(page) if self.notifications.len() < self.limit => {
+                tracing::debug!(
+                    "Should fetch more. notifications: {} next_page {:?}",
+                    self.notifications.len(),
+                    self.next_page
+                );
                 Some(Command::FetchGhNotifications {
                     populate: Populate::Append,
-                    page,
+                    params: self.next_fetch_params(page),
                 })
             }
-            _ => None,
+            _ => {
+                tracing::debug!(
+                    "Nothing to fetch. notifications: {} next_page {:?}",
+                    self.notifications.len(),
+                    self.next_page
+                );
+                None
+            }
+        }
+    }
+
+    pub(crate) fn reload(&mut self) -> FetchNotificationsParams {
+        self.next_page = Some(config::github::INITIAL_PAGE_NUM);
+        self.next_fetch_params(config::github::INITIAL_PAGE_NUM)
+    }
+
+    fn next_fetch_params(&self, page: u8) -> FetchNotificationsParams {
+        let options = self.filter_popup.applied_options();
+        FetchNotificationsParams {
+            page,
+            include: options.include,
+            participating: options.participating,
         }
     }
 
@@ -164,6 +274,27 @@ impl GhNotifications {
         self.notifications.move_last();
     }
 
+    pub(crate) fn open_filter_popup(&mut self) {
+        self.filter_popup.is_active = true;
+    }
+
+    #[must_use]
+    pub(crate) fn close_filter_popup(&mut self) -> Option<Command> {
+        self.filter_popup.is_active = false;
+        match self.filter_popup.commit() {
+            GhNotificationFilterOptionsState::Changed(options) => {
+                let filterer = OptionFilterer::new(options);
+                self.notifications
+                    .with_filter(|composed| composed.update_right(filterer));
+                Some(Command::FetchGhNotifications {
+                    populate: Populate::Replace,
+                    params: self.reload(),
+                })
+            }
+            GhNotificationFilterOptionsState::Unchanged => None,
+        }
+    }
+
     pub(crate) fn selected_notification(&self) -> Option<&Notification> {
         self.notifications.selected()
     }
@@ -176,6 +307,10 @@ impl GhNotifications {
 
         self.render_notifications(notifications_area, buf, cx);
         self.render_detail(detail_area, buf, cx);
+
+        if self.filter_popup.is_active {
+            self.render_filter_popup(area, buf, cx);
+        }
     }
 
     fn render_notifications(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -256,7 +391,7 @@ impl GhNotifications {
             let subject = n.title();
             let subject_icon = n.subject_icon();
             let repo = n.repository.name.as_str();
-            let reason = reason_label(n.reason.as_str());
+            let reason = reason_label(&n.reason);
 
             let is_marking_as_done = self
                 .status
@@ -470,41 +605,28 @@ impl GhNotifications {
                 .render(comment_area, buf);
         }
     }
+
+    fn render_filter_popup(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+        let area = {
+            let area = area.centered(60, 30);
+            area.reset(buf);
+            area
+        };
+        self.filter_popup.render(area, buf, cx);
+    }
 }
 
-// https://docs.github.com/en/rest/activity/notifications?apiVersion=2022-11-28
-fn reason_label(reason: &str) -> &str {
+fn reason_label(reason: &Reason) -> &str {
     match reason {
-        "approval_requested" => "approval req",
-        // Assigned to the issue
-        "assign" => "assigned",
-        // You created the thread
-        "author" => "author",
-        // You commented on the thread
-        "comment" => "comment",
-        // A GitHub Actions workflow run that you triggered was completed
-        "ci_activity" => "ci",
-        // You accepted an invitation to contriute to the repository
-        "invitation" => "invitation",
-        // You subscribed to the thread(via an issue or pull request)
-        "manual" => "manual",
-        // Organization members have requested to enable a feature such as Draft Pull Requests or Copilot
-        "member_feature_requested" => "feature req",
-        // You wre specifically @mentioned in the content
-        "mention" => "mentioned",
-        // You, or a team you're a member of, were requested to review a pull request
-        "review_requested" => "review",
-        // GitHub discovered a security vulnerability in your repo
-        "security_alert" => "security alert",
-        // You wre credited for contributing to a security advisory
-        "security_advisory_credit" => "security advisory credit",
-        // You changed the thread state (for example, closing an issue or merging a PR)
-        "state_change" => "state change",
-        // You're watching the repository
-        "subscribed" => "subscribed",
-        // You were on a team that was mentioned
-        "team_mention" => "team mentioned",
-        etc => etc,
+        Reason::Assign => "assigned",
+        Reason::Author => "author",
+        Reason::CiActivity => "ci",
+        Reason::ManuallySubscribed => "manual",
+        Reason::Mention => "mentioned",
+        Reason::TeamMention => "team mentioned",
+        Reason::ReviewRequested => "review",
+        Reason::WatchingRepo => "subscribed",
+        Reason::Other(other) => other,
     }
 }
 

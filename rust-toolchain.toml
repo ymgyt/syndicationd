@@ -1,3 +1,4 @@
 [toolchain]
 channel    = "1.79.0"
-components = ["llvm-tools-preview"]
+components = ["llvm-tools-preview", "rust-src", "rust-analyzer"]
+profile    = "default"

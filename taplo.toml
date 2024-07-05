@@ -1,3 +1,4 @@
+exclude = ["THIRDPARTY.toml"]
 include = ["*.toml", "crates/**/Cargo.toml"]
 
 [formatting]

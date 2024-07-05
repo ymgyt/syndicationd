@@ -4,7 +4,7 @@ use ratatui::{
 };
 
 use crate::ui::{
-    components::{tabs::Tab, Components},
+    components::{filter::FilterContext, tabs::Tab, Components},
     Context,
 };
 
@@ -30,7 +30,14 @@ impl<'a> Root<'a> {
         let [tabs_area, filter_area, content_area, prompt_area] = layout.areas(area);
 
         self.components.tabs.render(tabs_area, buf, cx);
-        self.components.filter.render(filter_area, buf, cx);
+        self.components.filter.render(
+            filter_area,
+            buf,
+            &FilterContext {
+                ui: cx,
+                gh_options: self.components.gh_notifications.filter_options(),
+            },
+        );
 
         match cx.tab {
             Tab::Feeds => self.components.subscription.render(content_area, buf, cx),

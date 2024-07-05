@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use futures_util::TryFutureExt;
 use synd_term::{
     application::{Application, Cache, Config, Features},
-    cli::{self, ApiOptions, Args, ExperimentalOptions, FeedOptions, Palette},
+    cli::{self, ApiOptions, Args, FeedOptions, GithubOptions, Palette},
     client::{github::GithubClient, Client},
     config::{self, Categories},
     terminal::{self, Terminal},
@@ -67,10 +67,10 @@ fn build_app(
         entries_limit,
     }: FeedOptions,
     cache_dir: PathBuf,
-    ExperimentalOptions {
+    GithubOptions {
         github_pat,
         enable_github_notification,
-    }: ExperimentalOptions,
+    }: GithubOptions,
     dry_run: bool,
 ) -> anyhow::Result<Application> {
     let mut builder = Application::builder()

@@ -5,7 +5,7 @@ use crate::{
     config,
     types::github::{
         IssueContext, IssueId, Notification, NotificationContext, NotificationId,
-        PullRequestContext, PullRequestId, Repository, ThreadId,
+        PullRequestContext, PullRequestId, RepositoryKey, ThreadId,
     },
 };
 
@@ -17,12 +17,16 @@ pub struct GithubClient {
 impl GithubClient {
     pub fn new(pat: impl Into<String>) -> Self {
         // TODO: configure timeout
-        Self {
-            client: Octocrab::builder()
-                .personal_token(pat.into())
-                .build()
-                .unwrap(),
-        }
+        let octo = Octocrab::builder()
+            .personal_token(pat.into())
+            .build()
+            .unwrap();
+        Self::with(octo)
+    }
+
+    #[must_use]
+    pub fn with(client: Octocrab) -> Self {
+        Self { client }
     }
 
     pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> octocrab::Result<()> {
@@ -66,22 +70,36 @@ pub(crate) enum FetchNotificationInclude {
     All,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FetchNotificationParticipating {
+    /// Fetch only participating notifications
+    OnlyParticipating,
+    All,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct FetchNotificationsParams {
     pub(crate) page: u8,
     pub(crate) include: FetchNotificationInclude,
+    pub(crate) participating: FetchNotificationParticipating,
 }
 
 impl GithubClient {
     #[tracing::instrument(skip(self))]
     pub(crate) async fn fetch_notifications(
         &self,
-        FetchNotificationsParams { page, include }: FetchNotificationsParams,
+        FetchNotificationsParams {
+            page,
+            include,
+            participating,
+        }: FetchNotificationsParams,
     ) -> octocrab::Result<Vec<Notification>> {
         let mut page = self
             .client
             .activity()
             .notifications()
             .list()
+            .participating(participating == FetchNotificationParticipating::OnlyParticipating)
             .all(include == FetchNotificationInclude::All)
             .page(page) // 1 Origin
             .per_page(config::github::NOTIFICATION_PER_PAGE)
@@ -116,7 +134,7 @@ impl GithubClient {
         &self,
         NotificationContext {
             id,
-            repository_key: Repository { name, owner },
+            repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<IssueId>,
     ) -> octocrab::Result<IssueContext> {
@@ -158,7 +176,7 @@ impl GithubClient {
         &self,
         NotificationContext {
             id,
-            repository_key: Repository { name, owner },
+            repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<PullRequestId>,
     ) -> octocrab::Result<PullRequestContext> {

@@ -55,24 +55,33 @@ impl StatusLine {
             ("j/k", "󰹹"),
             ("gg", "󱞧"),
             ("ge", "󱞥"),
-            ("h/l", icon!(requirement)),
             ("c", icon!(category)),
             ("/", icon!(search)),
-            ("r", "󰑓"),
         ][..];
-        let suf_keys = &[("q", "")][..];
-        let per_screen_keys = match tab {
+        let suf_keys = &[("r", "󰑓"), ("q", "")][..];
+        let per_tab_keys = match tab {
             Some(Tab::Feeds) => pre_keys
                 .iter()
-                .chain(&[("Ent", icon!(open)), ("a", "󰑫"), ("e", ""), ("d", "󰼡")])
+                .chain(&[
+                    ("h/l", icon!(requirement)),
+                    ("Ent", icon!(open)),
+                    ("a", "󰑫"),
+                    ("e", ""),
+                    ("d", "󰼡"),
+                ])
                 .chain(suf_keys),
             Some(Tab::Entries) => pre_keys
                 .iter()
-                .chain(&[("Ent", icon!(open))])
+                .chain(&[("h/l", icon!(requirement)), ("Ent", icon!(open))])
                 .chain(suf_keys),
             Some(Tab::GitHub) => pre_keys
                 .iter()
-                .chain(&[("Ent", icon!(open)), ("d", icon!(check)), ("u", "")])
+                .chain(&[
+                    ("f", icon!(filter)),
+                    ("Ent", icon!(open)),
+                    ("d", icon!(check)),
+                    ("u", ""),
+                ])
                 .chain(suf_keys),
             // Imply login
             None => [("j/k", "󰹹")][..]
@@ -81,7 +90,7 @@ impl StatusLine {
                 .chain(&[("q", "")][..]),
         };
 
-        let spans = per_screen_keys
+        let spans = per_tab_keys
             .flat_map(|(key, desc)| {
                 let desc = Span::styled(format!("{key}:{desc}  "), cx.theme.prompt.key_desc);
                 [desc]

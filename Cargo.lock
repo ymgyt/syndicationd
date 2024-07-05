@@ -1599,6 +1599,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.25.0",
  "tower-service",
+ "webpki-roots 0.26.1",
 ]
 
 [[package]]
@@ -3737,6 +3738,7 @@ dependencies = [
  "headers",
  "jsonwebtoken",
  "kvsd",
+ "octocrab",
  "serde",
  "serde_json",
  "synd-auth",

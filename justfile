@@ -2,7 +2,7 @@ set shell := ["nu", "-c"]
 
 kvsd_user := "synduser"
 github_pat := env_var_or_default("GH_PAT", "")
-synd_endpoint := env_var_or_default("SYND_ENDPOITINT", "https://localhost:5959")
+synd_endpoint := env_var_or_default("SYND_ENDPOINT", "https://localhost:5959")
 otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT", "")
 term_dir := "crates/synd_term"
@@ -47,6 +47,7 @@ update-advisory-db:
 
 # Format files
 fmt: fmt-toml
+    cargo fmt
 
 # Run linter
 lint:
@@ -68,16 +69,27 @@ test *flags:
 integration *test_filter:
     @nu scripts/integration.nu {{ test_filter }}
 
+# Run integration test with debugging
+integration-debug *case:
+    RUST_LOG="synd=debug,octocrab=debug" SYND_LOG_LOCATION="true" \
+        cargo nextest run --package synd-term --features integration --test integration {{ case }} --no-capture
+
 # Run cargo insta review
 review:
     cargo insta review
         
 # Generate test coverage
+[linux]
 coverage *flags:
     nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest \
         --all-features --open \
         --ignore-filename-regex '(integration_backend.rs|client/generated/.*.rs)' \
         {{ flags }}
+
+[macos]
+coverage:
+    cargo llvm-cov nextest --all-features --open \
+        --ignore-filename-regex '(integration_backend.rs|client/generated/.*.rs)'
 
 # Update synd_api graphql schema
 update-gql-schema:

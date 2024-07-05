@@ -5,7 +5,11 @@ use synd_feed::types::Category;
 use crate::{
     application::Populate,
     config::{Categories, Icon},
-    ui::{self},
+    types::{self, github::Notification},
+    ui::{
+        self,
+        components::filter::{Composable, FilterResult, Filterable},
+    },
 };
 
 #[allow(dead_code)]
@@ -119,5 +123,51 @@ impl CategoriesState {
     pub(super) fn clear(&mut self) {
         self.categories.clear();
         self.state.clear();
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub(crate) struct CategoryFilterer {
+    state: HashMap<Category<'static>, FilterCategoryState>,
+}
+
+impl Composable for CategoryFilterer {}
+
+impl CategoryFilterer {
+    pub(crate) fn new(state: HashMap<Category<'static>, FilterCategoryState>) -> Self {
+        Self { state }
+    }
+
+    fn filter_by_category(&self, category: &Category<'_>) -> FilterResult {
+        match self.state.get(category) {
+            Some(FilterCategoryState::Inactive) => FilterResult::Discard,
+            _ => FilterResult::Use,
+        }
+    }
+}
+
+impl Filterable<types::Entry> for CategoryFilterer {
+    fn filter(&self, entry: &types::Entry) -> super::FilterResult {
+        self.filter_by_category(entry.category())
+    }
+}
+
+impl Filterable<types::Feed> for CategoryFilterer {
+    fn filter(&self, feed: &types::Feed) -> super::FilterResult {
+        self.filter_by_category(feed.category())
+    }
+}
+
+impl Filterable<Notification> for CategoryFilterer {
+    fn filter(&self, n: &Notification) -> super::FilterResult {
+        if !self.state.is_empty()
+            && n.categories()
+                .filter_map(|c| self.state.get(c))
+                .all(|state| !state.is_active())
+        {
+            FilterResult::Discard
+        } else {
+            FilterResult::Use
+        }
     }
 }

@@ -1,6 +1,8 @@
 use std::{io, path::PathBuf, sync::Once, time::Duration};
 
+use chrono::{DateTime, Utc};
 use futures_util::future;
+use octocrab::Octocrab;
 use ratatui::backend::TestBackend;
 use synd_api::{
     args::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
@@ -14,12 +16,15 @@ use synd_auth::{
     jwt,
 };
 use synd_term::{
-    application::{Application, Authenticator, Cache, Config, DeviceFlows, JwtService},
+    application::{
+        Application, Authenticator, Cache, Clock, Config, DeviceFlows, JwtService, SystemClock,
+    },
     auth::Credential,
-    client::Client,
+    client::{github::GithubClient as TermGithubClient, Client},
     config::Categories,
     interact::Interactor,
     terminal::Terminal,
+    types::Time,
     ui::theme::Theme,
 };
 use synd_test::temp_dir;
@@ -28,6 +33,14 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 use url::Url;
+
+struct DummyClock(Time);
+
+impl Clock for DummyClock {
+    fn now(&self) -> DateTime<Utc> {
+        self.0
+    }
+}
 
 #[derive(Clone)]
 pub struct TestCase {
@@ -40,6 +53,7 @@ pub struct TestCase {
     pub device_flow_case: &'static str,
     pub cache_dir: PathBuf,
     pub log_path: PathBuf,
+    pub now: Option<Time>,
 
     pub login_credential: Option<Credential>,
     pub interactor_buffer_fn: Option<fn(&TestCase) -> Vec<String>>,
@@ -61,6 +75,7 @@ impl Default for TestCase {
             device_flow_case: "case1",
             cache_dir: temp_dir().into_path(),
             log_path: temp_dir().into_path().join("synd.log"),
+            now: None,
 
             login_credential: None,
             interactor_buffer_fn: None,
@@ -115,6 +130,7 @@ impl TestCase {
             cache_dir,
             login_credential,
             interactor_buffer_fn,
+            now,
             ..
         } = self.clone();
 
@@ -177,6 +193,22 @@ impl TestCase {
                 Interactor::new().with_buffer(buffer)
             };
 
+            let github_client = {
+                let octo = Octocrab::builder()
+                    .base_uri(format!("http://localhost:{mock_port}/github/rest"))?
+                    .personal_token("dummpy_gh_pat".to_owned())
+                    .build()
+                    .unwrap();
+                TermGithubClient::with(octo)
+            };
+
+            let clock: Box<dyn Clock> = {
+                match now {
+                    Some(now) => Box::new(DummyClock(now)),
+                    None => Box::new(SystemClock),
+                }
+            };
+
             let mut app = Application::builder()
                 .terminal(terminal)
                 .client(client)
@@ -186,6 +218,8 @@ impl TestCase {
                 .theme(Theme::default())
                 .authenticator(authenticator)
                 .interactor(interactor)
+                .github_client(github_client)
+                .clock(clock)
                 .build();
 
             if should_reload {
@@ -203,7 +237,8 @@ pub fn init_tracing() {
     static INIT_SUBSCRIBER: Once = Once::new();
 
     INIT_SUBSCRIBER.call_once(|| {
-        let show_code_location = false;
+        let show_code_location = std::env::var("SYND_LOG_LOCATION").ok().is_some();
+
         tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .with_line_number(show_code_location)

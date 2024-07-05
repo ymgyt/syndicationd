@@ -6,16 +6,17 @@ use crate::{
     application::{Direction, Populate, RequestSequence},
     auth::{AuthenticationProvider, Credential, Verified},
     client::{
-        mutation::subscribe_feed::SubscribeFeedInput, payload,
+        github::FetchNotificationsParams, mutation::subscribe_feed::SubscribeFeedInput, payload,
         query::subscription::SubscriptionOutput, SyndApiError,
     },
     types::{
         github::{
             IssueContext, IssueOrPullRequest, Notification, NotificationId, PullRequestContext,
+            PullRequestState, Reason,
         },
         Feed,
     },
-    ui::components::filter::FilterLane,
+    ui::components::{filter::FilterLane, gh_notifications::GhNotificationFilterUpdater},
 };
 
 #[derive(Debug, Clone)]
@@ -155,18 +156,21 @@ pub(crate) enum Command {
     // Github notifications
     FetchGhNotifications {
         populate: Populate,
-        page: u8,
+        params: FetchNotificationsParams,
+    },
+    FetchGhNotificationDetails {
+        contexts: Vec<IssueOrPullRequest>,
     },
     MoveGhNotification(Direction),
     MoveGhNotificationFirst,
     MoveGhNotificationLast,
     OpenGhNotification,
     ReloadGhNotifications,
-    FetchGhNotificationDetails {
-        contexts: Vec<IssueOrPullRequest>,
-    },
     MarkGhNotificationAsDone,
     UnsubscribeGhThread,
+    OpenGhNotificationFilterPopup,
+    CloseGhNotificationFilterPopup,
+    UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater),
 
     // Error
     HandleError {
@@ -307,28 +311,88 @@ impl Command {
     pub fn rotate_theme() -> Self {
         Command::RotateTheme
     }
-    pub fn move_up_notification() -> Self {
+    pub fn move_up_gh_notification() -> Self {
         Command::MoveGhNotification(Direction::Up)
     }
-    pub fn move_down_notification() -> Self {
+    pub fn move_down_gh_notification() -> Self {
         Command::MoveGhNotification(Direction::Down)
     }
-    pub fn move_notification_first() -> Self {
+    pub fn move_gh_notification_first() -> Self {
         Command::MoveGhNotificationFirst
     }
-    pub fn move_notification_last() -> Self {
+    pub fn move_gh_notification_last() -> Self {
         Command::MoveGhNotificationLast
     }
-    pub fn open_notification() -> Self {
+    pub fn open_gh_notification() -> Self {
         Command::OpenGhNotification
     }
-    pub fn reload_notifications() -> Self {
+    pub fn reload_gh_notifications() -> Self {
         Command::ReloadGhNotifications
     }
-    pub fn mark_notification_as_done() -> Self {
+    pub fn mark_gh_notification_as_done() -> Self {
         Command::MarkGhNotificationAsDone
     }
-    pub fn unsubscribe_thread() -> Self {
+    pub fn unsubscribe_gh_thread() -> Self {
         Command::UnsubscribeGhThread
+    }
+    pub fn open_gh_notification_filter_popup() -> Self {
+        Command::OpenGhNotificationFilterPopup
+    }
+    pub fn close_gh_notification_filter_popup() -> Self {
+        Command::CloseGhNotificationFilterPopup
+    }
+    pub fn toggle_gh_notification_filter_popup_include_unread() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_include: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_participating() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_participating: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_visibility_public() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_visilibty_public: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_visibility_private() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_visilibty_private: true,
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_pr_open() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_pull_request_condition: Some(PullRequestState::Open),
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_pr_closed() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_pull_request_condition: Some(PullRequestState::Closed),
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_pr_merged() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_pull_request_condition: Some(PullRequestState::Merged),
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_reason_mentioned() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_reason: Some(Reason::Mention),
+            ..Default::default()
+        })
+    }
+    pub fn toggle_gh_notification_filter_popup_reason_review() -> Self {
+        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
+            toggle_reason: Some(Reason::ReviewRequested),
+            ..Default::default()
+        })
     }
 }

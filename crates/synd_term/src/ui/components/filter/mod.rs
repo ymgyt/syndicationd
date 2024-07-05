@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
@@ -12,17 +13,24 @@ use synd_feed::types::{Category, Requirement};
 
 use crate::{
     application::{Direction, Populate},
+    client::github::{FetchNotificationInclude, FetchNotificationParticipating},
     command::Command,
     config::Categories,
     keymap::{KeyTrie, Keymap},
     matcher::Matcher,
-    types::{self, RequirementExt},
+    types::{
+        self,
+        github::{PullRequestState, Reason, RepoVisibility},
+        RequirementExt,
+    },
     ui::{
         components::{
             filter::{
                 category::{CategoriesState, FilterCategoryState},
+                feed::RequirementFilterer,
                 github::GhNotificationHandler,
             },
+            gh_notifications::GhNotificationFilterOptions,
             tabs::Tab,
         },
         icon,
@@ -35,9 +43,15 @@ mod feed;
 pub(crate) use feed::{FeedFilterer, FeedHandler};
 
 mod github;
-pub(crate) use github::GhNotificationFilterer;
 
 mod category;
+pub(crate) use category::CategoryFilterer;
+
+mod composed;
+pub(crate) use composed::{Composable, ComposedFilterer};
+
+mod matcher;
+pub(crate) use matcher::MatcherFilterer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FilterLane {
@@ -54,10 +68,12 @@ impl From<Tab> for FilterLane {
     }
 }
 
+pub(crate) type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
+
 #[derive(Clone, Debug)]
 pub(crate) enum Filterer {
     Feed(FeedFilterer),
-    GhNotification(GhNotificationFilterer),
+    GhNotification(CategoryAndMatcherFilterer),
 }
 
 pub(crate) trait Filterable<T> {
@@ -211,6 +227,7 @@ impl Filter {
 
         self.filterer(lane)
     }
+
     #[must_use]
     pub(crate) fn filterer(&self, lane: FilterLane) -> Filterer {
         match lane {
@@ -221,32 +238,33 @@ impl Filter {
 
     #[must_use]
     fn feed_filterer(&self) -> FeedFilterer {
-        let mut matcher = self.matcher.clone();
-        matcher.update_needle(self.prompt.borrow().line());
-        FeedFilterer {
-            requirement: self.feed.requirement,
-            categories: self
-                .feed
-                .categories_state
-                .state
-                .iter()
-                .map(|(c, state)| (c.clone(), state.state))
-                .collect(),
-            matcher,
-        }
+        RequirementFilterer::new(self.feed.requirement)
+            .and_then(Self::category_filterer(&self.feed.categories_state))
+            .and_then(self.matcher_filterer())
     }
 
     #[must_use]
-    fn gh_notification_filterer(&self) -> GhNotificationFilterer {
-        GhNotificationFilterer {
-            categories: self
-                .gh_notification
-                .categories_state
+    fn gh_notification_filterer(&self) -> CategoryAndMatcherFilterer {
+        Self::category_filterer(&self.gh_notification.categories_state)
+            .and_then(self.matcher_filterer())
+    }
+
+    #[must_use]
+    fn category_filterer(categories: &CategoriesState) -> CategoryFilterer {
+        CategoryFilterer::new(
+            categories
                 .state
                 .iter()
                 .map(|(c, state)| (c.clone(), state.state))
                 .collect(),
-        }
+        )
+    }
+
+    #[must_use]
+    fn matcher_filterer(&self) -> MatcherFilterer {
+        let mut matcher = self.matcher.clone();
+        matcher.update_needle(self.prompt.borrow().line());
+        MatcherFilterer::new(matcher)
     }
 
     pub fn update_categories(
@@ -278,8 +296,13 @@ impl Filter {
     }
 }
 
+pub(super) struct FilterContext<'a> {
+    pub(super) ui: &'a Context<'a>,
+    pub(super) gh_options: &'a GhNotificationFilterOptions,
+}
+
 impl Filter {
-    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+    pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &FilterContext<'_>) {
         let area = Block::new()
             .padding(Padding {
                 left: 2,
@@ -291,30 +314,97 @@ impl Filter {
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Length(1)]);
         let [filter_area, search_area] = vertical.areas(area);
 
-        self.render_filter(filter_area, buf, cx);
-        self.render_search(search_area, buf, cx);
+        let lane = cx.ui.tab.into();
+        self.render_filter(filter_area, buf, cx, lane);
+        self.render_search(search_area, buf, cx.ui, lane);
     }
 
-    fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let horizontal = Layout::horizontal([Constraint::Length(18), Constraint::Fill(1)]);
-        let [requirement_area, categories_area] = horizontal.areas(area);
+    #[allow(unstable_name_collisions)]
+    fn render_filter(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        cx: &FilterContext<'_>,
+        lane: FilterLane,
+    ) {
+        let mut spans = vec![Span::from(concat!(icon!(filter), " Filter")).dim()];
 
-        let spans = vec![
-            Span::from(concat!(icon!(filter), " Filter")).dim(),
-            Span::from("    "),
-            {
-                let r = self.feed.requirement.label(&cx.theme.requirement);
+        match lane {
+            FilterLane::Feed => {
+                let mut r = self.feed.requirement.label(&cx.ui.theme.requirement);
                 if r.content == "MAY" {
-                    r.dim()
-                } else {
-                    r
+                    r = r.dim();
                 }
-            },
-            Span::from("  "),
-        ];
-        Line::from(spans).render(requirement_area, buf);
+                spans.extend([Span::from("    "), r, Span::from("  ")]);
+            }
+            FilterLane::GhNotification => {
+                let options = cx.gh_options;
+                let mut unread = Span::from("Unread");
+                if options.include == FetchNotificationInclude::All {
+                    unread = unread.dim();
+                };
 
-        let lane = cx.tab.into();
+                let mut participating = Span::from("Participating");
+                if options.participating == FetchNotificationParticipating::All {
+                    participating = participating.dim();
+                }
+
+                let visibility = match options.visibility {
+                    Some(RepoVisibility::Public) => Some(Span::from("Public")),
+                    Some(RepoVisibility::Private) => Some(Span::from("Private")),
+                    None => None,
+                };
+
+                spans.extend([
+                    Span::from("  "),
+                    unread,
+                    Span::from("  "),
+                    participating,
+                    Span::from("  "),
+                ]);
+                if let Some(visibility) = visibility {
+                    spans.extend([visibility, Span::from("  ")]);
+                }
+
+                let pr_conditions = options
+                    .pull_request_conditions
+                    .iter()
+                    .map(|cond| match cond {
+                        PullRequestState::Open => Span::from("Open"),
+                        PullRequestState::Merged => Span::from("Merged"),
+                        PullRequestState::Closed => Span::from("Closed"),
+                    })
+                    .collect::<Vec<_>>();
+                if !pr_conditions.is_empty() {
+                    spans.extend(pr_conditions.into_iter().intersperse(Span::from(" ")));
+                    spans.push(Span::from("  "));
+                }
+
+                let reasons = options
+                    .reasons
+                    .iter()
+                    .filter_map(|reason| match reason {
+                        Reason::Mention | Reason::TeamMention => Some(Span::from("Mentioned")),
+                        Reason::ReviewRequested => Some(Span::from("ReviewRequested")),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                if !reasons.is_empty() {
+                    spans.extend(reasons.into_iter().intersperse(Span::from(" ")));
+                    spans.push(Span::from("  "));
+                }
+            }
+        }
+        let status_line = Line::from(spans);
+        #[allow(clippy::cast_possible_truncation)]
+        let horizontal = Layout::horizontal([
+            Constraint::Length(status_line.width() as u16),
+            Constraint::Fill(1),
+        ]);
+        let [status_area, categories_area] = horizontal.areas(area);
+
+        status_line.render(status_area, buf);
+
         let (categories, categories_state) = match lane {
             FilterLane::Feed => (
                 &self.feed.categories_state.categories,
@@ -362,14 +452,20 @@ impl Filter {
         Line::from(spans).render(categories_area, buf);
     }
 
-    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>) {
+    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>, lane: FilterLane) {
         let mut spans = vec![];
         let mut label = Span::from(concat!(icon!(search), " Search"));
         if self.state != State::SearchFiltering {
             label = label.dim();
         }
         spans.push(label);
-        spans.push(Span::from("   "));
+        {
+            let padding = match lane {
+                FilterLane::Feed => "   ",
+                FilterLane::GhNotification => " ",
+            };
+            spans.push(Span::from(padding));
+        }
 
         let search = Line::from(spans);
         let margin = search.width() + 1;
@@ -401,17 +497,15 @@ mod tests {
     fn filter_match_feed_url() {
         let mut matcher = Matcher::new();
         matcher.update_needle("ymgyt");
-        let filter = FeedFilterer {
-            requirement: Requirement::May,
-            categories: HashMap::new(),
-            matcher,
-        };
+        let filter = RequirementFilterer::new(Requirement::May)
+            .and_then(CategoryFilterer::new(HashMap::new()))
+            .and_then(MatcherFilterer::new(matcher));
 
         let mut feed: Feed = Faker.fake();
         // title does not match needle
         feed.title = Some("ABC".into());
         feed.website_url = Some("https://blog.ymgyt.io".into());
 
-        assert_eq!(filter.filter_feed(&feed), FilterResult::Use);
+        assert_eq!(filter.filter(&feed), FilterResult::Use);
     }
 }
