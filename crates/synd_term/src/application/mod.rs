@@ -697,8 +697,9 @@ impl Application {
                     self.components.gh_notifications.move_last();
                     self.should_render();
                 }
-                Command::OpenGhNotification => {
+                Command::OpenGhNotification { with_mark_as_done } => {
                     self.open_notification();
+                    with_mark_as_done.then(|| self.mark_gh_notification_as_done(false));
                 }
                 Command::ReloadGhNotifications => {
                     let params = self.components.gh_notifications.reload();
@@ -707,8 +708,8 @@ impl Application {
                 Command::FetchGhNotificationDetails { contexts } => {
                     self.fetch_gh_notification_details(contexts);
                 }
-                Command::MarkGhNotificationAsDone => {
-                    self.mark_gh_notification_as_done();
+                Command::MarkGhNotificationAsDone { all } => {
+                    self.mark_gh_notification_as_done(all);
                 }
                 Command::UnsubscribeGhThread => {
                     // Unlike the web UI, simply unsubscribing does not mark it as done
@@ -716,7 +717,7 @@ impl Application {
                     // Therefore, when reloading, the unsubscribed notification is displayed again.
                     // To address this, we will implicitly mark it as done when unsubscribing.
                     self.unsubscribe_gh_thread();
-                    self.mark_gh_notification_as_done();
+                    self.mark_gh_notification_as_done(false);
                 }
                 Command::OpenGhNotificationFilterPopup => {
                     self.components.gh_notifications.open_filter_popup();
@@ -957,28 +958,45 @@ impl Application {
         self.jobs.futures.push(fut);
     }
 
-    fn mark_gh_notification_as_done(&mut self) {
-        let Some(id) = self.components.gh_notifications.marking_as_done() else {
-            return;
+    fn mark_gh_notification_as_done(&mut self, all: bool) {
+        let ids = if all {
+            Either::Left(
+                self.components
+                    .gh_notifications
+                    .marking_as_done_all()
+                    .into_iter(),
+            )
+        } else {
+            let Some(id) = self.components.gh_notifications.marking_as_done() else {
+                return;
+            };
+            Either::Right(std::iter::once(id))
         };
-        let client = self.github_client.as_ref().unwrap().clone();
-        let request_seq = self.in_flight.add(RequestId::MarkGithubNotificationAsDone);
-        let fut = async move {
-            match client.mark_thread_as_done(id).await {
-                Ok(()) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::MarkGithubNotificationAsDone {
-                        notification_id: id,
-                    },
-                }),
-                Err(error) => Ok(Command::HandleGithubApiError {
-                    error: Arc::new(error),
-                    request_seq,
-                }),
+
+        for id in ids {
+            let request_seq = self
+                .in_flight
+                .add(RequestId::MarkGithubNotificationAsDone { id });
+            let Some(client) = self.github_client.clone() else {
+                return;
+            };
+            let fut = async move {
+                match client.mark_thread_as_done(id).await {
+                    Ok(()) => Ok(Command::HandleApiResponse {
+                        request_seq,
+                        response: ApiResponse::MarkGithubNotificationAsDone {
+                            notification_id: id,
+                        },
+                    }),
+                    Err(error) => Ok(Command::HandleGithubApiError {
+                        error: Arc::new(error),
+                        request_seq,
+                    }),
+                }
             }
+            .boxed();
+            self.jobs.futures.push(fut);
         }
-        .boxed();
-        self.jobs.futures.push(fut);
     }
 
     fn unsubscribe_gh_thread(&mut self) {

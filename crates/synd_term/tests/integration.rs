@@ -510,7 +510,7 @@ mod test {
         .already_logined();
 
         let mut application = test_case.init_app().await?;
-        let (tx, mut event_stream) = helper::event_stream();
+        let (_tx, mut event_stream) = helper::event_stream();
 
         {
             application

@@ -7,6 +7,8 @@ use std::{
 
 use tokio::time::{Instant, Sleep};
 
+use crate::types::github::NotificationId;
+
 pub type RequestSequence = u64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -19,7 +21,7 @@ pub enum RequestId {
     FetchGithubSubject,
     SubscribeFeed,
     UnsubscribeFeed,
-    MarkGithubNotificationAsDone,
+    MarkGithubNotificationAsDone { id: NotificationId },
     UnsubscribeGithubThread,
 }
 

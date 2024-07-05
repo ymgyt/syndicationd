@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Debug};
+use std::{borrow::Cow, collections::HashMap, fmt::Debug, ops::ControlFlow};
 
 use chrono_humanize::{Accuracy, HumanTime, Tense};
 use itertools::Itertools;
@@ -226,14 +226,16 @@ impl GhNotifications {
         issue: IssueContext,
         config: &Categories,
     ) -> Option<&Notification> {
-        for n in self.notifications.unfiltered_iter_mut() {
+        let mut issue = Some(issue);
+        self.notifications.with_mut(|n| {
             if n.id == notification_id {
-                n.subject_context = Some(SubjectContext::Issue(issue));
+                n.subject_context = Some(SubjectContext::Issue(issue.take().unwrap()));
                 n.update_categories(config);
-                return Some(n);
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
             }
-        }
-        None
+        })
     }
 
     pub(crate) fn update_pull_request(
@@ -242,20 +244,30 @@ impl GhNotifications {
         pull_request: PullRequestContext,
         config: &Categories,
     ) -> Option<&Notification> {
-        for n in self.notifications.unfiltered_iter_mut() {
+        let mut pull_request = Some(pull_request);
+        self.notifications.with_mut(|n| {
             if n.id == notification_id {
-                n.subject_context = Some(SubjectContext::PullRequest(pull_request));
+                n.subject_context = Some(SubjectContext::PullRequest(pull_request.take().unwrap()));
                 n.update_categories(config);
-                return Some(n);
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
             }
-        }
-        None
+        })
     }
 
     pub(crate) fn marking_as_done(&mut self) -> Option<NotificationId> {
         let id = self.selected_notification()?.id;
         self.status.insert(id, NotificationStatus::MarkingAsDone);
         Some(id)
+    }
+
+    pub(crate) fn marking_as_done_all(&mut self) -> Vec<NotificationId> {
+        let ids: Vec<NotificationId> = self.notifications.iter().map(|n| n.id).collect();
+        for &id in &ids {
+            self.status.insert(id, NotificationStatus::MarkingAsDone);
+        }
+        ids
     }
 
     pub(crate) fn marked_as_done(&mut self, id: NotificationId) {

@@ -210,6 +210,7 @@ fn parse(s: &str) -> anyhow::Result<KeyEvent> {
         let modifier = match token {
             "C" => KeyModifiers::CONTROL,
             "S" => KeyModifiers::SHIFT,
+            "A" => KeyModifiers::ALT,
             undefined => bail!("`{undefined}` modifier is not implemented yet"),
         };
         modifiers.insert(modifier);

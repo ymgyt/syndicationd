@@ -112,8 +112,8 @@ impl StatusLine {
                     RequestId::FetchGithubSubject => Cow::Borrowed("Fetch github subject..."),
                     RequestId::SubscribeFeed => Cow::Borrowed("Subscribe feed..."),
                     RequestId::UnsubscribeFeed => Cow::Borrowed("Unsubscribe feed..."),
-                    RequestId::MarkGithubNotificationAsDone => {
-                        Cow::Borrowed("Mark notification as done...")
+                    RequestId::MarkGithubNotificationAsDone { id } => {
+                        Cow::Owned(format!("Mark notification({id}) as done..."))
                     }
                     RequestId::UnsubscribeGithubThread => Cow::Borrowed("Unsubscribe thread..."),
                 };

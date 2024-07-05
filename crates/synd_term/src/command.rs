@@ -164,9 +164,13 @@ pub(crate) enum Command {
     MoveGhNotification(Direction),
     MoveGhNotificationFirst,
     MoveGhNotificationLast,
-    OpenGhNotification,
+    OpenGhNotification {
+        with_mark_as_done: bool,
+    },
     ReloadGhNotifications,
-    MarkGhNotificationAsDone,
+    MarkGhNotificationAsDone {
+        all: bool,
+    },
     UnsubscribeGhThread,
     OpenGhNotificationFilterPopup,
     CloseGhNotificationFilterPopup,
@@ -324,13 +328,23 @@ impl Command {
         Command::MoveGhNotificationLast
     }
     pub fn open_gh_notification() -> Self {
-        Command::OpenGhNotification
+        Command::OpenGhNotification {
+            with_mark_as_done: false,
+        }
+    }
+    pub fn open_gh_notification_with_done() -> Self {
+        Command::OpenGhNotification {
+            with_mark_as_done: true,
+        }
     }
     pub fn reload_gh_notifications() -> Self {
         Command::ReloadGhNotifications
     }
     pub fn mark_gh_notification_as_done() -> Self {
-        Command::MarkGhNotificationAsDone
+        Command::MarkGhNotificationAsDone { all: false }
+    }
+    pub fn mark_gh_notification_as_done_all() -> Self {
+        Command::MarkGhNotificationAsDone { all: true }
     }
     pub fn unsubscribe_gh_thread() -> Self {
         Command::UnsubscribeGhThread

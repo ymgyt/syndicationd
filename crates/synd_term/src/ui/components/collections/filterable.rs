@@ -1,10 +1,12 @@
+use std::ops::ControlFlow;
+
 use crate::{
     application::{Direction, IndexOutOfRange, Populate},
     ui::components::filter::{FilterResult, Filterable},
 };
 
 pub(crate) struct FilterableVec<T, F> {
-    pub(crate) items: Vec<T>,
+    items: Vec<T>,
     effective_items: Vec<usize>,
     selected_item_index: usize,
     filterer: F,
@@ -66,10 +68,6 @@ impl<T, F> FilterableVec<T, F> {
             .map(move |&idx| &self.items[idx])
     }
 
-    pub(crate) fn unfiltered_iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.items.iter_mut()
-    }
-
     pub(crate) fn as_unfiltered_slice(&self) -> &[T] {
         self.items.as_slice()
     }
@@ -98,6 +96,29 @@ where
         self.refresh();
     }
 
+    pub(crate) fn with_mut<F2>(&mut self, mut f: F2) -> Option<&T>
+    where
+        F2: FnMut(&mut T) -> ControlFlow<()>,
+    {
+        let mut found = None;
+        for (idx, item) in self.items.iter_mut().enumerate() {
+            match f(item) {
+                ControlFlow::Break(()) => {
+                    found = Some(idx);
+                    break;
+                }
+                ControlFlow::Continue(()) => continue,
+            }
+        }
+
+        if let Some(idx) = found {
+            self.refresh();
+            self.items.get(idx)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn update_filter(&mut self, filterer: F) {
         self.filterer = filterer;
         self.refresh();
@@ -119,7 +140,7 @@ where
         self.refresh();
     }
 
-    fn refresh(&mut self) {
+    pub(crate) fn refresh(&mut self) {
         self.effective_items = self
             .items
             .iter()

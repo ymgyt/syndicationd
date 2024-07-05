@@ -37,8 +37,10 @@ pub fn default() -> KeymapsConfig {
         "k" | "up" => move_up_gh_notification,
         "j" | "down" => move_down_gh_notification,
         "enter" => open_gh_notification,
+        "A-enter" => open_gh_notification_with_done,
         "r" => reload_gh_notifications,
         "d" => mark_gh_notification_as_done,
+        "S-d" => mark_gh_notification_as_done_all,
         "u" => unsubscribe_gh_thread,
         "g" => {
             "g" => move_gh_notification_first,
