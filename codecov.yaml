@@ -7,6 +7,9 @@ coverage:
       default:
         target: auto # use the coverage from the base commit 
         threshold: 3% # allow the coverage to drop by
+    patch:
+      default:
+        target: 50%
 ignore:
   # On Codecov, it shows 300 lines being tracked, but in reality, there are only 3 lines.
   # These can be excluded in the report on llvm-cov.
