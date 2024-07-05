@@ -48,7 +48,7 @@ pub struct Args {
     #[command(flatten)]
     pub feed: FeedOptions,
     #[command(flatten)]
-    pub experimental: ExperimentalOptions,
+    pub experimental: GithubOptions,
     #[arg(hide = true, long = "dry-run", hide_long_help = true)]
     pub dry_run: bool,
 }
@@ -76,23 +76,27 @@ pub struct FeedOptions {
 }
 
 #[derive(clap::Args, Debug)]
-pub struct ExperimentalOptions {
-    /// GitHub Personal Access Token
-    #[arg(
-        long,
-        hide = true,
-        hide_long_help = true,
-        env = "SYND_GH_PAT",
-        required_if_eq("enable_github_notification", "true")
-    )]
-    pub github_pat: Option<String>,
+#[command(next_help_heading = "GitHub options")]
+pub struct GithubOptions {
+    /// Enable GitHub notification feature
     #[arg(
         action = clap::ArgAction::SetTrue,
         long,
-        hide = true, hide_long_help = true,
+        short = 'G',
+        visible_alias = "enable-gh",
+        env = "SYND_ENABLE_GH",
         default_value_t = false,
+        default_missing_value = "true",
     )]
     pub enable_github_notification: bool,
+    /// GitHub personal access token to fetch notifications
+    #[arg(
+        long,
+        env = "SYND_GH_PAT",
+        hide_env_values = true,
+        required_if_eq("enable_github_notification", "true")
+    )]
+    pub github_pat: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]

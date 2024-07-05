@@ -39,7 +39,6 @@ pub struct ExportCommand {
 }
 
 impl ExportCommand {
-    #[allow(clippy::unused_self)]
     pub async fn run(self, endpoint: Url) -> i32 {
         let err = if self.print_schema {
             Self::print_json_schema()

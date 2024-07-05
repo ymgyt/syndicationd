@@ -13,6 +13,12 @@ pub struct Matcher {
     buf: Rc<RefCell<Vec<char>>>,
 }
 
+impl Default for Matcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Matcher {
     pub fn new() -> Self {
         Self {

@@ -2,7 +2,7 @@ set shell := ["nu", "-c"]
 
 kvsd_user := "synduser"
 github_pat := env_var_or_default("GH_PAT", "")
-synd_endpoint := env_var_or_default("SYND_ENDPOITINT", "https://localhost:5959")
+synd_endpoint := env_var_or_default("SYND_ENDPOINT", "https://localhost:5959")
 otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT", "")
 term_dir := "crates/synd_term"
@@ -47,6 +47,7 @@ update-advisory-db:
 
 # Format files
 fmt: fmt-toml
+    cargo fmt
 
 # Run linter
 lint:

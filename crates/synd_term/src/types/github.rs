@@ -54,17 +54,30 @@ impl Deref for PullRequestId {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RepoVisibility {
+    Public,
+    Private,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RepositoryKey {
+    pub(crate) name: String,
+    pub(crate) owner: String,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Repository {
     pub(crate) name: String,
     pub(crate) owner: String,
+    pub(crate) visibility: RepoVisibility,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct NotificationContext<ID> {
     pub(crate) id: ID,
     pub(crate) notification_id: NotificationId,
-    pub(crate) repository_key: Repository,
+    pub(crate) repository_key: RepositoryKey,
 }
 
 pub(crate) type IssueOrPullRequest =
@@ -86,11 +99,25 @@ pub(crate) enum SubjectContext {
     PullRequest(PullRequestContext),
 }
 
+/// `https://docs.github.com/en/rest/activity/notifications?apiVersion=2022-11-28#about-notification-reasons`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Reason {
+    Assign,
+    Author,
+    CiActivity,
+    ManuallySubscribed,
+    Mention,
+    TeamMention,
+    ReviewRequested,
+    WatchingRepo,
+    Other(String),
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Notification {
     pub(crate) id: NotificationId,
     pub(crate) thread_id: Option<ThreadId>,
-    pub(crate) reason: String,
+    pub(crate) reason: Reason,
     #[allow(unused)]
     pub(crate) unread: bool,
     pub(crate) updated_at: Time,
@@ -128,7 +155,15 @@ impl From<models::activity::Notification> for Notification {
             tracing::warn!("Repository full_name not found");
             (String::new(), repository.name)
         };
-        let repository = Repository { name, owner };
+        let repository = Repository {
+            name,
+            owner,
+            visibility: if repository.private.unwrap_or(false) {
+                RepoVisibility::Private
+            } else {
+                RepoVisibility::Public
+            },
+        };
 
         // Assume url is like "https://api.github.com/notifications/threads/11122223333"
         let thread_id = url
@@ -151,6 +186,18 @@ impl From<models::activity::Notification> for Notification {
                 tracing::warn!("Unknown url: {url:?} reason: {reason} subject: `{subject:?}`");
                 None
             }
+        };
+
+        let reason = match reason.as_str() {
+            "assign" => Reason::Assign,
+            "author" => Reason::Author,
+            "ci_activity" => Reason::CiActivity,
+            "manual" => Reason::ManuallySubscribed,
+            "mention" => Reason::Mention,
+            "team_mention" => Reason::TeamMention,
+            "review_requested" => Reason::ReviewRequested,
+            "subscribed" => Reason::WatchingRepo,
+            other => Reason::Other(other.to_owned()),
         };
 
         Self {
@@ -268,12 +315,12 @@ impl Notification {
             SubjectType::Issue => Some(Either::Left(NotificationContext {
                 id: self.issue_id()?,
                 notification_id: self.id,
-                repository_key: self.repository().clone(),
+                repository_key: self.repository_key().clone(),
             })),
             SubjectType::PullRequest => Some(Either::Right(NotificationContext {
                 id: self.pull_request_id()?,
                 notification_id: self.id,
-                repository_key: self.repository().clone(),
+                repository_key: self.repository_key().clone(),
             })),
             // Currently ignore ci, release, discussion
             _ => None,
@@ -322,8 +369,11 @@ impl Notification {
             .map(PullRequestId)
     }
 
-    fn repository(&self) -> &Repository {
-        &self.repository
+    fn repository_key(&self) -> RepositoryKey {
+        RepositoryKey {
+            name: self.repository.name.clone(),
+            owner: self.repository.owner.clone(),
+        }
     }
 
     fn comment_id(&self) -> Option<String> {
@@ -514,7 +564,7 @@ pub(crate) struct PullRequestContext {
     author: Option<String>,
     #[allow(unused)]
     topics: Vec<String>,
-    state: PullRequestState,
+    pub(crate) state: PullRequestState,
     is_draft: bool,
     body: String,
     last_comment: Option<Comment>,
@@ -570,8 +620,6 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
                 luminance: luminance(&label.color),
             })
             .collect();
-
-        tracing::debug!("{labels:?}");
 
         Self {
             author,

@@ -103,6 +103,14 @@ where
         self.refresh();
     }
 
+    pub(crate) fn with_filter<With>(&mut self, f: With)
+    where
+        With: FnOnce(&mut F),
+    {
+        f(&mut self.filterer);
+        self.refresh();
+    }
+
     pub(crate) fn retain<C>(&mut self, cond: C)
     where
         C: Fn(&T) -> bool,

@@ -485,7 +485,11 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn cli_commands() -> anyhow::Result<()> {
+        helper::init_tracing();
         let test_case = TestCase {
+            // If the mock server on port 7000 is not functioning properly on macOS
+            // it might be due to the AirPlay Receiver.
+            // try uncheking System Preferences > AirPlay Receiver > On to resolve the issue.
             mock_port: 7000,
             synd_api_port: 7001,
             kvsd_port: 7002,

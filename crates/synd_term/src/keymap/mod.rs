@@ -16,10 +16,11 @@ pub(crate) enum KeymapId {
     Tabs = 2,
     Entries = 3,
     Subscription = 4,
-    Notification = 5,
+    GhNotification = 5,
     Filter = 6,
     CategoryFiltering = 7,
     UnsubscribePopupSelection = 8,
+    GhNotificationFilterPopup = 9,
 }
 
 #[derive(Debug)]
@@ -74,7 +75,8 @@ pub(crate) struct KeymapsConfig {
     pub tabs: KeyTrie,
     pub entries: KeyTrie,
     pub subscription: KeyTrie,
-    pub notification: KeyTrie,
+    pub gh_notification: KeyTrie,
+    pub gh_notification_filter_popup: KeyTrie,
     pub filter: KeyTrie,
     pub unsubscribe_popup: KeyTrie,
     pub global: KeyTrie,
@@ -100,12 +102,16 @@ impl Keymaps {
             Keymap::new(KeymapId::Tabs, config.tabs),
             Keymap::new(KeymapId::Entries, config.entries),
             Keymap::new(KeymapId::Subscription, config.subscription),
-            Keymap::new(KeymapId::Notification, config.notification),
+            Keymap::new(KeymapId::GhNotification, config.gh_notification),
             Keymap::new(KeymapId::Filter, config.filter),
             Keymap::new(KeymapId::CategoryFiltering, KeyTrie::default()),
             Keymap::new(
                 KeymapId::UnsubscribePopupSelection,
                 config.unsubscribe_popup,
+            ),
+            Keymap::new(
+                KeymapId::GhNotificationFilterPopup,
+                config.gh_notification_filter_popup,
             ),
         ];
 
