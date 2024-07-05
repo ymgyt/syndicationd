@@ -18,6 +18,7 @@ use tokio::net::TcpListener;
 use crate::{certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID, GITHUB_INVALID_TOKEN, TEST_EMAIL};
 
 mod feed;
+mod github;
 
 async fn github_device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
@@ -201,6 +202,10 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
     let router = Router::new()
         .nest("/case1", case_1)
         .route("/github/graphql", post(github_graphql_viewer))
+        .route(
+            "/github/rest/notifications",
+            get(github::notifications::list),
+        )
         .route("/google/oauth2/v1/certs", get(google_jwt_pem))
         .route("/google/oauth2/token", post(google_oauth2_token))
         .route("/feed/error/:error", get(feed::feed_error))
@@ -218,6 +223,6 @@ async fn debug_mw(
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    tracing::debug!("req:?");
+    tracing::debug!("{req:?}");
     next.run(req).await
 }

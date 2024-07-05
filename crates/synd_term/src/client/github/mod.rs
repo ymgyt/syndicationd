@@ -17,12 +17,16 @@ pub struct GithubClient {
 impl GithubClient {
     pub fn new(pat: impl Into<String>) -> Self {
         // TODO: configure timeout
-        Self {
-            client: Octocrab::builder()
-                .personal_token(pat.into())
-                .build()
-                .unwrap(),
-        }
+        let octo = Octocrab::builder()
+            .personal_token(pat.into())
+            .build()
+            .unwrap();
+        Self::with(octo)
+    }
+
+    #[must_use]
+    pub fn with(client: Octocrab) -> Self {
+        Self { client }
     }
 
     pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> octocrab::Result<()> {

@@ -21,6 +21,7 @@ futures-util = { workspace = true }
 headers      = { workspace = true }
 jsonwebtoken = { workspace = true }
 kvsd         = { workspace = true }
+octocrab     = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
 tempfile     = { workspace = true }

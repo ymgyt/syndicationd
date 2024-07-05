@@ -1,5 +1,5 @@
 use crate::{
-    application::{Application, Authenticator, Cache, Config},
+    application::{Application, Authenticator, Cache, Clock, Config},
     client::{github::GithubClient, Client},
     config::Categories,
     interact::Interactor,
@@ -25,6 +25,7 @@ pub struct ApplicationBuilder<
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Option<Interactor>,
     pub(super) github_client: Option<GithubClient>,
+    pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) dry_run: bool,
 }
 
@@ -40,6 +41,7 @@ impl Default for ApplicationBuilder {
             authenticator: None,
             interactor: None,
             github_client: None,
+            clock: None,
             dry_run: false,
         }
     }
@@ -58,6 +60,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
             authenticator: self.authenticator,
             interactor: self.interactor,
             github_client: self.github_client,
+            clock: self.clock,
             dry_run: self.dry_run,
         }
     }
@@ -76,6 +79,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
             authenticator: self.authenticator,
             interactor: self.interactor,
             github_client: self.github_client,
+            clock: self.clock,
             dry_run: self.dry_run,
         }
     }
@@ -97,6 +101,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
             authenticator: self.authenticator,
             interactor: self.interactor,
             github_client: self.github_client,
+            clock: self.clock,
             dry_run: self.dry_run,
         }
     }
@@ -115,6 +120,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
             authenticator: self.authenticator,
             interactor: self.interactor,
             github_client: self.github_client,
+            clock: self.clock,
             dry_run: self.dry_run,
         }
     }
@@ -133,6 +139,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
             authenticator: self.authenticator,
             interactor: self.interactor,
             github_client: self.github_client,
+            clock: self.clock,
             dry_run: self.dry_run,
         }
     }
@@ -151,6 +158,7 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
             authenticator: self.authenticator,
             interactor: self.interactor,
             github_client: self.github_client,
+            clock: self.clock,
             dry_run: self.dry_run,
         }
     }
@@ -177,6 +185,14 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
     pub fn github_client(self, github_client: GithubClient) -> Self {
         Self {
             github_client: Some(github_client),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn clock(self, clock: Box<dyn Clock>) -> Self {
+        Self {
+            clock: Some(clock),
             ..self
         }
     }

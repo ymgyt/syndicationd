@@ -2,7 +2,12 @@
 mod test {
     use std::path::{Path, PathBuf};
 
-    use synd_term::{application::Config, auth::Credential, key, shift};
+    use chrono::{TimeZone, Utc};
+    use synd_term::{
+        application::{Config, Features},
+        auth::Credential,
+        key, shift,
+    };
     use synd_test::temp_dir;
 
     mod helper;
@@ -479,6 +484,67 @@ mod test {
                 insta::assert_debug_snapshot!("unauthorized_error_message", application.buffer());
             });
         }
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn github_notifications() -> anyhow::Result<()> {
+        helper::init_tracing();
+
+        let test_case = TestCase {
+            mock_port: 6070,
+            synd_api_port: 6071,
+            kvsd_port: 6072,
+            terminal_col_row: (120, 30),
+            // Enable github notification features
+            config: Config {
+                features: Features {
+                    enable_github_notification: true,
+                },
+                ..test_config()
+            },
+            now: Some(Utc::with_ymd_and_hms(&Utc, 2024, 5, 5, 8, 0, 0).unwrap()),
+            ..Default::default()
+        }
+        .already_logined();
+
+        let mut application = test_case.init_app().await?;
+        let (tx, mut event_stream) = helper::event_stream();
+
+        {
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "github notifications initial",
+            },{
+                insta::assert_debug_snapshot!("gh_notifications_init", application.buffer());
+            });
+        }
+
+        // TODO
+        /*
+        {
+            // Done
+            tx.send(key!('d'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+
+            // Unsubscribe
+            tx.send(key!('u'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+
+            insta::with_settings!({
+                description => "github notifications mark as done",
+            },{
+                insta::assert_debug_snapshot!("gh_notifications_mark_as_done", application.buffer());
+            });
+        }
+        */
 
         Ok(())
     }

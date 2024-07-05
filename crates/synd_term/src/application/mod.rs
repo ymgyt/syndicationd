@@ -55,7 +55,7 @@ use input_parser::InputParser;
 pub use auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
 mod clock;
-pub(crate) use clock::{Clock, SystemClock};
+pub use clock::{Clock, SystemClock};
 
 mod cache;
 pub use cache::Cache;
@@ -120,6 +120,7 @@ impl Application {
             theme,
             authenticator,
             interactor,
+            clock,
             dry_run,
         } = builder;
 
@@ -138,7 +139,7 @@ impl Application {
         }
 
         Self {
-            clock: Box::new(SystemClock),
+            clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
             terminal,
             client,
             github_client,
