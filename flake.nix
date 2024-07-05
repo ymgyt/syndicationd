@@ -4,8 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
-    fenix = {
-      url = "github:nix-community/fenix";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -22,15 +22,14 @@
     };
   };
 
-  outputs = { self, nixpkgs, fenix, crane, flake-utils, advisory-db, ... }:
+  outputs =
+    { self, nixpkgs, crane, rust-overlay, flake-utils, advisory-db, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        overlays = [ fenix.overlays.default ];
+        overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rustToolchain = fenix.packages.${system}.fromToolchainFile {
-          file = ./rust-toolchain.toml;
-          sha256 = "sha256-Ngiz76YP4HTY75GGdH2P+APE/DEIx2R/Dn+BwwOyzZU=";
-        };
+        rustToolchain =
+          pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
@@ -62,7 +61,6 @@
         # Inherits from checks cargo-nextest, cargo-audit
         dev_packages = with pkgs;
           [
-            # rust-analyzer-nightly
             typos
             graphql-client
             opentelemetry-collector-contrib
