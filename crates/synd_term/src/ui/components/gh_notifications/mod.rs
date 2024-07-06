@@ -620,7 +620,14 @@ impl GhNotifications {
 
     fn render_filter_popup(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = {
-            let area = area.centered(60, 30);
+            let vertical = Layout::vertical([
+                Constraint::Fill(1),
+                Constraint::Length(9),
+                Constraint::Fill(2),
+            ]);
+            let [_, area, _] = vertical.areas(area);
+
+            let area = area.centered(70, 100);
             area.reset(buf);
             area
         };

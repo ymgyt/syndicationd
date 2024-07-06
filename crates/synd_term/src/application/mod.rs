@@ -723,6 +723,9 @@ impl Application {
                     self.components.gh_notifications.open_filter_popup();
                     self.keymaps().enable(KeymapId::GhNotificationFilterPopup);
                     self.keymaps().disable(KeymapId::GhNotification);
+                    self.keymaps().disable(KeymapId::Filter);
+                    self.keymaps().disable(KeymapId::Entries);
+                    self.keymaps().disable(KeymapId::Subscription);
                     self.should_render();
                 }
                 Command::CloseGhNotificationFilterPopup => {
@@ -733,6 +736,9 @@ impl Application {
                         .for_each(|command| queue.push_back(command));
                     self.keymaps().disable(KeymapId::GhNotificationFilterPopup);
                     self.keymaps().enable(KeymapId::GhNotification);
+                    self.keymaps().enable(KeymapId::Filter);
+                    self.keymaps().enable(KeymapId::Entries);
+                    self.keymaps().enable(KeymapId::Subscription);
                     self.should_render();
                 }
                 Command::UpdateGhnotificationFilterPopupOptions(updater) => {

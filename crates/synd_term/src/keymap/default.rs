@@ -49,20 +49,27 @@ pub fn default() -> KeymapsConfig {
         "f" => open_gh_notification_filter_popup,
     });
     let gh_notification_filter_popup = keymap!({
-        "u" => toggle_gh_notification_filter_popup_include_unread,
+        "u" => {
+            "n" => toggle_gh_notification_filter_popup_include_unread,
+        },
+        "c" => {
+            "l" => toggle_gh_notification_filter_popup_pr_closed,
+        },
         "p" => {
             "a" => toggle_gh_notification_filter_popup_participating,
-            "o" => toggle_gh_notification_filter_popup_pr_open,
-            "m" => toggle_gh_notification_filter_popup_pr_merged,
-            "c" => toggle_gh_notification_filter_popup_pr_closed,
-            "b" => toggle_gh_notification_filter_popup_visibility_public,
+            "u" => toggle_gh_notification_filter_popup_visibility_public,
             "r" => toggle_gh_notification_filter_popup_visibility_private,
+        },
+        "o" => {
+            "p" => toggle_gh_notification_filter_popup_pr_open,
+
         },
         "m" => {
             "e" => toggle_gh_notification_filter_popup_reason_mentioned,
+            "r" => toggle_gh_notification_filter_popup_pr_merged,
         },
         "r" => {
-            "r" => toggle_gh_notification_filter_popup_reason_review,
+            "e" => toggle_gh_notification_filter_popup_reason_review,
         },
         "esc" | "enter" => close_gh_notification_filter_popup,
     });
