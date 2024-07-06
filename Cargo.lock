@@ -3739,6 +3739,7 @@ dependencies = [
  "jsonwebtoken",
  "kvsd",
  "octocrab",
+ "once_cell",
  "serde",
  "serde_json",
  "synd-auth",

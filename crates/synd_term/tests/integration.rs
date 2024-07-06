@@ -2,7 +2,6 @@
 mod test {
     use std::path::{Path, PathBuf};
 
-    use chrono::{TimeZone, Utc};
     use synd_term::{
         application::{Config, Features},
         auth::Credential,
@@ -516,7 +515,7 @@ mod test {
                 },
                 ..test_config()
             },
-            now: Some(Utc::with_ymd_and_hms(&Utc, 2024, 5, 5, 8, 0, 0).unwrap()),
+            now: Some(*synd_test::mock::github::notifications::NOW),
             ..Default::default()
         }
         .already_logined();

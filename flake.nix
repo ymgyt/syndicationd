@@ -40,6 +40,7 @@
             || (pkgs.lib.hasSuffix ".gql" path) # graphql query
             || (pkgs.lib.hasSuffix "schema.json" path) # graphql schema
             || (pkgs.lib.hasSuffix ".snap" path) # insta snapshots
+            || (pkgs.lib.hasSuffix ".json" path) # graphql fixtures
             || (pkgs.lib.hasSuffix ".kvsd" path) # kvsd fixtures
             || (pkgs.lib.hasSuffix ".xml" path) # rss fixtures
             || (pkgs.lib.hasSuffix "categories.toml" path) ||

@@ -1,0 +1,47 @@
+{
+	"data": {
+		"repository": {
+			"repositoryTopics": {
+				"nodes": [
+					{
+						"topic": {
+							"name": "rust"
+						}
+					}
+				]
+			},
+			"issue": {
+				"author": {
+					"__typename": "User",
+					"login": "userX"
+				},
+				"state": "OPEN",
+				"stateReason": null,
+				"bodyText": "Hello World",
+				"labels": {
+					"nodes": [
+						{
+							"color": "FBCA04",
+							"name": "A-label"
+						},
+						{
+							"color": "C5DEF5",
+							"name": "C-enhancement"
+						}
+					]
+				},
+				"comments": {
+					"nodes": [
+						{
+							"bodyText": "LastComment...",
+							"author": {
+								"__typename": "User",
+								"login": "userY"
+							}
+						}
+					]
+				}
+			}
+		}
+	}
+}
