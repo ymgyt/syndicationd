@@ -521,7 +521,7 @@ mod test {
         .already_logined();
 
         let mut application = test_case.init_app().await?;
-        let (_tx, mut event_stream) = helper::event_stream();
+        let (tx, mut event_stream) = helper::event_stream();
 
         {
             application
@@ -534,8 +534,60 @@ mod test {
             });
         }
 
-        // TODO
-        /*
+        {
+            // Filter
+            tx.send(key!('f'));
+            // Enable private repo
+            tx.send_multi([key!('p'), key!('r'), key!(enter)]);
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "github notifications enable private repo filter",
+            },{
+                insta::assert_debug_snapshot!("gh_notifications_filter_private_repo", application.buffer());
+            });
+
+            // Disable private and enable PR closed
+            tx.send_multi([
+                key!('f'),
+                key!('p'),
+                key!('r'),
+                key!('c'),
+                key!('l'),
+                key!(enter),
+            ]);
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "github notifications enable pr closed filter",
+            },{
+                insta::assert_debug_snapshot!("gh_notifications_filter_pr_closed", application.buffer());
+            });
+
+            // Disable PR closed and enable review requested
+            tx.send_multi([
+                key!('f'),
+                key!('c'),
+                key!('l'),
+                key!('r'),
+                key!('e'),
+                key!(enter),
+            ]);
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+            insta::with_settings!({
+                description => "github notifications enable review requested filter",
+            },{
+                insta::assert_debug_snapshot!("gh_notifications_filter_reason_review_requested", application.buffer());
+            });
+
+            // Clear filter conditions
+            tx.send_multi([key!('f'), key!('r'), key!('e'), key!(enter)]);
+        }
+
         {
             // Done
             tx.send(key!('d'));
@@ -549,13 +601,18 @@ mod test {
                 .wait_until_jobs_completed(&mut event_stream)
                 .await;
 
+            // Done all
+            tx.send(key!('D'));
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+
             insta::with_settings!({
-                description => "github notifications mark as done",
+                description => "github notifications mark as done all",
             },{
-                insta::assert_debug_snapshot!("gh_notifications_mark_as_done", application.buffer());
+                insta::assert_debug_snapshot!("gh_notifications_mark_as_done_all", application.buffer());
             });
         }
-        */
 
         Ok(())
     }

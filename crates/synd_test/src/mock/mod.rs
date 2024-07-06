@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::atomic::AtomicUsize, time::Duration};
 use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, patch, post, put},
     Form, Json, Router,
 };
 use headers::{authorization::Bearer, Authorization, Header};
@@ -205,6 +205,14 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
         .route(
             "/github/rest/notifications",
             get(github::notifications::list),
+        )
+        .route(
+            "/github/rest/notifications/threads/:thread",
+            patch(github::notifications::mark_as_done),
+        )
+        .route(
+            "/github/rest/notifications/threads/:thread/subscription",
+            put(github::notifications::unsubscribe_thread),
         )
         .route("/github/rest/graphql", post(github::gql::graphql))
         .route("/google/oauth2/v1/certs", get(google_jwt_pem))

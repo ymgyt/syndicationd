@@ -1,0 +1,44 @@
+{
+	"data": {
+		"repository": {
+			"repositoryTopics": {
+				"nodes": [
+					{
+						"topic": {
+							"name": "rust"
+						}
+					}
+				]
+			},
+			"pullRequest": {
+				"totalCommentsCount": 4,
+				"state": "CLOSED",
+				"isDraft": false,
+				"bodyText": "About feature...",
+				"author": {
+					"__typename": "User",
+					"login": "ferris"
+				},
+				"labels": {
+					"nodes": [
+						{
+							"color": "FBCA04",
+							"name": "A-vcs"
+						}
+					]
+				},
+				"comments": {
+					"nodes": [
+						{
+							"bodyText": "Cool",
+							"author": {
+								"__typename": "User",
+								"login": "userA"
+							}
+						}
+					]
+				}
+			}
+		}
+	}
+}

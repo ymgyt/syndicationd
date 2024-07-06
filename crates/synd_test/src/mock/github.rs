@@ -8,10 +8,13 @@ pub mod notifications {
     #[allow(clippy::wildcard_imports)]
     use super::*;
     use axum::{
-        extract::Query,
+        extract::{Path, Query},
+        http::StatusCode,
         response::{IntoResponse, Response},
+        Json,
     };
     use chrono::{DateTime, Duration, TimeZone, Utc};
+    use serde::Serialize;
     use serde_json::Value;
 
     #[allow(unused)]
@@ -27,8 +30,6 @@ pub mod notifications {
         Lazy::new(|| Utc::with_ymd_and_hms(&Utc, 2024, 7, 5, 8, 0, 0).unwrap());
 
     pub async fn list(Query(n): Query<Notifications>) -> Response {
-        tracing::debug!("{n:?}");
-
         if n.page == 1 {
             let notifications = json!({
                 "items": [
@@ -43,7 +44,7 @@ pub mod notifications {
                       "reason": "mention",
                       "unread": true,
                       "updated_at": NOW.sub(Duration::hours(1)),
-                      "url": "https://test.ymgyt.io/notifications/100",
+                      "url": "https://api.ymgyt.io/notifications/threads/1",
                   },
                   {
                       "id": 2,
@@ -56,11 +57,36 @@ pub mod notifications {
                       "reason": "mention",
                       "unread": true,
                       "updated_at": NOW.sub(Duration::hours(2)),
-                      "url": "https://test.ymgyt.io/notifications/100",
+                      "url": "https://api.ymgyt.io/notifications/threads/2",
+                  },
+                  {
+                      "id": 3,
+                      "repository": repo_private(),
+                      "subject": {
+                          "title": "Add feature foo",
+                          "url": "https://api.ymgyt.io/repos/sakura/repo-private/pulls/2",
+                          "type": "pullrequest",
+                      },
+                      "reason": "subscribed",
+                      "unread": true,
+                      "updated_at": NOW.sub(Duration::hours(3)),
+                      "url": "https://api.ymgyt.io/notifications/threads/3",
+                  },
+                  {
+                      "id": 4,
+                      "repository": repo_private(),
+                      "subject": {
+                          "title": "Request Review",
+                          "url": "https://api.ymgyt.io/repos/sakura/repo-private/pulls/3",
+                          "type": "pullrequest",
+                      },
+                      "reason": "review_requested",
+                      "unread": true,
+                      "updated_at": NOW.sub(Duration::hours(4)),
+                      "url": "https://api.ymgyt.io/notifications/threads/4",
                   }
                 ],
             });
-            tracing::debug!("{}", notifications.to_string());
 
             notifications.to_string().into_response()
         } else {
@@ -77,9 +103,44 @@ pub mod notifications {
           "id": 1,
           "name": "repo-a",
           "full_name": "sakura/repo-a",
-          "private:": false,
+          "private": false,
           "url": "https://github.ymgyt.io/sakura/repo-a/",
         })
+    }
+
+    fn repo_private() -> Value {
+        json!({
+          "id": 2,
+          "name": "repo-private",
+          "full_name": "sakura/repo-private",
+          "private": true,
+          "url": "https://github.ymgyt.io/sakura/repo-private/",
+        })
+    }
+
+    #[derive(Deserialize)]
+    pub struct MarkAsDoneParams {
+        thread: u64,
+    }
+
+    pub async fn mark_as_done(
+        Path(MarkAsDoneParams { thread }): Path<MarkAsDoneParams>,
+    ) -> impl IntoResponse {
+        tracing::info!("Mark as done thread: {thread}");
+        StatusCode::OK
+    }
+
+    #[derive(Deserialize)]
+    pub struct UnsubscribeThreadParams {
+        thread: u64,
+    }
+    #[derive(Serialize)]
+    pub struct UnsubscribeThreadResponse {}
+    pub async fn unsubscribe_thread(
+        Path(UnsubscribeThreadParams { thread }): Path<UnsubscribeThreadParams>,
+    ) -> Json<UnsubscribeThreadResponse> {
+        tracing::info!("Unsubscribe thread: {thread}");
+        Json(UnsubscribeThreadResponse {})
     }
 }
 
@@ -122,6 +183,12 @@ pub mod gql {
                 match fixture.as_str() {
                     "sakura_repo-a_prs_1" => {
                         include_str!("./githubdata/sakura_repo-a_prs_1.json").into_response()
+                    }
+                    "sakura_repo-private_prs_2" => {
+                        include_str!("./githubdata/sakura_repo-private_prs_2.json").into_response()
+                    }
+                    "sakura_repo-private_prs_3" => {
+                        include_str!("./githubdata/sakura_repo-private_prs_3.json").into_response()
                     }
                     _ => panic!("Unexpected pr fixture: {fixture}"),
                 }
