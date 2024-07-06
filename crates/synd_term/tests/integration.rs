@@ -11,7 +11,9 @@ mod test {
     use synd_test::temp_dir;
 
     mod helper;
-    use crate::test::helper::{resize_event, test_config, TestCase};
+    use crate::test::helper::{
+        focus_gained_event, focus_lost_event, resize_event, test_config, TestCase,
+    };
 
     #[tokio::test(flavor = "multi_thread")]
     async fn login_with_github() -> anyhow::Result<()> {
@@ -427,7 +429,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn resize_terminal_to_zero() -> anyhow::Result<()> {
+    async fn terminal_events() -> anyhow::Result<()> {
         let (mut col, mut row) = (120, 30);
         let test_case = TestCase {
             mock_port: 6050,
@@ -441,6 +443,16 @@ mod test {
         let mut application = test_case.init_app().await?;
         let (tx, mut event_stream) = helper::event_stream();
 
+        // Focus
+        {
+            tx.send(focus_gained_event());
+            tx.send(focus_lost_event());
+            application
+                .wait_until_jobs_completed(&mut event_stream)
+                .await;
+        }
+
+        // Resize
         loop {
             col /= 2;
             row /= 2;

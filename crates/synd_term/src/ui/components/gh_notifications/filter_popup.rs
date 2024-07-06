@@ -246,7 +246,7 @@ impl FilterPopup {
                 Span::from(concat!(icon!(pullrequest), " PullRequest")).bold(),
                 Span::from("    "),
             ];
-            // dim then bold approch does not work :(
+            // dim then bold approach does not work :(
             let mut open1 = Span::styled("Op", keyword).italic().bold();
             let mut open2 = Span::from("en").bold();
             let mut merged1 = Span::styled("M", keyword).italic().bold();
@@ -308,12 +308,12 @@ impl FilterPopup {
             let mut mentioned2 = Span::from("ntioned").bold();
             let mut review1 = Span::styled("Re", keyword).italic().bold();
             let mut review2 = Span::from("viewRequested").bold();
-            let mut disable_mentiond = true;
+            let mut disable_mentioned = true;
             let mut disable_review = true;
             for reason in &options.reasons {
                 match reason {
                     Reason::Mention | Reason::TeamMention => {
-                        disable_mentiond = false;
+                        disable_mentioned = false;
                     }
                     Reason::ReviewRequested => {
                         disable_review = false;
@@ -321,7 +321,7 @@ impl FilterPopup {
                     _ => {}
                 }
             }
-            if disable_mentiond {
+            if disable_mentioned {
                 mentioned1 = mentioned1.dim();
                 mentioned2 = mentioned2.dim();
             }
