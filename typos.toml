@@ -2,6 +2,7 @@
 extend-exclude = [
   # Could not fix github api typo
   "crates/synd_api/src/client/github/schema.json",
+  "crates/synd_term/gql/github/schema.json",
   # Ignore commit message typo
   "CHANGELOG.md",
   # Ignore dependencies LICENSES
