@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased] __release_date__
 
+### Bug Fixes
+
+- Apply initial filter by [@ymgyt](https://github.com/ymgyt) ([47ed7abf](https://github.com/ymgyt/syndicationd/commit/47ed7abf59ca8d11abff337dc1e141b83752595e))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0-rc.1...
+
+
+## [v0.3.0-rc.1] - 2024-07-07
+
 ### Features
 
 - Use local timezone when displaying time (#71) by [@ymgyt](https://github.com/ymgyt) ([36212b4b](https://github.com/ymgyt/syndicationd/commit/36212b4b1d00855b0b4206a45714cc42359dfb8e))
@@ -19,13 +28,13 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Make tab width dynamic by [@ymgyt](https://github.com/ymgyt) ([9679d7da](https://github.com/ymgyt/syndicationd/commit/9679d7da3e6315bebb46a70a13a3ab4e8ce24fa5))
-- Fix graphql schema path by [@](https://github.com/) ([f1abe4b7](https://github.com/ymgyt/syndicationd/commit/f1abe4b76294c4a6111fa440c3c77fd3e55c5d23))
+- Fix graphql schema path by [@ymgyt](https://github.com/ymgyt) ([f1abe4b7](https://github.com/ymgyt/syndicationd/commit/f1abe4b76294c4a6111fa440c3c77fd3e55c5d23))
 
 ### Miscellaneous Tasks
 
 - Update ratatui from 0.26.3 to 0.27.0 by [@ymgyt](https://github.com/ymgyt) ([968c3256](https://github.com/ymgyt/syndicationd/commit/968c32564b6dd2882da413d88320077989464f8c))
-- Include graphql files by [@](https://github.com/) ([453d630e](https://github.com/ymgyt/syndicationd/commit/453d630e07b5f849b0f981619e0403977b1887c3))
-- Copy github graphql schema by [@](https://github.com/) ([ce90f72b](https://github.com/ymgyt/syndicationd/commit/ce90f72b9acf461d6aeadfe1413602dcc851a2ef))
+- Include graphql files by [@ymgyt](https://github.com/ymgyt) ([453d630e](https://github.com/ymgyt/syndicationd/commit/453d630e07b5f849b0f981619e0403977b1887c3))
+- Copy github graphql schema by [@ymgyt](https://github.com/ymgyt) ([ce90f72b](https://github.com/ymgyt/syndicationd/commit/ce90f72b9acf461d6aeadfe1413602dcc851a2ef))
 
 ### Styling
 
@@ -37,7 +46,7 @@ All notable changes to this project will be documented in this file.
 - Add gql fixtures to gh notifications test by [@ymgyt](https://github.com/ymgyt) ([1616c526](https://github.com/ymgyt/syndicationd/commit/1616c526e076547648661705fec2fafd66090e88))
 - Add test case for filtering gh notifications by [@ymgyt](https://github.com/ymgyt) ([cf45254d](https://github.com/ymgyt/syndicationd/commit/cf45254d7db5080cf1753bb33cfa2c9d91c10cce))
 
-https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.6...
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.6...synd-term-v0.3.0-rc.1
 
 
 ## [v0.2.6] - 2024-06-18
