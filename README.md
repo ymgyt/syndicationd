@@ -41,9 +41,8 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 
 ## Features
 
-* Subscribe feeds(RSS1, RSS2, Atom, JSON) and browse latest entries 
-* Open the entry in a browser
-* Filter entries by categories and [requirement](#requirement)
+* Subscribe RSS/Atom feeds
+* Handle [GitHub notifications](https://github.com/notifications)
 
 ## Installation
 
@@ -108,7 +107,7 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 <summary>Click to show a complete list of options</summary>
 
 ```sh
-Usage: synd [OPTIONS] [COMMAND]
+Usage:
 
 Commands:
   clean   Clean cache and logs
@@ -117,12 +116,13 @@ Commands:
   help    Print this message or the help of the given subcommand(s)
 
 Options:
-      --log <LOG>        Log file path [env: SYND_LOG_PATH=] [default: /home/ymgyt/.local/share/synd/synd.log]
-      --theme <PALETTE>  Color palette [env: SYND_THEME=] [default: slate] [possible values: slate, gray,
-                         zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan,
-                         sky, blue, indigo, violet, purple, fuchsia, pink]
-  -h, --help             Print help
-  -V, --version          Print version
+      --log <LOG>              Log file path [env: SYND_LOG_PATH=] [default:
+                               /home/ymgyt/.local/share/synd/synd.log]
+      --cache-dir <CACHE_DIR>  Cache directory [default: /home/ymgyt/.cache/synd]
+      --theme <THEME>          Color theme [env: SYND_THEME=] [default: ferra] [possible values: ferra,
+                               solarized-dark, helix]
+  -h, --help                   Print help
+  -V, --version                Print version
 
 Api options:
       --endpoint <ENDPOINT>              `synd_api` endpoint [env: SYND_ENDPOINT=] [default:
@@ -133,6 +133,11 @@ Feed options:
       --categories <CATEGORIES TOML PATH>  categories.toml path
       --entries-limit <ENTRIES_LIMIT>      Feed entries limit to fetch [default: 200]
 
+GitHub options:
+  -G, --enable-github-notification  Enable GitHub notification feature [env: SYND_ENABLE_GH=]
+                                    [aliases: enable-gh]
+      --github-pat <GITHUB_PAT>     GitHub personal access token to fetch notifications [env:
+                                    SYND_GH_PAT]
 ```
 
 </details>
@@ -164,6 +169,15 @@ Currently, GitHub and Google are supported as authorize server/id provider. The 
 | `-`     | Deactivate all category(on Category filter)   |
 | `/`     | Activate keyword search(Esc to deactivate)    |
 | `q`     | Quit app                                      |
+
+#### GitHub Notification
+
+| Key     | Description                                   |
+| ---     | ---                                           |
+| `d`     | Mark as done                                  |
+| `D`     | Mark all as done                              |
+| `u`     | Unsubscribe                                   |
+| `f`     | Open notification filter(Esc to apply)        |
 
 </details>
 
@@ -264,6 +278,25 @@ You can check the JSON schema of the data to be exported with `synd export --pri
 }
 ```
 </details>
+
+### GitHub Notifications
+
+To enable GitHub notifications feature, specify the `--enable-github-notification | -G` flag or set the environment variable `SYND_ENABLE_GH=true`.  
+When enabling the GitHub notifications feature, GitHub personal access token (PAT) is required. Specify the PAT using the `--github-pat` flag or the environment variable `SYND_GH_PAT`.  
+For GitHub notifications, unlike feeds, the synd-api is not used.
+
+#### PAT Scope
+
+##### Classic token
+
+The `repo` scope is required. For more details, see [about github notifications](https://docs.github.com/en/rest/activity/notifications?apiVersion=2022-11-28#about-github-notifications).
+
+##### Fine grained access token
+
+"Metadata" repository permissions (read) and "Notifications" user permissions (read) are required.  
+For more details, see [list notifications for the authenticated user](https://docs.github.com/en/rest/activity/notifications?apiVersion=2022-11-28#list-notifications-for-the-authenticated-user).  
+Since the Mark notification as done API does not support fine grained access token, c class token is required to use this feature.  
+
 
 ### Log file
 
