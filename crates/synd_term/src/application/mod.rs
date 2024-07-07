@@ -36,8 +36,8 @@ use crate::{
     ui::{
         self,
         components::{
-            authentication::AuthenticateState, filter::Filterer, root::Root,
-            subscription::UnsubscribeSelection, tabs::Tab, Components,
+            authentication::AuthenticateState, filter::Filterer, gh_notifications::GhNotifications,
+            root::Root, subscription::UnsubscribeSelection, tabs::Tab, Components,
         },
         theme::{Palette, Theme},
     },
@@ -203,6 +203,19 @@ impl Application {
             Ok(cred) => self.handle_initial_credential(cred),
             Err(err) => tracing::warn!("Restore credential: {err}"),
         }
+
+        if self.config.features.enable_github_notification {
+            // Restore previous filter options
+            match self.cache.load_gh_notification_filter_options() {
+                Ok(options) => {
+                    self.components.gh_notifications =
+                        GhNotifications::with_filter_options(options);
+                }
+                Err(err) => {
+                    tracing::warn!("Load github notification filter options: {err}");
+                }
+            }
+        }
         Ok(())
     }
 
@@ -257,6 +270,16 @@ impl Application {
 
     /// Restore terminal state and print something to console if necesseary
     fn cleanup(&mut self) -> anyhow::Result<()> {
+        if self.config.features.enable_github_notification {
+            let options = self.components.gh_notifications.filter_options();
+            match self.cache.persist_gh_notification_filter_options(options) {
+                Ok(()) => {}
+                Err(err) => {
+                    tracing::warn!("Failed to persist github notification filter options: {err}");
+                }
+            }
+        }
+
         self.terminal.restore()?;
 
         // Make sure inform after terminal restored

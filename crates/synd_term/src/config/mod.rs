@@ -51,6 +51,8 @@ pub mod cache {
     /// Credential cache file name
     pub const CREDENTIAL_FILE: &str = "credential.json";
 
+    pub const GH_NOTIFICATION_FILTER_OPTION_FILE: &str = "gh_notification_filter_options.json";
+
     pub fn dir() -> &'static Path {
         super::project_dirs().cache_dir()
     }

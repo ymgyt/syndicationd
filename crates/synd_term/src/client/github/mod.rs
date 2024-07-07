@@ -1,5 +1,6 @@
 use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     config,
@@ -63,14 +64,14 @@ impl GithubClient {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum FetchNotificationInclude {
     /// Fetch only unread notifications
     OnlyUnread,
     All,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum FetchNotificationParticipating {
     /// Fetch only participating notifications
     OnlyParticipating,

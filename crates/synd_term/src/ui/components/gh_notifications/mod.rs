@@ -12,6 +12,7 @@ use ratatui::{
         TableState, Widget, Wrap,
     },
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     application::{Direction, Populate},
@@ -54,7 +55,7 @@ pub(crate) enum GhNotificationFilterOptionsState {
     Changed(GhNotificationFilterOptions),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) struct GhNotificationFilterOptions {
     pub(crate) include: FetchNotificationInclude,
     pub(crate) participating: FetchNotificationParticipating,
@@ -125,6 +126,12 @@ pub(crate) struct GhNotifications {
 
 impl GhNotifications {
     pub(crate) fn new() -> Self {
+        Self::with_filter_options(GhNotificationFilterOptions::default())
+    }
+
+    pub(crate) fn with_filter_options(filter_options: GhNotificationFilterOptions) -> Self {
+        let filter_popup = FilterPopup::new(filter_options);
+
         Self {
             notifications: FilterableVec::new(),
             max_repository_name: 0,
@@ -132,7 +139,7 @@ impl GhNotifications {
             status: HashMap::new(),
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
-            filter_popup: FilterPopup::new(GhNotificationFilterOptions::default()),
+            filter_popup,
         }
     }
 

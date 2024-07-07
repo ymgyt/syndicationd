@@ -6,6 +6,7 @@ use ratatui::{
     style::{Color, Stylize},
     text::Span,
 };
+use serde::{Deserialize, Serialize};
 use synd_feed::types::Category;
 use url::Url;
 
@@ -54,7 +55,7 @@ impl Deref for PullRequestId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum RepoVisibility {
     Public,
     Private,
@@ -100,7 +101,7 @@ pub(crate) enum SubjectContext {
 }
 
 /// `https://docs.github.com/en/rest/activity/notifications?apiVersion=2022-11-28#about-notification-reasons`
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum Reason {
     Assign,
     Author,
@@ -552,7 +553,7 @@ impl From<issue_query::ResponseData> for IssueContext {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum PullRequestState {
     Open,
     Merged,

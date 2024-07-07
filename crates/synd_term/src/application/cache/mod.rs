@@ -3,6 +3,7 @@ use std::{borrow::Borrow, io, path::PathBuf};
 use crate::{
     auth::{Credential, CredentialError, Unverified},
     config,
+    ui::components::gh_notifications::GhNotificationFilterOptions,
 };
 
 pub struct Cache {
@@ -46,6 +47,40 @@ impl Cache {
             .map(Unverified::from)
     }
 
+    fn credential_file(&self) -> PathBuf {
+        self.dir.join(config::cache::CREDENTIAL_FILE)
+    }
+
+    pub(crate) fn persist_gh_notification_filter_options(
+        &self,
+        options: impl Borrow<GhNotificationFilterOptions>,
+    ) -> anyhow::Result<()> {
+        let options = options.borrow();
+        let path = self.gh_notification_filter_option_file();
+
+        std::fs::create_dir_all(self.dir.as_path())?;
+
+        let mut file = std::fs::File::create(path)?;
+
+        serde_json::to_writer(&mut file, options).map_err(anyhow::Error::from)
+    }
+
+    pub(crate) fn load_gh_notification_filter_options(
+        &self,
+    ) -> anyhow::Result<GhNotificationFilterOptions> {
+        let path = self.gh_notification_filter_option_file();
+
+        let mut file = std::fs::File::open(path)?;
+
+        serde_json::from_reader::<_, GhNotificationFilterOptions>(&mut file)
+            .map_err(anyhow::Error::from)
+    }
+
+    fn gh_notification_filter_option_file(&self) -> PathBuf {
+        self.dir
+            .join(config::cache::GH_NOTIFICATION_FILTER_OPTION_FILE)
+    }
+
     /// Remove all cache files
     pub(crate) fn clean(&self) -> io::Result<()> {
         // User can specify any directory as the cache
@@ -57,10 +92,6 @@ impl Cache {
                 _ => Err(err),
             },
         }
-    }
-
-    fn credential_file(&self) -> PathBuf {
-        self.dir.join(config::cache::CREDENTIAL_FILE)
     }
 }
 
