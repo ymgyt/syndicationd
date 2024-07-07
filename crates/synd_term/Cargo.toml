@@ -9,7 +9,7 @@ license.workspace     = true
 readme.workspace      = true
 repository.workspace  = true
 
-include = ["src/**/*", "CHANGELOG.md", "categories.toml"]
+include = ["src/**/*", "gql/**/*", "CHANGELOG.md", "categories.toml"]
 name    = "synd-term"
 version = "0.2.6"
 
