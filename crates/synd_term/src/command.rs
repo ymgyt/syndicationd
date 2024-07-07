@@ -6,8 +6,11 @@ use crate::{
     application::{Direction, Populate, RequestSequence},
     auth::{AuthenticationProvider, Credential, Verified},
     client::{
-        github::FetchNotificationsParams, mutation::subscribe_feed::SubscribeFeedInput, payload,
-        query::subscription::SubscriptionOutput, SyndApiError,
+        github::{FetchNotificationsParams, GithubError},
+        mutation::subscribe_feed::SubscribeFeedInput,
+        payload,
+        query::subscription::SubscriptionOutput,
+        SyndApiError,
     },
     types::{
         github::{
@@ -192,7 +195,7 @@ pub(crate) enum Command {
     },
     HandleGithubApiError {
         // use Arc for impl Clone
-        error: Arc<octocrab::Error>,
+        error: Arc<GithubError>,
         request_seq: RequestSequence,
     },
 }

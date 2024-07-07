@@ -1,6 +1,7 @@
 use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::{
     config,
@@ -9,6 +10,30 @@ use crate::{
         PullRequestContext, PullRequestId, RepositoryKey, ThreadId,
     },
 };
+
+#[derive(Debug, Error)]
+pub(crate) enum GithubError {
+    #[error("invalid credential. please make sure a valid PAT is set")]
+    BadCredential,
+    #[error("github api error: {0}")]
+    Api(octocrab::Error),
+}
+
+impl From<octocrab::Error> for GithubError {
+    fn from(err: octocrab::Error) -> Self {
+        match &err {
+            octocrab::Error::GitHub { source, .. } => {
+                // octocrab does not re-export http crate
+                if source.status_code.as_u16() == 401 {
+                    GithubError::BadCredential
+                } else {
+                    GithubError::Api(err)
+                }
+            }
+            _ => GithubError::Api(err),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct GithubClient {
@@ -30,15 +55,16 @@ impl GithubClient {
         Self { client }
     }
 
-    pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> octocrab::Result<()> {
+    pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> Result<(), GithubError> {
         self.client
             .activity()
             .notifications()
             .mark_as_read(id)
             .await
+            .map_err(GithubError::from)
     }
 
-    pub(crate) async fn unsubscribe_thread(&self, id: ThreadId) -> octocrab::Result<()> {
+    pub(crate) async fn unsubscribe_thread(&self, id: ThreadId) -> Result<(), GithubError> {
         // The reasons for not using the `set_thread_subscription` method of `NotificationHandler` are twofold:
         // 1. Since the API require the PUT method, but it is implemented using GET, it results in a "Not found" error.
         // 2. During the deserialization of the `ThreadSubscription` response type, an empty string is assigned to the reason, causing an error when deserializing the `Reason` enum.
@@ -94,7 +120,7 @@ impl GithubClient {
             include,
             participating,
         }: FetchNotificationsParams,
-    ) -> octocrab::Result<Vec<Notification>> {
+    ) -> Result<Vec<Notification>, GithubError> {
         let mut page = self
             .client
             .activity()
@@ -138,7 +164,7 @@ impl GithubClient {
             repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<IssueId>,
-    ) -> octocrab::Result<IssueContext> {
+    ) -> Result<IssueContext, GithubError> {
         let response: octocrab::Result<graphql_client::Response<issue_query::ResponseData>> = self
             .client
             .graphql(&IssueQuery::build_query(issue_query::Variables {
@@ -157,7 +183,7 @@ impl GithubClient {
                 (Some(data), _) => Ok(IssueContext::from(data)),
                 _ => unreachable!(),
             },
-            Err(error) => Err(error),
+            Err(error) => Err(GithubError::from(error)),
         }
     }
 }
@@ -180,7 +206,7 @@ impl GithubClient {
             repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<PullRequestId>,
-    ) -> octocrab::Result<PullRequestContext> {
+    ) -> Result<PullRequestContext, GithubError> {
         let response: octocrab::Result<graphql_client::Response<pull_request_query::ResponseData>> =
             self.client
                 .graphql(&PullRequestQuery::build_query(
@@ -201,7 +227,7 @@ impl GithubClient {
                 (Some(data), _) => Ok(PullRequestContext::from(data)),
                 _ => unreachable!(),
             },
-            Err(error) => Err(error),
+            Err(error) => Err(GithubError::from(error)),
         }
     }
 }
