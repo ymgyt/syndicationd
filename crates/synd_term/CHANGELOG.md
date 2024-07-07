@@ -2,7 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.6] 2024-06-18
+## [unreleased] __release_date__
+
+### Features
+
+- Use local timezone when displaying time (#71) by [@ymgyt](https://github.com/ymgyt) ([36212b4b](https://github.com/ymgyt/syndicationd/commit/36212b4b1d00855b0b4206a45714cc42359dfb8e))
+- Handle terminal focus event by [@ymgyt](https://github.com/ymgyt) ([27f02a36](https://github.com/ymgyt/syndicationd/commit/27f02a36aead07994fb495eb4305d32e3fd0bdd4))
+- Support github notification (#77) by [@ymgyt](https://github.com/ymgyt) ([b3fc9958](https://github.com/ymgyt/syndicationd/commit/b3fc9958e739df57fb212ca0f986cb9cc25af333))
+- Category filtering for github notifications (#78) by [@ymgyt](https://github.com/ymgyt) ([e67b0502](https://github.com/ymgyt/syndicationd/commit/e67b0502e8039844f2dc579af84f9caa9ede8bfe))
+- Display labels for github issues and PRs by [@ymgyt](https://github.com/ymgyt) ([1cd28d0c](https://github.com/ymgyt/syndicationd/commit/1cd28d0c06305d44820e19ecf4ae9bc08a54c1c0))
+- Add github filter conditions (#85) by [@ymgyt](https://github.com/ymgyt) ([a1135c7e](https://github.com/ymgyt/syndicationd/commit/a1135c7e94f71b74cbb98b6ce3e26c67d1c029f4))
+- Add mark_as_done_all command by [@ymgyt](https://github.com/ymgyt) ([4633d73c](https://github.com/ymgyt/syndicationd/commit/4633d73caaef414cc830d445b1af4431763ac389))
+- Persist github notifications filter options by [@ymgyt](https://github.com/ymgyt) ([28ba85ee](https://github.com/ymgyt/syndicationd/commit/28ba85ee2957e3a513b8814e46fb15b741f0e67a))
+- Handle github unauthorized error by [@ymgyt](https://github.com/ymgyt) ([0f9acbb5](https://github.com/ymgyt/syndicationd/commit/0f9acbb536c1241534f8a67306a589db819bf638))
+
+### Bug Fixes
+
+- Make tab width dynamic by [@ymgyt](https://github.com/ymgyt) ([9679d7da](https://github.com/ymgyt/syndicationd/commit/9679d7da3e6315bebb46a70a13a3ab4e8ce24fa5))
+- Fix graphql schema path by [@](https://github.com/) ([f1abe4b7](https://github.com/ymgyt/syndicationd/commit/f1abe4b76294c4a6111fa440c3c77fd3e55c5d23))
+
+### Miscellaneous Tasks
+
+- Update ratatui from 0.26.3 to 0.27.0 by [@ymgyt](https://github.com/ymgyt) ([968c3256](https://github.com/ymgyt/syndicationd/commit/968c32564b6dd2882da413d88320077989464f8c))
+- Include graphql files by [@](https://github.com/) ([453d630e](https://github.com/ymgyt/syndicationd/commit/453d630e07b5f849b0f981619e0403977b1887c3))
+- Copy github graphql schema by [@](https://github.com/) ([ce90f72b](https://github.com/ymgyt/syndicationd/commit/ce90f72b9acf461d6aeadfe1413602dcc851a2ef))
+
+### Styling
+
+- Use italic modifier for gh notification filters by [@ymgyt](https://github.com/ymgyt) ([ead785ac](https://github.com/ymgyt/syndicationd/commit/ead785acfbb32d766f238b847b87b0a4a8ed6654))
+
+### Testing
+
+- Add test case for focus gained event by [@ymgyt](https://github.com/ymgyt) ([423d201f](https://github.com/ymgyt/syndicationd/commit/423d201f35b94217c0ff9a68e1442f261dcfb2e9))
+- Add gql fixtures to gh notifications test by [@ymgyt](https://github.com/ymgyt) ([1616c526](https://github.com/ymgyt/syndicationd/commit/1616c526e076547648661705fec2fafd66090e88))
+- Add test case for filtering gh notifications by [@ymgyt](https://github.com/ymgyt) ([cf45254d](https://github.com/ymgyt/syndicationd/commit/cf45254d7db5080cf1753bb33cfa2c9d91c10cce))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.6...
+
+
+## [v0.2.6] - 2024-06-18
 
 ### Features
 
@@ -54,11 +92,14 @@ All notable changes to this project will be documented in this file.
 - Add filter entries integration test case by [@ymgyt](https://github.com/ymgyt) ([d005d0d2](https://github.com/ymgyt/syndicationd/commit/d005d0d2822960ae12190b822b3c1e4a16aa4c29))
 - Handle not tty case by [@ymgyt](https://github.com/ymgyt) ([b3ada7c0](https://github.com/ymgyt/syndicationd/commit/b3ada7c068cbb04230715e1764535768715a6613))
 - Add pperiodic refresher test case by [@ymgyt](https://github.com/ymgyt) ([6e9a19da](https://github.com/ymgyt/syndicationd/commit/6e9a19da92dfe5d006756d19d8c4ed1bdd9690c5))
-- Add refreshing expired jwt test case (#53) by [@Yuta Yamaguchi](https://github.com/Yuta Yamaguchi) ([ffd73907](https://github.com/ymgyt/syndicationd/commit/ffd73907b88aab2c044362c0debdfa9b012571bd))
+- Add refreshing expired jwt test case (#53) by [@ymgyt](https://github.com/ymgyt) ([ffd73907](https://github.com/ymgyt/syndicationd/commit/ffd73907b88aab2c044362c0debdfa9b012571bd))
 - Add test to direction by [@ymgyt](https://github.com/ymgyt) ([90f8492a](https://github.com/ymgyt/syndicationd/commit/90f8492a7450f6cc2b4a025d451a9d15144e0ee5))
 - Add test case that resize terminal by [@ymgyt](https://github.com/ymgyt) ([05251ee4](https://github.com/ymgyt/syndicationd/commit/05251ee4fbfc776c0acaa0980e8c44b84038fa28))
 - Add test case that edit and open feed by [@ymgyt](https://github.com/ymgyt) ([a2e99d98](https://github.com/ymgyt/syndicationd/commit/a2e99d98d2fed6497ba783aeba273218a1c21cfc))
 - Add error handling test case by [@ymgyt](https://github.com/ymgyt) ([25641b2c](https://github.com/ymgyt/syndicationd/commit/25641b2c4a4aff371254531f0104cf477a24fc2b))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.5...synd-term-v0.2.6
+
 
 ## [v0.2.5] - 2024-05-23
 
@@ -73,6 +114,9 @@ All notable changes to this project will be documented in this file.
 ### Refactor
 
 - Use std::ops::ControlFlow for app loop control by [@ymgyt](https://github.com/ymgyt) ([99423986](https://github.com/ymgyt/syndicationd/commit/9942398608c174c1ff41b7c18f1e3169fc857c7d))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.4...synd-term-v0.2.5
+
 
 ## [v0.2.4] - 2024-05-06
 
@@ -106,6 +150,9 @@ All notable changes to this project will be documented in this file.
 - Rename parse module to service by [@ymgyt](https://github.com/ymgyt) ([256542d9](https://github.com/ymgyt/syndicationd/commit/256542d9955811eac0c26b350f528cce1106dd50))
 - Reduce visibility by [@ymgyt](https://github.com/ymgyt) ([08df3e55](https://github.com/ymgyt/syndicationd/commit/08df3e55dd3deac1ef7f7445a2cedaa9b8d20bdb))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.3...synd-term-v0.2.4
+
+
 ## [v0.2.3] - 2024-04-29
 
 ### Features
@@ -128,17 +175,26 @@ All notable changes to this project will be documented in this file.
 
 - Add matcher test by [@ymgyt](https://github.com/ymgyt) ([f1dc9564](https://github.com/ymgyt/syndicationd/commit/f1dc9564a371fee96b0b8a742eeb87cf8474397e))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.2...synd-term-v0.2.3
+
+
 ## [v0.2.2] - 2024-04-18
 
 ### Bug Fixes
 
 - Use selected_feed to render feed detail by [@ymgyt](https://github.com/ymgyt) ([404cc4cf](https://github.com/ymgyt/syndicationd/commit/404cc4cf6f52129a9a32bb58a23a3e9eb1e98efb))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.1...synd-term-v0.2.2
+
+
 ## [v0.2.1] - 2024-04-17
 
 ### Bug Fixes
 
 - Rollback ratatui from 0.26.2 to 0.26.1 by [@ymgyt](https://github.com/ymgyt) ([75b6db7f](https://github.com/ymgyt/syndicationd/commit/75b6db7ff5f237dba68fdb0480c1af4edede7dbd))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.2.0...synd-term-v0.2.1
+
 
 ## [v0.2.0] - 2024-04-17
 
@@ -183,6 +239,9 @@ All notable changes to this project will be documented in this file.
 
 - Fix integration by [@ymgyt](https://github.com/ymgyt) ([0348ec21](https://github.com/ymgyt/syndicationd/commit/0348ec21b1605371c3532c648a29aca92680f7f0))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.10...synd-term-v0.2.0
+
+
 ## [v0.1.10] - 2024-03-19
 
 ### Features
@@ -194,6 +253,9 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Set log level for the credential restore process to debug by [@ymgyt](https://github.com/ymgyt) ([30dc7a2f](https://github.com/ymgyt/syndicationd/commit/30dc7a2f71e34ce431435acdc21c170c86c677b0))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.9...synd-term-v0.1.10
+
 
 ## [v0.1.9] - 2024-03-18
 
@@ -213,6 +275,9 @@ All notable changes to this project will be documented in this file.
 
 - Rename jwt_decoder to jwt_service by [@ymgyt](https://github.com/ymgyt) ([fa6f178c](https://github.com/ymgyt/syndicationd/commit/fa6f178cbad30c6100cde0a9c77ca2eed1eadb52))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.8...synd-term-v0.1.9
+
+
 ## [v0.1.8] - 2024-03-17
 
 ### Features
@@ -227,6 +292,9 @@ All notable changes to this project will be documented in this file.
 
 - Rename device flow poll method by [@ymgyt](https://github.com/ymgyt) ([19fe8c4f](https://github.com/ymgyt/syndicationd/commit/19fe8c4fbce84cc8dab6678d38653fa304bd26ff))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.7...synd-term-v0.1.8
+
+
 ## [v0.1.7] - 2024-03-12
 
 ### Features
@@ -240,6 +308,9 @@ All notable changes to this project will be documented in this file.
 - Configure oranda changelog by [@ymgyt](https://github.com/ymgyt) ([1aecb8ce](https://github.com/ymgyt/syndicationd/commit/1aecb8ce5a31b766d63d8bb283e993508e379608))
 - Specify features to build by [@ymgyt](https://github.com/ymgyt) ([b7db28d1](https://github.com/ymgyt/syndicationd/commit/b7db28d1eb796899a48cf23366499e287fe775fa))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.6...synd-term-v0.1.7
+
+
 ## [v0.1.6] - 2024-02-28
 
 ### Features
@@ -249,6 +320,9 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Read changelog by [@ymgyt](https://github.com/ymgyt) ([9095f676](https://github.com/ymgyt/syndicationd/commit/9095f6764cf8ee1bf2acff85f4df4250bb0e4167))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.5...synd-term-v0.1.6
+
 
 ## [v0.1.5] - 2024-02-25
 
@@ -289,11 +363,17 @@ All notable changes to this project will be documented in this file.
 
 - Use tempfile instead of deprecated tempdir by [@ymgyt](https://github.com/ymgyt) ([749de1db](https://github.com/ymgyt/syndicationd/commit/749de1dba0235e30e1e79ca10849d049005c0a15))
 
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.3...synd-term-v0.1.5
+
+
 ## [v0.1.3] - 2024-02-19
 
 ### Features
 
 - Improve feed url parse by [@ymgyt](https://github.com/ymgyt) ([460e87d0](https://github.com/ymgyt/syndicationd/commit/460e87d00f9acd83a922a97c339a620c0037c14f))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.2...synd-term-v0.1.3
+
 
 ## [v0.1.2] - 2024-02-19
 
@@ -308,6 +388,9 @@ All notable changes to this project will be documented in this file.
 ### Refactor
 
 - Remove comment by [@ymgyt](https://github.com/ymgyt) ([2b042c69](https://github.com/ymgyt/syndicationd/commit/2b042c696d5c64c3dd2608e4382f50e4a76ed38c))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.1.1...synd-term-v0.1.2
+
 
 ## [v0.1.1] - 2024-02-12
 
@@ -366,5 +449,8 @@ All notable changes to this project will be documented in this file.
 - Run kvsd in test by [@ymgyt](https://github.com/ymgyt) ([923e65a1](https://github.com/ymgyt/syndicationd/commit/923e65a131bed1a0a10d073b0eb9d5091cc184fe))
 - Run integration test by [@ymgyt](https://github.com/ymgyt) ([20c0bc2d](https://github.com/ymgyt/syndicationd/commit/20c0bc2d31a938d3103fafedba5a10b4a9bba9ae))
 - Fix tls conf path by [@ymgyt](https://github.com/ymgyt) ([e3d764a4](https://github.com/ymgyt/syndicationd/commit/e3d764a453b527a98b1eaf268ead67469c0e192d))
+
+https://github.com/ymgyt/syndicationd/compare/...synd-term-v0.1.1
+
 
 <!-- generated by git-cliff -->
