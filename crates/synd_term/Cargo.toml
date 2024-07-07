@@ -40,7 +40,7 @@ nucleo               = "0.5.0"
 octocrab             = { workspace = true }
 open                 = "5.1.4"
 parse_duration       = { workspace = true }
-ratatui              = { version = "0.26.3" }
+ratatui              = { version = "0.27.0" }
 reqwest              = { workspace = true }
 schemars             = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
@@ -51,7 +51,7 @@ toml                 = { version = "0.8.14", default-features = true }
 tracing              = { workspace = true }
 tracing-appender     = "0.2.3"
 tracing-subscriber   = { workspace = true }
-tui-big-text         = "0.4.4"
+tui-big-text         = "0.4.5"
 unicode-segmentation = "1.10.1"
 update-informer      = { version = "1.1.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 url                  = { workspace = true }
