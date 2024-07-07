@@ -130,9 +130,9 @@ impl GhNotifications {
     }
 
     pub(crate) fn with_filter_options(filter_options: GhNotificationFilterOptions) -> Self {
-        let filter_popup = FilterPopup::new(filter_options);
+        let filter_popup = FilterPopup::new(filter_options.clone());
 
-        Self {
+        let mut slf = Self {
             notifications: FilterableVec::new(),
             max_repository_name: 0,
             #[allow(clippy::zero_sized_map_values)]
@@ -140,7 +140,10 @@ impl GhNotifications {
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
             filter_popup,
-        }
+        };
+
+        slf.apply_filter_options(filter_options);
+        slf
     }
 
     pub(crate) fn filter_options(&self) -> &GhNotificationFilterOptions {
@@ -302,9 +305,7 @@ impl GhNotifications {
         self.filter_popup.is_active = false;
         match self.filter_popup.commit() {
             GhNotificationFilterOptionsState::Changed(options) => {
-                let filterer = OptionFilterer::new(options);
-                self.notifications
-                    .with_filter(|composed| composed.update_right(filterer));
+                self.apply_filter_options(options);
                 Some(Command::FetchGhNotifications {
                     populate: Populate::Replace,
                     params: self.reload(),
@@ -312,6 +313,12 @@ impl GhNotifications {
             }
             GhNotificationFilterOptionsState::Unchanged => None,
         }
+    }
+
+    fn apply_filter_options(&mut self, options: GhNotificationFilterOptions) {
+        let filterer = OptionFilterer::new(options);
+        self.notifications
+            .with_filter(|composed| composed.update_right(filterer));
     }
 
     pub(crate) fn selected_notification(&self) -> Option<&Notification> {

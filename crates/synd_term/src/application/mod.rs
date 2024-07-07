@@ -199,11 +199,6 @@ impl Application {
             }
         }?;
 
-        match self.restore_credential().await {
-            Ok(cred) => self.handle_initial_credential(cred),
-            Err(err) => tracing::warn!("Restore credential: {err}"),
-        }
-
         if self.config.features.enable_github_notification {
             // Restore previous filter options
             match self.cache.load_gh_notification_filter_options() {
@@ -216,6 +211,12 @@ impl Application {
                 }
             }
         }
+
+        match self.restore_credential().await {
+            Ok(cred) => self.handle_initial_credential(cred),
+            Err(err) => tracing::warn!("Restore credential: {err}"),
+        }
+
         Ok(())
     }
 
