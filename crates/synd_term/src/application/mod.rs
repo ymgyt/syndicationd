@@ -85,6 +85,7 @@ pub struct Application {
     client: Client,
     github_client: Option<GithubClient>,
     jobs: Jobs,
+    background_jobs: Jobs,
     components: Components,
     interactor: Interactor,
     authenticator: Authenticator,
@@ -146,6 +147,7 @@ impl Application {
             github_client,
             // The secondary rate limit of the GitHub API is 100 concurrent requests, so we have set it to 90.
             jobs: Jobs::new(NonZero::new(90).unwrap()),
+            background_jobs: Jobs::new(NonZero::new(10).unwrap()),
             components: Components::new(&config.features),
             interactor: interactor.unwrap_or_else(Interactor::new),
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
@@ -317,6 +319,9 @@ impl Application {
                     self.handle_terminal_event(event)
                 }
                 Some(command) = self.jobs.next() => {
+                    Some(command.unwrap())
+                }
+                Some(command) = self.background_jobs.next() => {
                     Some(command.unwrap())
                 }
                 ()  = self.in_flight.throbber_timer() => {
@@ -1317,7 +1322,7 @@ impl Application {
                     }
                 }
                 .boxed();
-                self.jobs.push_background(fut);
+                self.background_jobs.push(fut);
             }
         }
     }
