@@ -21,51 +21,35 @@ pub(crate) type ThreadId = octocrab::models::ThreadId;
 
 pub(crate) type NotificationId = octocrab::models::NotificationId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct IssueId(i64);
+macro_rules! new_id {
+    ($id:ident, $pri:ty) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub(crate) struct $id($pri);
 
-impl Display for IssueId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
+        impl Display for $id {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.fmt(f)
+            }
+        }
+
+        impl Deref for $id {
+            type Target = $pri;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl $id {
+            pub(crate) fn into_inner(self) -> $pri {
+                self.0
+            }
+        }
+    };
 }
 
-impl IssueId {
-    pub(crate) fn into_inner(self) -> i64 {
-        self.0
-    }
-}
-
-impl Deref for IssueId {
-    type Target = i64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct PullRequestId(i64);
-
-impl Display for PullRequestId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl PullRequestId {
-    pub(crate) fn into_inner(self) -> i64 {
-        self.0
-    }
-}
-
-impl Deref for PullRequestId {
-    type Target = i64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+new_id!(IssueId, i64);
+new_id!(PullRequestId, i64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub(crate) enum RepoVisibility {
