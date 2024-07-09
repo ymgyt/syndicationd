@@ -33,6 +33,7 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
   - [Keymap](#keymap)
   - [Subscribe Feed](#subscribe-feed)
   - [Export Feeds](#export-subscribed-feeds)
+  - [GitHub Notifications](#github-notifications)
   - [Theme](#theme)
   - [Backend API](#backend-api)
   - [Log File](#log-file)
