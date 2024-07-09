@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     future,
+    num::NonZero,
     ops::{ControlFlow, Sub},
     pin::Pin,
     sync::Arc,
@@ -143,7 +144,8 @@ impl Application {
             terminal,
             client,
             github_client,
-            jobs: Jobs::new(),
+            // The secondary rate limit of the GitHub API is 100 concurrent requests, so we have set it to 90.
+            jobs: Jobs::new(NonZero::new(90).unwrap()),
             components: Components::new(&config.features),
             interactor: interactor.unwrap_or_else(Interactor::new),
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
@@ -255,7 +257,7 @@ impl Application {
 
     fn initial_fetch(&mut self) {
         tracing::info!("Initial fetch");
-        self.jobs.futures.push(
+        self.jobs.push(
             future::ready(Ok(Command::FetchEntries {
                 after: None,
                 first: self.config.entries_per_pagination,
@@ -264,7 +266,7 @@ impl Application {
         );
         if self.config.features.enable_github_notification {
             if let Some(fetch) = self.components.gh_notifications.fetch_next_if_needed() {
-                self.jobs.futures.push(future::ready(Ok(fetch)).boxed());
+                self.jobs.push(future::ready(Ok(fetch)).boxed());
             }
         }
     }
@@ -314,10 +316,7 @@ impl Application {
                 Some(event) = input.next() => {
                     self.handle_terminal_event(event)
                 }
-                Some(command) = self.jobs.futures.next() => {
-                    Some(command.unwrap())
-                }
-                Some(command) = self.jobs.scheduled.next() => {
+                Some(command) = self.jobs.next() => {
                     Some(command.unwrap())
                 }
                 ()  = self.in_flight.throbber_timer() => {
@@ -924,7 +923,7 @@ impl Application {
             .boxed(),
         };
 
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn prompt_feed_edition(&mut self) {
@@ -951,7 +950,7 @@ impl Application {
             .boxed(),
         };
 
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn subscribe_feed(&mut self, input: SubscribeFeedInput) {
@@ -969,7 +968,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn unsubscribe_feed(&mut self, url: FeedUrl) {
@@ -985,7 +984,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn mark_gh_notification_as_done(&mut self, all: bool) {
@@ -1025,7 +1024,7 @@ impl Application {
                 }
             }
             .boxed();
-            self.jobs.futures.push(fut);
+            self.jobs.push(fut);
         }
     }
 
@@ -1053,7 +1052,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 }
 
@@ -1111,7 +1110,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     #[tracing::instrument(skip(self))]
@@ -1134,7 +1133,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     #[tracing::instrument(skip(self))]
@@ -1162,10 +1161,10 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip_all)]
     fn fetch_gh_notification_details(&mut self, contexts: Vec<IssueOrPullRequest>) {
         let client = self
             .github_client
@@ -1173,11 +1172,13 @@ impl Application {
             .expect("Github client not found, this is a BUG");
 
         for context in contexts {
-            let request_seq = self.in_flight.add(RequestId::FetchGithubSubject);
             let client = client.clone();
 
             let fut = match context {
                 Either::Left(issue) => {
+                    let request_seq = self
+                        .in_flight
+                        .add(RequestId::FetchGithubIssue { id: issue.id });
                     let notification_id = issue.notification_id;
                     async move {
                         match client.fetch_issue(issue).await {
@@ -1197,7 +1198,11 @@ impl Application {
                     .boxed()
                 }
                 Either::Right(pull_request) => {
+                    let request_seq = self.in_flight.add(RequestId::FetchGithubPullRequest {
+                        id: pull_request.id,
+                    });
                     let notification_id = pull_request.notification_id;
+
                     async move {
                         match client.fetch_pull_request(pull_request).await {
                             Ok(pull_request) => Ok(Command::HandleApiResponse {
@@ -1216,7 +1221,7 @@ impl Application {
                     .boxed()
                 }
             };
-            self.jobs.futures.push(fut);
+            self.jobs.push(fut);
         }
     }
 }
@@ -1241,7 +1246,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn handle_device_flow_authorization_response(
@@ -1274,7 +1279,7 @@ impl Application {
         }
         .boxed();
 
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn complete_device_authroize_flow(&mut self, cred: Verified<Credential>) {
@@ -1312,7 +1317,7 @@ impl Application {
                     }
                 }
                 .boxed();
-                self.jobs.scheduled.push(fut);
+                self.jobs.push_background(fut);
             }
         }
     }
@@ -1369,7 +1374,7 @@ impl Application {
             }
         }
         .boxed();
-        self.jobs.futures.push(fut);
+        self.jobs.push(fut);
     }
 
     fn inform_latest_release(&self) {
@@ -1423,7 +1428,7 @@ impl Application {
             // the assertion timing by waiting until jobs are empty.
             // However the future of refreshing the id token sleeps until it expires and remains in the jobs for long time
             // Therefore, we ignore scheduled jobs
-            if self.jobs.futures.is_empty() {
+            if self.jobs.is_empty() {
                 break;
             }
         }

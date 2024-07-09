@@ -109,7 +109,12 @@ impl StatusLine {
                     RequestId::FetchGithubNotifications { page } => {
                         Cow::Owned(format!("Fetch github notifications(page: {page})..."))
                     }
-                    RequestId::FetchGithubSubject => Cow::Borrowed("Fetch github subject..."),
+                    RequestId::FetchGithubIssue { id } => {
+                        Cow::Owned(format!("Fetch github issue(#{id})..."))
+                    }
+                    RequestId::FetchGithubPullRequest { id } => {
+                        Cow::Owned(format!("Fetch github pull request(#{id})..."))
+                    }
                     RequestId::SubscribeFeed => Cow::Borrowed("Subscribe feed..."),
                     RequestId::UnsubscribeFeed => Cow::Borrowed("Unsubscribe feed..."),
                     RequestId::MarkGithubNotificationAsDone { id } => {

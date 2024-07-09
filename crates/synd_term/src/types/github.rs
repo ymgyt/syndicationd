@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr};
+use std::{fmt::Display, ops::Deref, str::FromStr};
 
 use either::Either;
 use octocrab::models::{self, activity::Subject};
@@ -21,8 +21,14 @@ pub(crate) type ThreadId = octocrab::models::ThreadId;
 
 pub(crate) type NotificationId = octocrab::models::NotificationId;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct IssueId(i64);
+
+impl Display for IssueId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl IssueId {
     pub(crate) fn into_inner(self) -> i64 {
@@ -38,8 +44,14 @@ impl Deref for IssueId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PullRequestId(i64);
+
+impl Display for PullRequestId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl PullRequestId {
     pub(crate) fn into_inner(self) -> i64 {

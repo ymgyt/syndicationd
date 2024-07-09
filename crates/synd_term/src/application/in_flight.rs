@@ -7,18 +7,19 @@ use std::{
 
 use tokio::time::{Instant, Sleep};
 
-use crate::types::github::NotificationId;
+use crate::types::github::{IssueId, NotificationId, PullRequestId};
 
 pub type RequestSequence = u64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum RequestId {
+pub(crate) enum RequestId {
     DeviceFlowDeviceAuthorize,
     DeviceFlowPollAccessToken,
     FetchEntries,
     FetchSubscription,
     FetchGithubNotifications { page: u8 },
-    FetchGithubSubject,
+    FetchGithubIssue { id: IssueId },
+    FetchGithubPullRequest { id: PullRequestId },
     SubscribeFeed,
     UnsubscribeFeed,
     MarkGithubNotificationAsDone { id: NotificationId },
@@ -53,7 +54,7 @@ impl InFlight {
         }
     }
 
-    pub fn recent_in_flight(&self) -> Option<RequestId> {
+    pub(crate) fn recent_in_flight(&self) -> Option<RequestId> {
         self.in_flights
             .iter()
             .max_by_key(|(_, entry)| entry.start)
@@ -78,7 +79,7 @@ impl InFlight {
         self.throbber_step
     }
 
-    pub fn add(&mut self, request_id: RequestId) -> RequestSequence {
+    pub(crate) fn add(&mut self, request_id: RequestId) -> RequestSequence {
         let seq = self.next_request_sequence();
         self.in_flights.insert(
             seq,
@@ -93,7 +94,7 @@ impl InFlight {
         seq
     }
 
-    pub fn remove(&mut self, seq: RequestSequence) -> Option<RequestId> {
+    pub(crate) fn remove(&mut self, seq: RequestSequence) -> Option<RequestId> {
         let req_id = self.in_flights.remove(&seq).map(|entry| entry.request_id);
 
         if self.in_flights.is_empty() {
