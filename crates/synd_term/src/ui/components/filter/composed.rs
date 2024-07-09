@@ -22,6 +22,10 @@ impl<L, R> ComposedFilterer<L, R> {
     pub(crate) fn and_then<F>(self, right: F) -> ComposedFilterer<Self, F> {
         ComposedFilterer::new(self, right)
     }
+
+    pub(crate) fn right(&self) -> &R {
+        &self.right
+    }
 }
 
 impl<L, R, T> Filterable<T> for ComposedFilterer<L, R>

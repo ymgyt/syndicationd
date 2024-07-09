@@ -30,6 +30,10 @@ impl OptionFilterer {
     pub(super) fn new(options: GhNotificationFilterOptions) -> Self {
         Self { options }
     }
+
+    pub(super) fn options(&self) -> &GhNotificationFilterOptions {
+        &self.options
+    }
 }
 
 impl Filterable<Notification> for OptionFilterer {
@@ -70,38 +74,33 @@ impl Filterable<Notification> for OptionFilterer {
 
 pub(super) struct FilterPopup {
     pub(super) is_active: bool,
-    options: GhNotificationFilterOptions,
     pending_options: Option<GhNotificationFilterOptions>,
 }
 
 impl FilterPopup {
-    pub(super) fn new(options: GhNotificationFilterOptions) -> Self {
+    pub(super) fn new() -> Self {
         Self {
             is_active: false,
-            options,
             pending_options: None,
         }
     }
 
-    pub(super) fn applied_options(&self) -> &GhNotificationFilterOptions {
-        &self.options
-    }
-
     pub(super) fn commit(&mut self) -> GhNotificationFilterOptionsState {
-        if let Some(options) = self.pending_options.take() {
-            let org = std::mem::replace(&mut self.options, options);
-            if org != self.options {
-                return GhNotificationFilterOptionsState::Changed(self.options.clone());
-            }
+        match self.pending_options.take() {
+            Some(options) => GhNotificationFilterOptionsState::Changed(options),
+            None => GhNotificationFilterOptionsState::Unchanged,
         }
-        GhNotificationFilterOptionsState::Unchanged
     }
 
-    pub(super) fn update_options(&mut self, new: &GhNotificationFilterUpdater) {
+    pub(super) fn update_options(
+        &mut self,
+        new: &GhNotificationFilterUpdater,
+        current: &GhNotificationFilterOptions,
+    ) {
         let mut pending = self
             .pending_options
             .take()
-            .unwrap_or_else(|| self.options.clone());
+            .unwrap_or_else(|| current.clone());
 
         if new.toggle_include {
             pending.include = match pending.include {
@@ -144,7 +143,13 @@ impl FilterPopup {
 
 impl FilterPopup {
     #[allow(clippy::too_many_lines)]
-    pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+    pub(super) fn render(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        cx: &Context<'_>,
+        current: &GhNotificationFilterOptions,
+    ) {
         let area = {
             let block = Block::new()
                 .title_top("Filter")
@@ -173,7 +178,7 @@ impl FilterPopup {
         ]);
         let [status_area, participating_area, visibility_area, pull_request_area, reason_area] =
             vertical.areas(area);
-        let options = self.pending_options.as_ref().unwrap_or(&self.options);
+        let options = self.pending_options.as_ref().unwrap_or(current);
         let keyword = cx.theme.entries.selected_entry;
 
         // Render status

@@ -130,28 +130,27 @@ impl GhNotifications {
     }
 
     pub(crate) fn with_filter_options(filter_options: GhNotificationFilterOptions) -> Self {
-        let filter_popup = FilterPopup::new(filter_options.clone());
+        let filterer =
+            CategoryAndMatcherFilterer::default().and_then(OptionFilterer::new(filter_options));
 
-        let mut slf = Self {
-            notifications: FilterableVec::new(),
+        Self {
+            notifications: FilterableVec::from_filter(filterer),
             max_repository_name: 0,
             #[allow(clippy::zero_sized_map_values)]
             status: HashMap::new(),
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
-            filter_popup,
-        };
-
-        slf.apply_filter_options(filter_options);
-        slf
+            filter_popup: FilterPopup::new(),
+        }
     }
 
     pub(crate) fn filter_options(&self) -> &GhNotificationFilterOptions {
-        self.filter_popup.applied_options()
+        self.notifications.filter().right().options()
     }
 
     pub(crate) fn update_filter_options(&mut self, updater: &GhNotificationFilterUpdater) {
-        self.filter_popup.update_options(updater);
+        let current = self.filter_options().clone();
+        self.filter_popup.update_options(updater, &current);
     }
 
     pub(crate) fn update_filterer(&mut self, filterer: CategoryAndMatcherFilterer) {
@@ -196,9 +195,8 @@ impl GhNotifications {
         match self.next_page {
             Some(page) if self.notifications.len() < self.limit => {
                 tracing::debug!(
-                    "Should fetch more. notifications: {} next_page {:?}",
+                    "Should fetch more. notifications: {} next_page {page}",
                     self.notifications.len(),
-                    self.next_page
                 );
                 Some(Command::FetchGhNotifications {
                     populate: Populate::Append,
@@ -222,7 +220,7 @@ impl GhNotifications {
     }
 
     fn next_fetch_params(&self, page: u8) -> FetchNotificationsParams {
-        let options = self.filter_popup.applied_options();
+        let options = self.filter_options();
         FetchNotificationsParams {
             page,
             include: options.include,
@@ -304,11 +302,13 @@ impl GhNotifications {
     pub(crate) fn close_filter_popup(&mut self) -> Option<Command> {
         self.filter_popup.is_active = false;
         match self.filter_popup.commit() {
-            GhNotificationFilterOptionsState::Changed(options) => {
-                self.apply_filter_options(options);
-                Some(Command::FetchGhNotifications {
-                    populate: Populate::Replace,
-                    params: self.reload(),
+            GhNotificationFilterOptionsState::Changed(new_options) => {
+                (&new_options != self.filter_options()).then(|| {
+                    self.apply_filter_options(new_options);
+                    Command::FetchGhNotifications {
+                        populate: Populate::Replace,
+                        params: self.reload(),
+                    }
                 })
             }
             GhNotificationFilterOptionsState::Unchanged => None,
@@ -645,7 +645,8 @@ impl GhNotifications {
             area.reset(buf);
             area
         };
-        self.filter_popup.render(area, buf, cx);
+        self.filter_popup
+            .render(area, buf, cx, self.filter_options());
     }
 }
 

@@ -17,11 +17,15 @@ where
     F: Default,
 {
     pub(crate) fn new() -> Self {
+        Self::from_filter(F::default())
+    }
+
+    pub(crate) fn from_filter(filterer: F) -> Self {
         Self {
             items: Vec::new(),
             effective_items: Vec::new(),
             selected_item_index: 0,
-            filterer: F::default(),
+            filterer,
         }
     }
 }
@@ -70,6 +74,10 @@ impl<T, F> FilterableVec<T, F> {
 
     pub(crate) fn as_unfiltered_slice(&self) -> &[T] {
         self.items.as_slice()
+    }
+
+    pub(crate) fn filter(&self) -> &F {
+        &self.filterer
     }
 }
 
