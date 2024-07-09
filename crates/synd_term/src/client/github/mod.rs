@@ -15,6 +15,9 @@ use crate::{
 pub(crate) enum GithubError {
     #[error("invalid credential. please make sure a valid PAT is set")]
     BadCredential,
+    // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#about-secondary-rate-limits
+    #[error("secondary rate limits exceeded")]
+    SecondaryRateLimit,
     #[error("github api error: {0}")]
     Api(octocrab::Error),
 }
@@ -22,14 +25,13 @@ pub(crate) enum GithubError {
 impl From<octocrab::Error> for GithubError {
     fn from(err: octocrab::Error) -> Self {
         match &err {
-            octocrab::Error::GitHub { source, .. } => {
-                // octocrab does not re-export http crate
-                if source.status_code.as_u16() == 401 {
-                    GithubError::BadCredential
-                } else {
-                    GithubError::Api(err)
+            octocrab::Error::GitHub { source, .. } => match source.status_code.as_u16() {
+                401 => GithubError::BadCredential,
+                403 if source.message.contains("secondary rate limit") => {
+                    GithubError::SecondaryRateLimit
                 }
-            }
+                _ => GithubError::Api(err),
+            },
             _ => GithubError::Api(err),
         }
     }
