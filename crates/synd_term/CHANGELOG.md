@@ -4,11 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased] __release_date__
 
+### Features
+
+- Handle github secondary rate limit error by [@ymgyt](https://github.com/ymgyt) ([9f690c67](https://github.com/ymgyt/syndicationd/commit/9f690c675870b359150738c66029224f5c94b52f))
+- Limit the number of concurrent executions of job futures by [@ymgyt](https://github.com/ymgyt) ([62b51bb0](https://github.com/ymgyt/syndicationd/commit/62b51bb041b151593cc634ca30114d356243ceff))
+
+### Refactor
+
+- Use the filter of FilterableVec as the primary source by [@ymgyt](https://github.com/ymgyt) ([f1739fe8](https://github.com/ymgyt/syndicationd/commit/f1739fe811749466038070d242a2913a7524baaf))
+- Use macro to impl newtype by [@ymgyt](https://github.com/ymgyt) ([17797a5c](https://github.com/ymgyt/syndicationd/commit/17797a5c25b2c30d4b20dfede7cf331fd1ad8c6b))
+- Split background futures to another jobs by [@ymgyt](https://github.com/ymgyt) ([995f143b](https://github.com/ymgyt/syndicationd/commit/995f143bce4237bfceacad816b86522e59d268a2))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0-rc.2...
+
+
+## [v0.3.0-rc.2] - 2024-07-07
+
 ### Bug Fixes
 
 - Apply initial filter by [@ymgyt](https://github.com/ymgyt) ([47ed7abf](https://github.com/ymgyt/syndicationd/commit/47ed7abf59ca8d11abff337dc1e141b83752595e))
 
-https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0-rc.1...
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0-rc.1...synd-term-v0.3.0-rc.2
 
 
 ## [v0.3.0-rc.1] - 2024-07-07
