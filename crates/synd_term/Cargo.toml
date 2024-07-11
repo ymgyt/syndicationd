@@ -47,6 +47,7 @@ serde                = { workspace = true, features = ["derive"] }
 serde_json           = "1.0.120"
 thiserror            = { workspace = true }
 tokio                = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio-stream         = { version = "0.1.15", optional = true }
 toml                 = { version = "0.8.14", default-features = true }
 tracing              = { workspace = true }
 tracing-appender     = "0.2.3"
@@ -60,22 +61,26 @@ url                  = { workspace = true }
 
 [features]
 # Integration test
-integration = []
+integration = ["dep:tokio-stream"]
 
 [dev-dependencies]
 synd-api  = { path = "../synd_api" }
 synd-test = { path = "../synd_test" }
 
-assert_cmd   = { workspace = true }
-axum-server  = { workspace = true }
-fake         = { workspace = true }
-insta        = { workspace = true }
-kvsd         = { workspace = true }
-proptest     = { workspace = true }
-serial_test  = { version = "3.1.1", default-features = false, features = ["async", "file_locks"] }
-tempfile     = { workspace = true }
-tokio-stream = "0.1.15"
-tokio-util   = { workspace = true }
+assert_cmd  = { workspace = true }
+axum-server = { workspace = true }
+criterion   = { workspace = true }
+fake        = { workspace = true }
+insta       = { workspace = true }
+kvsd        = { workspace = true }
+proptest    = { workspace = true }
+serial_test = { version = "3.1.1", default-features = false, features = ["async", "file_locks"] }
+tempfile    = { workspace = true }
+tokio-util  = { workspace = true }
+
+[[bench]]
+harness = false
+name    = "render"
 
 [lints]
 workspace = true

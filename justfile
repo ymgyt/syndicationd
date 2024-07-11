@@ -31,7 +31,7 @@ check *flags:
 
 # Run cargo check
 c:
-    cargo check --all-features --tests
+    cargo check --all-features --tests --benches
 
 # Run spell checker
 typo:
@@ -90,6 +90,11 @@ coverage *flags:
 coverage:
     cargo llvm-cov nextest --all-features --open \
         --ignore-filename-regex '(integration_backend.rs|client/generated/.*.rs)'
+
+# Run benchmark
+bench:
+    cargo bench --package synd-term --bench render --features integration -- --verbose
+    @start ./target/criterion/report/index.html
 
 # Update synd_api graphql schema
 update-gql-schema:
