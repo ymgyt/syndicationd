@@ -13,6 +13,9 @@ jobs:
   publish-synd-api-image:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@V27
