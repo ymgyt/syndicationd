@@ -14,3 +14,6 @@ pub mod matcher;
 pub mod terminal;
 pub mod types;
 pub mod ui;
+
+#[cfg(feature = "integration")]
+pub mod integration;

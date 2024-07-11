@@ -70,6 +70,7 @@
             cargo-machete
             cargo-insta
             oranda
+            gnuplot # for rendering with criterion
           ] ++ ci_packages
           ## For cargo-release build
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin synd.darwinDeps;

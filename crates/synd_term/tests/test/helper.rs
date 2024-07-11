@@ -1,4 +1,4 @@
-use std::{io, path::PathBuf, sync::Once, time::Duration};
+use std::{path::PathBuf, sync::Once, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures_util::future;
@@ -15,6 +15,7 @@ use synd_auth::{
     device_flow::{provider, DeviceFlow},
     jwt,
 };
+pub use synd_term::integration::event_stream;
 use synd_term::{
     application::{
         Application, Authenticator, Cache, Clock, Config, DeviceFlows, JwtService, SystemClock,
@@ -28,8 +29,7 @@ use synd_term::{
     ui::theme::Theme,
 };
 use synd_test::temp_dir;
-use tokio::{net::TcpListener, sync::mpsc::UnboundedSender};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 use url::Url;
@@ -330,35 +330,6 @@ pub async fn serve_api(
     ));
 
     Ok(())
-}
-
-pub fn event_stream() -> (
-    UnboundedSenderWrapper,
-    UnboundedReceiverStream<io::Result<crossterm::event::Event>>,
-) {
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let tx = UnboundedSenderWrapper { inner: tx };
-    let event_stream = UnboundedReceiverStream::new(rx);
-    (tx, event_stream)
-}
-
-pub struct UnboundedSenderWrapper {
-    inner: UnboundedSender<io::Result<crossterm::event::Event>>,
-}
-
-impl UnboundedSenderWrapper {
-    pub fn send(&self, event: crossterm::event::Event) {
-        self.inner.send(Ok(event)).unwrap();
-    }
-
-    pub fn send_multi<T>(&self, events: T)
-    where
-        T: IntoIterator<Item = crossterm::event::Event>,
-    {
-        events.into_iter().for_each(|event| {
-            self.send(event);
-        });
-    }
 }
 
 pub fn resize_event(columns: u16, rows: u16) -> crossterm::event::Event {
