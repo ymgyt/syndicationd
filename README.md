@@ -50,7 +50,7 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd/synd-term-v0.2.6
+nix profile install github:ymgyt/syndicationd/synd-term-v0.3.0
 ```
 
 ### arch linux
@@ -68,7 +68,7 @@ brew install ymgyt/homebrew-syndicationd/synd-term
 ### shell
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.2.6/synd-term-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.0
 ```
 
 ### cargo
@@ -86,7 +86,7 @@ npm install @syndicationd/synd-term
 ### powershell
 
 ```sh
-powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.2.6/synd-term-installer.ps1 | iex"
+powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.0
 ```
 
 ### docker
