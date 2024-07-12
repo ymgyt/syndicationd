@@ -1,20 +1,3 @@
-## Commit Message
-
-Commit message should follow [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/).  
-type is one of the following.
-
-| commit type | description                         |
-|-------------|-------------------------------------|
-| `feat`      | add a new feature                   |
-| `style`     | tui style                           |
-| `fix`       | bug fix                             |
-| `perf`      | performance improvement             |
-| `doc`       | documentation                       |
-| `ci`        | continuous Integration and delivery |
-| `refactor`  | refactoring                         |
-| `chore`     | catch all                           |
-
-
 ## Development
 
 In syndicationd, we manage the development environment with [Nix](https://nixos.org/).  
@@ -36,6 +19,31 @@ Execute in the following order: `just kvsd`, `just api`, `just term`
 
 If you have updated the GraphQL schema of synd-api, execute `just update-gql-schema` This command updates the GraphQL schema of synd-term.   
 To generate synd-term's GraphQL client code, execute `just gen-gql`.
+
+## Testing
+
+* `just lint` : run linters
+* `just test` : run unit tests
+* `just integration` : run integration test
+* `just bench` : run benchmarks
+* `just flamegraph` : generate flamegraph
+
+
+## Commit Message
+
+Commit message should follow [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/).  
+type is one of the following.
+
+| commit type | description                         |
+|-------------|-------------------------------------|
+| `feat`      | add a new feature                   |
+| `style`     | tui style                           |
+| `fix`       | bug fix                             |
+| `perf`      | performance improvement             |
+| `doc`       | documentation                       |
+| `ci`        | continuous Integration and delivery |
+| `refactor`  | refactoring                         |
+| `chore`     | catch all                           |
 
 ## License
 

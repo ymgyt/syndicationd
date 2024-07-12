@@ -38,6 +38,7 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
   - [Backend API](#backend-api)
   - [Log File](#log-file)
   - [Clean](#remove-cache-and-logs)
+- [Development](#development)
 - [License](#license)
 
 ## Features
@@ -339,6 +340,10 @@ synd check --format json | from json
 ╰───────┴─────────────────────────────────────────╯
 ```
 
+## Development
+
+Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with development.
+
 ## License
 
 This project is available under the terms of either the [Apache 2.0 license](./LICENSE-APACHE) or the [MIT license](./LICENSE-MIT).
@@ -354,14 +359,6 @@ Some tips about feed that I know.
   * For tags, it's `https://github.com/ymgyt/syndicationd/tag.atom` 
 
 * Adding `.rss` to the end of a Reddit URL allows you to retrieve the feed. for example, for `https://www.reddit.com/r/HelixEditor/`, it would be `https://www.reddit.com/r/HelixEditor.rss`
-
-<details>
-<summary>Click to show more tips</summary>
-                       
-* Adding `.ja.atom` to the end of a connpass group URL to get the event feed. for example, `https://opentelemetry.connpass.com/ja.atom` 
-
-* Adding `/feed` for Hatena blog
-</details>
 
 If you're looking for feeds, here are my recommendations.
 
