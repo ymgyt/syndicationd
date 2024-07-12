@@ -1,3 +1,6 @@
+use criterion::Criterion;
+use pprof::criterion::{Output, PProfProfiler};
+
 mod bench {
     use criterion::Criterion;
     use synd_term::{integration, key};
@@ -31,12 +34,10 @@ mod bench {
     }
 }
 
-// Explicitly using the expanded code of the following lines.
-// criterion::criterion_group!(benches, bench::render);
-// criterion::criterion_main!(benches);
 pub fn benches() {
-    let mut criterion: criterion::Criterion<_> =
-        criterion::Criterion::default().configure_from_args();
+    let mut criterion: Criterion<_> = Criterion::default()
+        .with_profiler(PProfProfiler::new(100, Output::Flamegraph(None)))
+        .configure_from_args();
     bench::render(&mut criterion);
 }
 

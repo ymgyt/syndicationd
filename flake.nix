@@ -69,6 +69,7 @@
             cargo-release
             cargo-machete
             cargo-insta
+            cargo-flamegraph
             oranda
             gnuplot # for rendering with criterion
           ] ++ ci_packages

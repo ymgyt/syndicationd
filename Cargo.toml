@@ -40,6 +40,7 @@ moka               = { version = "0.12.8", features = ["future"] }
 octocrab           = { version = "0.38.0", features = ["rustls-webpki-tokio"] }
 once_cell          = { version = "1.19.0" }
 parse_duration     = { version = "2.1.1" }
+pprof              = { version = "0.13", features = ["flamegraph", "criterion"] }
 proptest           = { version = "1.5.0" }
 rand               = { version = "0.8.5" }
 reqwest            = { version = "0.11.27", default-features = false, features = ["rustls-tls", "json"] }
@@ -53,6 +54,9 @@ tracing            = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.2" }
 
+[profile.bench]
+# To enable framegraph
+debug = true
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

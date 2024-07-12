@@ -51,7 +51,7 @@ fmt: fmt-toml
 
 # Run linter
 lint:
-    cargo clippy --all-features --tests
+    cargo clippy --all-features --tests --benches
 
 # Format toml files
 fmt-toml:
@@ -95,6 +95,14 @@ coverage:
 bench:
     cargo bench --package synd-term --bench render --features integration -- --verbose
     @start ./target/criterion/report/index.html
+
+# Generate flamegraph
+flamegraph:
+    cargo flamegraph \
+        --root --output target/flamegraph.svg \
+        --package synd-term --bench render --features integration \
+        -- --bench
+    @start target/flamegraph.svg
 
 # Update synd_api graphql schema
 update-gql-schema:
