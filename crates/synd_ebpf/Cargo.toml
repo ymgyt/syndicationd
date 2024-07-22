@@ -1,7 +1,15 @@
 [package]
-edition = "2021"
-name    = "synd-ebpf"
-version = "0.1.0"
+authors     = ["ymgyt"]
+categories  = []
+description = "syndicationd bpf programs"
+edition     = "2021"
+homepage    = "https://docs.syndicationd.ymgyt.io/synd-term/"
+keywords    = ["ebpf"]
+license     = "MIT OR Apache-2.0"
+name        = "synd-ebpf"
+readme      = "README.md"
+repository  = "https://github.com/ymgyt/syndicationd"
+version     = "0.1.0"
 
 [dependencies]
 aya-ebpf         = "0.1.0"

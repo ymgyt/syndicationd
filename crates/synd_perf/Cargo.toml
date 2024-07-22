@@ -1,11 +1,20 @@
 [package]
-edition = "2021"
-name    = "synd_perf"
-publish = false
-version = "0.1.0"
+authors.workspace    = true
+categories           = []
+edition.workspace    = true
+keywords             = ["ebpf"]
+license.workspace    = true
+readme.workspace     = true
+repository.workspace = true
+
+description = "syndicationd bpf userspace programs"
+name        = "synd-perf"
+publish     = false
+version     = "0.1.0"
 
 [dependencies]
 anyhow     = "1"
+cfg-if = "1.0.0"
 env_logger = "0.10"
 libc       = "0.2"
 log        = "0.4"

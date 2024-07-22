@@ -1,6 +1,12 @@
 [package]
-edition = "2021"
-name    = "synd_ebpf_task"
+authors.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+readme.workspace     = true
+repository.workspace = true
+
+name    = "synd-ebpf-task"
+publish = false
 version = "0.1.0"
 
 [dependencies]

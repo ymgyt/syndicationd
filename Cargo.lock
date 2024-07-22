@@ -4063,6 +4063,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "synd-ebpf-task"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+]
+
+[[package]]
 name = "synd-feed"
 version = "0.3.3"
 dependencies = [
@@ -4110,6 +4118,21 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "synd-perf"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aya",
+ "aya-log",
+ "cfg-if",
+ "env_logger",
+ "libc",
+ "log",
+ "synd-ebpf-common",
+ "tokio",
 ]
 
 [[package]]
@@ -4187,28 +4210,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "synd_ebpf_task"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
-]
-
-[[package]]
-name = "synd_perf"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aya",
- "aya-log",
- "env_logger",
- "libc",
- "log",
- "synd-ebpf-common",
- "tokio",
 ]
 
 [[package]]
