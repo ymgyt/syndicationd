@@ -3,3 +3,7 @@
 # cause 'too many file operands' on doctest
 # rustdocflags = ["tokio_unstable"]
 rustflags = ["--cfg", "tokio_unstable"]
+
+[alias]
+# imported from aya
+task = "run --package synd_ebpf_task --"

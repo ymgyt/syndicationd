@@ -170,6 +170,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_matches"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
+
+[[package]]
 name = "async-graphql"
 version = "7.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -449,6 +455,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "aya"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90eea657cc8028447cbda5068f4e10c4fadba0131624f4f7dd1a9c46ffc8d81f"
+dependencies = [
+ "assert_matches",
+ "aya-obj",
+ "bitflags 2.6.0",
+ "bytes",
+ "lazy_static",
+ "libc",
+ "log",
+ "object",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aya-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f11a92f305b983e9f53433457dede617a4ad0aa22e4702220092f39e844c1a2"
+dependencies = [
+ "aya",
+ "aya-log-common",
+ "bytes",
+ "log",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aya-log-common"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d38a351ee2d5dc24e04cac6184b1b39408642d9a8b585892c99146f8dd4edb"
+dependencies = [
+ "num_enum",
+]
+
+[[package]]
+name = "aya-obj"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c02024a307161cf3d1f052161958fd13b1a33e3e038083e58082c0700fdab85"
+dependencies = [
+ "bytes",
+ "core-error",
+ "hashbrown 0.14.3",
+ "log",
+ "object",
+ "thiserror",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -725,6 +786,15 @@ dependencies = [
  "lazy_static",
  "libc",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "core-error"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efcdb2972eb64230b4c50646d8498ff73f5128d196a90c7236eec4cbe8619b8f"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]
@@ -1070,6 +1140,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7268b386296a025e474d5140678f75d6de9493ae55a5d709eeb9dd08149945e1"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -1658,6 +1741,12 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
+
+[[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
@@ -2380,6 +2469,26 @@ checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
  "hermit-abi",
  "libc",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02339744ee7253741199f897151b38e72257d13802d4ee837285cc2990a90845"
+dependencies = [
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.52",
 ]
 
 [[package]]
@@ -3947,6 +4056,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "synd-ebpf-common"
+version = "0.1.0"
+dependencies = [
+ "aya",
+]
+
+[[package]]
 name = "synd-feed"
 version = "0.3.3"
 dependencies = [
@@ -4074,6 +4190,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "synd_ebpf_task"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+]
+
+[[package]]
+name = "synd_perf"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aya",
+ "aya-log",
+ "env_logger",
+ "libc",
+ "log",
+ "synd-ebpf-common",
+ "tokio",
+]
+
+[[package]]
 name = "system-configuration"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4121,6 +4259,15 @@ dependencies = [
  "futf",
  "mac",
  "utf-8",
+]
+
+[[package]]
+name = "termcolor"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
+dependencies = [
+ "winapi-util",
 ]
 
 [[package]]

@@ -1,0 +1,32 @@
+[package]
+edition = "2021"
+name    = "synd-ebpf"
+version = "0.1.0"
+
+[dependencies]
+aya-ebpf         = "0.1.0"
+aya-log-ebpf     = "0.1.0"
+synd-ebpf-common = { path = "../synd_ebpf_common" }
+
+[[bin]]
+name = "perf-example"
+path = "src/perf_example/main.rs"
+
+[profile.dev]
+codegen-units    = 1
+debug            = false
+debug-assertions = false
+incremental      = false
+lto              = true
+opt-level        = 3
+overflow-checks  = false
+panic            = "abort"
+rpath            = false
+
+[profile.release]
+codegen-units = 1
+lto           = true
+panic         = "abort"
+
+[workspace]
+members = []
