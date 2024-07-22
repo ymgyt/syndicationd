@@ -1,0 +1,21 @@
+[package]
+edition = "2021"
+name    = "synd_perf"
+publish = false
+version = "0.1.0"
+
+[dependencies]
+anyhow     = "1"
+env_logger = "0.10"
+libc       = "0.2"
+log        = "0.4"
+tokio      = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+aya              = "0.12"
+aya-log          = "0.2"
+synd-ebpf-common = { path = "../synd_ebpf_common", features = ["user"] }
+
+[[bin]]
+name = "synd-perf"
+path = "src/main.rs"

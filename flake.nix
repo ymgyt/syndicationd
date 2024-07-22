@@ -106,6 +106,18 @@
         };
 
         devShells.ci = craneLib.devShell { packages = ci_packages; };
+
+        devShells.ebpf = pkgs.mkShell {
+          packages = [
+            (pkgs.rust-bin.fromRustupToolchainFile
+              ./crates/synd_ebpf/rust-toolchain.toml)
+
+          ];
+          # shellHook = ''
+          #   exec nu
+          # '';
+        };
+
       });
 
   nixConfig = {

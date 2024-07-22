@@ -1,0 +1,8 @@
+[package]
+edition = "2021"
+name    = "synd_ebpf_task"
+version = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+clap   = { workspace = true, features = ["derive", "std"] }

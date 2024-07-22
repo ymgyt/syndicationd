@@ -182,6 +182,9 @@ demo-vhs-record *flags:
 demo-vhs-gif:
     nix run nixpkgs#vhs -- {{ demo_tape }}
 
+demo-vhs-gif-short:
+    nix run nixpkgs#vhs -- assets/demo_short.tape --output assets/demo_short.gif
+
 changelog-auth:
     GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
     git cliff --include-path "{{ auth_dir }}/**" --include-path "crates/synd_authn/**" out> {{ auth_dir }}/CHANGELOG.md
@@ -270,3 +273,7 @@ docker-login:
 # Reinstall synd-term
 reinstall:
     @nu scripts/reinstall.nu
+
+# Build ebpf program
+build-ebpf *flags:
+    nix develop .#ebpf --command cargo task build-ebpf {{ flags }}

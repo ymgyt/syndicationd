@@ -1,4 +1,5 @@
 [workspace]
+exclude  = ["crates/synd_ebpf"]
 members  = ["crates/*"]
 resolver = "2"
 
