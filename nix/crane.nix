@@ -65,7 +65,7 @@ in {
   checks = {
     clippy = craneLib.cargoClippy (commonArgs // {
       inherit cargoArtifacts;
-      cargoExtraArgs = "--features integration";
+      cargoExtraArgs = "--features integration --exclude synd-perf";
       cargoClippyExtraArgs = "--workspace -- --deny warnings";
     });
 
