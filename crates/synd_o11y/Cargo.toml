@@ -27,7 +27,7 @@ reqwest                            = { workspace = true }
 serde                              = { workspace = true, features = ["derive"] }
 serde_json                         = { workspace = true, optional = true }
 tracing                            = { workspace = true }
-tracing-opentelemetry              = { version = "0.24.0" }
+tracing-opentelemetry              = { version = "0.25.0" }
 tracing-subscriber                 = { workspace = true, features = ["registry", "fmt", "std"] }
 
 [features]
