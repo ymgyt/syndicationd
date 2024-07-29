@@ -16,7 +16,7 @@ version     = "0.1.7"
 axum                               = { workspace = true }
 http                               = { workspace = true }
 opentelemetry                      = { version = "0.23.0" }
-opentelemetry-appender-tracing     = { version = "0.4.0", default-features = false }                                                         # disable logs_level_enabled which affect global filtering
+opentelemetry-appender-tracing     = { version = "0.5.0", default-features = false }                                                         # disable logs_level_enabled which affect global filtering
 opentelemetry-http                 = { version = "0.12.0" }
 opentelemetry-otlp                 = { version = "0.16.0", default-features = false, features = ["trace", "metrics", "logs", "grpc-tonic"] }
 opentelemetry-semantic-conventions = { version = "0.15.0" }
