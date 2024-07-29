@@ -358,6 +358,8 @@ Some tips about feed that I know.
   * To obtain releases of a repository, specify `releases.atom`. for example, to obtain releases of syndicationd, specify `https://github.com/ymgyt/syndicationd/releases.atom`
   * For tags, it's `https://github.com/ymgyt/syndicationd/tag.atom` 
 
+* crates.io have introduced a couple of experimental [RSS feeds](https://blog.rust-lang.org/2024/07/29/crates-io-development-update.html#rss-feeds)
+
 * Adding `.rss` to the end of a Reddit URL allows you to retrieve the feed. for example, for `https://www.reddit.com/r/HelixEditor/`, it would be `https://www.reddit.com/r/HelixEditor.rss`
 
 If you're looking for feeds, here are my recommendations.
