@@ -17,7 +17,7 @@ where
 {
     let provider = opentelemetry_otlp::new_pipeline()
         .logging()
-        .with_log_config(opentelemetry_sdk::logs::Config::default().with_resource(resource))
+        .with_resource(resource)
         .with_batch_config(batch_config)
         .with_exporter(
             opentelemetry_otlp::new_exporter()

@@ -8,8 +8,7 @@ observedTimeUnixNano: "[OBSERVED_TIME_UNIX_NANO]"
 severityNumber: 9
 severityText: INFO
 body:
-  value:
-    stringValue: f1_message
+  stringValue: f1_message
 attributes:
   - key: name
     value: "[SOURCE_CODE_LOCATION]"

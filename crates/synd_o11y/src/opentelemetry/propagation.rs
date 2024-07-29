@@ -5,8 +5,7 @@ use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 /// axum is ver 1, reqwest ver 0.2, therefore, we use each type in inject and extract.
 pub mod http {
     use crate::opentelemetry::extension::*;
-    use opentelemetry::propagation::Extractor;
-    use opentelemetry_http::HeaderInjector;
+    use opentelemetry_http::{HeaderExtractor, HeaderInjector};
 
     /// Inject current opentelemetry context into given headers
     pub fn inject(cx: &opentelemetry::Context, headers: &mut reqwest::header::HeaderMap) {
@@ -29,42 +28,6 @@ pub mod http {
         opentelemetry::global::get_text_map_propagator(|propagator| {
             propagator.extract(&HeaderExtractor(headers))
         })
-    }
-
-    /// `opentelemetry_http` implement `HeaderExtractor` against http 0.2
-    /// so, imple manually
-    struct HeaderExtractor<'a>(pub &'a axum::http::HeaderMap);
-
-    impl<'a> Extractor for HeaderExtractor<'a> {
-        /// Get a value for a key from the `HeaderMap`.  If the value is not valid ASCII, returns None.
-        fn get(&self, key: &str) -> Option<&str> {
-            self.0.get(key).and_then(|value| value.to_str().ok())
-        }
-
-        /// Collect all the keys from the `HeaderMap`.
-        fn keys(&self) -> Vec<&str> {
-            self.0
-                .keys()
-                .map(axum::http::HeaderName::as_str)
-                .collect::<Vec<_>>()
-        }
-    }
-    #[cfg(test)]
-    mod tests {
-        use axum::http::HeaderValue;
-
-        use super::*;
-
-        #[test]
-        fn header_extractor() {
-            let mut h = axum::http::HeaderMap::new();
-            h.insert("traceparent", HeaderValue::from_static("foo"));
-
-            let e = HeaderExtractor(&h);
-
-            assert_eq!(e.get("traceparent").unwrap(), "foo");
-            assert_eq!(e.keys(), vec!["traceparent"]);
-        }
     }
 }
 

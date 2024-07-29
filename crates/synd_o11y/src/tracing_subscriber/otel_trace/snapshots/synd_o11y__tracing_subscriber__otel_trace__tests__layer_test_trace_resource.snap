@@ -1,7 +1,7 @@
 ---
 source: crates/synd_o11y/src/tracing_subscriber/otel_trace/mod.rs
-description: span f1 resource
-expression: f1_span.resource
+description: trace resource
+expression: "req.resource_spans[0].resource"
 ---
 attributes:
   - key: service.name

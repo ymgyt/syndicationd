@@ -1,3 +1,4 @@
+use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     runtime,
@@ -26,7 +27,7 @@ fn init_tracer(
     sampler_ratio: f64,
     batch_config: BatchConfig,
 ) -> Tracer {
-    opentelemetry_otlp::new_pipeline()
+    let provider = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_trace_config(
             opentelemetry_sdk::trace::Config::default()
@@ -42,7 +43,13 @@ fn init_tracer(
                 .with_endpoint(endpoint),
         )
         .install_batch(runtime::Tokio)
-        .unwrap()
+        .unwrap();
+
+    // > It would now be the responsibility of users to set it by calling global::set_tracer_provider(tracer_provider.clone());
+    //  https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry-otlp/CHANGELOG.md#v0170
+    global::set_tracer_provider(provider.clone());
+
+    provider.tracer("tracing-opentelemetry")
 }
 
 #[cfg(test)]
@@ -121,26 +128,19 @@ mod tests {
         });
 
         let req = rx.recv().await.unwrap().into_inner();
-        assert_eq!(req.resource_spans.len(), 2);
-        let [f2_span, f1_span] = req.resource_spans.as_slice() else {
+        assert_eq!(req.resource_spans.len(), 1);
+
+        let resource_span = req.resource_spans[0].clone();
+        insta::with_settings!({
+            description => "trace resource",
+        }, {
+            insta::assert_yaml_snapshot!("layer_test_trace_resource", req.resource_spans[0].resource);
+        });
+
+        let [f2_span, f1_span] = resource_span.scope_spans[0].spans.as_slice() else {
             panic!()
         };
 
-        insta::with_settings!({
-            description => "span f2 resource",
-        }, {
-            insta::assert_yaml_snapshot!("layer_test_span_f2_resource", f2_span.resource);
-        });
-        insta::with_settings!({
-            description => "span f1 resource",
-        }, {
-            insta::assert_yaml_snapshot!("layer_test_span_f1_resource", f1_span.resource);
-        });
-
-        let (f2_span, f1_span) = (
-            f2_span.scope_spans[0].spans[0].clone(),
-            f1_span.scope_spans[0].spans[0].clone(),
-        );
         assert_eq!(&f2_span.name, "f2_custom");
         assert_eq!(&f1_span.name, "f1_custom");
         assert_eq!(f2_span.parent_span_id, f1_span.span_id);

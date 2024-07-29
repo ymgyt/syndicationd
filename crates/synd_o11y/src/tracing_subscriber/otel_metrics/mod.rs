@@ -1,9 +1,6 @@
 use std::time::Duration;
 
-use opentelemetry::{
-    global,
-    metrics::{MeterProvider, Unit},
-};
+use opentelemetry::{global, metrics::MeterProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     metrics::{
@@ -103,7 +100,7 @@ fn view() -> impl View {
                         },
                     )
                     // https://opentelemetry.io/docs/specs/semconv/general/metrics/#instrument-units
-                    .unit(Unit::new("s")),
+                    .unit("s"),
             ),
             name => {
                 tracing::debug!(name, "There is no explicit view");
