@@ -29,7 +29,7 @@ let
 
   syndTerm = craneLib.buildPackage (individualCrateArgs // (let
     crate = craneLib.crateNameFromCargoToml {
-      cargoToml = ../crates/synd_term/Cargo.toml;
+      cargoToml = ../../crates/synd_term/Cargo.toml;
     };
   in {
     inherit (crate) pname version;
@@ -46,7 +46,7 @@ let
 
   syndApi = craneLib.buildPackage (individualCrateArgs // (let
     crate = craneLib.crateNameFromCargoToml {
-      cargoToml = ../crates/synd_api/Cargo.toml;
+      cargoToml = ../../crates/synd_api/Cargo.toml;
     };
   in {
     inherit (crate) pname version;
@@ -82,7 +82,7 @@ in {
       cargoAuditExtraArgs = let
         ignoreAdvisories = lib.concatStrings (lib.strings.intersperse " "
           (map (x: "--ignore ${x}") (builtins.fromTOML
-            (builtins.readFile ../.cargo/audit.toml)).advisories.ignore));
+            (builtins.readFile ../../.cargo/audit.toml)).advisories.ignore));
       in "${ignoreAdvisories}";
     };
 

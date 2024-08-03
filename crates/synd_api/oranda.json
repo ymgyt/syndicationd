@@ -1,30 +1,30 @@
 {
-  "build": {
-    "static_dir": "assets",
-    "dist_dir": "website"
-  },
-  "styles": {
-    "theme": "axo_dark",
-    "favicon": "https://blog.ymgyt.io/favicon.ico"
-  },
-  "marketing": {
-    "social": {
-      "image": "https://blog.ymgyt.io/images/emoji/crab.png",
-      "image_alt": "synd",
-      "twitter_account": "@YAmaguchixt"
-    }
-  },
-  "components": {
-    "changelog": {
-      "read_changelog_file": false
-    },
-    "artifacts": {
-      "package_managers": {
-        "additional": {
-          "nix": "nix profile install github:ymgyt/syndicationd#synd-api",
-          "cargo": "cargo install synd-api --locked"
-        }
-      }
-    }
-  }
+	"build": {
+		"static_dir": "etc/website/assets",
+		"dist_dir": "website"
+	},
+	"styles": {
+		"theme": "axo_dark",
+		"favicon": "https://blog.ymgyt.io/favicon.ico"
+	},
+	"marketing": {
+		"social": {
+			"image": "https://blog.ymgyt.io/images/emoji/crab.png",
+			"image_alt": "synd",
+			"twitter_account": "@YAmaguchixt"
+		}
+	},
+	"components": {
+		"changelog": {
+			"read_changelog_file": false
+		},
+		"artifacts": {
+			"package_managers": {
+				"additional": {
+					"nix": "nix profile install github:ymgyt/syndicationd#synd-api",
+					"cargo": "cargo install synd-api --locked"
+				}
+			}
+		}
+	}
 }

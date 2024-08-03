@@ -48,7 +48,7 @@
             (craneLib.filterCargoSources path type);
         };
 
-        synd = pkgs.callPackage ./nix/crane.nix {
+        synd = pkgs.callPackage ./etc/nix/crane.nix {
           inherit src craneLib advisory-db;
         };
 
@@ -79,7 +79,7 @@
       in {
         checks = {
           inherit (synd.checks) clippy nextest audit fmt;
-          typo = pkgs.callPackage ./nix/typo.nix { };
+          typo = pkgs.callPackage ./etc/nix/typo.nix { };
         };
 
         packages = {

@@ -63,7 +63,7 @@ jobs:
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/oranda/releases/latest/download/oranda-installer.sh | sh
           oranda build
       # Manually added
-      - run: cp assets/CNAME public/CNAME
+      - run: cp etc/website/CNAME public/CNAME
       # Deploy to our gh-pages branch (creating it if it doesn't exist)
       # the "public" dir that oranda made above will become the root dir
       # of this branch.

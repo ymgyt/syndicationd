@@ -1,4 +1,4 @@
-Output assets/demo_short.gif
+Output etc/demo/demo_short.gif
 Set Shell nu
 Set FontSize 17
 Set FontFamily "JetBrainsMono Nerd Font"

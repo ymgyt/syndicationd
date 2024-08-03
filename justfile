@@ -11,7 +11,7 @@ feed_dir := "crates/synd_feed"
 o11y_dir := "crates/synd_o11y"
 api_dir := "crates/synd_api"
 
-demo_tape := "assets/demo.tape"
+demo_tape := "etc/demo/demo.tape"
 
 arch := arch()
 os := if os() == "macos" { "darwin" } else { "linux" }
@@ -67,7 +67,7 @@ test *flags:
 
 # Run integration test by insta
 integration *test_filter:
-    @nu scripts/integration.nu {{ test_filter }}
+    @nu etc/scripts/integration.nu {{ test_filter }}
 
 # Run integration test with debugging
 integration-debug *case:
@@ -137,7 +137,7 @@ gen-gql:
 # Run kvsd
 kvsd:
     KVSD_LOG=info nix run github:ymgyt/kvsd/426ddaf5a6356551f0945b7ca3c48366580928d9 -- server \
-        --disable-tls --config .dev/kvsd_config.yaml \
+        --disable-tls --config etc/dev/kvsd_config.yaml \
         --username {{ kvsd_user }} \
         --kvsd-dir .kvsd
 
@@ -150,7 +150,7 @@ api *flags:
       OTEL_RESOURCE_ATTRIBUTES="service.namespace=syndlocal,deployment.environment=local" \
       cargo run --features opentelemetry-stdout,introspection -- \
         --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{ kvsd_user }} --kvsd-password secret \
-        --tls-cert ../../.dev/self_signed_certs/certificate.pem --tls-key ../../.dev/self_signed_certs/private_key.pem \
+        --tls-cert ../../etc/dev/self_signed_certs/certificate.pem --tls-key ../../etc/dev/self_signed_certs/private_key.pem \
         --show-code-location=true --show-target=false --trace-sampler-ratio "1.0" {{ flags }}
 
 # Run term
@@ -159,11 +159,11 @@ term *flags:
 
 # Run opentelemetry-collector-contrib
 @otelcol config:
-    otelcontribcol --config=file:.dev/otelcol/{{ config }}
+    otelcontribcol --config=file:etc/dev/otelcol/{{ config }}
 
 # Run backends
 backend:
-    zellij action new-tab --layout .dev/backend_layout.kdl
+    zellij action new-tab --layout etc/dev/backend_layout.kdl
 
 # Record demo
 demo *flags:
@@ -172,18 +172,18 @@ demo *flags:
 # Convert demo to gif
 # --rederer=resvg need to render nerd fonts and CJK
 demo2gif *flags:
-    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast assets/demo.gif --renderer=resvg {{ flags }}
+    LC_ALL="en_US.UTF-8" LANG="en_US.UTF-8" nix run nixpkgs#asciinema-agg -- demo.cast etc/demo/demo.gif --renderer=resvg {{ flags }}
     rm demo.cast
 
 demo-vhs-record *flags:
-    cat assets/vhs_settings.tape out> {{ demo_tape }}
+    cat etc/demo/vhs_settings.tape out> {{ demo_tape }}
     nix run nixpkgs#vhs -- record --shell nu out>> {{ demo_tape }}
 
 demo-vhs-gif:
     nix run nixpkgs#vhs -- {{ demo_tape }}
 
 demo-vhs-gif-short:
-    nix run nixpkgs#vhs -- assets/demo_short.tape --output assets/demo_short.gif
+    nix run nixpkgs#vhs -- etc/demo/demo_short.tape --output etc/demo/demo_short.gif
 
 changelog-auth:
     GIT_CLIFF__GIT__TAG_PATTERN="synd-auth-v.*" \
@@ -272,7 +272,7 @@ docker-login:
     
 # Reinstall synd-term
 reinstall:
-    @nu scripts/reinstall.nu
+    @nu etc/scripts/reinstall.nu
 
 # Build ebpf program
 build-ebpf *flags:
