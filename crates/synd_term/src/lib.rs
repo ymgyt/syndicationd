@@ -7,6 +7,7 @@ pub mod cli;
 pub mod client;
 pub(crate) mod command;
 pub mod config;
+pub mod filesystem;
 pub mod interact;
 pub mod job;
 pub mod keymap;

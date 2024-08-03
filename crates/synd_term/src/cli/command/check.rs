@@ -1,4 +1,4 @@
-use std::{io, path::Path, time::Duration};
+use std::{io, path::Path, process::ExitCode, time::Duration};
 
 use anyhow::Context;
 use clap::Args;
@@ -22,12 +22,12 @@ pub struct CheckCommand {
 
 impl CheckCommand {
     #[allow(clippy::unused_self)]
-    pub async fn run(self, endpoint: Url) -> i32 {
+    pub async fn run(self, endpoint: Url) -> ExitCode {
         if let Err(err) = self.check(endpoint).await {
             tracing::error!("{err:?}");
-            1
+            ExitCode::from(1)
         } else {
-            0
+            ExitCode::SUCCESS
         }
     }
 

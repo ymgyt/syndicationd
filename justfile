@@ -83,7 +83,7 @@ review:
 coverage *flags:
     nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest \
         --all-features --open \
-        --ignore-filename-regex '(integration_backend.rs|client/generated/.*.rs)' \
+        --ignore-filename-regex '(integration_backend.rs|client/generated/.*.rs|synd_ebpf_task/src/.*.rs)' \
         {{ flags }}
 
 [macos]

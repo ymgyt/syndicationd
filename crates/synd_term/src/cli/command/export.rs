@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, process::ExitCode, time::Duration};
 
 use anyhow::anyhow;
 use clap::Args;
@@ -39,7 +39,7 @@ pub struct ExportCommand {
 }
 
 impl ExportCommand {
-    pub async fn run(self, endpoint: Url) -> i32 {
+    pub async fn run(self, endpoint: Url) -> ExitCode {
         let err = if self.print_schema {
             Self::print_json_schema()
         } else {
@@ -47,9 +47,9 @@ impl ExportCommand {
         };
         if let Err(err) = err {
             tracing::error!("{err:?}");
-            1
+            ExitCode::from(1)
         } else {
-            0
+            ExitCode::SUCCESS
         }
     }
 

@@ -1,4 +1,4 @@
-use std::{future, path::PathBuf, time::Duration};
+use std::{future, path::PathBuf, process::ExitCode, time::Duration};
 
 use anyhow::Context as _;
 use futures_util::TryFutureExt;
@@ -7,6 +7,7 @@ use synd_term::{
     cli::{self, ApiOptions, Args, FeedOptions, GithubOptions, Palette},
     client::{github::GithubClient, Client},
     config::{self, Categories},
+    filesystem::fsimpl::FileSystem,
     terminal::{self, Terminal},
     ui::theme::Theme,
 };
@@ -101,7 +102,7 @@ fn build_app(
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     let Args {
         api: ApiOptions {
             endpoint,
@@ -121,13 +122,11 @@ async fn main() {
     let _guard = init_tracing(log).unwrap();
 
     if let Some(command) = command {
-        let exit_code = match command {
-            cli::Command::Clean(clean) => clean.run(),
+        return match command {
+            cli::Command::Clean(clean) => clean.run(&FileSystem::new()),
             cli::Command::Check(check) => check.run(endpoint).await,
             cli::Command::Export(export) => export.run(endpoint).await,
         };
-
-        std::process::exit(exit_code);
     };
 
     let mut event_stream = terminal::event_stream();
@@ -148,6 +147,8 @@ async fn main() {
     .await
     {
         error!("{err:?}");
-        std::process::exit(1);
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }

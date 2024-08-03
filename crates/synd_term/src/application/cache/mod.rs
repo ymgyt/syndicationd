@@ -3,16 +3,30 @@ use std::{borrow::Borrow, io, path::PathBuf};
 use crate::{
     auth::{Credential, CredentialError, Unverified},
     config,
+    filesystem::{fsimpl, FileSystem},
     ui::components::gh_notifications::GhNotificationFilterOptions,
 };
 
-pub struct Cache {
+pub struct Cache<FS = fsimpl::FileSystem> {
     dir: PathBuf,
+    fs: FS,
 }
 
-impl Cache {
+impl Cache<fsimpl::FileSystem> {
     pub fn new(dir: impl Into<PathBuf>) -> Self {
-        Self { dir: dir.into() }
+        Self::with(dir, fsimpl::FileSystem::new())
+    }
+}
+
+impl<FS> Cache<FS>
+where
+    FS: FileSystem,
+{
+    pub fn with(dir: impl Into<PathBuf>, fs: FS) -> Self {
+        Self {
+            dir: dir.into(),
+            fs,
+        }
     }
 
     /// Persist credential in filesystem.
@@ -85,7 +99,7 @@ impl Cache {
     pub(crate) fn clean(&self) -> io::Result<()> {
         // User can specify any directory as the cache
         // so instead of deleting the entire directory with `remove_dir_all`, delete files individually.
-        match std::fs::remove_file(self.credential_file()) {
+        match self.fs.remove_file(self.credential_file()) {
             Ok(()) => Ok(()),
             Err(err) => match err.kind() {
                 io::ErrorKind::NotFound => Ok(()),

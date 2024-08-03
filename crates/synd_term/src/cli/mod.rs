@@ -5,9 +5,7 @@ use url::Url;
 
 use crate::{config, ui::theme};
 
-mod check;
-mod clean;
-mod export;
+mod command;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
 pub enum Palette {
@@ -102,9 +100,9 @@ pub struct GithubOptions {
 #[derive(Subcommand, Debug)]
 pub enum Command {
     #[command(alias = "clear")]
-    Clean(clean::CleanCommand),
-    Check(check::CheckCommand),
-    Export(export::ExportCommand),
+    Clean(command::clean::CleanCommand),
+    Check(command::check::CheckCommand),
+    Export(command::export::ExportCommand),
 }
 
 pub fn parse() -> Args {
