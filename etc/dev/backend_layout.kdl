@@ -8,10 +8,10 @@ layout {
 	}
 	pane split_direction="horizontal" {
 		just {
-			args "api"
+			args "run" "api"
 		}
 		just {
-			args "kvsd"
+			args "run" "kvsd"
 		}
 	}
 	pane size=2 borderless=true {

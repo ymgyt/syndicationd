@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -22,12 +23,14 @@
     };
   };
 
-  outputs =
-    { self, nixpkgs, crane, rust-overlay, flake-utils, advisory-db, ... }:
+  outputs = { self, nixpkgs, nixpkgs-unstable, crane, rust-overlay, flake-utils
+    , advisory-db, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
+        pkgs-unstable = import nixpkgs-unstable { inherit system overlays; };
+
         rustToolchain =
           pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
@@ -53,7 +56,8 @@
         };
 
         ci_packages = with pkgs; [
-          just
+          # >= 1.31.0 for modules
+          pkgs-unstable.just
           nushell # just set nu as shell
           cargo-bundle-licenses
           docker

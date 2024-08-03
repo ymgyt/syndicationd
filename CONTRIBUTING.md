@@ -13,20 +13,20 @@ Launch three terminals.
 1. the second one is for kvsd, which serves as the persistent backend used by synd-api
 1. the last one is for synd.
 
-Execute in the following order: `just kvsd`, `just api`, `just term`
+Execute in the following order: `just run kvsd`, `just run api`, `just run term`
 
 ### Updating GraphQL Schema
 
-If you have updated the GraphQL schema of synd-api, execute `just update-gql-schema` This command updates the GraphQL schema of synd-term.   
-To generate synd-term's GraphQL client code, execute `just gen-gql`.
+If you have updated the GraphQL schema of synd-api, execute `just graphql schema` This command updates the GraphQL schema of synd-term.   
+To generate synd-term's GraphQL client code, execute `just graphql generate`.
 
 ## Testing
 
 * `just lint` : run linters
-* `just test` : run unit tests
-* `just integration` : run integration test
+* `just test unit` : run unit tests
+* `just test integration` : run integration test
 * `just bench` : run benchmarks
-* `just flamegraph` : generate flamegraph
+* `just bench flamegraph` : generate flamegraph
 
 
 ## Commit Message
