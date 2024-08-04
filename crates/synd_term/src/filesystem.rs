@@ -1,10 +1,18 @@
-use std::{io, path::Path};
+use std::{fs::File, io, path::Path};
 
 pub trait FileSystem {
+    fn create_dir_all<P: AsRef<Path>>(&self, path: P) -> io::Result<()>;
+
+    fn create_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File>;
+
+    fn open_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File>;
+
     fn remove_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()>;
 }
 
 pub mod fsimpl {
+    use std::{fs::File, io, path::Path};
+
     #[derive(Debug, Clone)]
     pub struct FileSystem {}
 
@@ -15,7 +23,19 @@ pub mod fsimpl {
     }
 
     impl super::FileSystem for FileSystem {
-        fn remove_file<P: AsRef<std::path::Path>>(&self, path: P) -> std::io::Result<()> {
+        fn create_dir_all<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+            std::fs::create_dir_all(path)
+        }
+
+        fn create_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File> {
+            std::fs::File::create(path)
+        }
+
+        fn open_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File> {
+            std::fs::File::open(path)
+        }
+
+        fn remove_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
             std::fs::remove_file(path)
         }
     }
@@ -23,7 +43,12 @@ pub mod fsimpl {
 
 #[cfg(test)]
 pub(crate) mod mock {
-    use std::{collections::HashMap, io, path::PathBuf};
+    use std::{
+        collections::HashMap,
+        fs::File,
+        io,
+        path::{Path, PathBuf},
+    };
 
     #[derive(Default, Clone)]
     pub(crate) struct MockFileSystem {
@@ -42,7 +67,18 @@ pub(crate) mod mock {
     }
 
     impl super::FileSystem for MockFileSystem {
-        fn remove_file<P: AsRef<std::path::Path>>(&self, path: P) -> io::Result<()> {
+        fn create_dir_all<P: AsRef<Path>>(&self, _path: P) -> io::Result<()> {
+            unimplemented!()
+        }
+
+        fn create_file<P: AsRef<Path>>(&self, _path: P) -> io::Result<File> {
+            unimplemented!()
+        }
+        fn open_file<P: AsRef<Path>>(&self, _path: P) -> io::Result<File> {
+            unimplemented!()
+        }
+
+        fn remove_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
             let path = path.as_ref();
             match self.remove_errors.get(path) {
                 Some(err) => Err(io::Error::from(*err)),

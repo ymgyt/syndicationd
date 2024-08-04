@@ -35,14 +35,16 @@ where
         let cred = cred.borrow();
         let path = self.credential_file();
 
-        std::fs::create_dir_all(self.dir.as_path()).map_err(|err| {
+        self.fs.create_dir_all(self.dir.as_path()).map_err(|err| {
             CredentialError::PersistCredential {
                 io_err: err,
                 path: self.dir.clone(),
             }
         })?;
 
-        let mut file = std::fs::File::create(&path)
+        let mut file = self
+            .fs
+            .create_file(&path)
             .map_err(|err| CredentialError::PersistCredential { io_err: err, path })?;
 
         serde_json::to_writer(&mut file, cred).map_err(CredentialError::Serialize)
@@ -53,7 +55,9 @@ where
     pub fn load_credential(&self) -> Result<Unverified<Credential>, CredentialError> {
         let path = self.credential_file();
 
-        let mut file = std::fs::File::open(&path)
+        let mut file = self
+            .fs
+            .open_file(&path)
             .map_err(|err| CredentialError::Open { io_err: err, path })?;
 
         serde_json::from_reader::<_, Credential>(&mut file)
@@ -72,9 +76,9 @@ where
         let options = options.borrow();
         let path = self.gh_notification_filter_option_file();
 
-        std::fs::create_dir_all(self.dir.as_path())?;
+        self.fs.create_dir_all(self.dir.as_path())?;
 
-        let mut file = std::fs::File::create(path)?;
+        let mut file = self.fs.create_file(path)?;
 
         serde_json::to_writer(&mut file, options).map_err(anyhow::Error::from)
     }
@@ -84,7 +88,7 @@ where
     ) -> anyhow::Result<GhNotificationFilterOptions> {
         let path = self.gh_notification_filter_option_file();
 
-        let mut file = std::fs::File::open(path)?;
+        let mut file = self.fs.open_file(path)?;
 
         serde_json::from_reader::<_, GhNotificationFilterOptions>(&mut file)
             .map_err(anyhow::Error::from)
