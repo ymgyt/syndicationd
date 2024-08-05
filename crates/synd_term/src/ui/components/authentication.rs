@@ -94,15 +94,13 @@ impl Authentication {
         let [big_text_area, title_area, methods_area] = vertical.areas(area);
 
         // Render big "syndicationd"
-        if let Ok(big_text) = BigText::builder()
+        BigText::builder()
             .pixel_size(PixelSize::HalfWidth)
             .style(cx.theme.base)
             .alignment(Alignment::Center)
             .lines(vec!["Syndicationd".into()])
             .build()
-        {
-            big_text.render(big_text_area, buf);
-        }
+            .render(big_text_area, buf);
 
         let title = Self::login_title(cx);
 

@@ -52,7 +52,7 @@ toml                 = { version = "0.8.15", default-features = true }
 tracing              = { workspace = true }
 tracing-appender     = "0.2.3"
 tracing-subscriber   = { workspace = true }
-tui-big-text         = "0.4.5"
+tui-big-text         = "0.5.3"
 unicode-segmentation = "1.10.1"
 update-informer      = { version = "1.1.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 url                  = { workspace = true }
