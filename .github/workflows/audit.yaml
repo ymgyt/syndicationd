@@ -13,6 +13,6 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: "Update advisory db"
-        run: nix develop .#ci --accept-flake-config --command just update-advisory-db
+        run: nix develop .#ci --accept-flake-config --command just audit update-advisory-db
       - name: "Run cargo-audit"
         run: nix develop .#ci --accept-flake-config --command just audit
