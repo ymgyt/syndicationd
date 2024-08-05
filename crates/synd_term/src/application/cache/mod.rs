@@ -1,11 +1,36 @@
-use std::{borrow::Borrow, io, path::PathBuf};
+use std::{
+    borrow::Borrow,
+    io,
+    path::{Path, PathBuf},
+};
+
+use serde::{de::DeserializeOwned, Serialize};
+use thiserror::Error;
 
 use crate::{
-    auth::{Credential, CredentialError, Unverified},
+    auth::{Credential, Unverified},
     config,
     filesystem::{fsimpl, FileSystem},
     ui::components::gh_notifications::GhNotificationFilterOptions,
 };
+
+#[derive(Debug, Error)]
+pub enum PersistCacheError {
+    #[error("io error: {path} {io} ")]
+    Io { path: PathBuf, io: io::Error },
+    #[error("serialize error: {0}")]
+    Serialize(#[from] serde_json::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum LoadCacheError {
+    #[error("cache entry not found")]
+    NotFound,
+    #[error("io error: {path} {io}")]
+    Io { path: PathBuf, io: io::Error },
+    #[error("deserialize error: {0}")]
+    Deserialize(#[from] serde_json::Error),
+}
 
 pub struct Cache<FS = fsimpl::FileSystem> {
     dir: PathBuf,
@@ -31,67 +56,74 @@ where
 
     /// Persist credential in filesystem.
     /// This is blocking operation.
-    pub fn persist_credential(&self, cred: impl Borrow<Credential>) -> Result<(), CredentialError> {
-        let cred = cred.borrow();
-        let path = self.credential_file();
-
-        self.fs.create_dir_all(self.dir.as_path()).map_err(|err| {
-            CredentialError::PersistCredential {
-                io_err: err,
-                path: self.dir.clone(),
-            }
-        })?;
-
-        let mut file = self
-            .fs
-            .create_file(&path)
-            .map_err(|err| CredentialError::PersistCredential { io_err: err, path })?;
-
-        serde_json::to_writer(&mut file, cred).map_err(CredentialError::Serialize)
-    }
-
-    /// Load credential from filesystem.
-    /// This is blocking operation.
-    pub fn load_credential(&self) -> Result<Unverified<Credential>, CredentialError> {
-        let path = self.credential_file();
-
-        let mut file = self
-            .fs
-            .open_file(&path)
-            .map_err(|err| CredentialError::Open { io_err: err, path })?;
-
-        serde_json::from_reader::<_, Credential>(&mut file)
-            .map_err(CredentialError::Deserialize)
-            .map(Unverified::from)
-    }
-
-    fn credential_file(&self) -> PathBuf {
-        self.dir.join(config::cache::CREDENTIAL_FILE)
+    pub fn persist_credential(
+        &self,
+        cred: impl Borrow<Credential>,
+    ) -> Result<(), PersistCacheError> {
+        self.persist(&self.credential_file(), cred.borrow())
     }
 
     pub(crate) fn persist_gh_notification_filter_options(
         &self,
         options: impl Borrow<GhNotificationFilterOptions>,
-    ) -> anyhow::Result<()> {
-        let options = options.borrow();
-        let path = self.gh_notification_filter_option_file();
+    ) -> Result<(), PersistCacheError> {
+        self.persist(&self.gh_notification_filter_option_file(), options.borrow())
+    }
 
-        self.fs.create_dir_all(self.dir.as_path())?;
+    fn persist<T>(&self, path: &Path, entry: &T) -> Result<(), PersistCacheError>
+    where
+        T: ?Sized + Serialize,
+    {
+        if let Some(parent) = path.parent() {
+            self.fs
+                .create_dir_all(parent)
+                .map_err(|err| PersistCacheError::Io {
+                    path: parent.to_path_buf(),
+                    io: err,
+                })?;
+        }
 
-        let mut file = self.fs.create_file(path)?;
+        self.fs
+            .create_file(path)
+            .map_err(|err| PersistCacheError::Io {
+                path: path.to_path_buf(),
+                io: err,
+            })
+            .and_then(|mut file| {
+                serde_json::to_writer(&mut file, entry).map_err(PersistCacheError::Serialize)
+            })
+    }
 
-        serde_json::to_writer(&mut file, options).map_err(anyhow::Error::from)
+    /// Load credential from filesystem.
+    /// This is blocking operation.
+    pub fn load_credential(&self) -> Result<Unverified<Credential>, LoadCacheError> {
+        self.load::<Credential>(&self.credential_file())
+            .map(Unverified::from)
     }
 
     pub(crate) fn load_gh_notification_filter_options(
         &self,
-    ) -> anyhow::Result<GhNotificationFilterOptions> {
-        let path = self.gh_notification_filter_option_file();
+    ) -> Result<GhNotificationFilterOptions, LoadCacheError> {
+        self.load(&self.gh_notification_filter_option_file())
+    }
 
-        let mut file = self.fs.open_file(path)?;
+    fn load<T>(&self, path: &Path) -> Result<T, LoadCacheError>
+    where
+        T: DeserializeOwned,
+    {
+        self.fs
+            .open_file(path)
+            .map_err(|err| LoadCacheError::Io {
+                io: err,
+                path: path.to_path_buf(),
+            })
+            .and_then(|mut file| {
+                serde_json::from_reader::<_, T>(&mut file).map_err(LoadCacheError::Deserialize)
+            })
+    }
 
-        serde_json::from_reader::<_, GhNotificationFilterOptions>(&mut file)
-            .map_err(anyhow::Error::from)
+    fn credential_file(&self) -> PathBuf {
+        self.dir.join(config::cache::CREDENTIAL_FILE)
     }
 
     fn gh_notification_filter_option_file(&self) -> PathBuf {

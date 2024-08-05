@@ -59,7 +59,7 @@ mod clock;
 pub use clock::{Clock, SystemClock};
 
 mod cache;
-pub use cache::Cache;
+pub use cache::{Cache, LoadCacheError, PersistCacheError};
 
 mod builder;
 pub use builder::ApplicationBuilder;

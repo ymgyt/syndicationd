@@ -1,9 +1,8 @@
 use std::{
     borrow::Borrow,
     cmp::Ordering,
-    fmt, io,
+    fmt,
     ops::{Deref, Sub},
-    path::PathBuf,
 };
 
 use chrono::{DateTime, Utc};
@@ -13,7 +12,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    application::{Cache, JwtService},
+    application::{Cache, JwtService, LoadCacheError, PersistCacheError},
     config,
     types::Time,
 };
@@ -32,26 +31,14 @@ pub enum CredentialError {
     GoogleJwtExpired { refresh_token: String },
     #[error("google jwt email not verified")]
     GoogleJwtEmailNotVerified,
-    #[error("failed to open: {path} :{io_err}")]
-    Open {
-        #[source]
-        io_err: std::io::Error,
-        path: PathBuf,
-    },
-    #[error("serialize credential: {0}")]
-    Serialize(serde_json::Error),
-    #[error("deserialize credential: {0}")]
-    Deserialize(serde_json::Error),
     #[error("decode jwt: {0}")]
     DecodeJwt(JwtError),
     #[error("refresh jwt id token: {0}")]
     RefreshJwt(JwtError),
-    #[error("persist credential: {path} :{io_err}")]
-    PersistCredential {
-        #[source]
-        io_err: io::Error,
-        path: PathBuf,
-    },
+    #[error("persist credential: {0}")]
+    PersistCredential(#[from] PersistCacheError),
+    #[error("load credential: {0}")]
+    LoadCredential(#[from] LoadCacheError),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
