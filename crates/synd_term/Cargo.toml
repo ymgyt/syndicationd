@@ -44,7 +44,7 @@ ratatui              = { version = "0.27.0" }
 reqwest              = { workspace = true }
 schemars             = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
-serde_json           = "1.0.120"
+serde_json           = "1.0.122"
 thiserror            = { workspace = true }
 tokio                = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
 tokio-stream         = { version = "0.1.15", optional = true }
