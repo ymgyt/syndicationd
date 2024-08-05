@@ -20,7 +20,7 @@
 [grafana-badge]: https://img.shields.io/badge/Grafana-Dashboard-orange?style=for-the-badge&logo=grafana
 [grafana-url]: https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now
 
-![Demo](./etc/demo/demo.gif)
+![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
 
 Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 
