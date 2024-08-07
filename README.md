@@ -297,7 +297,7 @@ The `repo` scope is required. For more details, see [about github notifications]
 
 "Metadata" repository permissions (read) and "Notifications" user permissions (read) are required.  
 For more details, see [list notifications for the authenticated user](https://docs.github.com/en/rest/activity/notifications?apiVersion=2022-11-28#list-notifications-for-the-authenticated-user).  
-Since the Mark notification as done API does not support fine grained access token, c class token is required to use this feature.  
+Since the Mark notification as done API does not support fine grained access token, classic token is required to use this feature.  
 
 
 ### Log file
