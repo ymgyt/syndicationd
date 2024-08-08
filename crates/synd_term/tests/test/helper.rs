@@ -23,7 +23,7 @@ use synd_term::{
     auth::Credential,
     client::{github::GithubClient as TermGithubClient, Client},
     config::Categories,
-    interact::Interactor,
+    interact::mock::MockInteractor,
     terminal::Terminal,
     types::Time,
     ui::theme::Theme,
@@ -190,7 +190,7 @@ impl TestCase {
                 } else {
                     Vec::new()
                 };
-                Interactor::new().with_buffer(buffer)
+                Box::new(MockInteractor::new().with_buffer(buffer))
             };
 
             let github_client = {

@@ -2,7 +2,7 @@ use crate::{
     application::{Application, Authenticator, Cache, Clock, Config},
     client::{github::GithubClient, Client},
     config::Categories,
-    interact::Interactor,
+    interact::Interact,
     terminal::Terminal,
     ui::theme::Theme,
 };
@@ -23,7 +23,7 @@ pub struct ApplicationBuilder<
     pub(super) theme: Theme,
 
     pub(super) authenticator: Option<Authenticator>,
-    pub(super) interactor: Option<Interactor>,
+    pub(super) interactor: Option<Box<dyn Interact>>,
     pub(super) github_client: Option<GithubClient>,
     pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) dry_run: bool,
@@ -174,7 +174,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
     }
 
     #[must_use]
-    pub fn interactor(self, interactor: Interactor) -> Self {
+    pub fn interactor(self, interactor: Box<dyn Interact>) -> Self {
         Self {
             interactor: Some(interactor),
             ..self

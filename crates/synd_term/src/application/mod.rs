@@ -18,6 +18,7 @@ use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_feed::types::FeedUrl;
 use tokio::time::{Instant, Sleep};
 use update_informer::Version;
+use url::Url;
 
 use crate::{
     application::event::KeyEventResult,
@@ -29,7 +30,7 @@ use crate::{
     },
     command::{ApiResponse, Command},
     config::{self, Categories},
-    interact::Interactor,
+    interact::{Interact, ProcessInteractor},
     job::Jobs,
     keymap::{KeymapId, Keymaps},
     terminal::Terminal,
@@ -87,7 +88,7 @@ pub struct Application {
     jobs: Jobs,
     background_jobs: Jobs,
     components: Components,
-    interactor: Interactor,
+    interactor: Box<dyn Interact>,
     authenticator: Authenticator,
     in_flight: InFlight,
     cache: Cache,
@@ -149,7 +150,7 @@ impl Application {
             jobs: Jobs::new(NonZero::new(90).unwrap()),
             background_jobs: Jobs::new(NonZero::new(10).unwrap()),
             components: Components::new(&config.features),
-            interactor: interactor.unwrap_or_else(Interactor::new),
+            interactor: interactor.unwrap_or_else(|| Box::new(ProcessInteractor::new())),
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             cache,
@@ -898,9 +899,17 @@ impl Application {
 
 impl Application {
     fn prompt_feed_subscription(&mut self) {
-        let input = self
+        let input = match self
             .interactor
-            .open_editor(InputParser::SUSBSCRIBE_FEED_PROMPT);
+            .open_editor(InputParser::SUSBSCRIBE_FEED_PROMPT)
+        {
+            Ok(input) => input,
+            Err(err) => {
+                tracing::warn!("{err}");
+                // TODO: Handle error case
+                return;
+            }
+        };
         tracing::debug!("Got user modified feed subscription: {input}");
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
@@ -936,9 +945,17 @@ impl Application {
             return;
         };
 
-        let input = self
+        let input = match self
             .interactor
-            .open_editor(InputParser::edit_feed_prompt(feed));
+            .open_editor(InputParser::edit_feed_prompt(feed).as_str())
+        {
+            Ok(input) => input,
+            Err(err) => {
+                // TODO: handle error case
+                tracing::warn!("{err}");
+                return;
+            }
+        };
         // the terminal state becomes strange after editing in the editor
         self.terminal.force_redraw();
 
@@ -1071,14 +1088,28 @@ impl Application {
         else {
             return;
         };
-        self.interactor.open_browser(feed_website_url);
+        match Url::parse(&feed_website_url) {
+            Ok(url) => {
+                self.interactor.open_browser(url).ok();
+            }
+            Err(err) => {
+                tracing::warn!("Try to open invalid feed url: {feed_website_url} {err}");
+            }
+        };
     }
 
     fn open_entry(&mut self) {
         let Some(entry_website_url) = self.components.entries.selected_entry_website_url() else {
             return;
         };
-        self.interactor.open_browser(entry_website_url);
+        match Url::parse(entry_website_url) {
+            Ok(url) => {
+                self.interactor.open_browser(url).ok();
+            }
+            Err(err) => {
+                tracing::warn!("Try to open invalid entry url: {entry_website_url} {err}");
+            }
+        };
     }
 
     fn open_notification(&mut self) {
@@ -1090,7 +1121,7 @@ impl Application {
         else {
             return;
         };
-        self.interactor.open_browser(notification_url.as_str());
+        self.interactor.open_browser(notification_url).ok();
     }
 }
 
@@ -1264,8 +1295,9 @@ impl Application {
             .set_device_authorization_response(device_authorization.clone());
         self.should_render();
         // try to open input screen in the browser
-        self.interactor
-            .open_browser(device_authorization.verification_uri().to_string());
+        if let Ok(url) = Url::parse(device_authorization.verification_uri().to_string().as_str()) {
+            self.interactor.open_browser(url).ok();
+        }
 
         let authenticator = self.authenticator.clone();
         let now = self.now();
