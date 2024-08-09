@@ -4,6 +4,7 @@ use directories::ProjectDirs;
 
 mod categories;
 pub use categories::{Categories, Icon, IconColor};
+mod file;
 
 pub mod api {
     pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100";
@@ -72,6 +73,7 @@ fn project_dirs() -> &'static ProjectDirs {
     static PROJECT_DIRS: OnceLock<ProjectDirs> = OnceLock::new();
 
     PROJECT_DIRS.get_or_init(|| {
-        ProjectDirs::from("ymgyt.io", "syndicationd", "synd").expect("Failed to get project dirs")
+        // Prioritizing consistency with Linux, the qualifier and organization have not been specified
+        ProjectDirs::from("", "", "syndicationd").expect("Failed to get project dirs")
     })
 }

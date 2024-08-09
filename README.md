@@ -340,6 +340,24 @@ synd check --format json | from json
 ╰───────┴─────────────────────────────────────────╯
 ```
 
+## Configuration
+
+Syndicationd searches for the configuration file in the following paths for each platform.  
+
+* Linux
+  * `$XDG_CONFIG_HOME/syndicationd/syndicationd.toml`
+  * `$HOME/.config/syndicationd/syndicationd.toml`
+
+* macOS
+  * `$HOME/Application Support/syndicationd/syndicationd.toml`
+
+* Windows
+  * `{FOLDERID_RoamingAppData}/syndicationd/syndicationd.toml`
+
+The path to the configuration file can be specified using the `SYND_CONFIG` environment variable or the `--config` flag.  
+Syndicationd doesn't create the config file for you. to output the default configuration file, please run the `synd config dump` command.  
+
+
 ## Development
 
 Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with development.

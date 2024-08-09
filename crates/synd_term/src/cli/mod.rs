@@ -1,13 +1,14 @@
 use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{config, ui::theme};
 
 mod command;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum, Serialize, Deserialize)]
 pub enum Palette {
     Ferra,
     SolarizedDark,
