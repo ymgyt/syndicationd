@@ -360,7 +360,7 @@ dependencies = [
  "sync_wrapper 1.0.0",
  "tokio",
  "tokio-tungstenite",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -406,7 +406,7 @@ dependencies = [
  "rustls-pemfile 2.1.1",
  "tokio",
  "tokio-rustls 0.24.1",
- "tower",
+ "tower 0.4.13",
  "tower-service",
 ]
 
@@ -1829,7 +1829,7 @@ dependencies = [
  "pin-project-lite",
  "socket2",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-service",
  "tracing",
 ]
@@ -2486,7 +2486,7 @@ dependencies = [
  "serde_urlencoded",
  "snafu",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-http",
  "tracing",
  "url",
@@ -4091,7 +4091,7 @@ dependencies = [
  "tokio",
  "tokio-metrics",
  "tokio-util",
- "tower",
+ "tower 0.5.0",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -4612,7 +4612,7 @@ dependencies = [
  "socket2",
  "tokio",
  "tokio-stream",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -4639,6 +4639,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36b837f86b25d7c0d7988f00a54e74739be6477f2aac6201b8f429a7569991b7"
+dependencies = [
+ "futures-core",
+ "pin-project-lite",
+ "tokio",
+ "tokio-util",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "tower-http"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4652,7 +4667,7 @@ dependencies = [
  "http-body-util",
  "iri-string",
  "pin-project-lite",
- "tower",
+ "tower 0.4.13",
  "tower-layer",
  "tower-service",
  "tracing",
