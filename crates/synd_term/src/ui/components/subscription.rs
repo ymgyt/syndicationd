@@ -176,7 +176,7 @@ impl Subscription {
                     .selected_feed
                     .add_modifier(cx.table_highlight_modifier()),
             )
-            .highlight_spacing(HighlightSpacing::WhenSelected);
+            .highlight_spacing(HighlightSpacing::Always);
 
         StatefulWidget::render(feeds, feeds_area, buf, &mut feeds_state);
 

@@ -351,7 +351,7 @@ impl GhNotifications {
             .column_spacing(2)
             .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
             .highlight_style(cx.theme.entries.selected_entry)
-            .highlight_spacing(ratatui::widgets::HighlightSpacing::WhenSelected);
+            .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
         StatefulWidget::render(
             notifications,

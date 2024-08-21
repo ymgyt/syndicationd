@@ -111,7 +111,7 @@ impl Entries {
                     .selected_entry
                     .add_modifier(cx.table_highlight_modifier()),
             )
-            .highlight_spacing(ratatui::widgets::HighlightSpacing::WhenSelected);
+            .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
         StatefulWidget::render(entries, entries_area, buf, &mut entries_state);
 
