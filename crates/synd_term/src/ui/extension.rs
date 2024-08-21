@@ -37,7 +37,7 @@ impl RectExt for Rect {
     fn reset(&self, buf: &mut Buffer) {
         for x in self.x..(self.x + self.width) {
             for y in self.y..(self.y + self.height) {
-                buf.get_mut(x, y).reset();
+                buf.cell_mut((x, y)).unwrap().reset();
             }
         }
     }

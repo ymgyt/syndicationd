@@ -8,7 +8,7 @@ use ratatui::{
     },
 };
 use synd_auth::device_flow::DeviceAuthorizationResponse;
-use tui_big_text::{BigText, PixelSize};
+use tui_widgets::big_text::{BigText, PixelSize};
 
 use crate::{
     application::Direction,

@@ -854,7 +854,7 @@ impl Application {
         let root = Root::new(&self.components, cx);
 
         self.terminal
-            .render(|frame| Widget::render(root, frame.size(), frame.buffer_mut()))
+            .render(|frame| Widget::render(root, frame.area(), frame.buffer_mut()))
             .expect("Failed to render");
     }
 
