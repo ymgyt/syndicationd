@@ -13,6 +13,13 @@ kvsd:
         --username {{ kvsd_user }} \
         --kvsd-dir .kvsd
 
+[no-cd]
+kvsd-local:
+    cd ../kvsd; KVSD_LOG=info cargo run -- server \
+        --disable-tls --config ../syndicationd/etc/dev/kvsd_config.yaml \
+        --username {{ kvsd_user }} \
+        --kvsd-dir .../syndicationd/kvsd
+
 # Run api
 [no-cd]
 api *flags:
