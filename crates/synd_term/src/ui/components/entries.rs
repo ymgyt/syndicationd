@@ -8,7 +8,7 @@ use crate::{
         self,
         components::{collections::FilterableVec, filter::FeedFilterer},
         icon,
-        widgets::scrollbar::Scrollbar,
+        widgets::{scrollbar::Scrollbar, table::Table},
         Context,
     },
 };
@@ -16,10 +16,7 @@ use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Rect},
     style::Stylize,
     text::{Line, Span, Text},
-    widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, StatefulWidget, Table,
-        TableState, Widget, Wrap,
-    },
+    widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
 };
 use synd_feed::types::FeedUrl;
 
@@ -95,25 +92,17 @@ impl Entries {
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let entries_area = Block::new().padding(Padding::top(1)).inner(area);
 
-        let mut entries_state = TableState::new()
-            .with_offset(0)
-            .with_selected(self.entries.selected_index());
-
         let (header, widths, rows) = self.entry_rows(cx);
 
-        let entries = Table::new(rows, widths)
-            .header(header.style(cx.theme.entries.header))
-            .column_spacing(2)
-            .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .highlight_style(
-                cx.theme
-                    .entries
-                    .selected_entry
-                    .add_modifier(cx.table_highlight_modifier()),
-            )
-            .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
-
-        StatefulWidget::render(entries, entries_area, buf, &mut entries_state);
+        Table::builder()
+            .header(header)
+            .widths(widths)
+            .rows(rows)
+            .theme(&cx.theme.entries)
+            .selected_idx(self.entries.selected_index())
+            .highlight_modifier(cx.table_highlight_modifier())
+            .build()
+            .render(entries_area, buf);
 
         let header_rows = 2;
         #[allow(clippy::cast_possible_truncation)]

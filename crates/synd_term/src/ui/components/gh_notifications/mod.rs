@@ -7,10 +7,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Modifier, Style, Styled, Stylize},
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, StatefulWidget, Table,
-        TableState, Widget, Wrap,
-    },
+    widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
 };
 use serde::{Deserialize, Serialize};
 
@@ -29,14 +26,13 @@ use crate::{
         TimeExt,
     },
     ui::{
-        self,
         components::{
             collections::FilterableVec,
             filter::{CategoryFilterer, ComposedFilterer, MatcherFilterer},
         },
         extension::RectExt,
         icon,
-        widgets::scrollbar::Scrollbar,
+        widgets::{scrollbar::Scrollbar, table::Table},
         Context,
     },
 };
@@ -342,23 +338,17 @@ impl GhNotifications {
     fn render_notifications(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let notifications_area = Block::new().padding(Padding::top(1)).inner(area);
 
-        let mut notifications_state = TableState::new()
-            .with_offset(0)
-            .with_selected(self.notifications.selected_index());
         let (header, widths, rows) = self.notification_rows(cx);
-        let notifications = Table::new(rows, widths)
-            .header(header.style(cx.theme.entries.header))
-            .column_spacing(2)
-            .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .highlight_style(cx.theme.entries.selected_entry)
-            .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
-        StatefulWidget::render(
-            notifications,
-            notifications_area,
-            buf,
-            &mut notifications_state,
-        );
+        Table::builder()
+            .header(header)
+            .widths(widths)
+            .rows(rows)
+            .theme(&cx.theme.entries)
+            .selected_idx(self.notifications.selected_index())
+            .highlight_modifier(cx.table_highlight_modifier())
+            .build()
+            .render(notifications_area, buf);
 
         let header_rows = 2;
         #[allow(clippy::cast_possible_truncation)]

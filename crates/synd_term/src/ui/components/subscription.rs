@@ -6,8 +6,8 @@ use ratatui::{
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row,
-        StatefulWidget, Table, TableState, Tabs, Widget,
+        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table as RatatuiTable, Tabs,
+        Widget,
     },
 };
 use synd_feed::types::{FeedType, FeedUrl};
@@ -20,7 +20,7 @@ use crate::{
         self,
         components::{collections::FilterableVec, filter::FeedFilterer},
         extension::RectExt,
-        widgets::scrollbar::Scrollbar,
+        widgets::{scrollbar::Scrollbar, table::Table},
         Context,
     },
 };
@@ -153,32 +153,17 @@ impl Subscription {
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let feeds_area = Block::new().padding(Padding::top(1)).inner(area);
 
-        let mut feeds_state = TableState::new()
-            .with_offset(0)
-            .with_selected(self.feeds.selected_index());
-
         let (header, widths, rows) = self.feed_rows(cx);
 
-        let feeds = Table::new(rows, widths)
-            .block(Block::new().padding(Padding {
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-            }))
-            .header(header.style(cx.theme.subscription.header))
-            .column_spacing(2)
-            .style(cx.theme.subscription.background)
-            .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .highlight_style(
-                cx.theme
-                    .subscription
-                    .selected_feed
-                    .add_modifier(cx.table_highlight_modifier()),
-            )
-            .highlight_spacing(HighlightSpacing::Always);
-
-        StatefulWidget::render(feeds, feeds_area, buf, &mut feeds_state);
+        Table::builder()
+            .header(header)
+            .widths(widths)
+            .rows(rows)
+            .theme(&cx.theme.entries)
+            .selected_idx(self.feeds.selected_index())
+            .highlight_modifier(cx.table_highlight_modifier())
+            .build()
+            .render(feeds_area, buf);
 
         let header_rows = 2;
         #[allow(clippy::cast_possible_truncation)]
@@ -353,7 +338,7 @@ impl Subscription {
             ]),
         ];
 
-        let table = Table::new(meta_rows, widths)
+        let table = RatatuiTable::new(meta_rows, widths)
             .column_spacing(1)
             .style(cx.theme.subscription.background);
         Widget::render(table, meta_area, buf);
@@ -381,7 +366,7 @@ impl Subscription {
         ]);
 
         let rows = feed.entries.iter().map(entry);
-        let table = Table::new(rows, widths)
+        let table = RatatuiTable::new(rows, widths)
             .header(header.style(cx.theme.subscription.header))
             .column_spacing(1)
             .style(cx.theme.subscription.background);
