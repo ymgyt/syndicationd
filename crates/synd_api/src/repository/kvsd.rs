@@ -140,6 +140,13 @@ impl SubscriptionRepository for KvsdClient {
                 .map(|m| m.insert(feed.url, annotations));
             feeds
         } else {
+            // for investigating data loss
+            tracing::warn!(
+                enduser.id = feed.user_id,
+                feed_url = %feed.url,
+                "SubscribedFeeds not found"
+            );
+
             let mut metadata = HashMap::new();
             metadata.insert(feed.url.clone(), annotations);
             SubscribedFeeds {
