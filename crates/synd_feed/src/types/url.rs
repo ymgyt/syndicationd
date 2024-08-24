@@ -12,6 +12,7 @@ pub enum FeedUrlError {
 
 /// Feed Url which serve rss or atom
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 pub struct FeedUrl(Url);
 
 impl Borrow<Url> for FeedUrl {

@@ -1,6 +1,6 @@
 use chrono::DateTime;
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
 
 use crate::{
@@ -116,6 +116,27 @@ impl Feed {
 
     pub fn category(&self) -> &Category<'static> {
         self.category.as_ref().unwrap_or(ui::default_category())
+    }
+
+    #[must_use]
+    pub fn with_url(self, url: FeedUrl) -> Self {
+        Self { url, ..self }
+    }
+
+    #[must_use]
+    pub fn with_requirement(self, requirement: Requirement) -> Self {
+        Self {
+            requirement: Some(requirement),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_category(self, category: Category<'static>) -> Self {
+        Self {
+            category: Some(category),
+            ..self
+        }
     }
 }
 
@@ -235,17 +256,40 @@ impl From<query::entries::Entry> for Entry {
     }
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 pub struct ExportedFeed {
     pub title: Option<String>,
-    pub url: String,
+    pub url: FeedUrl,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
 }
 
 impl From<query::export_subscription::ExportSubscriptionOutputFeedsNodes> for ExportedFeed {
     fn from(v: query::export_subscription::ExportSubscriptionOutputFeedsNodes) -> Self {
         Self {
             title: v.title,
-            url: v.url.to_string(),
+            url: v.url,
+            requirement: v.requirement.and_then(|r| match r {
+                query::export_subscription::Requirement::MUST => Some(Requirement::Must),
+                query::export_subscription::Requirement::SHOULD => Some(Requirement::Should),
+                query::export_subscription::Requirement::MAY => Some(Requirement::May),
+                query::export_subscription::Requirement::Other(_) => None,
+            }),
+            category: v.category,
+        }
+    }
+}
+
+impl From<ExportedFeed> for mutation::subscribe_feed::SubscribeFeedInput {
+    fn from(feed: ExportedFeed) -> Self {
+        Self {
+            url: feed.url,
+            requirement: feed.requirement.map(|r| match r {
+                Requirement::Must => mutation::subscribe_feed::Requirement::MUST,
+                Requirement::Should => mutation::subscribe_feed::Requirement::SHOULD,
+                Requirement::May => mutation::subscribe_feed::Requirement::MAY,
+            }),
+            category: feed.category,
         }
     }
 }

@@ -9,6 +9,7 @@ use std::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "graphql", derive(async_graphql::Enum))]
 #[cfg_attr(feature = "fake", derive(fake::Dummy))]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 pub enum Requirement {
     /// `Must` indicates it must be read
     Must = 2,
@@ -34,9 +35,9 @@ impl FromStr for Requirement {
 impl Display for Requirement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Requirement::Must => f.write_str("MUST"),
-            Requirement::Should => f.write_str("SHOULD"),
-            Requirement::May => f.write_str("MAY"),
+            Requirement::Must => f.pad("MUST"),
+            Requirement::Should => f.pad("SHOULD"),
+            Requirement::May => f.pad("MAY"),
         }
     }
 }

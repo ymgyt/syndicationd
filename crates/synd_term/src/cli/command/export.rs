@@ -1,18 +1,11 @@
-use std::{path::PathBuf, process::ExitCode, time::Duration};
+use std::{path::PathBuf, process::ExitCode};
 
-use anyhow::anyhow;
 use clap::Args;
 use schemars::JsonSchema;
 use serde::Serialize;
 use url::Url;
 
-use crate::{
-    application::{Cache, Clock, JwtService, SystemClock},
-    auth,
-    client::Client,
-    config,
-    types::ExportedFeed,
-};
+use crate::{cli::port::PortContext, config, types::ExportedFeed};
 
 #[derive(Serialize, JsonSchema)]
 struct Export {
@@ -59,26 +52,13 @@ impl ExportCommand {
     }
 
     async fn export(self, endpoint: Url) -> anyhow::Result<()> {
-        let mut client = Client::new(endpoint, Duration::from_secs(10))?;
-        let jwt_service = JwtService::new();
-        let cache = Cache::new(self.cache_dir);
-        let restore = auth::Restore {
-            jwt_service: &jwt_service,
-            cache: &cache,
-            now: SystemClock.now(),
-            persist_when_refreshed: false,
-        };
-        let credential = restore
-            .restore()
-            .await
-            .map_err(|_| anyhow!("You are not authenticated, try login in first"))?;
-        client.set_credential(credential);
+        let cx = PortContext::new(endpoint, self.cache_dir).await?;
 
         let mut after = None;
         let mut exported_feeds = Vec::new();
 
         loop {
-            let response = client.export_subscription(after.take(), 50).await?;
+            let response = cx.client.export_subscription(after.take(), 50).await?;
             exported_feeds.extend(response.feeds);
 
             if !response.page_info.has_next_page {
