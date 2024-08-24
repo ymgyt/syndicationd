@@ -281,6 +281,21 @@ You can check the JSON schema of the data to be exported with `synd export --pri
 ```
 </details>
 
+### Import feeds
+
+You can subscribe to multiple feeds at once using the `synd import` command.  
+The input schema is the same as that of `synd export`. You can also check it with `synd import --print-schema`.  
+
+```
+# from stdin
+echo '{"feeds": [ {"url": "https://this-week-in-rust.org/atom.xml", "category": "rust", "requirement": "Must" } ]}' 
+| synd import -
+
+# read from file
+synd export out> feeds.json
+synd import feeds.json
+```
+
 ### GitHub Notifications
 
 To enable GitHub notifications feature, specify the `--enable-github-notification | -G` flag or set the environment variable `SYND_ENABLE_GH=true`.  

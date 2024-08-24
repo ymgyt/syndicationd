@@ -44,7 +44,7 @@ pub struct ImportCommand {
     cache_dir: PathBuf,
     /// Path to input file, '-' means stdin.
     #[arg()]
-    input: PathBuf,
+    input: Option<PathBuf>,
 }
 
 impl ImportCommand {
@@ -68,10 +68,16 @@ impl ImportCommand {
     }
 
     async fn import(self, endpoint: Url) -> anyhow::Result<()> {
+        let input = match self.input {
+            Some(input) => Self::read_input(input.as_path())?,
+            None => {
+                anyhow::bail!("input file path required")
+            }
+        };
         let cx = PortContext::new(endpoint, self.cache_dir).await?;
         let import = Import {
             client: cx.client,
-            input: Self::read_input(self.input.as_path())?,
+            input,
             out: io::stdout(),
             interval: Duration::from_millis(500),
         };
