@@ -1,0 +1,10 @@
+---
+source: crates/synd_term/src/cli/command/import.rs
+assertion_line: 264
+description: import command output
+expression: buf
+---
+OK    MUST@ rust https://ok1.ymgyt.io/feed.xml
+ERROR https://err_unavailable.ymgyt.io/feed.xml server return 500 error
+OK    SHOULD@ rust https://ok2.ymgyt.io/feed.xml
+2/3 feeds successfully subscribed

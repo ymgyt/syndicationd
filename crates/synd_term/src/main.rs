@@ -126,6 +126,7 @@ async fn main() -> ExitCode {
             cli::Command::Clean(clean) => clean.run(&FileSystem::new()),
             cli::Command::Check(check) => check.run(endpoint).await,
             cli::Command::Export(export) => export.run(endpoint).await,
+            cli::Command::Import(import) => import.run(endpoint).await,
         };
     };
 

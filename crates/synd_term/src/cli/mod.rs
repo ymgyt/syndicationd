@@ -6,6 +6,7 @@ use url::Url;
 use crate::{config, ui::theme};
 
 mod command;
+mod port;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
 pub enum Palette {
@@ -103,6 +104,7 @@ pub enum Command {
     Clean(command::clean::CleanCommand),
     Check(command::check::CheckCommand),
     Export(command::export::ExportCommand),
+    Import(command::import::ImportCommand),
 }
 
 pub fn parse() -> Args {

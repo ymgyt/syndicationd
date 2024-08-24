@@ -15,6 +15,7 @@ pub enum CategoryError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 pub struct Category<'a>(Cow<'a, str>);
 
 impl<'a> Category<'a> {
@@ -42,7 +43,7 @@ impl<'a> Category<'a> {
 
 impl<'a> Display for Category<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.0.as_ref())
+        f.pad(self.0.as_ref())
     }
 }
 

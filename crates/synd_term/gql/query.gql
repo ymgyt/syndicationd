@@ -101,6 +101,9 @@ query ExportSubscription($after: String, $first: Int!) {
       nodes {
         title
         url
+        description
+        requirement
+        category
       }
     }
   }

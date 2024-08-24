@@ -19,7 +19,7 @@ path = "src/main.rs"
 
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.3" }
-synd-feed = { path = "../synd_feed", version = "0.3.3", features = ["fake"] }
+synd-feed = { path = "../synd_feed", version = "0.3.3", features = ["fake", "jsonschema"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.7" }
 
 anyhow               = { workspace = true }
@@ -42,7 +42,7 @@ open                 = "5.3.0"
 parse_duration       = { workspace = true }
 ratatui              = { version = "0.28.0" }
 reqwest              = { workspace = true }
-schemars             = { version = "0.8.21", default-features = false, features = ["derive"] }
+schemars             = { workspace = true, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
 serde_json           = "1.0.125"
 thiserror            = { workspace = true }
@@ -56,8 +56,6 @@ tui-widgets          = { version = "0.3.0", default-features = false, features =
 unicode-segmentation = "1.10.1"
 update-informer      = { version = "1.1.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 url                  = { workspace = true }
-# https://github.com/arkbig/throbber-widgets-tui/pull/5
-# throbber-widgets-tui = "0.3.0"
 
 [features]
 # Integration test
@@ -73,6 +71,7 @@ criterion   = { workspace = true }
 fake        = { workspace = true }
 insta       = { workspace = true }
 kvsd        = { workspace = true }
+mockall     = { workspace = true }
 pprof       = { workspace = true }
 proptest    = { workspace = true }
 serial_test = { version = "3.1.1", default-features = false, features = ["async", "file_locks"] }
