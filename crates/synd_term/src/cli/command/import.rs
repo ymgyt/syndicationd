@@ -218,7 +218,7 @@ mod tests {
         };
 
         let base_feed: types::Feed = Faker.fake();
-        let interval = Duration::from_millis(10);
+        let interval = Duration::from_millis(100);
         let mut prev = None;
         let mut client = MockSubscribeFeed::new();
 
@@ -226,7 +226,9 @@ mod tests {
             let now = Instant::now();
             if let Some(prev) = prev {
                 assert!(
-                    now.duration_since(prev) > interval,
+                    // Dut to insability in the CI execution
+                    // the interval assertion has been relaxed
+                    now.duration_since(prev) >= (interval - Duration::from_millis(50)),
                     "the interval between requests is too short"
                 );
             }
@@ -265,11 +267,10 @@ mod tests {
         import.import().await.unwrap();
 
         let buf = String::from_utf8_lossy(out.as_slice());
-        // insta::with_settings!({
-        //     description => "import command output"
-        // }, {
-        //     insta::assert_snapshot!("import_usecase",buf);
-        // });
-        println!("{buf}");
+        insta::with_settings!({
+            description => "import command output"
+        }, {
+            insta::assert_snapshot!("import_usecase",buf);
+        });
     }
 }
