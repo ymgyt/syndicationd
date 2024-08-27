@@ -4,6 +4,12 @@ use directories::ProjectDirs;
 
 mod categories;
 pub use categories::{Categories, Icon, IconColor};
+mod file;
+pub use file::INIT_CONFIG;
+pub(crate) mod parse;
+
+mod resolver;
+pub use resolver::ConfigResolver;
 
 pub mod api {
     pub const ENDPOINT: &str = "https://api.syndicationd.ymgyt.io:6100";
@@ -19,12 +25,20 @@ pub mod env {
     pub const LOG_DIRECTIVE: &str = env_key!("LOG");
 
     pub const ENDPOINT: &str = env_key!("ENDPOINT");
-    pub const LOG_PATH: &str = env_key!("LOG_PATH");
+    pub const CLIENT_TIMEOUT: &str = env_key!("CLIENT_TIMEOUT");
+    pub const CONFIG_FILE: &str = env_key!("CONFIG_FILE");
+    pub const LOG_FILE: &str = env_key!("LOG_FILE");
+    pub const CACHE_DIR: &str = env_key!("CACHE_DIR");
     pub const THEME: &str = env_key!("THEME");
+    pub const FEED_ENTRIES_LIMIT: &str = env_key!("ENTRIES_LIMIT");
+    pub const ENABLE_GITHUB: &str = env_key!("ENABLE_GH");
+    pub const GITHUB_PAT: &str = env_key!("GH_PAT");
 }
 
 pub mod client {
-    pub const DEFAULT_TIMEOUT: &str = "30s";
+    use std::time::Duration;
+
+    pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
     pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
     /// Number of entries to fetch in one request
@@ -64,14 +78,25 @@ pub(crate) mod github {
     pub(crate) const NOTIFICATION_PER_PAGE: u8 = 40;
 }
 
+pub(crate) mod theme {
+    use crate::cli::Palette;
+
+    pub(crate) const DEFAULT_PALETTE: Palette = Palette::Ferra;
+}
+
 pub fn log_path() -> PathBuf {
     project_dirs().data_dir().join("synd.log")
+}
+
+pub fn config_path() -> PathBuf {
+    project_dirs().config_dir().join("config.toml")
 }
 
 fn project_dirs() -> &'static ProjectDirs {
     static PROJECT_DIRS: OnceLock<ProjectDirs> = OnceLock::new();
 
     PROJECT_DIRS.get_or_init(|| {
-        ProjectDirs::from("ymgyt.io", "syndicationd", "synd").expect("Failed to get project dirs")
+        // Prioritizing consistency with Linux, the qualifier and organization have not been specified
+        ProjectDirs::from("", "", "syndicationd").expect("Failed to get project dirs")
     })
 }

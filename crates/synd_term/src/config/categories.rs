@@ -2,10 +2,10 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::Context;
 use ratatui::style::Color;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use synd_feed::types::Category;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct Categories {
     categories: HashMap<String, Entry>,
     #[serde(skip)]
@@ -68,16 +68,21 @@ impl Categories {
             None
         }
     }
+
+    pub(super) fn merge(&mut self, other: HashMap<String, Entry>) {
+        self.categories.extend(other);
+        self.update_aliases();
+    }
 }
 
-#[derive(Deserialize)]
-struct Entry {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(super) struct Entry {
     icon: Icon,
     #[serde(default)]
     aliases: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Icon {
     symbol: String,
     color: Option<IconColor>,
@@ -107,7 +112,7 @@ impl Icon {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct IconColor {
     rgb: Option<u32>,
     // https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html#variant.Red

@@ -1,0 +1,89 @@
+---
+source: crates/synd_term/src/config/file.rs
+expression: config
+---
+ConfigFile {
+    cache: Some(
+        CacheEntry {
+            directory: Some(
+                "/tmp/synd/cache",
+            ),
+        },
+    ),
+    log: Some(
+        LogEntry {
+            path: Some(
+                "/tmp/synd/synd.log",
+            ),
+        },
+    ),
+    theme: Some(
+        ThemeEntry {
+            name: Some(
+                Ferra,
+            ),
+        },
+    ),
+    api: Some(
+        ApiEntry {
+            endpoint: Some(
+                Url {
+                    scheme: "https",
+                    cannot_be_a_base: false,
+                    username: "",
+                    password: None,
+                    host: Some(
+                        Domain(
+                            "api.syndicationd.ymgyt.io",
+                        ),
+                    ),
+                    port: None,
+                    path: "/",
+                    query: None,
+                    fragment: None,
+                },
+            ),
+            timeout: Some(
+                30s,
+            ),
+        },
+    ),
+    feed: Some(
+        FeedEntry {
+            entries_limit: Some(
+                100,
+            ),
+        },
+    ),
+    github: Some(
+        GithubEntry {
+            enable: Some(
+                true,
+            ),
+            pat: Some(
+                "ghp_xxxx",
+            ),
+        },
+    ),
+    categories: Some(
+        {
+            "rust": Entry {
+                icon: Icon {
+                    symbol: "S",
+                    color: Some(
+                        IconColor {
+                            rgb: Some(
+                                16206848,
+                            ),
+                            name: None,
+                            color: None,
+                        },
+                    ),
+                },
+                aliases: [
+                    "rs",
+                ],
+            },
+        },
+    ),
+}

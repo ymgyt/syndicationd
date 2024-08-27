@@ -1,6 +1,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{config, ui::theme};
@@ -8,7 +9,8 @@ use crate::{config, ui::theme};
 mod command;
 mod port;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all(deserialize = "kebab-case"))]
 pub enum Palette {
     Ferra,
     SolarizedDark,
@@ -28,18 +30,18 @@ impl From<Palette> for theme::Palette {
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, name = "synd")]
 pub struct Args {
+    /// Configuration file path
+    #[arg(long, short = 'c', env = config::env::CONFIG_FILE)]
+    pub config: Option<PathBuf>,
     /// Log file path
-    #[arg(long, default_value = config::log_path().into_os_string(), env = config::env::LOG_PATH)]
-    pub log: PathBuf,
+    #[arg(long, env = config::env::LOG_FILE)]
+    pub log: Option<PathBuf>,
     /// Cache directory
-    #[arg(
-        long,
-        default_value = config::cache::dir().to_path_buf().into_os_string(),
-    )]
-    pub cache_dir: PathBuf,
+    #[arg(long, env = config::env::CACHE_DIR)]
+    pub cache_dir: Option<PathBuf>,
     /// Color theme
-    #[arg(value_enum, long = "theme", default_value_t = Palette::Ferra, env = config::env::THEME, value_name = "THEME")]
-    pub palette: Palette,
+    #[arg(value_enum, long = "theme", env = config::env::THEME, value_name = "THEME")]
+    pub palette: Option<Palette>,
     #[command(subcommand)]
     pub command: Option<Command>,
     #[command(flatten)]
@@ -47,7 +49,7 @@ pub struct Args {
     #[command(flatten)]
     pub feed: FeedOptions,
     #[command(flatten)]
-    pub experimental: GithubOptions,
+    pub github: GithubOptions,
     #[arg(hide = true, long = "dry-run", hide_long_help = true)]
     pub dry_run: bool,
 }
@@ -56,22 +58,19 @@ pub struct Args {
 #[command(next_help_heading = "Api options")]
 pub struct ApiOptions {
     /// `synd_api` endpoint
-    #[arg(long, global = true, default_value = config::api::ENDPOINT, env = config::env::ENDPOINT)]
-    pub endpoint: Url,
+    #[arg(long, global = true, env = config::env::ENDPOINT)]
+    pub endpoint: Option<Url>,
     /// Client timeout
-    #[arg(long, value_parser = parse_duration::parse, default_value = config::client::DEFAULT_TIMEOUT)]
-    pub client_timeout: Duration,
+    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::CLIENT_TIMEOUT)]
+    pub client_timeout: Option<Duration>,
 }
 
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Feed options")]
 pub struct FeedOptions {
-    /// categories.toml path
-    #[arg(long,aliases = ["category"],value_name = "CATEGORIES TOML PATH")]
-    pub categories: Option<PathBuf>,
     /// Feed entries limit to fetch
-    #[arg(long, aliases = ["max-entries"], default_value_t = config::feed::DEFAULT_ENTRIES_LIMIT)]
-    pub entries_limit: usize,
+    #[arg(long, aliases = ["max-entries"], env = config::env::FEED_ENTRIES_LIMIT)]
+    pub entries_limit: Option<usize>,
 }
 
 #[derive(clap::Args, Debug)]
@@ -79,21 +78,17 @@ pub struct FeedOptions {
 pub struct GithubOptions {
     /// Enable GitHub notification feature
     #[arg(
-        action = clap::ArgAction::SetTrue,
         long,
         short = 'G',
         visible_alias = "enable-gh",
-        env = "SYND_ENABLE_GH",
-        default_value_t = false,
-        default_missing_value = "true",
+        env = config::env::ENABLE_GITHUB,
     )]
-    pub enable_github_notification: bool,
+    pub enable_github_notification: Option<bool>,
     /// GitHub personal access token to fetch notifications
     #[arg(
         long,
-        env = "SYND_GH_PAT",
+        env = config::env::GITHUB_PAT,
         hide_env_values = true,
-        required_if_eq("enable_github_notification", "true")
     )]
     pub github_pat: Option<String>,
 }
@@ -105,6 +100,7 @@ pub enum Command {
     Check(command::check::CheckCommand),
     Export(command::export::ExportCommand),
     Import(command::import::ImportCommand),
+    Config(command::config::ConfigCommand),
 }
 
 pub fn parse() -> Args {

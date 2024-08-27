@@ -1,25 +1,27 @@
-use std::{future, path::PathBuf, process::ExitCode, time::Duration};
+use std::{future, path::PathBuf, process::ExitCode};
 
 use anyhow::Context as _;
-use futures_util::TryFutureExt;
+use futures_util::TryFutureExt as _;
 use synd_term::{
     application::{Application, Cache, Config, Features},
-    cli::{self, ApiOptions, Args, FeedOptions, GithubOptions, Palette},
+    cli::{self, Args},
     client::{github::GithubClient, Client},
-    config::{self, Categories},
+    config::{self, ConfigResolver},
     filesystem::fsimpl::FileSystem,
     terminal::{self, Terminal},
     ui::theme::Theme,
 };
 use tracing::error;
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::fmt::writer::BoxMakeWriter;
-use url::Url;
 
 fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>> {
     use synd_o11y::opentelemetry::init_propagation;
     use tracing_subscriber::{
-        filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Registry,
+        filter::EnvFilter,
+        fmt::{self, writer::BoxMakeWriter},
+        layer::SubscriberExt,
+        util::SubscriberInitExt as _,
+        Registry,
     };
 
     let (writer, guard) = if let Some(log_path) = log_path {
@@ -59,43 +61,28 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
     Ok(guard)
 }
 
-fn build_app(
-    endpoint: Url,
-    timeout: Duration,
-    palette: Palette,
-    FeedOptions {
-        categories,
-        entries_limit,
-    }: FeedOptions,
-    cache_dir: PathBuf,
-    GithubOptions {
-        github_pat,
-        enable_github_notification,
-    }: GithubOptions,
-    dry_run: bool,
-) -> anyhow::Result<Application> {
+#[allow(clippy::needless_pass_by_value)]
+fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Application> {
     let mut builder = Application::builder()
         .terminal(Terminal::new().context("Failed to construct terminal")?)
-        .client(Client::new(endpoint, timeout).context("Failed to construct client")?)
-        .categories(
-            categories
-                .map(Categories::load)
-                .transpose()?
-                .unwrap_or_else(Categories::default_toml),
+        .client(
+            Client::new(config.api_endpoint(), config.api_timeout())
+                .context("Failed to construct client")?,
         )
         .config(Config {
-            entries_limit,
+            entries_limit: config.feed_entries_limit(),
             features: Features {
-                enable_github_notification,
+                enable_github_notification: config.is_github_enable(),
             },
             ..Default::default()
         })
-        .cache(Cache::new(cache_dir))
-        .theme(Theme::with_palette(&palette.into()))
+        .cache(Cache::new(config.cache_dir()))
+        .theme(Theme::with_palette(config.palette()))
+        .categories(config.categories())
         .dry_run(dry_run);
 
-    if enable_github_notification {
-        builder = builder.github_client(GithubClient::new(github_pat.unwrap()));
+    if config.is_github_enable() {
+        builder = builder.github_client(GithubClient::new(config.github_pat()));
     }
 
     Ok(builder.build())
@@ -104,48 +91,53 @@ fn build_app(
 #[tokio::main]
 async fn main() -> ExitCode {
     let Args {
-        api: ApiOptions {
-            endpoint,
-            client_timeout,
-        },
-        feed,
+        config,
         log,
         cache_dir,
+        api,
+        feed,
+        github,
         command,
         palette,
         dry_run,
-        experimental,
     } = cli::parse();
 
-    // Subcommand logs to the terminal, tui writes logs to a file.
-    let log = if command.is_some() { None } else { Some(log) };
+    let config = ConfigResolver::builder()
+        .config_file(config)
+        .log_file(log)
+        .cache_dir(cache_dir)
+        .api_options(api)
+        .feed_options(feed)
+        .github_options(github)
+        .palette(palette)
+        .build();
+
+    // Subcommand logs to the terminal, while tui writes logs to a file.
+    let log = if command.is_some() {
+        None
+    } else {
+        Some(config.log_file())
+    };
     let _guard = init_tracing(log).unwrap();
 
     if let Some(command) = command {
         return match command {
             cli::Command::Clean(clean) => clean.run(&FileSystem::new()),
-            cli::Command::Check(check) => check.run(endpoint).await,
-            cli::Command::Export(export) => export.run(endpoint).await,
-            cli::Command::Import(import) => import.run(endpoint).await,
+            cli::Command::Check(check) => check.run(config).await,
+            cli::Command::Export(export) => export.run(config.api_endpoint()).await,
+            cli::Command::Import(import) => import.run(config.api_endpoint()).await,
+            cli::Command::Config(config) => config.run(),
         };
     };
 
     let mut event_stream = terminal::event_stream();
 
-    if let Err(err) = future::ready(build_app(
-        endpoint,
-        client_timeout,
-        palette,
-        feed,
-        cache_dir,
-        experimental,
-        dry_run,
-    ))
-    .and_then(|app| {
-        tracing::info!("Running...");
-        app.run(&mut event_stream)
-    })
-    .await
+    if let Err(err) = future::ready(build_app(config, dry_run))
+        .and_then(|app| {
+            tracing::info!("Running...");
+            app.run(&mut event_stream)
+        })
+        .await
     {
         error!("{err:?}");
         ExitCode::FAILURE

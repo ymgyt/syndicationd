@@ -62,6 +62,7 @@ pub struct SelectionPopup {
     pub highlight: Style,
 }
 
+#[derive(Clone, Debug)]
 pub struct Palette {
     name: &'static str,
     bg: Color,
@@ -107,7 +108,8 @@ impl Palette {
 }
 
 impl Theme {
-    pub fn with_palette(p: &Palette) -> Self {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn with_palette(p: Palette) -> Self {
         let Palette {
             name,
             bg,
@@ -115,7 +117,7 @@ impl Theme {
             fg_inactive,
             fg_focus,
             error,
-        } = *p;
+        } = p;
 
         Self {
             name,
@@ -161,7 +163,7 @@ impl Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::with_palette(&Palette::ferra())
+        Theme::with_palette(Palette::ferra())
     }
 }
 

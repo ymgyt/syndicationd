@@ -13,7 +13,7 @@ pub trait FileSystem {
 pub mod fsimpl {
     use std::{fs::File, io, path::Path};
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub struct FileSystem {}
 
     impl FileSystem {

@@ -33,6 +33,7 @@ futures-util       = { version = "0.3.30", default-features = false }
 graphql_client     = { version = "0.13.0", default-features = false }
 headers            = { version = "0.4.0" }
 http               = { version = "1.1" }                                                                                                   # request use 0.2
+humantime          = { version = "2.1.0" }
 insta              = { version = "1.39" }
 itertools          = { version = "0.13", default-features = false, features = ["use_std"] }
 jsonwebtoken       = { version = "9.3.0" }
@@ -53,6 +54,7 @@ tempfile           = { version = "3" }
 thiserror          = { version = "1.0.63" }
 tokio              = { version = "1.39", default-features = false }
 tokio-util         = { version = "0.7.11" }
+toml               = { version = "0.8.19" }
 tracing            = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.2" }

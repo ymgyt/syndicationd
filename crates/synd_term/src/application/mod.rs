@@ -1382,7 +1382,7 @@ impl Application {
             "solarized_dark" => Palette::helix(),
             _ => Palette::ferra(),
         };
-        self.theme = Theme::with_palette(&p);
+        self.theme = Theme::with_palette(p);
     }
 }
 
