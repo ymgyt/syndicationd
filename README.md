@@ -28,11 +28,13 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 
 - [Features](#features)
 - [Installation](#installation)
+- [Configuration](#configuration)
 - [Usage](#usage)
   - [Authentication](#authentication)
   - [Keymap](#keymap)
   - [Subscribe Feed](#subscribe-feed)
   - [Export Feeds](#export-subscribed-feeds)
+  - [Import Feeds](#import-feeds)
   - [GitHub Notifications](#github-notifications)
   - [Theme](#theme)
   - [Backend API](#backend-api)
@@ -101,6 +103,61 @@ docker run -it ghcr.io/ymgyt/synd-term
 Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/syndicationd/releases).
 
 
+### source
+
+```sh
+cargo install --path ./crates/synd_term
+```
+
+## Configuration
+
+Settings can be configured in the following ways(in order of priority)
+
+* Command line flag
+* Environment variables
+* Configuration file
+* Default value
+
+The location of the configuration file can be specified using `--config` or the environment variable `SYND_CONFIG_FILE`.  
+By default, synd will search the following locations depending on the platform
+
+| Platform | Locations |
+| ---      | ---       |
+| Linux    | `$XDG_CONFIG_HOME/syndicationd/config.toml`<br>`$HOME/.config/syndicationd/config.toml` |
+| macOS    | `$HOME/Library/Application Support/syndicationd/config.toml` |
+|Windows   | `{FOLDERID_RoamingAppData}/syndicationd/config.toml` |
+
+Synd does not automatically create configuration files.  
+When creating a configuration file, you can use the following command
+
+```sh
+synd config init > config.toml
+``` 
+
+### Settings
+
+| Flag               | Environment variable  | Toml                   | Description |
+| ---                | ---                   | ---                    | ---         |
+| `--config`         | `SYND_CONFIG_FILE`    | -                      | Configuration file path |
+| `--log`            | `SYND_LOG_FILE`       | `[log.path]`           | Log file path |
+| `--cache-dir`      | `SYND_CACHE_DIR`      | `[cache.directory]`    | Cache directory |
+| `--theme`          | `SYND_THEME`          | `[theme.name]`         | Theme name |
+| `--endpoint`       | `SYND_ENDPOINT`       | `[api.endpoint]`       | synd-api endpoint |
+| `--client-timeout` | `SYND_CLIENT_TIMEOUT` | `[api.timeout]`        | synd-api client timeout |
+| `--entries-limit`  | `SYND_ENTRIES_LIMIT`  | `[feed.entries_limit]` | Feed entreis to fetch |
+| `--enable-gh`      | `SYND_ENABLE_GH`      | `[github.enable]`      | Enable github notification feature |
+| `--github-pat`     | `SYND_GH_PAT`         | `[github.pat]`         | Github personal access token to fetch notifications | 
+
+### Additional categories
+
+To add a category , add the following content to the configuration file
+
+```toml
+[categories.rust]
+icon = { symbol = "", color = { rgb = 0xF74C00 } }
+aliases = ["rs"]
+```
+
 ## Usage
 
 `synd` will start the TUI application.
@@ -109,37 +166,38 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 <summary>Click to show a complete list of options</summary>
 
 ```sh
-Usage:
+Usage: 
 
 Commands:
   clean   Clean cache and logs
   check   Check application conditions
   export  Export subscribed feeds
+  import  Import subscribed feeds
+  config  Manage configurations
   help    Print this message or the help of the given subcommand(s)
 
 Options:
-      --log <LOG>              Log file path [env: SYND_LOG_PATH=] [default:
-                               /home/ymgyt/.local/share/synd/synd.log]
-      --cache-dir <CACHE_DIR>  Cache directory [default: /home/ymgyt/.cache/synd]
-      --theme <THEME>          Color theme [env: SYND_THEME=] [default: ferra] [possible values: ferra,
-                               solarized-dark, helix]
+  -c, --config <CONFIG>        Configuration file path [env: SYND_CONFIG_FILE=]
+      --log <LOG>              Log file path [env: SYND_LOG_FILE=]
+      --cache-dir <CACHE_DIR>  Cache directory [env: SYND_CACHE_DIR=]
+      --theme <THEME>          Color theme [env: SYND_THEME=] [possible values: ferra, solarized-dark,
+                               helix]
   -h, --help                   Print help
   -V, --version                Print version
 
 Api options:
-      --endpoint <ENDPOINT>              `synd_api` endpoint [env: SYND_ENDPOINT=] [default:
-                                         https://api.syndicationd.ymgyt.io:6100]
-      --client-timeout <CLIENT_TIMEOUT>  Client timeout [default: 30s]
+      --endpoint <ENDPOINT>              `synd_api` endpoint [env: SYND_ENDPOINT=]
+      --client-timeout <CLIENT_TIMEOUT>  Client timeout [env: SYND_CLIENT_TIMEOUT=]
 
 Feed options:
-      --categories <CATEGORIES TOML PATH>  categories.toml path
-      --entries-limit <ENTRIES_LIMIT>      Feed entries limit to fetch [default: 200]
+      --entries-limit <ENTRIES_LIMIT>  Feed entries limit to fetch [env: SYND_ENTRIES_LIMIT=]
 
 GitHub options:
-  -G, --enable-github-notification  Enable GitHub notification feature [env: SYND_ENABLE_GH=]
-                                    [aliases: enable-gh]
-      --github-pat <GITHUB_PAT>     GitHub personal access token to fetch notifications [env:
-                                    SYND_GH_PAT]
+  -G, --enable-github-notification <ENABLE_GITHUB_NOTIFICATION>
+          Enable GitHub notification feature [env: SYND_ENABLE_GH=] [aliases: enable-gh] [possible
+          values: true, false]
+      --github-pat <GITHUB_PAT>
+          GitHub personal access token to fetch notifications [env: SYND_GH_PAT]
 ```
 
 </details>
@@ -205,7 +263,7 @@ This uses an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)
 
 #### Category
 
-`Category` represents the category of the feed. You can specify any value as a category. The values that `synd` recognizes as categories are defined in [`categories.toml`](./categories.toml). You can override the default values with the `--categories` flag.
+`Category` represents the category of the feed. You can specify any value as a category. The values that `synd` recognizes as categories are defined in [`categories.toml`](./categories.toml). Default values and additional categories can be added from the configuration file.
 
 
 ### Edit subscribed feed
@@ -286,13 +344,13 @@ You can check the JSON schema of the data to be exported with `synd export --pri
 You can subscribe to multiple feeds at once using the `synd import` command.  
 The input schema is the same as that of `synd export`. You can also check it with `synd import --print-schema`.  
 
-```
+```sh
 # from stdin
 echo '{"feeds": [ {"url": "https://this-week-in-rust.org/atom.xml", "category": "rust", "requirement": "Must" } ]}' 
 | synd import -
 
 # read from file
-synd export out> feeds.json
+synd export > feeds.json
 synd import feeds.json
 ```
 
@@ -343,16 +401,13 @@ Authentication credentials are cached. to remove them, execute `synd clean`.
 `synd check [--format (human|json)]` return current application status.
 
 ```sh
-synd check --format json | from json
-╭───────┬─────────────────────────────────────────╮
-│       │ ╭─────────────┬────────────────────╮    │
-│ api   │ │ description │ health of synd-api │    │
-│       │ │ status      │ Pass               │    │
-│       │ │ version     │ 0.1.9              │    │
-│       │ ╰─────────────┴────────────────────╯    │
-│ cache │ /home/ferris/.cache/synd                │
-│ log   │ /home/ferris/.local/share/synd/synd.log │
-╰───────┴─────────────────────────────────────────╯
+synd check
+
+ Api Health: pass
+Api Version: 0.2.4
+     Config: /home/ferris/.config/syndicationd/config.toml
+      Cache: /home/ferris/.cache/syndicationd
+        Log: /home/ferris/.local/share/syndicationd/synd.log
 ```
 
 ## Development
