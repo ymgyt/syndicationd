@@ -22,12 +22,16 @@
 
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
 
-Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
+Syndicationd is a project for simple feed management on the terminal, and the following components are beging developed
+
+* synd-term(`synd`): A TUI feed viewer based on [ratatui](https://github.com/ratatui-org/ratatui)
+* synd-api: A self-hostable GraphQL api server utilizing [feed-rs](https://github.com/feed-rs/feed-rs) 
 
 **Table of Contents:**
 
 - [Features](#features)
 - [Installation](#installation)
+- [Overview](#overview)
 - [Configuration](#configuration)
 - [Usage](#usage)
   - [Authentication](#authentication)
@@ -46,7 +50,7 @@ Syndicationd(`synd`) is a TUI feed viewer, based on [feed-rs](https://github.com
 ## Features
 
 * Subscribe RSS/Atom feeds
-* Handle [GitHub notifications](https://github.com/notifications)
+* Handle [GitHub notifications](https://github.com/notifications) (optional)
 
 ## Installation
 
@@ -108,6 +112,14 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 ```sh
 cargo install --path ./crates/synd_term
 ```
+
+## Overview
+
+![Overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/overview.svg)
+
+The subscribed feeds are stored in synd-api. synd-api periodically fetches the feeds to retrieve the latest entries.  
+When the user views the feed list in synd, it retrieves the latest entries from synd-api's cache.  
+This allows the user to quickly obtain a list of the latest entries without requesting each subscribed feed individually.
 
 ## Configuration
 

@@ -18,6 +18,7 @@ mod oranda 'etc/just/oranda.just'
 mod demo 'etc/just/demo.just'
 mod bpf 'etc/just/bpf.just'
 mod etc 'etc/just/etc'
+mod dot 'etc/just/dot.just'
 
 # List recipe
 default:

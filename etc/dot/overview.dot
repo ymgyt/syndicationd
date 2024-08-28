@@ -1,0 +1,54 @@
+digraph {
+    graph [
+        layout=dot,
+        rankdir=TB,
+        label="Syndicationd overview",
+        labelloc="top", // t(top) | b(bottom)
+        labeljust="left", // l(left) | c(center) | r(right)
+        fontname="Helvetica,Arial,sans-serif"
+        compound=true; 
+        newrank=true
+        // dpi=600
+    ];
+
+    synd [
+        label="synd-term"
+    ]
+
+    subgraph cluster_synd_api {
+        label="synd-api"
+
+        feeds [
+            label="Feeds"
+            shape="box"
+        ]
+
+        feed_entries_cache [
+            label="Feed entries cache"
+            shape="box"
+        ]
+    }
+
+    feed_src [
+        label="Feed Src"
+    ]
+
+    synd -> feeds [
+        label="subscribe"
+    ]
+
+    feeds -> feed_src [
+        label="periodically fetch"
+    ]
+
+    feed_src -> feed_entries_cache [
+        label="stored"
+    ]
+
+    feed_entries_cache -> synd [
+        label="fetch"
+    ]
+
+    { rank=same; synd; feeds; }
+    { rank=same; feed_src; feed_entries_cache; }
+}
