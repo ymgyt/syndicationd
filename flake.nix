@@ -76,6 +76,7 @@
             cargo-flamegraph
             oranda
             gnuplot # for rendering with criterion
+            graphviz
           ] ++ ci_packages
           ## For cargo-release build
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin synd.darwinDeps;
