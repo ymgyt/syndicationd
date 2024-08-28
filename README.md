@@ -110,7 +110,7 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 ### source
 
 ```sh
-cargo install --path ./crates/synd_term
+cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 ```
 
 ## Overview
