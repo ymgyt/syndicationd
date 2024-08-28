@@ -42,7 +42,6 @@ mockall            = { version = "0.13.0" }
 moka               = { version = "0.12.8", features = ["future"] }
 octocrab           = { version = "0.38.0", features = ["rustls-webpki-tokio"] }
 once_cell          = { version = "1.19.0" }
-parse_duration     = { version = "2.1.1" }
 pprof              = { version = "0.13", features = ["flamegraph", "criterion"] }
 proptest           = { version = "1.5.0" }
 rand               = { version = "0.8.5" }

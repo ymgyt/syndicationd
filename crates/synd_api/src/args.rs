@@ -52,7 +52,7 @@ pub struct BindOptions {
 #[command(next_help_heading = "Serve options")]
 pub struct ServeOptions {
     /// Request timeout duration
-    #[arg(long, value_parser = parse_duration::parse, default_value = config::serve::DEFAULT_REQUEST_TIMEOUT)]
+    #[arg(long, value_parser = humantime::parse_duration, default_value = config::serve::DEFAULT_REQUEST_TIMEOUT)]
     pub timeout: Duration,
     /// Request body limit
     #[arg(long, default_value_t = config::serve::DEFAULT_REQUEST_BODY_LIMIT_BYTES)]
@@ -98,9 +98,9 @@ pub struct CacheOptions {
     /// Max feed cache size in MiB
     #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_SIZE_MB, env = env_key!("FEED_CACHE_SIZE") )]
     pub feed_cache_size_mb: u64,
-    #[arg(long, value_parser = parse_duration::parse, default_value = config::cache::DEFAULT_FEED_CACHE_TTL, env = env_key!("FEED_CACHE_TTL"))]
+    #[arg(long, value_parser = humantime::parse_duration, default_value = config::cache::DEFAULT_FEED_CACHE_TTL, env = env_key!("FEED_CACHE_TTL"))]
     pub feed_cache_ttl: Duration,
-    #[arg(long, value_parser = parse_duration::parse, default_value = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL, env = env_key!("FEED_CACHE_REFRESH_INTERVAL"))]
+    #[arg(long, value_parser = humantime::parse_duration, default_value = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL, env = env_key!("FEED_CACHE_REFRESH_INTERVAL"))]
     pub feed_cache_refresh_interval: Duration,
 }
 

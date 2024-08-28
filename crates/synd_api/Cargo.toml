@@ -33,9 +33,9 @@ fdlimit            = { workspace = true }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
+humantime          = { workspace = true }
 kvsd               = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
-parse_duration     = { workspace = true }
 pin-project        = "1.1.4"
 reqwest            = { workspace = true }
 serde              = { workspace = true }
