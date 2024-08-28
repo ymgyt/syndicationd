@@ -118,9 +118,6 @@
               ./crates/synd_ebpf/rust-toolchain.toml)
 
           ];
-          # shellHook = ''
-          #   exec nu
-          # '';
         };
 
       });
