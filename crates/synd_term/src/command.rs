@@ -132,6 +132,7 @@ pub(crate) enum Command {
     MoveEntryFirst,
     MoveEntryLast,
     OpenEntry,
+    BrowseEntry,
 
     // Filter
     MoveFilterRequirement(Direction),
@@ -257,6 +258,9 @@ impl Command {
     }
     pub fn open_entry() -> Self {
         Command::OpenEntry
+    }
+    pub fn browse_entry() -> Self {
+        Command::BrowseEntry
     }
     pub fn move_entry_first() -> Self {
         Command::MoveEntryFirst

@@ -71,6 +71,12 @@ pub struct FeedOptions {
     /// Feed entries limit to fetch
     #[arg(long, aliases = ["max-entries"], env = config::env::FEED_ENTRIES_LIMIT)]
     pub entries_limit: Option<usize>,
+    /// Feed browser command
+    #[arg(long, env = config::env::FEED_BROWSER)]
+    pub browser: Option<PathBuf>,
+    /// Feed browser args
+    #[arg(long, env = config::env::FEED_BROWSER_ARGS)]
+    pub browser_args: Option<Vec<String>>,
 }
 
 #[derive(clap::Args, Debug)]

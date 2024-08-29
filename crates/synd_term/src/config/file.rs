@@ -27,6 +27,13 @@ pub struct ThemeEntry {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FeedEntry {
     pub(super) entries_limit: Option<usize>,
+    pub(super) browser: Option<FeedBrowserEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FeedBrowserEntry {
+    pub(super) command: Option<PathBuf>,
+    pub(super) args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -93,6 +100,9 @@ pub static INIT_CONFIG: &str = r#"[cache]
 # Feed entries to fetch
 # entries_limit = 200 
 
+# Command to browse feed
+# browser = { command = "", args = [] }
+
 [github]
 # Enable github notification feature
 # enable = true
@@ -123,6 +133,7 @@ timeout = "30s"
 
 [feed]
 entries_limit = 100
+browser = { command = "w3m", args = ["--foo", "--bar"] }
 
 [github]
 enable = true

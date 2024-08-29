@@ -30,7 +30,7 @@ use crate::{
     },
     command::{ApiResponse, Command},
     config::{self, Categories},
-    interact::{Interact, ProcessInteractor},
+    interact::Interact,
     job::Jobs,
     keymap::{KeymapId, Keymaps},
     terminal::Terminal,
@@ -111,7 +111,15 @@ impl Application {
     /// Construct `Application` from builder.
     /// Configure keymaps for terminal use
     fn new(
-        builder: ApplicationBuilder<Terminal, Client, Categories, Cache, Config, Theme>,
+        builder: ApplicationBuilder<
+            Terminal,
+            Client,
+            Categories,
+            Cache,
+            Config,
+            Theme,
+            Box<dyn Interact>,
+        >,
     ) -> Self {
         let ApplicationBuilder {
             terminal,
@@ -150,7 +158,7 @@ impl Application {
             jobs: Jobs::new(NonZero::new(90).unwrap()),
             background_jobs: Jobs::new(NonZero::new(10).unwrap()),
             components: Components::new(&config.features),
-            interactor: interactor.unwrap_or_else(|| Box::new(ProcessInteractor::new())),
+            interactor,
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
             cache,
@@ -649,6 +657,9 @@ impl Application {
                 Command::OpenEntry => {
                     self.open_entry();
                 }
+                Command::BrowseEntry => {
+                    self.browse_entry();
+                }
                 Command::MoveFilterRequirement(direction) => {
                     let filterer = self.components.filter.move_requirement(direction);
                     self.apply_filterer(filterer)
@@ -1099,17 +1110,31 @@ impl Application {
     }
 
     fn open_entry(&mut self) {
-        let Some(entry_website_url) = self.components.entries.selected_entry_website_url() else {
-            return;
-        };
+        if let Some(url) = self.selected_entry_url() {
+            if let Err(err) = self.interactor.open_browser(url) {
+                tracing::error!("open browser: {err}");
+            }
+        }
+    }
+
+    fn browse_entry(&mut self) {
+        if let Some(url) = self.selected_entry_url() {
+            if let Err(err) = self.interactor.open_text_browser(url) {
+                tracing::error!("open text browser: {err}");
+            }
+            self.terminal.force_redraw();
+        }
+    }
+
+    fn selected_entry_url(&self) -> Option<Url> {
+        let entry_website_url = self.components.entries.selected_entry_website_url()?;
         match Url::parse(entry_website_url) {
-            Ok(url) => {
-                self.interactor.open_browser(url).ok();
-            }
+            Ok(url) => Some(url),
             Err(err) => {
-                tracing::warn!("Try to open invalid entry url: {entry_website_url} {err}");
+                tracing::warn!("Try to open/browse invalid entry url: {entry_website_url} {err}");
+                None
             }
-        };
+        }
     }
 
     fn open_notification(&mut self) {

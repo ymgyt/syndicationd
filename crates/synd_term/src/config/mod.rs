@@ -31,6 +31,8 @@ pub mod env {
     pub const CACHE_DIR: &str = env_key!("CACHE_DIR");
     pub const THEME: &str = env_key!("THEME");
     pub const FEED_ENTRIES_LIMIT: &str = env_key!("ENTRIES_LIMIT");
+    pub const FEED_BROWSER: &str = env_key!("BROWSER");
+    pub const FEED_BROWSER_ARGS: &str = env_key!("BROWSER_ARGS");
     pub const ENABLE_GITHUB: &str = env_key!("ENABLE_GH");
     pub const GITHUB_PAT: &str = env_key!("GH_PAT");
 }
@@ -55,8 +57,13 @@ pub mod credential {
 }
 
 pub mod feed {
+    use std::path::PathBuf;
+
     /// Default entries limit to fetch
     pub const DEFAULT_ENTRIES_LIMIT: usize = 200;
+    pub fn default_brower_command() -> PathBuf {
+        PathBuf::new()
+    }
 }
 
 pub mod cache {

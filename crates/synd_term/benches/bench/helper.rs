@@ -5,6 +5,7 @@ use synd_term::{
     application::{Application, Cache, Config},
     client::Client,
     config::Categories,
+    interact::mock::MockInteractor,
     terminal::Terminal,
     ui::theme::Theme,
 };
@@ -36,5 +37,6 @@ pub fn init_app() -> Application {
         .config(config)
         .cache(cache)
         .theme(Theme::default())
+        .interactor(Box::new(MockInteractor::new()))
         .build()
 }

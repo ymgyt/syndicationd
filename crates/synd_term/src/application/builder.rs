@@ -14,6 +14,7 @@ pub struct ApplicationBuilder<
     Cache = (),
     Config = (),
     Theme = (),
+    Interactor = (),
 > {
     pub(super) terminal: Terminal,
     pub(super) client: Client,
@@ -21,9 +22,9 @@ pub struct ApplicationBuilder<
     pub(super) cache: Cache,
     pub(super) config: Config,
     pub(super) theme: Theme,
+    pub(super) interactor: Interactor,
 
     pub(super) authenticator: Option<Authenticator>,
-    pub(super) interactor: Option<Box<dyn Interact>>,
     pub(super) github_client: Option<GithubClient>,
     pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) dry_run: bool,
@@ -38,8 +39,8 @@ impl Default for ApplicationBuilder {
             cache: (),
             config: (),
             theme: (),
+            interactor: (),
             authenticator: None,
-            interactor: None,
             github_client: None,
             clock: None,
             dry_run: false,
@@ -47,9 +48,12 @@ impl Default for ApplicationBuilder {
     }
 }
 
-impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
     #[must_use]
-    pub fn terminal(self, terminal: Terminal) -> ApplicationBuilder<Terminal, T1, T2, T3, T4, T5> {
+    pub fn terminal(
+        self,
+        terminal: Terminal,
+    ) -> ApplicationBuilder<Terminal, T1, T2, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal,
             client: self.client,
@@ -57,8 +61,8 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
             cache: self.cache,
             config: self.config,
             theme: self.theme,
-            authenticator: self.authenticator,
             interactor: self.interactor,
+            authenticator: self.authenticator,
             github_client: self.github_client,
             clock: self.clock,
             dry_run: self.dry_run,
@@ -66,9 +70,9 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<(), T1, T2, T3, T4, T5> {
     }
 }
 
-impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
     #[must_use]
-    pub fn client(self, client: Client) -> ApplicationBuilder<T1, Client, T2, T3, T4, T5> {
+    pub fn client(self, client: Client) -> ApplicationBuilder<T1, Client, T2, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client,
@@ -76,8 +80,8 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
             cache: self.cache,
             config: self.config,
             theme: self.theme,
-            authenticator: self.authenticator,
             interactor: self.interactor,
+            authenticator: self.authenticator,
             github_client: self.github_client,
             clock: self.clock,
             dry_run: self.dry_run,
@@ -85,12 +89,12 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, (), T2, T3, T4, T5> {
     }
 }
 
-impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
     #[must_use]
     pub fn categories(
         self,
         categories: Categories,
-    ) -> ApplicationBuilder<T1, T2, Categories, T3, T4, T5> {
+    ) -> ApplicationBuilder<T1, T2, Categories, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
@@ -98,8 +102,8 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
             cache: self.cache,
             config: self.config,
             theme: self.theme,
-            authenticator: self.authenticator,
             interactor: self.interactor,
+            authenticator: self.authenticator,
             github_client: self.github_client,
             clock: self.clock,
             dry_run: self.dry_run,
@@ -107,9 +111,9 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, (), T3, T4, T5> {
     }
 }
 
-impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
     #[must_use]
-    pub fn cache(self, cache: Cache) -> ApplicationBuilder<T1, T2, T3, Cache, T4, T5> {
+    pub fn cache(self, cache: Cache) -> ApplicationBuilder<T1, T2, T3, Cache, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
@@ -117,8 +121,8 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
             cache,
             config: self.config,
             theme: self.theme,
-            authenticator: self.authenticator,
             interactor: self.interactor,
+            authenticator: self.authenticator,
             github_client: self.github_client,
             clock: self.clock,
             dry_run: self.dry_run,
@@ -126,9 +130,9 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, (), T4, T5> {
     }
 }
 
-impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
     #[must_use]
-    pub fn config(self, config: Config) -> ApplicationBuilder<T1, T2, T3, T4, Config, T5> {
+    pub fn config(self, config: Config) -> ApplicationBuilder<T1, T2, T3, T4, Config, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
@@ -136,8 +140,8 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
             cache: self.cache,
             config,
             theme: self.theme,
-            authenticator: self.authenticator,
             interactor: self.interactor,
+            authenticator: self.authenticator,
             github_client: self.github_client,
             clock: self.clock,
             dry_run: self.dry_run,
@@ -145,9 +149,9 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, (), T5> {
     }
 }
 
-impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
     #[must_use]
-    pub fn theme(self, theme: Theme) -> ApplicationBuilder<T1, T2, T3, T4, T5, Theme> {
+    pub fn theme(self, theme: Theme) -> ApplicationBuilder<T1, T2, T3, T4, T5, Theme, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
@@ -155,8 +159,8 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
             cache: self.cache,
             config: self.config,
             theme,
-            authenticator: self.authenticator,
             interactor: self.interactor,
+            authenticator: self.authenticator,
             github_client: self.github_client,
             clock: self.clock,
             dry_run: self.dry_run,
@@ -164,19 +168,33 @@ impl<T1, T2, T3, T4, T5> ApplicationBuilder<T1, T2, T3, T4, T5, ()> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
+impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
+    #[must_use]
+    pub fn interactor(
+        self,
+        interactor: Box<dyn Interact>,
+    ) -> ApplicationBuilder<T1, T2, T3, T4, T5, T6, Box<dyn Interact>> {
+        ApplicationBuilder {
+            terminal: self.terminal,
+            client: self.client,
+            categories: self.categories,
+            cache: self.cache,
+            config: self.config,
+            theme: self.theme,
+            interactor,
+            authenticator: self.authenticator,
+            github_client: self.github_client,
+            clock: self.clock,
+            dry_run: self.dry_run,
+        }
+    }
+}
+
+impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> {
     #[must_use]
     pub fn authenticator(self, authenticator: Authenticator) -> Self {
         Self {
             authenticator: Some(authenticator),
-            ..self
-        }
-    }
-
-    #[must_use]
-    pub fn interactor(self, interactor: Box<dyn Interact>) -> Self {
-        Self {
-            interactor: Some(interactor),
             ..self
         }
     }
@@ -203,7 +221,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6> {
     }
 }
 
-impl ApplicationBuilder<Terminal, Client, Categories, Cache, Config, Theme> {
+impl ApplicationBuilder<Terminal, Client, Categories, Cache, Config, Theme, Box<dyn Interact>> {
     #[must_use]
     pub fn build(self) -> Application {
         Application::new(self)

@@ -3,12 +3,12 @@ use std::io;
 #[cfg(feature = "integration")]
 pub mod mock;
 mod process;
-pub use process::ProcessInteractor;
+pub use process::{ProcessInteractor, TextBrowserInteractor};
 
 use thiserror::Error;
 use url::Url;
 
-pub trait Interact: OpenBrowser + OpenEditor {}
+pub trait Interact: OpenWebBrowser + OpenTextBrowser + OpenEditor {}
 
 #[derive(Debug, Error)]
 pub enum OpenBrowserError {
@@ -16,8 +16,12 @@ pub enum OpenBrowserError {
     Io(#[from] io::Error),
 }
 
-pub trait OpenBrowser {
+pub trait OpenWebBrowser {
     fn open_browser(&self, url: Url) -> Result<(), OpenBrowserError>;
+}
+
+pub trait OpenTextBrowser {
+    fn open_text_browser(&self, url: Url) -> Result<(), OpenBrowserError>;
 }
 
 #[derive(Debug, Error)]

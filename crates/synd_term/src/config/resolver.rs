@@ -34,6 +34,8 @@ pub struct ConfigResolver {
     api_endpoint: Entry<Url>,
     api_timeout: Entry<Duration>,
     feed_entries_limit: Entry<usize>,
+    feed_browser_command: Entry<PathBuf>,
+    feed_browser_args: Entry<Vec<String>>,
     github_enable: Entry<bool>,
     github_pat: Entry<String>,
     palette: Entry<Palette>,
@@ -67,6 +69,14 @@ impl ConfigResolver {
 
     pub fn feed_entries_limit(&self) -> usize {
         self.feed_entries_limit.resolve()
+    }
+
+    pub fn feed_browser_command(&self) -> PathBuf {
+        self.feed_browser_command.resolve_ref().clone()
+    }
+
+    pub fn feed_browser_args(&self) -> Vec<String> {
+        self.feed_browser_args.resolve_ref().clone()
     }
 
     pub fn is_github_enable(&self) -> bool {
@@ -213,7 +223,12 @@ impl ConfigResolverBuilder {
                     endpoint,
                     client_timeout,
                 }),
-            feed_flags: Some(FeedOptions { entries_limit }),
+            feed_flags:
+                Some(FeedOptions {
+                    entries_limit,
+                    browser,
+                    browser_args,
+                }),
             github_flags:
                 Some(GithubOptions {
                     enable_github_notification,
@@ -269,6 +284,24 @@ impl ConfigResolverBuilder {
                     .and_then(|c| c.feed.as_mut())
                     .and_then(|feed| feed.entries_limit),
                 default: config::feed::DEFAULT_ENTRIES_LIMIT,
+            },
+            feed_browser_command: Entry {
+                flag: browser,
+                file: config_file
+                    .as_mut()
+                    .and_then(|c| c.feed.as_mut())
+                    .and_then(|feed| feed.browser.as_mut())
+                    .and_then(|brower| brower.command.take()),
+                default: config::feed::default_brower_command(),
+            },
+            feed_browser_args: Entry {
+                flag: browser_args,
+                file: config_file
+                    .as_mut()
+                    .and_then(|c| c.feed.as_mut())
+                    .and_then(|feed| feed.browser.as_mut())
+                    .and_then(|brower| brower.args.take()),
+                default: Vec::new(),
             },
             github_enable: Entry {
                 flag: enable_github_notification,

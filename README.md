@@ -148,17 +148,19 @@ synd config init > config.toml
 
 ### Settings
 
-| Flag               | Environment variable  | Toml                   | Description |
-| ---                | ---                   | ---                    | ---         |
-| `--config`         | `SYND_CONFIG_FILE`    | -                      | Configuration file path |
-| `--log`            | `SYND_LOG_FILE`       | `[log.path]`           | Log file path |
-| `--cache-dir`      | `SYND_CACHE_DIR`      | `[cache.directory]`    | Cache directory |
-| `--theme`          | `SYND_THEME`          | `[theme.name]`         | Theme name |
-| `--endpoint`       | `SYND_ENDPOINT`       | `[api.endpoint]`       | synd-api endpoint |
-| `--client-timeout` | `SYND_CLIENT_TIMEOUT` | `[api.timeout]`        | synd-api client timeout |
-| `--entries-limit`  | `SYND_ENTRIES_LIMIT`  | `[feed.entries_limit]` | Feed entreis to fetch |
-| `--enable-gh`      | `SYND_ENABLE_GH`      | `[github.enable]`      | Enable github notification feature |
-| `--github-pat`     | `SYND_GH_PAT`         | `[github.pat]`         | Github personal access token to fetch notifications | 
+| Flag               | Environment variable      | Configuration file       | Description                                         | Default                             |
+| ---                | ---                       | ---                      | ---                                                 | ---                                 |
+| `--config`         | `SYND_CONFIG_FILE`        | -                        | Configuration file path                             | see [configuration](#configuration) |
+| `--log`            | `SYND_LOG_FILE`           | `[log.path]`             | Log file path                                       | see `synd check`                    |
+| `--cache-dir`      | `SYND_CACHE_DIR`          | `[cache.directory]`      | Cache directory                                     | see `synd check`                    |
+| `--theme`          | `SYND_THEME`              | `[theme.name]`           | Theme name                                          | `ferra`                             |
+| `--endpoint`       | `SYND_ENDPOINT`           | `[api.endpoint]`         | synd-api endpoint                                   | `https://api.syndicationd.ymgyt.io` |
+| `--client-timeout` | `SYND_CLIENT_TIMEOUT`     | `[api.timeout]`          | synd-api client timeout                             | `30s`                               |
+| `--entries-limit`  | `SYND_ENTRIES_LIMIT`      | `[feed.entries_limit]`   | Feed entreis to fetch                               | `200`                               |
+| `--browser`        | `SYND_FEED_BROWSER`       | `[feed.browser.command]` | Command to browse feed                              | -                                   |
+| `--browser-args`   | `SYND_FEED_BROWSER_ARGS`  | `[feed.browser.args]`    | Command args to browse feed                         | `[]`                                |
+| `--enable-gh`      | `SYND_ENABLE_GH`          | `[github.enable]`        | Enable github notification feature                  | `false`                             |
+| `--github-pat`     | `SYND_GH_PAT`             | `[github.pat]`           | Github personal access token to fetch notifications | -                                   |
 
 ### Additional categories
 

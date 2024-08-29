@@ -1,6 +1,10 @@
 use std::cell::RefCell;
 
-use crate::interact::{Interact, OpenBrowser, OpenBrowserError, OpenEditor, OpenEditorError};
+use url::Url;
+
+use crate::interact::{
+    Interact, OpenBrowserError, OpenEditor, OpenEditorError, OpenTextBrowser, OpenWebBrowser,
+};
 
 pub struct MockInteractor {
     editor_buffer: RefCell<Vec<String>>,
@@ -22,8 +26,15 @@ impl MockInteractor {
     }
 }
 
-impl OpenBrowser for MockInteractor {
+impl OpenWebBrowser for MockInteractor {
     fn open_browser(&self, url: url::Url) -> Result<(), OpenBrowserError> {
+        self.browser_urls.borrow_mut().push(url.to_string());
+        Ok(())
+    }
+}
+
+impl OpenTextBrowser for MockInteractor {
+    fn open_text_browser(&self, url: Url) -> Result<(), OpenBrowserError> {
         self.browser_urls.borrow_mut().push(url.to_string());
         Ok(())
     }

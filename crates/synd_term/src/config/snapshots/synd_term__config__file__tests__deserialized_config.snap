@@ -53,6 +53,19 @@ ConfigFile {
             entries_limit: Some(
                 100,
             ),
+            browser: Some(
+                FeedBrowserEntry {
+                    command: Some(
+                        "w3m",
+                    ),
+                    args: Some(
+                        [
+                            "--foo",
+                            "--bar",
+                        ],
+                    ),
+                },
+            ),
         },
     ),
     github: Some(

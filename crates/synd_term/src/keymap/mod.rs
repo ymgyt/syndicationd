@@ -201,6 +201,7 @@ fn parse(s: &str) -> anyhow::Result<KeyEvent> {
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
         "esc" => KeyCode::Esc,
+        "space" => KeyCode::Char(' '),
         single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),
         undefined => bail!("`{undefined}` is not implemented yet"),
     };

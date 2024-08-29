@@ -8,6 +8,7 @@ use synd_term::{
     client::{github::GithubClient, Client},
     config::{self, ConfigResolver},
     filesystem::fsimpl::FileSystem,
+    interact::{ProcessInteractor, TextBrowserInteractor},
     terminal::{self, Terminal},
     ui::theme::Theme,
 };
@@ -69,6 +70,7 @@ fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Applicatio
             Client::new(config.api_endpoint(), config.api_timeout())
                 .context("Failed to construct client")?,
         )
+        .categories(config.categories())
         .config(Config {
             entries_limit: config.feed_entries_limit(),
             features: Features {
@@ -78,7 +80,9 @@ fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Applicatio
         })
         .cache(Cache::new(config.cache_dir()))
         .theme(Theme::with_palette(config.palette()))
-        .categories(config.categories())
+        .interactor(Box::new(ProcessInteractor::new(
+            TextBrowserInteractor::new(config.feed_browser_command(), config.feed_browser_args()),
+        )))
         .dry_run(dry_run);
 
     if config.is_github_enable() {

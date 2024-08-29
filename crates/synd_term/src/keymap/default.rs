@@ -15,6 +15,7 @@ pub fn default() -> KeymapsConfig {
         "j" | "down" => move_down_entry,
         "r" => reload_entries,
         "enter" => open_entry,
+        "space" => browse_entry,
         "g" => {
            "g" => move_entry_first,
            "e" => move_entry_last,
