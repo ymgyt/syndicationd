@@ -23,22 +23,32 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, crane, rust-overlay, flake-utils
-    , advisory-db, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nixpkgs-unstable,
+      crane,
+      rust-overlay,
+      flake-utils,
+      advisory-db,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
         pkgs-unstable = import nixpkgs-unstable { inherit system overlays; };
 
-        rustToolchain =
-          pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         src = pkgs.lib.cleanSourceWith {
           src = ./.; # The original, unfiltered source
-          filter = path: type:
+          filter =
+            path: type:
             (pkgs.lib.hasSuffix ".pem" path) # Load self signed certs to test
             || (pkgs.lib.hasSuffix ".gql" path) # graphql query
             || (pkgs.lib.hasSuffix "schema.json" path) # graphql schema
@@ -46,14 +56,13 @@
             || (pkgs.lib.hasSuffix ".json" path) # graphql fixtures
             || (pkgs.lib.hasSuffix ".kvsd" path) # kvsd fixtures
             || (pkgs.lib.hasSuffix ".xml" path) # rss fixtures
-            || (pkgs.lib.hasSuffix "categories.toml" path) ||
-            # Default filter from crane (allow .rs files)
-            (craneLib.filterCargoSources path type);
+            || (pkgs.lib.hasSuffix "categories.toml" path)
+            ||
+              # Default filter from crane (allow .rs files)
+              (craneLib.filterCargoSources path type);
         };
 
-        synd = pkgs.callPackage ./etc/nix/crane.nix {
-          inherit src craneLib advisory-db;
-        };
+        synd = pkgs.callPackage ./etc/nix/crane.nix { inherit src craneLib advisory-db; };
 
         ci_packages = with pkgs; [
           # >= 1.31.0 for modules
@@ -64,7 +73,8 @@
         ];
 
         # Inherits from checks cargo-nextest, cargo-audit
-        dev_packages = with pkgs;
+        dev_packages =
+          with pkgs;
           [
             typos
             graphql-client
@@ -77,24 +87,33 @@
             oranda
             gnuplot # for rendering with criterion
             graphviz
-          ] ++ ci_packages
+          ]
+          ++ ci_packages
           ## For cargo-release build
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin synd.darwinDeps;
 
-      in {
+      in
+      {
         checks = {
-          inherit (synd.checks) clippy nextest audit fmt;
+          inherit (synd.checks)
+            clippy
+            nextest
+            audit
+            fmt
+            ;
           typo = pkgs.callPackage ./etc/nix/typo.nix { };
         };
 
-        packages = {
-          default = self.packages."${system}".synd-term;
-          inherit (synd.packages) synd-term synd-api;
+        packages =
+          {
+            default = self.packages."${system}".synd-term;
+            inherit (synd.packages) synd-term synd-api;
 
-        } // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          inherit (synd.packages) coverage synd-term-image synd-api-image;
+          }
+          // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+            inherit (synd.packages) coverage synd-term-image synd-api-image;
 
-        };
+          };
 
         apps.default = flake-utils.lib.mkApp {
           drv = synd.packages.synd-term;
@@ -114,13 +133,14 @@
 
         devShells.ebpf = pkgs.mkShell {
           packages = [
-            (pkgs.rust-bin.fromRustupToolchainFile
-              ./crates/synd_ebpf/rust-toolchain.toml)
+            (pkgs.rust-bin.fromRustupToolchainFile ./crates/synd_ebpf/rust-toolchain.toml)
 
           ];
         };
 
-      });
+        formatter = pkgs.nixfmt-rfc-style;
+      }
+    );
 
   nixConfig = {
     extra-substituters = [ "https://syndicationd.cachix.org" ];
