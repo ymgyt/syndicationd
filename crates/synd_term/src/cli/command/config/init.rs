@@ -11,7 +11,7 @@ pub struct ConfigInitCommand {}
 impl ConfigInitCommand {
     #[allow(clippy::unused_self)]
     pub fn run(self) -> ExitCode {
-        print!("{}", config::INIT_CONFIG);
+        print!("{}", config::INIT_CONFIG.trim_start().trim_end());
         ExitCode::SUCCESS
     }
 }

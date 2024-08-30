@@ -76,7 +76,8 @@ impl ConfigFile {
     }
 }
 
-pub static INIT_CONFIG: &str = r#"[cache]
+pub static INIT_CONFIG: &str = r#"
+[cache]
 # Cache directory
 # directory = "path/to/dir"
 
