@@ -60,7 +60,7 @@ pub struct ApiOptions {
     /// `synd_api` endpoint
     #[arg(long, global = true, env = config::env::ENDPOINT)]
     pub endpoint: Option<Url>,
-    /// Client timeout
+    /// Client timeout(ex. 30s)
     #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::CLIENT_TIMEOUT)]
     pub client_timeout: Option<Duration>,
 }
@@ -71,10 +71,10 @@ pub struct FeedOptions {
     /// Feed entries limit to fetch
     #[arg(long, aliases = ["max-entries"], env = config::env::FEED_ENTRIES_LIMIT)]
     pub entries_limit: Option<usize>,
-    /// Feed browser command
+    /// Browser command to open feed entry
     #[arg(long, env = config::env::FEED_BROWSER)]
     pub browser: Option<PathBuf>,
-    /// Feed browser args
+    /// Args for launching the browser command
     #[arg(long, env = config::env::FEED_BROWSER_ARGS)]
     pub browser_args: Option<Vec<String>>,
 }
