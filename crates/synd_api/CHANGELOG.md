@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.4] 2024-06-18
+## [unreleased] __release_date__
+
+### Miscellaneous Tasks
+
+- Mk etc dir by [@ymgyt](https://github.com/ymgyt) ([fd209bc8](https://github.com/ymgyt/syndicationd/commit/fd209bc8695b0334fe97829afcb2a959fba9e24f))
+- Instrument warning when feeds not found for investigation by [@ymgyt](https://github.com/ymgyt) ([cc501c73](https://github.com/ymgyt/syndicationd/commit/cc501c734bc69ff3a8bb2fc2f26aa08c664105e6))
+
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.2.4...
+
+
+## [v0.2.4] - 2024-06-18
 
 ### Miscellaneous Tasks
 
@@ -33,6 +43,9 @@ All notable changes to this project will be documented in this file.
 - Add repository error case for coverage by [@ymgyt](https://github.com/ymgyt) ([d1034f68](https://github.com/ymgyt/syndicationd/commit/d1034f6884f567c04338cdc2a2bcc4fff60f1443))
 - Add error handling test case by [@ymgyt](https://github.com/ymgyt) ([bbc5465d](https://github.com/ymgyt/syndicationd/commit/bbc5465d0de86d811536700ca5d0b741fd4d7307))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.2.3...synd-api-v0.2.4
+
+
 ## [v0.2.3] - 2024-05-06
 
 ### Features
@@ -52,11 +65,17 @@ All notable changes to this project will be documented in this file.
 
 - Reduce visibility by [@ymgyt](https://github.com/ymgyt) ([ddf2eb12](https://github.com/ymgyt/syndicationd/commit/ddf2eb12e5f746ae6d608ff308a07e4a8c6db29e))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.2.2...synd-api-v0.2.3
+
+
 ## [v0.2.2] - 2024-04-29
 
 ### Features
 
 - Parse entry cache flags as duration by [@ymgyt](https://github.com/ymgyt) ([39067498](https://github.com/ymgyt/syndicationd/commit/39067498148becdf8baf33ba41ca5a64f1338daa))
+
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.2.1...synd-api-v0.2.2
+
 
 ## [v0.2.1] - 2024-04-20
 
@@ -67,6 +86,9 @@ All notable changes to this project will be documented in this file.
 ### Refactor
 
 - Use FeedUrl instead of String by [@ymgyt](https://github.com/ymgyt) ([95bb5ea6](https://github.com/ymgyt/syndicationd/commit/95bb5ea6b3774c7f59a3502d495ef27b269b828d))
+
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.2.0...synd-api-v0.2.1
+
 
 ## [v0.2.0] - 2024-04-17
 
@@ -89,6 +111,9 @@ All notable changes to this project will be documented in this file.
 
 - Use synd_o11y otel layer by [@ymgyt](https://github.com/ymgyt) ([943b9c4d](https://github.com/ymgyt/syndicationd/commit/943b9c4d36b3e45a616deb9065f384faf5c193a0))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.9...synd-api-v0.2.0
+
+
 ## [v0.1.9] - 2024-03-29
 
 ### Features
@@ -100,17 +125,26 @@ All notable changes to this project will be documented in this file.
 
 - Ignore health checks in request metrics by [@ymgyt](https://github.com/ymgyt) ([d56e142b](https://github.com/ymgyt/syndicationd/commit/d56e142b3b3fec205f0bb147d8a31e9f1f93b6af))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.8...synd-api-v0.1.9
+
+
 ## [v0.1.8] - 2024-03-23
 
 ### Miscellaneous Tasks
 
 - Disable cargo-dist due to .cargo/config by [@ymgyt](https://github.com/ymgyt) ([7407a67e](https://github.com/ymgyt/syndicationd/commit/7407a67e1b730e079016e138e58495c75354f456))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.7...synd-api-v0.1.8
+
+
 ## [v0.1.7] - 2024-03-23
 
 ### Features
 
 - Use tokio-metrics to get runtime metrics by [@ymgyt](https://github.com/ymgyt) ([ed3b881d](https://github.com/ymgyt/syndicationd/commit/ed3b881d37888a9bdecb7653e6b9a46c5c71bd22))
+
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.6...synd-api-v0.1.7
+
 
 ## [v0.1.6] - 2024-03-17
 
@@ -128,6 +162,9 @@ All notable changes to this project will be documented in this file.
 ### Refactor
 
 - Use cfg macro to configure gql schema by [@ymgyt](https://github.com/ymgyt) ([d2a1f551](https://github.com/ymgyt/syndicationd/commit/d2a1f551d72d49d68ce288f6c06753aa55b57fdd))
+
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.4...synd-api-v0.1.6
+
 
 ## [v0.1.4] - 2024-02-25
 
@@ -149,6 +186,9 @@ All notable changes to this project will be documented in this file.
 
 - Refactor flags by [@ymgyt](https://github.com/ymgyt) ([7e2a91d9](https://github.com/ymgyt/syndicationd/commit/7e2a91d93a8ed1afd7955583a2dc9ff9c6289a4f))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.3...synd-api-v0.1.4
+
+
 ## [v0.1.3] - 2024-02-23
 
 ### Features
@@ -162,6 +202,9 @@ All notable changes to this project will be documented in this file.
 
 - Trim prefix from changelog by [@ymgyt](https://github.com/ymgyt) ([95d44877](https://github.com/ymgyt/syndicationd/commit/95d448773ec7ab009fbece0928854364679b6f2c))
 
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.2...synd-api-v0.1.3
+
+
 ## [v0.1.2] - 2024-02-20
 
 ### Features
@@ -173,6 +216,9 @@ All notable changes to this project will be documented in this file.
 ### Bug Fixes
 
 - Strict fetch feed in flight limit by [@ymgyt](https://github.com/ymgyt) ([5a2b646e](https://github.com/ymgyt/syndicationd/commit/5a2b646e2d4fa2b24a2f115a27288c922fa87af3))
+
+https://github.com/ymgyt/syndicationd/compare/synd-api-v0.1.1...synd-api-v0.1.2
+
 
 ## [v0.1.1] - 2024-02-19
 
@@ -216,5 +262,8 @@ All notable changes to this project will be documented in this file.
 - Impl device flow test case by [@ymgyt](https://github.com/ymgyt) ([93572902](https://github.com/ymgyt/syndicationd/commit/9357290265a4fbf8d78721e4f9f1904b1cf5b12a))
 - Add auth flow case by [@ymgyt](https://github.com/ymgyt) ([6d2b1905](https://github.com/ymgyt/syndicationd/commit/6d2b1905d9b06bd9ed670f210cd590f89405c37c))
 - Run integration test by [@ymgyt](https://github.com/ymgyt) ([20c0bc2d](https://github.com/ymgyt/syndicationd/commit/20c0bc2d31a938d3103fafedba5a10b4a9bba9ae))
+
+https://github.com/ymgyt/syndicationd/compare/...synd-api-v0.1.1
+
 
 <!-- generated by git-cliff -->
