@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, path::PathBuf};
 
 #[cfg(feature = "integration")]
 pub mod mock;
@@ -12,8 +12,10 @@ pub trait Interact: OpenWebBrowser + OpenTextBrowser + OpenEditor {}
 
 #[derive(Debug, Error)]
 pub enum OpenBrowserError {
-    #[error("failed to open browser: {0}")]
+    #[error("io: {0}")]
     Io(#[from] io::Error),
+    #[error("command `{command}` not found")]
+    CommandNotFound { command: PathBuf },
 }
 
 pub trait OpenWebBrowser {

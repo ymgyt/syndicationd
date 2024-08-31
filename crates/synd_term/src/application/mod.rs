@@ -1112,7 +1112,7 @@ impl Application {
     fn open_entry(&mut self) {
         if let Some(url) = self.selected_entry_url() {
             if let Err(err) = self.interactor.open_browser(url) {
-                tracing::error!("open browser: {err}");
+                self.handle_error_message(format!("open browser: {err}"), None);
             }
         }
     }
@@ -1120,7 +1120,7 @@ impl Application {
     fn browse_entry(&mut self) {
         if let Some(url) = self.selected_entry_url() {
             if let Err(err) = self.interactor.open_text_browser(url) {
-                tracing::error!("open text browser: {err}");
+                self.handle_error_message(format!("open browser: {err}"), None);
             }
             self.terminal.force_redraw();
         }
