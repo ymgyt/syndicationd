@@ -72,7 +72,11 @@ impl StatusLine {
                 .chain(suf_keys),
             Some(Tab::Entries) => pre_keys
                 .iter()
-                .chain(&[("h/l", icon!(requirement)), ("Ent", icon!(open))])
+                .chain(&[
+                    ("h/l", icon!(requirement)),
+                    ("Ent", icon!(open)),
+                    ("Sp", icon!(browse)),
+                ])
                 .chain(suf_keys),
             Some(Tab::GitHub) => pre_keys
                 .iter()

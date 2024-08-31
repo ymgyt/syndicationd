@@ -35,7 +35,7 @@ Buffer {
         "  Hello and welcome to another issue of *This Week in Rust*! [Rust][1] is a programming language empowering everyone    ",
         "  to build reliable and efficient software. This is a weekly summary of its progress and community. Want something      ",
         "  mentioned? Tag us at [@ThisWeekInRust][2] on X(formerly Twitter) or [@ThisWeekinRust][3] on mastodon.social …         ",
-        "                              Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  c:  /:  h/l:  Ent:󰏌  r:󰑓  q:                                ",
+        "                           Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  c:  /:  h/l:  Ent:󰏌  Sp:󰏋  r:󰑓  q:                             ",
     ],
     styles: [
         x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
@@ -69,7 +69,7 @@ Buffer {
         x: 13, y: 23, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
         x: 2, y: 25, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD | UNDERLINED,
         x: 11, y: 25, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 30, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 90, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 27, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 93, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
     ]
 }

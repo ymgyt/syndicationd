@@ -1,5 +1,5 @@
 use std::{
-    io::{self},
+    io::{self, ErrorKind},
     path::PathBuf,
     process::{Command, Stdio},
 };
@@ -53,6 +53,7 @@ impl TextBrowserInteractor {
 }
 
 impl OpenTextBrowser for TextBrowserInteractor {
+    #[tracing::instrument(skip(self))]
     fn open_text_browser(&self, url: Url) -> Result<(), OpenBrowserError> {
         let status = Command::new(self.command.as_os_str())
             .args(self.args.iter())
@@ -60,7 +61,16 @@ impl OpenTextBrowser for TextBrowserInteractor {
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
-            .output()?
+            .output()
+            .map_err(|err| {
+                if err.kind() == ErrorKind::NotFound {
+                    OpenBrowserError::CommandNotFound {
+                        command: self.command.clone(),
+                    }
+                } else {
+                    err.into()
+                }
+            })?
             .status;
 
         if status.success() {

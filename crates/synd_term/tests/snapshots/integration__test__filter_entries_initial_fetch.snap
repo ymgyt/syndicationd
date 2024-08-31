@@ -35,7 +35,7 @@ Buffer {
         "  ## Booking.com’s o11y platform                                                                                        ",
         "                                                                                                                        ",
         "  Santanu Sahoo shared [Events: The 4th pillar of Booking.com’s Observability platform][1] where he describes           ",
-        "                              Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  c:  /:  h/l:  Ent:󰏌  r:󰑓  q:                                ",
+        "                           Tab:󰹳  j/k:󰹹  gg:󱞧  ge:󱞥  c:  /:  h/l:  Ent:󰏌  Sp:󰏋  r:󰑓  q:                             ",
     ],
     styles: [
         x: 0, y: 0, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
@@ -93,7 +93,7 @@ Buffer {
         x: 13, y: 23, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
         x: 2, y: 25, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: BOLD | UNDERLINED,
         x: 11, y: 25, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 30, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
-        x: 90, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 27, y: 29, fg: Rgb(111, 93, 99), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
+        x: 93, y: 29, fg: Rgb(254, 205, 178), bg: Rgb(43, 41, 45), underline: Reset, modifier: NONE,
     ]
 }

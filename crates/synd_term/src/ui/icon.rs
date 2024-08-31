@@ -1,5 +1,6 @@
 #[rustfmt::skip]
 macro_rules! icon {
+    (browse)            => { "󰏋" };
     (feeds)             => { "󰑫" };
     (feedsoff)          => { "󰑫" };
     (entries)           => { "󱉯" };
