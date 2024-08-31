@@ -80,9 +80,12 @@ pub mod cache {
 }
 
 pub(crate) mod github {
+    use std::time::Duration;
+
     /// GitHub pagination rest api is 1 origin
     pub(crate) const INITIAL_PAGE_NUM: u8 = 1;
     pub(crate) const NOTIFICATION_PER_PAGE: u8 = 40;
+    pub(crate) const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
 }
 
 pub(crate) mod theme {

@@ -46,7 +46,10 @@ impl GithubClient {
     pub fn new(pat: impl Into<String>) -> Self {
         // TODO: configure timeout
         let octo = Octocrab::builder()
-            .personal_token(pat.into())
+            .personal_token(pat)
+            .set_connect_timeout(timeout)
+            .set_read_timeout(timeout)
+            .set_write_timeout(timeout)
             .build()
             .unwrap();
         Self::with(octo)
