@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
-pub(crate) enum GithubError {
+pub enum GithubError {
     #[error("invalid credential. please make sure a valid PAT is set")]
     BadCredential,
     // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#about-secondary-rate-limits
@@ -43,8 +43,12 @@ pub struct GithubClient {
 }
 
 impl GithubClient {
-    pub fn new(pat: impl Into<String>) -> Self {
-        // TODO: configure timeout
+    pub fn new(pat: impl Into<String>) -> Result<Self, GithubError> {
+        let pat = pat.into();
+        if pat.is_empty() {
+            return Err(GithubError::BadCredential);
+        }
+        let timeout = Some(config::github::CLIENT_TIMEOUT);
         let octo = Octocrab::builder()
             .personal_token(pat)
             .set_connect_timeout(timeout)
@@ -52,7 +56,7 @@ impl GithubClient {
             .set_write_timeout(timeout)
             .build()
             .unwrap();
-        Self::with(octo)
+        Ok(Self::with(octo))
     }
 
     #[must_use]

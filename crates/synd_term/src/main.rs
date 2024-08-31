@@ -86,7 +86,9 @@ fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Applicatio
         .dry_run(dry_run);
 
     if config.is_github_enable() {
-        builder = builder.github_client(GithubClient::new(config.github_pat()));
+        builder = builder.github_client(
+            GithubClient::new(config.github_pat()).context("Failed to construct github client")?,
+        );
     }
 
     Ok(builder.build())
