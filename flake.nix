@@ -76,6 +76,7 @@
         dev_packages =
           with pkgs;
           [
+            pkgs-unstable.cargo-dist
             typos
             graphql-client
             opentelemetry-collector-contrib
@@ -91,7 +92,6 @@
           ++ ci_packages
           ## For cargo-release build
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin synd.darwinDeps;
-
       in
       {
         checks = {
@@ -108,11 +108,9 @@
           {
             default = self.packages."${system}".synd-term;
             inherit (synd.packages) synd-term synd-api;
-
           }
           // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
             inherit (synd.packages) coverage synd-term-image synd-api-image;
-
           };
 
         apps.default = flake-utils.lib.mkApp {
@@ -134,7 +132,6 @@
         devShells.ebpf = pkgs.mkShell {
           packages = [
             (pkgs.rust-bin.fromRustupToolchainFile ./crates/synd_ebpf/rust-toolchain.toml)
-
           ];
         };
 
