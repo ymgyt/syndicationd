@@ -27,7 +27,6 @@ let
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
   individualCrateArgs = commonArgs // {
-    inherit cargoArtifacts;
     doCheck = false;
     CARGO_PROFILE = "release";
   };
@@ -76,7 +75,6 @@ let
       Cmd = [ "${syndApi}/bin/synd-api" ];
       Labels = dockerImageLabels;
     };
-
   };
 in
 {
