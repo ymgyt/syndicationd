@@ -96,12 +96,26 @@ impl ConfigResolver {
     }
 }
 
+impl ConfigResolver {
+    /// performs validation based on the relationshsips between the various settings.
+    fn validate(self) -> Result<Self, ConfigResolverBuildError> {
+        if self.github_enable.resolve() && self.github_pat.resolve_ref().is_empty() {
+            return Err(ConfigResolverBuildError::ValidateConfigFile(
+                "github pat is required for github feature".into(),
+            ));
+        }
+        Ok(self)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ConfigResolverBuildError {
     #[error("failed to open {path} {err}")]
     ConfigFileOpen { path: String, err: io::Error },
     #[error(transparent)]
     ConfigFileLoad(#[from] ConfigFileError),
+    #[error("invalid configration: {0}")]
+    ValidateConfigFile(String),
 }
 
 #[derive(Default)]
@@ -243,7 +257,7 @@ impl ConfigResolverBuilder {
             panic!()
         };
 
-        Ok(ConfigResolver {
+        let resolver = ConfigResolver {
             config_file: config_path,
             log_file: Entry {
                 flag: log_file_flag,
@@ -329,7 +343,9 @@ impl ConfigResolverBuilder {
                 default: config::theme::DEFAULT_PALETTE.into(),
             },
             categories,
-        })
+        };
+
+        resolver.validate()
     }
 }
 

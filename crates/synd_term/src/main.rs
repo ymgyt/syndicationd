@@ -96,36 +96,52 @@ fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Applicatio
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let Args {
-        config,
-        log,
-        cache_dir,
-        api,
-        feed,
-        github,
-        command,
-        palette,
-        dry_run,
-    } = cli::parse();
+    // parse args and resolve configuration
+    let (config, command, dry_run) = {
+        let Args {
+            config,
+            log,
+            cache_dir,
+            api,
+            feed,
+            github,
+            command,
+            palette,
+            dry_run,
+        } = cli::parse();
 
-    let config = ConfigResolver::builder()
-        .config_file(config)
-        .log_file(log)
-        .cache_dir(cache_dir)
-        .api_options(api)
-        .feed_options(feed)
-        .github_options(github)
-        .palette(palette)
-        .build();
-
-    // Subcommand logs to the terminal, while tui writes logs to a file.
-    let log = if command.is_some() {
-        None
-    } else {
-        Some(config.log_file())
+        let config = match ConfigResolver::builder()
+            .config_file(config)
+            .log_file(log)
+            .cache_dir(cache_dir)
+            .api_options(api)
+            .feed_options(feed)
+            .github_options(github)
+            .palette(palette)
+            .try_build()
+        {
+            Ok(config) => config,
+            Err(err) => {
+                // tracing subscriber is not yet configured
+                eprintln!("{err}");
+                return ExitCode::FAILURE;
+            }
+        };
+        (config, command, dry_run)
     };
-    let _guard = init_tracing(log).unwrap();
 
+    // init tracing
+    let _guard = {
+        // Subcommand logs to the terminal, while tui writes logs to a file.
+        let log = if command.is_some() {
+            None
+        } else {
+            Some(config.log_file())
+        };
+        init_tracing(log).unwrap()
+    };
+
+    // if subcommand is specified, execute it
     if let Some(command) = command {
         return match command {
             cli::Command::Clean(clean) => clean.run(&FileSystem::new()),
