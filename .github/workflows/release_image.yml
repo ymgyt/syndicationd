@@ -37,4 +37,4 @@ jobs:
           else
             echo "tag=${{ github.ref_name }}" >> $GITHUB_ENV
           fi
-      - run: nix develop .#ci --accept-flake-config --command nu scripts/docker/build_and_push.nu ${{ env.tag }}
+      - run: nix develop .#ci --accept-flake-config --command nu etc/scripts/docker/build_and_push.nu ${{ env.tag }}
