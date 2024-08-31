@@ -2,7 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.3.0] 2024-07-11
+## [unreleased] __release_date__
+
+### Features
+
+- Add import command (#132) by [@ymgyt](https://github.com/ymgyt) ([3513a253](https://github.com/ymgyt/syndicationd/commit/3513a2530b7ff3ecf8bc75ef1f03a49f34a01a81))
+- Support configuration file by [@ymgyt](https://github.com/ymgyt) ([86d7b246](https://github.com/ymgyt/syndicationd/commit/86d7b246276193d8790cb3bc0a092789919c7e19))
+- Set timeout for the github client by [@ymgyt](https://github.com/ymgyt) ([96e47621](https://github.com/ymgyt/syndicationd/commit/96e47621d1f55977b97565c96fd969a2e92990f9))
+
+### Documentation
+
+- Add description for import command by [@ymgyt](https://github.com/ymgyt) ([f77dff7c](https://github.com/ymgyt/syndicationd/commit/f77dff7cca03a0a09949ca1f9925a89485a6a48f))
+
+### Miscellaneous Tasks
+
+- Add benchmark for rendering (#93) by [@ymgyt](https://github.com/ymgyt) ([0a1d4d3f](https://github.com/ymgyt/syndicationd/commit/0a1d4d3f578c1a531c41b7db381f6b00da684cd5))
+- Support flamegraph by [@ymgyt](https://github.com/ymgyt) ([e09f315e](https://github.com/ymgyt/syndicationd/commit/e09f315ec529334a2f6257ff55bcb32df1fddd8d))
+- Mk etc dir by [@ymgyt](https://github.com/ymgyt) ([fd209bc8](https://github.com/ymgyt/syndicationd/commit/fd209bc8695b0334fe97829afcb2a959fba9e24f))
+- Upgrade tui-big-text from 0.4.5 to 0.5.3 by [@ymgyt](https://github.com/ymgyt) ([23de054b](https://github.com/ymgyt/syndicationd/commit/23de054b02a66f1910b60f18e44b88d2c8c308b0))
+- Use HighlightSpacing::Alway when rendering table by [@ymgyt](https://github.com/ymgyt) ([fe357e9c](https://github.com/ymgyt/syndicationd/commit/fe357e9c5666762e3bce060c5ea4f79c69dfc61c))
+- Trim the output of config init by [@ymgyt](https://github.com/ymgyt) ([e1c3e048](https://github.com/ymgyt/syndicationd/commit/e1c3e048ce3159bb9f95c63664eb805706bed91f))
+- Update cli help by [@ymgyt](https://github.com/ymgyt) ([35981ef0](https://github.com/ymgyt/syndicationd/commit/35981ef05537b5eb1ff82d73a42ab54bc7aeedb9))
+- Handle command not found error by [@ymgyt](https://github.com/ymgyt) ([b6b914c0](https://github.com/ymgyt/syndicationd/commit/b6b914c03077a378c2c0e77a4ac7b6154aa3a152))
+- Add pat validation during github client construction by [@ymgyt](https://github.com/ymgyt) ([f75ddf9a](https://github.com/ymgyt/syndicationd/commit/f75ddf9a22a2c1dcf41b2dcdcf1b48131d5d79ea))
+- Add validation method to ConfigResolver by [@ymgyt](https://github.com/ymgyt) ([9152458b](https://github.com/ymgyt/syndicationd/commit/9152458b7514139ae8644403ad7b94552be5d42e))
+- Change unreferenced value in insta test by [@ymgyt](https://github.com/ymgyt) ([4fa07c39](https://github.com/ymgyt/syndicationd/commit/4fa07c39c7d153f7d3d6f8b1d6e855baa0a1d927))
+
+### Refactor
+
+- Abstract file system by [@ymgyt](https://github.com/ymgyt) ([9cbef556](https://github.com/ymgyt/syndicationd/commit/9cbef556b42abff85e057c6a37292198279e58e6))
+- Add create operations to fs trait by [@ymgyt](https://github.com/ymgyt) ([db46ab02](https://github.com/ymgyt/syndicationd/commit/db46ab02c1ff299a9ee349e62298c51392edddca))
+- Remove duplicat code in cache's load and persis methods by [@ymgyt](https://github.com/ymgyt) ([e9445da8](https://github.com/ymgyt/syndicationd/commit/e9445da874c316f97754b37a23486dacda3b4875))
+- Abstract interactor (#121) by [@ymgyt](https://github.com/ymgyt) ([f0283f8d](https://github.com/ymgyt/syndicationd/commit/f0283f8d0dae98f58ed2023bd8863ec307f3eed3))
+- Add custom table widget to remove duplicate code by [@ymgyt](https://github.com/ymgyt) ([5a2953c6](https://github.com/ymgyt/syndicationd/commit/5a2953c6ee9fa0292779b86a6a50430cd787cc9c))
+
+### Styling
+
+- Show help key for brose entry command by [@ymgyt](https://github.com/ymgyt) ([ba7bb2f2](https://github.com/ymgyt/syndicationd/commit/ba7bb2f2850e2744b3afc28addeb4fb4894162d8))
+
+### Testing
+
+- Relax interval assertion in import test by [@ymgyt](https://github.com/ymgyt) ([822d6f4c](https://github.com/ymgyt/syndicationd/commit/822d6f4cdf5a94df130c6bd2fc3ff437e4302750))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0...
+
+
+## [v0.3.0] - 2024-07-11
 
 ### Features
 
@@ -15,7 +60,7 @@ All notable changes to this project will be documented in this file.
 - Use macro to impl newtype by [@ymgyt](https://github.com/ymgyt) ([17797a5c](https://github.com/ymgyt/syndicationd/commit/17797a5c25b2c30d4b20dfede7cf331fd1ad8c6b))
 - Split background futures to another jobs by [@ymgyt](https://github.com/ymgyt) ([995f143b](https://github.com/ymgyt/syndicationd/commit/995f143bce4237bfceacad816b86522e59d268a2))
 
-https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0-rc.2...
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0-rc.2...synd-term-v0.3.0
 
 
 ## [v0.3.0-rc.2] - 2024-07-07
