@@ -42,7 +42,7 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
   - [GitHub Notifications](#github-notifications)
   - [Theme](#theme)
   - [Backend API](#backend-api)
-  - [Log File](#log-file)
+  - [Log](#log)
   - [Clean](#remove-cache-and-logs)
 - [Development](#development)
 - [License](#license)
@@ -168,7 +168,7 @@ To add a category , add the following content to the configuration file
 
 ```toml
 [categories.rust]
-icon = { symbol = "", color = { rgb = 0xF74C00 } }
+icon = { symbol = "🦀", color = { rgb = 0xF74C00 } }
 aliases = ["rs"]
 ```
 
@@ -232,7 +232,8 @@ Currently, GitHub and Google are supported as authorize server/id provider. The 
 | `gg`    | Go to first                                   |
 | `ge`    | Go to end                                     |
 | `Tab`   | Switch Tab                                    |
-| `Enter` | Open entry/feed                               |
+| `Enter` | Open entry/feed with web browser              |
+| `Space` | Open entry with text browser(`$SYND_BROWSER`) |    
 | `a`     | Add feed subscription(on Feeds Tab)           |
 | `e`     | Edit subscribed feed(on Feeds Tab)            |
 | `d`     | Delete subscribed feed(on Feeds Tab)          |
@@ -305,6 +306,12 @@ Pressing "-" will deactivate all categories, and pressing "+" will activate all 
 You can exit the filter category mode by pressing the "Esc" key.  
 The icons for categories can be specified in `categories.toml`
 
+### Open feed entry
+
+To open a feed entry in a web browser, select the entry and press Enter.   
+To view the entry in a text browser within the terminal, press the Space.   
+The command that is triggered by pressing the Space can be specified using the `$SYND_BROWSER` environment variable, or through related flags or configuration files.   
+The command is executed as `$SYND_BROWSER $SYND_BROWSER_ARGS <entry url>`.
 
 ### Export subscribed feeds
 
@@ -387,10 +394,10 @@ For more details, see [list notifications for the authenticated user](https://do
 Since the Mark notification as done API does not support fine grained access token, classic token is required to use this feature.  
 
 
-### Log file
+### Log 
 
-The log file path is based on [`ProjectDirs::data_dir()`](https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir).  
-Please refer to the `--log` flag in `synd --help` for the default output destination.  
+The default log file path is based on [`ProjectDirs::data_dir()`](https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir).  
+Please refer to the `synd check` command for the output destination.  
 
 You can modify the [log directives](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives) using the environment variable `SYND_LOG`. (for example, `SYND_LOG=synd=debug`)
 
@@ -422,6 +429,11 @@ Api Version: 0.2.4
      Config: /home/ferris/.config/syndicationd/config.toml
       Cache: /home/ferris/.cache/syndicationd
         Log: /home/ferris/.local/share/syndicationd/synd.log
+```
+
+```sh
+# open log file
+bat (synd check --format json | from json | get log)
 ```
 
 ## Development
