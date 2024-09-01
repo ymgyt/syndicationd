@@ -8,10 +8,12 @@ loki_endpoint := env_var_or_default("LOKI_ENDPOINT", "")
 # Run kvsd
 [no-cd]
 kvsd:
-    KVSD_LOG=info nix run github:ymgyt/kvsd/426ddaf5a6356551f0945b7ca3c48366580928d9 -- server \
+    # KVSD_LOG=info nix run github:ymgyt/kvsd/426ddaf5a6356551f0945b7ca3c48366580928d9 -- server \
         --disable-tls --config etc/dev/kvsd_config.yaml \
         --username {{ kvsd_user }} \
         --kvsd-dir .kvsd
+    KVSD_LOG=info cargo run \
+        --package synd-kvs --bin synd-kvsd --features kvsd
 
 [no-cd]
 kvsd-local:

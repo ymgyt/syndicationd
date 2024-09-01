@@ -1,0 +1,18 @@
+# List recipe
+default:
+    just --list
+
+# Generate CHANGELOG for given version release 
+changelog version:
+    git cliff \
+        --config ../../cliff.toml \
+        --repository ../../ \
+        --include-path crates/synd_kvs/** \
+        --tag-pattern synd-kvs-v.* \
+        --tag synd-kvs-v{{version}} \
+        --output CHANGELOG.md
+
+# Release crate
+[no-cd]
+release *flags:
+    cargo release --package synd-kvs -v {{flags}}

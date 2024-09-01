@@ -1,0 +1,45 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+edition.workspace    = true
+homepage.workspace   = true
+keywords.workspace   = true
+license.workspace    = true
+repository.workspace = true
+
+include = ["src/**/*","CHANGELOG.md"]
+description = "syndicationd key value store"
+name        = "synd-kvs"
+readme      = "README.md"
+version     = "0.1.0"
+
+[[bin]]
+name = "synd-kvsd"
+path = "src/bin/kvsd/main.rs"
+
+[dependencies]
+clap = { workspace = true, optional =  true, features = ["derive", "env", "std"]}
+tokio              = { workspace = true, features = ["rt", "rt-multi-thread", "io-util", "net", "signal", "fs", "sync", "macros", "time"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, optional = true, features = ["chrono"]}
+
+[features]
+kvsd = ["cli"]
+cli = ["dep:tracing-subscriber", "dep:clap"]
+
+[dev-dependencies]
+
+[lints]
+workspace = true
+
+[package.metadata.release]
+pre-release-hook = ["just", "changelog", "{{version}}"]
+pre-release-replacements = [
+  { file = "CHANGELOG.md", search = "unreleased", replace = "v{{version}}", min = 0 },
+  { file = "CHANGELOG.md", search = "__release_date__", replace = "{{date}}", min = 0 },
+  { file = "README.md", search = "/synd-kvs-v.*/", replace = "/{{crate_name}}-v{{version}}/", min = 0 },
+]
+tag-message = "chore: release {{crate_name}} version {{version}}"
+
+[package.metadata.dist]
+dist = false
