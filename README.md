@@ -54,7 +54,11 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
 ## Features
 
 * Subscribe RSS/Atom feeds
+  * Open feed entries in your preferred text or web browser
+  * Filter feed entries based on category, keyword, and importance
 * Handle [GitHub notifications](https://github.com/notifications) (optional)
+  * Unsubscribe or Done a notification from the terminal
+  * Filter notifications based on reason, repository, and status
 
 ## Installation
 
