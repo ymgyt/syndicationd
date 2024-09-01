@@ -41,6 +41,7 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
   - [Authentication](#authentication)
   - [Keymap](#keymap)
   - [Subscribe Feed](#subscribe-feed)
+  - [Open Feed Entry](#open-feed-entry)
   - [Export Feeds](#export-subscribed-feeds)
   - [Import Feeds](#import-feeds)
   - [GitHub Notifications](#github-notifications)
@@ -49,6 +50,7 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
   - [Log](#log)
   - [Clean](#remove-cache-and-logs)
 - [Development](#development)
+- [Project Goals](#project-goals)
 - [License](#license)
 
 ## Features
@@ -454,7 +456,7 @@ Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with developm
 
 ## Project Goals
 
-* **A Terminal First Simple Feed Service**. Create a simple, self-hostable feed service for terminal users that does not involve curation, recommendations, or user behavior analysis.
+* **A terminal-first, self-hosted feed service**. Create a simple, self-hosted feed service for terminal users that does not involve curation, recommendations, or user behavior analysis.
 
 * **Longevity**. Maintain this project for as long as possible, with a minimu maintenance period of at lease 5 yeas.
 
