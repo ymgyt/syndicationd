@@ -1,0 +1,29 @@
+digraph {
+    graph [
+        layout=dot,
+        rankdir=BT,
+        label="Syndicationd packages overview",
+        labelloc="top", // t(top) | b(bottom)
+        labeljust="left", // l(left) | c(center) | r(right)
+        fontname="Helvetica,Arial,sans-serif"
+        compound=true; 
+        newrank=true
+    ];
+
+    o11y [ label="synd_o11y" ]
+    auth [ label="synd_auth" ]
+    feed [ label="synd_feed" ]
+
+    term [ label="synd_term", shape="box" ]
+    api  [ label="synd_api", shape="box" ]
+
+    feed -> o11y
+
+    term -> o11y
+    term -> auth
+    term -> feed
+
+    api  -> o11y
+    api  -> auth
+    api  -> feed
+}

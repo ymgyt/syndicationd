@@ -1,9 +1,21 @@
 ## Development
 
-In syndicationd, we manage the development environment with [Nix](https://nixos.org/).  
+In syndicationd, we manage the development environment and CI with [Nix](https://nixos.org/).  
+For installing Nix, please refer to the [Nix install documentation](https://github.com/DeterminateSystems/nix-installer)
+
 By executing `nix develop`, the necessary tools for development can be prepared.
 
-To test code, execute `just check`
+### Overview of Packages
+
+![Overview](etc/dot/packages.svg)
+
+| Package     | Description        |
+| ---         | ---                |
+| `synd_o11y` | Observability lib  |
+| `synd_feed` | RSS/Atom feed lib  |
+| `synd_auth` | Authentication lib |
+| `synd_api`  | GraphQL api bin    |
+| `synd_term` | TUI app bin        |
 
 ### Launching Develop Environment
 
@@ -44,6 +56,24 @@ type is one of the following.
 | `ci`        | continuous Integration and delivery |
 | `refactor`  | refactoring                         |
 | `chore`     | catch all                           |
+
+Please use the scope without `synd` prefix from the crate name.  
+For example, when making changes to `synd_term`, the commit message should be `feat(term): add new feature`.  
+The commit will be used to generate the CHANGELOG for each crate.
+
+## For Maintainers
+
+For information about CI, please refer to [ci.md](/docs/ci.md).  
+
+### Release Flow
+
+To perform a release, run `just <package> release (patch|minor|major) [--execute]`.  
+For example, to release version v0.2.0 of `synd-api` when it is currently at version v0.1.0, you would run `just synd api release minor`.  
+
+This task will be executed in dry-run mode, allowing you to review the CHANGELOG generation and replacement processing. Once you have confirmed that there are no issues, return the command with the `--execute` flag.  
+
+This process will publish the package to crates.io and push the git tag.  
+The git tag will trigger the release workflow, which will create a GitHub release.
 
 ## License
 

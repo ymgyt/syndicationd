@@ -6,6 +6,8 @@
 
 [![CI][workflow-ci-badge]][workflow-ci-url]
 [![Release][workflow-release-badge]][workflow-release-url]
+[![Audit][workflow-audit-badge]][workflow-audit-url]
+
 [![Coverage][coverage-badge]][coverage-url]
 
 [crates-badge]: https://img.shields.io/crates/v/synd-term?style=for-the-badge&logo=rust
@@ -15,6 +17,8 @@
 [workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
 [workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
 [workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
+[workflow-audit-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/audit.yaml?style=for-the-badge&logo=github&label=Audit
+[workflow-audit-url]: https://github.com/ymgyt/syndicationd/actions/workflows/audit.yaml
 [coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov&color=brightgreen
 [coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
 [grafana-badge]: https://img.shields.io/badge/Grafana-Dashboard-orange?style=for-the-badge&logo=grafana

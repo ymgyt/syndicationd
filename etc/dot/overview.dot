@@ -8,7 +8,6 @@ digraph {
         fontname="Helvetica,Arial,sans-serif"
         compound=true; 
         newrank=true
-        // dpi=600
     ];
 
     synd [
