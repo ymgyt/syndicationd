@@ -15,7 +15,7 @@ All notable changes to this project will be documented in this file.\n
 # https://keats.github.io/tera/docs/#introduction
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="synd-") | trim_start_matches(pat="api-") | trim_start_matches(pat="term-") | trim_start_matches(pat="auth-") | trim_start_matches(pat="o11y-") | trim_start_matches(pat="feed-") | trim_start_matches(pat="authn-")}}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased] __release_date__
 {% endif %}\
@@ -55,21 +55,21 @@ commit_preprocessors = [
 # regex for parsing and grouping commits
 # comment like <!-- 0 --> for force order 
 commit_parsers = [
-  { message = "^feat", group = "<!-- 0 -->Features" },
-  { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
-  { message = "^doc", group = "Documentation" },
-  { message = "^docs", group = "Documentation" },
-  { message = "^perf", group = "Performance" },
-  { message = "^refactor", group = "Refactor" },
-  { message = "^style", group = "Styling" },
-  { message = "^test", group = "Testing" },
+  { message = "^feat", group = "<!-- 0 -->📡 Features" },
+  { message = "^fix", group = "<!-- 1 -->🐛 Bug Fixes" },
+  { message = "^doc", group = "📚 Documentation" },
+  { message = "^docs", group = "📚 Documentation" },
+  { message = "^perf", group = "🏃 Performance" },
+  { message = "^refactor", group = "🧹 Refactor" },
+  { message = "^style", group = "🎨 Styling" },
+  { message = "^test", group = "🔧 Testing" },
   { message = "^chore: release", skip = true },
   { message = "^chore: release.*", skip = true },
   { message = "^chore: changelog", skip = true },
   { message = "^chore\\(deps\\)", skip = true },
   { message = "doc: fix typo", skip = true },
-  { message = "^chore|ci", group = "Miscellaneous Tasks" },
-  { body = ".*security", group = "Security" },
+  { message = "^chore|ci", group = "⚙️ Miscellaneous Tasks" },
+  { body = ".*security", group = "🔒 Security" },
   { message = "^revert", group = "Revert" },
 ]
 # protect breaking changes from being skipped due to matching a skipping commit_parser

@@ -10,15 +10,14 @@ mod test 'etc/just/test.just'
 mod audit 'etc/just/audit.just'
 mod bench 'etc/just/bench.just'
 mod dep 'etc/just/dep.just'
-mod changelog 'etc/just/changelog.just'
 mod license 'etc/just/license.just'
-mod release 'etc/just/release.just'
 mod dist 'etc/just/dist.just'
 mod oranda 'etc/just/oranda.just'
 mod demo 'etc/just/demo.just'
 mod bpf 'etc/just/bpf.just'
 mod etc 'etc/just/etc'
 mod dot 'etc/just/dot.just'
+mod synd 'etc/just/synd.just'
 
 # List recipe
 default:

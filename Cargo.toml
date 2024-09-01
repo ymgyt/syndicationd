@@ -88,14 +88,7 @@ name = "synd"
 
 [workspace.metadata.release]
 allow-branch = ["main"]
-pre-release-commit-message = "chore: release"
-pre-release-replacements = [
-  { file = "CHANGELOG.md", search = "unreleased", replace = "v{{version}}" },
-  { file = "CHANGELOG.md", search = "__release_date__", replace = "{{date}}" },
-  { file = "README.md", search = "/synd-term-v.*/", replace = "/{{crate_name}}-v{{version}}/", min = 0 },
-  { file = "README.md", search = "/synd-term-v.*", replace = "/{{crate_name}}-v{{version}}", min = 0 },
-]
-tag-message = "chore: release {{crate_name}} version {{version}}"
+# https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md#placeholders
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

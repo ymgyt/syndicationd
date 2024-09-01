@@ -1,0 +1,18 @@
+# List recipe
+default:
+    just --list
+
+# Generate CHANGELOG for given version release 
+changelog version:
+    git cliff \
+        --config ../../cliff.toml \
+        --repository ../../ \
+        --include-path "crates/synd_auth/**" --include-path "crates/synd_authn/**" \
+        --tag-pattern synd-auth-v.* \
+        --tag synd-auth-v{{version}} \
+        --output CHANGELOG.md
+
+# Release crate
+[no-cd]
+release *flags:
+    cargo release --package synd-auth -v {{flags}}

@@ -1,7 +1,7 @@
 import '.base.just'
 
 # Format files
-default: toml cargo
+default: toml cargo nix
 
 # Format toml files
 [no-cd]
@@ -13,3 +13,7 @@ toml:
 cargo:
 	cargo fmt
 
+# Run nix fmt
+[no-cd]
+nix:
+	nix fmt

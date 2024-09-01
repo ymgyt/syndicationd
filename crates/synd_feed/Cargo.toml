@@ -42,5 +42,14 @@ jsonschema = ["dep:schemars"]
 [lints]
 workspace = true
 
+[package.metadata.release]
+pre-release-hook = ["just", "changelog", "{{version}}"]
+pre-release-replacements = [
+  { file = "CHANGELOG.md", search = "unreleased", replace = "v{{version}}", min = 0 },
+  { file = "CHANGELOG.md", search = "__release_date__", replace = "{{date}}", min = 0 },
+  { file = "README.md", search = "/synd-feed-v.*/", replace = "/{{crate_name}}-v{{version}}/", min = 0 },
+]
+tag-message = "chore: release {{crate_name}} version {{version}}"
+
 [package.metadata.dist]
 dist = false

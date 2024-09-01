@@ -1,0 +1,5 @@
+mod api  '../../crates/synd_api'
+mod auth '../../crates/synd_auth'
+mod o11y '../../crates/synd_o11y'
+mod feed '../../crates/synd_feed'
+mod term '../../crates/synd_term'

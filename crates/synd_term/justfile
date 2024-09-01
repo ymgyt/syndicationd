@@ -1,0 +1,23 @@
+# List recipe
+default:
+    just --list
+
+# Generate CHANGELOG for given version release 
+changelog version:
+    git cliff \
+        --config ../../cliff.toml \
+        --repository ../../ \
+        --include-path crates/synd_term/** \
+        --tag-pattern synd-term-v.* \
+        --tag synd-term-v{{version}} \
+        --output CHANGELOG.md
+
+# Release crate
+[no-cd]
+release *flags:
+    cargo release --package synd-term -v {{flags}}
+
+# Reinstall synd-term
+[no-cd]
+reinstall:
+    @nu etc/scripts/reinstall.nu
