@@ -1,14 +1,14 @@
-use std::env;
+#[cfg(feature = "kvsd")]
+#[tokio::main]
+async fn main() {
+    use std::env;
+    use synd_kvs::{config, kvsd::cli};
 
-use synd_kvs::config;
+    let _args = match cli::try_parse(env::args_os()) {
+        Ok(args) => args,
+        Err(err) => err.exit(),
+    };
 
-use crate::args::ObservabilityOptions;
-
-mod args;
-
-// TODO: instrument with otel
-fn init_tracing(_options: &ObservabilityOptions) {
-    // Install global collector configured based on KVS_LOG env var.
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_env(
             config::env::LOG_DIRECTIVE,
@@ -19,12 +19,5 @@ fn init_tracing(_options: &ObservabilityOptions) {
         .init();
 }
 
-#[tokio::main]
-async fn main() {
-    let args = match args::try_parse(env::args_os()) {
-        Ok(args) => args,
-        Err(err) => err.exit(),
-    };
-
-    init_tracing(&args.o11y);
-}
+#[cfg(not(feature = "kvsd"))]
+fn main() {}

@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 
+use crate::config;
 use clap::{ArgAction, Parser};
-use synd_kvs::config;
 
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, disable_help_subcommand = true)]

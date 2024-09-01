@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod error;
 
 pub type Result<T, E = crate::kvsd::error::KvsdError> = std::result::Result<T, E>;
