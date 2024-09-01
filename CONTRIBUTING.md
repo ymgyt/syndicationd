@@ -67,7 +67,7 @@ For information about CI, please refer to [ci.md](/docs/ci.md).
 
 ### Release Flow
 
-To perform a release, run `just <package> release (patch|minor|major) [--execute]`.  
+To perform a release, run `just synd <package> release (patch|minor|major) [--execute]`.  
 For example, to release version v0.2.0 of `synd-api` when it is currently at version v0.1.0, you would run `just synd api release minor`.  
 
 This task will be executed in dry-run mode, allowing you to review the CHANGELOG generation and replacement processing. Once you have confirmed that there are no issues, return the command with the `--execute` flag.  

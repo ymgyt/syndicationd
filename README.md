@@ -452,6 +452,13 @@ bat (synd check --format json | from json | get log)
 
 Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with development.
 
+## Project Goals
+
+* **A Terminal First Simple Feed Service**. Create a simple, self-hostable feed service for terminal users that does not involve curation, recommendations, or user behavior analysis.
+
+* **Longevity**. Maintain this project for as long as possible, with a minimu maintenance period of at lease 5 yeas.
+
+
 ## License
 
 This project is available under the terms of either the [Apache 2.0 license](./LICENSE-APACHE) or the [MIT license](./LICENSE-MIT).
@@ -469,80 +476,3 @@ Some tips about feed that I know.
 * crates.io have introduced a couple of experimental [RSS feeds](https://blog.rust-lang.org/2024/07/29/crates-io-development-update.html#rss-feeds)
 
 * Adding `.rss` to the end of a Reddit URL allows you to retrieve the feed. for example, for `https://www.reddit.com/r/HelixEditor/`, it would be `https://www.reddit.com/r/HelixEditor.rss`
-
-If you're looking for feeds, here are my recommendations.
-
-<details>
-<summary>Click to show a list</summary>
-
-### For Rust users
-
-<details>
-<summary>Click to show a table</summary>
-
-| Feed | URL |
-| ---  | --- |
-| [This Week in Rust](https://this-week-in-rust.org/) | `https://this-week-in-rust.org/atom.xml`|
-| [Rust Blog](https://without.boats/index.xml) | `https://blog.rust-lang.org/feed.xml` |
-| [Inside Rust Blog](https://blog.rust-lang.org/inside-rust/) | `https://blog.rust-lang.org/inside-rust/feed.xml` |
-| [RustSec Advisories](https://rustsec.org/) | `https://rustsec.org/feed.xml` |
-| [seanmonstar](https://seanmonstar.com/) | `https://seanmonstar.com/rss` |
-| [Mara's Blog](https://blog.m-ou.se/) | `https://blog.m-ou.se/index.xml` |
-| [Without boats, dreams dry up](https://without.boats/) | `https://without.boats/index.xml` |
-| [fasterthanli.me](https://fasterthanli.me/) | `https://fasterthanli.me/index.xml` |
-| [Orhun's Blog](https://blog.orhun.dev/) | `https://blog.orhun.dev/rss.xml` |
-| [axo blog](https://blog.axo.dev/) | `https://blog.axo.dev/rss.xml` |
-| [Kbzol's blog](https://kobzol.github.io/) | `https://kobzol.github.io/feed.xml` |
-| [baby steps](https://smallcultfollowing.com/babysteps/) | `https://smallcultfollowing.com/babysteps/` |
-| [COCl2's blog home](https://blog.cocl2.com/) | `https://blog.cocl2.com/index.xml` |
-
-</details>
-
-### For Nix users
-
-<details>
-<summary>Click to show a table</summary>
-
-| Feed | URL |
-| ---  | --- |
-| [This Cute World](https://thiscute.world/en/) | `https://thiscute.world/en/index.xml` |
-| [Determinate Systems](https://determinate.systems/) | `https://determinate.systems/rss.xml` |
-</details>
-
-
-### For Observability 
-
-<details>
-<summary>Click to show a table</summary>
-
-| Feed | URL |
-| ---  | --- |
-| [observability news](https://buttondown.email/o11y.news) | `https://buttondown.email/o11y.news/rss` |
-| [Opentelemetry blog](https://opentelemetry.io/blog/2024/) | `https://opentelemetry.io/blog/2024/index.xml` |
-| [eBPF Blog](https://ebpf.io/blog/) | `https://ebpf.io/blog/rss.xml` |
-
-</details>
-
-### For Kubernetes users
-
-<details>
-<summary>Click to show a table</summary>
-
-| Feed | URL |
-| ---  | --- |
-| [Kubernetes Blog](https://kubernetes.io/) | ` https://kubernetes.io/feed.xml` |
-| [Kubernetes Official CVE](https://kubernetes.io/docs/reference/issues-security/official-cve-feed/) | `https://kubernetes.io/docs/reference/issues-security/official-cve-feed/feed.xml` |
-| [CNCF](https://www.cncf.io/) | `https://www.cncf.io/feed/` |
-</details>
-
-### Misc
-
-<details>
-<summary>Click to show a table</summary>
-
-| Feed | URL |
-| ---  | --- |
-| [Terminal Trove](https://terminaltrove.com/) | `https://terminaltrove.com/blog.xml` |
-
-</details>
-</details>
