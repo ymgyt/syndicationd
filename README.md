@@ -420,6 +420,10 @@ To change the endpoint, specify the `--endpoint` flag
 
 The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [![Grafana][grafana-badge]][grafana-url]
 
+<details>
+  <summary>Click to show a public dashboard image</summary>
+  <img alt="grafana dashboard" src="https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/grafana-dashboard.png">
+</details>
 
 ### Remove cache and logs
 
