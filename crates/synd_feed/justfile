@@ -1,18 +1,16 @@
+import '../.justfile'
+
+pkg := "feed"
+
 # List recipe
 default:
     just --list
 
 # Generate CHANGELOG for given version release 
 changelog version:
-    git cliff \
-        --config ../../cliff.toml \
-        --repository ../../ \
-        --include-path crates/synd_feed/** \
-        --tag-pattern synd-feed-v.* \
-        --tag synd-feed-v{{version}} \
-        --output CHANGELOG.md
+    @nu {{script_dir}}/changelog.nu {{pkg}} {{version}}    
 
 # Release crate
 [no-cd]
 release *flags:
-    cargo release --package synd-feed -v {{flags}}
+    cargo release --package synd-{{pkg}} -v {{flags}}

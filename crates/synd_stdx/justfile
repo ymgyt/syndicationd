@@ -1,6 +1,6 @@
 import '../.justfile'
 
-pkg := "o11y"
+pkg := "stdx"
 
 # List recipe
 default:
