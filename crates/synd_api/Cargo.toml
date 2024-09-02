@@ -20,6 +20,7 @@ path = "src/main.rs"
 synd-auth = { path = "../synd_auth", version = "0.2.4" }
 synd-feed = { path = "../synd_feed", version = "0.3.4", features = ["graphql"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.8" }
+synd-stdx = { path = "../synd_stdx", version = "0.1.0", features = ["color"] }
 
 anyhow             = { workspace = true }
 async-graphql      = { workspace = true, features = ["tracing"] }
@@ -40,7 +41,6 @@ pin-project        = "1.1.4"
 reqwest            = { workspace = true }
 serde              = { workspace = true }
 serde_json         = "1.0.127"
-supports-color     = { version = "3.0.0" }
 thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 tokio-metrics      = { version = "0.3.1", default-features = false, features = ["rt"] }

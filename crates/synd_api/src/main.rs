@@ -4,6 +4,7 @@ use fdlimit::Outcome;
 use synd_o11y::{
     opentelemetry::OpenTelemetryGuard, tracing_subscriber::otel_metrics::metrics_event_filter,
 };
+use synd_stdx::color::{is_color_supported, ColorSupport};
 use tracing::{error, info};
 
 use synd_api::{
@@ -22,12 +23,6 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
         Registry,
     };
 
-    let color = {
-        use supports_color::Stream;
-        supports_color::on(Stream::Stdout).is_some()
-    };
-    let show_src = options.show_code_location;
-    let show_target = options.show_target;
     let (otel_layer, otel_guard) = match options
         .otlp_endpoint
         .as_deref()
@@ -44,11 +39,15 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
         _ => (None, None),
     };
 
+    let ansi = is_color_supported() == ColorSupport::Supported;
+    let show_src = options.show_code_location;
+    let show_target = options.show_target;
+
     Registry::default()
         .with(
             fmt::Layer::new()
-                .with_ansi(color)
-                .with_timer(fmt::time::UtcTime::rfc_3339())
+                .with_ansi(ansi)
+                .with_timer(fmt::time::ChronoLocal::rfc_3339())
                 .with_file(show_src)
                 .with_line_number(show_src)
                 .with_target(show_target)

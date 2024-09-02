@@ -4015,10 +4015,10 @@ dependencies = [
  "reqwest 0.12.7",
  "serde",
  "serde_json",
- "supports-color",
  "synd-auth",
  "synd-feed",
  "synd-o11y",
+ "synd-stdx",
  "synd-test",
  "thiserror",
  "tokio",
@@ -4088,10 +4088,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd-kvs"
+name = "synd-kvsd"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "synd-o11y",
+ "synd-stdx",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4121,6 +4123,13 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "synd-stdx"
+version = "0.1.0"
+dependencies = [
+ "supports-color",
 ]
 
 [[package]]
