@@ -35,8 +35,8 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
         .map(|endpoint| {
             synd_o11y::opentelemetry_layer(
                 endpoint,
-                config::NAME,
-                config::VERSION,
+                config::app::NAME,
+                config::app::VERSION,
                 options.trace_sampler_ratio,
             )
         }) {
@@ -92,7 +92,7 @@ async fn run(
     .await?;
 
     info!(
-        version = config::VERSION,
+        version = config::app::VERSION,
         otlp_endpoint=?o11y.otlp_endpoint,
         request_timeout=?dep.serve_options.timeout,
         request_body_limit_bytes=dep.serve_options.body_limit_bytes,

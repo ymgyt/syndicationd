@@ -13,7 +13,7 @@ pub async fn healthcheck() -> impl IntoResponse {
         [(header::CONTENT_TYPE, Health::CONTENT_TYPE)],
         Json(
             Health::pass()
-                .with_version(config::VERSION)
+                .with_version(config::app::VERSION)
                 .with_description("health of synd-api"),
         ),
     )
