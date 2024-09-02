@@ -2,8 +2,8 @@ import '.base.just'
 
 # Update Cargo.toml [metadata.dist] section
 [no-cd]
-init:
-    cargo dist init
+init *flags:
+    cargo dist init --allow-dirty {{flags}}
 
 # Show cargo-dist plan
 [no-cd]

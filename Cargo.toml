@@ -88,10 +88,10 @@ name = "synd"
 
 [workspace.metadata.release]
 allow-branch = ["main"]
-# https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md#placeholders
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]
+allow-dirty = true
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.21.1"
 # CI backends to support
