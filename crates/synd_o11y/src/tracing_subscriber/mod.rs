@@ -7,6 +7,7 @@ use tracing_subscriber::{registry::LookupSpan, Layer};
 use crate::OpenTelemetryGuard;
 
 pub mod audit;
+pub mod initializer;
 pub mod otel_log;
 pub mod otel_metrics;
 pub mod otel_trace;
