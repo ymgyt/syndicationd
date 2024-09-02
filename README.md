@@ -123,6 +123,9 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 ```
 
+> [!NOTE]
+> `synd` requires [Nerd Fonts](https://www.nerdfonts.com/) to be installed on your system for rendering icons.
+
 ## Overview
 
 ![Overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/overview.svg)
@@ -141,7 +144,7 @@ Settings can be configured in the following ways(in order of priority)
 * Default value
 
 The location of the configuration file can be specified using `--config` or the environment variable `SYND_CONFIG_FILE`.  
-By default, synd will search the following locations depending on the platform
+By default, `synd` will search the following locations depending on the platform
 
 | Platform | Locations |
 | ---      | ---       |
@@ -149,7 +152,7 @@ By default, synd will search the following locations depending on the platform
 | macOS    | `$HOME/Library/Application Support/syndicationd/config.toml` |
 |Windows   | `{FOLDERID_RoamingAppData}/syndicationd/config.toml` |
 
-Synd does not automatically create configuration files.  
+`synd` does not automatically create configuration files.  
 When creating a configuration file, you can use the following command
 
 ```sh
@@ -204,24 +207,25 @@ Options:
   -c, --config <CONFIG>        Configuration file path [env: SYND_CONFIG_FILE=]
       --log <LOG>              Log file path [env: SYND_LOG_FILE=]
       --cache-dir <CACHE_DIR>  Cache directory [env: SYND_CACHE_DIR=]
-      --theme <THEME>          Color theme [env: SYND_THEME=] [possible values: ferra, solarized-dark,
-                               helix]
+      --theme <THEME>          Color theme [env: SYND_THEME=] [possible values: ferra, solarized-dark, helix]
   -h, --help                   Print help
   -V, --version                Print version
 
 Api options:
       --endpoint <ENDPOINT>              `synd_api` endpoint [env: SYND_ENDPOINT=]
-      --client-timeout <CLIENT_TIMEOUT>  Client timeout [env: SYND_CLIENT_TIMEOUT=]
+      --client-timeout <CLIENT_TIMEOUT>  Client timeout(ex. 30s) [env: SYND_CLIENT_TIMEOUT=]
 
 Feed options:
       --entries-limit <ENTRIES_LIMIT>  Feed entries limit to fetch [env: SYND_ENTRIES_LIMIT=]
+      --browser <BROWSER>              Browser command to open feed entry [env: SYND_BROWSER=]
+      --browser-args <BROWSER_ARGS>    Args for launching the browser command [env: SYND_BROWSER_ARGS=]
 
 GitHub options:
   -G, --enable-github-notification <ENABLE_GITHUB_NOTIFICATION>
-          Enable GitHub notification feature [env: SYND_ENABLE_GH=] [aliases: enable-gh] [possible
-          values: true, false]
+          Enable GitHub notification feature [env: SYND_ENABLE_GH=] [aliases: enable-gh] [possible values: true, false]
       --github-pat <GITHUB_PAT>
           GitHub personal access token to fetch notifications [env: SYND_GH_PAT]
+
 ```
 
 </details>
@@ -456,7 +460,7 @@ Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with developm
 
 ## Project Goals
 
-* **A terminal-first, self-hosted feed service**. Create a simple, self-hosted feed service for terminal users that does not involve curation, recommendations, or user behavior analysis.
+* **A terminal-first, self-hostable feed service**. Create a simple, self-hostable feed service for terminal users that does not involve curation, recommendations, or user behavior analysis.
 
 * **Longevity**. Maintain this project for as long as possible, with a minimu maintenance period of at lease 5 yeas.
 
