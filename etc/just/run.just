@@ -13,7 +13,7 @@ kvsd:
         --username {{ kvsd_user }} \
         --kvsd-dir .kvsd
     KVSD_LOG=info cargo run \
-        --package synd-kvs --bin synd-kvsd --features kvsd
+        --package synd-kvsd
 
 [no-cd]
 kvsd-local:

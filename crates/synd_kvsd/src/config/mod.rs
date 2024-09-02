@@ -1,4 +1,10 @@
-/// Environment variable configuration
+/// Application configurations
+pub mod app {
+    pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+    pub const NAME: &str = env!("CARGO_PKG_NAME");
+}
+
+/// Environment variable configurations
 pub mod env {
     macro_rules! env_key {
         ($key:expr) => {
