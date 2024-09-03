@@ -28,7 +28,7 @@ serde                              = { workspace = true, features = ["derive"] }
 serde_json                         = { workspace = true, optional = true }
 tracing                            = { workspace = true }
 tracing-opentelemetry              = { version = "0.25.0" }
-tracing-subscriber                 = { workspace = true, features = ["registry", "fmt", "std"] }
+tracing-subscriber                 = { workspace = true, features = ["registry", "fmt", "std", "chrono"] }
 
 [features]
 opentelemetry-stdout = ["dep:opentelemetry-stdout", "dep:serde_json"]

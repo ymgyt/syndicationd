@@ -4,7 +4,7 @@ use opentelemetry_sdk::{logs, trace};
 use tracing::Subscriber;
 use tracing_subscriber::{registry::LookupSpan, Layer};
 
-use crate::OpenTelemetryGuard;
+use crate::{tracing_subscriber::otel_metrics::metrics_event_filter, OpenTelemetryGuard};
 
 pub mod audit;
 pub mod initializer;
@@ -31,6 +31,8 @@ where
 
     let (log_layer, logger_provider) =
         otel_log::layer(endpoint.clone(), resource.clone(), log_batch_config);
+    // Since metrics events are handled by the metrics layer and are not needed as logs, set afilter for them.
+    let log_layer = log_layer.with_filter(metrics_event_filter());
     let guard = OpenTelemetryGuard { logger_provider };
 
     (

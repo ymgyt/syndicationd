@@ -45,7 +45,7 @@ term *flags:
 # Run opentelemetry-collector-contrib
 [no-cd]
 @otelcol config:
-    otelcontribcol --config=file:etc/dev/otelcol/{{ config }}
+    otelcontribcol --config=file:etc/dev/otelcol/{{ config }}.yaml
 
 # Run backends
 [no-cd]

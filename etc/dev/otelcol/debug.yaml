@@ -1,0 +1,21 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:4317
+processors: {}
+exporters:
+  debug:
+    verbosity: detailed
+  debug/noop:
+    verbosity: normal
+    sampling_initial: 0
+    sampling_thereafter: 0
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [debug]
+    metrics:
+      receivers: [otlp]
+      exporters: [debug/noop]

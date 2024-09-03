@@ -4096,7 +4096,6 @@ dependencies = [
  "synd-stdx",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

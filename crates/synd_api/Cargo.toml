@@ -48,7 +48,6 @@ tokio-util         = { workspace = true }
 tower              = { version = "0.5.0", default-features = false, features = ["limit", "timeout"] }
 tower-http         = { version = "0.5.2", default-features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
 tracing            = { workspace = true }
-tracing-subscriber = { workspace = true }
 
 [features]
 # Integration test
@@ -58,9 +57,11 @@ introspection        = []
 opentelemetry-stdout = ["synd-o11y/opentelemetry-stdout"]
 
 [dev-dependencies]
-assert_cmd = { workspace = true }
-insta      = { workspace = true, features = ["yaml"] }
-synd-test  = { path = "../synd_test" }
+synd-test = { path = "../synd_test" }
+
+assert_cmd         = { workspace = true }
+insta              = { workspace = true, features = ["yaml"] }
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true
