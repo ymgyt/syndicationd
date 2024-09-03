@@ -4007,7 +4007,6 @@ dependencies = [
  "feed-rs",
  "futures-util",
  "graphql_client",
- "humantime",
  "insta",
  "kvsd",
  "moka",
@@ -4128,6 +4127,7 @@ dependencies = [
 name = "synd-stdx"
 version = "0.1.0"
 dependencies = [
+ "humantime",
  "supports-color",
 ]
 
@@ -4151,7 +4151,6 @@ dependencies = [
  "futures-util",
  "graphql_client",
  "html2text",
- "humantime",
  "insta",
  "itertools 0.13.0",
  "kvsd",
@@ -4172,6 +4171,7 @@ dependencies = [
  "synd-auth",
  "synd-feed",
  "synd-o11y",
+ "synd-stdx",
  "synd-test",
  "tempfile",
  "thiserror",

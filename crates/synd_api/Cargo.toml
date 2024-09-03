@@ -20,7 +20,7 @@ path = "src/main.rs"
 synd-auth = { path = "../synd_auth", version = "0.2.4" }
 synd-feed = { path = "../synd_feed", version = "0.3.4", features = ["graphql"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.8" }
-synd-stdx = { path = "../synd_stdx", version = "0.1.0", features = ["color"] }
+synd-stdx = { path = "../synd_stdx", version = "0.1.0", features = ["color", "humantime"] }
 
 anyhow             = { workspace = true }
 async-graphql      = { workspace = true, features = ["tracing"] }
@@ -34,7 +34,6 @@ fdlimit            = { workspace = true }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
-humantime          = { workspace = true }
 kvsd               = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
 pin-project        = "1.1.4"

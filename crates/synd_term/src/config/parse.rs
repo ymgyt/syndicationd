@@ -2,6 +2,7 @@ pub(crate) mod de {
     use std::time::Duration;
 
     use serde::{Deserialize, Deserializer};
+    use synd_stdx::time::humantime;
 
     pub(crate) fn parse_duration_opt<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
     where
@@ -18,10 +19,11 @@ pub(crate) mod de {
 }
 
 pub(crate) mod flag {
-    use humantime::DurationError;
     use std::time::Duration;
 
+    use synd_stdx::time::humantime::{parse_duration, DurationError};
+
     pub(crate) fn parse_duration_opt(s: &str) -> Result<Duration, DurationError> {
-        humantime::parse_duration(s)
+        parse_duration(s)
     }
 }

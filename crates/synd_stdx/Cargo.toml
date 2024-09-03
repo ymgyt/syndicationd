@@ -14,10 +14,12 @@ name        = "synd-stdx"
 version     = "0.1.0"
 
 [dependencies]
+humantime      = { version = "2.1.0", optional = true }
 supports-color = { version = "3.0.0", optional = true }
 
 [features]
-color = ["dep:supports-color"]
+color     = ["dep:supports-color"]
+humantime = ["dep:humantime"]
 
 [lints]
 workspace = true
