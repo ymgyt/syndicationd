@@ -27,4 +27,5 @@ pub mod env {
 
     pub const TLS_CERT: &str = env_key!("TLS_CERT");
     pub const TLS_KEY: &str = env_key!("TLS_KEY");
+    pub const DISABLE_TLS: &str = env_key!("DISABLE_TLS");
 }

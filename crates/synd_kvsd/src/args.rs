@@ -48,6 +48,9 @@ pub struct KvsdOptions {
     /// Tls server private key file path
     #[arg(long, env = config::env::TLS_KEY, default_value = "./files/localhost.key")]
     tls_key: PathBuf,
+    /// Disable Tls
+    #[arg(long, env = config::env::DISABLE_TLS)]
+    disable_tls: bool,
 }
 
 #[derive(clap::Args, Debug)]

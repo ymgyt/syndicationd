@@ -14,4 +14,5 @@ Syndicationd key value store daemon
 | `--bind-port` | `KVSD_BIND_PORT` | ??? | Bind address | ??? |
 | `--tls-cert` | `KVSD_TLS_CERT` | ??? | Tls server certificate path | ??? | 
 | `--tls-key` | `KVSD_TLS_KEY` | ??? | Tls server private key path | ??? | 
+| `--disable-tls` | `KVSD_DISABLE_TLS` |  ??? | Disable tls | ??? |
 
