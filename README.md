@@ -128,7 +128,7 @@ cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 
 ## Overview
 
-![Overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/overview.svg)
+![Overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/overview.svg)
 
 The subscribed feeds are stored in synd-api. synd-api periodically fetches the feeds to retrieve the latest entries.  
 When the user views the feed list in synd, it retrieves the latest entries from synd-api's cache.  
@@ -231,6 +231,8 @@ GitHub options:
 </details>
 
 ### Authentication
+
+![Authentication overview](etc/dot/dist/authentication.svg)
 
 syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
 Currently, GitHub and Google are supported as authorize server/id provider. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to authenticate the user's email address. The user's email address is used only as an identifier after being hashed and never stored. for more info, please refer to the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html)

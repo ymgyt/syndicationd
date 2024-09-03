@@ -16,6 +16,10 @@ packages:
 	@just dot generate packages
 
 [no-cd]
+authentication:
+	@just dot generate authentication
+
+[no-cd]
 [private]
 generate src:
-	dot -T{{format}} {{dot_dir}}/{{src}}.dot out> {{dot_dir}}/{{src}}.{{format}}
+	dot -T{{format}} {{dot_dir}}/{{src}}.dot out> {{dot_dir}}/dist/{{src}}.{{format}}

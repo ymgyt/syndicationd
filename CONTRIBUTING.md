@@ -7,7 +7,7 @@ By executing `nix develop`, the necessary tools for development can be prepared.
 
 ### Overview of Packages
 
-![Overview](etc/dot/packages.svg)
+![Overview](etc/dot/dist/packages.svg)
 
 | Package     | Description        |
 | ---         | ---                |

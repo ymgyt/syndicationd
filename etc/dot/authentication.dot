@@ -1,0 +1,35 @@
+digraph {
+    graph [
+        layout=dot,
+        rankdir=TB,
+        label="",
+        labelloc="top", // t(top) | b(bottom)
+        labeljust="left", // l(left) | c(center) | r(right)
+        fontname="Helvetica,Arial,sans-serif"
+        compound=true; 
+        newrank=true
+    ];
+
+    synd_term        [ label="synd_term" shape="ellipse" ]
+    synd_api         [ label="synd_api" shape="ellipse" ]
+    id_provider      [ label="OIDC\nID Provider", shape="box" ]
+    authorize_server [ label="OAuth\nAuthorize Server" shape="box" ]
+
+    synd_term -> id_provider [ label="1. authenticate" ]
+    id_provider -> synd_term [ label="2. jwt", style="dashed" ]
+    synd_term -> authorize_server [ label="1. authenticate" ]
+    authorize_server -> synd_term [ label="2. token" style="dashed" ]
+
+    synd_term -> synd_api [ label="3. request" ]
+
+    synd_api -> id_provider [ label="4. verify" ]
+    id_provider -> synd_api [ label="5. email" style="dashed" ]
+    synd_api -> authorize_server [ label="4. profile" ]
+    authorize_server -> synd_api [ label="5. email" style="dashed" ]
+
+    { rank=min; id_provider; }
+    { rank=same; synd_term; synd_api; }
+    { rank=max; authorize_server; }
+
+
+}
