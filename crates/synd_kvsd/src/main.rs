@@ -23,6 +23,7 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
         .enable_ansi(is_color_supported() == ColorSupport::Supported)
         .show_code_location(*show_code_location)
         .show_target(*show_target)
+        .log_directive_env(config::env::LOG_DIRECTIVE)
         .init()
 }
 

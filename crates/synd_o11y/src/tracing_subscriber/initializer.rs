@@ -5,7 +5,7 @@ use crate::{
     OpenTelemetryGuard,
 };
 
-const LOG_DIRECTIVE: &str = "SYND_LOG";
+const LOG_DIRECTIVE_ENV: &str = "SYND_LOG";
 const DEFAULT_LOG_DIRECTIVE: &str = "info";
 
 pub struct TracingInitializer {
@@ -16,6 +16,7 @@ pub struct TracingInitializer {
     enable_ansi: bool,
     show_code_location: bool,
     show_target: bool,
+    log_directive_env: Option<&'static str>,
 }
 
 impl Default for TracingInitializer {
@@ -28,6 +29,7 @@ impl Default for TracingInitializer {
             enable_ansi: true,
             show_code_location: false,
             show_target: true,
+            log_directive_env: None,
         }
     }
 }
@@ -48,6 +50,7 @@ impl TracingInitializer {
             enable_ansi,
             show_code_location,
             show_target,
+            log_directive_env,
         } = self
         else {
             panic!()
@@ -75,7 +78,7 @@ impl TracingInitializer {
                     .with_filter(metrics_event_filter())
                     .and_then(otel_layer)
                     .with_filter(
-                        EnvFilter::try_from_env(LOG_DIRECTIVE)
+                        EnvFilter::try_from_env(log_directive_env.unwrap_or(LOG_DIRECTIVE_ENV))
                             .or_else(|_| EnvFilter::try_new(DEFAULT_LOG_DIRECTIVE))
                             .unwrap()
                             .add_directive(audit::Audit::directive()),
@@ -144,6 +147,14 @@ impl TracingInitializer {
     pub fn show_target(self, show_target: bool) -> Self {
         Self {
             show_target,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn log_directive_env(self, log_directive_env: &'static str) -> Self {
+        Self {
+            log_directive_env: Some(log_directive_env),
             ..self
         }
     }
