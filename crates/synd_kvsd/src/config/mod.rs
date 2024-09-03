@@ -1,3 +1,7 @@
+use std::{path::PathBuf, time::Duration};
+
+use serde::Deserialize;
+
 /// Application configurations
 pub mod app {
     pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -28,4 +32,26 @@ pub mod env {
     pub const TLS_CERT: &str = env_key!("TLS_CERT");
     pub const TLS_KEY: &str = env_key!("TLS_KEY");
     pub const DISABLE_TLS: &str = env_key!("DISABLE_TLS");
+}
+
+// Server configuration.
+#[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
+pub struct Config {
+    /// Max tcp connections.
+    max_tcp_connections: Option<u32>,
+    /// Size of buffer allocated per tcp connection.
+    buffer_size_per_connection: Option<usize>,
+    /// Timeout duration for reading authenticate message.
+    authenticate_timeout: Duration,
+    /// Bind address
+    bind_address: Option<String>,
+    // tcp listen port.
+    bind_port: u16,
+    // disable tls connections.
+    disable_tls: bool,
+    // tls server certificate file path
+    tls_certificate: Option<PathBuf>,
+    // tls server private key file path
+    tls_key: Option<PathBuf>,
 }

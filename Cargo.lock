@@ -4091,6 +4091,7 @@ name = "synd-kvsd"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "serde",
  "synd-o11y",
  "synd-stdx",
  "tokio",

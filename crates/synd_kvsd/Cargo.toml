@@ -22,6 +22,7 @@ synd-o11y = { path = "../synd_o11y", version = "0.1.8" }
 synd-stdx = { path = "../synd_stdx", version = "0.1.0", features = ["color"] }
 
 clap    = { workspace = true, features = ["derive", "env", "std"] }
+serde   = { workspace = true, features = ["derive"] }
 tokio   = { workspace = true, features = ["rt", "rt-multi-thread", "io-util", "net", "signal", "fs", "sync", "macros", "time"] }
 tracing = { workspace = true }
 
