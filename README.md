@@ -234,8 +234,21 @@ GitHub options:
 
 ![Authentication overview](etc/dot/dist/authentication.svg)
 
-syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
-Currently, GitHub and Google are supported as authorize server/id provider. The only scope syndicationd requires is [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)(Github) or [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url)(Google) to authenticate the user's email address. The user's email address is used only as an identifier after being hashed and never stored. for more info, please refer to the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html)
+Syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
+Currently, GitHub and Google are supported as authorize server/id provider.   
+The only scope required by syndicationd to authenticate users is the email address. please refer to the table below for details on the scopes for each provider.    
+
+| IdP/AuthServer | Scope                                                                                                            |
+| ---            | ---                                                                                                              |
+| GitHub         | [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)             |
+| Google         | [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url) | 
+
+> [!IMPORTANT]
+> **The user's email address is used only as an identifier after being hashed and never stored**.   
+
+for more info, please refer to the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html)  
+
+If you'd like support for additional ID providers, please feel free to request it.
 
 ### Keymap
 
@@ -395,7 +408,9 @@ synd import feeds.json
 
 To enable GitHub notifications feature, specify the `--enable-github-notification | -G` flag or set the environment variable `SYND_ENABLE_GH=true`.  
 When enabling the GitHub notifications feature, GitHub personal access token (PAT) is required. Specify the PAT using the `--github-pat` flag or the environment variable `SYND_GH_PAT`.  
-For GitHub notifications, unlike feeds, the synd-api is not used.
+
+> [!TIP]
+> For GitHub notifications, unlike feeds, the synd-api is not used.
 
 #### PAT Scope
 
