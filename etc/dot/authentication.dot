@@ -2,7 +2,7 @@ digraph {
     graph [
         layout=dot,
         rankdir=TB,
-        label="",
+        label="Device Authorization Grant",
         labelloc="top", // t(top) | b(bottom)
         labeljust="left", // l(left) | c(center) | r(right)
         fontname="Helvetica,Arial,sans-serif"
