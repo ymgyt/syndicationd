@@ -1,4 +1,6 @@
-use std::{ffi::OsString, path::PathBuf};
+use std::{ffi::OsString, path::PathBuf, time::Duration};
+
+use synd_stdx::time::humantime;
 
 use crate::config;
 use clap::{ArgAction, Parser};
@@ -7,7 +9,45 @@ use clap::{ArgAction, Parser};
 #[command(version, propagate_version = true, disable_help_subcommand = true)]
 pub struct Args {
     #[command(flatten)]
+    pub kvsd: KvsdOptions,
+    #[command(flatten)]
     pub o11y: ObservabilityOptions,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Kvsd options")]
+pub struct KvsdOptions {
+    /// Max tcp connections
+    #[arg(long, env = config::env::MAX_CONNECTIONS)]
+    max_connections: Option<u32>,
+    /// Buffer bytes assigned to each connection
+    #[arg(long, env = config::env::CONNECTION_BUFFER_BYTES)]
+    connection_buffer_bytes: Option<usize>,
+    /// Authenticate timeout
+    #[arg(long, value_parser = humantime::parse_duration, env = config::env::AUTHENTICATE_TIMEOUT)]
+    authenticate_timeout: Option<Duration>,
+    /// Configuration file path
+    // TODO: use toml
+    #[arg( long, short = 'C',
+         default_value = "./files/config.yaml", env = config::env::CONFIG_FILE,
+    )]
+    config: PathBuf,
+    /// Tcp binding address host(e.g. 0.0.0.0, localhost)
+    // TODO: use Url or Addr
+    #[arg(long, env = config::env::BIND_ADDRESS)]
+    bind_address: Option<String>,
+    /// Tcp binding address port
+    #[arg(long, env = config::env::BIND_PORT)]
+    bind_port: Option<u16>,
+    /// Root directory where kvsd store it's data
+    #[arg(long, env = config::env::DATA_DIR, default_value = ".kvsd")]
+    data_dir: PathBuf,
+    /// Tls server certificate file path
+    #[arg(long, env = config::env::TLS_CERT, default_value = "./files/localhost.pem")]
+    tls_cert: PathBuf,
+    /// Tls server private key file path
+    #[arg(long, env = config::env::TLS_KEY, default_value = "./files/localhost.key")]
+    tls_key: PathBuf,
 }
 
 #[derive(clap::Args, Debug)]
