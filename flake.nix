@@ -38,7 +38,12 @@
       system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs { inherit system overlays; };
+        pkgs = import nixpkgs {
+          inherit system overlays;
+
+          # terraform has an unfree license (‘bsl11’)
+          config.allowUnfree = true;
+        };
         pkgs-unstable = import nixpkgs-unstable { inherit system overlays; };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
@@ -70,6 +75,7 @@
           nushell # just set nu as shell
           cargo-bundle-licenses
           docker
+          terraform
         ];
 
         # Inherits from checks cargo-nextest, cargo-audit
