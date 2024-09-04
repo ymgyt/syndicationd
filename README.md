@@ -232,7 +232,7 @@ GitHub options:
 
 ### Authentication
 
-![Authentication overview](etc/dot/dist/authentication.svg)
+![Authentication overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/authentication.svg)
 
 Syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
 Currently, GitHub and Google are supported as authorize server/id provider.   
@@ -406,6 +406,8 @@ synd import feeds.json
 
 ### GitHub Notifications
 
+<img alt="github notification screent shot" src="https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/ss/github_notification_ss.png" width="425"/> 
+
 To enable GitHub notifications feature, specify the `--enable-github-notification | -G` flag or set the environment variable `SYND_ENABLE_GH=true`.  
 When enabling the GitHub notifications feature, GitHub personal access token (PAT) is required. Specify the PAT using the `--github-pat` flag or the environment variable `SYND_GH_PAT`.  
 
@@ -468,7 +470,7 @@ Api Version: 0.2.4
 
 ```sh
 # open log file
-bat (synd check --format json | from json | get log)
+synd check --format json | from json | get log | bat $in
 ```
 
 ## Development
