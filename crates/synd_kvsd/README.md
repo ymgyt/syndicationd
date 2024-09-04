@@ -16,3 +16,6 @@ Syndicationd key value store daemon
 | `--tls-key` | `KVSD_TLS_KEY` | ??? | Tls server private key path | ??? | 
 | `--disable-tls` | `KVSD_DISABLE_TLS` |  ??? | Disable tls | ??? |
 
+## Overview
+
+![Request flow](../../etc/dot/dist/kvsd_architecture.svg)

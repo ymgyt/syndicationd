@@ -1,0 +1,80 @@
+digraph {
+    graph [
+        layout=dot,
+        rankdir=BT,
+        label="synd-kvsd request flow",
+        labelloc="top"
+        labeljust="left"
+        fontname="Helvetica,Arial,sans-serif"
+        compound=true; 
+        newrank=true
+    ];
+
+    node [ shape="box" ]
+
+    subgraph cluster_task_table {
+        label="Task"
+
+        subgraph cluster_table {
+            label="Table"
+
+            file [ label="File" ]
+            table_rx [ label="rx" ]
+
+            { rank=same; file; table_rx; }
+        }
+    }
+
+    subgraph cluster_task_kvsd {
+        label="Task"
+
+        subgraph cluster_kvsd {
+            label="Kvsd"
+
+            subgraph cluster_mw {
+                label="Middleware"
+
+                logger [ label="Logger" ]
+                authenticator [ label="Authenticator" ]
+                authorizer [ label="Authorizer" ]
+                dispatcher [ label="Dispatcher" ]
+                table_tx [ label="tx" ]
+
+                logger -> authenticator
+                authenticator -> authorizer
+                authorizer -> dispatcher
+                dispatcher -> table_tx
+                table_tx -> table_rx [ label="UnitOfWork" ]
+
+                { rank=same; logger; authenticator; authorizer; dispatcher; }
+            }
+
+            kvsd_rx [ label="rx" ]
+        }
+    }
+
+    client [ label="Client" ]
+
+    subgraph cluster_server {
+        label="Server"
+
+        listener [ label="Listener" ]
+
+        subgraph cluster_handler {
+            label="Handler"
+
+            connection [ label="Connection" ]
+            handler_tx [ label="tx" ]
+        }
+
+        { rank=same; listener; connection; }
+
+    }
+
+    client -> listener [ label="connect" ]
+    listener -> connection [ label="accept" ]
+    connection -> handler_tx [ label="message" ]
+    handler_tx -> kvsd_rx [ label="UnitOfWork"]
+    kvsd_rx -> logger [ label="apply" lhead=cluster_mw ]
+    table_rx -> file
+}

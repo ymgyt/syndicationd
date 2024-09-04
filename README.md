@@ -252,9 +252,6 @@ If you'd like support for additional ID providers, please feel free to request i
 
 ### Keymap
 
-<details>
-<summary>Click to show a keymap table</summary>
-
 | Key     | Description                                   |
 | ---     | ---                                           |
 | `k/j`   | Move up/down                                  |
@@ -282,8 +279,6 @@ If you'd like support for additional ID providers, please feel free to request i
 | `D`     | Mark all as done                              |
 | `u`     | Unsubscribe                                   |
 | `f`     | Open notification filter(Esc to apply)        |
-
-</details>
 
 for more details, refer to [`keymap/default.rs`](https://github.com/ymgyt/syndicationd/blob/main/crates/synd_term/src/keymap/default.rs)
 
