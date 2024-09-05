@@ -3610,9 +3610,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.127"
+version = "1.0.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
+checksum = "6ff5456707a1de34e7e37f2a6fd3d3f808c318259cbd01ab6377795054b483d8"
 dependencies = [
  "itoa",
  "memchr",
@@ -3923,9 +3923,9 @@ checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
 
 [[package]]
 name = "supports-color"
-version = "3.0.0"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9829b314621dfc575df4e409e79f9d6a66a3bd707ab73f23cb4aa3a854ac854f"
+checksum = "8775305acf21c96926c900ad056abeef436701108518cf890020387236ac5a77"
 dependencies = [
  "is_ci",
 ]
@@ -4460,9 +4460,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.11"
+version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cf6b47b3771c49ac75ad09a6162f53ad4b8088b76ac60e8ec1455b31a189fe1"
+checksum = "61e7c3654c13bcd040d4a03abee2c75b1d14a37b423cf5a813ceae1cc903ec6a"
 dependencies = [
  "bytes",
  "futures-core",
