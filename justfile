@@ -18,6 +18,7 @@ mod bpf 'etc/just/bpf.just'
 mod etc 'etc/just/etc'
 mod dot 'etc/just/dot.just'
 mod synd 'etc/just/synd.just'
+mod nix 'etc/just/nix'
 mod tf 'hosting/terraform'
 
 # List recipe
