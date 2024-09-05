@@ -9,13 +9,15 @@ By executing `nix develop`, the necessary tools for development can be prepared.
 
 ![Overview](etc/dot/dist/packages.svg)
 
-| Package     | Description        |
-| ---         | ---                |
-| `synd_o11y` | Observability lib  |
-| `synd_feed` | RSS/Atom feed lib  |
-| `synd_auth` | Authentication lib |
-| `synd_api`  | GraphQL api bin    |
-| `synd_term` | TUI app bin        |
+| Package     | Description             |
+| ---         | ---                     |
+| `synd_stdx` | Extended std(util) lib  |
+| `synd_o11y` | Observability lib       |
+| `synd_feed` | RSS/Atom feed lib       |
+| `synd_auth` | Authentication lib      |
+| `synd_api`  | GraphQL api bin         |
+| `synd_term` | TUI app bin             |
+| `synd_kvsd` | Key value store bin     | 
 
 ### Launching Develop Environment
 

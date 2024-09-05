@@ -10,19 +10,25 @@ digraph {
         newrank=true
     ];
 
+    stdx [ label="synd_stdx" ]
     o11y [ label="synd_o11y" ]
     auth [ label="synd_auth" ]
     feed [ label="synd_feed" ]
 
+    kvsd [ label="synd_kvsd", shape="box" ]
     term [ label="synd_term", shape="box" ]
     api  [ label="synd_api", shape="box" ]
 
+    kvsd -> stdx [ headport="s" ]
+
     feed -> o11y
 
+    term -> stdx [ headport="se" ]
     term -> o11y
     term -> auth
     term -> feed
 
+    api  -> stdx [ headport="se" ]
     api  -> o11y
     api  -> auth
     api  -> feed

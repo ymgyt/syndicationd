@@ -3,7 +3,7 @@ import '.base.just'
 dot_dir := "etc/dot"
 format := "svg"
 
-default: overview packages
+default: overview packages authentication kvsd
 
 # Generate overview image
 [no-cd]
