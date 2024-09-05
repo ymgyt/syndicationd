@@ -2,9 +2,21 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
-    schedule:
+    schedule: &schedule
       interval: weekly
+      time: "07:00"
+      timezone: "Asia/Tokyo"
+    labels: ["kind/dependencies", "area/github_actions"]
   - package-ecosystem: cargo
     directory: /
-    schedule:
-      interval: weekly
+    schedule: *schedule
+    labels: ["kind/dependencies", "area/rust"]
+    # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#groups
+    # If a dependency doesn't belong to any group, Dependabot will continue to raise single pull requests to update the dependency to its latest version as normal.
+    groups:
+      opentelemetry:
+        applies-to: version-updates
+        patterns: ["opentelemetry*"]
+      rust-patch:
+        applies-to: version-updates
+        update-types: ["patch"]
