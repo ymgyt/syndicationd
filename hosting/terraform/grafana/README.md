@@ -2,6 +2,12 @@
 
 ## Init project
 
+```nu
+# Configure credentials for grafana provider
+$env.TF_VAR_grafana_url = "https://your.grafana.net"
+$env.TF_VAR_grafana_sa_token = "[REDACTED]"
+```
+
 ### S3 Backend
 
 ```nu
