@@ -4,6 +4,15 @@
 
 ### Workflows
 
+| Workflow        | Trigger   | Role                         |
+| ---             | ---       | ---                          |
+| `audit`         | Schedule  | Audit security               |
+| `ci`            | Push, PR  | Test, Lint, Coverage         |
+| `release`       | TagPush   | Distribution, GitHub Release |
+| `release_image` | TagPush   | PushDockerImage              |
+| `website`       | Push, PR  | Update website               |
+
+
 #### [`audit`](https://github.com/ymgyt/syndicationd/blob/main/.github/workflows/audit.yaml)  
 
 It is scheduled to run periodically, updating the advisory database for `cargo audit` to the latest version before executing `cargo audit`
