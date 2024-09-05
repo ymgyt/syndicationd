@@ -47,11 +47,11 @@ rand               = { version = "0.8.5" }
 reqwest            = { version = "0.12.5", default-features = false, features = ["rustls-tls", "json"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
-serde_json         = { version = "1.0.127" }
+serde_json         = { version = "1.0.128" }
 tempfile           = { version = "3" }
 thiserror          = { version = "1.0.63" }
 tokio              = { version = "1.40", default-features = false }
-tokio-util         = { version = "0.7.11" }
+tokio-util         = { version = "0.7.12" }
 toml               = { version = "0.8.19" }
 tracing            = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
