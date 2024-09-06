@@ -4,10 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::{
-    cli::Palette,
-    config::{self, categories},
-};
+use crate::{cli::Palette, config::categories};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CacheEntry {
@@ -39,7 +36,10 @@ pub struct FeedBrowserEntry {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiEntry {
     pub(super) endpoint: Option<Url>,
-    #[serde(default, deserialize_with = "config::parse::de::parse_duration_opt")]
+    #[serde(
+        default,
+        deserialize_with = "synd_stdx::time::humantime::de::parse_duration_opt"
+    )]
     pub(super) timeout: Option<Duration>,
 }
 
