@@ -3,12 +3,40 @@ source: crates/synd_kvsd/src/config/file.rs
 expression: c
 ---
 ConfigFile {
-    connection: ConnectionEntry {
-        limit: Some(
-            2048,
-        ),
-        buffer_size: Some(
-            "4MiB",
-        ),
-    },
+    connection: Some(
+        ConnectionEntry {
+            limit: Some(
+                2048,
+            ),
+            buffer_size: Some(
+                Byte(
+                    4194304,
+                ),
+            ),
+        },
+    ),
+    authentication: Some(
+        AuthenticationEntry {
+            timeout: Some(
+                3s,
+            ),
+        },
+    ),
+    bind: Some(
+        BindEntry {
+            address: Some(
+                127.0.0.1,
+            ),
+            port: Some(
+                7777,
+            ),
+        },
+    ),
+    tls: Some(
+        TlsEntry {
+            disable: Some(
+                true,
+            ),
+        },
+    ),
 }

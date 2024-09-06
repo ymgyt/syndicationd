@@ -1,14 +1,40 @@
+use std::{net::IpAddr, time::Duration};
+
 use serde::Deserialize;
+use synd_stdx::byte::Byte;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ConfigFile {
-    connection: ConnectionEntry,
+    connection: Option<ConnectionEntry>,
+    authentication: Option<AuthenticationEntry>,
+    bind: Option<BindEntry>,
+    tls: Option<TlsEntry>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ConnectionEntry {
     limit: Option<u32>,
-    buffer_size: Option<String>,
+    buffer_size: Option<Byte>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct AuthenticationEntry {
+    #[serde(
+        default,
+        deserialize_with = "synd_stdx::time::humantime::de::parse_duration_opt"
+    )]
+    timeout: Option<Duration>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct BindEntry {
+    address: Option<IpAddr>,
+    port: Option<u16>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct TlsEntry {
+    disable: Option<bool>,
 }
 
 #[cfg(test)]

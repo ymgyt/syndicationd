@@ -19,7 +19,7 @@ path = "src/main.rs"
 
 [dependencies]
 synd-o11y = { path = "../synd_o11y", version = "0.1.8" }
-synd-stdx = { path = "../synd_stdx", version = "0.1.0", features = ["color", "humantime"] }
+synd-stdx = { path = "../synd_stdx", version = "0.1.0", features = ["color", "humantime", "byte"] }
 
 clap      = { workspace = true, features = ["derive", "env", "std"] }
 serde     = { workspace = true, features = ["derive"] }
