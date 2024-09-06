@@ -158,8 +158,8 @@ impl GithubClient {
 
 #[derive(GraphQLQuery)]
 #[graphql(
-    schema_path = "gql/github/schema.json",
-    query_path = "gql/github/issue_query.gql",
+    schema_path = "src/client/github/schema.json",
+    query_path = "src/client/github/issue_query.gql",
     variables_derives = "Clone, Debug",
     response_derives = "Clone, Debug"
 )]
@@ -199,8 +199,8 @@ impl GithubClient {
 
 #[derive(GraphQLQuery)]
 #[graphql(
-    schema_path = "gql/github/schema.json",
-    query_path = "gql/github/pull_request_query.gql",
+    schema_path = "src/client/github/schema.json",
+    query_path = "src/client/github/pull_request_query.gql",
     variables_derives = "Clone, Debug",
     response_derives = "Clone, Debug"
 )]

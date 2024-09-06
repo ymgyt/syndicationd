@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::{
     cli::port::PortContext,
-    client::{
+    client::synd_api::{
         mutation::subscribe_feed::SubscribeFeedInput, Client, SubscribeFeedError, SyndApiError,
     },
     config,

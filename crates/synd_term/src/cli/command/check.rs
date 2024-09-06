@@ -4,7 +4,7 @@ use anyhow::Context;
 use clap::Args;
 use synd_o11y::health_check::Health;
 
-use crate::{client::Client, config::ConfigResolver};
+use crate::{client::synd_api::Client, config::ConfigResolver};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum)]
 pub enum CheckFormat {

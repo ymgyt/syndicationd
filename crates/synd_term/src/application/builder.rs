@@ -1,6 +1,6 @@
 use crate::{
     application::{Application, Authenticator, Cache, Clock, Config},
-    client::{github::GithubClient, Client},
+    client::{github::GithubClient, synd_api::Client},
     config::Categories,
     interact::Interact,
     terminal::Terminal,

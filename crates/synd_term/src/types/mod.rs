@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
 
 use crate::{
-    client::{
+    client::synd_api::{
         mutation,
         query::{self},
     },

@@ -14,7 +14,7 @@ use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::{Direction, Populate},
-    client::query::subscription::SubscriptionOutput,
+    client::synd_api::query::subscription::SubscriptionOutput,
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{
         self,

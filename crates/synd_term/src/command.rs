@@ -7,10 +7,10 @@ use crate::{
     auth::{AuthenticationProvider, Credential, Verified},
     client::{
         github::{FetchNotificationsParams, GithubError},
-        mutation::subscribe_feed::SubscribeFeedInput,
-        payload,
-        query::subscription::SubscriptionOutput,
-        SyndApiError,
+        synd_api::{
+            mutation::subscribe_feed::SubscribeFeedInput, payload,
+            query::subscription::SubscriptionOutput, SyndApiError,
+        },
     },
     types::{
         github::{

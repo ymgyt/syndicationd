@@ -2,7 +2,7 @@ use nom::error::VerboseErrorKind;
 use thiserror::Error;
 
 use crate::{
-    client::mutation::subscribe_feed::SubscribeFeedInput,
+    client::synd_api::mutation::subscribe_feed::SubscribeFeedInput,
     config::Categories,
     types::{self},
 };
@@ -106,7 +106,7 @@ mod feed {
         application::input_parser::{
             comment, CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REQUIREMENT, CTX_URL,
         },
-        client::mutation::subscribe_feed::{Requirement, SubscribeFeedInput},
+        client::synd_api::mutation::subscribe_feed::{Requirement, SubscribeFeedInput},
     };
 
     pub(super) fn parse(s: &str) -> Result<SubscribeFeedInput, NomError> {

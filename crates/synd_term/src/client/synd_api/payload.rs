@@ -1,4 +1,4 @@
-use crate::{client::query, types};
+use crate::{client::synd_api::query, types};
 
 #[derive(Debug, Clone)]
 pub struct FetchEntriesPayload {

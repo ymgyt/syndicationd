@@ -6,7 +6,7 @@ use url::Url;
 use crate::{
     application::{Cache, Clock, JwtService, SystemClock},
     auth,
-    client::Client,
+    client::synd_api::Client,
 };
 
 pub(super) struct PortContext {

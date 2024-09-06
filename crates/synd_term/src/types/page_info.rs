@@ -1,4 +1,4 @@
-use crate::client::query;
+use crate::client::synd_api::query;
 
 #[derive(Debug, Clone)]
 pub struct PageInfo {

@@ -5,7 +5,7 @@ use futures_util::TryFutureExt as _;
 use synd_term::{
     application::{Application, Cache, Config, Features},
     cli::{self, Args},
-    client::{github::GithubClient, Client},
+    client::{github::GithubClient, synd_api::Client},
     config::{self, ConfigResolver},
     filesystem::fsimpl::FileSystem,
     interact::{ProcessInteractor, TextBrowserInteractor},

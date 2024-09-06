@@ -15,9 +15,9 @@ pub mod subscribe_feed {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
-    type Category = crate::client::scalar::Category;
-    type FeedUrl = crate::client::scalar::FeedUrl;
-    type Rfc3339Time = crate::client::scalar::Rfc3339Time;
+    type Category = crate::client::synd_api::scalar::Category;
+    type FeedUrl = crate::client::synd_api::scalar::FeedUrl;
+    type Rfc3339Time = crate::client::synd_api::scalar::Rfc3339Time;
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum FeedType {
         ATOM,
@@ -231,7 +231,7 @@ pub mod unsubscribe_feed {
     type Int = i64;
     #[allow(dead_code)]
     type ID = String;
-    type FeedUrl = crate::client::scalar::FeedUrl;
+    type FeedUrl = crate::client::synd_api::scalar::FeedUrl;
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub enum ResponseCode {
         OK,

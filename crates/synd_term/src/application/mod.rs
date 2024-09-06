@@ -25,8 +25,7 @@ use crate::{
     auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
     client::{
         github::{FetchNotificationsParams, GithubClient},
-        mutation::subscribe_feed::SubscribeFeedInput,
-        Client, SyndApiError,
+        synd_api::{mutation::subscribe_feed::SubscribeFeedInput, Client, SyndApiError},
     },
     command::{ApiResponse, Command},
     config::{self, Categories},

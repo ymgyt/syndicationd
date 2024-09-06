@@ -21,7 +21,7 @@ use synd_term::{
         Application, Authenticator, Cache, Clock, Config, DeviceFlows, JwtService, SystemClock,
     },
     auth::Credential,
-    client::{github::GithubClient as TermGithubClient, Client},
+    client::{github::GithubClient as TermGithubClient, synd_api::Client},
     config::Categories,
     interact::mock::MockInteractor,
     terminal::Terminal,

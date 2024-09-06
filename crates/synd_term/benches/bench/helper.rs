@@ -3,7 +3,7 @@ use std::time::Duration;
 use ratatui::backend::TestBackend;
 use synd_term::{
     application::{Application, Cache, Config},
-    client::Client,
+    client::synd_api::Client,
     config::Categories,
     interact::mock::MockInteractor,
     terminal::Terminal,
