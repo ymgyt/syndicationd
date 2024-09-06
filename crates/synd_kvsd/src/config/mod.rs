@@ -1,6 +1,12 @@
-use std::{path::PathBuf, time::Duration};
+use std::{net::IpAddr, path::PathBuf, time::Duration};
 
 use serde::Deserialize;
+
+use crate::{args::KvsdOptions, config::file::ConfigFile};
+
+mod file;
+mod resolver;
+pub use resolver::{ConfigResolver, ConfigResolverError};
 
 /// Application configurations
 pub mod app {
@@ -34,24 +40,74 @@ pub mod env {
     pub const DISABLE_TLS: &str = env_key!("DISABLE_TLS");
 }
 
+mod kvsd {
+    pub(super) mod default {
+        use std::{net::IpAddr, time::Duration};
+
+        use crate::config::TlsConnection;
+
+        pub(crate) const MAX_TCP_CONNECTIONS: u32 = 1024;
+        pub(crate) const BUFFER_SIZE_PER_CONNECTION: usize = 1024 * 1024 * 1024;
+        pub(crate) const AUTHENTICATE_TIMEOUT: Duration = Duration::from_secs(3);
+        pub(crate) const BIND_PORT: u16 = 7379;
+        pub(crate) const TLS_CONNECTION: TlsConnection = TlsConnection::Disable;
+
+        pub(crate) fn bind_address() -> IpAddr {
+            IpAddr::from([127, 0, 0, 1])
+        }
+    }
+}
+
 // Server configuration.
-#[derive(Debug, Deserialize, Default)]
-#[allow(dead_code)]
+#[derive(Debug)]
 pub struct Config {
     /// Max tcp connections.
-    max_tcp_connections: Option<u32>,
+    connections_limit: u32,
     /// Size of buffer allocated per tcp connection.
-    buffer_size_per_connection: Option<usize>,
+    buffer_size_per_connection: usize,
     /// Timeout duration for reading authenticate message.
     authenticate_timeout: Duration,
     /// Bind address
-    bind_address: Option<String>,
-    // tcp listen port.
+    bind_address: IpAddr,
+    /// tcp listen port.
     bind_port: u16,
-    // disable tls connections.
-    disable_tls: bool,
+    /// Tls connection
+    tls: TlsConnection,
+}
+
+#[derive(Debug)]
+pub enum TlsConnection {
+    Enable(TlsConfig),
+    Disable,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TlsConfig {
     // tls server certificate file path
-    tls_certificate: Option<PathBuf>,
+    tls_certificate: PathBuf,
     // tls server private key file path
-    tls_key: Option<PathBuf>,
+    tls_key: PathBuf,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            connections_limit: kvsd::default::MAX_TCP_CONNECTIONS,
+            buffer_size_per_connection: kvsd::default::BUFFER_SIZE_PER_CONNECTION,
+            authenticate_timeout: kvsd::default::AUTHENTICATE_TIMEOUT,
+            bind_address: kvsd::default::bind_address(),
+            bind_port: kvsd::default::BIND_PORT,
+            tls: kvsd::default::TLS_CONNECTION,
+        }
+    }
+}
+
+impl Config {
+    fn merge_config_file(&mut self, _file: ConfigFile) {
+        todo!()
+    }
+
+    fn merge_args(&mut self, _flags: KvsdOptions) {
+        todo!()
+    }
 }

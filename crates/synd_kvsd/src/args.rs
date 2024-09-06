@@ -19,38 +19,36 @@ pub struct Args {
 pub struct KvsdOptions {
     /// Max tcp connections
     #[arg(long, env = config::env::MAX_CONNECTIONS)]
-    max_connections: Option<u32>,
+    pub(crate) max_connections: Option<u32>,
     /// Buffer bytes assigned to each connection
     #[arg(long, env = config::env::CONNECTION_BUFFER_BYTES)]
-    connection_buffer_bytes: Option<usize>,
+    pub(crate) connection_buffer_bytes: Option<usize>,
     /// Authenticate timeout
     #[arg(long, value_parser = humantime::parse_duration, env = config::env::AUTHENTICATE_TIMEOUT)]
-    authenticate_timeout: Option<Duration>,
+    pub(crate) authenticate_timeout: Option<Duration>,
     /// Configuration file path
     // TODO: use toml
-    #[arg( long, short = 'C',
-         default_value = "./files/config.yaml", env = config::env::CONFIG_FILE,
-    )]
-    config: PathBuf,
+    #[arg(long, short = 'C', env = config::env::CONFIG_FILE)]
+    pub(crate) config: Option<PathBuf>,
     /// Tcp binding address host(e.g. 0.0.0.0, localhost)
     // TODO: use Url or Addr
     #[arg(long, env = config::env::BIND_ADDRESS)]
-    bind_address: Option<String>,
+    pub(crate) bind_address: Option<String>,
     /// Tcp binding address port
     #[arg(long, env = config::env::BIND_PORT)]
-    bind_port: Option<u16>,
+    pub(crate) bind_port: Option<u16>,
     /// Root directory where kvsd store it's data
     #[arg(long, env = config::env::DATA_DIR, default_value = ".kvsd")]
-    data_dir: PathBuf,
+    pub(crate) data_dir: PathBuf,
     /// Tls server certificate file path
     #[arg(long, env = config::env::TLS_CERT, default_value = "./files/localhost.pem")]
-    tls_cert: PathBuf,
+    pub(crate) tls_cert: PathBuf,
     /// Tls server private key file path
     #[arg(long, env = config::env::TLS_KEY, default_value = "./files/localhost.key")]
-    tls_key: PathBuf,
+    pub(crate) tls_key: PathBuf,
     /// Disable Tls
     #[arg(long, env = config::env::DISABLE_TLS)]
-    disable_tls: bool,
+    pub(crate) disable_tls: bool,
 }
 
 #[derive(clap::Args, Debug)]

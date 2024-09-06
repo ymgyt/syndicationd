@@ -2,7 +2,7 @@ use std::env;
 
 use synd_kvsd::{
     args::{self, ObservabilityOptions},
-    config,
+    config::{self, ConfigResolver},
 };
 use synd_o11y::{tracing_subscriber::initializer::TracingInitializer, OpenTelemetryGuard};
 use synd_stdx::io::color::{is_color_supported, ColorSupport};
@@ -34,4 +34,22 @@ async fn main() {
         Err(err) => err.exit(),
     };
     let _guard = init_tracing(&args.o11y);
+
+    // TODO:
+    // 1. Resolve Config
+    let _config = match ConfigResolver::new(args.kvsd).resolve() {
+        Ok(config) => config,
+        Err(err) => {
+            tracing::error!("{err}");
+            std::process::exit(1);
+        }
+    };
+
+    // 2. FileTreeProvisioner provision file tree
+    // 3. Walk table direcotries
+    // 4. Create Dispatcher
+    // 5. Create Middleware
+    // 6. Create Kvsd
+    // 7. Spawn Kvsd
+    // 8. Run Server
 }

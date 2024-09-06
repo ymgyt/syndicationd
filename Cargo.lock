@@ -4091,10 +4091,13 @@ name = "synd-kvsd"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "insta",
  "serde",
  "synd-o11y",
  "synd-stdx",
+ "thiserror",
  "tokio",
+ "toml",
  "tracing",
 ]
 

@@ -1,0 +1,14 @@
+---
+source: crates/synd_kvsd/src/config/file.rs
+expression: c
+---
+ConfigFile {
+    connection: ConnectionEntry {
+        limit: Some(
+            2048,
+        ),
+        buffer_size: Some(
+            "4MiB",
+        ),
+    },
+}
