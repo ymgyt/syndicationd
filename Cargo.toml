@@ -1,6 +1,5 @@
 [workspace]
-exclude  = ["crates/synd_ebpf", "crates/synd_perf"]
-members  = ["crates/*"]
+members  = ["crates/synd_*"]
 resolver = "2"
 
 [workspace.package]
