@@ -83,13 +83,13 @@
           with pkgs;
           [
             pkgs-unstable.cargo-dist
+            pkgs-unstable.cargo-insta
             typos
             graphql-client
             opentelemetry-collector-contrib
             git-cliff
             cargo-release
             cargo-machete
-            cargo-insta
             cargo-flamegraph
             oranda
             gnuplot # for rendering with criterion
