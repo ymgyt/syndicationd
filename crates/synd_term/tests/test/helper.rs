@@ -5,7 +5,7 @@ use futures_util::future;
 use octocrab::Octocrab;
 use ratatui::backend::TestBackend;
 use synd_api::{
-    args::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
+    cli::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
     repository::kvsd::KvsdClient,

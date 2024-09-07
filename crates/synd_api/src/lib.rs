@@ -2,7 +2,7 @@
 #![allow(clippy::new_without_default)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
-pub mod args;
+pub mod cli;
 pub mod client;
 pub mod config;
 pub mod dependency;

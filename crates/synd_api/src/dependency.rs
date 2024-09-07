@@ -9,7 +9,7 @@ use synd_feed::feed::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    args::{self, CacheOptions, KvsdOptions, TlsOptions},
+    cli::{self, CacheOptions, KvsdOptions, TlsOptions},
     config,
     monitor::Monitors,
     repository::kvsd::KvsdClient,
@@ -29,7 +29,7 @@ impl Dependency {
     pub async fn new(
         kvsd: KvsdOptions,
         tls: TlsOptions,
-        serve_options: args::ServeOptions,
+        serve_options: cli::ServeOptions,
         cache: CacheOptions,
         ct: CancellationToken,
     ) -> anyhow::Result<Self> {

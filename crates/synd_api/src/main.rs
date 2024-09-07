@@ -8,7 +8,7 @@ use synd_stdx::io::color::{is_color_supported, ColorSupport};
 use tracing::{error, info};
 
 use synd_api::{
-    args::{self, Args, ObservabilityOptions},
+    cli::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
     repository::kvsd::ConnectKvsdFailed,
@@ -88,7 +88,7 @@ fn init_file_descriptor_limit() {
 
 #[tokio::main]
 async fn main() {
-    let args = match args::try_parse(env::args_os()) {
+    let args = match cli::try_parse(env::args_os()) {
         Ok(args) => args,
         Err(err) => err.exit(),
     };
