@@ -22,7 +22,7 @@
 			"read_changelog_file": false
 		},
 		"mdbook": {
-			"path": "../../docs"
+			"path": "../../docs/mdbook"
 		},
 		"artifacts": {
 			"package_managers": {
