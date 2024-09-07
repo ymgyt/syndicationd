@@ -29,7 +29,7 @@
 Syndicationd is a project for simple feed management on the terminal, and the following components are beging developed
 
 * synd-term(`synd`): A TUI feed viewer based on [ratatui](https://github.com/ratatui-org/ratatui)
-* synd-api: A self-hostable GraphQL api server utilizing [feed-rs](https://github.com/feed-rs/feed-rs) 
+* synd-api: A GraphQL api server utilizing [feed-rs](https://github.com/feed-rs/feed-rs) 
 
 **Table of Contents:**
 
@@ -61,6 +61,9 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
 * Handle [GitHub notifications](https://github.com/notifications) (optional)
   * Unsubscribe or Done a notification from the terminal
   * Filter notifications based on reason, repository, and status
+* OpenTelemetry compatible
+  * Export traces, metrics, and logs using OTLP
+  * A Grafana dashboard is provided
 
 ## Installation
 
@@ -131,8 +134,8 @@ cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 ![Overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/overview.svg)
 
 The subscribed feeds are stored in synd-api. synd-api periodically fetches the feeds to retrieve the latest entries.  
-When the user views the feed list in synd, it retrieves the latest entries from synd-api's cache.  
-This allows the user to quickly obtain a list of the latest entries without requesting each subscribed feed individually.
+When the user views the feed list in synd, it retrieves the latest entries from synd-api's cache.   
+This project hosts the synd-api, but it can also be self-hosted.
 
 ## Configuration
 
