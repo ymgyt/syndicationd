@@ -24,6 +24,9 @@ byte      = ["dep:byte-unit"]
 color     = ["dep:supports-color"]
 humantime = ["dep:humantime"]
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [lints]
 workspace = true
 

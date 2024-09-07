@@ -16,3 +16,25 @@ where
         None => Ok(None),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_parse() {
+        #[derive(Deserialize)]
+        struct Data {
+            #[serde(default, deserialize_with = "parse_duration_opt")]
+            d: Option<Duration>,
+        }
+
+        let s = r#"{"d": "30sec" }"#;
+        let data: Data = serde_json::from_str(s).unwrap();
+        assert_eq!(data.d, Some(Duration::from_secs(30)));
+
+        let s = r#"{"d": null }"#;
+        let data: Data = serde_json::from_str(s).unwrap();
+        assert_eq!(data.d, None);
+    }
+}
