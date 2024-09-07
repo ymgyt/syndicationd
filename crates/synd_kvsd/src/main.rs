@@ -1,7 +1,7 @@
 use std::env;
 
 use synd_kvsd::{
-    args::{self, ObservabilityOptions},
+    cli::{self, ObservabilityOptions},
     config::{self, ConfigResolver},
 };
 use synd_o11y::{tracing_subscriber::initializer::TracingInitializer, OpenTelemetryGuard};
@@ -29,7 +29,7 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
 
 #[tokio::main]
 async fn main() {
-    let args = match args::try_parse(env::args_os()) {
+    let args = match cli::try_parse(env::args_os()) {
         Ok(args) => args,
         Err(err) => err.exit(),
     };

@@ -4,7 +4,7 @@ use synd_stdx::conf::Entry;
 use thiserror::Error;
 
 use crate::{
-    args::KvsdOptions,
+    cli::KvsdOptions,
     config::{
         file::{ConfigFile, ConfigFileError},
         kvsd, Config,
