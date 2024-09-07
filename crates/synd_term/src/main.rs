@@ -2,12 +2,12 @@ use std::{future, path::PathBuf, process::ExitCode};
 
 use anyhow::Context as _;
 use futures_util::TryFutureExt as _;
+use synd_stdx::fs::fsimpl::FileSystem;
 use synd_term::{
     application::{Application, Cache, Config, Features},
     cli::{self, Args},
     client::{github::GithubClient, synd_api::Client},
     config::{self, ConfigResolver},
-    filesystem::fsimpl::FileSystem,
     interact::{ProcessInteractor, TextBrowserInteractor},
     terminal::{self, Terminal},
     ui::theme::Theme,

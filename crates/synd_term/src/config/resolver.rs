@@ -4,7 +4,10 @@ use std::{
     time::Duration,
 };
 
-use synd_stdx::conf::Entry;
+use synd_stdx::{
+    conf::Entry,
+    fs::{fsimpl, FileSystem},
+};
 use thiserror::Error;
 use url::Url;
 
@@ -15,7 +18,6 @@ use crate::{
         file::{ConfigFile, ConfigFileError},
         Categories,
     },
-    filesystem::{fsimpl, FileSystem},
     ui::theme::Palette,
 };
 

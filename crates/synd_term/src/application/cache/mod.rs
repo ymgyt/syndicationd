@@ -5,12 +5,12 @@ use std::{
 };
 
 use serde::{de::DeserializeOwned, Serialize};
+use synd_stdx::fs::{fsimpl, FileSystem};
 use thiserror::Error;
 
 use crate::{
     auth::{Credential, Unverified},
     config,
-    filesystem::{fsimpl, FileSystem},
     ui::components::gh_notifications::GhNotificationFilterOptions,
 };
 

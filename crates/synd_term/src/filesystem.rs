@@ -1,46 +1,3 @@
-use std::{fs::File, io, path::Path};
-
-pub trait FileSystem {
-    fn create_dir_all<P: AsRef<Path>>(&self, path: P) -> io::Result<()>;
-
-    fn create_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File>;
-
-    fn open_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File>;
-
-    fn remove_file<P: AsRef<Path>>(&self, path: P) -> io::Result<()>;
-}
-
-pub mod fsimpl {
-    use std::{fs::File, io, path::Path};
-
-    #[derive(Debug, Clone, Default)]
-    pub struct FileSystem {}
-
-    impl FileSystem {
-        pub fn new() -> Self {
-            Self {}
-        }
-    }
-
-    impl super::FileSystem for FileSystem {
-        fn create_dir_all<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-            std::fs::create_dir_all(path)
-        }
-
-        fn create_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File> {
-            std::fs::File::create(path)
-        }
-
-        fn open_file<P: AsRef<Path>>(&self, path: P) -> io::Result<File> {
-            std::fs::File::open(path)
-        }
-
-        fn remove_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-            std::fs::remove_file(path)
-        }
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod mock {
     use std::{
@@ -49,6 +6,7 @@ pub(crate) mod mock {
         io,
         path::{Path, PathBuf},
     };
+    use synd_stdx::fs::FileSystem;
 
     #[derive(Default, Clone)]
     pub(crate) struct MockFileSystem {
@@ -66,7 +24,7 @@ pub(crate) mod mock {
         }
     }
 
-    impl super::FileSystem for MockFileSystem {
+    impl FileSystem for MockFileSystem {
         fn create_dir_all<P: AsRef<Path>>(&self, _path: P) -> io::Result<()> {
             unimplemented!()
         }

@@ -6,8 +6,9 @@ use std::{
 
 use anyhow::Context;
 use clap::Args;
+use synd_stdx::fs::FileSystem;
 
-use crate::{application::Cache, config, filesystem::FileSystem};
+use crate::{application::Cache, config};
 
 /// Clean cache and logs
 #[derive(Args, Debug)]
@@ -74,9 +75,10 @@ impl CleanCommand {
 mod tests {
     use std::io;
 
+    use synd_stdx::fs::fsimpl;
     use tempfile::{NamedTempFile, TempDir};
 
-    use crate::filesystem::{fsimpl, mock::MockFileSystem};
+    use crate::filesystem::mock::MockFileSystem;
 
     use super::*;
 
