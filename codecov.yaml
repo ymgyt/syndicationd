@@ -10,7 +10,11 @@ coverage:
     patch:
       default:
         target: 50%
-ignore: []
+ignore:
+  # There are only 3 lines, but 340 lines are displayed as tracked lines, and We can't deal with it
+  # https://app.codecov.io/github/ymgyt/syndicationd/blob/main/crates%2Fsynd_api%2Fsrc%2Fserve%2Flayer%2Fmod.rs
+  - "crates/synd_api/src/serve/layer/mod.rs"
+  - "crates/ebpf"
 comment: # https://docs.codecov.com/docs/pull-request-comments
   # reach is not documented, but validator doesn't complain
   layout: "condensed_header,reach,diff,condensed_files,condensed_footer"
