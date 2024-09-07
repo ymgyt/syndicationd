@@ -164,19 +164,19 @@ synd config init > config.toml
 
 ### Settings
 
-| Flag               | Environment variable      | Configuration file       | Description                                         | Default                             |
-| ---                | ---                       | ---                      | ---                                                 | ---                                 |
-| `--config`         | `SYND_CONFIG_FILE`        | -                        | Configuration file path                             | see [configuration](#configuration) |
-| `--log`            | `SYND_LOG_FILE`           | `[log.path]`             | Log file path                                       | see `synd check`                    |
-| `--cache-dir`      | `SYND_CACHE_DIR`          | `[cache.directory]`      | Cache directory                                     | see `synd check`                    |
-| `--theme`          | `SYND_THEME`              | `[theme.name]`           | Theme name                                          | `ferra`                             |
-| `--endpoint`       | `SYND_ENDPOINT`           | `[api.endpoint]`         | synd-api endpoint                                   | `https://api.syndicationd.ymgyt.io` |
-| `--client-timeout` | `SYND_CLIENT_TIMEOUT`     | `[api.timeout]`          | synd-api client timeout                             | `30s`                               |
-| `--entries-limit`  | `SYND_ENTRIES_LIMIT`      | `[feed.entries_limit]`   | Feed entreis to fetch                               | `200`                               |
-| `--browser`        | `SYND_FEED_BROWSER`       | `[feed.browser.command]` | Command to browse feed                              | -                                   |
-| `--browser-args`   | `SYND_FEED_BROWSER_ARGS`  | `[feed.browser.args]`    | Command args to browse feed                         | `[]`                                |
-| `--enable-gh`      | `SYND_ENABLE_GH`          | `[github.enable]`        | Enable github notification feature                  | `false`                             |
-| `--github-pat`     | `SYND_GH_PAT`             | `[github.pat]`           | Github personal access token to fetch notifications | -                                   |
+| Flag               | Environment variable     | Configuration file       | Default                             | Description                                         |
+|--------------------|--------------------------|--------------------------|-------------------------------------|-----------------------------------------------------|
+| `--config`         | `SYND_CONFIG_FILE`       | \-                       | see [configuration](#configuration) | Configuration file path                             |
+| `--log`            | `SYND_LOG_FILE`          | `[log.path]`             | see `synd check`                    | Log file path                                       |
+| `--cache-dir`      | `SYND_CACHE_DIR`         | `[cache.directory]`      | see `synd check`                    | Cache directory                                     |
+| `--theme`          | `SYND_THEME`             | `[theme.name]`           | `ferra`                             | Theme name                                          |
+| `--endpoint`       | `SYND_ENDPOINT`          | `[api.endpoint]`         | `https://api.syndicationd.ymgyt.io` | synd-api endpoint                                   |
+| `--client-timeout` | `SYND_CLIENT_TIMEOUT`    | `[api.timeout]`          | `30s`                               | synd-api client timeout                             |
+| `--entries-limit`  | `SYND_ENTRIES_LIMIT`     | `[feed.entries_limit]`   | `200`                               | Feed entreis to fetch                               |
+| `--browser`        | `SYND_FEED_BROWSER`      | `[feed.browser.command]` | \-                                  | Command to browse feed                              |
+| `--browser-args`   | `SYND_FEED_BROWSER_ARGS` | `[feed.browser.args]`    | `[]`                                | Command args to browse feed                         |
+| `--enable-gh`      | `SYND_ENABLE_GH`         | `[github.enable]`        | `false`                             | Enable github notification feature                  |
+| `--github-pat`     | `SYND_GH_PAT`            | `[github.pat]`           | \-                                  | Github personal access token to fetch notifications |
 
 ### Additional categories
 
