@@ -6,14 +6,14 @@ updates:
       interval: weekly
       time: "07:00"
       timezone: "Asia/Tokyo"
-    labels: ["kind/dependencies", "area/github_actions"]
+    labels: ["dependencies/github_actions"]
   - package-ecosystem: cargo
     directory: /
     schedule: # github does not support yaml anchors
       interval: weekly
       time: "07:00"
       timezone: "Asia/Tokyo"
-    labels: ["kind/dependencies", "area/rust"]
+    labels: ["dependencies/rust"]
     # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file#groups
     # If a dependency doesn't belong to any group, Dependabot will continue to raise single pull requests to update the dependency to its latest version as normal.
     groups:
