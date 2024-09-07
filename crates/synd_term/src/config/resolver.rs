@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use synd_stdx::conf::Entry;
 use thiserror::Error;
 use url::Url;
 
@@ -259,154 +260,95 @@ impl ConfigResolverBuilder {
 
         let resolver = ConfigResolver {
             config_file: config_path,
-            log_file: Entry {
-                flag: log_file_flag,
-                default: config::log_path(),
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.log.as_mut())
-                    .and_then(|log| log.path.take()),
-            },
-            cache_dir: Entry {
-                flag: cache_dir_flag,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.cache.as_mut())
-                    .and_then(|cache| cache.directory.take()),
-                default: config::cache::dir().to_owned(),
-            },
-            api_endpoint: Entry {
-                flag: endpoint,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.api.as_mut())
-                    .and_then(|api| api.endpoint.take()),
-                default: Url::parse(config::api::ENDPOINT).unwrap(),
-            },
-            api_timeout: Entry {
-                flag: client_timeout,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.api.as_mut())
-                    .and_then(|api| api.timeout.take()),
-                default: config::client::DEFAULT_TIMEOUT,
-            },
-            feed_entries_limit: Entry {
-                flag: entries_limit,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.feed.as_mut())
-                    .and_then(|feed| feed.entries_limit),
-                default: config::feed::DEFAULT_ENTRIES_LIMIT,
-            },
-            feed_browser_command: Entry {
-                flag: browser,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.feed.as_mut())
-                    .and_then(|feed| feed.browser.as_mut())
-                    .and_then(|brower| brower.command.take()),
-                default: config::feed::default_brower_command(),
-            },
-            feed_browser_args: Entry {
-                flag: browser_args,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.feed.as_mut())
-                    .and_then(|feed| feed.browser.as_mut())
-                    .and_then(|brower| brower.args.take()),
-                default: Vec::new(),
-            },
-            github_enable: Entry {
-                flag: enable_github_notification,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.github.as_mut())
-                    .and_then(|gh| gh.enable.take()),
-                default: false,
-            },
-            github_pat: Entry {
-                flag: github_pat,
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.github.as_mut())
-                    .and_then(|gh| gh.pat.take()),
-                default: String::new(),
-            },
-            palette: Entry {
-                flag: palette_flag.map(Into::into),
-                file: config_file
-                    .as_mut()
-                    .and_then(|c| c.theme.as_mut())
-                    .and_then(|theme| theme.name.take())
-                    .map(Into::into),
-                default: config::theme::DEFAULT_PALETTE.into(),
-            },
+            log_file: Entry::with_default(config::log_path())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.log.as_mut())
+                        .and_then(|log| log.path.take()),
+                )
+                .with_flag(log_file_flag),
+            cache_dir: Entry::with_default(config::cache::dir().to_owned())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.cache.as_mut())
+                        .and_then(|cache| cache.directory.take()),
+                )
+                .with_flag(cache_dir_flag),
+            api_endpoint: Entry::with_default(Url::parse(config::api::ENDPOINT).unwrap())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.api.as_mut())
+                        .and_then(|api| api.endpoint.take()),
+                )
+                .with_flag(endpoint),
+            api_timeout: Entry::with_default(config::client::DEFAULT_TIMEOUT)
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.api.as_mut())
+                        .and_then(|api| api.timeout.take()),
+                )
+                .with_flag(client_timeout),
+
+            feed_entries_limit: Entry::with_default(config::feed::DEFAULT_ENTRIES_LIMIT)
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.feed.as_mut())
+                        .and_then(|feed| feed.entries_limit),
+                )
+                .with_flag(entries_limit),
+            feed_browser_command: Entry::with_default(config::feed::default_brower_command())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.feed.as_mut())
+                        .and_then(|feed| feed.browser.as_mut())
+                        .and_then(|brower| brower.command.take()),
+                )
+                .with_flag(browser),
+
+            feed_browser_args: Entry::with_default(Vec::new())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.feed.as_mut())
+                        .and_then(|feed| feed.browser.as_mut())
+                        .and_then(|brower| brower.args.take()),
+                )
+                .with_flag(browser_args),
+
+            github_enable: Entry::with_default(false)
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.github.as_mut())
+                        .and_then(|gh| gh.enable.take()),
+                )
+                .with_flag(enable_github_notification),
+            github_pat: Entry::with_default(String::new())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.github.as_mut())
+                        .and_then(|gh| gh.pat.take()),
+                )
+                .with_flag(github_pat),
+            palette: Entry::with_default(config::theme::DEFAULT_PALETTE.into())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.theme.as_mut())
+                        .and_then(|theme| theme.name.take())
+                        .map(Into::into),
+                )
+                .with_flag(palette_flag.map(Into::into)),
             categories,
         };
 
         resolver.validate()
-    }
-}
-
-#[derive(Debug)]
-struct Entry<T> {
-    flag: Option<T>,
-    file: Option<T>,
-    default: T,
-}
-
-impl<T> Entry<T> {
-    fn resolve_ref(&self) -> &T {
-        self.flag
-            .as_ref()
-            .or(self.file.as_ref())
-            .unwrap_or(&self.default)
-    }
-}
-
-impl<T> Entry<T>
-where
-    T: Copy,
-{
-    fn resolve(&self) -> T {
-        *self.resolve_ref()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolve_order() {
-        let flag = 10;
-        let file = 9;
-        let default = 8;
-
-        let e = Entry {
-            flag: Some(flag),
-            file: Some(file),
-            default,
-        };
-        assert_eq!(e.resolve(), flag, "flag should have highest priority");
-
-        let e = Entry {
-            flag: None,
-            file: Some(file),
-            default,
-        };
-        assert_eq!(
-            e.resolve(),
-            file,
-            "file should have higher priority over default"
-        );
-
-        let e = Entry {
-            flag: None,
-            file: None,
-            default,
-        };
-        assert_eq!(e.resolve(), default);
     }
 }

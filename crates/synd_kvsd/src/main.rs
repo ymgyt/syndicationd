@@ -37,7 +37,7 @@ async fn main() {
 
     // TODO:
     // 1. Resolve Config
-    let _config = match ConfigResolver::new(args.kvsd).resolve() {
+    let _config = match ConfigResolver::from_args(args.kvsd).resolve() {
         Ok(config) => config,
         Err(err) => {
             tracing::error!("{err}");

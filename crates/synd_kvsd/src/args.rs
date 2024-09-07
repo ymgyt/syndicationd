@@ -17,9 +17,9 @@ pub struct Args {
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Kvsd options")]
 pub struct KvsdOptions {
-    /// Max tcp connections
-    #[arg(long, env = config::env::MAX_CONNECTIONS)]
-    pub(crate) max_connections: Option<u32>,
+    /// Tcp connections limit
+    #[arg(long, env = config::env::CONNECTIONS_LIMIT)]
+    pub(crate) connections_limit: Option<u32>,
     /// Buffer bytes assigned to each connection
     #[arg(long, env = config::env::CONNECTION_BUFFER_BYTES)]
     pub(crate) connection_buffer_bytes: Option<usize>,

@@ -6,7 +6,7 @@ Syndicationd key value store daemon
 
 | Flag                | Environment variable | Configuration file | Description | Default |
 | ---                 | ---                  | ---                | ---         | ---     |
-| `--max-connections` | `KVSD_MAX_CONNECTIONS` | ??? | Max tcp connections | ??? |
+| `--connections-limit` | `KVSD_CONNECTIONS_LIMIT` | ??? | Max tcp connections | ??? |
 | `--connection-buffer-bytes` | `KVSD_CONNECTION_BUFFER_BYTES` | ??? | Buffer bytes assigned to each connection | ??? |
 | `--authenticate-timeout` | `KVSD_AUTHENTICATE_TIMEOUT` | ??? | Authenticate timeout | ??? |
 | `--config` | `KVSD_CONFIG_FILE` | - | Configuration file path | ??? |

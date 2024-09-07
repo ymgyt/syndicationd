@@ -2,11 +2,10 @@ use std::{net::IpAddr, path::PathBuf, time::Duration};
 
 use serde::Deserialize;
 
-use crate::{args::KvsdOptions, config::file::ConfigFile};
-
 mod file;
 mod resolver;
 pub use resolver::{ConfigResolver, ConfigResolverError};
+use synd_stdx::conf::Entry;
 
 /// Application configurations
 pub mod app {
@@ -26,7 +25,7 @@ pub mod env {
     pub const LOG_SHOW_LOCATION: &str = env_key!("LOG_SHOW_LOCATION");
     pub const LOG_SHOW_TARGET: &str = env_key!("LOG_SHOW_TARGET");
 
-    pub const MAX_CONNECTIONS: &str = env_key!("MAX_CONNECTIONS");
+    pub const CONNECTIONS_LIMIT: &str = env_key!("CONNECTIONS_LIMIT");
     pub const CONNECTION_BUFFER_BYTES: &str = env_key!("CONNECTION_BUFFER_BYTES");
     pub const AUTHENTICATE_TIMEOUT: &str = env_key!("AUTHENTICATE_TIMEOUT");
     pub const CONFIG_FILE: &str = env_key!("CONFIG_FILE");
@@ -46,7 +45,7 @@ mod kvsd {
 
         use crate::config::TlsConnection;
 
-        pub(crate) const MAX_TCP_CONNECTIONS: u32 = 1024;
+        pub(crate) const CONNECTIONS_LIMIT: u32 = 1024;
         pub(crate) const BUFFER_SIZE_PER_CONNECTION: usize = 1024 * 1024 * 1024;
         pub(crate) const AUTHENTICATE_TIMEOUT: Duration = Duration::from_secs(3);
         pub(crate) const BIND_PORT: u16 = 7379;
@@ -60,19 +59,20 @@ mod kvsd {
 
 // Server configuration.
 #[derive(Debug)]
+#[expect(dead_code)]
 pub struct Config {
     /// Max tcp connections.
-    connections_limit: u32,
+    pub(super) connections_limit: Entry<u32>,
     /// Size of buffer allocated per tcp connection.
-    buffer_size_per_connection: usize,
+    pub(super) buffer_size_per_connection: Entry<usize>,
     /// Timeout duration for reading authenticate message.
-    authenticate_timeout: Duration,
+    pub(super) authenticate_timeout: Entry<Duration>,
     /// Bind address
-    bind_address: IpAddr,
+    pub(super) bind_address: Entry<IpAddr>,
     /// tcp listen port.
-    bind_port: u16,
+    pub(super) bind_port: Entry<u16>,
     /// Tls connection
-    tls: TlsConnection,
+    pub(super) tls: Entry<TlsConnection>,
 }
 
 #[derive(Debug)]
@@ -82,32 +82,10 @@ pub enum TlsConnection {
 }
 
 #[derive(Debug, Deserialize)]
+#[expect(dead_code)]
 pub struct TlsConfig {
     // tls server certificate file path
     tls_certificate: PathBuf,
     // tls server private key file path
     tls_key: PathBuf,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            connections_limit: kvsd::default::MAX_TCP_CONNECTIONS,
-            buffer_size_per_connection: kvsd::default::BUFFER_SIZE_PER_CONNECTION,
-            authenticate_timeout: kvsd::default::AUTHENTICATE_TIMEOUT,
-            bind_address: kvsd::default::bind_address(),
-            bind_port: kvsd::default::BIND_PORT,
-            tls: kvsd::default::TLS_CONNECTION,
-        }
-    }
-}
-
-impl Config {
-    fn merge_config_file(&mut self, _file: ConfigFile) {
-        todo!()
-    }
-
-    fn merge_args(&mut self, _flags: KvsdOptions) {
-        todo!()
-    }
 }

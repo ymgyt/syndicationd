@@ -22,6 +22,7 @@ supports-color = { version = "3.0.1", optional = true }
 [features]
 byte      = ["dep:byte-unit"]
 color     = ["dep:supports-color"]
+conf      = []
 humantime = ["dep:humantime"]
 
 [dev-dependencies]
