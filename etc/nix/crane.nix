@@ -125,7 +125,7 @@ in
       commonArgs
       // {
         inherit cargoArtifacts;
-        cargoLlvmCovExtraArgs = "--codecov --all-features --output-path $out  --ignore-filename-regex '(client/generated/.*.rs)'";
+        cargoLlvmCovExtraArgs = "--lcov --all-features --output-path $out  --ignore-filename-regex '(client/generated/.*.rs)'";
       }
     );
   };
