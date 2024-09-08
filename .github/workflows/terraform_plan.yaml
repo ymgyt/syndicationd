@@ -1,0 +1,46 @@
+name: "Terraform Plan"
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - hosting/terraform/grafana/*.tf
+      - hosting/terraform/grafana/dashboards/*.json
+jobs:
+  plan:
+    if: ${{github.repository == 'ymgyt/syndicationd'}}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@V27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: cachix/cachix-action@v15
+        with:
+          name: syndicationd
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: terraform init
+        run: nix develop .#ci --accept-flake-config --command just tf grafana init
+        env:
+          TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
+      - name: terraform plan
+        id: plan
+        continue-on-error: true
+        run: nix develop .#ci --accept-flake-config --command just tf grafana plan -no-color
+        env:
+          TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
+          TF_VAR_grafana_sa_token: "${{secrets.GRAFANA_SA_TOKEN}}"
+      - name: Post Plan to GitHub PR
+        uses: mshick/add-pr-comment@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token-user-login: 'github-actions[bot]'
+          message: |
+            Applying:
+
+            ```
+            ${{ steps.plan.outputs.stdout }}
+            ```

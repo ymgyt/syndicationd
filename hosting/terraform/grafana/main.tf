@@ -1,6 +1,6 @@
 terraform {
 
-  required_version = ">= 1.8.3"
+  required_version = ">= 1.9.5"
 
   cloud {
     organization = "ymgyt"
