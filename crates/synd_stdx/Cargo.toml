@@ -16,6 +16,7 @@ version     = "0.1.0"
 [dependencies]
 byte-unit      = { version = "5.1.4", optional = true, features = ["serde"] }
 humantime      = { version = "2.1.0", optional = true }
+mockall        = { workspace = true, optional = true }
 serde          = { workspace = true, features = ["derive"] }
 supports-color = { version = "3.0.1", optional = true }
 
@@ -24,6 +25,7 @@ byte      = ["dep:byte-unit"]
 color     = ["dep:supports-color"]
 conf      = []
 humantime = ["dep:humantime"]
+mock      = ["dep:mockall"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
