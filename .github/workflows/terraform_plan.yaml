@@ -34,7 +34,7 @@ jobs:
           TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
           TF_VAR_grafana_sa_token: "${{secrets.GRAFANA_SA_TOKEN}}"
       - name: Post Plan to GitHub PR
-        uses: mshick/add-pr-comment@v1
+        uses: mshick/add-pr-comment@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           repo-token-user-login: 'github-actions[bot]'
