@@ -2,3 +2,7 @@ mod grafana
 
 default:
     just --list --list-submodules
+
+# Run terraform fmt -check
+check:
+    terraform fmt -check

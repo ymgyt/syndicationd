@@ -2,7 +2,12 @@ terraform {
 
   required_version = ">= 1.8.3"
 
-  backend "s3" {
+  cloud {
+    organization = "ymgyt"
+
+    workspaces {
+      name = "grafana"
+    }
   }
 
   required_providers {

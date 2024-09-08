@@ -3,13 +3,9 @@ set shell := ["nu", "-c"]
 default:
     just --list
 
-# Init terraform project with s3 backend
-init-s3 *flags:
-    terraform init \
-        -backend-config=bucket={{env("TF_BE_BUCKET")}} \
-        -backend-config=key={{env("TF_BE_KEY")}} \
-        -backend-config=profile={{env("TF_BE_PROFILE")}} \
-        -backend-config=region={{env("TF_BE_REGION")}} {{flags}}
+# Init terraform project
+init *flags:
+    terraform init {{flags}}
 
 # Run terraform plan
 plan *flags:
