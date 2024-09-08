@@ -1,1 +1,4 @@
 mod grafana
+
+default:
+    just --list --list-submodules

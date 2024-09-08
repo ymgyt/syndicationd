@@ -19,3 +19,7 @@ $env.TF_BE_REGION  = "aws region"
 # Run terraform init with given backend configuration
 just init-s3
 ```
+
+## Dashboards
+
+Based on the JSON files stored in the [dashboards](./dashboards) directory, dashboards will be created under the Syndicationd folder in Grafana.

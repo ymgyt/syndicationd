@@ -1,0 +1,1228 @@
+{
+	"annotations": {
+		"list": [
+			{
+				"builtIn": 1,
+				"datasource": {
+					"type": "grafana",
+					"uid": "-- Grafana --"
+				},
+				"enable": true,
+				"hide": true,
+				"iconColor": "rgba(0, 211, 255, 1)",
+				"name": "Annotations & Alerts",
+				"type": "dashboard"
+			}
+		]
+	},
+	"editable": true,
+	"fiscalYearStartMonth": 0,
+	"graphTooltip": 0,
+	"id": 17,
+	"links": [],
+	"panels": [
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 0,
+						"gradientMode": "none",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 10,
+				"x": 0,
+				"y": 0
+			},
+			"id": 2,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"maxHeight": 600,
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "code",
+					"expr": "increase(http_server_request_total{job=\"syndicationd/synd-api\", instance=\"rpi4-03\"}[1d])",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "{{http_response_status_code}}",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "Daily Total Requests",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 0,
+						"gradientMode": "none",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 9,
+				"x": 10,
+				"y": 0
+			},
+			"id": 3,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"maxHeight": 600,
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "code",
+					"expr": "increase(feed_subscription_total{job=\"syndicationd/synd-api\"}[6m])",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "subscription",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "code",
+					"expr": "increase(feed_unsubscription_total{job=\"syndicationd/synd-api\"}[6m])",
+					"fullMetaSearch": false,
+					"hide": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "unsubscription",
+					"range": true,
+					"refId": "B",
+					"useBackend": false
+				}
+			],
+			"title": "Feed Subscriptions",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "loki",
+				"uid": "grafanacloud-logs"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "thresholds"
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 5,
+				"x": 19,
+				"y": 0
+			},
+			"id": 6,
+			"options": {
+				"colorMode": "value",
+				"graphMode": "area",
+				"justifyMode": "auto",
+				"orientation": "auto",
+				"percentChangeColorMode": "standard",
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"showPercentChange": false,
+				"textMode": "auto",
+				"wideLayout": true
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "loki",
+						"uid": "grafanacloud-logs"
+					},
+					"editorMode": "code",
+					"expr": "count(count(count_over_time({job=\"syndicationd/synd-api\"} | json | attributes_operation = \"FetchEntries\" and attributes_result = \"success\"[1w])) by (attributes_enduser_id))",
+					"queryType": "range",
+					"refId": "A"
+				}
+			],
+			"title": "Weekly Unique Users",
+			"type": "stat"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"description": "Latency Distribution",
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "thresholds"
+					},
+					"fieldMinMax": false,
+					"mappings": [],
+					"min": 0,
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 11,
+				"w": 12,
+				"x": 0,
+				"y": 8
+			},
+			"id": 1,
+			"options": {
+				"displayMode": "gradient",
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": false
+				},
+				"maxVizHeight": 300,
+				"minVizHeight": 16,
+				"minVizWidth": 8,
+				"namePlacement": "auto",
+				"orientation": "auto",
+				"reduceOptions": {
+					"calcs": ["lastNotNull"],
+					"fields": "",
+					"values": false
+				},
+				"showUnfilled": true,
+				"sizing": "auto",
+				"valueMode": "color"
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "code",
+					"exemplar": true,
+					"expr": "increase(graphql_duration_seconds_bucket{job=\"syndicationd/synd-api\", instance=\"rpi4-03\"}[1d])",
+					"format": "heatmap",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "{{le}}",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "GraphQL Duration Histogram",
+			"type": "bargauge"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"description": "tokio-metrics TaskMonitor metrics for graphql ",
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 0,
+						"gradientMode": "none",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "smooth",
+						"lineStyle": {
+							"fill": "solid"
+						},
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					},
+					"unit": "s"
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 11,
+				"w": 12,
+				"x": 12,
+				"y": 8
+			},
+			"id": 10,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"maxHeight": 600,
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "rate(task_graphql_mean_poll_duration_total{job=\"syndicationd/synd-api\"}[$__rate_interval])",
+					"format": "time_series",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "poll",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "rate(task_graphql_mean_slow_poll_duration_total{job=\"syndicationd/synd-api\"}[$__rate_interval])",
+					"fullMetaSearch": false,
+					"hide": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "slow_poll",
+					"range": true,
+					"refId": "B",
+					"useBackend": false
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "rate(task_graphql_mean_idle_duration_total{job=\"syndicationd/synd-api\"}[$__rate_interval])",
+					"fullMetaSearch": false,
+					"hide": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "idle",
+					"range": true,
+					"refId": "C",
+					"useBackend": false
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "rate(task_graphql_mean_scheduled_duration_total{job=\"syndicationd/synd-api\"}[$__rate_interval])",
+					"fullMetaSearch": false,
+					"hide": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "scheduled",
+					"range": true,
+					"refId": "D",
+					"useBackend": false
+				}
+			],
+			"title": "GraphQL TaskMonitor Metrics",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 0,
+						"gradientMode": "none",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 12,
+				"x": 0,
+				"y": 19
+			},
+			"id": 8,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"maxHeight": 600,
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "code",
+					"expr": "rate(runtime_poll_total{job=\"syndicationd/synd-api\"}[$__rate_interval])",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "__auto",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "Tokio Runtime Polls",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 0,
+						"gradientMode": "none",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": null
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					},
+					"unit": "s"
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 12,
+				"x": 12,
+				"y": 19
+			},
+			"id": 9,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"maxHeight": 600,
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75420",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "rate(runtime_busy_duration_total{job=\"syndicationd/synd-api\"}[$__rate_interval])",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "__auto",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "Tokio Runtime Busy Duration",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "tempo",
+				"uid": "grafanacloud-traces"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "thresholds"
+					},
+					"custom": {
+						"align": "auto",
+						"cellOptions": {
+							"type": "auto"
+						},
+						"inspect": false
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green"
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 12,
+				"x": 0,
+				"y": 27
+			},
+			"id": 4,
+			"options": {
+				"cellHeight": "sm",
+				"footer": {
+					"countRows": false,
+					"fields": "",
+					"reducer": ["sum"],
+					"show": false
+				},
+				"showHeader": true
+			},
+			"pluginVersion": "11.3.0-75221",
+			"targets": [
+				{
+					"datasource": {
+						"type": "tempo",
+						"uid": "grafanacloud-traces"
+					},
+					"filters": [
+						{
+							"id": "service-name",
+							"operator": "=",
+							"scope": "resource",
+							"tag": "service.name",
+							"value": ["synd-api"],
+							"valueType": "string"
+						},
+						{
+							"id": "e48f382a",
+							"operator": "=",
+							"scope": "resource",
+							"tag": "deployment.environment",
+							"value": ["production"],
+							"valueType": "string"
+						},
+						{
+							"id": "span-name",
+							"operator": "=",
+							"scope": "span",
+							"tag": "name",
+							"value": [],
+							"valueType": "string"
+						},
+						{
+							"id": "duration-type",
+							"value": "span"
+						},
+						{
+							"id": "min-duration",
+							"operator": ">",
+							"tag": "duration",
+							"value": "500ms",
+							"valueType": "duration"
+						}
+					],
+					"limit": 20,
+					"query": "",
+					"queryType": "traceqlSearch",
+					"refId": "A",
+					"tableType": "traces"
+				}
+			],
+			"title": "Slow Request Traces ( > 500ms)",
+			"type": "table"
+		},
+		{
+			"datasource": {
+				"type": "loki",
+				"uid": "grafanacloud-logs"
+			},
+			"fieldConfig": {
+				"defaults": {},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 12,
+				"x": 12,
+				"y": 27
+			},
+			"id": 5,
+			"options": {
+				"dedupStrategy": "none",
+				"enableLogDetails": true,
+				"prettifyLogMessage": false,
+				"showCommonLabels": true,
+				"showLabels": false,
+				"showTime": true,
+				"sortOrder": "Descending",
+				"wrapLogMessage": true
+			},
+			"pluginVersion": "11.3.0-75221",
+			"targets": [
+				{
+					"datasource": {
+						"type": "loki",
+						"uid": "grafanacloud-logs"
+					},
+					"editorMode": "builder",
+					"expr": "{job=\"syndicationd/synd-api\", level=\"ERROR\"} |= ``",
+					"queryType": "range",
+					"refId": "A"
+				}
+			],
+			"title": "Error Logs",
+			"type": "logs"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 15,
+						"gradientMode": "hue",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green"
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 9,
+				"w": 12,
+				"x": 0,
+				"y": 35
+			},
+			"id": 11,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75221",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "cache_feed_count{job=\"syndicationd/synd-api\"}",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "__auto",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "Feed Cache Count",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "palette-classic"
+					},
+					"custom": {
+						"axisBorderShow": false,
+						"axisCenteredZero": false,
+						"axisColorMode": "text",
+						"axisLabel": "",
+						"axisPlacement": "auto",
+						"barAlignment": 0,
+						"barWidthFactor": 0.6,
+						"drawStyle": "line",
+						"fillOpacity": 16,
+						"gradientMode": "none",
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineInterpolation": "linear",
+						"lineWidth": 1,
+						"pointSize": 5,
+						"scaleDistribution": {
+							"type": "linear"
+						},
+						"showPoints": "auto",
+						"spanNulls": false,
+						"stacking": {
+							"group": "A",
+							"mode": "none"
+						},
+						"thresholdsStyle": {
+							"mode": "off"
+						}
+					},
+					"mappings": [],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green"
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					},
+					"unit": "bytes"
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 9,
+				"w": 12,
+				"x": 12,
+				"y": 35
+			},
+			"id": 12,
+			"options": {
+				"legend": {
+					"calcs": [],
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"tooltip": {
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75221",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "builder",
+					"expr": "cache_feed_size{instance=\"rpi4-03\"}",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"instant": false,
+					"legendFormat": "__auto",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "Feed Cache Size",
+			"type": "timeseries"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "grafanacloud-prom"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "continuous-GrYlRd"
+					},
+					"custom": {
+						"fillOpacity": 70,
+						"hideFrom": {
+							"legend": false,
+							"tooltip": false,
+							"viz": false
+						},
+						"insertNulls": false,
+						"lineWidth": 1,
+						"spanNulls": false
+					},
+					"mappings": [
+						{
+							"options": {
+								"0": {
+									"color": "red",
+									"index": 0,
+									"text": "Down"
+								}
+							},
+							"type": "value"
+						},
+						{
+							"options": {
+								"from": 1,
+								"result": {
+									"color": "green",
+									"index": 1,
+									"text": "OK"
+								},
+								"to": 10
+							},
+							"type": "range"
+						},
+						{
+							"options": {
+								"match": "null+nan",
+								"result": {
+									"color": "purple",
+									"index": 2
+								}
+							},
+							"type": "special"
+						}
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green"
+							}
+						]
+					}
+				},
+				"overrides": []
+			},
+			"gridPos": {
+				"h": 8,
+				"w": 24,
+				"x": 0,
+				"y": 44
+			},
+			"id": 7,
+			"options": {
+				"alignValue": "left",
+				"legend": {
+					"displayMode": "list",
+					"placement": "bottom",
+					"showLegend": true
+				},
+				"mergeValues": false,
+				"rowHeight": 0.83,
+				"showValue": "auto",
+				"tooltip": {
+					"maxHeight": 600,
+					"mode": "single",
+					"sort": "none"
+				}
+			},
+			"pluginVersion": "11.3.0-75221",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "grafanacloud-prom"
+					},
+					"disableTextWrap": false,
+					"editorMode": "code",
+					"expr": "sum without (service_version) (target_info{job=\"syndicationd/synd-api\"})",
+					"fullMetaSearch": false,
+					"includeNullMetadata": true,
+					"legendFormat": "__auto",
+					"range": true,
+					"refId": "A",
+					"useBackend": false
+				}
+			],
+			"title": "Health History",
+			"type": "state-timeline"
+		}
+	],
+	"preload": false,
+	"refresh": "1h",
+	"schemaVersion": 39,
+	"tags": [],
+	"templating": {
+		"list": []
+	},
+	"time": {
+		"from": "now-12h",
+		"to": "now"
+	},
+	"timepicker": {},
+	"timezone": "browser",
+	"title": "synd-api",
+	"uid": "cdd2yfdz497uoc",
+	"version": 43,
+	"weekStart": ""
+}
