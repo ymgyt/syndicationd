@@ -23,7 +23,7 @@ digraph {
     synd_term -> synd_api [ label="3. request" ]
 
     synd_api -> id_provider [ label="4. verify" ]
-    id_provider -> synd_api [ label="5. email" style="dashed" ]
+    synd_api -> synd_api [ label="5. email" style="dashed" ]
     synd_api -> authorize_server [ label="4. profile" ]
     authorize_server -> synd_api [ label="5. email" style="dashed" ]
 
