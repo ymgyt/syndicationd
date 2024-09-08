@@ -37,14 +37,13 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-
-          # terraform has an unfree license (‘bsl11’)
-          config.allowUnfree = true;
+        # terraform has an unfree license (‘bsl11’)
+        config = {
+          allowUnfree = true;
         };
-        pkgs-unstable = import nixpkgs-unstable { inherit system overlays; };
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs { inherit system overlays config; };
+        pkgs-unstable = import nixpkgs-unstable { inherit system overlays config; };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
@@ -72,10 +71,11 @@
         ci_packages = with pkgs; [
           # >= 1.31.0 for modules
           pkgs-unstable.just
+          # ~> 1.9.0 for remote workspace
+          pkgs-unstable.terraform
           nushell # just set nu as shell
           cargo-bundle-licenses
           docker
-          terraform
         ];
 
         # Inherits from checks cargo-nextest, cargo-audit
