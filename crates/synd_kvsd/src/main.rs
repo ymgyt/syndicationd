@@ -1,6 +1,7 @@
 use std::env;
 
 use synd_kvsd::{
+    boot::Boot,
     cli::{self, ObservabilityOptions},
     config::{self, ConfigResolver},
 };
@@ -35,9 +36,8 @@ async fn main() {
     };
     let _guard = init_tracing(&args.o11y);
 
-    // TODO:
     // 1. Resolve Config
-    let _config = match ConfigResolver::from_args(args.kvsd).resolve() {
+    let config = match ConfigResolver::from_args(args.kvsd).resolve() {
         Ok(config) => config,
         Err(err) => {
             tracing::error!("{err}");
@@ -45,11 +45,8 @@ async fn main() {
         }
     };
 
-    // 2. FileTreeProvisioner provision file tree
-    // 3. Walk table direcotries
-    // 4. Create Dispatcher
-    // 5. Create Middleware
-    // 6. Create Kvsd
+    Boot::new(config.root_dir()).boot().unwrap();
+
     // 7. Spawn Kvsd
     // 8. Run Server
 }

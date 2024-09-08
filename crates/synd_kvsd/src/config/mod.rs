@@ -1,4 +1,8 @@
-use std::{net::IpAddr, path::PathBuf, time::Duration};
+use std::{
+    net::IpAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use serde::Deserialize;
 
@@ -41,7 +45,7 @@ pub mod env {
 
 mod kvsd {
     pub(super) mod default {
-        use std::{net::IpAddr, time::Duration};
+        use std::{net::IpAddr, path::PathBuf, time::Duration};
 
         use crate::config::TlsConnection;
 
@@ -54,7 +58,25 @@ mod kvsd {
         pub(crate) fn bind_address() -> IpAddr {
             IpAddr::from([127, 0, 0, 1])
         }
+        pub(crate) fn root_dir() -> PathBuf {
+            PathBuf::from(".kvsd")
+        }
     }
+}
+
+#[derive(Debug)]
+pub enum TlsConnection {
+    Enable(TlsConfig),
+    Disable,
+}
+
+#[derive(Debug, Deserialize)]
+#[expect(dead_code)]
+pub struct TlsConfig {
+    // tls server certificate file path
+    tls_certificate: PathBuf,
+    // tls server private key file path
+    tls_key: PathBuf,
 }
 
 // Server configuration.
@@ -73,19 +95,12 @@ pub struct Config {
     pub(super) bind_port: Entry<u16>,
     /// Tls connection
     pub(super) tls: Entry<TlsConnection>,
+    /// Root directory where kvsd store it's data
+    pub(super) root_dir: Entry<PathBuf>,
 }
 
-#[derive(Debug)]
-pub enum TlsConnection {
-    Enable(TlsConfig),
-    Disable,
-}
-
-#[derive(Debug, Deserialize)]
-#[expect(dead_code)]
-pub struct TlsConfig {
-    // tls server certificate file path
-    tls_certificate: PathBuf,
-    // tls server private key file path
-    tls_key: PathBuf,
+impl Config {
+    pub fn root_dir(&self) -> &Path {
+        self.root_dir.resolve_ref().as_path()
+    }
 }

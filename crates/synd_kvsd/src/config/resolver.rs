@@ -42,6 +42,7 @@ impl ConfigResolver {
             bind_address: Entry::with_default(kvsd::default::bind_address()),
             bind_port: Entry::with_default(kvsd::default::BIND_PORT),
             tls: Entry::with_default(kvsd::default::TLS_CONNECTION),
+            root_dir: Entry::with_default(kvsd::default::root_dir()),
         })
     }
 

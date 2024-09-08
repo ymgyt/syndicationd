@@ -31,6 +31,10 @@ tracing   = { workspace = true }
 [features]
 
 [dev-dependencies]
+mockall   = { workspace = true }
+synd-stdx = { path = "../synd_stdx", features = ["mock"] }
+tempfile  = { workspace = true }
+
 insta = { workspace = true }
 
 [lints]
