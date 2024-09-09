@@ -2,6 +2,8 @@
 ignore = [
   # yaml-rust unmaintained, but serde_yaml use it
   "RUSTSEC-2024-0320",
+  # https://github.com/ymgyt/syndicationd/issues/154
+  "RUSTSEC-2024-0370",
 ]
 
 [yanked]
