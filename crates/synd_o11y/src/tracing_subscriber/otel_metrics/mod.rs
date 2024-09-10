@@ -59,12 +59,7 @@ fn init_meter_provider(
 
     #[cfg(feature = "opentelemetry-stdout")]
     let stdout_reader = {
-        let exporter = opentelemetry_stdout::MetricsExporterBuilder::default()
-            .with_encoder(|writer, data| {
-                serde_json::to_writer_pretty(writer, &data).unwrap();
-                Ok(())
-            })
-            .build();
+        let exporter = opentelemetry_stdout::MetricsExporterBuilder::default().build();
         PeriodicReader::builder(exporter, runtime::Tokio)
             .with_interval(Duration::from_secs(60))
             .build()

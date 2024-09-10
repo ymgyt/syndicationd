@@ -108,7 +108,6 @@ mod tests {
         }, {
             insta::assert_yaml_snapshot!("layer_test_log_1_record", record, {
                 ".observedTimeUnixNano" => "[OBSERVED_TIME_UNIX_NANO]",
-                ".attributes[0].value" => "[SOURCE_CODE_LOCATION]",
             });
         });
     }

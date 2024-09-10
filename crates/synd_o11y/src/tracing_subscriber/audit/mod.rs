@@ -44,7 +44,7 @@ impl Audit {
     const EMIT_EVENT_NAME: &'static str = "audit";
 
     // follow opentelemetry semantic conventions
-    pub const USER_ID: &'static str = opentelemetry_semantic_conventions::trace::ENDUSER_ID;
+    pub const USER_ID: &'static str = opentelemetry_semantic_conventions::attribute::USER_ID;
     pub const OPERATION: &'static str = "operation";
     pub const RESULT: &'static str = "result";
 

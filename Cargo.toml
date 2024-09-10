@@ -14,42 +14,44 @@ readme      = "README.md"
 repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
-anyhow             = { version = "1", default-features = false, features = ["std"] }
-assert_cmd         = { version = "2.0.16" }
-async-graphql      = { version = "7.0" }
-async-trait        = { version = "0.1.82", default-features = false }
-axum               = { version = "0.7.5", default-features = false }
-axum-server        = { version = "0.6.0", features = ["tls-rustls"] }
-bitflags           = { version = "2.6.0", default-features = false }
-chrono             = { version = "0.4.38", default-features = false }
-clap               = { version = "4.5", default-features = false }
-criterion          = { version = "0.5.1", features = ["async_tokio"] }
-either             = { version = "1.13.0" }
-fake               = { version = "2.9.2", features = ["derive", "chrono"] }
-fdlimit            = { version = "0.3.0", default-features = false }
-feed-rs            = { version = "1.5", default-features = false }
-futures-util       = { version = "0.3.30", default-features = false }
-graphql_client     = { version = "0.13.0", default-features = false }
-headers            = { version = "0.4.0" }
-http               = { version = "1.1" }
-insta              = { version = "1.40" }
-itertools          = { version = "0.13", default-features = false, features = ["use_std"] }
-jsonwebtoken       = { version = "9.3.0" }
-kvsd               = { version = "0.1.3", default-features = false }
-mockall            = { version = "0.13.0" }
-moka               = { version = "0.12.8", features = ["future"] }
-octocrab           = { version = "0.38.0", features = ["rustls-webpki-tokio"] }
-once_cell          = { version = "1.19.0" }
-pprof              = { version = "0.13", features = ["flamegraph", "criterion"] }
-proptest           = { version = "1.5.0" }
-rand               = { version = "0.8.5" }
-reqwest            = { version = "0.12.5", default-features = false, features = ["rustls-tls", "json"] }
-schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
-serde              = { version = "1", features = ["derive"] }
-serde_json         = { version = "1.0.128" }
-tempfile           = { version = "3" }
-thiserror          = { version = "1.0.63" }
-tokio              = { version = "1.40", default-features = false }
+anyhow         = { version = "1", default-features = false, features = ["std"] }
+assert_cmd     = { version = "2.0.16" }
+async-graphql  = { version = "7.0" }
+async-trait    = { version = "0.1.82", default-features = false }
+axum           = { version = "0.7.5", default-features = false }
+axum-server    = { version = "0.6.0", features = ["tls-rustls"] }
+bitflags       = { version = "2.6.0", default-features = false }
+chrono         = { version = "0.4.38", default-features = false }
+clap           = { version = "4.5", default-features = false }
+criterion      = { version = "0.5.1", features = ["async_tokio"] }
+either         = { version = "1.13.0" }
+fake           = { version = "2.9.2", features = ["derive", "chrono"] }
+fdlimit        = { version = "0.3.0", default-features = false }
+feed-rs        = { version = "1.5", default-features = false }
+futures-util   = { version = "0.3.30", default-features = false }
+graphql_client = { version = "0.13.0", default-features = false }
+headers        = { version = "0.4.0" }
+http           = { version = "1.1" }
+insta          = { version = "1.40" }
+itertools      = { version = "0.13", default-features = false, features = ["use_std"] }
+jsonwebtoken   = { version = "9.3.0" }
+kvsd           = { version = "0.1.3", default-features = false }
+mockall        = { version = "0.13.0" }
+moka           = { version = "0.12.8", features = ["future"] }
+octocrab       = { version = "0.38.0", features = ["rustls-webpki-tokio"] }
+once_cell      = { version = "1.19.0" }
+pprof          = { version = "0.13", features = ["flamegraph", "criterion"] }
+proptest       = { version = "1.5.0" }
+rand           = { version = "0.8.5" }
+reqwest        = { version = "0.12.5", default-features = false, features = ["rustls-tls", "json"] }
+schemars       = { version = "0.8.21", default-features = false, features = ["derive"] }
+serde          = { version = "1", features = ["derive"] }
+serde_json     = { version = "1.0.128" }
+tempfile       = { version = "3" }
+thiserror      = { version = "1.0.63" }
+# opentelemetry specifies `~1.38` to tokio
+# https://github.com/open-telemetry/opentelemetry-rust/blob/66f29b876f4c5d0c1551c65e6d92d1ae2e6ea744/Cargo.toml#L45
+tokio              = { version = "1.38", default-features = false }
 tokio-util         = { version = "0.7.12" }
 toml               = { version = "0.8.19" }
 tracing            = { version = "0.1.40" }
