@@ -51,7 +51,11 @@ tempfile       = { version = "3" }
 thiserror      = { version = "1.0.63" }
 # opentelemetry specifies `~1.38` to tokio
 # https://github.com/open-telemetry/opentelemetry-rust/blob/66f29b876f4c5d0c1551c65e6d92d1ae2e6ea744/Cargo.toml#L45
-tokio              = { version = "1.38", default-features = false }
+# after the 0.25 release, this restriction was removed
+# https://github.com/open-telemetry/opentelemetry-rust/pull/2095
+# however, it has noe been released yet.
+# when upgrading opentelemetry from 0.25 we will be able to specify the latest version of tokio
+tokio              = { version = "~1.38", default-features = false }
 tokio-util         = { version = "0.7.12" }
 toml               = { version = "0.8.19" }
 tracing            = { version = "0.1.40" }
