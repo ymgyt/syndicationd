@@ -24,9 +24,13 @@ impl Boot {
     }
 
     pub fn boot(self) -> Result<(), BootError> {
-        let prov = Provisioner::new(self.root_dir);
+        let prov = Provisioner::new(self.root_dir).provision()?;
 
-        prov.provision()?;
+        // Create dispatcher
+        for (_namespace, _table_dir) in prov.table_dirs()? {
+            // Create table from path
+            // register table in dispatcher
+        }
         // Walk table direcotries
         // Create Dispatcher
         // Create Middleware
