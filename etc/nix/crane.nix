@@ -15,8 +15,25 @@ let
     darwin.apple_sdk.frameworks.SystemConfiguration
   ];
 
-  commonArgs = {
+  filteredSrc = lib.cleanSourceWith {
     inherit src;
+    filter =
+      path: type:
+      (lib.hasSuffix ".pem" path) # Load self signed certs to test
+      || (lib.hasSuffix ".gql" path) # graphql query
+      || (lib.hasSuffix "schema.json" path) # graphql schema
+      || (lib.hasSuffix ".snap" path) # insta snapshots
+      || (lib.hasSuffix ".json" path) # graphql fixtures
+      || (lib.hasSuffix ".kvsd" path) # kvsd fixtures
+      || (lib.hasSuffix ".xml" path) # rss fixtures
+      || (lib.hasSuffix "categories.toml" path)
+      ||
+        # Default filter from crane (allow .rs files)
+        (craneLib.filterCargoSources path type);
+  };
+
+  commonArgs = {
+    src = filteredSrc;
     strictDeps = true;
     # Cargo.toml workspace.metadata.crane.version does not work
     version = "1";
@@ -100,7 +117,8 @@ in
     );
 
     audit = craneLib.cargoAudit {
-      inherit src advisory-db;
+      inherit advisory-db;
+      src = filteredSrc;
       cargoAuditExtraArgs =
         let
           ignoreAdvisories = lib.concatStrings (

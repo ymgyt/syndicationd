@@ -49,24 +49,10 @@
 
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
-        src = pkgs.lib.cleanSourceWith {
-          src = ./.; # The original, unfiltered source
-          filter =
-            path: type:
-            (pkgs.lib.hasSuffix ".pem" path) # Load self signed certs to test
-            || (pkgs.lib.hasSuffix ".gql" path) # graphql query
-            || (pkgs.lib.hasSuffix "schema.json" path) # graphql schema
-            || (pkgs.lib.hasSuffix ".snap" path) # insta snapshots
-            || (pkgs.lib.hasSuffix ".json" path) # graphql fixtures
-            || (pkgs.lib.hasSuffix ".kvsd" path) # kvsd fixtures
-            || (pkgs.lib.hasSuffix ".xml" path) # rss fixtures
-            || (pkgs.lib.hasSuffix "categories.toml" path)
-            ||
-              # Default filter from crane (allow .rs files)
-              (craneLib.filterCargoSources path type);
+        synd = pkgs.callPackage ./etc/nix/crane.nix {
+          inherit craneLib advisory-db;
+          src = ./.;
         };
-
-        synd = pkgs.callPackage ./etc/nix/crane.nix { inherit src craneLib advisory-db; };
 
         ci_packages = with pkgs; [
           # >= 1.31.0 for modules
