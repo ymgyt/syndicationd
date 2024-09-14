@@ -6,3 +6,4 @@ default:
 # Run terraform fmt -check
 check:
     terraform fmt -check
+    terraform validate
