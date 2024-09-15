@@ -1,8 +1,6 @@
 use opentelemetry::propagation::TextMapCompositePropagator;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 
-/// Currently axum and reqwest have different http crate versions.
-/// axum is ver 1, reqwest ver 0.2, therefore, we use each type in inject and extract.
 pub mod http {
     use crate::opentelemetry::extension::*;
     use opentelemetry_http::{HeaderExtractor, HeaderInjector};
