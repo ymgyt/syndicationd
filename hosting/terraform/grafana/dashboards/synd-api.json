@@ -101,7 +101,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -203,7 +203,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -212,7 +212,7 @@
 					},
 					"disableTextWrap": false,
 					"editorMode": "code",
-					"expr": "increase(feed_subscription_total{job=\"syndicationd/synd-api\"}[6m])",
+					"expr": "increase(feed_subscription_total{job=\"syndicationd/synd-api\"}[1w])",
 					"fullMetaSearch": false,
 					"includeNullMetadata": true,
 					"instant": false,
@@ -228,7 +228,7 @@
 					},
 					"disableTextWrap": false,
 					"editorMode": "code",
-					"expr": "increase(feed_unsubscription_total{job=\"syndicationd/synd-api\"}[6m])",
+					"expr": "increase(feed_unsubscription_total{job=\"syndicationd/synd-api\"}[1w])",
 					"fullMetaSearch": false,
 					"hide": false,
 					"includeNullMetadata": true,
@@ -291,7 +291,7 @@
 				"textMode": "auto",
 				"wideLayout": true
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -366,7 +366,7 @@
 				"sizing": "auto",
 				"valueMode": "color"
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -475,7 +475,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -629,7 +629,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -732,7 +732,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75420",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -776,7 +776,8 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green"
+								"color": "green",
+								"value": null
 							},
 							{
 								"color": "red",
@@ -804,7 +805,7 @@
 				},
 				"showHeader": true
 			},
-			"pluginVersion": "11.3.0-75221",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -884,7 +885,7 @@
 				"sortOrder": "Descending",
 				"wrapLogMessage": true
 			},
-			"pluginVersion": "11.3.0-75221",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -948,7 +949,8 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green"
+								"color": "green",
+								"value": null
 							}
 						]
 					}
@@ -974,7 +976,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75221",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -1044,7 +1046,8 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green"
+								"color": "green",
+								"value": null
 							},
 							{
 								"color": "red",
@@ -1075,7 +1078,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75221",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -1156,7 +1159,8 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green"
+								"color": "green",
+								"value": null
 							}
 						]
 					}
@@ -1186,7 +1190,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75221",
+			"pluginVersion": "11.3.0-75812",
 			"targets": [
 				{
 					"datasource": {
@@ -1223,6 +1227,6 @@
 	"timezone": "browser",
 	"title": "synd-api",
 	"uid": "cdd2yfdz497uoc",
-	"version": 43,
+	"version": 45,
 	"weekStart": ""
 }
