@@ -441,7 +441,8 @@ The theme can be changed using the `--theme` flag. Please refer to the help for 
 By default, `synd` use `https://api.syndicationd.ymgyt.io` as the [backend api](./crates/synd_api)([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
 To change the endpoint, specify the `--endpoint` flag
 
-The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the [![Grafana][grafana-badge]][grafana-url]
+The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the public [Grafana dashboard][grafana-url]  
+Dashboards are managed with [terraform](https://github.com/ymgyt/syndicationd/tree/main/hosting/terraform/grafana)
 
 <details>
   <summary>Click to show a public dashboard image</summary>
