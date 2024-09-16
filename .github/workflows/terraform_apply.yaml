@@ -1,8 +1,9 @@
 name: "Terraform Plan"
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
+  push:
+    branches:
+      - main
     paths:
       - hosting/terraform/grafana/*.tf
       - hosting/terraform/grafana/dashboards/*.json
@@ -26,27 +27,27 @@ jobs:
         run: nix develop .#ci --accept-flake-config --command just tf grafana init
         env:
           TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
-      - name: terraform plan
-        id: plan
+      - name: terraform apply
+        id: apply
         continue-on-error: true
-        run: nix develop .#ci --accept-flake-config --command just tf grafana plan -no-color
+        run: nix develop .#ci --accept-flake-config --command just tf grafana apply -no-color
         env:
           TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
           TF_VAR_grafana_sa_token: "${{secrets.GRAFANA_SA_TOKEN}}"
-      - name: Post plan output to github PR
+      - name: Post apply output to github PR
         uses: actions/github-script@v7
         env:
-          PLAN_RESULT: ${{steps.plan.outcome}}
-          PLAN_STDOUT: ${{steps.plan.outputs.stdout}}
+          APPLY_RESULT: ${{steps.apply.outcome}}
+          APPLY_STDOUT: ${{steps.apply.outputs.stdout}}
         with:
           script: |
-            const { PLAN_RESULT, PLAN_STDOUT } = process.env
+            const { APPLY_RESULT, APPLY_STDOUT } = process.env
 
-            const body = `terraform plan: ${PLAN_RESULT}
+            const body = `terraform apply: ${APPLY_RESULT}
             <details>
-              <summary>plan output</summary>
+              <summary>apply output</summary>
               \`\`\`
-              ${PLAN_STDOUT}
+              ${APPLY_STDOUT}
               \`\`\`
             </details>`
 
