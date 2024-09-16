@@ -4,13 +4,15 @@
 
 ### Workflows
 
-| Workflow        | Trigger   | Role                         |
-| ---             | ---       | ---                          |
-| `audit`         | Schedule  | Audit security               |
-| `ci`            | Push, PR  | Test, Lint, Coverage         |
-| `release`       | TagPush   | Distribution, GitHub Release |
-| `release_image` | TagPush   | PushDockerImage              |
-| `website`       | Push, PR  | Update website               |
+| Workflow          | Trigger  | Role                         |
+|-------------------|----------|------------------------------|
+| `audit`           | Schedule | Audit security               |
+| `ci`              | Push, PR | Test, Lint, Coverage         |
+| `release`         | TagPush  | Distribution, GitHub Release |
+| `release_image`   | TagPush  | PushDockerImage              |
+| `terraform_apply` | PR       | Run terraform apply          |
+| `terraform_plan`  | Push     | Run terraform paln           |
+| `website`         | Push, PR | Update website               |
 
 
 #### [`audit`](https://github.com/ymgyt/syndicationd/blob/main/.github/workflows/audit.yaml)  
@@ -30,6 +32,21 @@ Whether a package is included in this workflow is controlled by the `[package.me
 #### [`release_image`](https://github.com/ymgyt/syndicationd/blob/main/.github/workflows/releases_image.yml)
 
 Build the package's docker image and push it to the registry
+
+### [`terraform_apply`](https://github.com/ymgyt/syndicationd/blob/main/.github/workflows/terraform_apply.yaml)
+
+This workflow is triggered when a PR is marged into the main branch.  
+It runs `terraform apply` and posts the result as a comment on the PR.  
+The terraform state is stored on Hashicorp Cloud.
+
+
+
+### [`terraform_plan`](https://github.com/ymgyt/syndicationd/blob/main/.github/workflows/terraform_plan.yaml)
+
+This workflow will be griggered when terraform-related files are modified.  
+It runs `terraform plan` and posts the result as a comment on the PR.  
+The terraform state is stored on Hashicorp Cloud.
+
 
 #### [`website`](https://github.com/ymgyt/syndicationd/blob/main/.github/workflows/website.yaml)
 
