@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub(crate) struct Namespace(Cow<'static, str>);
 
 impl From<&'static str> for Namespace {

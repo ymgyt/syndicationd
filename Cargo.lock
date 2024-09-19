@@ -806,9 +806,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.4.0"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3855a8a784b474f333699ef2bbca9db2c4a1f6d9088a90a2d25b1eb53111eaa"
+checksum = "a97769d94ddab943e4510d138150169a2758b5ef3eb191a9ee688de3e23ef7b3"
 dependencies = [
  "cfg-if",
 ]
@@ -4268,10 +4268,13 @@ dependencies = [
 name = "synd-kvsd"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
+ "crc32fast",
  "insta",
  "mockall",
  "serde",
+ "synd-kvsd-protocol",
  "synd-o11y",
  "synd-stdx",
  "tempfile",
@@ -4279,6 +4282,13 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "synd-kvsd-protocol"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -4316,6 +4326,7 @@ dependencies = [
  "serde",
  "serde_json",
  "supports-color",
+ "tracing",
 ]
 
 [[package]]

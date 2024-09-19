@@ -9,7 +9,7 @@ use synd_stdx::fs::{self, fsimpl};
 use thiserror::Error;
 use tracing::debug;
 
-use crate::types::Namespace;
+use crate::table::Namespace;
 use state::{Provisioned, Unprovisioned};
 
 mod state {

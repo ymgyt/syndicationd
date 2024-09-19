@@ -45,7 +45,7 @@ async fn main() {
         }
     };
 
-    Boot::new(config.root_dir()).boot().unwrap();
+    Boot::new(config.root_dir()).boot().await.unwrap();
 
     // 7. Spawn Kvsd
     // 8. Run Server

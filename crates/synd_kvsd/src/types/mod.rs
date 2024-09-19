@@ -1,3 +1,2 @@
-mod namespace;
-
-pub(crate) use namespace::Namespace;
+mod time;
+pub(crate) use time::Time;
