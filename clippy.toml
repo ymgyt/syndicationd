@@ -1,3 +1,5 @@
+# https://rust-lang.github.io/rust-clippy/master/index.html#/module_inception
+allow-private-module-inception = true
 allowed-duplicate-crates = [
   # tonic v0.11 use axum 0.6
   "axum",
