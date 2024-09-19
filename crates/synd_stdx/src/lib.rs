@@ -4,4 +4,5 @@ pub mod byte;
 pub mod conf;
 pub mod fs;
 pub mod io;
+pub mod prelude;
 pub mod time;
