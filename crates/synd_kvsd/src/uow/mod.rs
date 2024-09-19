@@ -15,7 +15,7 @@ use thiserror::Error;
 
 use std::sync::Arc;
 
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::authn::principal::Principal;
 
@@ -25,12 +25,33 @@ pub(crate) enum UowError {
     SendResponse,
 }
 
+pub(crate) struct UowSender {
+    tx: mpsc::Sender<UnitOfWork>,
+}
+
+pub(crate) struct UowReceiver {
+    rx: mpsc::Receiver<UnitOfWork>,
+}
+
+impl UowReceiver {
+    pub(crate) async fn recv(&mut self) -> Option<UnitOfWork> {
+        self.rx.recv().await
+    }
+}
+
 pub(crate) enum UnitOfWork {
     Authenticate(AuthenticateWork),
     Ping(PingWork),
     Set(SetWork),
     Get(GetWork),
     Delete(DeleteWork),
+}
+
+impl UnitOfWork {
+    pub(crate) fn channel(buffer: usize) -> (UowSender, UowReceiver) {
+        let (tx, rx) = mpsc::channel(buffer);
+        (UowSender { tx }, UowReceiver { rx })
+    }
 }
 
 pub(crate) struct Work<Req, Res> {

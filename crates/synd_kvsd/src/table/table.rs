@@ -8,9 +8,12 @@ use tokio::{
 };
 use tracing::debug;
 
-use crate::table::{
-    index::{Index, IndexError},
-    Namespace,
+use crate::{
+    table::{
+        index::{Index, IndexError},
+        Namespace,
+    },
+    uow::{UnitOfWork, UowError, UowReceiver},
 };
 
 #[derive(Error, Debug)]
@@ -109,8 +112,7 @@ where
         })
     }
 
-    /*
-    pub(crate) async fn run(mut self, mut receiver: Receiver<UnitOfWork>) {
+    pub(crate) async fn run(mut self, mut receiver: UowReceiver) {
         while let Some(uow) = receiver.recv().await {
             if let Err(err) = self.handle_uow(uow).await {
                 error!("handle uow {}", err);
@@ -118,7 +120,10 @@ where
         }
     }
 
-    async fn handle_uow(&mut self, uow: UnitOfWork) -> Result<()> {
+    #[expect(clippy::unused_async)]
+    async fn handle_uow(&mut self, _uow: UnitOfWork) -> Result<(), UowError> {
+        todo!()
+        /*
         match uow {
             UnitOfWork::Set(set) => {
                 info!("{}", set.request);
@@ -176,8 +181,10 @@ where
             }
             _ => unreachable!(),
         }
+        */
     }
 
+    /*
     fn send_value(
         &self,
         sender: Option<oneshot::Sender<Result<Option<Value>>>>,
@@ -207,34 +214,3 @@ where
     }
     */
 }
-
-/*
-impl<File> Table<File>
-where
-    File: AsyncRead + AsyncSeek + Unpin,
-{
-    pub(crate) async fn dump<F>(&mut self, mut callback: F) -> Result<()>
-    where
-        F: FnMut(EntryDump),
-    {
-        let current = self.file.seek(SeekFrom::Current(0)).await?;
-
-        self.file.seek(SeekFrom::Start(0)).await?;
-
-        loop {
-            match Entry::decode_from(&mut self.file).await {
-                Ok((_, entry)) => {
-                    callback(entry.into());
-                }
-                Err(err) if err.is_eof() => break,
-                Err(err) => {
-                    tracing::error!("{err}");
-                }
-            }
-        }
-
-        self.file.seek(SeekFrom::Start(current)).await?;
-        Ok(())
-    }
-}
-*/

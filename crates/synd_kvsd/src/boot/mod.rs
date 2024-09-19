@@ -2,12 +2,12 @@
 use std::path::PathBuf;
 
 use thiserror::Error;
-use tokio::sync::mpsc;
 
 use crate::{
     boot::provision::{ProvisionError, Provisioner},
     middleware::Dispatcher,
     table::{Table, TableRef},
+    uow::UnitOfWork,
 };
 
 mod provision;
@@ -43,7 +43,7 @@ impl Boot {
                     message: err.to_string(),
                 })?;
             // TODO: configure buffer size
-            let (tx, _) = mpsc::channel(1024);
+            let (tx, rx) = UnitOfWork::channel(1024);
             let table_ref = TableRef {
                 namespace,
                 name: table.name().into(),
@@ -51,7 +51,7 @@ impl Boot {
             dispatcher.add_table(table_ref, tx);
 
             // TODO: abstract async runtime
-            // tokio::spawn(table.run(rx));
+            tokio::spawn(table.run(rx));
         }
         // Create Middleware
         // Create Kvsd

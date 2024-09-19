@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 
-use tokio::sync::mpsc;
-
 use crate::{
     table::{Namespace, TableRef},
-    uow::UnitOfWork,
+    uow::UowSender,
 };
 
 pub(crate) struct Dispatcher {
     // TODO: use TableName
-    table: HashMap<Namespace, HashMap<String, mpsc::Sender<UnitOfWork>>>,
+    table: HashMap<Namespace, HashMap<String, UowSender>>,
 }
 
 impl Dispatcher {
@@ -19,7 +17,7 @@ impl Dispatcher {
         }
     }
 
-    pub(crate) fn add_table(&mut self, table_ref: TableRef<'_>, sender: mpsc::Sender<UnitOfWork>) {
+    pub(crate) fn add_table(&mut self, table_ref: TableRef<'_>, sender: UowSender) {
         self.table
             .entry(table_ref.namespace)
             .or_default()
