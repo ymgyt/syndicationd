@@ -29,7 +29,7 @@ api *flags:
     cd crates/synd_api; \
       SYND_LOG="info,synd_api=debug" \
       OTEL_EXPORTER_OTLP_ENDPOINT={{ otlp_endpoint }} \
-      OTEL_RESOURCE_ATTRIBUTES="service.namespace=syndlocal,deployment.environment=local" \
+      OTEL_RESOURCE_ATTRIBUTES="service.namespace=syndlocal,deployment.environment.name=local" \
       cargo run --features opentelemetry-stdout,introspection -- \
         --kvsd-host 127.0.0.1 --kvsd-port 7379 --kvsd-username {{ kvsd_user }} --kvsd-password secret \
         --tls-cert ../../etc/dev/self_signed_certs/certificate.pem --tls-key ../../etc/dev/self_signed_certs/private_key.pem \
