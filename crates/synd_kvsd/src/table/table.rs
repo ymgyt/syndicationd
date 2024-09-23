@@ -122,7 +122,8 @@ where
 
     #[expect(clippy::unused_async)]
     async fn handle_uow(&mut self, _uow: UnitOfWork) -> Result<(), UowError> {
-        todo!()
+        info!("Handle unit of work");
+        Ok(())
         /*
         match uow {
             UnitOfWork::Set(set) => {

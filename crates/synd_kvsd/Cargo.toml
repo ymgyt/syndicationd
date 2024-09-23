@@ -22,14 +22,15 @@ synd-kvsd-protocol = { path = "../synd_kvsd_protocol", version = "0.1.0" }
 synd-o11y          = { path = "../synd_o11y", version = "0.1.8" }
 synd-stdx          = { path = "../synd_stdx", version = "0.1.0", features = ["color", "humantime", "byte", "conf"] }
 
-chrono    = { workspace = true }
-clap      = { workspace = true, features = ["derive", "env", "std"] }
-crc32fast = "1.4.2"
-serde     = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
-tokio     = { workspace = true, features = ["rt", "rt-multi-thread", "io-util", "net", "signal", "fs", "sync", "macros", "time"] }
-toml      = { workspace = true }
-tracing   = { workspace = true }
+chrono       = { workspace = true }
+clap         = { workspace = true, features = ["derive", "env", "std"] }
+crc32fast    = "1.4.2"
+futures-util = { workspace = true }
+serde        = { workspace = true, features = ["derive"] }
+thiserror    = { workspace = true }
+tokio        = { workspace = true, features = ["rt", "rt-multi-thread", "io-util", "net", "signal", "fs", "sync", "macros", "time"] }
+toml         = { workspace = true }
+tracing      = { workspace = true }
 
 [features]
 

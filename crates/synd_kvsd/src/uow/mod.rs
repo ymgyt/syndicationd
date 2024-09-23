@@ -12,10 +12,12 @@ pub(crate) use authenticate::AuthenticateWork;
 mod ping;
 pub(crate) use ping::PingWork;
 use thiserror::Error;
+mod channel;
+pub(crate) use channel::{UowChannel, UowReceiver, UowSender};
 
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 
 use crate::authn::principal::Principal;
 
@@ -23,20 +25,6 @@ use crate::authn::principal::Principal;
 pub(crate) enum UowError {
     #[error("send response to channel")]
     SendResponse,
-}
-
-pub(crate) struct UowSender {
-    tx: mpsc::Sender<UnitOfWork>,
-}
-
-pub(crate) struct UowReceiver {
-    rx: mpsc::Receiver<UnitOfWork>,
-}
-
-impl UowReceiver {
-    pub(crate) async fn recv(&mut self) -> Option<UnitOfWork> {
-        self.rx.recv().await
-    }
 }
 
 pub(crate) enum UnitOfWork {
@@ -48,9 +36,8 @@ pub(crate) enum UnitOfWork {
 }
 
 impl UnitOfWork {
-    pub(crate) fn channel(buffer: usize) -> (UowSender, UowReceiver) {
-        let (tx, rx) = mpsc::channel(buffer);
-        (UowSender { tx }, UowReceiver { rx })
+    pub(crate) fn channel(buffer: usize) -> UowChannel {
+        UowChannel::new(buffer)
     }
 }
 

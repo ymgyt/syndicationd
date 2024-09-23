@@ -36,7 +36,6 @@ async fn main() {
     };
     let _guard = init_tracing(&args.o11y);
 
-    // 1. Resolve Config
     let config = match ConfigResolver::from_args(args.kvsd).resolve() {
         Ok(config) => config,
         Err(err) => {
@@ -45,7 +44,7 @@ async fn main() {
         }
     };
 
-    Boot::new(config.root_dir()).boot().await.unwrap();
+    let _kvsd = Boot::new(config.root_dir()).boot().await.unwrap();
 
     // 7. Spawn Kvsd
     // 8. Run Server

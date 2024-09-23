@@ -5,7 +5,8 @@ use thiserror::Error;
 
 use crate::{
     boot::provision::{ProvisionError, Provisioner},
-    middleware::Dispatcher,
+    kvsd::Kvsd,
+    middleware::{Dispatcher, MiddlewareStack},
     table::{Table, TableRef},
     uow::UnitOfWork,
 };
@@ -31,11 +32,10 @@ impl Boot {
         }
     }
 
-    pub async fn boot(self) -> Result<(), BootError> {
+    pub async fn boot(self) -> Result<Kvsd, BootError> {
         let prov = Provisioner::new(self.root_dir).provision()?;
         let mut dispatcher = Dispatcher::new();
 
-        // Create dispatcher
         for (namespace, table_dir) in prov.table_dirs()? {
             let table = Table::try_from_dir(table_dir)
                 .await
@@ -43,18 +43,22 @@ impl Boot {
                     message: err.to_string(),
                 })?;
             // TODO: configure buffer size
-            let (tx, rx) = UnitOfWork::channel(1024);
+            let (tx, rx) = UnitOfWork::channel(1024).split();
             let table_ref = TableRef {
                 namespace,
                 name: table.name().into(),
             };
             dispatcher.add_table(table_ref, tx);
 
-            // TODO: abstract async runtime
             tokio::spawn(table.run(rx));
         }
-        // Create Middleware
-        // Create Kvsd
-        Ok(())
+
+        let kvsd = {
+            let mw = MiddlewareStack::new(dispatcher);
+            let uow_ch = UnitOfWork::channel(1024);
+            Kvsd::new(uow_ch, mw)
+        };
+
+        Ok(kvsd)
     }
 }

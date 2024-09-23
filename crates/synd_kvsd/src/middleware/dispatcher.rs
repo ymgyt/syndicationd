@@ -1,9 +1,18 @@
 use std::collections::HashMap;
 
+use thiserror::Error;
+
 use crate::{
+    middleware::Middleware,
     table::{Namespace, TableRef},
-    uow::UowSender,
+    uow::{UnitOfWork, UowSender},
 };
+
+#[derive(Error, Debug)]
+pub(crate) enum DispatchError {
+    #[error("table not found")]
+    TableNotFound,
+}
 
 pub(crate) struct Dispatcher {
     // TODO: use TableName
@@ -32,4 +41,13 @@ impl Dispatcher {
             .ok_or_else(|| ErrorKind::TableNotFound(format!("{}/{}", namespace, table)).into())
     }
     */
+}
+
+impl Middleware for Dispatcher {
+    type Error = DispatchError;
+
+    async fn handle(&mut self, _uow: UnitOfWork) -> Result<(), Self::Error> {
+        // TODO: dispatch
+        Err(DispatchError::TableNotFound)
+    }
 }
