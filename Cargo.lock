@@ -4289,7 +4289,9 @@ dependencies = [
 name = "synd-kvsd-protocol"
 version = "0.1.0"
 dependencies = [
+ "atoi",
  "bytes",
+ "chrono",
  "thiserror",
  "tokio",
 ]

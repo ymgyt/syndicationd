@@ -14,7 +14,10 @@ name        = "synd-kvsd-protocol"
 version     = "0.1.0"
 
 [dependencies]
+# TODO: use latest
+atoi      = { version = "0.3.3" }
 bytes     = { workspace = true }
+chrono    = { workspace = true }
 thiserror = { workspace = true }
 tokio     = { workspace = true, features = ["net"] }
 
