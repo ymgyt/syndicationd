@@ -329,6 +329,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atoi"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f28d99ec8bfea296261ca1af174f24225171fea9664ba9003cbebee704810528"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2087,7 +2096,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70f7f96eab66f057d0ce7139840edadacc114fbc978d41898550731b473186ad"
 dependencies = [
  "async-trait",
- "atoi",
+ "atoi 0.3.3",
  "backtrace",
  "bytes",
  "chrono",
@@ -4289,7 +4298,7 @@ dependencies = [
 name = "synd-kvsd-protocol"
 version = "0.1.0"
 dependencies = [
- "atoi",
+ "atoi 2.0.0",
  "bytes",
  "chrono",
  "thiserror",
