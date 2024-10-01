@@ -4,6 +4,8 @@ pub(crate) use frame::{FrameError, MessageFrames};
 mod authenticate;
 use authenticate::Authenticate;
 
+mod cursor;
+pub(crate) use cursor::Cursor;
 mod parse;
 mod spec;
 
@@ -11,7 +13,7 @@ use thiserror::Error;
 
 use crate::message::parse::Parse;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum MessageError {
     #[error("unknown message type {message_type}")]
     UnknownMessageType { message_type: u8 },

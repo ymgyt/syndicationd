@@ -1,9 +1,10 @@
 use std::{
-    io::{self, Cursor},
+    io::{self},
     time::Duration,
 };
 
 use bytes::{Buf as _, BytesMut};
+use futures::TryFutureExt as _;
 use thiserror::Error;
 use tokio::{
     io::{AsyncRead, AsyncReadExt as _, AsyncWrite, BufWriter},
@@ -11,7 +12,7 @@ use tokio::{
     time::error::Elapsed,
 };
 
-use crate::message::{FrameError, Message, MessageError, MessageFrames};
+use crate::message::{Cursor, FrameError, Message, MessageError, MessageFrames};
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -72,10 +73,9 @@ where
         &mut self,
         duration: Duration,
     ) -> Result<Option<Message>, ConnectionError> {
-        match tokio::time::timeout(duration, self.read_message()).await {
-            Ok(read_result) => read_result,
-            Err(elapsed) => Err(ConnectionError::read_timeout(elapsed)),
-        }
+        tokio::time::timeout(duration, self.read_message())
+            .map_err(ConnectionError::read_timeout)
+            .await?
     }
 
     pub async fn read_message(&mut self) -> Result<Option<Message>, ConnectionError> {
@@ -111,14 +111,14 @@ where
     fn parse_message_frames(&mut self) -> Result<Option<MessageFrames>, ConnectionError> {
         use FrameError::Incomplete;
 
-        let mut buf = Cursor::new(&self.buffer[..]);
+        let mut cursor = Cursor::new(&self.buffer[..]);
 
-        match MessageFrames::check_parse(&mut buf) {
+        match MessageFrames::check_parse(&mut cursor) {
             Ok(()) => {
                 #[allow(clippy::cast_possible_truncation)]
-                let len = buf.position() as usize;
-                buf.set_position(0);
-                let message_frames = MessageFrames::parse(&mut buf)
+                let len = cursor.position() as usize;
+                cursor.set_position(0);
+                let message_frames = MessageFrames::parse(&mut cursor)
                     .map_err(ConnectionError::parse_message_frames)?;
                 self.buffer.advance(len);
 
