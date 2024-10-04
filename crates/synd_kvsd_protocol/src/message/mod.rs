@@ -1,5 +1,5 @@
 mod frame;
-pub(crate) use frame::{FrameError, MessageFrames};
+pub(crate) use frame::{Frame, FrameError, MessageFrames};
 
 mod authenticate;
 use authenticate::Authenticate;
