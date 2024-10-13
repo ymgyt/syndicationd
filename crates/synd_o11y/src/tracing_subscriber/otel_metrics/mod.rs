@@ -4,8 +4,8 @@ use opentelemetry::{global, metrics::MeterProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     metrics::{
-        reader::{DefaultAggregationSelector, DefaultTemporalitySelector},
-        Instrument, PeriodicReader, SdkMeterProvider, Stream, View,
+        reader::DefaultTemporalitySelector, Instrument, PeriodicReader, SdkMeterProvider, Stream,
+        View,
     },
     runtime, Resource,
 };
@@ -41,10 +41,7 @@ fn init_meter_provider(
     let exporter = opentelemetry_otlp::new_exporter()
         .tonic()
         .with_endpoint(endpoint)
-        .build_metrics_exporter(
-            Box::new(DefaultAggregationSelector::new()),
-            Box::new(DefaultTemporalitySelector::new()),
-        )
+        .build_metrics_exporter(Box::new(DefaultTemporalitySelector::new()))
         .unwrap();
 
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
