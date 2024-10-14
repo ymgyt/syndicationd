@@ -1,6 +1,9 @@
-use thiserror::Error;
+use std::io;
 
-use crate::message::{cursor::Cursor, MessageError, MessageType};
+use thiserror::Error;
+use tokio::io::AsyncWriteExt;
+
+use crate::message::{cursor::Cursor, spec, MessageError, MessageType};
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum FrameError {
@@ -74,6 +77,8 @@ impl Frame {
                 }
                 let value = Vec::from(&src.chunk()[..len]);
 
+                // TODO: debug assert delimiter
+
                 src.skip(n)?;
 
                 Ok(Frame::Bytes(value))
@@ -92,6 +97,52 @@ impl Frame {
             prefix::NULL => Ok(Frame::Null),
             _ => unreachable!(),
         }
+    }
+
+    pub(crate) async fn write<W>(self, mut writer: W) -> Result<(), io::Error>
+    where
+        W: AsyncWriteExt + Unpin,
+    {
+        match self {
+            Frame::MessageType(mt) => {
+                writer.write_u8(prefix::MESSAGE_TYPE).await?;
+                writer.write_u8(mt.into()).await
+            }
+            Frame::String(val) => {
+                writer.write_u8(prefix::STRING).await?;
+                writer.write_all(val.as_bytes()).await?;
+                writer.write_all(spec::DELIMITER).await
+            }
+            Frame::Bytes(val) => {
+                writer.write_u8(prefix::BYTES).await?;
+                Frame::write_u64(val.len() as u64, &mut writer).await?;
+                writer.write_all(val.as_ref()).await?;
+                writer.write_all(spec::DELIMITER).await
+            }
+            Frame::Time(val) => {
+                writer.write_u8(prefix::TIME).await?;
+                writer.write_all(val.to_rfc3339().as_bytes()).await?;
+                writer.write_all(spec::DELIMITER).await
+            }
+            Frame::Null => writer.write_u8(prefix::NULL).await,
+        }
+    }
+
+    // TODO: refactor
+    async fn write_u64<W>(val: u64, mut writer: W) -> io::Result<()>
+    where
+        W: AsyncWriteExt + Unpin,
+    {
+        use std::io::Write;
+
+        let mut buf = [0u8; 12];
+        let mut buf = std::io::Cursor::new(&mut buf[..]);
+        write!(&mut buf, "{val}")?;
+
+        #[allow(clippy::cast_possible_truncation)]
+        let pos = buf.position() as usize;
+        writer.write_all(&buf.get_ref()[..pos]).await?;
+        writer.write_all(spec::DELIMITER).await
     }
 }
 

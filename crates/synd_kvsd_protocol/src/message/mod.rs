@@ -1,5 +1,5 @@
 mod frame;
-pub(crate) use frame::{FrameError, MessageFrames};
+pub(crate) use frame::{Frame, FrameError, MessageFrames};
 
 mod authenticate;
 use authenticate::Authenticate;
@@ -63,6 +63,14 @@ pub enum Message {
     // Set(Set),
     // Get(Get),
     // Delete(Delete),
+}
+
+impl From<Message> for MessageFrames {
+    fn from(message: Message) -> Self {
+        match message {
+            Message::Authenticate(m) => m.into(),
+        }
+    }
 }
 
 impl Message {

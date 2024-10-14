@@ -7,12 +7,12 @@ use bytes::{Buf as _, BytesMut};
 use futures::TryFutureExt as _;
 use thiserror::Error;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt as _, AsyncWrite, BufWriter},
+    io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufWriter},
     net::TcpStream,
     time::error::Elapsed,
 };
 
-use crate::message::{Cursor, FrameError, Message, MessageError, MessageFrames};
+use crate::message::{Cursor, Frame, FrameError, Message, MessageError, MessageFrames};
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -26,6 +26,8 @@ pub enum ConnectionError {
     ReadMessageIo { source: io::Error },
     #[error("connection reset by peer")]
     ResetByPeer,
+    #[error("write message frame: {source}")]
+    WriteMessageFrame { source: io::Error },
 }
 
 impl ConnectionError {
@@ -44,6 +46,10 @@ impl ConnectionError {
     fn read_message_io(source: io::Error) -> Self {
         ConnectionError::ReadMessageIo { source }
     }
+
+    fn write_message_frame(source: io::Error) -> Self {
+        ConnectionError::WriteMessageFrame { source }
+    }
 }
 
 pub struct Connection<Stream = TcpStream> {
@@ -61,6 +67,35 @@ where
             stream: BufWriter::new(stream),
             buffer: BytesMut::with_capacity(buffer_size),
         }
+    }
+}
+
+impl<Stream> Connection<Stream>
+where
+    Stream: AsyncWrite + Unpin,
+{
+    pub async fn write_message(&mut self, message: Message) -> Result<(), ConnectionError> {
+        let frames: MessageFrames = message.into();
+
+        // TODO: impl in Into<MessageFrames>
+        // self.stream.write_u8(prefix::MESSAGE_FRAMES).await?;
+        // self.write_decimal(frames.len()).await?;
+
+        for frame in frames {
+            self.write_frame(frame).await?;
+        }
+
+        self.stream
+            .flush()
+            .await
+            .map_err(ConnectionError::write_message_frame)
+    }
+
+    async fn write_frame(&mut self, frame: Frame) -> Result<(), ConnectionError> {
+        frame
+            .write(&mut self.stream)
+            .await
+            .map_err(ConnectionError::write_message_frame)
     }
 }
 
