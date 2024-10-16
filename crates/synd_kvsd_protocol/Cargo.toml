@@ -16,10 +16,13 @@ version     = "0.1.0"
 [dependencies]
 atoi      = { version = "2.0.0" }
 bytes     = { workspace = true }
-chrono    = { workspace = true }
+chrono    = { workspace = true, features = ["alloc"] }
 futures   = { workspace = true }
 thiserror = { workspace = true }
 tokio     = { workspace = true, features = ["net", "time", "io-util"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["net", "time", "io-util", "macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true

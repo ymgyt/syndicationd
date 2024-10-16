@@ -5,6 +5,15 @@ use tokio::io::AsyncWriteExt;
 
 use crate::message::{cursor::Cursor, spec, MessageError, MessageType};
 
+mod prefix {
+    pub(super) const MESSAGE_FRAMES: u8 = b'*';
+    pub(super) const MESSAGE_TYPE: u8 = b'#';
+    pub(super) const STRING: u8 = b'+';
+    pub(super) const BYTES: u8 = b'$';
+    pub(super) const TIME: u8 = b'T';
+    pub(super) const NULL: u8 = b'|';
+}
+
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum FrameError {
     /// Not enough data is available to decode a message frames from buffer.
@@ -57,7 +66,7 @@ impl Frame {
         }
     }
 
-    fn parse(src: &mut Cursor) -> Result<Frame, FrameError> {
+    fn read(src: &mut Cursor) -> Result<Frame, FrameError> {
         match src.u8()? {
             prefix::MESSAGE_TYPE => {
                 Err(FrameError::Invalid("unexpected message type frame".into()))
@@ -128,31 +137,21 @@ impl Frame {
         }
     }
 
-    // TODO: refactor
     async fn write_u64<W>(val: u64, mut writer: W) -> io::Result<()>
     where
         W: AsyncWriteExt + Unpin,
     {
         use std::io::Write;
 
-        let mut buf = [0u8; 12];
+        // for write u64::MAX
+        let mut buf = [0u8; 20];
         let mut buf = std::io::Cursor::new(&mut buf[..]);
         write!(&mut buf, "{val}")?;
 
-        #[allow(clippy::cast_possible_truncation)]
-        let pos = buf.position() as usize;
+        let pos: usize = buf.position().try_into().unwrap();
         writer.write_all(&buf.get_ref()[..pos]).await?;
         writer.write_all(spec::DELIMITER).await
     }
-}
-
-mod prefix {
-    pub(super) const MESSAGE_FRAMES: u8 = b'*';
-    pub(super) const MESSAGE_TYPE: u8 = b'#';
-    pub(super) const STRING: u8 = b'+';
-    pub(super) const BYTES: u8 = b'$';
-    pub(super) const TIME: u8 = b'T';
-    pub(super) const NULL: u8 = b'|';
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -198,7 +197,7 @@ impl MessageFrames {
         let mut frames = MessageFrames::with_capacity(message_type, frames_len);
 
         for _ in 0..frames_len {
-            frames.0.push(Frame::parse(src)?);
+            frames.0.push(Frame::read(src)?);
         }
 
         Ok(frames)
@@ -209,5 +208,20 @@ impl MessageFrames {
             return Err(FrameError::Invalid("message frames prefix expected".into()));
         }
         src.u64()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn write_read_u64() {
+        for val in [0, 1, 1024, u64::MAX] {
+            let mut buf = Vec::new();
+            Frame::write_u64(val, &mut buf).await.unwrap();
+            let mut cursor = Cursor::new(&buf);
+            assert_eq!(cursor.u64(), Ok(val));
+        }
     }
 }
