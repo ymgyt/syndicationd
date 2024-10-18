@@ -77,6 +77,17 @@ This task will be executed in dry-run mode, allowing you to review the CHANGELOG
 This process will publish the package to crates.io and push the git tag.  
 The git tag will trigger the release workflow, which will create a GitHub release.
 
+### Update rust version
+
+The project's rust version is managed in the [rust-toolchain.toml](./rust-toolchain.toml).  
+If you encounter the following error after upgrading the rust version and running `nix develop`
+
+```
+error: Stable 1.x.y is not available  
+```
+
+In that case, please execute `just nix update rust-overlay`.
+
 ## License
 
 By contributing to `syndicationd`, you agree that your contributions will be dual-licensed under
