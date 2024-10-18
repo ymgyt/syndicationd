@@ -68,9 +68,9 @@ impl Frame {
 
     fn read(src: &mut Cursor) -> Result<Frame, FrameError> {
         match src.u8()? {
-            prefix::MESSAGE_TYPE => {
-                Err(FrameError::Invalid("unexpected message type frame".into()))
-            }
+            prefix::MESSAGE_TYPE => MessageType::try_from(src.u8()?)
+                .map_err(FrameError::InvalidMessageType)
+                .map(Frame::MessageType),
             prefix::STRING => {
                 let line = src.line()?.to_vec();
                 let string =
@@ -187,12 +187,11 @@ impl MessageFrames {
         #[allow(clippy::cast_possible_truncation)]
         let frames_len = (MessageFrames::frames_len(src)? - 1) as usize;
 
-        if src.u8()? != prefix::MESSAGE_TYPE {
-            return Err(FrameError::Invalid("message type expected".into()));
-        }
-        let message_type = src.u8()?;
-        let message_type =
-            MessageType::try_from(message_type).map_err(FrameError::InvalidMessageType)?;
+        let message_type = match Frame::read(src) {
+            Ok(Frame::MessageType(mt)) => mt,
+            Ok(frame) => return Err(FrameError::Invalid(format!("invalid frame {frame:?}"))),
+            Err(err) => return Err(err),
+        };
 
         let mut frames = MessageFrames::with_capacity(message_type, frames_len);
 
@@ -222,6 +221,27 @@ mod tests {
             Frame::write_u64(val, &mut buf).await.unwrap();
             let mut cursor = Cursor::new(&buf);
             assert_eq!(cursor.u64(), Ok(val));
+        }
+    }
+
+    #[tokio::test]
+    async fn frame_message_type() {
+        let types = vec![
+            MessageType::Ping,
+            MessageType::Authenticate,
+            MessageType::Success,
+            MessageType::Fail,
+            MessageType::Set,
+            MessageType::Get,
+            MessageType::Delete,
+        ];
+
+        for ty in types {
+            let mut buf = Vec::new();
+            let frame = Frame::MessageType(ty);
+            frame.write(&mut buf).await.unwrap();
+            let mut cursor = Cursor::new(&buf);
+            assert_eq!(Frame::read(&mut cursor), Ok(Frame::MessageType(ty)));
         }
     }
 }
