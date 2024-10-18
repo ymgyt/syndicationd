@@ -19,7 +19,7 @@ pub enum GithubError {
     #[error("secondary rate limits exceeded")]
     SecondaryRateLimit,
     #[error("github api error: {0}")]
-    Api(octocrab::Error),
+    Api(Box<octocrab::Error>),
 }
 
 impl From<octocrab::Error> for GithubError {
@@ -30,9 +30,9 @@ impl From<octocrab::Error> for GithubError {
                 403 if source.message.contains("secondary rate limit") => {
                     GithubError::SecondaryRateLimit
                 }
-                _ => GithubError::Api(err),
+                _ => GithubError::Api(Box::new(err)),
             },
-            _ => GithubError::Api(err),
+            _ => GithubError::Api(Box::new(err)),
         }
     }
 }
