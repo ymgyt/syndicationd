@@ -37,9 +37,9 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        # terraform has an unfree license (‘bsl11’)
         config = {
-          allowUnfree = true;
+          # terraform has an unfree license (‘bsl11’)
+          allowUnfreePredicate = pkg: builtins.elem (pkg.pname) [ "terraform" ];
         };
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays config; };
