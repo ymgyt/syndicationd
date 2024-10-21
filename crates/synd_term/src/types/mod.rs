@@ -2,6 +2,7 @@ use chrono::DateTime;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
+use tracing::warn;
 
 use crate::{
     client::synd_api::{
@@ -86,9 +87,15 @@ impl From<mutation::subscribe_feed::EntryMeta> for EntryMeta {
 
 impl EntryMeta {
     pub fn summary_text(&self, width: usize) -> Option<String> {
-        self.summary
-            .as_deref()
-            .map(|summary| html2text::from_read(summary.as_bytes(), width))
+        self.summary.as_deref().and_then(|summary| {
+            match html2text::from_read(summary.as_bytes(), width) {
+                Ok(text) => Some(text),
+                Err(err) => {
+                    warn!("convert summary html to text: {err}");
+                    None
+                }
+            }
+        })
     }
 }
 
