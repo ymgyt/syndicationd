@@ -1,13 +1,15 @@
 mod frame;
-pub(crate) use frame::{Frame, FrameError, MessageFrames};
-
-mod authenticate;
-use authenticate::Authenticate;
-
+pub(crate) use frame::{FrameError, MessageFrames};
 mod cursor;
 pub(crate) use cursor::Cursor;
+mod ioext;
+pub(crate) use ioext::MessageWriteExt;
 mod parse;
+mod payload;
+pub use payload::authenticate::Authenticate;
 mod spec;
+
+use std::io;
 
 use thiserror::Error;
 
@@ -90,5 +92,21 @@ impl Message {
         };
 
         Ok(message)
+    }
+
+    pub(crate) async fn write<W>(self, mut writer: W) -> Result<(), io::Error>
+    where
+        W: MessageWriteExt,
+    {
+        let frames: MessageFrames = self.into();
+
+        writer.write_u8(spec::MESSAGE_START).await?;
+        writer.write_u64m(frames.len() as u64).await?;
+
+        for frame in frames {
+            frame.write(&mut writer).await?;
+        }
+
+        Ok(())
     }
 }

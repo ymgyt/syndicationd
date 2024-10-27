@@ -1,6 +1,6 @@
 use crate::message::{
     parse::{Parse, ParseError},
-    MessageFrames,
+    MessageFrames, MessageType,
 };
 
 /// `Authenticate` is a message in which client requests the server
@@ -25,7 +25,7 @@ impl Authenticate {
     }
 
     // TODO: impl in trait
-    pub(super) fn parse_frames(parse: &mut Parse) -> Result<Self, ParseError> {
+    pub(in crate::message) fn parse_frames(parse: &mut Parse) -> Result<Self, ParseError> {
         let username = parse.next_string()?;
         let password = parse.next_string()?;
 
@@ -34,7 +34,12 @@ impl Authenticate {
 }
 
 impl From<Authenticate> for MessageFrames {
-    fn from(_m: Authenticate) -> Self {
-        todo!()
+    fn from(auth: Authenticate) -> Self {
+        let mut frames = MessageFrames::new(MessageType::Authenticate, 2);
+
+        frames.push_string(auth.username);
+        frames.push_string(auth.password);
+
+        frames
     }
 }

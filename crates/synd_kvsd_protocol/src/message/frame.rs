@@ -1,12 +1,11 @@
 use std::io;
 
 use thiserror::Error;
-use tokio::io::AsyncWriteExt;
 
-use crate::message::{cursor::Cursor, spec, MessageError, MessageType};
+use crate::message::{cursor::Cursor, ioext::MessageWriteExt, spec, MessageError, MessageType};
 
 mod prefix {
-    pub(super) const MESSAGE_FRAMES: u8 = b'*';
+    // pub(super) const MESSAGE_FRAMES: u8 = b'*';
     pub(super) const MESSAGE_TYPE: u8 = b'#';
     pub(super) const STRING: u8 = b'+';
     pub(super) const BYTES: u8 = b'$';
@@ -46,14 +45,15 @@ impl Frame {
                 Ok(())
             }
             prefix::STRING => {
-                src.line()?;
-                Ok(())
+                #[allow(clippy::cast_possible_truncation)]
+                let len = src.u64()? as usize;
+                src.skip(len + spec::DELIMITER.len())
             }
             prefix::BYTES => {
                 #[allow(clippy::cast_possible_truncation)]
                 let len = src.u64()? as usize;
                 // skip bytes length + delimiter
-                src.skip(len + 2)
+                src.skip(len + spec::DELIMITER.len())
             }
             prefix::TIME => {
                 src.line()?;
@@ -72,21 +72,28 @@ impl Frame {
                 .map_err(FrameError::InvalidMessageType)
                 .map(Frame::MessageType),
             prefix::STRING => {
-                let line = src.line()?.to_vec();
-                let string =
-                    String::from_utf8(line).map_err(|e| FrameError::Invalid(e.to_string()))?;
+                #[allow(clippy::cast_possible_truncation)]
+                let len = src.u64()? as usize;
+                let n = len + spec::DELIMITER.len();
+                if src.remaining() < n {
+                    return Err(FrameError::Incomplete);
+                }
+                let string = std::str::from_utf8(&src.chunk()[..len])
+                    .map_err(|e| FrameError::Invalid(e.to_string()))?
+                    .to_owned();
+
+                src.skip(n)?;
+
                 Ok(Frame::String(string))
             }
             prefix::BYTES => {
                 #[allow(clippy::cast_possible_truncation)]
                 let len = src.u64()? as usize;
-                let n = len + 2;
+                let n = len + spec::DELIMITER.len();
                 if src.remaining() < n {
                     return Err(FrameError::Incomplete);
                 }
                 let value = Vec::from(&src.chunk()[..len]);
-
-                // TODO: debug assert delimiter
 
                 src.skip(n)?;
 
@@ -110,7 +117,7 @@ impl Frame {
 
     pub(crate) async fn write<W>(self, mut writer: W) -> Result<(), io::Error>
     where
-        W: AsyncWriteExt + Unpin,
+        W: MessageWriteExt,
     {
         match self {
             Frame::MessageType(mt) => {
@@ -119,12 +126,13 @@ impl Frame {
             }
             Frame::String(val) => {
                 writer.write_u8(prefix::STRING).await?;
+                writer.write_u64m(val.len() as u64).await?;
                 writer.write_all(val.as_bytes()).await?;
                 writer.write_all(spec::DELIMITER).await
             }
             Frame::Bytes(val) => {
                 writer.write_u8(prefix::BYTES).await?;
-                Frame::write_u64(val.len() as u64, &mut writer).await?;
+                writer.write_u64m(val.len() as u64).await?;
                 writer.write_all(val.as_ref()).await?;
                 writer.write_all(spec::DELIMITER).await
             }
@@ -135,22 +143,6 @@ impl Frame {
             }
             Frame::Null => writer.write_u8(prefix::NULL).await,
         }
-    }
-
-    async fn write_u64<W>(val: u64, mut writer: W) -> io::Result<()>
-    where
-        W: AsyncWriteExt + Unpin,
-    {
-        use std::io::Write;
-
-        // for write u64::MAX
-        let mut buf = [0u8; 20];
-        let mut buf = std::io::Cursor::new(&mut buf[..]);
-        write!(&mut buf, "{val}")?;
-
-        let pos: usize = buf.position().try_into().unwrap();
-        writer.write_all(&buf.get_ref()[..pos]).await?;
-        writer.write_all(spec::DELIMITER).await
     }
 }
 
@@ -167,10 +159,14 @@ impl IntoIterator for MessageFrames {
 }
 
 impl MessageFrames {
-    pub(crate) fn with_capacity(mt: MessageType, n: usize) -> Self {
-        let mut v = Vec::with_capacity(n + 1);
+    pub(super) fn new(mt: MessageType, capasity: usize) -> Self {
+        let mut v = Vec::with_capacity(capasity + 1);
         v.push(Frame::MessageType(mt));
-        Self(v)
+        MessageFrames(v)
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.0.len()
     }
 
     pub(crate) fn check_parse(src: &mut Cursor) -> Result<(), FrameError> {
@@ -193,7 +189,7 @@ impl MessageFrames {
             Err(err) => return Err(err),
         };
 
-        let mut frames = MessageFrames::with_capacity(message_type, frames_len);
+        let mut frames = MessageFrames::new(message_type, frames_len);
 
         for _ in 0..frames_len {
             frames.0.push(Frame::read(src)?);
@@ -203,10 +199,14 @@ impl MessageFrames {
     }
 
     fn frames_len(src: &mut Cursor) -> Result<u64, FrameError> {
-        if src.u8()? != prefix::MESSAGE_FRAMES {
+        if src.u8()? != spec::MESSAGE_START {
             return Err(FrameError::Invalid("message frames prefix expected".into()));
         }
         src.u64()
+    }
+
+    pub(super) fn push_string(&mut self, s: impl Into<String>) {
+        self.0.push(Frame::String(s.into()));
     }
 }
 
@@ -218,7 +218,7 @@ mod tests {
     async fn write_read_u64() {
         for val in [0, 1, 1024, u64::MAX] {
             let mut buf = Vec::new();
-            Frame::write_u64(val, &mut buf).await.unwrap();
+            buf.write_u64m(val).await.unwrap();
             let mut cursor = Cursor::new(&buf);
             assert_eq!(cursor.u64(), Ok(val));
         }
@@ -242,6 +242,22 @@ mod tests {
             frame.write(&mut buf).await.unwrap();
             let mut cursor = Cursor::new(&buf);
             assert_eq!(Frame::read(&mut cursor), Ok(Frame::MessageType(ty)));
+        }
+    }
+
+    #[tokio::test]
+    async fn string() {
+        let messages = vec!["", "Hello", "\r\n"];
+
+        for message in messages {
+            let mut buf = Vec::new();
+            let frame = Frame::String(message.to_string());
+            frame.write(&mut buf).await.unwrap();
+            let mut cursor = Cursor::new(&buf);
+            assert_eq!(
+                Frame::read(&mut cursor),
+                Ok(Frame::String(message.to_string())),
+            );
         }
     }
 }

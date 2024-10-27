@@ -50,7 +50,7 @@ impl<'a> Cursor<'a> {
 
     pub(super) fn u64(&mut self) -> Result<u64, FrameError> {
         let line = self.line()?;
-        atoi::atoi::<u64>(line).ok_or_else(|| FrameError::Invalid("invalid u64".into()))
+        atoi::atoi::<u64>(line).ok_or_else(|| FrameError::Invalid("invalid u64 line".into()))
     }
 
     /// Return the buffer up to the line delimiter.  

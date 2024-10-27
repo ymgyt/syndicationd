@@ -7,12 +7,12 @@ use bytes::{Buf as _, BytesMut};
 use futures::TryFutureExt as _;
 use thiserror::Error;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufWriter},
+    io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt, BufWriter},
     net::TcpStream,
     time::error::Elapsed,
 };
 
-use crate::message::{Cursor, Frame, FrameError, Message, MessageError, MessageFrames};
+use crate::message::{Cursor, FrameError, Message, MessageError, MessageFrames};
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -26,8 +26,8 @@ pub enum ConnectionError {
     ReadMessageIo { source: io::Error },
     #[error("connection reset by peer")]
     ResetByPeer,
-    #[error("write message frame: {source}")]
-    WriteMessageFrame { source: io::Error },
+    #[error("write message: {source}")]
+    WriteMessage { source: io::Error },
 }
 
 impl ConnectionError {
@@ -47,8 +47,8 @@ impl ConnectionError {
         ConnectionError::ReadMessageIo { source }
     }
 
-    fn write_message_frame(source: io::Error) -> Self {
-        ConnectionError::WriteMessageFrame { source }
+    fn write_message(source: io::Error) -> Self {
+        ConnectionError::WriteMessage { source }
     }
 }
 
@@ -75,27 +75,15 @@ where
     Stream: AsyncWrite + Unpin,
 {
     pub async fn write_message(&mut self, message: Message) -> Result<(), ConnectionError> {
-        let frames: MessageFrames = message.into();
-
-        // TODO: impl in Into<MessageFrames>
-        // self.stream.write_u8(prefix::MESSAGE_FRAMES).await?;
-        // self.write_decimal(frames.len()).await?;
-
-        for frame in frames {
-            self.write_frame(frame).await?;
-        }
+        message
+            .write(&mut self.stream)
+            .await
+            .map_err(ConnectionError::write_message)?;
 
         self.stream
             .flush()
             .await
-            .map_err(ConnectionError::write_message_frame)
-    }
-
-    async fn write_frame(&mut self, frame: Frame) -> Result<(), ConnectionError> {
-        frame
-            .write(&mut self.stream)
-            .await
-            .map_err(ConnectionError::write_message_frame)
+            .map_err(ConnectionError::write_message)
     }
 }
 
@@ -162,6 +150,31 @@ where
             Err(Incomplete) => Ok(None),
             // TODO: define distinct error
             Err(e) => Err(ConnectionError::parse_message_frames(e)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::message::Authenticate;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn read_write() {
+        let messages = vec![Message::Authenticate(Authenticate::new("user", "pass"))];
+
+        let buf_size = 1024;
+        let (read, write) = tokio::io::duplex(buf_size);
+        let (mut read, mut write) = (
+            Connection::new(read, buf_size),
+            Connection::new(write, buf_size),
+        );
+
+        for message in messages {
+            write.write_message(message.clone()).await.unwrap();
+
+            assert_eq!(read.read_message().await.unwrap(), Some(message));
         }
     }
 }
