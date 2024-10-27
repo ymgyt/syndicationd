@@ -1939,6 +1939,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indoc"
+version = "2.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
+
+[[package]]
 name = "inferno"
 version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3202,7 +3208,6 @@ dependencies = [
  "bitflags 2.6.0",
  "cassowary",
  "compact_str",
- "crossterm",
  "instability",
  "itertools 0.13.0",
  "lru",
@@ -3212,6 +3217,27 @@ dependencies = [
  "unicode-segmentation",
  "unicode-truncate",
  "unicode-width 0.1.13",
+]
+
+[[package]]
+name = "ratatui"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eabd94c2f37801c20583fc49dd5cd6b0ba68c716787c2dd6ed18571e1e63117b"
+dependencies = [
+ "bitflags 2.6.0",
+ "cassowary",
+ "compact_str",
+ "crossterm",
+ "indoc",
+ "instability",
+ "itertools 0.13.0",
+ "lru",
+ "paste",
+ "strum",
+ "unicode-segmentation",
+ "unicode-truncate",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -4364,7 +4390,7 @@ dependencies = [
  "open",
  "pprof",
  "proptest",
- "ratatui",
+ "ratatui 0.29.0",
  "reqwest 0.12.8",
  "schemars",
  "serde",
@@ -4967,7 +4993,7 @@ dependencies = [
  "derive_builder",
  "font8x8",
  "itertools 0.13.0",
- "ratatui",
+ "ratatui 0.28.1",
 ]
 
 [[package]]
@@ -4977,7 +5003,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "114fad0b03c2b8995274cc82be8d6be276d7eadae92486b03c98c670917711d9"
 dependencies = [
  "document-features",
- "ratatui",
+ "ratatui 0.28.1",
  "tui-big-text",
 ]
 
