@@ -1,4 +1,4 @@
-name: "Terraform Plan"
+name: "Terraform Apply"
 on:
   workflow_dispatch:
   push:
@@ -8,7 +8,7 @@ on:
       - hosting/terraform/grafana/*.tf
       - hosting/terraform/grafana/dashboards/*.json
 jobs:
-  plan:
+  apply:
     if: ${{github.repository == 'ymgyt/syndicationd'}}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -32,7 +32,7 @@ jobs:
       - name: terraform apply
         id: apply
         continue-on-error: true
-        run: nix develop .#ci --accept-flake-config --command just tf grafana apply -no-color
+        run: nix develop .#ci --accept-flake-config --command just tf grafana apply -no-color -auto-approve
         env:
           TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
           TF_VAR_grafana_sa_token: "${{secrets.GRAFANA_SA_TOKEN}}"
