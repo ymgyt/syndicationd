@@ -101,7 +101,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -203,7 +203,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -291,7 +291,7 @@
 				"textMode": "auto",
 				"wideLayout": true
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -299,7 +299,7 @@
 						"uid": "grafanacloud-logs"
 					},
 					"editorMode": "code",
-					"expr": "count(count(count_over_time({job=\"syndicationd/synd-api\"} | json | attributes_operation = \"FetchEntries\" and attributes_result = \"success\"[1w])) by (attributes_enduser_id))",
+					"expr": "count(count(count_over_time({service_name=\"synd-api\", service_namespace=\"syndicationd\"} | operation = \"FetchEntries\" and result = \"success\"[1w])) by (attributes_enduser_id))",
 					"queryType": "range",
 					"refId": "A"
 				}
@@ -366,7 +366,7 @@
 				"sizing": "auto",
 				"valueMode": "color"
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -475,7 +475,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -629,7 +629,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -732,7 +732,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -805,7 +805,7 @@
 				},
 				"showHeader": true
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -885,15 +885,15 @@
 				"sortOrder": "Descending",
 				"wrapLogMessage": true
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
 						"type": "loki",
 						"uid": "grafanacloud-logs"
 					},
-					"editorMode": "builder",
-					"expr": "{job=\"syndicationd/synd-api\", level=\"ERROR\"} |= ``",
+					"editorMode": "code",
+					"expr": "{service_namespace=\"syndicationd\", service_name = \"synd-api\", level=\"ERROR\"} |= ``",
 					"queryType": "range",
 					"refId": "A"
 				}
@@ -976,7 +976,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -1078,7 +1078,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -1190,7 +1190,7 @@
 					"sort": "none"
 				}
 			},
-			"pluginVersion": "11.3.0-75812",
+			"pluginVersion": "11.4.0-77868",
 			"targets": [
 				{
 					"datasource": {
@@ -1214,19 +1214,19 @@
 	],
 	"preload": false,
 	"refresh": "1h",
-	"schemaVersion": 39,
+	"schemaVersion": 40,
 	"tags": [],
 	"templating": {
 		"list": []
 	},
 	"time": {
-		"from": "now-12h",
+		"from": "now-2d",
 		"to": "now"
 	},
 	"timepicker": {},
 	"timezone": "browser",
 	"title": "synd-api",
 	"uid": "cdd2yfdz497uoc",
-	"version": 45,
+	"version": 47,
 	"weekStart": ""
 }
