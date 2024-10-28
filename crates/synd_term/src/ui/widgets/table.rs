@@ -137,7 +137,7 @@ impl<'a> TableBuilder<Row<'a>, Vec<Row<'a>>, Vec<Constraint>, &'a EntriesTheme, 
             .header(header.style(theme.header))
             .column_spacing(2)
             .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .highlight_style(theme.selected_entry.add_modifier(highlight_modifier))
+            .row_highlight_style(theme.selected_entry.add_modifier(highlight_modifier))
             .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
         let state = TableState::new().with_offset(0).with_selected(selected_idx);
