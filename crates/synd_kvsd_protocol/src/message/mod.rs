@@ -78,6 +78,8 @@ impl From<Message> for MessageFrames {
 impl Message {
     pub(crate) fn parse(frames: MessageFrames) -> Result<Message, MessageError> {
         let mut parse = Parse::new(frames);
+        // skip message_start and frame_length
+        parse.skip(2);
         let message_type = parse.message_type().ok_or(MessageError::ParseFrame {
             message: "message type not found",
         })?;
@@ -99,9 +101,6 @@ impl Message {
         W: MessageWriteExt,
     {
         let frames: MessageFrames = self.into();
-
-        writer.write_u8(spec::MESSAGE_START).await?;
-        writer.write_u64m(frames.len() as u64).await?;
 
         for frame in frames {
             frame.write(&mut writer).await?;

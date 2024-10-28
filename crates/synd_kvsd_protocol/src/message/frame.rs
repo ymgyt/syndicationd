@@ -5,7 +5,8 @@ use thiserror::Error;
 use crate::message::{cursor::Cursor, ioext::MessageWriteExt, spec, MessageError, MessageType};
 
 mod prefix {
-    // pub(super) const MESSAGE_FRAMES: u8 = b'*';
+    pub(super) const MESSAGE_START: u8 = b'*';
+    pub(super) const FRAME_LENGTH: u8 = b'@';
     pub(super) const MESSAGE_TYPE: u8 = b'#';
     pub(super) const STRING: u8 = b'+';
     pub(super) const BYTES: u8 = b'$';
@@ -22,6 +23,8 @@ pub enum FrameError {
     InvalidMessageType(#[from] MessageError),
     #[error("invalid frame: {0}")]
     Invalid(String),
+    #[error("invalid u64: {0}")]
+    InvalidU64(String),
     // Other(common::Error),
 }
 
@@ -30,6 +33,8 @@ pub(crate) type Time = chrono::DateTime<chrono::Utc>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Frame {
+    MessageStart,
+    Length(u64),
     MessageType(MessageType),
     String(String),
     Bytes(Vec<u8>),
@@ -68,6 +73,11 @@ impl Frame {
 
     fn read(src: &mut Cursor) -> Result<Frame, FrameError> {
         match src.u8()? {
+            prefix::MESSAGE_START => Ok(Frame::MessageStart),
+            prefix::FRAME_LENGTH => {
+                let len = src.u64()?;
+                Ok(Frame::Length(len))
+            }
             prefix::MESSAGE_TYPE => MessageType::try_from(src.u8()?)
                 .map_err(FrameError::InvalidMessageType)
                 .map(Frame::MessageType),
@@ -120,6 +130,11 @@ impl Frame {
         W: MessageWriteExt,
     {
         match self {
+            Frame::MessageStart => writer.write_u8(prefix::MESSAGE_START).await,
+            Frame::Length(len) => {
+                writer.write_u8(prefix::FRAME_LENGTH).await?;
+                writer.write_u64m(len).await
+            }
             Frame::MessageType(mt) => {
                 writer.write_u8(prefix::MESSAGE_TYPE).await?;
                 writer.write_u8(mt.into()).await
@@ -160,13 +175,13 @@ impl IntoIterator for MessageFrames {
 
 impl MessageFrames {
     pub(super) fn new(mt: MessageType, capasity: usize) -> Self {
-        let mut v = Vec::with_capacity(capasity + 1);
+        let mut v = Vec::with_capacity(capasity + 3);
+        let message_len = capasity + 1;
+
+        v.push(Frame::MessageStart);
+        v.push(Frame::Length(message_len as u64));
         v.push(Frame::MessageType(mt));
         MessageFrames(v)
-    }
-
-    pub(super) fn len(&self) -> usize {
-        self.0.len()
     }
 
     pub(crate) fn check_parse(src: &mut Cursor) -> Result<(), FrameError> {
@@ -199,8 +214,11 @@ impl MessageFrames {
     }
 
     fn frames_len(src: &mut Cursor) -> Result<u64, FrameError> {
-        if src.u8()? != spec::MESSAGE_START {
+        if src.u8()? != prefix::MESSAGE_START {
             return Err(FrameError::Invalid("message frames prefix expected".into()));
+        }
+        if src.u8()? != prefix::FRAME_LENGTH {
+            return Err(FrameError::Invalid("message frame length expected".into()));
         }
         src.u64()
     }

@@ -22,6 +22,12 @@ impl Parse {
         }
     }
 
+    pub(super) fn skip(&mut self, n: usize) {
+        for _ in 0..n {
+            self.frames.next();
+        }
+    }
+
     pub(super) fn message_type(&mut self) -> Option<MessageType> {
         self.next().ok().and_then(|frame| match frame {
             Frame::MessageType(mt) => Some(mt),
