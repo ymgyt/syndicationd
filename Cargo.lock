@@ -4301,6 +4301,7 @@ dependencies = [
  "bytes",
  "chrono",
  "futures",
+ "nom 8.0.0-alpha2",
  "thiserror",
  "tokio",
 ]

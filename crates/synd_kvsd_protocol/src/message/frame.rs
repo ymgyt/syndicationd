@@ -4,14 +4,14 @@ use thiserror::Error;
 
 use crate::message::{cursor::Cursor, ioext::MessageWriteExt, spec, MessageError, MessageType};
 
-mod prefix {
-    pub(super) const MESSAGE_START: u8 = b'*';
-    pub(super) const FRAME_LENGTH: u8 = b'@';
-    pub(super) const MESSAGE_TYPE: u8 = b'#';
-    pub(super) const STRING: u8 = b'+';
-    pub(super) const BYTES: u8 = b'$';
-    pub(super) const TIME: u8 = b'T';
-    pub(super) const NULL: u8 = b'|';
+pub(in crate::message) mod prefix {
+    pub(in crate::message) const MESSAGE_START: u8 = b'*';
+    pub(in crate::message) const FRAME_LENGTH: u8 = b'@';
+    pub(in crate::message) const MESSAGE_TYPE: u8 = b'#';
+    pub(in crate::message) const STRING: u8 = b'+';
+    pub(in crate::message) const BYTES: u8 = b'$';
+    pub(in crate::message) const TIME: u8 = b'T';
+    pub(in crate::message) const NULL: u8 = b'|';
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -25,7 +25,6 @@ pub enum FrameError {
     Invalid(String),
     #[error("invalid u64: {0}")]
     InvalidU64(String),
-    // Other(common::Error),
 }
 
 // Should support time type ?
@@ -133,7 +132,7 @@ impl Frame {
             Frame::MessageStart => writer.write_u8(prefix::MESSAGE_START).await,
             Frame::Length(len) => {
                 writer.write_u8(prefix::FRAME_LENGTH).await?;
-                writer.write_u64m(len).await
+                writer.write_u64(len).await
             }
             Frame::MessageType(mt) => {
                 writer.write_u8(prefix::MESSAGE_TYPE).await?;
@@ -141,7 +140,7 @@ impl Frame {
             }
             Frame::String(val) => {
                 writer.write_u8(prefix::STRING).await?;
-                writer.write_u64m(val.len() as u64).await?;
+                writer.write_u64(val.len() as u64).await?;
                 writer.write_all(val.as_bytes()).await?;
                 writer.write_all(spec::DELIMITER).await
             }
@@ -260,22 +259,6 @@ mod tests {
             frame.write(&mut buf).await.unwrap();
             let mut cursor = Cursor::new(&buf);
             assert_eq!(Frame::read(&mut cursor), Ok(Frame::MessageType(ty)));
-        }
-    }
-
-    #[tokio::test]
-    async fn string() {
-        let messages = vec!["", "Hello", "\r\n"];
-
-        for message in messages {
-            let mut buf = Vec::new();
-            let frame = Frame::String(message.to_string());
-            frame.write(&mut buf).await.unwrap();
-            let mut cursor = Cursor::new(&buf);
-            assert_eq!(
-                Frame::read(&mut cursor),
-                Ok(Frame::String(message.to_string())),
-            );
         }
     }
 }

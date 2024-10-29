@@ -18,6 +18,7 @@ atoi      = { version = "2.0.0" }
 bytes     = { workspace = true }
 chrono    = { workspace = true, features = ["alloc"] }
 futures   = { workspace = true }
+nom       = { workspace = true }
 thiserror = { workspace = true }
 tokio     = { workspace = true, features = ["net", "time", "io-util"] }
 
