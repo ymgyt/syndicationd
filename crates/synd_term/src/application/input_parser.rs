@@ -95,7 +95,7 @@ mod feed {
         character::complete::{multispace0, multispace1},
         combinator::{map, value},
         error::context,
-        sequence::{delimited, Tuple},
+        sequence::delimited,
         AsChar, Finish, IResult, Parser,
     };
     use synd_feed::types::{Category, FeedUrl};

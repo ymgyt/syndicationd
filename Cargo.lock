@@ -1644,7 +1644,7 @@ checksum = "049569e3be4e14dca02e7bfc888d0f1a772e9c1849b3fd234d441fb4fa6adcc4"
 dependencies = [
  "html5ever",
  "markup5ever",
- "nom",
+ "nom 7.1.3",
  "tendril",
  "thiserror",
  "unicode-width 0.2.0",
@@ -2370,6 +2370,15 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nom"
+version = "8.0.0-alpha2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2785486691910e746b3d84220af18362bd15ba71f9b7bc0a47ac549550b7fe2"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -4358,7 +4367,7 @@ dependencies = [
  "itertools 0.13.0",
  "kvsd",
  "mockall",
- "nom",
+ "nom 8.0.0-alpha2",
  "nucleo",
  "octocrab",
  "open",
