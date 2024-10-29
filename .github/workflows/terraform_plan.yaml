@@ -46,10 +46,10 @@ jobs:
 
             const body = `terraform plan: ${PLAN_RESULT}
             <details>
-              <summary>plan output</summary>
-              \`\`\`
-              ${PLAN_STDOUT}
-              \`\`\`
+            <summary>plan output</summary>
+            \`\`\`\n
+            ${PLAN_STDOUT}
+            \`\`\`
             </details>`
 
             github.rest.issues.createComment({
