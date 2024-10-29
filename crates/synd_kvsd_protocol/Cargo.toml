@@ -21,6 +21,7 @@ futures   = { workspace = true }
 nom       = { workspace = true }
 thiserror = { workspace = true }
 tokio     = { workspace = true, features = ["net", "time", "io-util"] }
+tracing   = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["net", "time", "io-util", "macros", "rt-multi-thread"] }

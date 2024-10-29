@@ -1,7 +1,4 @@
-use crate::message::{
-    parse::{Parse, ParseError},
-    MessageFrames, MessageType,
-};
+use crate::message::{MessageFrames, MessageType};
 
 /// `Authenticate` is a message in which client requests the server
 /// to perform authentication process.
@@ -22,14 +19,6 @@ impl Authenticate {
             username: username.into(),
             password: password.into(),
         }
-    }
-
-    // TODO: impl in trait
-    pub(in crate::message) fn parse_frames(parse: &mut Parse) -> Result<Self, ParseError> {
-        let username = parse.next_string()?;
-        let password = parse.next_string()?;
-
-        Ok(Authenticate::new(username, password))
     }
 }
 

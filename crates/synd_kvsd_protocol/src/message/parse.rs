@@ -1,17 +1,17 @@
-use std::vec;
+use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
-use crate::message::{frame::Frame, Message, MessageError, MessageFrames, MessageType};
+use crate::message::{Authenticate, Message, MessageError, MessageType};
 
 #[derive(Error, Debug)]
-pub(super) enum ParseError {
+pub enum ParseError {
     #[error("end of stream")]
     EndOfStream,
-    #[error("unexpecte frame: {frame:?}")]
-    UnexpectedFrame { frame: Frame },
     #[error("invalid message type: {0}")]
     InvalidMessageType(#[from] MessageError),
+    #[error("invalid utf8: {0}")]
+    InvalidUtf8(#[from] FromUtf8Error),
     #[error("expect frame: {0}")]
     Expect(&'static str),
     #[error("incomplete")]
@@ -29,87 +29,14 @@ impl ParseError {
     }
 }
 
-pub(super) struct Parse {
-    frames: vec::IntoIter<Frame>,
-}
-impl Parse {
-    pub(super) fn new(message_frames: MessageFrames) -> Self {
-        Self {
-            frames: message_frames.into_iter(),
-        }
-    }
+pub(crate) struct Parser;
 
-    pub(super) fn skip(&mut self, n: usize) {
-        for _ in 0..n {
-            self.frames.next();
-        }
-    }
-
-    pub(super) fn message_type(&mut self) -> Option<MessageType> {
-        self.next().ok().and_then(|frame| match frame {
-            Frame::MessageType(mt) => Some(mt),
-            _ => None,
-        })
-    }
-
-    pub(crate) fn next_string(&mut self) -> Result<String, ParseError> {
-        match self.next()? {
-            Frame::String(s) => Ok(s),
-            frame => Err(ParseError::UnexpectedFrame { frame }),
-        }
-    }
-    /*
-    pub(crate) fn next_bytes(&mut self) -> Result<Vec<u8>, ParseError> {
-        match self.next()? {
-            Frame::Bytes(val) => Ok(val),
-            frame => Err(format!("unexpected frame. want bytes got {:?}", frame).into()),
-        }
-    }
-
-    pub(crate) fn next_bytes_or_null(&mut self) -> Result<Option<Vec<u8>>, ParseError> {
-        match self.next()? {
-            Frame::Bytes(val) => Ok(Some(val)),
-            Frame::Null => Ok(None),
-            frame => Err(format!("unexpected frame. want (bytes|null) got {:?}", frame).into()),
-        }
-    }
-
-    pub(crate) fn next_time_or_null(&mut self) -> Result<Option<Time>, ParseError> {
-        match self.next()? {
-            Frame::Time(time) => Ok(Some(time)),
-            Frame::Null => Ok(None),
-            frame => Err(format!("unexpected frame. want (time|null) got {:?} ", frame).into()),
-        }
-    }
-
-    // Make sure that caller has parse all the frames.
-    pub(crate) fn expect_consumed(&mut self) -> Result<()> {
-        match self.next() {
-            Ok(frame) => Err(ErrorKind::NetworkFraming(format!(
-                "unparsed frame still remains {:?}",
-                frame
-            ))
-            .into()),
-            Err(ParseError::EndOfStream) => Ok(()),
-            Err(err) => Err(err.into()),
-        }
-    }
-    */
-
-    fn next(&mut self) -> Result<Frame, ParseError> {
-        self.frames.next().ok_or(ParseError::EndOfStream)
-    }
-}
-
-pub(super) struct Parser;
-
-#[expect(dead_code)]
 impl Parser {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self
     }
 
-    pub(super) fn parse(&self, input: &[u8]) -> Result<Message, ParseError> {
+    pub(crate) fn parse<'a>(&self, input: &'a [u8]) -> Result<(&'a [u8], Message), ParseError> {
         let (input, _start) =
             parse::message_start(input).map_err(|err| ParseError::expect(err, "message_start"))?;
 
@@ -122,7 +49,16 @@ impl Parser {
 
         match message_type {
             MessageType::Ping => todo!(),
-            MessageType::Authenticate => parse::authenticate(input).map(Message::Authenticate),
+            MessageType::Authenticate => {
+                let (input, (username, password)) = parse::authenticate(input)
+                    .map_err(|err| ParseError::expect(err, "message authenticate"))?;
+                let username = String::from_utf8(username.to_vec())?;
+                let password = String::from_utf8(password.to_vec())?;
+                Ok((
+                    input,
+                    Message::Authenticate(Authenticate::new(username, password)),
+                ))
+            }
             MessageType::Success => todo!(),
             MessageType::Fail => todo!(),
             MessageType::Set => todo!(),
@@ -137,11 +73,11 @@ mod parse {
         bytes::streaming::{tag, take},
         combinator::map,
         number::streaming::{be_u64, u8},
-        sequence::{preceded, terminated},
+        sequence::{pair, preceded, terminated},
         IResult, Parser as _,
     };
 
-    use crate::message::{frame::prefix, parse::ParseError, spec, Authenticate};
+    use crate::message::{frame::prefix, spec};
     pub(super) fn message_start(input: &[u8]) -> IResult<&[u8], &[u8]> {
         tag([prefix::MESSAGE_START].as_slice())(input)
     }
@@ -154,8 +90,8 @@ mod parse {
         preceded(tag([prefix::MESSAGE_TYPE].as_slice()), u8).parse(input)
     }
 
-    pub(super) fn authenticate(_input: &[u8]) -> Result<Authenticate, ParseError> {
-        todo!()
+    pub(super) fn authenticate(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
+        pair(string, string).parse(input)
     }
 
     fn delimiter(input: &[u8]) -> IResult<&[u8], ()> {

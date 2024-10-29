@@ -1,19 +1,15 @@
 mod frame;
-pub(crate) use frame::{FrameError, MessageFrames};
-mod cursor;
-pub(crate) use cursor::Cursor;
-mod ioext;
-pub(crate) use ioext::MessageWriteExt;
+pub(crate) use frame::MessageFrames;
 mod parse;
+pub(crate) use parse::{ParseError, Parser};
 mod payload;
 pub use payload::authenticate::Authenticate;
+use tokio::io::AsyncWriteExt;
 mod spec;
 
 use std::io;
 
 use thiserror::Error;
-
-use crate::message::parse::Parse;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum MessageError {
@@ -76,29 +72,9 @@ impl From<Message> for MessageFrames {
 }
 
 impl Message {
-    pub(crate) fn parse(frames: MessageFrames) -> Result<Message, MessageError> {
-        let mut parse = Parse::new(frames);
-        // skip message_start and frame_length
-        parse.skip(2);
-        let message_type = parse.message_type().ok_or(MessageError::ParseFrame {
-            message: "message type not found",
-        })?;
-
-        let message = match message_type {
-            MessageType::Authenticate => Message::Authenticate(
-                Authenticate::parse_frames(&mut parse)
-                    .map_err(|_| MessageError::ParseFrame { message: "TODO" })?,
-            ),
-            // TODO: impl
-            _ => unimplemented!(),
-        };
-
-        Ok(message)
-    }
-
     pub(crate) async fn write<W>(self, mut writer: W) -> Result<(), io::Error>
     where
-        W: MessageWriteExt,
+        W: AsyncWriteExt + Unpin,
     {
         let frames: MessageFrames = self.into();
 

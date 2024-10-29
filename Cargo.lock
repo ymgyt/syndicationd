@@ -4304,6 +4304,7 @@ dependencies = [
  "nom 8.0.0-alpha2",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
