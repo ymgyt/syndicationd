@@ -47,10 +47,10 @@ jobs:
 
             const body = `terraform apply: ${APPLY_RESULT}
             <details>
-              <summary>apply output</summary>
-              \`\`\`
-              ${APPLY_STDOUT}
-              \`\`\`
+            <summary>apply output</summary>
+            \`\`\`\n
+            ${APPLY_STDOUT}
+            \`\`\`
             </details>`
 
             github.rest.issues.createComment({

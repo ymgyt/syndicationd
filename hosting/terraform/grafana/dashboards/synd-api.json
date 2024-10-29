@@ -299,7 +299,7 @@
 						"uid": "grafanacloud-logs"
 					},
 					"editorMode": "code",
-					"expr": "count(count(count_over_time({service_name=\"synd-api\", service_namespace=\"syndicationd\"} | operation = \"FetchEntries\" and result = \"success\"[1w])) by (attributes_enduser_id))",
+					"expr": "count(count(count_over_time({service_name=\"synd-api\", service_namespace=\"syndicationd\"} | operation = \"FetchEntries\" and result = \"success\"[1w])) by (enduser_id))",
 					"queryType": "range",
 					"refId": "A"
 				}
@@ -949,8 +949,7 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green",
-								"value": null
+								"color": "green"
 							}
 						]
 					}
@@ -1046,8 +1045,7 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green",
-								"value": null
+								"color": "green"
 							},
 							{
 								"color": "red",
@@ -1159,8 +1157,7 @@
 						"mode": "absolute",
 						"steps": [
 							{
-								"color": "green",
-								"value": null
+								"color": "green"
 							}
 						]
 					}
@@ -1220,13 +1217,13 @@
 		"list": []
 	},
 	"time": {
-		"from": "now-2d",
+		"from": "now-12h",
 		"to": "now"
 	},
 	"timepicker": {},
 	"timezone": "browser",
 	"title": "synd-api",
 	"uid": "cdd2yfdz497uoc",
-	"version": 47,
+	"version": 48,
 	"weekStart": ""
 }
