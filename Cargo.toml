@@ -46,12 +46,12 @@ once_cell          = { version = "1.20.2" }
 pprof              = { version = "0.13", features = ["flamegraph", "criterion"] }
 proptest           = { version = "1.5.0" }
 rand               = { version = "0.8.5" }
-reqwest            = { version = "0.12.8", default-features = false, features = ["rustls-tls", "json"] }
+reqwest            = { version = "0.12.9", default-features = false, features = ["rustls-tls", "json"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.132" }
 tempfile           = { version = "3" }
-thiserror          = { version = "1.0.65" }
+thiserror          = { version = "1.0.67" }
 tokio              = { version = "1.41", default-features = false }
 tokio-util         = { version = "0.7.12" }
 toml               = { version = "0.8.19" }
