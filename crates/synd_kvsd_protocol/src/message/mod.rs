@@ -3,7 +3,7 @@ pub(crate) use frame::MessageFrames;
 mod parse;
 pub(crate) use parse::{ParseError, Parser};
 mod payload;
-pub use payload::authenticate::Authenticate;
+pub use payload::{Authenticate, Ping};
 use tokio::io::AsyncWriteExt;
 mod spec;
 
@@ -54,7 +54,7 @@ impl TryFrom<u8> for MessageType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message {
-    // Ping(Ping),
+    Ping(Ping),
     Authenticate(Authenticate),
     // Success(Success),
     // Fail(Fail),
@@ -66,6 +66,7 @@ pub enum Message {
 impl From<Message> for MessageFrames {
     fn from(message: Message) -> Self {
         match message {
+            Message::Ping(m) => m.into(),
             Message::Authenticate(m) => m.into(),
         }
     }

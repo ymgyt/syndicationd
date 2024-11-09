@@ -129,13 +129,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::message::Authenticate;
+    use crate::message::{Authenticate, Ping};
 
     use super::*;
 
     #[tokio::test]
     async fn read_write() {
-        let messages = vec![Message::Authenticate(Authenticate::new("user", "pass"))];
+        let messages = vec![
+            Message::Authenticate(Authenticate::new("user", "pass")),
+            Message::Ping(Ping::new()),
+        ];
 
         let buf_size = 1024;
         let (read, write) = tokio::io::duplex(buf_size);

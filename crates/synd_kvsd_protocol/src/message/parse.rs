@@ -1,8 +1,9 @@
 use std::string::FromUtf8Error;
 
+use chrono::{DateTime, Utc};
 use thiserror::Error;
 
-use crate::message::{Authenticate, Message, MessageError, MessageType};
+use crate::message::{frame::prefix, Authenticate, Message, MessageError, MessageType, Ping};
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -48,7 +49,38 @@ impl Parser {
         let message_type = MessageType::try_from(message_type)?;
 
         match message_type {
-            MessageType::Ping => todo!(),
+            MessageType::Ping => {
+                let parse_time = |input| -> Result<(&[u8], Option<DateTime<Utc>>), ParseError> {
+                    let (input, t) =
+                        parse::time(input).map_err(|err| ParseError::expect(err, "time"))?;
+                    let rfc3339 = String::from_utf8(t.to_vec())?;
+                    let t = DateTime::parse_from_rfc3339(&rfc3339).unwrap();
+                    Ok((input, Some(t.with_timezone(&Utc))))
+                };
+
+                let (input, pre) =
+                    parse::prefix(input).map_err(|err| ParseError::expect(err, "prefix"))?;
+
+                println!("prefix {pre}");
+
+                let (input, client) = match pre {
+                    prefix::TIME => parse_time(input)?,
+                    prefix::NULL => (input, None),
+                    _ => unreachable!(),
+                };
+                let (input, server) = match pre {
+                    prefix::TIME => parse_time(input)?,
+                    prefix::NULL => (input, None),
+                    _ => unreachable!(),
+                };
+                Ok((
+                    input,
+                    Message::Ping(Ping {
+                        client_timestamp: client,
+                        server_timestamp: server,
+                    }),
+                ))
+            }
             MessageType::Authenticate => {
                 let (input, (username, password)) = parse::authenticate(input)
                     .map_err(|err| ParseError::expect(err, "message authenticate"))?;
@@ -94,6 +126,10 @@ mod parse {
         pair(string, string).parse(input)
     }
 
+    pub(super) fn prefix(input: &[u8]) -> IResult<&[u8], u8> {
+        u8(input)
+    }
+
     fn delimiter(input: &[u8]) -> IResult<&[u8], ()> {
         map(tag(spec::DELIMITER), |_| ()).parse(input)
     }
@@ -108,8 +144,15 @@ mod parse {
         terminated(take(len), delimiter).parse(input)
     }
 
+    pub(super) fn time(input: &[u8]) -> IResult<&[u8], &[u8]> {
+        let (input, len) = preceded(tag([prefix::TIME].as_slice()), u64).parse(input)?;
+        terminated(take(len), delimiter).parse(input)
+    }
+
     #[cfg(test)]
     mod tests {
+        use chrono::DateTime;
+
         use crate::message::{frame::Frame, MessageType};
 
         use super::*;
@@ -169,6 +212,21 @@ mod parse {
                 assert!(remain.is_empty());
             }
             let err = string(b"").unwrap_err();
+            assert!(err.is_incomplete());
+        }
+
+        #[tokio::test]
+        async fn parse_time_frame() {
+            let mut buf = Vec::new();
+            let t = DateTime::from_timestamp(1000, 0).unwrap();
+            let f = Frame::Time(t);
+            f.write(&mut buf).await.unwrap();
+
+            let (remain, parsed_time) = time(buf.as_slice()).unwrap();
+            assert_eq!(parsed_time, t.to_rfc3339().as_bytes());
+            assert!(remain.is_empty());
+
+            let err = time(b"").unwrap_err();
             assert!(err.is_incomplete());
         }
     }
