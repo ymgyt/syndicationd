@@ -51,7 +51,7 @@ schemars           = { version = "0.8.21", default-features = false, features = 
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.132" }
 tempfile           = { version = "3" }
-thiserror          = { version = "1.0.67" }
+thiserror          = { version = "1.0.69" }
 tokio              = { version = "1.41", default-features = false }
 tokio-util         = { version = "0.7.12" }
 toml               = { version = "0.8.19" }
