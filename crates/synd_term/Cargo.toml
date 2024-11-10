@@ -74,7 +74,7 @@ kvsd        = { workspace = true }
 mockall     = { workspace = true }
 pprof       = { workspace = true }
 proptest    = { workspace = true }
-serial_test = { version = "3.1.1", default-features = false, features = ["async", "file_locks"] }
+serial_test = { version = "3.2.0", default-features = false, features = ["async", "file_locks"] }
 tempfile    = { workspace = true }
 tokio-util  = { workspace = true }
 
