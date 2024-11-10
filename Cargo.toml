@@ -57,7 +57,7 @@ tokio-util         = { version = "0.7.12" }
 toml               = { version = "0.8.19" }
 tracing            = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
-url                = { version = "2.5.2" }
+url                = { version = "2.5.3" }
 
 [profile.bench]
 # To enable framegraph
