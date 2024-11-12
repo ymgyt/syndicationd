@@ -212,7 +212,7 @@ dependencies = [
  "serde_urlencoded",
  "static_assertions_next",
  "tempfile",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tracing",
  "tracing-futures",
 ]
@@ -249,7 +249,7 @@ dependencies = [
  "quote",
  "strum",
  "syn 2.0.87",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1233,7 +1233,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e182f7dbc2ef73d9ef67351c5fbbea084729c48362d3ce9dd44c28e32e277fe5"
 dependencies = [
  "libc",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1474,7 +1474,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2ebc8013b4426d5b81a4364c419a95ed0b404af2b82e2457de52d9348f0e474"
 dependencies = [
  "combine",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1575,7 +1575,7 @@ dependencies = [
  "pest_derive",
  "serde",
  "serde_json",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2276,9 +2276,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.159"
+version = "0.2.162"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
+checksum = "18d287de67fe55fd7e1581fe933d965a5a9477b38e949cfa9f8574ef01506398"
 
 [[package]]
 name = "libm"
@@ -2475,7 +2475,7 @@ dependencies = [
  "rustc_version",
  "smallvec",
  "tagptr",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "triomphe",
  "uuid",
 ]
@@ -2709,7 +2709,7 @@ dependencies = [
  "js-sys",
  "once_cell",
  "pin-project-lite",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2749,7 +2749,7 @@ dependencies = [
  "opentelemetry-proto",
  "opentelemetry_sdk",
  "prost",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tonic",
 ]
@@ -2805,7 +2805,7 @@ dependencies = [
  "percent-encoding",
  "rand",
  "serde_json",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
 ]
@@ -2895,7 +2895,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd53dff83f26735fdc1ca837098ccf133605d794cdae66acfc2bfac3ec809d95"
 dependencies = [
  "memchr",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "ucd-trie",
 ]
 
@@ -3075,7 +3075,7 @@ dependencies = [
  "smallvec",
  "symbolic-demangle",
  "tempfile",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3273,7 +3273,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 1.1.0",
  "rustls 0.23.7",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
 ]
@@ -3290,7 +3290,7 @@ dependencies = [
  "rustc-hash 2.0.0",
  "rustls 0.23.7",
  "slab",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tinyvec",
  "tracing",
 ]
@@ -3428,7 +3428,7 @@ checksum = "a18479200779601e498ada4e8c1e1f50e3ee19deb0259c25825a98b5603b2cb4"
 dependencies = [
  "getrandom",
  "libredox",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3667,9 +3667,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.37"
+version = "0.38.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8acb788b847c24f28525660c4d7758620a7210875711f79e7f663cc152726811"
+checksum = "99e4ea3e1cdc4b559b8e5650f9c8e5998e3e5c1343b4eaf034565f32318d63c0"
 dependencies = [
  "bitflags 2.6.0",
  "errno",
@@ -4111,7 +4111,7 @@ checksum = "adc4e5204eb1910f40f9cfa375f6f05b68c3abac4b6fd879c8ff5e7ae8a0a085"
 dependencies = [
  "num-bigint",
  "num-traits",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "time",
 ]
 
@@ -4373,7 +4373,7 @@ dependencies = [
  "synd-o11y",
  "synd-stdx",
  "synd-test",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-metrics",
  "tokio-util",
@@ -4395,7 +4395,7 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
 ]
@@ -4418,7 +4418,7 @@ dependencies = [
  "serde",
  "serde_json",
  "synd-o11y",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-util",
  "tracing",
@@ -4440,7 +4440,7 @@ dependencies = [
  "synd-o11y",
  "synd-stdx",
  "tempfile",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "toml",
  "tracing",
@@ -4455,7 +4455,7 @@ dependencies = [
  "chrono",
  "futures",
  "nom 8.0.0-alpha2",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
 ]
@@ -4541,7 +4541,7 @@ dependencies = [
  "synd-stdx",
  "synd-test",
  "tempfile",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -4622,9 +4622,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tempfile"
-version = "3.13.0"
+version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0f2c9fc62d0beef6951ccffd757e241266a2c833136efbe35af6cd2567dca5b"
+checksum = "28cce251fcbc87fac86a866eeb0d6c2d536fc16d06f184bb61aeae11aa4cee0c"
 dependencies = [
  "cfg-if",
  "fastrand",
@@ -4666,7 +4666,7 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl 1.0.67",
+ "thiserror-impl 1.0.69",
 ]
 
 [[package]]
@@ -5065,7 +5065,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
 dependencies = [
  "crossbeam-channel",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "time",
  "tracing-subscriber",
 ]
@@ -5200,7 +5200,7 @@ dependencies = [
  "log",
  "rand",
  "sha1",
- "thiserror 1.0.67",
+ "thiserror 1.0.69",
  "utf-8",
 ]
 
