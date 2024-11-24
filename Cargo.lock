@@ -1656,9 +1656,9 @@ dependencies = [
 
 [[package]]
 name = "html2text"
-version = "0.13.3"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8cdab6bba74a9391292f57edeff4b2f3002885382f9f108824b474a212e9c13"
+checksum = "30428514ad6e806b3fac736b1e76cae415ec5e2fcc25ec904a01c68ef703ac8a"
 dependencies = [
  "html5ever",
  "markup5ever",
@@ -2432,9 +2432,9 @@ dependencies = [
 
 [[package]]
 name = "mockall"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4c28b3fb6d753d28c20e826cd46ee611fda1cf3cde03a443a974043247c065a"
+checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
 dependencies = [
  "cfg-if",
  "downcast",
@@ -2446,9 +2446,9 @@ dependencies = [
 
 [[package]]
 name = "mockall_derive"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "341014e7f530314e9a1fdbc7400b244efea7122662c96bfa248c31da5bfb2020"
+checksum = "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898"
 dependencies = [
  "cfg-if",
  "proc-macro2",
@@ -4378,7 +4378,7 @@ dependencies = [
  "tokio-metrics",
  "tokio-util",
  "tower 0.5.1",
- "tower-http 0.6.1",
+ "tower-http 0.6.2",
  "tracing",
  "tracing-subscriber",
 ]
@@ -5019,9 +5019,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8437150ab6bbc8c5f0f519e3d5ed4aa883a83dd4cdd3d1b21f9482936046cb97"
+checksum = "403fa3b783d4b626a8ad51d766ab03cb6d2dbfc46b1c5d4448395e6628dc9697"
 dependencies = [
  "bitflags 2.6.0",
  "bytes",
@@ -5177,9 +5177,9 @@ dependencies = [
 
 [[package]]
 name = "tui-widgets"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3ffa531a0d538cc64f2a21107fad7f613123a825afa9e06364ca1ad7a0b0e67"
+checksum = "ffd1ac763030d3e3fa086b9488d1069cbccb1e40b86c3bcbbf629815c7b0cac2"
 dependencies = [
  "document-features",
  "ratatui",
@@ -5306,9 +5306,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.5.3"
+version = "2.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d157f1b96d14500ffdc1f10ba712e780825526c03d9a49b4d0324b0d9113ada"
+checksum = "32f8b686cadd1473f4bd0117a5d28d36b1ade384ea9b5069a1c40aefed7fda60"
 dependencies = [
  "form_urlencoded",
  "idna",
