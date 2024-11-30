@@ -21,29 +21,27 @@ where
     OpenTelemetryLayer::new(init_tracer(endpoint, resource, sampler_ratio, batch_config))
 }
 
+#[expect(clippy::needless_pass_by_value)]
 fn init_tracer(
     endpoint: impl Into<String>,
     resource: Resource,
     sampler_ratio: f64,
-    batch_config: BatchConfig,
+    // TODO: how to use BatchConfig after 0.27 ?
+    _batch_config: BatchConfig,
 ) -> Tracer {
-    let provider = opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_trace_config(
-            opentelemetry_sdk::trace::Config::default()
-                .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-                    sampler_ratio,
-                ))))
-                .with_resource(resource),
-        )
-        .with_batch_config(batch_config)
-        .with_exporter(
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(endpoint),
-        )
-        .install_batch(runtime::Tokio)
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(endpoint)
+        .build()
         .unwrap();
+
+    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
+        .with_resource(resource)
+        .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
+            sampler_ratio,
+        ))))
+        .with_batch_exporter(exporter, runtime::Tokio)
+        .build();
 
     // > It would now be the responsibility of users to set it by calling global::set_tracer_provider(tracer_provider.clone());
     //  https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry-otlp/CHANGELOG.md#v0170

@@ -3,10 +3,7 @@ use std::time::Duration;
 use opentelemetry::{global, metrics::MeterProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
-    metrics::{
-        reader::DefaultTemporalitySelector, Instrument, PeriodicReader, SdkMeterProvider, Stream,
-        View,
-    },
+    metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream, View},
     runtime, Resource,
 };
 use tracing::{Metadata, Subscriber};
@@ -38,10 +35,10 @@ fn init_meter_provider(
     interval: Duration,
 ) -> impl MeterProvider {
     // Currently OtelpMetricPipeline does not provide a way to set up views.
-    let exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
+    let exporter = opentelemetry_otlp::MetricExporter::builder()
+        .with_tonic()
         .with_endpoint(endpoint)
-        .build_metrics_exporter(Box::new(DefaultTemporalitySelector::new()))
+        .build()
         .unwrap();
 
     let reader = PeriodicReader::builder(exporter, runtime::Tokio)
@@ -56,7 +53,7 @@ fn init_meter_provider(
 
     #[cfg(feature = "opentelemetry-stdout")]
     let stdout_reader = {
-        let exporter = opentelemetry_stdout::MetricsExporterBuilder::default().build();
+        let exporter = opentelemetry_stdout::MetricExporterBuilder::default().build();
         PeriodicReader::builder(exporter, runtime::Tokio)
             .with_interval(Duration::from_secs(60))
             .build()

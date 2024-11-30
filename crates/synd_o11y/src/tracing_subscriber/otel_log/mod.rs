@@ -1,5 +1,5 @@
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
-use opentelemetry_otlp::WithExportConfig as _;
+use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     logs::{BatchConfig, LoggerProvider},
     runtime, Resource,
@@ -7,25 +7,25 @@ use opentelemetry_sdk::{
 use tracing::Subscriber;
 use tracing_subscriber::{registry::LookupSpan, Layer};
 
+#[expect(clippy::needless_pass_by_value)]
 pub fn layer<S>(
     endpoint: impl Into<String>,
     resource: Resource,
-    batch_config: BatchConfig,
+    // TODO: how to use BatchConfig after 0.27 ?
+    _batch_config: BatchConfig,
 ) -> (impl Layer<S>, LoggerProvider)
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    let provider = opentelemetry_otlp::new_pipeline()
-        .logging()
-        .with_resource(resource)
-        .with_batch_config(batch_config)
-        .with_exporter(
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(endpoint),
-        )
-        .install_batch(runtime::Tokio)
+    let exporter = opentelemetry_otlp::LogExporter::builder()
+        .with_tonic()
+        .with_endpoint(endpoint)
+        .build()
         .unwrap();
+    let provider = opentelemetry_sdk::logs::LoggerProvider::builder()
+        .with_resource(resource)
+        .with_batch_exporter(exporter, runtime::Tokio)
+        .build();
 
     (OpenTelemetryTracingBridge::new(&provider), provider)
 }
