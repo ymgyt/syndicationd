@@ -93,6 +93,10 @@ icon = { symbol = "󰚄", color = { name = "magenta" } } # nf-md-dna
 aliases = ["nushell"]
 icon    = { symbol = "" }
 
+## Industries
+[categories.space]
+icon = { symbol = "" }
+
 ## Misc
 
 [categories.book]
