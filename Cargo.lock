@@ -2526,9 +2526,9 @@ dependencies = [
 
 [[package]]
 name = "nom"
-version = "8.0.0-alpha2"
+version = "8.0.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2785486691910e746b3d84220af18362bd15ba71f9b7bc0a47ac549550b7fe2"
+checksum = "842c447b3ca1221b1c26a101f24c092320f8014f40729356fbcba967afb0c1f2"
 dependencies = [
  "memchr",
 ]
@@ -4453,7 +4453,7 @@ dependencies = [
  "bytes",
  "chrono",
  "futures",
- "nom 8.0.0-alpha2",
+ "nom 8.0.0-beta.1",
  "thiserror 2.0.6",
  "tokio",
  "tracing",
@@ -4521,7 +4521,7 @@ dependencies = [
  "itertools 0.13.0",
  "kvsd",
  "mockall",
- "nom 8.0.0-alpha2",
+ "nom 8.0.0-beta.1",
  "nucleo",
  "octocrab",
  "open",
