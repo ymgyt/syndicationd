@@ -22,7 +22,7 @@ axum               = { version = "0.7.9", default-features = false }
 axum-server        = { version = "0.6.0", features = ["tls-rustls"] }
 bitflags           = { version = "2.6.0", default-features = false }
 bytes              = { version = "1.9.0" }
-chrono             = { version = "0.4.38", default-features = false }
+chrono             = { version = "0.4.39", default-features = false }
 clap               = { version = "4.5", default-features = false }
 criterion          = { version = "0.5.1", features = ["async_tokio"] }
 either             = { version = "1.13.0" }
@@ -51,7 +51,7 @@ schemars           = { version = "0.8.21", default-features = false, features = 
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.133" }
 tempfile           = { version = "3" }
-thiserror          = { version = "2.0.6" }
+thiserror          = { version = "2.0.7" }
 tokio              = { version = "1.42", default-features = false }
 tokio-util         = { version = "0.7.13" }
 toml               = { version = "0.8.19" }

@@ -44,7 +44,7 @@ thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 tokio-metrics      = { version = "0.4.0", default-features = false, features = ["rt"] }
 tokio-util         = { workspace = true }
-tower              = { version = "0.5.1", default-features = false, features = ["limit", "timeout"] }
+tower              = { version = "0.5.2", default-features = false, features = ["limit", "timeout"] }
 tower-http         = { version = "0.6.2", default-features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
 tracing            = { workspace = true }
 
