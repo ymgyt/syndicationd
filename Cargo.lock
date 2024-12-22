@@ -137,9 +137,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.94"
+version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
+checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 
 [[package]]
 name = "arc-swap"
@@ -1655,15 +1655,15 @@ dependencies = [
 
 [[package]]
 name = "html2text"
-version = "0.13.5"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68b2a77923bd16367f5d738c706b81b97ddb436c8ae863da5efc66599ef99552"
+checksum = "1bf7722c2ffdd62628b6e13065b6ab6cf154a236bd476c6e89af1352d745b83e"
 dependencies = [
  "html5ever",
  "markup5ever",
  "nom 7.1.3",
  "tendril",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "unicode-width 0.2.0",
 ]
 
@@ -3951,9 +3951,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.133"
+version = "1.0.134"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
+checksum = "d00f4175c42ee48b15416f6193a959ba3a0d67fc699a0db9ad12df9f83991c7d"
 dependencies = [
  "itoa",
  "memchr",
@@ -4372,7 +4372,7 @@ dependencies = [
  "synd-o11y",
  "synd-stdx",
  "synd-test",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "tokio",
  "tokio-metrics",
  "tokio-util",
@@ -4394,7 +4394,7 @@ dependencies = [
  "reqwest 0.12.9",
  "serde",
  "serde_json",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "tokio",
  "tracing",
 ]
@@ -4417,7 +4417,7 @@ dependencies = [
  "serde",
  "serde_json",
  "synd-o11y",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "tokio",
  "tokio-util",
  "tracing",
@@ -4439,7 +4439,7 @@ dependencies = [
  "synd-o11y",
  "synd-stdx",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "tokio",
  "toml",
  "tracing",
@@ -4454,7 +4454,7 @@ dependencies = [
  "chrono",
  "futures",
  "nom 8.0.0-alpha2",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "tokio",
  "tracing",
 ]
@@ -4540,7 +4540,7 @@ dependencies = [
  "synd-stdx",
  "synd-test",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.9",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -4670,11 +4670,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.7"
+version = "2.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93605438cbd668185516ab499d589afb7ee1859ea3d5fc8f6b0755e1c7443767"
+checksum = "f072643fd0190df67a8bab670c20ef5d8737177d6ac6b2e9a236cb096206b2cc"
 dependencies = [
- "thiserror-impl 2.0.7",
+ "thiserror-impl 2.0.9",
 ]
 
 [[package]]
@@ -4690,9 +4690,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.7"
+version = "2.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1d8749b4531af2117677a5fcd12b1348a3fe2b81e36e61ffeac5c4aa3273e36"
+checksum = "7b50fa271071aae2e6ee85f842e2e28ba8cd2c5fb67f11fcb1fd70b276f9e7d4"
 dependencies = [
  "proc-macro2",
  "quote",
