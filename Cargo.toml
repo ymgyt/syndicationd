@@ -44,7 +44,7 @@ nom                = { version = "8.0.0-alpha2", default-features = false, featu
 octocrab           = { version = "0.38.0", features = ["rustls-webpki-tokio"] }
 once_cell          = { version = "1.20.2" }
 pprof              = { version = "0.13", features = ["flamegraph", "criterion"] }
-proptest           = { version = "1.5.0" }
+proptest           = { version = "1.6.0" }
 rand               = { version = "0.8.5" }
 reqwest            = { version = "0.12.9", default-features = false, features = ["rustls-tls", "json"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
