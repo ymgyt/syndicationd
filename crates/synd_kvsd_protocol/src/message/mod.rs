@@ -79,6 +79,8 @@ impl Message {
     {
         let frames: MessageFrames = self.into();
 
+        println!("{frames:#?}");
+
         for frame in frames {
             frame.write(&mut writer).await?;
         }

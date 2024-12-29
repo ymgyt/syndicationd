@@ -129,15 +129,27 @@ where
 
 #[cfg(test)]
 mod tests {
+    use chrono::TimeDelta;
+    use std::ops::Add;
+
     use crate::message::{Authenticate, Ping};
 
     use super::*;
 
     #[tokio::test]
     async fn read_write() {
+        let t = chrono::DateTime::parse_from_rfc3339("2024-12-29T15:00:00+09:00")
+            .unwrap()
+            .to_utc();
+
         let messages = vec![
             Message::Authenticate(Authenticate::new("user", "pass")),
-            Message::Ping(Ping::new()),
+            Message::Ping(Ping::new().with_client_timestamp(t)),
+            Message::Ping(
+                Ping::new()
+                    .with_client_timestamp(t)
+                    .with_server_timestamp(t.add(TimeDelta::seconds(1))),
+            ),
         ];
 
         let buf_size = 1024;

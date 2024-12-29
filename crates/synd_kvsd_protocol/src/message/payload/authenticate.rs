@@ -1,4 +1,4 @@
-use crate::message::{MessageFrames, MessageType};
+use crate::message::{parse::parse, MessageFrames, MessageType, ParseError};
 
 /// `Authenticate` is a message in which client requests the server
 /// to perform authentication process.
@@ -30,5 +30,15 @@ impl From<Authenticate> for MessageFrames {
         frames.push_string(auth.password);
 
         frames
+    }
+}
+
+impl Authenticate {
+    pub(crate) fn parse(input: &[u8]) -> Result<(&[u8], Self), ParseError> {
+        let (input, (username, password)) = parse::authenticate(input)
+            .map_err(|err| ParseError::expect(err, "message authenticate"))?;
+        let username = String::from_utf8(username.to_vec())?;
+        let password = String::from_utf8(password.to_vec())?;
+        Ok((input, Authenticate::new(username, password)))
     }
 }

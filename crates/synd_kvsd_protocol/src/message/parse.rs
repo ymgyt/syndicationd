@@ -1,9 +1,8 @@
 use std::string::FromUtf8Error;
 
-use chrono::{DateTime, Utc};
 use thiserror::Error;
 
-use crate::message::{frame::prefix, Authenticate, Message, MessageError, MessageType, Ping};
+use crate::message::{Authenticate, Message, MessageError, MessageType, Ping};
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -21,7 +20,7 @@ pub enum ParseError {
 
 impl ParseError {
     #[expect(clippy::needless_pass_by_value)]
-    fn expect(err: nom::Err<nom::error::Error<&[u8]>>, frame: &'static str) -> Self {
+    pub(crate) fn expect(err: nom::Err<nom::error::Error<&[u8]>>, frame: &'static str) -> Self {
         if err.is_incomplete() {
             ParseError::Incomplete
         } else {
@@ -50,46 +49,10 @@ impl Parser {
 
         match message_type {
             MessageType::Ping => {
-                let parse_time = |input| -> Result<(&[u8], Option<DateTime<Utc>>), ParseError> {
-                    let (input, t) =
-                        parse::time(input).map_err(|err| ParseError::expect(err, "time"))?;
-                    let rfc3339 = String::from_utf8(t.to_vec())?;
-                    let t = DateTime::parse_from_rfc3339(&rfc3339).unwrap();
-                    Ok((input, Some(t.with_timezone(&Utc))))
-                };
-
-                let (input, pre) =
-                    parse::prefix(input).map_err(|err| ParseError::expect(err, "prefix"))?;
-
-                println!("prefix {pre}");
-
-                let (input, client) = match pre {
-                    prefix::TIME => parse_time(input)?,
-                    prefix::NULL => (input, None),
-                    _ => unreachable!(),
-                };
-                let (input, server) = match pre {
-                    prefix::TIME => parse_time(input)?,
-                    prefix::NULL => (input, None),
-                    _ => unreachable!(),
-                };
-                Ok((
-                    input,
-                    Message::Ping(Ping {
-                        client_timestamp: client,
-                        server_timestamp: server,
-                    }),
-                ))
+                Ping::parse(input).map(|(input, ping)| (input, Message::Ping(ping)))
             }
             MessageType::Authenticate => {
-                let (input, (username, password)) = parse::authenticate(input)
-                    .map_err(|err| ParseError::expect(err, "message authenticate"))?;
-                let username = String::from_utf8(username.to_vec())?;
-                let password = String::from_utf8(password.to_vec())?;
-                Ok((
-                    input,
-                    Message::Authenticate(Authenticate::new(username, password)),
-                ))
+                Authenticate::parse(input).map(|(input, auth)| (input, Message::Authenticate(auth)))
             }
             MessageType::Success => todo!(),
             MessageType::Fail => todo!(),
@@ -100,10 +63,10 @@ impl Parser {
     }
 }
 
-mod parse {
+pub(super) mod parse {
     use nom::{
         bytes::streaming::{tag, take},
-        combinator::map,
+        combinator::{map, peek},
         number::streaming::{be_u64, u8},
         sequence::{pair, preceded, terminated},
         IResult, Parser as _,
@@ -122,12 +85,16 @@ mod parse {
         preceded(tag([prefix::MESSAGE_TYPE].as_slice()), u8).parse(input)
     }
 
-    pub(super) fn authenticate(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
+    pub(crate) fn authenticate(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
         pair(string, string).parse(input)
     }
 
-    pub(super) fn prefix(input: &[u8]) -> IResult<&[u8], u8> {
+    pub(crate) fn prefix(input: &[u8]) -> IResult<&[u8], u8> {
         u8(input)
+    }
+
+    pub(crate) fn peek_prefix(input: &[u8]) -> IResult<&[u8], u8> {
+        peek(prefix).parse(input)
     }
 
     fn delimiter(input: &[u8]) -> IResult<&[u8], ()> {
@@ -144,9 +111,13 @@ mod parse {
         terminated(take(len), delimiter).parse(input)
     }
 
-    pub(super) fn time(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    pub(crate) fn time(input: &[u8]) -> IResult<&[u8], &[u8]> {
         let (input, len) = preceded(tag([prefix::TIME].as_slice()), u64).parse(input)?;
         terminated(take(len), delimiter).parse(input)
+    }
+
+    pub(crate) fn null(input: &[u8]) -> IResult<&[u8], ()> {
+        map(tag([prefix::NULL].as_slice()), |_| ()).parse(input)
     }
 
     #[cfg(test)]
