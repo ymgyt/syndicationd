@@ -21,7 +21,6 @@ where
     OpenTelemetryLayer::new(init_tracer(endpoint, resource, sampler_ratio, batch_config))
 }
 
-#[expect(clippy::needless_pass_by_value)]
 fn init_tracer(
     endpoint: impl Into<String>,
     resource: Resource,

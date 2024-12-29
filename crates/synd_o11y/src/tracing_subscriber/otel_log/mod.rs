@@ -7,7 +7,6 @@ use opentelemetry_sdk::{
 use tracing::Subscriber;
 use tracing_subscriber::{registry::LookupSpan, Layer};
 
-#[expect(clippy::needless_pass_by_value)]
 pub fn layer<S>(
     endpoint: impl Into<String>,
     resource: Resource,

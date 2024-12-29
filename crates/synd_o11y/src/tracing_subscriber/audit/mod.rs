@@ -105,7 +105,7 @@ struct AuditEventVisitor<'a> {
     ctx: &'a mut AuditContext,
 }
 
-impl<'a> field::Visit for AuditEventVisitor<'a> {
+impl field::Visit for AuditEventVisitor<'_> {
     fn record_debug(&mut self, _field: &field::Field, _value: &dyn std::fmt::Debug) {
         // do nothing
     }
