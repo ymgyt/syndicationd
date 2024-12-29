@@ -42,7 +42,7 @@ pub(crate) struct Entry<'a> {
 #[Object]
 impl<'a> Entry<'a> {
     /// Feed of this entry
-    async fn feed(&'a self) -> FeedMeta {
+    async fn feed(&self) -> FeedMeta {
         self.meta.clone().into()
     }
     /// Entry title

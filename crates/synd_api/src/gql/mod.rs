@@ -58,7 +58,7 @@ pub(crate) fn schema_builder() -> SchemaBuilder<Query, Mutation, EmptySubscripti
     // schema.extension(Tracing)
 }
 
-impl<'a> usecase::Context for &async_graphql::Context<'a> {
+impl usecase::Context for &async_graphql::Context<'_> {
     fn principal(&self) -> Principal {
         self.data_unchecked::<Principal>().clone()
     }

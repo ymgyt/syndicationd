@@ -21,7 +21,7 @@ impl From<FeedIdV1> for async_graphql::ID {
 #[derive(Debug, PartialEq, Eq)]
 pub(in crate::gql) struct EntryId<'a>(types::EntryId<'a>);
 
-impl<'a> CursorType for EntryId<'a> {
+impl CursorType for EntryId<'_> {
     type Error = Infallible;
 
     fn decode_cursor(s: &str) -> Result<Self, Self::Error> {
