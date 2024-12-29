@@ -45,7 +45,7 @@ pub struct Context<'a> {
     pub(crate) tab: Tab,
 }
 
-impl<'a> Context<'a> {
+impl Context<'_> {
     fn table_highlight_modifier(&self) -> Modifier {
         match self.focus {
             TerminalFocus::Gained => Modifier::empty(),

@@ -43,7 +43,7 @@ pub struct Throbber<'a> {
     use_type: throbber::WhichUse,
 }
 
-impl<'a> Default for Throbber<'a> {
+impl Default for Throbber<'_> {
     fn default() -> Self {
         Self {
             label: None,
@@ -79,7 +79,7 @@ impl<'a> Throbber<'a> {
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-impl<'a> StatefulWidget for Throbber<'a> {
+impl StatefulWidget for Throbber<'_> {
     type State = ThrobberState;
 
     /// Render specified index symbols.

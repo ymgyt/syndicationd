@@ -54,7 +54,7 @@ impl<'a> Root<'a> {
     }
 }
 
-impl<'a> Widget for Root<'a> {
+impl Widget for Root<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Background
         Block::new().style(self.cx.theme.base).render(area, buf);

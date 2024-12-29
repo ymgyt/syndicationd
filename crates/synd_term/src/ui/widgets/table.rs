@@ -151,7 +151,7 @@ pub(crate) struct Table<'a> {
     state: TableState,
 }
 
-impl<'a> Table<'a> {
+impl Table<'_> {
     pub(crate) fn builder() -> TableBuilder<(), (), (), (), (), ()> {
         TableBuilder::default()
     }
