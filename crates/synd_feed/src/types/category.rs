@@ -41,7 +41,7 @@ impl<'a> Category<'a> {
     }
 }
 
-impl<'a> Display for Category<'a> {
+impl Display for Category<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad(self.0.as_ref())
     }
@@ -49,7 +49,7 @@ impl<'a> Display for Category<'a> {
 
 #[cfg(feature = "graphql")]
 #[async_graphql::Scalar]
-impl<'s> async_graphql::ScalarType for Category<'s> {
+impl async_graphql::ScalarType for Category<'_> {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         let async_graphql::Value::String(s) = value else {
             return Err(async_graphql::InputValueError::expected_type(value));
@@ -68,7 +68,7 @@ impl<'s> async_graphql::ScalarType for Category<'s> {
 }
 
 #[cfg(feature = "fake")]
-impl<'a> fake::Dummy<fake::Faker> for Category<'a> {
+impl fake::Dummy<fake::Faker> for Category<'_> {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &fake::Faker, rng: &mut R) -> Self {
         let category: String = fake::Fake::fake_with_rng(&(1..31), rng);
         Self::new(category).unwrap()
