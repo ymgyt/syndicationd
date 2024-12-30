@@ -2,7 +2,7 @@
   description = "syndicationd";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     rust-overlay = {
@@ -11,7 +11,7 @@
     };
 
     crane = {
-      url = "github:ipetkov/crane/v0.17.3";
+      url = "github:ipetkov/crane/v0.20.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
