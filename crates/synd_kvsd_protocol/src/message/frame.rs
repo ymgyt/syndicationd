@@ -17,7 +17,6 @@ pub(in crate::message) mod prefix {
 // Should support time type ?
 pub(crate) type Time = chrono::DateTime<chrono::Utc>;
 
-#[expect(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Frame {
     MessageStart,
@@ -93,6 +92,10 @@ impl MessageFrames {
 
     pub(super) fn push_string(&mut self, s: impl Into<String>) {
         self.0.push(Frame::String(s.into()));
+    }
+
+    pub(super) fn push_bytes(&mut self, bytes: impl Into<Vec<u8>>) {
+        self.0.push(Frame::Bytes(bytes.into()));
     }
 
     pub(super) fn push_time(&mut self, time: Time) {

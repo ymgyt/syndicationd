@@ -2,7 +2,7 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
-use crate::message::{Authenticate, Message, MessageError, MessageType, Ping};
+use crate::message::{Authenticate, Message, MessageError, MessageType, Ping, Success};
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -54,7 +54,9 @@ impl Parser {
             MessageType::Authenticate => {
                 Authenticate::parse(input).map(|(input, auth)| (input, Message::Authenticate(auth)))
             }
-            MessageType::Success => todo!(),
+            MessageType::Success => {
+                Success::parse(input).map(|(input, success)| (input, Message::Success(success)))
+            }
             MessageType::Fail => todo!(),
             MessageType::Set => todo!(),
             MessageType::Get => todo!(),
@@ -105,10 +107,14 @@ pub(super) mod parse {
         be_u64(input)
     }
 
-    #[allow(dead_code)]
     fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
         let (input, len) = preceded(tag([prefix::STRING].as_slice()), u64).parse(input)?;
         terminated(take(len), delimiter).parse(input)
+    }
+
+    pub(crate) fn bytes(input: &[u8]) -> IResult<&[u8], Vec<u8>> {
+        let (input, len) = preceded(tag([prefix::BYTES].as_slice()), u64).parse(input)?;
+        map(terminated(take(len), delimiter), <[u8]>::to_vec).parse(input)
     }
 
     pub(crate) fn time(input: &[u8]) -> IResult<&[u8], &[u8]> {

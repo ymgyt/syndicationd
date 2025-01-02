@@ -132,7 +132,10 @@ mod tests {
     use chrono::TimeDelta;
     use std::ops::Add;
 
-    use crate::message::{Authenticate, Ping};
+    use crate::{
+        message::{Authenticate, Ping, Success},
+        Value,
+    };
 
     use super::*;
 
@@ -150,6 +153,8 @@ mod tests {
                     .with_client_timestamp(t)
                     .with_server_timestamp(t.add(TimeDelta::seconds(1))),
             ),
+            Message::Success(Success::new()),
+            Message::Success(Success::with_value(Value::new("Hello".as_bytes()).unwrap())),
         ];
 
         let buf_size = 1024;
