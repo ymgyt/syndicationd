@@ -18,6 +18,7 @@ impl Ping {
         }
     }
 
+    #[must_use]
     pub fn with_client_timestamp(self, time: Time) -> Self {
         Self {
             client_timestamp: Some(time),
@@ -25,6 +26,7 @@ impl Ping {
         }
     }
 
+    #[must_use]
     pub fn with_server_timestamp(self, time: Time) -> Self {
         Self {
             server_timestamp: Some(time),

@@ -2,7 +2,7 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
-use crate::message::{Authenticate, Message, MessageError, MessageType, Ping, Success};
+use crate::message::{Authenticate, Fail, Message, MessageError, MessageType, Ping, Success};
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -57,7 +57,9 @@ impl Parser {
             MessageType::Success => {
                 Success::parse(input).map(|(input, success)| (input, Message::Success(success)))
             }
-            MessageType::Fail => todo!(),
+            MessageType::Fail => {
+                Fail::parse(input).map(|(input, fail)| (input, Message::Fail(fail)))
+            }
             MessageType::Set => todo!(),
             MessageType::Get => todo!(),
             MessageType::Delete => todo!(),
@@ -107,7 +109,7 @@ pub(super) mod parse {
         be_u64(input)
     }
 
-    fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    pub(crate) fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
         let (input, len) = preceded(tag([prefix::STRING].as_slice()), u64).parse(input)?;
         terminated(take(len), delimiter).parse(input)
     }

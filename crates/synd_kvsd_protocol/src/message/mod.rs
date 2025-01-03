@@ -3,7 +3,7 @@ pub(crate) use frame::MessageFrames;
 mod parse;
 pub(crate) use parse::{ParseError, Parser};
 mod payload;
-pub use payload::{Authenticate, Ping, Success};
+pub use payload::{Authenticate, Fail, FailCode, Ping, Success};
 use tokio::io::AsyncWriteExt;
 mod spec;
 
@@ -57,7 +57,7 @@ pub enum Message {
     Ping(Ping),
     Authenticate(Authenticate),
     Success(Success),
-    // Fail(Fail),
+    Fail(Fail),
     // Set(Set),
     // Get(Get),
     // Delete(Delete),
@@ -69,6 +69,7 @@ impl From<Message> for MessageFrames {
             Message::Ping(m) => m.into(),
             Message::Authenticate(m) => m.into(),
             Message::Success(m) => m.into(),
+            Message::Fail(m) => m.into(),
         }
     }
 }

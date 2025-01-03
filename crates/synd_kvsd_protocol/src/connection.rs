@@ -133,7 +133,7 @@ mod tests {
     use std::ops::Add;
 
     use crate::{
-        message::{Authenticate, Ping, Success},
+        message::{Authenticate, Fail, FailCode, Ping, Success},
         Value,
     };
 
@@ -155,6 +155,7 @@ mod tests {
             ),
             Message::Success(Success::new()),
             Message::Success(Success::with_value(Value::new("Hello".as_bytes()).unwrap())),
+            Message::Fail(Fail::new(FailCode::Unauthenticated)),
         ];
 
         let buf_size = 1024;
