@@ -2,7 +2,7 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 
-use crate::message::{Authenticate, Fail, Message, MessageError, MessageType, Ping, Success};
+use crate::message::{Authenticate, Fail, Message, MessageError, MessageType, Ping, Set, Success};
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -60,7 +60,7 @@ impl Parser {
             MessageType::Fail => {
                 Fail::parse(input).map(|(input, fail)| (input, Message::Fail(fail)))
             }
-            MessageType::Set => todo!(),
+            MessageType::Set => Set::parse(input).map(|(input, set)| (input, Message::Set(set))),
             MessageType::Get => todo!(),
             MessageType::Delete => todo!(),
         }

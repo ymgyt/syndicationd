@@ -133,8 +133,8 @@ mod tests {
     use std::ops::Add;
 
     use crate::{
-        message::{Authenticate, Fail, FailCode, Ping, Success},
-        Value,
+        message::{Authenticate, Fail, FailCode, Ping, Set, Success},
+        Key, Value,
     };
 
     use super::*;
@@ -156,6 +156,11 @@ mod tests {
             Message::Success(Success::new()),
             Message::Success(Success::with_value(Value::new("Hello".as_bytes()).unwrap())),
             Message::Fail(Fail::new(FailCode::Unauthenticated)),
+            Message::Fail(Fail::new(FailCode::Unauthenticated).with_message("fail")),
+            Message::Set(Set::new(
+                Key::new("key").unwrap(),
+                Value::try_from(b"value").unwrap(),
+            )),
         ];
 
         let buf_size = 1024;

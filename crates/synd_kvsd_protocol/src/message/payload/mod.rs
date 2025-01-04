@@ -9,3 +9,6 @@ pub use success::Success;
 
 mod fail;
 pub use fail::{Fail, FailCode};
+
+mod set;
+pub use set::Set;
