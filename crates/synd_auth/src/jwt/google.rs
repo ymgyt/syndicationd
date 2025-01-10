@@ -254,10 +254,10 @@ impl JwtService {
             id_token: String,
         }
 
-        async fn call<'s>(
+        async fn call(
             client: &Client,
             endpoint: Url,
-            payload: &Request<'s>,
+            payload: &Request<'_>,
         ) -> Result<Response, reqwest::Error> {
             client
                 .post(endpoint)
