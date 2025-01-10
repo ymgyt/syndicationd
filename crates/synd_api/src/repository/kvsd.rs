@@ -68,8 +68,8 @@ impl KvsdClient {
             .inspect(|_| tracing::info!("Kvsd handshake successfully completed"))
     }
 
-    async fn get<'a, T>(
-        client: &mut MutexGuard<'a, Client<TcpStream>>,
+    async fn get<T>(
+        client: &mut MutexGuard<'_, Client<TcpStream>>,
         key: Key,
     ) -> RepositoryResult<Option<T>>
     where
@@ -82,8 +82,8 @@ impl KvsdClient {
         Ok(Some(value.try_into().map_err(Into::into)?))
     }
 
-    async fn set<'a, T>(
-        client: &mut MutexGuard<'a, Client<TcpStream>>,
+    async fn set<T>(
+        client: &mut MutexGuard<'_, Client<TcpStream>>,
         key: Key,
         value: T,
     ) -> RepositoryResult<()>

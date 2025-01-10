@@ -40,7 +40,7 @@ pub(crate) struct Entry<'a> {
 }
 
 #[Object]
-impl<'a> Entry<'a> {
+impl Entry<'_> {
     /// Feed of this entry
     async fn feed(&self) -> FeedMeta {
         self.meta.clone().into()
@@ -220,7 +220,7 @@ impl From<Annotated<Arc<types::Feed>>> for Feed {
 pub(super) struct FeedMeta<'a>(Cow<'a, Annotated<types::FeedMeta>>);
 
 #[Object]
-impl<'a> FeedMeta<'a> {
+impl FeedMeta<'_> {
     /// Title of the feed
     async fn title(&self) -> Option<&str> {
         self.0.feed.title()
