@@ -263,7 +263,7 @@ mod link {
                 .find(|link| {
                     !std::path::Path::new(link.href.as_str())
                         .extension()
-                        .map_or(false, |ext| ext.eq_ignore_ascii_case("json"))
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
                 })
                 .map(|link| link.href.as_str()),
 
