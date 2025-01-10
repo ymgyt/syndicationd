@@ -146,7 +146,7 @@ pub(crate) struct Restore<'a> {
     pub(crate) persist_when_refreshed: bool,
 }
 
-impl<'a> Restore<'a> {
+impl Restore<'_> {
     pub(crate) async fn restore(self) -> Result<Verified<Credential>, CredentialError> {
         let Restore {
             jwt_service,
