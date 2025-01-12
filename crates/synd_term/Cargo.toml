@@ -29,7 +29,7 @@ chrono               = { workspace = true, features = ["std", "now", "serde", "c
 chrono-humanize      = "0.2.3"
 clap                 = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env", "std"] }
 crossterm            = { version = "0.28.1", features = ["event-stream"] }
-directories          = "5.0.1"
+directories          = "6.0.0"
 edit                 = "0.1.5"
 either               = { workspace = true }
 futures-util         = { workspace = true }
