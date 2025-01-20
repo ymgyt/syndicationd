@@ -12,6 +12,8 @@ mod port;
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "kebab-case"))]
 pub enum Palette {
+    Dracula,
+    Eldritch,
     Ferra,
     SolarizedDark,
     Helix,
@@ -20,6 +22,8 @@ pub enum Palette {
 impl From<Palette> for theme::Palette {
     fn from(p: Palette) -> Self {
         match p {
+            Palette::Dracula => theme::Palette::dracula(),
+            Palette::Eldritch => theme::Palette::eldritch(),
             Palette::Ferra => theme::Palette::ferra(),
             Palette::SolarizedDark => theme::Palette::solarized_dark(),
             Palette::Helix => theme::Palette::helix(),
