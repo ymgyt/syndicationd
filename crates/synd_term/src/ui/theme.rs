@@ -73,6 +73,28 @@ pub struct Palette {
 }
 
 impl Palette {
+    pub fn dracula() -> Self {
+        Self {
+            name: "dracula",
+            bg: Color::Rgb(0x28, 0x2a, 0x36),
+            fg: Color::Rgb(0xf8, 0xf8, 0xf2),
+            fg_inactive: Color::Rgb(0x62, 0x72, 0xa4),
+            fg_focus: Color::Rgb(0xff, 0x79, 0xc6),
+            error: Color::Rgb(0xff, 0x55, 0x55),
+        }
+    }
+
+    pub fn eldritch() -> Self {
+        Self {
+            name: "eldritch",
+            bg: Color::Rgb(0x21, 0x23, 0x37),
+            fg: Color::Rgb(0xeb, 0xfa, 0xfa),
+            fg_inactive: Color::Rgb(0x70, 0x81, 0xd0),
+            fg_focus: Color::Rgb(0x37, 0xf4, 0x99),
+            error: Color::Rgb(0xf1, 0x6c, 0x75),
+        }
+    }
+
     pub fn helix() -> Self {
         Self {
             name: "helix",
