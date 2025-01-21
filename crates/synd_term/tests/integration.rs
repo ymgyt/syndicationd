@@ -66,7 +66,13 @@ mod test {
 
         {
             // Rotate theme
-            tx.send_multi([shift!('t'), shift!('t'), shift!('t')]);
+            tx.send_multi([
+                shift!('t'),
+                shift!('t'),
+                shift!('t'),
+                shift!('t'),
+                shift!('t'),
+            ]);
             application
                 .wait_until_jobs_completed(&mut event_stream)
                 .await;

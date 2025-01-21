@@ -1404,6 +1404,8 @@ impl Application {
         let p = match self.theme.name {
             "ferra" => Palette::solarized_dark(),
             "solarized_dark" => Palette::helix(),
+            "helix" => Palette::dracula(),
+            "dracula" => Palette::eldritch(),
             _ => Palette::ferra(),
         };
         self.theme = Theme::with_palette(p);
