@@ -4367,7 +4367,7 @@ dependencies = [
 
 [[package]]
 name = "synd-stdx"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byte-unit",
  "humantime",

@@ -11,7 +11,7 @@ repository.workspace = true
 description = "syndicationd lib"
 include     = ["src/**/*", "CHANGELOG.md"]
 name        = "synd-stdx"
-version     = "0.1.0"
+version     = "0.1.1"
 
 [dependencies]
 byte-unit      = { version = "5.1.6", optional = true, features = ["serde"] }
