@@ -10,7 +10,7 @@ repository.workspace = true
 description = "Library to handle syndication spec"
 name        = "synd-feed"
 readme      = "README.md"
-version     = "0.3.4"
+version     = "0.3.5"
 
 [dependencies]
 synd-o11y = { path = "../synd_o11y", version = "0.1.9" }
