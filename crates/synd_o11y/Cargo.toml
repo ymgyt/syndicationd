@@ -10,7 +10,7 @@ repository.workspace = true
 description = "syndicationd lib for tracing and opentelemetry ecosystem"
 name        = "synd-o11y"
 readme      = "README.md"
-version     = "0.1.8"
+version     = "0.1.9"
 
 [dependencies]
 axum                               = { workspace = true }
