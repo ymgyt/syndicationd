@@ -6,10 +6,48 @@ All notable changes to this project will be documented in this file.
 
 ### 📡 Features
 
+- Add dracula and eldritch themes (#225) by [@tangowithfoxtrot](https://github.com/tangowithfoxtrot) ([c4e6a333](https://github.com/ymgyt/syndicationd/commit/c4e6a33354514428d311267d9eb0b9a370ebe59c))
+
+### ⚙️ Miscellaneous Tasks
+
+- Reorganize release tasks by [@ymgyt](https://github.com/ymgyt) ([e920156a](https://github.com/ymgyt/syndicationd/commit/e920156aab15b5a839cadf5e56af2883c9c5708f))
+- Refactor justfile by [@ymgyt](https://github.com/ymgyt) ([56b21266](https://github.com/ymgyt/syndicationd/commit/56b21266d79131d63e2cb6ce4136f75f8865f262))
+- Standardize graphql colocation by [@ymgyt](https://github.com/ymgyt) ([ceb479b8](https://github.com/ymgyt/syndicationd/commit/ceb479b8adbba74f1fb6999b1194e2de21b64f6a))
+- Bump html2text from 0.12.6 to 0.13.2 by [@ymgyt](https://github.com/ymgyt) ([6db8cb89](https://github.com/ymgyt/syndicationd/commit/6db8cb8995c8b72c11459ee619716f873d6d1912))
+- Bump ratatui from 0.28.1 to 0.29.0 by [@ymgyt](https://github.com/ymgyt) ([98c88658](https://github.com/ymgyt/syndicationd/commit/98c886582261d8f14eb35690a995e50190817e05))
+- Bump nom from 7.1.3 to 8.0.0-alpha2 by [@ymgyt](https://github.com/ymgyt) ([c2a313a2](https://github.com/ymgyt/syndicationd/commit/c2a313a20a6157bc1e776825374961926fa33ad9))
+
+### 📚 Documentation
+
+- Reorganize mdbook dir by [@ymgyt](https://github.com/ymgyt) ([7fff65bb](https://github.com/ymgyt/syndicationd/commit/7fff65bbc592483cb9d828135d09fdbfc5df9713))
+
+### 🔧 Testing
+
+- Cover new themes by [@ymgyt](https://github.com/ymgyt) ([b48cc783](https://github.com/ymgyt/syndicationd/commit/b48cc7835b10255fa82479c9f94ec2d4054a7ea6))
+
+### 🧹 Refactor
+
+- Migrate humantime to stdx by [@ymgyt](https://github.com/ymgyt) ([5908219d](https://github.com/ymgyt/syndicationd/commit/5908219dc47c40969e3306063e673618fe52e658))
+- Migrate deserialization method to stdx by [@ymgyt](https://github.com/ymgyt) ([cd8c7751](https://github.com/ymgyt/syndicationd/commit/cd8c775198bb21793fedd0f5ec0a8d2930b5596c))
+- Migrate conf Entry to stdx by [@ymgyt](https://github.com/ymgyt) ([fe75d6f0](https://github.com/ymgyt/syndicationd/commit/fe75d6f06b8c4720d359942b77fe980b7754d82b))
+- Migrate filesystem trait to stdx by [@ymgyt](https://github.com/ymgyt) ([03fca010](https://github.com/ymgyt/syndicationd/commit/03fca010209a41fcf1deca5ae7a0a5f7d61bbe63))
+- Rename args module to cli by [@ymgyt](https://github.com/ymgyt) ([8a4c3487](https://github.com/ymgyt/syndicationd/commit/8a4c3487c8246cf6f67ece0b637a78ecdc9ee17e))
+- Appease clippy by [@ymgyt](https://github.com/ymgyt) ([c3756d13](https://github.com/ymgyt/syndicationd/commit/c3756d13c8414550ba7e27c90f3f6487857a46d0))
+- Appease clippy by [@ymgyt](https://github.com/ymgyt) ([d525dbea](https://github.com/ymgyt/syndicationd/commit/d525dbeaa520a4bdc40fe643b1f0583aa328a20a))
+- Appease clippy by [@ymgyt](https://github.com/ymgyt) ([21248fbd](https://github.com/ymgyt/syndicationd/commit/21248fbd7cc03b591037b4fb1a42f9c7453f5e56))
+
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.1...synd-term-v0.3.2
+
+
+* @tangowithfoxtrot made their first contribution in #225
+
+## [synd-term-v0.3.1] - 2024-08-31
+
+### 📡 Features
+
 - Add import command (#132) by [@ymgyt](https://github.com/ymgyt) ([3513a253](https://github.com/ymgyt/syndicationd/commit/3513a2530b7ff3ecf8bc75ef1f03a49f34a01a81))
 - Support configuration file by [@ymgyt](https://github.com/ymgyt) ([86d7b246](https://github.com/ymgyt/syndicationd/commit/86d7b246276193d8790cb3bc0a092789919c7e19))
 - Set timeout for the github client by [@ymgyt](https://github.com/ymgyt) ([96e47621](https://github.com/ymgyt/syndicationd/commit/96e47621d1f55977b97565c96fd969a2e92990f9))
-- Add dracula and eldritch themes (#225) by [@tangowithfoxtrot](https://github.com/tangowithfoxtrot) ([c4e6a333](https://github.com/ymgyt/syndicationd/commit/c4e6a33354514428d311267d9eb0b9a370ebe59c))
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -24,19 +62,6 @@ All notable changes to this project will be documented in this file.
 - Add pat validation during github client construction by [@ymgyt](https://github.com/ymgyt) ([f75ddf9a](https://github.com/ymgyt/syndicationd/commit/f75ddf9a22a2c1dcf41b2dcdcf1b48131d5d79ea))
 - Add validation method to ConfigResolver by [@ymgyt](https://github.com/ymgyt) ([9152458b](https://github.com/ymgyt/syndicationd/commit/9152458b7514139ae8644403ad7b94552be5d42e))
 - Change unreferenced value in insta test by [@ymgyt](https://github.com/ymgyt) ([4fa07c39](https://github.com/ymgyt/syndicationd/commit/4fa07c39c7d153f7d3d6f8b1d6e855baa0a1d927))
-- Reorganize release tasks by [@ymgyt](https://github.com/ymgyt) ([e920156a](https://github.com/ymgyt/syndicationd/commit/e920156aab15b5a839cadf5e56af2883c9c5708f))
-- Refactor justfile by [@ymgyt](https://github.com/ymgyt) ([56b21266](https://github.com/ymgyt/syndicationd/commit/56b21266d79131d63e2cb6ce4136f75f8865f262))
-- Standardize graphql colocation by [@ymgyt](https://github.com/ymgyt) ([ceb479b8](https://github.com/ymgyt/syndicationd/commit/ceb479b8adbba74f1fb6999b1194e2de21b64f6a))
-- Appease clippy by [@ymgyt](https://github.com/ymgyt) ([c3756d13](https://github.com/ymgyt/syndicationd/commit/c3756d13c8414550ba7e27c90f3f6487857a46d0))
-- Bump html2text from 0.12.6 to 0.13.2 by [@ymgyt](https://github.com/ymgyt) ([6db8cb89](https://github.com/ymgyt/syndicationd/commit/6db8cb8995c8b72c11459ee619716f873d6d1912))
-- Bump ratatui from 0.28.1 to 0.29.0 by [@ymgyt](https://github.com/ymgyt) ([98c88658](https://github.com/ymgyt/syndicationd/commit/98c886582261d8f14eb35690a995e50190817e05))
-- Bump nom from 7.1.3 to 8.0.0-alpha2 by [@ymgyt](https://github.com/ymgyt) ([c2a313a2](https://github.com/ymgyt/syndicationd/commit/c2a313a20a6157bc1e776825374961926fa33ad9))
-- Appease clippy by [@ymgyt](https://github.com/ymgyt) ([d525dbea](https://github.com/ymgyt/syndicationd/commit/d525dbeaa520a4bdc40fe643b1f0583aa328a20a))
-- Appease clippy by [@ymgyt](https://github.com/ymgyt) ([21248fbd](https://github.com/ymgyt/syndicationd/commit/21248fbd7cc03b591037b4fb1a42f9c7453f5e56))
-- Release by [@ymgyt](https://github.com/ymgyt) ([371c8ec3](https://github.com/ymgyt/syndicationd/commit/371c8ec30c40e771d5de9c0923bf5e068d1781fe))
-- Release by [@ymgyt](https://github.com/ymgyt) ([8dfc462c](https://github.com/ymgyt/syndicationd/commit/8dfc462c8d4c8e16646debca8f2eedfcd2feb4ff))
-- Release by [@ymgyt](https://github.com/ymgyt) ([3067b6f3](https://github.com/ymgyt/syndicationd/commit/3067b6f3a3c3ba1231e76711f28a02f43edf7e52))
-- Release by [@ymgyt](https://github.com/ymgyt) ([275066af](https://github.com/ymgyt/syndicationd/commit/275066af286688a57b89f8b934beddf98af9d841))
 
 ### 🎨 Styling
 
@@ -45,12 +70,10 @@ All notable changes to this project will be documented in this file.
 ### 📚 Documentation
 
 - Add description for import command by [@ymgyt](https://github.com/ymgyt) ([f77dff7c](https://github.com/ymgyt/syndicationd/commit/f77dff7cca03a0a09949ca1f9925a89485a6a48f))
-- Reorganize mdbook dir by [@ymgyt](https://github.com/ymgyt) ([7fff65bb](https://github.com/ymgyt/syndicationd/commit/7fff65bbc592483cb9d828135d09fdbfc5df9713))
 
 ### 🔧 Testing
 
 - Relax interval assertion in import test by [@ymgyt](https://github.com/ymgyt) ([822d6f4c](https://github.com/ymgyt/syndicationd/commit/822d6f4cdf5a94df130c6bd2fc3ff437e4302750))
-- Cover new themes by [@ymgyt](https://github.com/ymgyt) ([b48cc783](https://github.com/ymgyt/syndicationd/commit/b48cc7835b10255fa82479c9f94ec2d4054a7ea6))
 
 ### 🧹 Refactor
 
@@ -59,18 +82,11 @@ All notable changes to this project will be documented in this file.
 - Remove duplicat code in cache's load and persis methods by [@ymgyt](https://github.com/ymgyt) ([e9445da8](https://github.com/ymgyt/syndicationd/commit/e9445da874c316f97754b37a23486dacda3b4875))
 - Abstract interactor (#121) by [@ymgyt](https://github.com/ymgyt) ([f0283f8d](https://github.com/ymgyt/syndicationd/commit/f0283f8d0dae98f58ed2023bd8863ec307f3eed3))
 - Add custom table widget to remove duplicate code by [@ymgyt](https://github.com/ymgyt) ([5a2953c6](https://github.com/ymgyt/syndicationd/commit/5a2953c6ee9fa0292779b86a6a50430cd787cc9c))
-- Migrate humantime to stdx by [@ymgyt](https://github.com/ymgyt) ([5908219d](https://github.com/ymgyt/syndicationd/commit/5908219dc47c40969e3306063e673618fe52e658))
-- Migrate deserialization method to stdx by [@ymgyt](https://github.com/ymgyt) ([cd8c7751](https://github.com/ymgyt/syndicationd/commit/cd8c775198bb21793fedd0f5ec0a8d2930b5596c))
-- Migrate conf Entry to stdx by [@ymgyt](https://github.com/ymgyt) ([fe75d6f0](https://github.com/ymgyt/syndicationd/commit/fe75d6f06b8c4720d359942b77fe980b7754d82b))
-- Migrate filesystem trait to stdx by [@ymgyt](https://github.com/ymgyt) ([03fca010](https://github.com/ymgyt/syndicationd/commit/03fca010209a41fcf1deca5ae7a0a5f7d61bbe63))
-- Rename args module to cli by [@ymgyt](https://github.com/ymgyt) ([8a4c3487](https://github.com/ymgyt/syndicationd/commit/8a4c3487c8246cf6f67ece0b637a78ecdc9ee17e))
-- Use nom to parse frame by [@ymgyt](https://github.com/ymgyt) ([be57556e](https://github.com/ymgyt/syndicationd/commit/be57556e5cc54c280f4bb53ac9e6fe5e13f3141a))
 
-https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0...synd-term-v0.3.2
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.0...synd-term-v0.3.1
 
 
-
-* @tangowithfoxtrot made their first contribution in #225## [synd-term-v0.3.0] - 2024-07-11
+## [synd-term-v0.3.0] - 2024-07-11
 
 ### 📡 Features
 
