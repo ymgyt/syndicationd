@@ -10,7 +10,7 @@ def main [
   let root = "../.."
   # handle package rename
   let additional_include_path = if ($package == "auth") {
-    "--include-path crates/synd_authn/**"
+    "crates/synd_authn/**"
   } else {
     ""
   }
