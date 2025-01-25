@@ -70,7 +70,7 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd/synd-term-v0.3.1
+nix profile install github:ymgyt/syndicationd/synd-term-v0.3.2
 ```
 
 ### arch linux
@@ -88,7 +88,7 @@ brew install ymgyt/homebrew-syndicationd/synd-term
 ### shell
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.1
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2
 ```
 
 ### cargo
@@ -106,7 +106,7 @@ npm install @syndicationd/synd-term
 ### powershell
 
 ```sh
-powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.1
+powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2
 ```
 
 ### docker
