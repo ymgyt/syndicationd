@@ -480,7 +480,7 @@ Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with developm
 
 * **A terminal-first, self-hostable feed service**. Create a simple, self-hostable feed service for terminal users that does not involve curation, recommendations, or user behavior analysis.
 
-* **Longevity**. Maintain this project for as long as possible, with a minimu maintenance period of at lease 5 yeas.
+* **Longevity**. Maintain this project for as long as possible, with a minimum maintenance period of at least 5 years.
 
 
 ## License
