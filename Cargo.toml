@@ -17,7 +17,7 @@ repository  = "https://github.com/ymgyt/syndicationd"
 anyhow             = { version = "1", default-features = false, features = ["std"] }
 assert_cmd         = { version = "2.0.16" }
 async-graphql      = { version = "7.0" }
-async-trait        = { version = "0.1.85", default-features = false }
+async-trait        = { version = "0.1.86", default-features = false }
 axum               = { version = "0.7.9", default-features = false }
 axum-server        = { version = "0.6.0", features = ["tls-rustls"] }
 bitflags           = { version = "2.8.0", default-features = false }
@@ -49,7 +49,7 @@ rand               = { version = "0.8.5" }
 reqwest            = { version = "0.12.12", default-features = false, features = ["rustls-tls", "json"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
-serde_json         = { version = "1.0.136" }
+serde_json         = { version = "1.0.138" }
 tempfile           = { version = "3" }
 thiserror          = { version = "2.0.11" }
 tokio              = { version = "1.43", default-features = false }
