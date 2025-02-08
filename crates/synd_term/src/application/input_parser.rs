@@ -1,4 +1,4 @@
-use nom::error::VerboseErrorKind;
+use nom_language::error::{VerboseError, VerboseErrorKind};
 use thiserror::Error;
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
     types::{self},
 };
 
-type NomError<'s> = nom::error::VerboseError<&'s str>;
+type NomError<'s> = VerboseError<&'s str>;
 
 const CTX_REQUIREMENT: &str = "requirement";
 const CTX_CATEGORY: &str = "category";
@@ -98,6 +98,7 @@ mod feed {
         sequence::delimited,
         AsChar, Finish, IResult, Parser,
     };
+    use nom_language::error::{VerboseError, VerboseErrorKind};
     use synd_feed::types::{Category, FeedUrl};
     use url::Url;
 
@@ -174,8 +175,8 @@ mod feed {
             Ok(url) => Ok((remain, FeedUrl::from(url))),
             Err(err) => {
                 tracing::warn!("Invalid url: {err}");
-                let nom_err = nom::error::VerboseError {
-                    errors: vec![(s, nom::error::VerboseErrorKind::Context("url"))],
+                let nom_err = VerboseError {
+                    errors: vec![(s, VerboseErrorKind::Context("url"))],
                 };
                 Err(nom::Err::Failure(nom_err))
             }
@@ -184,8 +185,6 @@ mod feed {
 
     #[cfg(test)]
     mod tests {
-        use nom::error::VerboseErrorKind;
-
         use super::*;
 
         #[test]
