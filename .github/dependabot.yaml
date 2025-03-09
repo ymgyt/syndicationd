@@ -20,6 +20,9 @@ updates:
       opentelemetry:
         applies-to: version-updates
         patterns: ["opentelemetry*"]
+      axum:
+        applies-to: version-updates
+        patterns: ["axum", "axum-server", "async-graphql", "async-graphq-axum"]
       rust-patch:
         applies-to: version-updates
         update-types: ["patch"]
