@@ -2,9 +2,9 @@ use std::{borrow::Cow, time::Duration};
 
 use opentelemetry_sdk::{logs, trace};
 use tracing::Subscriber;
-use tracing_subscriber::{registry::LookupSpan, Layer};
+use tracing_subscriber::{Layer, registry::LookupSpan};
 
-use crate::{tracing_subscriber::otel_metrics::metrics_event_filter, OpenTelemetryGuard};
+use crate::{OpenTelemetryGuard, tracing_subscriber::otel_metrics::metrics_event_filter};
 
 pub mod audit;
 pub mod initializer;

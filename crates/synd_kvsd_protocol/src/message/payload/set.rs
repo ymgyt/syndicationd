@@ -1,6 +1,6 @@
 use crate::{
-    message::{parse::parse, MessageFrames, MessageType, ParseError},
     Key, Value,
+    message::{MessageFrames, MessageType, ParseError, parse::parse},
 };
 
 #[derive(Debug, Clone, PartialEq)]

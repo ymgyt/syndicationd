@@ -1,2 +1,2 @@
 mod support;
-pub use support::{is_color_supported, ColorSupport};
+pub use support::{ColorSupport, is_color_supported};

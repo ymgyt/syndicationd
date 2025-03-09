@@ -1,7 +1,7 @@
 use axum::{
-    http::{header, StatusCode},
-    response::IntoResponse,
     Json,
+    http::{StatusCode, header},
+    response::IntoResponse,
 };
 use synd_o11y::health_check::Health;
 

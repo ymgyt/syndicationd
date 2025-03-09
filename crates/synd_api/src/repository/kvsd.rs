@@ -4,18 +4,17 @@ use anyhow::Context;
 use async_trait::async_trait;
 use futures_util::TryFutureExt;
 use kvsd::{
-    client::{tcp::Client, Api},
     Key, Value,
+    client::{Api, tcp::Client},
 };
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::{net::TcpStream, sync::MutexGuard};
 
 use crate::repository::{
-    self,
+    self, RepositoryError, SubscriptionRepository,
     subscription::RepositoryResult,
     types::{FeedAnnotations, SubscribedFeeds},
-    RepositoryError, SubscriptionRepository,
 };
 
 #[derive(Error, Debug)]

@@ -3,10 +3,10 @@ use std::{fmt::Debug, time::Duration};
 use anyhow::anyhow;
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use synd_o11y::{health_check::Health, opentelemetry::extension::*};
 use thiserror::Error;
-use tracing::{error, Span};
+use tracing::{Span, error};
 use url::Url;
 
 use crate::{

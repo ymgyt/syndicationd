@@ -1,14 +1,13 @@
 use tracing::{
-    field,
+    Event, Level, Metadata, Subscriber, field,
     span::{self, Attributes},
     subscriber::Interest,
-    Event, Level, Metadata, Subscriber,
 };
 use tracing_subscriber::{
+    Layer,
     filter::{Directive, Filtered},
     layer::{self, Context},
     registry::LookupSpan,
-    Layer,
 };
 
 mod macros {

@@ -1,11 +1,12 @@
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
+    Resource,
     logs::{BatchConfig, LoggerProvider},
-    runtime, Resource,
+    runtime,
 };
 use tracing::Subscriber;
-use tracing_subscriber::{registry::LookupSpan, Layer};
+use tracing_subscriber::{Layer, registry::LookupSpan};
 
 pub fn layer<S>(
     endpoint: impl Into<String>,
@@ -35,14 +36,14 @@ mod tests {
 
     use opentelemetry::KeyValue;
     use opentelemetry_proto::tonic::collector::logs::v1::{
-        logs_service_server::{LogsService, LogsServiceServer},
         ExportLogsServiceRequest, ExportLogsServiceResponse,
+        logs_service_server::{LogsService, LogsServiceServer},
     };
     use opentelemetry_sdk::logs::BatchConfigBuilder;
     use tokio::sync::mpsc::UnboundedSender;
     use tonic::transport::Server;
     use tracing::dispatcher;
-    use tracing_subscriber::{layer::SubscriberExt, Registry};
+    use tracing_subscriber::{Registry, layer::SubscriberExt};
 
     use super::*;
 

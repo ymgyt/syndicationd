@@ -1,4 +1,4 @@
 mod parse;
-pub use parse::{parse_duration, DurationError};
+pub use parse::{DurationError, parse_duration};
 
 pub mod de;

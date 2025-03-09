@@ -13,7 +13,7 @@ use tui_widgets::big_text::{BigText, PixelSize};
 use crate::{
     application::Direction,
     auth::AuthenticationProvider,
-    ui::{self, extension::RectExt, icon, Context},
+    ui::{self, Context, extension::RectExt, icon},
 };
 
 /// Handle user authentication

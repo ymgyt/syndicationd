@@ -101,10 +101,12 @@ mod tests {
         use async_graphql::ScalarType;
 
         assert!(Category::parse(async_graphql::Value::Null).is_err());
-        assert!(Category::parse(async_graphql::Value::String(
-            "a".repeat(Category::MAX_LEN + 1)
-        ))
-        .is_err());
+        assert!(
+            Category::parse(async_graphql::Value::String(
+                "a".repeat(Category::MAX_LEN + 1)
+            ))
+            .is_err()
+        );
     }
 
     #[test]

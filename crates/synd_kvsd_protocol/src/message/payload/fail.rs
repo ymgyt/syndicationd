@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::message::{parse::parse, MessageFrames, MessageType, ParseError};
+use crate::message::{MessageFrames, MessageType, ParseError, parse::parse};
 
 const UNDEFINED: &str = "UNDEFINED";
 const UNAUTHENTICATED: &str = "UNAUTHENTICATED";

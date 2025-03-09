@@ -1,8 +1,8 @@
 use std::{cell::RefCell, fmt, rc::Rc};
 
 use nucleo::{
-    pattern::{AtomKind, CaseMatching, Normalization, Pattern},
     Utf32Str,
+    pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
 
 #[derive(Clone)]

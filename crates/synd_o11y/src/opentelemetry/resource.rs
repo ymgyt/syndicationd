@@ -1,8 +1,8 @@
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::resource::EnvResourceDetector;
 use opentelemetry_semantic_conventions::{
-    resource::{SERVICE_NAME, SERVICE_NAMESPACE, SERVICE_VERSION},
     SCHEMA_URL,
+    resource::{SERVICE_NAME, SERVICE_NAMESPACE, SERVICE_VERSION},
 };
 use std::{borrow::Cow, time::Duration};
 

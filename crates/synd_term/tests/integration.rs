@@ -11,7 +11,7 @@ mod test {
 
     mod helper;
     use crate::test::helper::{
-        focus_gained_event, focus_lost_event, resize_event, test_config, TestCase,
+        TestCase, focus_gained_event, focus_lost_event, resize_event, test_config,
     };
 
     #[tokio::test(flavor = "multi_thread")]

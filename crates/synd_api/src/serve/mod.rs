@@ -1,15 +1,15 @@
 use std::{net::IpAddr, time::Duration};
 
 use axum::{
+    BoxError, Extension, Router,
     error_handling::HandleErrorLayer,
-    http::{header::AUTHORIZATION, StatusCode},
+    http::{StatusCode, header::AUTHORIZATION},
     response::IntoResponse,
     routing::{get, post},
-    BoxError, Extension, Router,
 };
 use tokio::net::TcpListener;
 use tokio_metrics::TaskMonitor;
-use tower::{limit::ConcurrencyLimitLayer, timeout::TimeoutLayer, ServiceBuilder};
+use tower::{ServiceBuilder, limit::ConcurrencyLimitLayer, timeout::TimeoutLayer};
 use tower_http::{
     cors::CorsLayer, limit::RequestBodyLimitLayer, sensitive_headers::SetSensitiveHeadersLayer,
 };

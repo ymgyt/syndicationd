@@ -9,12 +9,11 @@ use ratatui::{
 use crate::{
     application::RequestId,
     ui::{
-        icon,
+        Context, icon,
         widgets::throbber::{
-            throbber::{self, WhichUse},
             Throbber, ThrobberState,
+            throbber::{self, WhichUse},
         },
-        Context,
     },
 };
 

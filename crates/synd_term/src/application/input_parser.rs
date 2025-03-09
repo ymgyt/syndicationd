@@ -90,13 +90,13 @@ impl<'a> InputParser<'a> {
 
 mod feed {
     use nom::{
+        AsChar, Finish, IResult, Parser,
         branch::alt,
         bytes::complete::{tag_no_case, take_while, take_while_m_n},
         character::complete::{multispace0, multispace1},
         combinator::{map, value},
         error::context,
         sequence::delimited,
-        AsChar, Finish, IResult, Parser,
     };
     use nom_language::error::{VerboseError, VerboseErrorKind};
     use synd_feed::types::{Category, FeedUrl};
@@ -105,7 +105,7 @@ mod feed {
     use super::NomError;
     use crate::{
         application::input_parser::{
-            comment, CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REQUIREMENT, CTX_URL,
+            CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REQUIREMENT, CTX_URL, comment,
         },
         client::synd_api::mutation::subscribe_feed::{Requirement, SubscribeFeedInput},
     };
@@ -255,12 +255,12 @@ mod feed {
 
 mod comment {
     use nom::{
+        IResult, Parser,
         bytes::complete::{tag, take_until},
         character::complete::line_ending,
         combinator::value,
         multi::fold_many0,
         sequence::delimited,
-        IResult, Parser,
     };
 
     use crate::application::input_parser::NomError;

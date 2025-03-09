@@ -19,13 +19,14 @@ use crate::{
     command::Command,
     config::{self, Categories},
     types::{
+        TimeExt,
         github::{
             Comment, IssueContext, Notification, NotificationId, PullRequestContext,
             PullRequestState, Reason, RepoVisibility, SubjectContext, SubjectType,
         },
-        TimeExt,
     },
     ui::{
+        Context,
         components::{
             collections::FilterableVec,
             filter::{CategoryFilterer, ComposedFilterer, MatcherFilterer},
@@ -33,7 +34,6 @@ use crate::{
         extension::RectExt,
         icon,
         widgets::{scrollbar::Scrollbar, table::Table},
-        Context,
     },
 };
 
@@ -600,8 +600,12 @@ impl GhNotifications {
                 Constraint::Length(1),
                 Constraint::Fill(1),
             ]);
-            let [body_header_area, body_area, comment_header_area, comment_area] =
-                vertical.areas(content_area);
+            let [
+                body_header_area,
+                body_area,
+                comment_header_area,
+                comment_area,
+            ] = vertical.areas(content_area);
 
             body.render(body_header_area, buf);
             body_para.render(body_area, buf);

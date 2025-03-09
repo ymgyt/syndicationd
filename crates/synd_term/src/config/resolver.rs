@@ -6,7 +6,7 @@ use std::{
 
 use synd_stdx::{
     conf::Entry,
-    fs::{fsimpl, FileSystem},
+    fs::{FileSystem, fsimpl},
 };
 use thiserror::Error;
 use url::Url;
@@ -14,9 +14,8 @@ use url::Url;
 use crate::{
     cli::{self, ApiOptions, FeedOptions, GithubOptions},
     config::{
-        self,
+        self, Categories,
         file::{ConfigFile, ConfigFileError},
-        Categories,
     },
     ui::theme::Palette,
 };
@@ -204,7 +203,7 @@ impl ConfigResolverBuilder {
                     return Err(ConfigResolverBuildError::ConfigFileOpen {
                         path: path.display().to_string(),
                         err,
-                    })
+                    });
                 }
             }
         // If the path is not specified, builder search for the default path
@@ -222,7 +221,7 @@ impl ConfigResolverBuilder {
                         return Err(ConfigResolverBuildError::ConfigFileOpen {
                             path: default_path.display().to_string(),
                             err,
-                        })
+                        });
                     }
                 },
             }

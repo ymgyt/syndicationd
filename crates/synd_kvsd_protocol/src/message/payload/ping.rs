@@ -1,6 +1,6 @@
 use crate::{
-    message::{frame::prefix, parse::parse, MessageFrames, MessageType, ParseError},
     Time,
+    message::{MessageFrames, MessageType, ParseError, frame::prefix, parse::parse},
 };
 use chrono::{DateTime, Utc};
 

@@ -13,8 +13,8 @@ use crate::{
     config,
     monitor::Monitors,
     repository::kvsd::KvsdClient,
-    serve::{auth::Authenticator, ServeOptions},
-    usecase::{authorize::Authorizer, MakeUsecase, Runtime},
+    serve::{ServeOptions, auth::Authenticator},
+    usecase::{MakeUsecase, Runtime, authorize::Authorizer},
 };
 
 pub struct Dependency {

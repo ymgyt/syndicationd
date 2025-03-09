@@ -117,7 +117,9 @@ impl<P: Provider> DeviceFlow<P> {
                 }
                 other => {
                     let error_msg = response.text().await.unwrap_or_default();
-                    anyhow::bail!("Failed to authenticate. authorization server respond with {other} {error_msg}")
+                    anyhow::bail!(
+                        "Failed to authenticate. authorization server respond with {other} {error_msg}"
+                    )
                 }
             }
         };

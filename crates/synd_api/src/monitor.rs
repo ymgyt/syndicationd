@@ -99,11 +99,11 @@ impl Monitors {
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use tracing::{instrument::WithSubscriber, Event, Subscriber};
+    use tracing::{Event, Subscriber, instrument::WithSubscriber};
     use tracing_subscriber::{
+        Layer, Registry,
         layer::{Context, SubscriberExt as _},
         registry::LookupSpan,
-        Layer, Registry,
     };
 
     use super::*;

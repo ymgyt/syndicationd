@@ -2,7 +2,7 @@ use std::io;
 
 use tokio::io::AsyncWriteExt;
 
-use crate::message::{spec, MessageType};
+use crate::message::{MessageType, spec};
 
 pub(in crate::message) mod prefix {
     pub(in crate::message) const MESSAGE_START: u8 = b'*';

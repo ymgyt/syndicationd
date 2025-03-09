@@ -1,6 +1,6 @@
 use std::ops::Add;
 use synd_auth::{
-    device_flow::{provider, DeviceAuthorizationResponse, DeviceFlow},
+    device_flow::{DeviceAuthorizationResponse, DeviceFlow, provider},
     jwt,
 };
 

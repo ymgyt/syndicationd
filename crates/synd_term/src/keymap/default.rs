@@ -1,4 +1,4 @@
-use crate::keymap::{macros::keymap, KeymapsConfig};
+use crate::keymap::{KeymapsConfig, macros::keymap};
 
 pub fn default() -> KeymapsConfig {
     let login = keymap!({

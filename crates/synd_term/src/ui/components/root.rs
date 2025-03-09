@@ -4,8 +4,8 @@ use ratatui::{
 };
 
 use crate::ui::{
-    components::{filter::FilterContext, tabs::Tab, Components},
     Context,
+    components::{Components, filter::FilterContext, tabs::Tab},
 };
 
 pub struct Root<'a> {

@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 
 use async_graphql::{
-    connection::{Connection, Edge},
     Context, Object, Result, SimpleObject,
+    connection::{Connection, Edge},
 };
 use synd_feed::types::FeedUrl;
 
 use crate::{
     gql::{
-        object::{self, id, Entry},
+        object::{self, Entry, id},
         run_usecase,
     },
     usecase::{

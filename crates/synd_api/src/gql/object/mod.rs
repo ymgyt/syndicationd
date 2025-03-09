@@ -1,8 +1,8 @@
 use std::{borrow::Cow, sync::Arc};
 
 use async_graphql::{
+    ID, Object, SimpleObject,
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
-    Object, SimpleObject, ID,
 };
 use feed_rs::model as feedrs;
 use synd_feed::types::{self, Annotated, Category, FeedType, FeedUrl, Requirement};

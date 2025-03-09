@@ -10,8 +10,8 @@ use tracing::debug;
 
 use crate::{
     table::{
-        index::{Index, IndexError},
         Namespace,
+        index::{Index, IndexError},
     },
     uow::{UnitOfWork, UowError, UowReceiver},
 };

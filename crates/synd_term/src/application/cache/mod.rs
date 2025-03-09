@@ -4,8 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{de::DeserializeOwned, Serialize};
-use synd_stdx::fs::{fsimpl, FileSystem};
+use serde::{Serialize, de::DeserializeOwned};
+use synd_stdx::fs::{FileSystem, fsimpl};
 use thiserror::Error;
 
 use crate::{
@@ -168,11 +168,13 @@ mod tests {
     #[test]
     fn filesystem_error() {
         let cache = Cache::new("/dev/null");
-        assert!(cache
-            .persist_credential(Credential::Github {
-                access_token: "dummy".into(),
-            })
-            .is_err());
+        assert!(
+            cache
+                .persist_credential(Credential::Github {
+                    access_token: "dummy".into(),
+                })
+                .is_err()
+        );
     }
 
     fn temp_dir() -> PathBuf {

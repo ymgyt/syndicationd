@@ -8,10 +8,10 @@ pub mod notifications {
     #[allow(clippy::wildcard_imports)]
     use super::*;
     use axum::{
+        Json,
         extract::{Path, Query},
         http::StatusCode,
         response::{IntoResponse, Response},
-        Json,
     };
     use chrono::{DateTime, Duration, TimeZone, Utc};
     use serde::Serialize;
@@ -147,8 +147,8 @@ pub mod notifications {
 pub mod gql {
 
     use axum::{
-        response::{IntoResponse, Response},
         Json,
+        response::{IntoResponse, Response},
     };
     use serde::Deserialize;
     use serde_json::Value;

@@ -1,8 +1,8 @@
 use crate::{
+    OpenTelemetryGuard,
     opentelemetry::init_propagation,
     opentelemetry_layer,
     tracing_subscriber::{audit, otel_metrics::metrics_event_filter},
-    OpenTelemetryGuard,
 };
 
 const LOG_DIRECTIVE_ENV: &str = "SYND_LOG";
@@ -38,8 +38,8 @@ impl TracingInitializer {
     /// Initialize tracing Subscriber with layers
     pub fn init(self) -> Option<OpenTelemetryGuard> {
         use tracing_subscriber::{
-            filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt as _, Layer as _,
-            Registry,
+            Layer as _, Registry, filter::EnvFilter, fmt, layer::SubscriberExt,
+            util::SubscriberInitExt as _,
         };
 
         let Self {

@@ -5,8 +5,8 @@ use synd_kvsd::{
     cli::{self, ObservabilityOptions},
     config::{self, ConfigResolver},
 };
-use synd_o11y::{tracing_subscriber::initializer::TracingInitializer, OpenTelemetryGuard};
-use synd_stdx::io::color::{is_color_supported, ColorSupport};
+use synd_o11y::{OpenTelemetryGuard, tracing_subscriber::initializer::TracingInitializer};
+use synd_stdx::io::color::{ColorSupport, is_color_supported};
 
 fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let ObservabilityOptions {

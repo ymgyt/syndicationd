@@ -1,5 +1,5 @@
 mod resource;
-pub use resource::{resource, Resource};
+pub use resource::{Resource, resource};
 
 mod propagation;
 pub use propagation::{http, init_propagation};

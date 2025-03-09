@@ -10,6 +10,7 @@ use crate::{
     client::github::{FetchNotificationInclude, FetchNotificationParticipating},
     types::github::{Notification, PullRequestState, Reason, RepoVisibility, SubjectContext},
     ui::{
+        Context,
         components::{
             filter::{FilterResult, Filterable},
             gh_notifications::{
@@ -17,7 +18,7 @@ use crate::{
                 GhNotificationFilterUpdater,
             },
         },
-        icon, Context,
+        icon,
     },
 };
 
@@ -176,8 +177,13 @@ impl FilterPopup {
             Constraint::Length(1),
             // Constraint::Fill(1),
         ]);
-        let [status_area, participating_area, visibility_area, pull_request_area, reason_area] =
-            vertical.areas(area);
+        let [
+            status_area,
+            participating_area,
+            visibility_area,
+            pull_request_area,
+            reason_area,
+        ] = vertical.areas(area);
         let options = self.pending_options.as_ref().unwrap_or(current);
         let keyword = cx.theme.entries.selected_entry;
 

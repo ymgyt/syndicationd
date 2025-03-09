@@ -8,16 +8,16 @@ use crate::{
     client::{
         github::{FetchNotificationsParams, GithubError},
         synd_api::{
-            mutation::subscribe_feed::SubscribeFeedInput, payload,
-            query::subscription::SubscriptionOutput, SyndApiError,
+            SyndApiError, mutation::subscribe_feed::SubscribeFeedInput, payload,
+            query::subscription::SubscriptionOutput,
         },
     },
     types::{
+        Feed,
         github::{
             IssueContext, IssueOrPullRequest, Notification, NotificationId, PullRequestContext,
             PullRequestState, Reason,
         },
-        Feed,
     },
     ui::components::{filter::FilterLane, gh_notifications::GhNotificationFilterUpdater},
 };

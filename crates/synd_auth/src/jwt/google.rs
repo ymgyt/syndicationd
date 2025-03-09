@@ -11,7 +11,7 @@ use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{config, USER_AGENT};
+use crate::{USER_AGENT, config};
 
 type Kid = String;
 

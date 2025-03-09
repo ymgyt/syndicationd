@@ -1,21 +1,21 @@
 use crossterm::{
+    ExecutableCommand,
     event::{EnableFocusChange, EventStream},
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
-use futures_util::{future::Either, stream, Stream};
+use futures_util::{Stream, future::Either, stream};
 use ratatui::Frame;
 use std::io::{self, IsTerminal};
 
 #[cfg(not(feature = "integration"))]
 mod backend;
 #[cfg(not(feature = "integration"))]
-pub use backend::{new_backend, TerminalBackend};
+pub use backend::{TerminalBackend, new_backend};
 
 #[cfg(feature = "integration")]
 mod integration_backend;
 #[cfg(feature = "integration")]
-pub use integration_backend::{new_backend, Buffer, TerminalBackend};
+pub use integration_backend::{Buffer, TerminalBackend, new_backend};
 
 /// Provide terminal manipulation operations.
 pub struct Terminal {

@@ -9,7 +9,7 @@ use crate::{
     usecase::{Input, Output},
 };
 
-use super::{authorize::Unauthorized, Usecase};
+use super::{Usecase, authorize::Unauthorized};
 
 pub struct UnsubscribeFeed {
     pub repository: Arc<dyn SubscriptionRepository>,

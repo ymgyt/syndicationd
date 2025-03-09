@@ -17,11 +17,10 @@ use crate::{
     client::synd_api::query::subscription::SubscriptionOutput,
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{
-        self,
+        self, Context,
         components::{collections::FilterableVec, filter::FeedFilterer},
         extension::RectExt,
         widgets::{scrollbar::Scrollbar, table::Table},
-        Context,
     },
 };
 

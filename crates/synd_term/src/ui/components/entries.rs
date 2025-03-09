@@ -5,11 +5,10 @@ use crate::{
     client::synd_api::payload,
     types::{self, RequirementExt, TimeExt},
     ui::{
-        self,
+        self, Context,
         components::{collections::FilterableVec, filter::FeedFilterer},
         icon,
         widgets::{scrollbar::Scrollbar, table::Table},
-        Context,
     },
 };
 use ratatui::{
@@ -206,8 +205,14 @@ impl Entries {
             Constraint::Length(1),
             Constraint::Min(0),
         ]);
-        let [title_area, url_area, published_area, _, summary_heading_area, summary_area] =
-            vertical.areas(inner);
+        let [
+            title_area,
+            url_area,
+            published_area,
+            _,
+            summary_heading_area,
+            summary_area,
+        ] = vertical.areas(inner);
 
         Line::from(vec![
             Span::from(concat!(icon!(entry), " Entry")).bold(),

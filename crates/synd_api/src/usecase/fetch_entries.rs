@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use synd_feed::{
     feed::{cache::FetchCachedFeed, service::FetchFeedError},
     types::{self, Annotated, Entry, EntryId, FeedMeta, FeedUrl},
@@ -10,10 +10,10 @@ use thiserror::Error;
 use crate::{
     principal::Principal,
     repository::{
-        types::{FeedAnnotations, SubscribedFeeds},
         SubscriptionRepository,
+        types::{FeedAnnotations, SubscribedFeeds},
     },
-    usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
+    usecase::{Error, Input, MakeUsecase, Output, Usecase, authorize::Unauthorized},
 };
 
 pub struct FetchEntries {

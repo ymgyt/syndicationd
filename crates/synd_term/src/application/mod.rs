@@ -25,7 +25,7 @@ use crate::{
     auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
     client::{
         github::{FetchNotificationsParams, GithubClient},
-        synd_api::{mutation::subscribe_feed::SubscribeFeedInput, Client, SyndApiError},
+        synd_api::{Client, SyndApiError, mutation::subscribe_feed::SubscribeFeedInput},
     },
     command::{ApiResponse, Command},
     config::{self, Categories},
@@ -37,8 +37,9 @@ use crate::{
     ui::{
         self,
         components::{
-            authentication::AuthenticateState, filter::Filterer, gh_notifications::GhNotifications,
-            root::Root, subscription::UnsubscribeSelection, tabs::Tab, Components,
+            Components, authentication::AuthenticateState, filter::Filterer,
+            gh_notifications::GhNotifications, root::Root, subscription::UnsubscribeSelection,
+            tabs::Tab,
         },
         theme::{Palette, Theme},
     },
@@ -1414,7 +1415,7 @@ impl Application {
 
 impl Application {
     fn check_latest_release(&mut self) {
-        use update_informer::{registry, Check};
+        use update_informer::{Check, registry};
 
         // update informer use reqwest::blocking
         let check = tokio::task::spawn_blocking(|| {

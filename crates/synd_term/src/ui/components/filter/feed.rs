@@ -3,8 +3,8 @@ use synd_feed::types::Requirement;
 use crate::{
     types,
     ui::components::filter::{
-        category::CategoriesState, composed::Composable, CategoryFilterer, ComposedFilterer,
-        FilterResult, Filterable, MatcherFilterer,
+        CategoryFilterer, ComposedFilterer, FilterResult, Filterable, MatcherFilterer,
+        category::CategoriesState, composed::Composable,
     },
 };
 

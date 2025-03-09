@@ -133,8 +133,8 @@ mod tests {
     use std::ops::Add;
 
     use crate::{
-        message::{Authenticate, Fail, FailCode, Ping, Set, Success},
         Key, Value,
+        message::{Authenticate, Fail, FailCode, Ping, Set, Success},
     };
 
     use super::*;

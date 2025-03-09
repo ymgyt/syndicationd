@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, num::NonZero};
 
-use futures_util::{future::BoxFuture, stream::FuturesUnordered, StreamExt as _};
+use futures_util::{StreamExt as _, future::BoxFuture, stream::FuturesUnordered};
 
 use crate::command::Command;
 

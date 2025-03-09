@@ -48,7 +48,7 @@ impl Direction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::{prop_oneof, proptest, Just, ProptestConfig, Strategy};
+    use proptest::prelude::{Just, ProptestConfig, Strategy, prop_oneof, proptest};
 
     proptest! {
         #![proptest_config(ProptestConfig::default())]

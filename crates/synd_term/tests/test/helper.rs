@@ -12,7 +12,7 @@ use synd_api::{
     shutdown::Shutdown,
 };
 use synd_auth::{
-    device_flow::{provider, DeviceFlow},
+    device_flow::{DeviceFlow, provider},
     jwt,
 };
 pub use synd_term::integration::event_stream;

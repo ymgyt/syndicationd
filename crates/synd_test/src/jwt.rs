@@ -6,7 +6,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use synd_auth::jwt;
 
-use crate::{private_key_buff, TEST_EMAIL};
+use crate::{TEST_EMAIL, private_key_buff};
 
 pub(super) const DUMMY_GOOGLE_JWT_KEY_ID: &str = "dummy-google-jwt-kid-1";
 pub const DUMMY_GOOGLE_CLIENT_ID: &str = "dummy_google_client_id";

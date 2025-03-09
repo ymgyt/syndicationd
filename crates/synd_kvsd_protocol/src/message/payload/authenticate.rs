@@ -1,4 +1,4 @@
-use crate::message::{parse::parse, MessageFrames, MessageType, ParseError};
+use crate::message::{MessageFrames, MessageType, ParseError, parse::parse};
 
 /// `Authenticate` is a message in which client requests the server
 /// to perform authentication process.

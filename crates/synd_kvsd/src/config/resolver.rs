@@ -6,8 +6,9 @@ use thiserror::Error;
 use crate::{
     cli::KvsdOptions,
     config::{
+        Config,
         file::{ConfigFile, ConfigFileError},
-        kvsd, Config,
+        kvsd,
     },
 };
 

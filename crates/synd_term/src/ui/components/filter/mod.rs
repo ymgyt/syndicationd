@@ -19,11 +19,11 @@ use crate::{
     keymap::{KeyTrie, Keymap},
     matcher::Matcher,
     types::{
-        self,
+        self, RequirementExt,
         github::{PullRequestState, Reason, RepoVisibility},
-        RequirementExt,
     },
     ui::{
+        Context,
         components::{
             filter::{
                 category::{CategoriesState, FilterCategoryState},
@@ -35,7 +35,6 @@ use crate::{
         },
         icon,
         widgets::prompt::{Prompt, RenderCursor},
-        Context,
     },
 };
 

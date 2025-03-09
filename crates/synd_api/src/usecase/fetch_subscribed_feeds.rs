@@ -8,8 +8,8 @@ use thiserror::Error;
 
 use crate::{
     principal::Principal,
-    repository::{types::SubscribedFeeds, SubscriptionRepository},
-    usecase::{authorize::Unauthorized, Error, Input, MakeUsecase, Output, Usecase},
+    repository::{SubscriptionRepository, types::SubscribedFeeds},
+    usecase::{Error, Input, MakeUsecase, Output, Usecase, authorize::Unauthorized},
 };
 
 pub struct FetchSubscribedFeeds {

@@ -69,11 +69,11 @@ impl Parser {
 
 pub(super) mod parse {
     use nom::{
+        IResult, Parser as _,
         bytes::streaming::{tag, take},
         combinator::{map, peek},
         number::streaming::{be_u64, u8},
         sequence::{pair, preceded, terminated},
-        IResult, Parser as _,
     };
 
     use crate::message::{frame::prefix, spec};
@@ -132,7 +132,7 @@ pub(super) mod parse {
     mod tests {
         use chrono::DateTime;
 
-        use crate::message::{frame::Frame, MessageType};
+        use crate::message::{MessageType, frame::Frame};
 
         use super::*;
 

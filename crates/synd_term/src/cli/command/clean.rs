@@ -62,7 +62,7 @@ impl CleanCommand {
                 ErrorKind::NotFound => {}
                 _ => {
                     return Err(anyhow::Error::from(err))
-                        .with_context(|| format!("path: {}", log.display()))
+                        .with_context(|| format!("path: {}", log.display()));
                 }
             },
         }

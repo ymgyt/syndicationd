@@ -1,21 +1,21 @@
 use std::{collections::HashMap, sync::atomic::AtomicUsize, time::Duration};
 
 use axum::{
+    Form, Json, Router,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, patch, post, put},
-    Form, Json, Router,
 };
-use headers::{authorization::Bearer, Authorization, Header};
+use headers::{Authorization, Header, authorization::Bearer};
 use serde::Serialize;
 use synd_auth::device_flow::{
-    provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
     DeviceAccessTokenErrorResponse, DeviceAccessTokenRequest, DeviceAccessTokenResponse,
     DeviceAuthorizationRequest, DeviceAuthorizationResponse,
+    provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
 };
 use tokio::net::TcpListener;
 
-use crate::{certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID, GITHUB_INVALID_TOKEN, TEST_EMAIL};
+use crate::{GITHUB_INVALID_TOKEN, TEST_EMAIL, certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID};
 
 mod feed;
 pub mod github;

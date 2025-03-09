@@ -3,12 +3,13 @@ use std::time::Duration;
 use opentelemetry::{global, metrics::MeterProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
+    Resource,
     metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream, View},
-    runtime, Resource,
+    runtime,
 };
 use tracing::{Metadata, Subscriber};
 use tracing_opentelemetry::MetricsLayer;
-use tracing_subscriber::{filter::filter_fn, layer::Filter, registry::LookupSpan, Layer};
+use tracing_subscriber::{Layer, filter::filter_fn, layer::Filter, registry::LookupSpan};
 
 pub mod macros;
 
@@ -107,15 +108,15 @@ mod tests {
     use opentelemetry::KeyValue;
     use opentelemetry_proto::tonic::{
         collector::metrics::v1::{
-            metrics_service_server::{MetricsService, MetricsServiceServer},
             ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+            metrics_service_server::{MetricsService, MetricsServiceServer},
         },
-        metrics::v1::{metric::Data, number_data_point::Value, AggregationTemporality},
+        metrics::v1::{AggregationTemporality, metric::Data, number_data_point::Value},
     };
     use tokio::sync::mpsc::UnboundedSender;
     use tonic::transport::Server;
     use tracing::dispatcher;
-    use tracing_subscriber::{layer::SubscriberExt, Registry};
+    use tracing_subscriber::{Registry, layer::SubscriberExt};
 
     use super::*;
 

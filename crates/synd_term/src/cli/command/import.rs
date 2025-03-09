@@ -14,7 +14,7 @@ use url::Url;
 use crate::{
     cli::port::PortContext,
     client::synd_api::{
-        mutation::subscribe_feed::SubscribeFeedInput, Client, SubscribeFeedError, SyndApiError,
+        Client, SubscribeFeedError, SyndApiError, mutation::subscribe_feed::SubscribeFeedInput,
     },
     config,
     types::{self, ExportedFeed},

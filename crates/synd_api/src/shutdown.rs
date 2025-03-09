@@ -62,8 +62,8 @@ mod tests {
     use std::{
         io::ErrorKind,
         sync::{
-            atomic::{AtomicBool, Ordering},
             Arc,
+            atomic::{AtomicBool, Ordering},
         },
     };
 

@@ -1,5 +1,5 @@
 use crate::{
-    middleware::{telemetry::Telemetry, Dispatcher, Middleware},
+    middleware::{Dispatcher, Middleware, telemetry::Telemetry},
     uow::UnitOfWork,
 };
 

@@ -29,12 +29,16 @@ mod tests {
 
     #[test]
     fn error() {
-        assert!(!RepositoryError::internal(anyhow::anyhow!("error"))
-            .to_string()
-            .is_empty());
+        assert!(
+            !RepositoryError::internal(anyhow::anyhow!("error"))
+                .to_string()
+                .is_empty()
+        );
 
-        assert!(!RepositoryError::from(KvsdError::Unauthenticated)
-            .to_string()
-            .is_empty());
+        assert!(
+            !RepositoryError::from(KvsdError::Unauthenticated)
+                .to_string()
+                .is_empty()
+        );
     }
 }

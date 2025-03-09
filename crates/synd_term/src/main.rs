@@ -18,11 +18,11 @@ use tracing_appender::non_blocking::WorkerGuard;
 fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>> {
     use synd_o11y::opentelemetry::init_propagation;
     use tracing_subscriber::{
+        Registry,
         filter::EnvFilter,
         fmt::{self, writer::BoxMakeWriter},
         layer::SubscriberExt,
         util::SubscriberInitExt as _,
-        Registry,
     };
 
     let (writer, guard) = if let Some(log_path) = log_path {

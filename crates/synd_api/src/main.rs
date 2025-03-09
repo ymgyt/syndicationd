@@ -4,7 +4,7 @@ use fdlimit::Outcome;
 use synd_o11y::{
     opentelemetry::OpenTelemetryGuard, tracing_subscriber::initializer::TracingInitializer,
 };
-use synd_stdx::io::color::{is_color_supported, ColorSupport};
+use synd_stdx::io::color::{ColorSupport, is_color_supported};
 use tracing::{error, info};
 
 use synd_api::{

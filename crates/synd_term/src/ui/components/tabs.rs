@@ -6,7 +6,7 @@ use ratatui::{
 
 use crate::{
     application::{Direction, Features, IndexOutOfRange},
-    ui::{icon, Context},
+    ui::{Context, icon},
 };
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]

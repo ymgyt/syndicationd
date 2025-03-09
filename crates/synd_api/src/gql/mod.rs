@@ -15,7 +15,7 @@ pub(crate) type SyndSchema = Schema<Query, Mutation, EmptySubscription>;
 pub(crate) mod handler {
     use async_graphql::http::GraphiQLSource;
     use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-    use axum::{response::IntoResponse, Extension};
+    use axum::{Extension, response::IntoResponse};
     use synd_o11y::audit_span;
     use tokio_metrics::TaskMonitor;
     use tracing::Instrument;
