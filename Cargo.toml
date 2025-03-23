@@ -17,7 +17,7 @@ repository  = "https://github.com/ymgyt/syndicationd"
 anyhow             = { version = "1", default-features = false, features = ["std"] }
 assert_cmd         = { version = "2.0.16" }
 async-graphql      = { version = "7.0" }
-async-trait        = { version = "0.1.85", default-features = false }
+async-trait        = { version = "0.1.88", default-features = false }
 axum               = { version = "0.7.9", default-features = false }
 axum-server        = { version = "0.6.0", features = ["tls-rustls"] }
 bitflags           = { version = "2.8.0", default-features = false }
@@ -46,14 +46,14 @@ once_cell          = { version = "1.20.2" }
 pprof              = { version = "0.13", features = ["flamegraph", "criterion"] }
 proptest           = { version = "1.6.0" }
 rand               = { version = "0.8.5" }
-reqwest            = { version = "0.12.12", default-features = false, features = ["rustls-tls", "json"] }
+reqwest            = { version = "0.12.15", default-features = false, features = ["rustls-tls", "json"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.136" }
 tempfile           = { version = "3" }
-thiserror          = { version = "2.0.11" }
+thiserror          = { version = "2.0.12" }
 tokio              = { version = "1.43", default-features = false }
-tokio-util         = { version = "0.7.13" }
+tokio-util         = { version = "0.7.14" }
 toml               = { version = "0.8.19" }
 tracing            = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }

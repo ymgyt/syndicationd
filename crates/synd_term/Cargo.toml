@@ -34,7 +34,7 @@ edit                 = "0.1.5"
 either               = { workspace = true }
 futures-util         = { workspace = true }
 graphql_client       = { workspace = true, features = ["graphql_query_derive"] }
-html2text            = { version = "0.14.0" }
+html2text            = { version = "0.14.2" }
 itertools            = { workspace = true }
 nom                  = { workspace = true }
 nucleo               = "0.5.0"
