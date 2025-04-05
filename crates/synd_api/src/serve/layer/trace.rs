@@ -12,7 +12,7 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
         let request_id = cx
             .baggage()
             .get(synd_o11y::REQUEST_ID_KEY)
-            .map_or("?".into(), |v| v.as_str());
+            .map_or("?", |v| v.as_str());
 
         let span = tracing::span!(
             Level::INFO,
