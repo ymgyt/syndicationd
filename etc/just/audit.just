@@ -10,4 +10,4 @@ default:
 # Update advisory db
 [no-cd]
 update-advisory-db:
-    nix flake lock --update-input advisory-db
+    nix flake update advisory-db
