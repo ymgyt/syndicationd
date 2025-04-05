@@ -10,6 +10,7 @@ def main [
   } else {
     "ignore"
   }
+  let filter = if ($filter == null) { "" } else { $filter | into string}
 
   $env.RUST_LOG = "synd_term=info,integration=info,synd_test=info,synd_feed=warn,kvsd=warn,metrics=warn,tower_http=warn,info"
   $env.INSTA_OUTPUT = "diff"
@@ -24,6 +25,6 @@ def main [
       --test-runner "nextest"
       --review
       --
-      ($filter | into string)
+      $filter
   )
 }
