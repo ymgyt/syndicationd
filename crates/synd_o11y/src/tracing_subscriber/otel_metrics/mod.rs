@@ -1,11 +1,10 @@
 use std::time::Duration;
 
-use opentelemetry::{global, metrics::MeterProvider};
+use opentelemetry::global;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     Resource,
     metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream, View},
-    runtime,
 };
 use tracing::{Metadata, Subscriber};
 use tracing_opentelemetry::MetricsLayer;
@@ -23,18 +22,19 @@ pub fn layer<S>(
     endpoint: impl Into<String>,
     resource: Resource,
     interval: Duration,
-) -> impl Layer<S>
+) -> (impl Layer<S>, SdkMeterProvider)
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    MetricsLayer::new(init_meter_provider(endpoint, resource, interval))
+    let provider = init_meter_provider(endpoint, resource, interval);
+    (MetricsLayer::new(provider.clone()), provider)
 }
 
 fn init_meter_provider(
     endpoint: impl Into<String>,
     resource: Resource,
     interval: Duration,
-) -> impl MeterProvider {
+) -> SdkMeterProvider {
     // Currently OtelpMetricPipeline does not provide a way to set up views.
     let exporter = opentelemetry_otlp::MetricExporter::builder()
         .with_tonic()
@@ -42,7 +42,7 @@ fn init_meter_provider(
         .build()
         .unwrap();
 
-    let reader = PeriodicReader::builder(exporter, runtime::Tokio)
+    let reader = PeriodicReader::builder(exporter)
         .with_interval(interval)
         .build();
 
@@ -55,7 +55,7 @@ fn init_meter_provider(
     #[cfg(feature = "opentelemetry-stdout")]
     let stdout_reader = {
         let exporter = opentelemetry_stdout::MetricExporterBuilder::default().build();
-        PeriodicReader::builder(exporter, runtime::Tokio)
+        PeriodicReader::builder(exporter)
             .with_interval(Duration::from_secs(60))
             .build()
     };
@@ -158,7 +158,7 @@ mod tests {
         let resource = resource();
         // The default interval is 60 seconds, which slows down the test
         let interval = Duration::from_millis(100);
-        let layer = layer("https://localhost:48101", resource.clone(), interval);
+        let (layer, _provider) = layer("https://localhost:48101", resource.clone(), interval);
         let subscriber = Registry::default().with(layer);
         let dispatcher = tracing::Dispatch::new(subscriber);
 
@@ -173,7 +173,9 @@ mod tests {
         insta::with_settings!({
             description => " metric 1 resource",
         }, {
-            insta::assert_yaml_snapshot!("layer_test_metric_1_resource", metric1.resource);
+            insta::assert_yaml_snapshot!("layer_test_metric_1_resource", metric1.resource, {
+                ".attributes" => insta::sorted_redaction(),
+            });
         });
 
         let metric1 = metric1.scope_metrics[0].metrics[0].clone();
@@ -206,12 +208,15 @@ mod tests {
             insta::assert_yaml_snapshot!("layer_test_metrics_graphql_histogram", req, {
                 ".**.startTimeUnixNano" => "[UNIX_TIMESTAMP]",
                 ".**.timeUnixNano" => "[UNIX_TIMESTAMP]",
-                ".**.scope.version" => "[INSTRUMENT_LIB_VERSION]"
+                ".**.scope.version" => "[INSTRUMENT_LIB_VERSION]",
+                ".**.attributes" => insta::sorted_redaction(),
             });
         });
     }
 
     fn resource() -> Resource {
-        Resource::new([KeyValue::new("service.name", "test")])
+        Resource::builder()
+            .with_attributes([KeyValue::new("service.name", "test")])
+            .build()
     }
 }

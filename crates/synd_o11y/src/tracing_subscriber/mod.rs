@@ -25,29 +25,38 @@ where
 {
     let endpoint = endpoint.into();
     let resource = crate::opentelemetry::resource(service_name, service_version);
-    let trace_batch_config = trace::BatchConfigBuilder::default().build();
-    let log_batch_config = logs::BatchConfigBuilder::default().build();
-    let metrics_reader_interval = Duration::from_secs(60);
 
-    let (log_layer, logger_provider) =
-        otel_log::layer(endpoint.clone(), resource.clone(), log_batch_config);
-    // Since metrics events are handled by the metrics layer and are not needed as logs, set afilter for them.
-    let log_layer = log_layer.with_filter(metrics_event_filter());
-    let guard = OpenTelemetryGuard { logger_provider };
-
-    (
+    let (trace_layer, tracer_provider) = {
+        let trace_batch_config = trace::BatchConfigBuilder::default().build();
         otel_trace::layer(
             endpoint.clone(),
             resource.clone(),
             trace_sampler_ratio,
             trace_batch_config,
         )
-        .and_then(otel_metrics::layer(
-            endpoint.clone(),
-            resource.clone(),
-            metrics_reader_interval,
-        ))
-        .and_then(log_layer),
+    };
+
+    let (metrics_layer, meter_provider) = {
+        let metrics_reader_interval = Duration::from_secs(60);
+        otel_metrics::layer(endpoint.clone(), resource.clone(), metrics_reader_interval)
+    };
+
+    let (log_layer, logger_provider) = {
+        let log_batch_config = logs::BatchConfigBuilder::default().build();
+        otel_log::layer(endpoint.clone(), resource.clone(), log_batch_config)
+    };
+
+    // Since metrics events are handled by the metrics layer and are not needed as logs, set a filter for them.
+    let log_layer = log_layer.with_filter(metrics_event_filter());
+
+    let guard = OpenTelemetryGuard {
+        tracer_provider,
+        meter_provider,
+        logger_provider,
+    };
+
+    (
+        trace_layer.and_then(metrics_layer).and_then(log_layer),
         guard,
     )
 }

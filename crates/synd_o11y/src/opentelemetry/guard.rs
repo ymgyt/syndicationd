@@ -1,18 +1,26 @@
-use opentelemetry_sdk::logs::LoggerProvider;
+use opentelemetry_sdk::{
+    logs::SdkLoggerProvider, metrics::SdkMeterProvider, trace::SdkTracerProvider,
+};
+use tracing::warn;
 
 /// `OpenTelemetry` terminination process handler
 pub struct OpenTelemetryGuard {
-    pub(crate) logger_provider: LoggerProvider,
+    pub(crate) tracer_provider: SdkTracerProvider,
+    pub(crate) meter_provider: SdkMeterProvider,
+    pub(crate) logger_provider: SdkLoggerProvider,
 }
 
 impl Drop for OpenTelemetryGuard {
     fn drop(&mut self) {
-        opentelemetry::global::shutdown_tracer_provider();
-        // global provider for logs is removed in v0.23.0
-        // https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry/CHANGELOG.md#removed
-        self.logger_provider.shutdown().ok();
-
-        // global::shutdown_meter_provider is removed in v0.22.0
-        // https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry/CHANGELOG.md#removed
+        // https://github.com/open-telemetry/opentelemetry-rust/blob/main/docs/migration_0.28.md#tracing-shutdown-changes
+        if let Err(err) = self.tracer_provider.shutdown() {
+            warn!("{err}");
+        }
+        if let Err(err) = self.meter_provider.shutdown() {
+            warn!("{err}");
+        }
+        if let Err(err) = self.logger_provider.shutdown() {
+            warn!("{err}");
+        }
     }
 }

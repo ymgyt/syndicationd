@@ -14,3 +14,4 @@ droppedAttributesCount: 0
 flags: 0
 traceId: ""
 spanId: ""
+eventName: "event crates/synd_o11y/src/tracing_subscriber/otel_log/mod.rs:70"

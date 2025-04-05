@@ -2,8 +2,7 @@ use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     Resource,
-    logs::{BatchConfig, LoggerProvider},
-    runtime,
+    logs::{BatchConfig, SdkLoggerProvider},
 };
 use tracing::Subscriber;
 use tracing_subscriber::{Layer, registry::LookupSpan};
@@ -13,7 +12,7 @@ pub fn layer<S>(
     resource: Resource,
     // TODO: how to use BatchConfig after 0.27 ?
     _batch_config: BatchConfig,
-) -> (impl Layer<S>, LoggerProvider)
+) -> (impl Layer<S>, SdkLoggerProvider)
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
@@ -22,9 +21,9 @@ where
         .with_endpoint(endpoint)
         .build()
         .unwrap();
-    let provider = opentelemetry_sdk::logs::LoggerProvider::builder()
+    let provider = SdkLoggerProvider::builder()
         .with_resource(resource)
-        .with_batch_exporter(exporter, runtime::Tokio)
+        .with_batch_exporter(exporter)
         .build();
 
     (OpenTelemetryTracingBridge::new(&provider), provider)
@@ -99,7 +98,9 @@ mod tests {
         insta::with_settings!({
             description => " log 1 resource",
         }, {
-            insta::assert_yaml_snapshot!("layer_test_log_1_resource", log1.resource);
+            insta::assert_yaml_snapshot!("layer_test_log_1_resource", log1.resource,{
+                ".attributes"  => insta::sorted_redaction(),
+            });
         });
 
         let record = log1.scope_logs[0].log_records[0].clone();
@@ -113,6 +114,8 @@ mod tests {
     }
 
     fn resource() -> Resource {
-        Resource::new([KeyValue::new("service.name", "test")])
+        Resource::builder()
+            .with_attributes([KeyValue::new("service.name", "test")])
+            .build()
     }
 }

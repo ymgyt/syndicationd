@@ -1,8 +1,8 @@
 use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
-    Resource, runtime,
-    trace::{BatchConfig, Sampler, Tracer},
+    Resource,
+    trace::{BatchConfig, BatchSpanProcessor, Sampler, SdkTracerProvider, Tracer},
 };
 use tracing::Subscriber;
 use tracing_opentelemetry::OpenTelemetryLayer;
@@ -13,11 +13,12 @@ pub fn layer<S>(
     resource: Resource,
     sampler_ratio: f64,
     batch_config: BatchConfig,
-) -> impl Layer<S>
+) -> (impl Layer<S>, SdkTracerProvider)
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    OpenTelemetryLayer::new(init_tracer(endpoint, resource, sampler_ratio, batch_config))
+    let (tracer, provider) = init_tracer(endpoint, resource, sampler_ratio, batch_config);
+    (OpenTelemetryLayer::new(tracer), provider)
 }
 
 fn init_tracer(
@@ -25,27 +26,31 @@ fn init_tracer(
     resource: Resource,
     sampler_ratio: f64,
     // TODO: how to use BatchConfig after 0.27 ?
-    _batch_config: BatchConfig,
-) -> Tracer {
+    batch_config: BatchConfig,
+) -> (Tracer, SdkTracerProvider) {
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic()
         .with_endpoint(endpoint)
         .build()
         .unwrap();
 
-    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
+    let batch_processor = BatchSpanProcessor::builder(exporter)
+        .with_batch_config(batch_config)
+        .build();
+
+    let provider = SdkTracerProvider::builder()
         .with_resource(resource)
         .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
             sampler_ratio,
         ))))
-        .with_batch_exporter(exporter, runtime::Tokio)
+        .with_span_processor(batch_processor)
         .build();
 
     // > It would now be the responsibility of users to set it by calling global::set_tracer_provider(tracer_provider.clone());
     //  https://github.com/open-telemetry/opentelemetry-rust/blob/main/opentelemetry-otlp/CHANGELOG.md#v0170
     global::set_tracer_provider(provider.clone());
 
-    provider.tracer("tracing-opentelemetry")
+    (provider.tracer("tracing-opentelemetry"), provider)
 }
 
 #[cfg(test)]
@@ -115,7 +120,7 @@ mod tests {
             // The default interval is 5 seconds, which slows down the test
             .with_scheduled_delay(Duration::from_millis(10))
             .build();
-        let layer = layer("https://localhost:48100", resource.clone(), 1.0, config);
+        let (layer, _provider) = layer("https://localhost:48100", resource.clone(), 1.0, config);
         let subscriber = Registry::default().with(layer);
         let dispatcher = tracing::Dispatch::new(subscriber);
 
@@ -130,7 +135,9 @@ mod tests {
         insta::with_settings!({
             description => "trace resource",
         }, {
-            insta::assert_yaml_snapshot!("layer_test_trace_resource", req.resource_spans[0].resource);
+            insta::assert_yaml_snapshot!("layer_test_trace_resource", req.resource_spans[0].resource, {
+                ".attributes" => insta::sorted_redaction(),
+            });
         });
 
         let [f2_span, f1_span] = resource_span.scope_spans[0].spans.as_slice() else {
@@ -162,6 +169,8 @@ mod tests {
     }
 
     fn resource() -> Resource {
-        Resource::new([KeyValue::new("service.name", "test")])
+        Resource::builder()
+            .with_attributes([KeyValue::new("service.name", "test")])
+            .build()
     }
 }

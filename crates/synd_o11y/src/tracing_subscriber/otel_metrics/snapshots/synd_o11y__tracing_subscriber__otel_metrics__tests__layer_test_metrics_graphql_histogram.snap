@@ -9,6 +9,15 @@ resourceMetrics:
         - key: service.name
           value:
             stringValue: test
+        - key: telemetry.sdk.language
+          value:
+            stringValue: rust
+        - key: telemetry.sdk.name
+          value:
+            stringValue: opentelemetry
+        - key: telemetry.sdk.version
+          value:
+            stringValue: 0.29.0
       droppedAttributesCount: 0
     scopeMetrics:
       - scope:
