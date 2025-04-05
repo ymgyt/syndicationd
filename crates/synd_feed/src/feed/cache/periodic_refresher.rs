@@ -80,8 +80,8 @@ where
         loop {
             tokio::select! {
                 biased;
-                _ = interval.tick() => {},
                 () = ct.cancelled() => break,
+                _ = interval.tick() => {},
             }
 
             if self.emit_metrics {
