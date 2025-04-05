@@ -150,7 +150,7 @@ async fn main() -> ExitCode {
             cli::Command::Import(import) => import.run(config.api_endpoint()).await,
             cli::Command::Config(config) => config.run(),
         };
-    };
+    }
 
     let mut event_stream = terminal::event_stream();
 

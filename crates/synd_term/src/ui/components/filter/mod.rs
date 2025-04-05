@@ -341,7 +341,7 @@ impl Filter {
                 let mut unread = Span::from("Unread");
                 if options.include == FetchNotificationInclude::All {
                     unread = unread.dim();
-                };
+                }
 
                 let mut participating = Span::from("Participating");
                 if options.participating == FetchNotificationParticipating::All {

@@ -129,10 +129,10 @@ impl SubscriptionRepository for KvsdClient {
             // Create case
             if !feeds.urls.contains(&feed.url) {
                 feeds.urls.insert(0, feed.url.clone());
-            };
+            }
             if feeds.annotations.is_none() {
                 feeds.annotations = Some(HashMap::new());
-            };
+            }
             feeds
                 .annotations
                 .as_mut()

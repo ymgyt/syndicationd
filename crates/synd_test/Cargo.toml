@@ -22,7 +22,6 @@ headers      = { workspace = true }
 jsonwebtoken = { workspace = true }
 kvsd         = { workspace = true }
 octocrab     = { workspace = true }
-once_cell    = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
 tempfile     = { workspace = true }

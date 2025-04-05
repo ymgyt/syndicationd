@@ -77,7 +77,7 @@ impl Monitors {
                 biased;
                 // Make sure to respect cancellation
                 () = ct.cancelled() => break,
-                () = tokio::time::sleep(interval) => continue
+                () = tokio::time::sleep(interval) => ()
             }
         }
     }

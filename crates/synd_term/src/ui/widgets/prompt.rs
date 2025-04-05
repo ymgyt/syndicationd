@@ -93,7 +93,7 @@ impl Prompt {
 
         if cursor == RenderCursor::Enable {
             spans.push(Span::from(" ").reversed());
-        };
+        }
         Line::from(spans).render(area, buf);
     }
 }

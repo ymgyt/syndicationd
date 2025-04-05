@@ -74,14 +74,12 @@ async fn run(
 
 fn init_file_descriptor_limit() {
     fdlimit::raise_fd_limit()
-        .inspect(|outcome| {
-            match outcome {
-                Outcome::LimitRaised { from, to } => {
-                    tracing::info!("Raise fd limit {from} to {to}");
-                }
+        .inspect(|outcome| match outcome {
+            Outcome::LimitRaised { from, to } => {
+                tracing::info!("Raise fd limit {from} to {to}");
+            }
 
-                Outcome::Unsupported => tracing::info!("Raise fd limit unsupported"),
-            };
+            Outcome::Unsupported => tracing::info!("Raise fd limit unsupported"),
         })
         .ok();
 }

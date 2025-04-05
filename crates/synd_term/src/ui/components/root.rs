@@ -46,7 +46,7 @@ impl<'a> Root<'a> {
                 .components
                 .gh_notifications
                 .render(content_area, buf, cx),
-        };
+        }
 
         self.components
             .prompt

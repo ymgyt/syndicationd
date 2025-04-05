@@ -42,7 +42,7 @@ impl KeyHandlers {
         for handler in &mut self.handlers {
             match handler {
                 KeyHandler::Keymaps(keymaps) => return Some(keymaps),
-                KeyHandler::Prompt(_) => continue,
+                KeyHandler::Prompt(_) => (),
             }
         }
         None

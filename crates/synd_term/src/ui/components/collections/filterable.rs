@@ -115,7 +115,7 @@ where
                     found = Some(idx);
                     break;
                 }
-                ControlFlow::Continue(()) => continue,
+                ControlFlow::Continue(()) => (),
             }
         }
 

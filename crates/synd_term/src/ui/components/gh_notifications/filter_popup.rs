@@ -246,7 +246,7 @@ impl FilterPopup {
                     pub1 = pub1.dim();
                     pub2 = pub2.dim();
                 }
-            };
+            }
             spans.extend([pub1, pub2, Span::from("         "), pri1, pri2]);
             Line::from(spans).render(visibility_area, buf);
         }

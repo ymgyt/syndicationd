@@ -1,9 +1,8 @@
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::json;
 
 pub mod notifications {
-    use std::ops::Sub;
+    use std::{ops::Sub, sync::LazyLock};
 
     #[allow(clippy::wildcard_imports)]
     use super::*;
@@ -26,8 +25,8 @@ pub mod notifications {
         page: u8,
     }
 
-    pub static NOW: Lazy<DateTime<Utc>> =
-        Lazy::new(|| Utc::with_ymd_and_hms(&Utc, 2024, 7, 5, 8, 0, 0).unwrap());
+    pub static NOW: LazyLock<DateTime<Utc>> =
+        LazyLock::new(|| Utc::with_ymd_and_hms(&Utc, 2024, 7, 5, 8, 0, 0).unwrap());
 
     pub async fn list(Query(n): Query<Notifications>) -> Response {
         if n.page == 1 {

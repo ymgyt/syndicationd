@@ -1106,7 +1106,7 @@ impl Application {
             Err(err) => {
                 tracing::warn!("Try to open invalid feed url: {feed_website_url} {err}");
             }
-        };
+        }
     }
 
     fn open_entry(&mut self) {

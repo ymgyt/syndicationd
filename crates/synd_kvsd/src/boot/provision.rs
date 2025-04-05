@@ -163,7 +163,6 @@ impl<State, FS> Provisioner<State, FS> {
                         "Ignore {}({file_type:?}) as namespace directory",
                         entry.file_name().to_string_lossy(),
                     );
-                    continue;
                 }
                 Err(err) => return Err(ProvisionError::read_dir(entry.path(), err)),
             }
@@ -191,7 +190,6 @@ impl<State, FS> Provisioner<State, FS> {
                         "Ignore {}({file_type:?}) as table directory",
                         entry.file_name().to_string_lossy(),
                     );
-                    continue;
                 }
                 Err(err) => return Err(ProvisionError::read_dir(entry.path(), err)),
             }
