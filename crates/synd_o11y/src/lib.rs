@@ -18,8 +18,8 @@ pub const REQUEST_ID_KEY: &str = "request.id";
 /// Generate random request id
 pub fn request_id() -> String {
     // https://stackoverflow.com/questions/54275459/how-do-i-create-a-random-string-by-sampling-from-alphanumeric-characters
-    use rand::distributions::{Alphanumeric, DistString};
-    Alphanumeric.sample_string(&mut rand::thread_rng(), 10)
+    use rand::distr::{Alphanumeric, SampleString};
+    Alphanumeric.sample_string(&mut rand::rng(), 10)
 }
 
 /// Generate random request id key value
