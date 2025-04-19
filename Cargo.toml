@@ -58,6 +58,9 @@ tracing            = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.4" }
 
+[profile.release]
+panic = "abort"
+
 [profile.bench]
 # To enable framegraph
 debug = true
