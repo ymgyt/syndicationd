@@ -207,18 +207,18 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
             get(github::notifications::list),
         )
         .route(
-            "/github/rest/notifications/threads/:thread",
+            "/github/rest/notifications/threads/{thread}",
             patch(github::notifications::mark_as_done),
         )
         .route(
-            "/github/rest/notifications/threads/:thread/subscription",
+            "/github/rest/notifications/threads/{thread}/subscription",
             put(github::notifications::unsubscribe_thread),
         )
         .route("/github/rest/graphql", post(github::gql::graphql))
         .route("/google/oauth2/v1/certs", get(google_jwt_pem))
         .route("/google/oauth2/token", post(google_oauth2_token))
-        .route("/feed/error/:error", get(feed::feed_error))
-        .route("/feed/:feed", get(feed::feed))
+        .route("/feed/error/{error}", get(feed::feed_error))
+        .route("/feed/{feed}", get(feed::feed))
         .layer(axum::middleware::from_fn(debug_mw));
 
     let addr = listener.local_addr().ok();
