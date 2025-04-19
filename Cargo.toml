@@ -15,7 +15,7 @@ repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
 anyhow             = { version = "1", default-features = false, features = ["std"] }
-assert_cmd         = { version = "2.0.16" }
+assert_cmd         = { version = "2.0.17" }
 async-graphql      = { version = "7.0" }
 async-trait        = { version = "0.1.88", default-features = false }
 axum               = { version = "0.7.9", default-features = false }
