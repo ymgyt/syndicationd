@@ -52,8 +52,8 @@ serde_json         = { version = "1.0.136" }
 tempfile           = { version = "3" }
 thiserror          = { version = "2.0.12" }
 tokio              = { version = "1.44.2", default-features = false }
-tokio-util         = { version = "0.7.14" }
-toml               = { version = "0.8.19" }
+tokio-util         = { version = "0.7.15" }
+toml               = { version = "0.8.21" }
 tracing            = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.4" }
