@@ -232,7 +232,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c95b41ba3c0f4ecccd73bf7e7aa7be3c41ff054968e988317bd9133ed210a4a2"
 dependencies = [
  "async-graphql",
- "axum 0.8.3",
+ "axum 0.8.4",
  "bytes",
  "futures-util",
  "serde_json",
@@ -380,9 +380,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de45108900e1f9b9242f7f2e254aa3e2c029c921c258fe9e6b4217eeebd54288"
+checksum = "021e862c184ae977658b36c4500f7feac3221ca5da43e3f25bd04ab6c79a29b5"
 dependencies = [
  "axum-core 0.5.2",
  "base64 0.22.1",
@@ -4353,7 +4353,7 @@ dependencies = [
  "async-graphql",
  "async-graphql-axum",
  "async-trait",
- "axum 0.8.3",
+ "axum 0.8.4",
  "axum-server",
  "chrono",
  "clap",
@@ -4464,7 +4464,7 @@ dependencies = [
 name = "synd-o11y"
 version = "0.1.9"
 dependencies = [
- "axum 0.8.3",
+ "axum 0.8.4",
  "http",
  "insta",
  "opentelemetry",
@@ -4561,7 +4561,7 @@ name = "synd-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "axum 0.8.3",
+ "axum 0.8.4",
  "chrono",
  "futures-util",
  "headers",
