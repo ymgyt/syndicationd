@@ -32,7 +32,7 @@ feed-rs            = { version = "1.5", default-features = false }
 futures            = { version = "0.3.31" }
 futures-util       = { version = "0.3.31", default-features = false }
 graphql_client     = { version = "0.13.0", default-features = false }
-headers            = { version = "0.4.0" }
+headers            = { version = "0.4.1" }
 http               = { version = "1.1" }
 insta              = { version = "1.43" }
 itertools          = { version = "0.13", default-features = false, features = ["use_std"] }
@@ -44,15 +44,15 @@ nom                = { version = "8.0.0", default-features = false, features = [
 octocrab           = { version = "0.38.0", features = ["rustls-webpki-tokio"] }
 pprof              = { version = "0.14", features = ["flamegraph", "criterion"] }
 proptest           = { version = "1.6.0" }
-rand               = { version = "0.9.1" }
-reqwest            = { version = "0.12.15", default-features = false, features = ["rustls-tls", "json"] }
+rand               = { version = "0.9.2" }
+reqwest            = { version = "0.12.18", default-features = false, features = ["rustls-tls", "json"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
-serde_json         = { version = "1.0.136" }
+serde_json         = { version = "1.0.142" }
 tempfile           = { version = "3" }
 thiserror          = { version = "2.0.12" }
 tokio              = { version = "1.47.1", default-features = false }
-tokio-util         = { version = "0.7.15" }
+tokio-util         = { version = "0.7.16" }
 toml               = { version = "0.8.22" }
 tracing            = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
