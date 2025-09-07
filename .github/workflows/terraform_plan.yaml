@@ -36,7 +36,7 @@ jobs:
           TF_TOKEN_app_terraform_io: "${{secrets.TF_TOKEN_APP_TERRAFORM_IO}}"
           TF_VAR_grafana_sa_token: "${{secrets.GRAFANA_SA_TOKEN}}"
       - name: Post plan output to github PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           PLAN_RESULT: ${{steps.plan.outcome}}
           PLAN_STDOUT: ${{steps.plan.outputs.stdout}}
