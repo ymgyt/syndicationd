@@ -17,6 +17,7 @@ use crate::{
 };
 
 /// Handle user authentication
+#[expect(clippy::large_enum_variant)]
 #[derive(PartialEq, Eq)]
 pub(crate) enum AuthenticateState {
     NotAuthenticated,

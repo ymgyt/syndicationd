@@ -121,10 +121,10 @@ impl FetchOperation {
         let in_flight_limit = 10;
 
         for url in self.urls.take().unwrap() {
-            if tasks.len() >= in_flight_limit {
-                if let Some(result) = tasks.next().await {
-                    self.handle(result);
-                }
+            if tasks.len() >= in_flight_limit
+                && let Some(result) = tasks.next().await
+            {
+                self.handle(result);
             }
 
             let fetch_feed = Arc::clone(&self.fetch_feed);

@@ -110,14 +110,14 @@ mod feed {
         client::synd_api::mutation::subscribe_feed::{Requirement, SubscribeFeedInput},
     };
 
-    pub(super) fn parse(s: &str) -> Result<SubscribeFeedInput, NomError> {
+    pub(super) fn parse(s: &'_ str) -> Result<SubscribeFeedInput, NomError<'_>> {
         delimited(comment::comments, feed_input, comment::comments)
             .parse(s)
             .finish()
             .map(|(_, input)| input)
     }
 
-    fn feed_input(s: &str) -> IResult<&str, SubscribeFeedInput, NomError> {
+    fn feed_input(s: &'_ str) -> IResult<&'_ str, SubscribeFeedInput, NomError<'_>> {
         let (remain, (_, requirement, _, category, _, feed_url, _)) = (
             multispace0,
             requirement,
@@ -138,7 +138,7 @@ mod feed {
         ))
     }
 
-    pub fn requirement(s: &str) -> IResult<&str, Requirement, NomError> {
+    pub fn requirement(s: &'_ str) -> IResult<&'_ str, Requirement, NomError<'_>> {
         context(
             CTX_REQUIREMENT,
             alt((
@@ -150,7 +150,7 @@ mod feed {
         .parse(s)
     }
 
-    fn category(s: &str) -> IResult<&str, Category<'static>, NomError> {
+    fn category(s: &'_ str) -> IResult<&'_ str, Category<'static>, NomError<'_>> {
         let (remain, category) = context(
             CTX_CATEGORY,
             take_while_m_n(1, 20, |c: char| c.is_alphanum()),
@@ -163,7 +163,7 @@ mod feed {
         ))
     }
 
-    fn url(s: &str) -> IResult<&str, FeedUrl, NomError> {
+    fn url(s: &'_ str) -> IResult<&'_ str, FeedUrl, NomError<'_>> {
         let (remain, url) = context(
             CTX_URL,
             map(take_while(|c: char| !c.is_whitespace()), |s: &str| {
@@ -265,11 +265,11 @@ mod comment {
 
     use crate::application::input_parser::NomError;
 
-    pub(super) fn comments(s: &str) -> IResult<&str, (), NomError> {
+    pub(super) fn comments(s: &'_ str) -> IResult<&'_ str, (), NomError<'_>> {
         fold_many0(comment, || (), |acc, ()| acc).parse(s)
     }
 
-    pub(super) fn comment(s: &str) -> IResult<&str, (), NomError> {
+    pub(super) fn comment(s: &'_ str) -> IResult<&'_ str, (), NomError<'_>> {
         value((), delimited(tag("#"), take_until("\n"), line_ending)).parse(s)
     }
 

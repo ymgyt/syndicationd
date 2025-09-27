@@ -86,7 +86,7 @@ impl OpenTextBrowser for TextBrowserInteractor {
                     url,
                 )
             };
-            Err(io::Error::new(io::ErrorKind::Other, full_command).into())
+            Err(io::Error::other(full_command).into())
         }
     }
 }

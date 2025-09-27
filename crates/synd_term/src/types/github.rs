@@ -218,7 +218,7 @@ impl Notification {
         self.subject_type
     }
 
-    pub(crate) fn subject_icon(&self) -> Span {
+    pub(crate) fn subject_icon(&'_ self) -> Span<'_> {
         match self.subject_type() {
             Some(SubjectType::Issue) => match self.subject_context {
                 Some(SubjectContext::Issue(ref issue)) => match issue.state {

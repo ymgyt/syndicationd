@@ -16,7 +16,7 @@ pub trait Provider: private::Sealed {
 
     fn device_authorization_endpoint(&self) -> Url;
     fn token_endpoint(&self) -> Url;
-    fn device_authorization_request(&self) -> DeviceAuthorizationRequest;
+    fn device_authorization_request(&'_ self) -> DeviceAuthorizationRequest<'_>;
     fn device_access_token_request<'d, 'p: 'd>(
         &'p self,
         device_code: &'d str,

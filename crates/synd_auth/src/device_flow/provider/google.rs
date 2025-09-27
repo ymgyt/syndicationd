@@ -79,7 +79,7 @@ impl Provider for Google {
         self.token_endpoint.clone()
     }
 
-    fn device_authorization_request(&self) -> DeviceAuthorizationRequest {
+    fn device_authorization_request(&'_ self) -> DeviceAuthorizationRequest<'_> {
         DeviceAuthorizationRequest {
             client_id: self.client_id.clone(),
             scope: Self::SCOPE.into(),

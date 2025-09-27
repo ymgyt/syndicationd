@@ -50,6 +50,7 @@ pub enum SyndApiError {
 /// synd-api client
 #[derive(Clone)]
 pub struct Client {
+    #[expect(clippy::struct_field_names)]
     client: reqwest::Client,
     credential: Option<HeaderValue>,
     endpoint: Url,

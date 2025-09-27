@@ -7,6 +7,7 @@ use nucleo::{
 
 #[derive(Clone)]
 pub struct Matcher {
+    #[expect(clippy::struct_field_names)]
     matcher: Rc<RefCell<nucleo::Matcher>>,
     needle: Option<Pattern>,
     // For Utf32 conversion

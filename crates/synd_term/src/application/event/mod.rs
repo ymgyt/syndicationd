@@ -3,6 +3,7 @@ use crate::command::Command;
 mod key_handlers;
 pub use key_handlers::{KeyHandler, KeyHandlers};
 
+#[expect(clippy::large_enum_variant)]
 pub(crate) enum KeyEventResult {
     Consumed {
         command: Option<Command>,

@@ -158,6 +158,7 @@ impl Default for Keymaps {
     }
 }
 
+#[expect(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub(crate) enum KeyTrie {
     Command(Command),

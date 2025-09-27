@@ -77,6 +77,7 @@ impl Display for ApiResponse {
     }
 }
 
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
     Nop,

@@ -88,11 +88,11 @@ impl Subscription {
 
     /// Return subscribed latest entries order by published time.
     async fn entries<'cx>(
-        &self,
+        &'_ self,
         cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<id::EntryId, Entry<'cx>>> {
+    ) -> Result<Connection<id::EntryId<'_>, Entry<'cx>>> {
         #[allow(clippy::cast_sign_loss)]
         let first = first.unwrap_or(20).min(200) as usize;
         let has_prev = after.is_some();

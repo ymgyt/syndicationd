@@ -3,6 +3,7 @@ use opentelemetry_sdk::{
 };
 use tracing::warn;
 
+#[expect(clippy::struct_field_names)]
 /// `OpenTelemetry` terminination process handler
 pub struct OpenTelemetryGuard {
     pub(crate) tracer_provider: SdkTracerProvider,

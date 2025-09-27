@@ -275,10 +275,10 @@ impl Application {
             }))
             .boxed(),
         );
-        if self.config.features.enable_github_notification {
-            if let Some(fetch) = self.components.gh_notifications.fetch_next_if_needed() {
-                self.jobs.push(future::ready(Ok(fetch)).boxed());
-            }
+        if self.config.features.enable_github_notification
+            && let Some(fetch) = self.components.gh_notifications.fetch_next_if_needed()
+        {
+            self.jobs.push(future::ready(Ok(fetch)).boxed());
         }
     }
 
@@ -1110,10 +1110,10 @@ impl Application {
     }
 
     fn open_entry(&mut self) {
-        if let Some(url) = self.selected_entry_url() {
-            if let Err(err) = self.interactor.open_browser(url) {
-                self.handle_error_message(format!("open browser: {err}"), None);
-            }
+        if let Some(url) = self.selected_entry_url()
+            && let Err(err) = self.interactor.open_browser(url)
+        {
+            self.handle_error_message(format!("open browser: {err}"), None);
         }
     }
 
@@ -1485,7 +1485,7 @@ impl Application {
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
         loop {
-            self.event_loop_until_idle(input).await;
+            let _ = self.event_loop_until_idle(input).await;
             self.reset_idle_timer();
 
             // In the current test implementation, we synchronie

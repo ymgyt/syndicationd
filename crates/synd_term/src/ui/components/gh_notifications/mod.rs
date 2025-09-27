@@ -576,14 +576,15 @@ impl GhNotifications {
                 line.extend(labels);
                 Line::from(line)
             });
-            if labels.is_none() {
-                content_area
-            } else {
-                let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]);
-                let [labels_area, content_area] = vertical.areas(content_area);
+            match labels {
+                None => content_area,
+                Some(labels) => {
+                    let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]);
+                    let [labels_area, content_area] = vertical.areas(content_area);
 
-                labels.unwrap().render(labels_area, buf);
-                content_area
+                    labels.render(labels_area, buf);
+                    content_area
+                }
             }
         };
 
@@ -610,6 +611,7 @@ impl GhNotifications {
             body.render(body_header_area, buf);
             body_para.render(body_area, buf);
 
+            #[expect(clippy::unnecessary_unwrap)]
             let Comment { author, body } = last_comment.unwrap();
             Line::from(vec![
                 Span::from(concat!(icon!(comment), " Comment"))

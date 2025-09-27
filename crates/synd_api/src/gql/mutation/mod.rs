@@ -53,6 +53,7 @@ impl ResponseStatus {
     }
 }
 
+#[expect(dead_code)]
 #[allow(clippy::large_enum_variant)]
 #[derive(Interface)]
 #[graphql(field(name = "status", method = "status", ty = "ResponseStatus"))]
@@ -61,6 +62,7 @@ enum MutationResponse {
     UnsubscribeFeed(unsubscribe_feed::UnsubscribeFeedSuccess),
 }
 
+#[expect(dead_code)]
 #[derive(Interface)]
 #[graphql(
     field(name = "status", ty = "ResponseStatus"),

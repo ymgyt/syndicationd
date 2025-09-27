@@ -40,10 +40,10 @@ impl OptionFilterer {
 impl Filterable<Notification> for OptionFilterer {
     fn filter(&self, n: &Notification) -> FilterResult {
         // unread and participating are handled in rest api
-        if let Some(visibility) = self.options.visibility {
-            if visibility != n.repository.visibility {
-                return FilterResult::Discard;
-            }
+        if let Some(visibility) = self.options.visibility
+            && visibility != n.repository.visibility
+        {
+            return FilterResult::Discard;
         }
         if !self.options.pull_request_conditions.is_empty() {
             match n.subject_context.as_ref() {

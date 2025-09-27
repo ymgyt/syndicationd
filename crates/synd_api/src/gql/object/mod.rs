@@ -42,7 +42,7 @@ pub(crate) struct Entry<'a> {
 #[Object]
 impl Entry<'_> {
     /// Feed of this entry
-    async fn feed(&self) -> FeedMeta {
+    async fn feed(&self) -> FeedMeta<'_> {
         self.meta.clone().into()
     }
     /// Entry title
@@ -109,11 +109,11 @@ impl Feed {
     /// Feed entries
     #[allow(clippy::cast_sign_loss)]
     async fn entries(
-        &self,
+        &'_ self,
         #[graphql(default = 5)] first: Option<i32>,
     ) -> Connection<
         usize,
-        Entry,
+        Entry<'_>,
         EmptyFields,
         EmptyFields,
         FeedEntryConnectionName,

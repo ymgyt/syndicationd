@@ -44,7 +44,7 @@ mod test {
         {
             // push enter => start auth flow
             tx.send(key!(enter));
-            application.event_loop_until_idle(&mut event_stream).await;
+            let _ = application.event_loop_until_idle(&mut event_stream).await;
             insta::with_settings!({
                 description => "show device flow code",
             },{
@@ -101,7 +101,7 @@ mod test {
             // push enter => start auth flow
             // Select google then select
             tx.send_multi([key!('j'), key!(enter)]);
-            application.event_loop_until_idle(&mut event_stream).await;
+            let _ = application.event_loop_until_idle(&mut event_stream).await;
             insta::with_settings!({
                 description => "show google device flow code",
             },{

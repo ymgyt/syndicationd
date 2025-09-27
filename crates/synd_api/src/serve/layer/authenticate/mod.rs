@@ -24,6 +24,7 @@ pub trait Authenticate {
     fn authenticate(&self, token: Option<String>) -> Self::Output;
 }
 
+#[expect(clippy::large_enum_variant)]
 #[pin_project(project = AuthFutureProj)]
 pub enum AuthenticateFuture<AuthFut, S, F> {
     Authenticate {
