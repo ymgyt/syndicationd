@@ -1,6 +1,0 @@
-[build]
-target     = "bpfel-unknown-none"
-target-dir = "../../target"
-
-[unstable]
-build-std = ["core"]
