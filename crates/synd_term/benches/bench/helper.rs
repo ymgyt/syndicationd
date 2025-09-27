@@ -28,7 +28,7 @@ pub fn init_app() -> Application {
 
     let config = { Config::default().with_idle_timer_interval(Duration::from_micros(1)) };
 
-    let cache = { Cache::new(tempfile::TempDir::new().unwrap().into_path()) };
+    let cache = { Cache::new(tempfile::TempDir::new().unwrap().keep()) };
 
     Application::builder()
         .terminal(terminal)

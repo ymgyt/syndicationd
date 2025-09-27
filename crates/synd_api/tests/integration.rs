@@ -8,7 +8,7 @@ mod test {
             45000,
             "test".into(),
             "test".into(),
-            synd_test::temp_dir().into_path(),
+            synd_test::temp_dir().keep(),
         )
         .await?;
 

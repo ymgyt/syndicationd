@@ -178,6 +178,6 @@ mod tests {
     }
 
     fn temp_dir() -> PathBuf {
-        tempfile::TempDir::new().unwrap().into_path()
+        tempfile::TempDir::new().unwrap().keep()
     }
 }

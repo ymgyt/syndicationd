@@ -331,15 +331,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atoi"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f28d99ec8bfea296261ca1af174f24225171fea9664ba9003cbebee704810528"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2292,7 +2283,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70f7f96eab66f057d0ce7139840edadacc114fbc978d41898550731b473186ad"
 dependencies = [
  "async-trait",
- "atoi 0.3.3",
+ "atoi",
  "backtrace",
  "bytes",
  "chrono",
@@ -4438,41 +4429,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "url",
-]
-
-[[package]]
-name = "synd-kvsd"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "crc32fast",
- "futures-util",
- "insta",
- "mockall",
- "serde",
- "synd-kvsd-protocol",
- "synd-o11y",
- "synd-stdx",
- "tempfile",
- "thiserror 2.0.16",
- "tokio",
- "toml",
- "tracing",
-]
-
-[[package]]
-name = "synd-kvsd-protocol"
-version = "0.1.0"
-dependencies = [
- "atoi 2.0.0",
- "bytes",
- "chrono",
- "futures",
- "nom",
- "thiserror 2.0.16",
- "tokio",
- "tracing",
 ]
 
 [[package]]

@@ -24,7 +24,7 @@ mod test {
             kvsd_port: 47379,
             terminal_col_row: (120, 30),
             device_flow_case: "case1",
-            cache_dir: temp_dir().into_path(),
+            cache_dir: temp_dir().keep(),
             ..Default::default()
         };
         let mut application = test_case.init_app().await?;
@@ -91,7 +91,7 @@ mod test {
             kvsd_port: 47389,
             terminal_col_row: (120, 30),
             device_flow_case: "case1",
-            cache_dir: temp_dir().into_path(),
+            cache_dir: temp_dir().keep(),
             ..Default::default()
         };
         let mut application = test_case.init_app().await?;
@@ -132,7 +132,7 @@ mod test {
             kvsd_port: 6042,
             terminal_col_row: (120, 30),
             device_flow_case: "case1",
-            cache_dir: temp_dir().into_path(),
+            cache_dir: temp_dir().keep(),
             ..Default::default()
         }
         .with_credential(Credential::Google {
@@ -633,7 +633,7 @@ mod test {
             mock_port: 7000,
             synd_api_port: 7001,
             kvsd_port: 7002,
-            cache_dir: temp_dir().into_path(),
+            cache_dir: temp_dir().keep(),
             ..Default::default()
         }
         .already_logined();

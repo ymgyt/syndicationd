@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn remove_log_file() {
         let clean = CleanCommand {
-            cache_dir: TempDir::new().unwrap().into_path(),
+            cache_dir: TempDir::new().unwrap().keep(),
         };
         let log_file = NamedTempFile::new().unwrap();
         let exit_code = clean.clean(&fsimpl::FileSystem::new(), log_file.path());
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn ignore_log_file_not_found() {
         let clean = CleanCommand {
-            cache_dir: TempDir::new().unwrap().into_path(),
+            cache_dir: TempDir::new().unwrap().keep(),
         };
         let log_file = Path::new("./not_exists");
         let fs = MockFileSystem::default().with_remove_errors(log_file, io::ErrorKind::NotFound);
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn exit_code_on_permission_error() {
         let clean = CleanCommand {
-            cache_dir: TempDir::new().unwrap().into_path(),
+            cache_dir: TempDir::new().unwrap().keep(),
         };
         let log_file = Path::new("./not_allowed");
         let fs =
