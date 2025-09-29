@@ -3,12 +3,15 @@ use ::kvsd::KvsdError;
 pub use subscription::SubscriptionRepository;
 
 pub mod kvsd;
+pub mod sqlite;
 pub mod types;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RepositoryError {
     #[error("internal error: {0}")]
     Internal(#[from] anyhow::Error),
+    #[error(transparent)]
+    Migrate(#[from] sqlx::migrate::MigrateError),
 }
 
 impl RepositoryError {
@@ -20,6 +23,12 @@ impl RepositoryError {
 impl From<KvsdError> for RepositoryError {
     fn from(value: KvsdError) -> Self {
         RepositoryError::Internal(value.into())
+    }
+}
+
+impl From<sqlx::Error> for RepositoryError {
+    fn from(value: sqlx::Error) -> Self {
+        RepositoryError::internal(anyhow::Error::from(value))
     }
 }
 

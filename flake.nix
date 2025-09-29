@@ -67,6 +67,7 @@
           [
             pkgs-unstable.cargo-dist
             pkgs-unstable.cargo-insta
+            pkgs-unstable.sqlx-cli
             typos
             graphql-client
             opentelemetry-collector-contrib
@@ -77,6 +78,7 @@
             oranda
             gnuplot # for rendering with criterion
             graphviz
+            sqlite
           ]
           ++ ci_packages
           ## For cargo-release build
@@ -112,6 +114,9 @@
           checks = self.checks.${system};
           packages = dev_packages;
           shellHook = ''
+            # export DATABASE_URL="sqlite://$(pwd)/crates/synd_api/synd.db"
+            export SQLX_OFFLINE=true
+
             exec nu
           '';
         };

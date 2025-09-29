@@ -37,7 +37,7 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
 
 async fn run(
     Args {
-        kvsd,
+        sqlite,
         bind,
         serve,
         tls,
@@ -48,7 +48,7 @@ async fn run(
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
     let dep = Dependency::new(
-        kvsd,
+        sqlite,
         tls,
         serve,
         cache.clone(),
