@@ -4,6 +4,8 @@ use std::{
     str::FromStr,
 };
 
+use crate::types::macros::impl_sqlx_encode_decode;
+
 /// `Requirement` expresses how important the feed is
 /// using an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +31,14 @@ impl FromStr for Requirement {
             _ if s.eq_ignore_ascii_case("MAY") => Ok(Requirement::May),
             _ => Err("invalid requirement, should be one of ['must', 'should', 'may']"),
         }
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Requirement {
+    type Error = &'static str;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        s.parse()
     }
 }
 
@@ -67,6 +77,8 @@ impl Requirement {
         }
     }
 }
+
+impl_sqlx_encode_decode!(Requirement as String);
 
 #[cfg(test)]
 mod tests {

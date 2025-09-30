@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
+use crate::types::macros::impl_sqlx_encode_decode;
+
 #[derive(Error, Debug)]
 pub enum FeedUrlError {
     #[error("invalid url: {0}")]
@@ -93,6 +95,8 @@ impl fake::Dummy<fake::Faker> for FeedUrl {
         Url::parse("https://fake.ymgyt.io").unwrap().into()
     }
 }
+
+impl_sqlx_encode_decode!(FeedUrl as String);
 
 #[cfg(test)]
 mod tests {

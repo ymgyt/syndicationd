@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use kvsd::Value;
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::repository::RepositoryError;
@@ -12,7 +13,7 @@ pub struct Feed {
     pub title: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct FeedSubscription {
     pub user_id: String,
     pub url: FeedUrl,

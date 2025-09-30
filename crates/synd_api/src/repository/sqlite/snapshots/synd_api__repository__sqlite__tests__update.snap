@@ -1,0 +1,14 @@
+---
+source: crates/synd_api/src/repository/sqlite/mod.rs
+expression: feeds
+---
+urls:
+  - "https://ymgyt.io/feed_1"
+  - "https://ymgyt.io/feed_2"
+annotations:
+  "https://ymgyt.io/feed_1":
+    requirement: May
+    category: foo
+  "https://ymgyt.io/feed_2":
+    requirement: Should
+    category: linux

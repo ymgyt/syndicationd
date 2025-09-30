@@ -11,7 +11,7 @@ use synd_api::{
     cli::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
-    repository::kvsd::ConnectKvsdFailed,
+    repository::{kvsd::ConnectKvsdFailed, sqlite::DbPool},
     serve::listen_and_serve,
     shutdown::Shutdown,
 };
@@ -37,7 +37,7 @@ fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
 
 async fn run(
     Args {
-        kvsd,
+        sqlite,
         bind,
         serve,
         tls,
@@ -47,14 +47,9 @@ async fn run(
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
-    let dep = Dependency::new(
-        kvsd,
-        tls,
-        serve,
-        cache.clone(),
-        shutdown.cancellation_token(),
-    )
-    .await?;
+    let db = DbPool::connect(sqlite.sqlite_db).await?;
+    db.migrate().await?;
+    let dep = Dependency::new(db, tls, serve, cache.clone(), shutdown.cancellation_token()).await?;
 
     info!(
         version = config::app::VERSION,

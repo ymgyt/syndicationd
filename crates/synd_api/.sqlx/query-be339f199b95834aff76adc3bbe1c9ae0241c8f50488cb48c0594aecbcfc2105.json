@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO subscribed_feed (user_id, url, requirement, category)\n            VALUES (?, ?, ?, ?)\n            ON CONFLICT(user_id, url) DO UPDATE SET\n                requirement = excluded.requirement,\n                category = excluded.category\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "be339f199b95834aff76adc3bbe1c9ae0241c8f50488cb48c0594aecbcfc2105"
+}

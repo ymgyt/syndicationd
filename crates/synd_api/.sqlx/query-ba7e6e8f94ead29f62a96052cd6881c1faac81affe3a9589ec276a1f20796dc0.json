@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM subscribed_feed\n            WHERE user_id = ? AND url = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ba7e6e8f94ead29f62a96052cd6881c1faac81affe3a9589ec276a1f20796dc0"
+}

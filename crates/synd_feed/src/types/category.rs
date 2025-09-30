@@ -41,6 +41,14 @@ impl<'a> Category<'a> {
     }
 }
 
+impl<'s> TryFrom<&'s str> for Category<'s> {
+    type Error = CategoryError;
+
+    fn try_from(value: &'s str) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
 impl Display for Category<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad(self.0.as_ref())
@@ -72,6 +80,31 @@ impl fake::Dummy<fake::Faker> for Category<'_> {
     fn dummy_with_rng<R: rand::Rng + ?Sized>(_config: &fake::Faker, rng: &mut R) -> Self {
         let category: String = fake::Fake::fake_with_rng(&(1..31), rng);
         Self::new(category).unwrap()
+    }
+}
+
+#[cfg(feature = "sqlx")]
+impl sqlx::Type<sqlx::Sqlite> for Category<'static> {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+#[cfg(feature = "sqlx")]
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Category<'static> {
+    fn encode_by_ref(
+        &self,
+        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
+        self.to_string().encode_by_ref(buf)
+    }
+}
+
+#[cfg(feature = "sqlx")]
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for Category<'static> {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <String as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        Self::new(Cow::Owned(s)).map_err(Into::into)
     }
 }
 

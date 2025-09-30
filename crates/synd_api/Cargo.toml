@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.5" }
-synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["graphql"] }
+synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["graphql", "sqlx"] }
 synd-o11y = { path = "../synd_o11y", version = "0.1.9" }
 synd-stdx = { path = "../synd_stdx", version = "0.1.1", features = ["color", "humantime"] }
 
@@ -40,6 +40,7 @@ pin-project        = "1.1.8"
 reqwest            = { workspace = true }
 serde              = { workspace = true }
 serde_json         = "1.0.145"
+sqlx               = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
 thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 tokio-metrics      = { version = "0.4.5", default-features = false, features = ["rt"] }
@@ -59,7 +60,7 @@ opentelemetry-stdout = ["synd-o11y/opentelemetry-stdout"]
 synd-test = { path = "../synd_test" }
 
 assert_cmd         = { workspace = true }
-insta              = { workspace = true, features = ["yaml"] }
+insta              = { workspace = true, features = ["yaml", "redactions"] }
 tracing-subscriber = { workspace = true }
 
 [lints]

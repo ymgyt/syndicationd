@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::Context;
 use axum_server::tls_rustls::RustlsConfig;
@@ -9,10 +9,10 @@ use synd_feed::feed::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    cli::{self, CacheOptions, KvsdOptions, TlsOptions},
+    cli::{self, CacheOptions, TlsOptions},
     config,
     monitor::Monitors,
-    repository::kvsd::KvsdClient,
+    repository::sqlite::DbPool,
     serve::{ServeOptions, auth::Authenticator},
     usecase::{MakeUsecase, Runtime, authorize::Authorizer},
 };
@@ -27,29 +27,12 @@ pub struct Dependency {
 
 impl Dependency {
     pub async fn new(
-        kvsd: KvsdOptions,
+        db: DbPool,
         tls: TlsOptions,
         serve_options: cli::ServeOptions,
         cache: CacheOptions,
         ct: CancellationToken,
     ) -> anyhow::Result<Self> {
-        let kvsd = {
-            let KvsdOptions {
-                kvsd_host,
-                kvsd_port,
-                kvsd_username,
-                kvsd_password,
-            } = kvsd;
-            KvsdClient::connect(
-                kvsd_host,
-                kvsd_port,
-                kvsd_username,
-                kvsd_password,
-                Duration::from_secs(10),
-            )
-            .await?
-        };
-
         let cache_feed_service = {
             let CacheOptions {
                 feed_cache_size_mb,
@@ -73,7 +56,7 @@ impl Dependency {
         };
 
         let make_usecase = MakeUsecase {
-            subscription_repo: Arc::new(kvsd),
+            subscription_repo: Arc::new(db),
             fetch_feed: Arc::new(cache_feed_service),
         };
 

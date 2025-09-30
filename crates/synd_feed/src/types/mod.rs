@@ -17,6 +17,8 @@ pub use url::FeedUrl;
 mod feed_type;
 pub use feed_type::FeedType;
 
+mod macros;
+
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct EntryId<'a>(Cow<'a, str>);
 

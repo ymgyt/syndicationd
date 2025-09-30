@@ -1,6 +1,7 @@
 import '../.justfile'
 
 pkg := "api"
+database_url := "sqlite://" + source_directory() / "synd.db"
 
 # List recipe
 default:
@@ -14,3 +15,8 @@ changelog version:
 [no-cd]
 release *flags:
     cargo release --package synd-{{pkg}} -v {{flags}}
+
+prepare:
+    pwd
+    file synd.db
+    cargo sqlx prepare --database-url {{database_url}}

@@ -5,16 +5,17 @@ use futures_util::future;
 use octocrab::Octocrab;
 use ratatui::backend::TestBackend;
 use synd_api::{
-    cli::{CacheOptions, KvsdOptions, ServeOptions, TlsOptions},
+    cli::{CacheOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
-    repository::kvsd::KvsdClient,
+    repository::{SubscriptionRepository, sqlite::DbPool, types::FeedSubscription},
     shutdown::Shutdown,
 };
 use synd_auth::{
     device_flow::{DeviceFlow, provider},
     jwt,
 };
+use synd_feed::types::{Category, Requirement};
 pub use synd_term::integration::event_stream;
 use synd_term::{
     application::{
@@ -261,11 +262,32 @@ pub async fn serve_api(
     kvsd_port: u16,
     kvsd_root_dir: PathBuf,
 ) -> anyhow::Result<()> {
-    let kvsd_options = KvsdOptions {
-        kvsd_host: "localhost".into(),
-        kvsd_port,
-        kvsd_username: "test".into(),
-        kvsd_password: "test".into(),
+    let db = {
+        let db = DbPool::connect(kvsd_root_dir.join(format!("{kvsd_port}_synd.db"))).await?;
+        db.migrate().await?;
+
+        if api_port == 6031 {
+            // setup fixtures
+            let test_user_id = "899cf3fa5afc0aa1";
+
+            db.put_feed_subscription(FeedSubscription {
+                user_id: test_user_id.into(),
+                url: "http://localhost:6030/feed/twir_atom".try_into().unwrap(),
+                requirement: Some(Requirement::Must),
+                category: Some(Category::new("rust").unwrap()),
+            })
+            .await?;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            db.put_feed_subscription(FeedSubscription {
+                user_id: test_user_id.into(),
+                url: "http://localhost:6030/feed/o11y_news".try_into().unwrap(),
+                requirement: Some(Requirement::Should),
+                category: Some(Category::new("opentelemetry").unwrap()),
+            })
+            .await?;
+        }
+
+        db
     };
     let tls_options = TlsOptions {
         certificate: synd_test::certificate(),
@@ -282,18 +304,8 @@ pub async fn serve_api(
         feed_cache_refresh_interval: Duration::from_secs(3600),
     };
 
-    let _kvsd_client = synd_test::kvsd::run_kvsd(
-        kvsd_options.kvsd_host.clone(),
-        kvsd_options.kvsd_port,
-        kvsd_options.kvsd_password.clone(),
-        kvsd_options.kvsd_password.clone(),
-        kvsd_root_dir,
-    )
-    .await
-    .map(KvsdClient::new)?;
-
     let mut dep = Dependency::new(
-        kvsd_options,
+        db,
         tls_options,
         serve_options,
         cache_options,

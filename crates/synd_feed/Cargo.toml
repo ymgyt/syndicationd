@@ -28,6 +28,7 @@ reqwest       = { workspace = true, features = ["stream"] }
 schemars      = { workspace = true, optional = true, features = ["derive", "url"] }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
+sqlx          = { workspace = true, optional = true, features = ["sqlite"] }
 thiserror     = { workspace = true }
 tokio         = { workspace = true, features = ["macros"] }
 tokio-util    = { workspace = true }
@@ -38,6 +39,7 @@ url           = { workspace = true, features = ["serde"] }
 fake       = ["dep:fake", "dep:rand"]
 graphql    = ["dep:async-graphql"]
 jsonschema = ["dep:schemars"]
+sqlx       = ["dep:sqlx"]
 
 [lints]
 workspace = true

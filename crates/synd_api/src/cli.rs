@@ -12,7 +12,7 @@ use crate::{
 #[command(version, propagate_version = true, disable_help_subcommand = true)]
 pub struct Args {
     #[command(flatten)]
-    pub kvsd: KvsdOptions,
+    pub sqlite: SqliteOptions,
     #[command(flatten)]
     pub bind: BindOptions,
     #[command(flatten)]
@@ -28,16 +28,10 @@ pub struct Args {
 }
 
 #[derive(clap::Args, Debug, Clone)]
-#[command(next_help_heading = "Kvsd options")]
-pub struct KvsdOptions {
-    #[arg(long = "kvsd-host", env = env_key!("KVSD_HOST"))]
-    pub kvsd_host: String,
-    #[arg(long = "kvsd-port", env = env_key!("KVSD_PORT"))]
-    pub kvsd_port: u16,
-    #[arg(long = "kvsd-username", alias = "kvsd-user", env = env_key!("KVSD_USER"))]
-    pub kvsd_username: String,
-    #[arg(long = "kvsd-password", alias = "kvsd-pass", env = env_key!("KVSD_PASS"))]
-    pub kvsd_password: String,
+#[command(next_help_heading = "sqlite options")]
+pub struct SqliteOptions {
+    #[arg(long, env = env_key!("SQLITE_DB"))]
+    pub sqlite_db: PathBuf,
 }
 
 #[derive(clap::Args, Debug, Clone)]

@@ -49,6 +49,7 @@ reqwest            = { version = "0.12.23", default-features = false, features =
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.145" }
+sqlx               = { version = "0.8.6", default-features = false }
 tempfile           = { version = "3" }
 thiserror          = { version = "2.0.16" }
 tokio              = { version = "1.47.1", default-features = false }

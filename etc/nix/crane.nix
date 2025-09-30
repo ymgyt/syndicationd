@@ -23,6 +23,8 @@ let
       || (lib.hasSuffix ".gql" path) # graphql query
       || (lib.hasSuffix "schema.json" path) # graphql schema
       || (lib.hasSuffix ".snap" path) # insta snapshots
+      || (lib.hasSuffix ".sqlx" path) # sqlx prepared dir
+      || (lib.hasSuffix ".sql" path) # sqlx prepared dir
       || (lib.hasSuffix ".json" path) # graphql fixtures
       || (lib.hasSuffix ".kvsd" path) # kvsd fixtures
       || (lib.hasSuffix ".xml" path) # rss fixtures
@@ -100,7 +102,7 @@ in
       commonArgs
       // {
         inherit cargoArtifacts;
-        cargoExtraArgs = "--features integration --exclude synd-perf";
+        cargoExtraArgs = "--features integration";
         cargoClippyExtraArgs = "--workspace -- --deny warnings";
       }
     );

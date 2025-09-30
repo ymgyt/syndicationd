@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    user_id,\n                    url AS \"url: FeedUrl\",\n                    requirement AS \"requirement: Requirement\",\n                    category AS \"category: Category\"\n                FROM subscribed_feed\n                WHERE user_id = ?\n                ORDER BY created_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "user_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "url: FeedUrl",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "requirement: Requirement",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "category: Category",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "701bf3d0f08124c67f91e5ab4c40c7f3a2a4111ad46743935dde4b935446aa30"
+}
