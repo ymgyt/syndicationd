@@ -18,6 +18,10 @@ pub enum GithubError {
     // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#about-secondary-rate-limits
     #[error("secondary rate limits exceeded")]
     SecondaryRateLimit,
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("graphql: {0:?}")]
+    Graphql(Vec<graphql_client::Error>),
     #[error("github api error: {0}")]
     Api(Box<octocrab::Error>),
 }
@@ -34,6 +38,12 @@ impl From<octocrab::Error> for GithubError {
             },
             _ => GithubError::Api(Box::new(err)),
         }
+    }
+}
+
+impl From<Vec<graphql_client::Error>> for GithubError {
+    fn from(err: Vec<graphql_client::Error>) -> Self {
+        GithubError::Graphql(err)
     }
 }
 
@@ -187,7 +197,7 @@ impl GithubClient {
             Ok(response) => match (response.data, response.errors) {
                 (_, Some(errors)) => {
                     tracing::error!("{errors:?}");
-                    todo!()
+                    Err(err::handle_gql_error(errors))
                 }
                 (Some(data), _) => Ok(IssueContext::from(data)),
                 _ => unreachable!(),
@@ -230,12 +240,33 @@ impl GithubClient {
             Ok(response) => match (response.data, response.errors) {
                 (_, Some(errors)) => {
                     tracing::error!("{errors:?}");
-                    todo!()
+                    Err(err::handle_gql_error(errors))
                 }
                 (Some(data), _) => Ok(PullRequestContext::from(data)),
                 _ => unreachable!(),
             },
             Err(error) => Err(GithubError::from(error)),
         }
+    }
+}
+
+mod err {
+    use graphql_client::PathFragment;
+
+    use crate::client::github::GithubError;
+
+    pub(super) fn handle_gql_error(mut errors: Vec<graphql_client::Error>) -> GithubError {
+        if errors.len() == 1 && is_repository_not_found(&errors[0]) {
+            return GithubError::NotFound(errors.swap_remove(0).message);
+        }
+        GithubError::from(errors)
+    }
+
+    pub(super) fn is_repository_not_found(err: &graphql_client::Error) -> bool {
+        err.message.starts_with("Could not resolve to a Repository")
+            && err.path.as_ref().is_some_and(|p| {
+                p.iter()
+                    .any(|p| matches!(p, PathFragment::Key(key) if key == "repository"))
+            })
     }
 }
