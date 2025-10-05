@@ -51,7 +51,7 @@ serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.145" }
 sqlx               = { version = "0.8.6", default-features = false }
 tempfile           = { version = "3" }
-thiserror          = { version = "2.0.16" }
+thiserror          = { version = "2.0.17" }
 tokio              = { version = "1.47.1", default-features = false }
 tokio-util         = { version = "0.7.16" }
 toml               = { version = "0.8.23" }
