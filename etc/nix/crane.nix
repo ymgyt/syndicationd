@@ -11,8 +11,6 @@
 let
   darwinDeps = [
     libiconv
-    darwin.apple_sdk.frameworks.Security
-    darwin.apple_sdk.frameworks.SystemConfiguration
   ];
 
   filteredSrc = lib.cleanSourceWith {
