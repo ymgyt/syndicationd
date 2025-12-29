@@ -43,52 +43,5 @@ resourceMetrics:
                   asInt: 1
               aggregationTemporality: 2
               isMonotonic: true
-          - name: graphql.duration
-            description: graphql response duration
-            unit: s
-            metadata: []
-            histogram:
-              dataPoints:
-                - attributes: []
-                  startTimeUnixNano: "[UNIX_TIMESTAMP]"
-                  timeUnixNano: "[UNIX_TIMESTAMP]"
-                  count: 1
-                  sum: 0.5
-                  bucketCounts:
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 1
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                  explicitBounds:
-                    - 0.005
-                    - 0.01
-                    - 0.025
-                    - 0.05
-                    - 0.075
-                    - 0.1
-                    - 0.25
-                    - 0.5
-                    - 0.75
-                    - 1
-                    - 2.5
-                    - 5
-                    - 7.5
-                    - 10
-                  exemplars: []
-                  flags: 0
-                  min: ~
-                  max: ~
-              aggregationTemporality: 2
         schemaUrl: ""
     schemaUrl: ""
