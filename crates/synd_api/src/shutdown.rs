@@ -1,4 +1,4 @@
-use std::{future::Future, io, time::Duration};
+use std::{future::Future, io, net::SocketAddr, time::Duration};
 
 use axum_server::Handle;
 use tokio_util::sync::CancellationToken;
@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 /// `CancellationToken` wrapper
 pub struct Shutdown {
     root: CancellationToken,
-    handle: Handle,
+    handle: Handle<SocketAddr>,
 }
 
 impl Shutdown {
@@ -47,7 +47,7 @@ impl Shutdown {
         self.root.cancel();
     }
 
-    pub fn into_handle(self) -> Handle {
+    pub fn into_handle(self) -> Handle<SocketAddr> {
         self.handle
     }
 

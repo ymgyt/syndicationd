@@ -12,6 +12,7 @@ mod test {
         )
         .await?;
 
+        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd-api").unwrap();
 
         cmd.args([
