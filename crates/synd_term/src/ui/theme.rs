@@ -1,4 +1,4 @@
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Clone)]
 pub struct Theme {

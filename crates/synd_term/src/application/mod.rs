@@ -359,6 +359,7 @@ impl Application {
         }
     }
 
+    #[expect(clippy::too_many_lines)]
     #[tracing::instrument(skip_all)]
     fn apply(&mut self, queue: &mut VecDeque<Command>) {
         while let Some(command) = queue.pop_front() {

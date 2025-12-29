@@ -44,8 +44,8 @@ impl Terminal {
             panic_hook(panic);
         }));
 
-        self.backend.hide_cursor()?;
-        self.backend.clear()?;
+        self.backend.hide_cursor().ok();
+        self.backend.clear().ok();
 
         Ok(())
     }
@@ -53,7 +53,7 @@ impl Terminal {
     /// Reset terminal
     pub fn restore(&mut self) -> io::Result<()> {
         Self::restore_backend()?;
-        self.backend.show_cursor()?;
+        self.backend.show_cursor().ok();
         Ok(())
     }
 

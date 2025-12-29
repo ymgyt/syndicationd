@@ -1,6 +1,7 @@
 #[cfg(feature = "integration")]
 mod test {
     use std::path::{Path, PathBuf};
+    use std::sync::Once;
 
     use synd_term::{
         application::{Config, Features},
@@ -13,6 +14,15 @@ mod test {
     use crate::test::helper::{
         TestCase, focus_gained_event, focus_lost_event, resize_event, test_config,
     };
+
+    static INIT: Once = Once::new();
+
+    fn ensure_init() {
+        INIT.call_once(|| {
+            // Initialize rustls crypto provider for all integration tests
+            let _ = rustls::crypto::ring::default_provider().install_default();
+        });
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn login_with_github() -> anyhow::Result<()> {
@@ -125,6 +135,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn refresh_expired_google_jwt() -> anyhow::Result<()> {
+        ensure_init();
         let (expired_jwt, expired_at) = synd_test::jwt::google_expired_jwt();
         let test_case = TestCase {
             mock_port: 6040,
@@ -435,6 +446,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn terminal_events() -> anyhow::Result<()> {
+        ensure_init();
         let (mut col, mut row) = (120, 30);
         let test_case = TestCase {
             mock_port: 6050,
@@ -475,6 +487,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn unauthorized() -> anyhow::Result<()> {
+        ensure_init();
         let test_case = TestCase {
             mock_port: 6060,
             synd_api_port: 6061,
@@ -650,6 +663,7 @@ mod test {
     }
 
     fn check_command_test(api_port: u16) {
+        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args([
@@ -664,6 +678,7 @@ mod test {
     }
 
     fn export_command_test(api_port: u16, cache_dir: &Path) {
+        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args([
@@ -680,6 +695,7 @@ mod test {
     }
 
     fn clean_command_test(cache_dir: &Path) {
+        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args(["clean", "--cache-dir", &cache_dir.display().to_string()])
@@ -688,6 +704,7 @@ mod test {
     }
 
     fn term_command_test(cache_dir: &Path, log_path: &Path) {
+        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         // Nix do not allow to create log file in user directory

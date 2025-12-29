@@ -84,7 +84,7 @@ impl Authentication {
     }
 
     fn render_login(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let area = area.centered(40, 50);
+        let area = RectExt::centered(area, 40, 50);
 
         let vertical = Layout::vertical([
             Constraint::Length(9),
@@ -133,7 +133,7 @@ impl Authentication {
         cx: &Context<'_>,
         res: &DeviceAuthorizationResponse,
     ) {
-        let area = area.centered(40, 50);
+        let area = RectExt::centered(area, 40, 50);
 
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]);
 

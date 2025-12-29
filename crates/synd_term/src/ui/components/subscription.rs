@@ -381,7 +381,7 @@ impl Subscription {
         feed: &types::Feed,
     ) {
         let area = {
-            let area = area.centered(60, 60);
+            let area = RectExt::centered(area, 60, 60);
             let vertical = Layout::vertical([
                 Constraint::Fill(1),
                 Constraint::Min(12),

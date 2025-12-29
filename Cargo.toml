@@ -19,7 +19,7 @@ assert_cmd         = { version = "2.0.17" }
 async-graphql      = { version = "7.0.17" }
 async-trait        = { version = "0.1.89", default-features = false }
 axum               = { version = "0.8.6", default-features = false }
-axum-server        = { version = "0.6.0", features = ["tls-rustls"] }
+axum-server        = { version = "0.8.0", features = ["tls-rustls"] }
 bitflags           = { version = "2.9.4", default-features = false }
 bytes              = { version = "1.10.0" }
 chrono             = { version = "0.4.42", default-features = false }

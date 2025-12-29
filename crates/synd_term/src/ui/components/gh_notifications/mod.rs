@@ -637,7 +637,7 @@ impl GhNotifications {
             ]);
             let [_, area, _] = vertical.areas(area);
 
-            let area = area.centered(70, 100);
+            let area = RectExt::centered(area, 70, 100);
             area.reset(buf);
             area
         };
