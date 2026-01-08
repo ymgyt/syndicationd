@@ -2,15 +2,14 @@
   description = "syndicationd";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    crane.url = "github:ipetkov/crane/v0.20.1";
+    crane.url = "github:ipetkov/crane/v0.22.0";
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -24,7 +23,6 @@
     {
       self,
       nixpkgs,
-      nixpkgs-unstable,
       crane,
       rust-overlay,
       flake-utils,
@@ -40,7 +38,6 @@
         };
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays config; };
-        pkgs-unstable = import nixpkgs-unstable { inherit system overlays config; };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
@@ -53,9 +50,9 @@
 
         ci_packages = with pkgs; [
           # >= 1.31.0 for modules
-          pkgs-unstable.just
+          just
           # ~> 1.9.0 for remote workspace
-          pkgs-unstable.terraform
+          terraform
           nushell # just set nu as shell
           cargo-bundle-licenses
           docker
@@ -65,9 +62,9 @@
         dev_packages =
           with pkgs;
           [
-            pkgs-unstable.cargo-dist
-            pkgs-unstable.cargo-insta
-            pkgs-unstable.sqlx-cli
+            cargo-dist
+            cargo-insta
+            sqlx-cli
             typos
             graphql-client
             opentelemetry-collector-contrib
