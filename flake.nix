@@ -92,14 +92,13 @@
           typo = pkgs.callPackage ./etc/nix/typo.nix { };
         };
 
-        packages =
-          {
-            default = self.packages."${system}".synd-term;
-            inherit (synd.packages) synd-term synd-api;
-          }
-          // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-            inherit (synd.packages) coverage synd-term-image synd-api-image;
-          };
+        packages = {
+          default = self.packages."${system}".synd-term;
+          inherit (synd.packages) synd-term synd-api;
+        }
+        // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          inherit (synd.packages) coverage synd-term-image synd-api-image;
+        };
 
         apps.default = flake-utils.lib.mkApp {
           drv = synd.packages.synd-term;
