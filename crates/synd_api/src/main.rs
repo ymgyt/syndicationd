@@ -88,6 +88,9 @@ async fn main() {
     let _guard = init_tracing(&args.o11y);
     let shutdown = Shutdown::watch_signal(tokio::signal::ctrl_c(), || {});
 
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .unwrap();
     init_file_descriptor_limit();
 
     if let Err(err) = run(args, shutdown).await {
