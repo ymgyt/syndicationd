@@ -6,7 +6,7 @@ default: toml cargo nix
 # Format toml files
 [no-cd]
 toml:
-    taplo fmt --config {{justfile_directory()}}/taplo.toml **.toml
+    taplo fmt --config {{justfile_directory()}}/taplo.toml **/*.toml
 
 # Run cargo fmt
 [no-cd]
