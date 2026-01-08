@@ -1,8 +1,21 @@
 #[cfg(feature = "integration")]
 mod test {
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    fn ensure_init() {
+        INIT.call_once(|| {
+            // Initialize rustls crypto provider for all integration tests
+            rustls::crypto::ring::default_provider()
+                .install_default()
+                .unwrap();
+        });
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn api_command_test() -> anyhow::Result<()> {
+        ensure_init();
         let _kvsd_client = synd_test::kvsd::run_kvsd(
             "localhost".into(),
             45000,

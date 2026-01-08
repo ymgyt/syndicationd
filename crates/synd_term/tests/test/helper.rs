@@ -240,7 +240,7 @@ pub fn init_tracing() {
     INIT_SUBSCRIBER.call_once(|| {
         // Initialize rustls crypto provider for integration tests
         let _ = rustls::crypto::ring::default_provider().install_default();
-        
+
         let show_code_location = std::env::var("SYND_LOG_LOCATION").ok().is_some();
 
         tracing_subscriber::fmt()
