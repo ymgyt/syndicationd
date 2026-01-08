@@ -70,7 +70,7 @@ commit_parsers = [
   { message = "^docs", group = "📚 Documentation" },
   { message = "^perf", group = "🏃 Performance" },
   { message = "^refactor", group = "🧹 Refactor" },
-  { message = "^chore(.*): [Aa]ppease clippy", group = "🧹 Refactor"},
+  { message = "^chore(.*): [Aa]ppease clippy", group = "🧹 Refactor" },
   { message = "^style", group = "🎨 Styling" },
   { message = "^test", group = "🔧 Testing" },
   { message = "^chore: [Rr]elease", skip = true },
