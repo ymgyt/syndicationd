@@ -120,7 +120,7 @@
 
         devShells.ci = craneLib.devShell { packages = ci_packages; };
 
-        formatter = pkgs.nixfmt-rfc-style;
+        formatter = pkgs.nixfmt;
       }
     );
 
