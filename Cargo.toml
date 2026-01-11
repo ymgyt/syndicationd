@@ -15,7 +15,7 @@ repository  = "https://github.com/ymgyt/syndicationd"
 
 [workspace.dependencies]
 anyhow             = { version = "1", default-features = false, features = ["std"] }
-assert_cmd         = { version = "2.0.17" }
+assert_cmd         = { version = "2.1.2" }
 async-graphql      = { version = "7.0.17" }
 async-trait        = { version = "0.1.89", default-features = false }
 axum               = { version = "0.8.6", default-features = false }
@@ -49,16 +49,16 @@ reqwest            = { version = "0.12.23", default-features = false, features =
 rustls             = { version = "0.23", features = ["ring"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
-serde_json         = { version = "1.0.145" }
+serde_json         = { version = "1.0.149" }
 sqlx               = { version = "0.8.6", default-features = false }
 tempfile           = { version = "3" }
 thiserror          = { version = "2.0.17" }
 tokio              = { version = "1.47.1", default-features = false }
-tokio-util         = { version = "0.7.16" }
+tokio-util         = { version = "0.7.18" }
 toml               = { version = "0.8.23" }
 tracing            = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.20", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
-url                = { version = "2.5.7" }
+url                = { version = "2.5.8" }
 
 [profile.release]
 panic = "abort"
