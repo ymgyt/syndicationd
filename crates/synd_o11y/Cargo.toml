@@ -36,7 +36,7 @@ opentelemetry-stdout = ["dep:opentelemetry-stdout"]
 insta               = { workspace = true, features = ["yaml", "redactions"] }
 opentelemetry-proto = { version = "0.29.0", features = ["gen-tonic", "trace", "metrics", "logs", "with-serde"] }
 tokio               = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
-tonic               = { version = "0.12.3", features = ["transport"] }
+tonic               = { version = "0.14.2", features = ["transport"] }
 
 [lints]
 workspace = true
