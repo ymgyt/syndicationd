@@ -45,10 +45,10 @@ ratatui              = { version = "0.30.0", default-features = false, features 
 reqwest              = { workspace = true }
 schemars             = { workspace = true, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
-serde_json           = "1.0.145"
+serde_json           = "1.0.149"
 thiserror            = { workspace = true }
 tokio                = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
-tokio-stream         = { version = "0.1.17", optional = true }
+tokio-stream         = { version = "0.1.18", optional = true }
 toml                 = { workspace = true }
 tracing              = { workspace = true }
 tracing-appender     = "0.2.3"
