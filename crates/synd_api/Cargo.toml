@@ -40,13 +40,13 @@ pin-project        = "1.1.8"
 reqwest            = { workspace = true }
 rustls             = { workspace = true }
 serde              = { workspace = true }
-serde_json         = "1.0.145"
+serde_json         = "1.0.149"
 sqlx               = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
 thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
-tokio-metrics      = { version = "0.4.5", default-features = false, features = ["rt"] }
+tokio-metrics      = { version = "0.4.7", default-features = false, features = ["rt"] }
 tokio-util         = { workspace = true }
-tower              = { version = "0.5.2", default-features = false, features = ["limit", "timeout"] }
+tower              = { version = "0.5.3", default-features = false, features = ["limit", "timeout"] }
 tower-http         = { version = "0.6.6", default-features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
 tracing            = { workspace = true }
 
