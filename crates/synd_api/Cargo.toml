@@ -24,7 +24,7 @@ synd-stdx = { path = "../synd_stdx", version = "0.1.1", features = ["color", "hu
 
 anyhow             = { workspace = true }
 async-graphql      = { workspace = true, features = ["tracing"] }
-async-graphql-axum = { version = "7.0.17" }
+async-graphql-axum = { version = "7.2.0" }
 async-trait        = { workspace = true }
 axum               = { workspace = true, features = ["json"] }
 axum-server        = { workspace = true }
