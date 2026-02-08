@@ -5632,7 +5632,7 @@ dependencies = [
  "graphql_client",
  "html2text",
  "insta",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "kvsd",
  "mockall",
  "nom 8.0.0",
