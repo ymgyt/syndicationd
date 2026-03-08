@@ -26,7 +26,7 @@ jobs:
           name: syndicationd
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Login to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
