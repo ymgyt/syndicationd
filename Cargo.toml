@@ -57,7 +57,7 @@ tokio              = { version = "1.47.1", default-features = false }
 tokio-util         = { version = "0.7.18" }
 toml               = { version = "0.8.23" }
 tracing            = { version = "0.1.41" }
-tracing-subscriber = { version = "0.3.20", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
+tracing-subscriber = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.8" }
 
 [profile.release]
