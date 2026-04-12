@@ -6312,21 +6312,22 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tui-big-text"
-version = "0.8.1"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cb3cf7714229ca4503c1b94050bce7ae4f5bbcf9e5b3d24bee858f15ef23cef"
+checksum = "6833ec23415d48753f28caec76fa149d0d319ebaedec77ad7d09f7e2094bee8a"
 dependencies = [
  "derive_builder",
  "font8x8",
  "itertools 0.14.0",
  "ratatui-core",
+ "ratatui-widgets",
 ]
 
 [[package]]
 name = "tui-widgets"
-version = "0.6.2"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e23ce33a78f334c252f1ae777826ed5559ccdb9b23f0736b4253751b263491c9"
+checksum = "1a204904071830ebc39c305f799bf892b6a94ebe7e2cc1a67509328cd2391a5d"
 dependencies = [
  "document-features",
  "ratatui-core",
