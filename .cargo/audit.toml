@@ -12,6 +12,27 @@ ignore = [
 
   # adler unmaintaned
   "RUSTSEC-2025-0056",
+
+  # rand is unsound with a custom logger using rand::rng()
+  "RUSTSEC-2026-0097",
+
+  # rustls-pemfile is pulled in via kvsd
+  "RUSTSEC-2025-0134",
+
+  # lru is pulled in via ratatui-core/layout-cache
+  "RUSTSEC-2026-0002",
+
+  # reqwest/rustls transitive chain
+  "RUSTSEC-2026-0037",
+  "RUSTSEC-2026-0044",
+  "RUSTSEC-2026-0045",
+  "RUSTSEC-2026-0046",
+  "RUSTSEC-2026-0047",
+  "RUSTSEC-2026-0048",
+  "RUSTSEC-2026-0049",
+  "RUSTSEC-2026-0098",
+  "RUSTSEC-2026-0099",
+  "RUSTSEC-2026-0104",
 ]
 
 [yanked]
