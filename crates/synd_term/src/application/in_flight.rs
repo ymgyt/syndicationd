@@ -40,7 +40,7 @@ impl InFlight {
         Self {
             next_request_sequence: AtomicU64::new(0),
             in_flights: HashMap::new(),
-            throbber_timer: Box::pin(tokio::time::sleep(Duration::from_secs(3600 * 24))),
+            throbber_timer: Box::pin(tokio::time::sleep(Duration::from_hours(24))),
             throbber_step: 0,
             throbber_timer_interval: Duration::from_millis(250),
         }
@@ -100,7 +100,7 @@ impl InFlight {
         if self.in_flights.is_empty() {
             self.throbber_timer
                 .as_mut()
-                .reset(Instant::now() + Duration::from_secs(3600 * 24));
+                .reset(Instant::now() + Duration::from_hours(24));
         }
 
         req_id

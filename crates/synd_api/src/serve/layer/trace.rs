@@ -22,7 +22,7 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
             %request_id,
         );
 
-        span.set_parent(cx);
+        let _ = span.set_parent(cx);
         span
     }
 }

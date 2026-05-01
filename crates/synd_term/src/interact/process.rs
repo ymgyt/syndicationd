@@ -77,7 +77,7 @@ impl OpenTextBrowser for TextBrowserInteractor {
             Ok(())
         } else {
             let full_command = if self.args.is_empty() {
-                format!("{} {}", self.command.display(), url,)
+                format!("{} {}", self.command.display(), url)
             } else {
                 format!(
                     "{} {} {}",

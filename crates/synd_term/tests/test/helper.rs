@@ -303,8 +303,8 @@ pub async fn serve_api(
     };
     let cache_options = CacheOptions {
         feed_cache_size_mb: 1,
-        feed_cache_ttl: Duration::from_secs(60),
-        feed_cache_refresh_interval: Duration::from_secs(3600),
+        feed_cache_ttl: Duration::from_mins(1),
+        feed_cache_refresh_interval: Duration::from_hours(1),
     };
 
     let mut dep = Dependency::new(

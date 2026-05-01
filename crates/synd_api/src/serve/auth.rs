@@ -22,7 +22,7 @@ impl Authenticator {
     pub fn new() -> anyhow::Result<Self> {
         let cache = Cache::builder()
             .max_capacity(1024 * 1024)
-            .time_to_live(Duration::from_secs(60 * 60))
+            .time_to_live(Duration::from_hours(1))
             .build();
 
         Ok(Self {

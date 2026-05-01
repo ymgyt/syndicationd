@@ -23,7 +23,7 @@ impl Default for CacheConfig {
         Self {
             // 10MiB
             max_cache_size: 10 * 1024 * 1024,
-            time_to_live: Duration::from_secs(60 * 60),
+            time_to_live: Duration::from_hours(1),
         }
     }
 }

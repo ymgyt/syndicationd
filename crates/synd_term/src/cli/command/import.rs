@@ -162,7 +162,7 @@ where
                     feed_url,
                     message,
                 })) => {
-                    writeln!(&mut out, "ERROR {feed_url} {message}",)?;
+                    writeln!(&mut out, "ERROR {feed_url} {message}")?;
                 }
                 Err(err) => {
                     writeln!(&mut out, "ERROR {url} {err}")?;

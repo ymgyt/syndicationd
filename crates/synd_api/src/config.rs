@@ -29,7 +29,7 @@ pub mod serve {
 pub mod metrics {
     use std::time::Duration;
 
-    pub const MONITOR_INTERVAL: Duration = Duration::from_secs(60);
+    pub const MONITOR_INTERVAL: Duration = Duration::from_mins(1);
 }
 
 pub mod cache {

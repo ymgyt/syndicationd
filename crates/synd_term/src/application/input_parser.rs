@@ -65,7 +65,7 @@ impl<'a> InputParser<'a> {
                         )
                     }
                     Some((input, VerboseErrorKind::Context(CTX_CATEGORY_POST))) => {
-                        format!("Invalid category: {input}",)
+                        format!("Invalid category: {input}")
                     }
                     Some((input, VerboseErrorKind::Context(CTX_URL))) => {
                         format!("Invalid url: {input}")
@@ -279,8 +279,8 @@ mod comment {
 
         #[test]
         fn parse_comment() {
-            assert_eq!(comment("# foo\n"), Ok(("", ())),);
-            assert_eq!(comment("# foo\r\n"), Ok(("", ())),);
+            assert_eq!(comment("# foo\n"), Ok(("", ())));
+            assert_eq!(comment("# foo\r\n"), Ok(("", ())));
         }
 
         #[test]

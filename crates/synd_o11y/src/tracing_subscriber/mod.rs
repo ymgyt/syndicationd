@@ -37,7 +37,7 @@ where
     };
 
     let (metrics_layer, meter_provider) = {
-        let metrics_reader_interval = Duration::from_secs(60);
+        let metrics_reader_interval = Duration::from_mins(1);
         otel_metrics::layer(endpoint.clone(), resource.clone(), metrics_reader_interval)
     };
 

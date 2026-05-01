@@ -4,7 +4,7 @@ use opentelemetry::global;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     Resource,
-    metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream, View},
+    metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream},
 };
 use tracing::{Metadata, Subscriber};
 use tracing_opentelemetry::MetricsLayer;
@@ -56,7 +56,7 @@ fn init_meter_provider(
     let stdout_reader = {
         let exporter = opentelemetry_stdout::MetricExporterBuilder::default().build();
         PeriodicReader::builder(exporter)
-            .with_interval(Duration::from_secs(60))
+            .with_interval(Duration::from_mins(1))
             .build()
     };
     #[cfg(feature = "opentelemetry-stdout")]
@@ -69,29 +69,29 @@ fn init_meter_provider(
     meter_provider
 }
 
-fn view() -> impl View {
+fn view() -> impl Fn(&Instrument) -> Option<Stream> + Send + Sync + 'static {
     |instrument: &Instrument| -> Option<Stream> {
         tracing::debug!("{instrument:?}");
 
-        match instrument.name.as_ref() {
-            "graphql.duration" => Some(
-                Stream::new()
-                    .name(instrument.name.clone())
-                    .description("graphql response duration")
-                    // Currently we could not ingest metrics with Arregation::Base2ExponentialHistogram in grafanacloud
-                    .aggregation(
-                        opentelemetry_sdk::metrics::Aggregation::ExplicitBucketHistogram {
-                            // https://opentelemetry.io/docs/specs/semconv/http/http-metrics/#http-server
-                            boundaries: vec![
-                                0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5,
-                                5.0, 7.5, 10.0,
-                            ],
-                            record_min_max: false,
-                        },
-                    )
-                    // https://opentelemetry.io/docs/specs/semconv/general/metrics/#instrument-units
-                    .unit("s"),
-            ),
+        match instrument.name() {
+            "graphql.duration" => Stream::builder()
+                .with_name(instrument.name().to_owned())
+                .with_description("graphql response duration")
+                // Currently we could not ingest metrics with Arregation::Base2ExponentialHistogram in grafanacloud
+                .with_aggregation(
+                    opentelemetry_sdk::metrics::Aggregation::ExplicitBucketHistogram {
+                        // https://opentelemetry.io/docs/specs/semconv/http/http-metrics/#http-server
+                        boundaries: vec![
+                            0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0,
+                            7.5, 10.0,
+                        ],
+                        record_min_max: false,
+                    },
+                )
+                // https://opentelemetry.io/docs/specs/semconv/general/metrics/#instrument-units
+                .with_unit("s")
+                .build()
+                .ok(),
             name => {
                 tracing::debug!(name, "There is no explicit view");
                 None

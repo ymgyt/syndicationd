@@ -52,8 +52,8 @@ pub mod client {
 pub mod credential {
     use std::time::Duration;
     /// The `Duration` considered as expired before actually performing the refresh process
-    pub const EXPIRE_MARGIN: Duration = Duration::from_secs(60);
-    pub const FALLBACK_EXPIRE: Duration = Duration::from_secs(60 * 15);
+    pub const EXPIRE_MARGIN: Duration = Duration::from_mins(1);
+    pub const FALLBACK_EXPIRE: Duration = Duration::from_mins(15);
 }
 
 pub mod feed {

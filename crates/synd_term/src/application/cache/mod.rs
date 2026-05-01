@@ -162,7 +162,7 @@ mod tests {
         assert!(cache.persist_credential(&cred).is_ok());
 
         let loaded = cache.load_credential().unwrap();
-        assert_eq!(loaded, Unverified::from(cred),);
+        assert_eq!(loaded, Unverified::from(cred));
     }
 
     #[test]

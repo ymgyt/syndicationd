@@ -55,7 +55,7 @@ impl KvsdClient {
                     err => break err,
                 }
                 retry += 1;
-                tokio::time::sleep(Duration::from_millis(1000)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
             }
         };
 

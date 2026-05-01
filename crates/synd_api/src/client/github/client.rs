@@ -75,7 +75,7 @@ impl GithubClient {
                 Err(anyhow::anyhow!("failed to request github api: {errs:?}"))
             }
             (Some(data), _) => Ok(data),
-            _ => Err(anyhow::anyhow!("unexpected response",)),
+            _ => Err(anyhow::anyhow!("unexpected response")),
         }
     }
 }

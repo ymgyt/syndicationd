@@ -34,7 +34,7 @@ mod test {
             "--port",
             &format!("{}", 45001),
             "--sqlite-db",
-            &format!("{}", synd_test::temp_dir().keep().join("synd.db").display(),),
+            &format!("{}", synd_test::temp_dir().keep().join("synd.db").display()),
             "--tls-cert",
             synd_test::certificate().to_str().unwrap(),
             "--tls-key",

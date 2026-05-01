@@ -1424,7 +1424,7 @@ impl Application {
             let version = env!("CARGO_PKG_VERSION");
             #[cfg(not(test))]
             let informer = update_informer::new(registry::Crates, name, version)
-                .interval(Duration::from_secs(60 * 60 * 24))
+                .interval(Duration::from_hours(24))
                 .timeout(Duration::from_secs(5));
 
             #[cfg(test)]
@@ -1465,7 +1465,7 @@ impl Application {
         // https://github.com/tokio-rs/tokio/blob/e53b92a9939565edb33575fff296804279e5e419/tokio/src/time/instant.rs#L62
         self.idle_timer
             .as_mut()
-            .reset(Instant::now() + Duration::from_secs(86400 * 365 * 30));
+            .reset(Instant::now() + Duration::from_hours(24 * 365 * 30));
     }
 
     pub fn reset_idle_timer(&mut self) {

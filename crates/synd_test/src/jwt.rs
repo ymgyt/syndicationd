@@ -29,7 +29,7 @@ pub(super) fn google_test_jwt() -> String {
         email: TEST_EMAIL.to_owned(),
         email_verified: true,
         iat: Utc::now().timestamp(),
-        exp: Utc::now().add(Duration::from_secs(60 * 60)).timestamp(),
+        exp: Utc::now().add(Duration::from_hours(1)).timestamp(),
     };
 
     jsonwebtoken::encode(&header, &claims, &encoding_key).unwrap()
@@ -46,10 +46,10 @@ pub fn google_expired_jwt() -> (String, DateTime<Utc>) {
     };
     let encoding_key =
         jsonwebtoken::EncodingKey::from_ec_pem(private_key_buff().as_slice()).unwrap();
-    let iat = Utc::now().sub(Duration::from_secs(60 * 60 * 24));
+    let iat = Utc::now().sub(Duration::from_hours(24));
     let exp = Utc::now()
-        .sub(Duration::from_secs(60 * 60 * 24))
-        .add(Duration::from_secs(60 * 60));
+        .sub(Duration::from_hours(24))
+        .add(Duration::from_hours(1));
     let claims = jwt::google::Claims {
         iss: "https://accounts.google.com".into(),
         azp: DUMMY_GOOGLE_CLIENT_ID.to_owned(),
