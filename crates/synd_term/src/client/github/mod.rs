@@ -22,6 +22,8 @@ pub enum GithubError {
     NotFound(String),
     #[error("graphql: {0:?}")]
     Graphql(Vec<graphql_client::Error>),
+    #[error("unexpected github graphql response")]
+    UnexpectedResponse,
     #[error("github api error: {0}")]
     Api(Box<octocrab::Error>),
 }
@@ -184,7 +186,7 @@ impl GithubClient {
             ..
         }: NotificationContext<IssueId>,
     ) -> Result<IssueContext, GithubError> {
-        let response: octocrab::Result<graphql_client::Response<issue_query::ResponseData>> = self
+        let response: octocrab::Result<issue_query::ResponseData> = self
             .client
             .graphql(&IssueQuery::build_query(issue_query::Variables {
                 repository_owner: owner,
@@ -194,14 +196,10 @@ impl GithubClient {
             .await;
 
         match response {
-            Ok(response) => match (response.data, response.errors) {
-                (_, Some(errors)) => {
-                    tracing::error!("{errors:?}");
-                    Err(err::handle_gql_error(errors))
-                }
-                (Some(data), _) => Ok(IssueContext::from(data)),
-                _ => unreachable!(),
-            },
+            Ok(data) => IssueContext::try_from(data).map_err(|error| {
+                tracing::error!(%error, "failed to decode github issue response");
+                err::handle_decode_error(error)
+            }),
             Err(error) => Err(GithubError::from(error)),
         }
     }
@@ -225,48 +223,41 @@ impl GithubClient {
             ..
         }: NotificationContext<PullRequestId>,
     ) -> Result<PullRequestContext, GithubError> {
-        let response: octocrab::Result<graphql_client::Response<pull_request_query::ResponseData>> =
-            self.client
-                .graphql(&PullRequestQuery::build_query(
-                    pull_request_query::Variables {
-                        repository_owner: owner,
-                        repository_name: name,
-                        pull_request_number: id.into_inner(),
-                    },
-                ))
-                .await;
+        let response: octocrab::Result<pull_request_query::ResponseData> = self
+            .client
+            .graphql(&PullRequestQuery::build_query(
+                pull_request_query::Variables {
+                    repository_owner: owner,
+                    repository_name: name,
+                    pull_request_number: id.into_inner(),
+                },
+            ))
+            .await;
 
         match response {
-            Ok(response) => match (response.data, response.errors) {
-                (_, Some(errors)) => {
-                    tracing::error!("{errors:?}");
-                    Err(err::handle_gql_error(errors))
-                }
-                (Some(data), _) => Ok(PullRequestContext::from(data)),
-                _ => unreachable!(),
-            },
+            Ok(data) => PullRequestContext::try_from(data).map_err(|error| {
+                tracing::error!(%error, "failed to decode github pull request response");
+                err::handle_decode_error(error)
+            }),
             Err(error) => Err(GithubError::from(error)),
         }
     }
 }
 
 mod err {
-    use graphql_client::PathFragment;
+    use crate::{client::github::GithubError, types::github::SubjectContextDecodeError};
 
-    use crate::client::github::GithubError;
-
-    pub(super) fn handle_gql_error(mut errors: Vec<graphql_client::Error>) -> GithubError {
-        if errors.len() == 1 && is_repository_not_found(&errors[0]) {
-            return GithubError::NotFound(errors.swap_remove(0).message);
+    pub(super) fn handle_decode_error(error: SubjectContextDecodeError) -> GithubError {
+        match error {
+            SubjectContextDecodeError::RepositoryNotFound => {
+                GithubError::NotFound("repository not found in graphql response".to_owned())
+            }
+            SubjectContextDecodeError::IssueNotFound => {
+                GithubError::NotFound("issue not found in graphql response".to_owned())
+            }
+            SubjectContextDecodeError::PullRequestNotFound => {
+                GithubError::NotFound("pull request not found in graphql response".to_owned())
+            }
         }
-        GithubError::from(errors)
-    }
-
-    pub(super) fn is_repository_not_found(err: &graphql_client::Error) -> bool {
-        err.message.starts_with("Could not resolve to a Repository")
-            && err.path.as_ref().is_some_and(|p| {
-                p.iter()
-                    .any(|p| matches!(p, PathFragment::Key(key) if key == "repository"))
-            })
     }
 }

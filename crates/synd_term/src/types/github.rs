@@ -213,6 +213,23 @@ impl From<models::activity::Notification> for Notification {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum SubjectContextDecodeError {
+    RepositoryNotFound,
+    IssueNotFound,
+    PullRequestNotFound,
+}
+
+impl Display for SubjectContextDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SubjectContextDecodeError::RepositoryNotFound => f.write_str("repository not found"),
+            SubjectContextDecodeError::IssueNotFound => f.write_str("issue not found"),
+            SubjectContextDecodeError::PullRequestNotFound => f.write_str("pull request not found"),
+        }
+    }
+}
+
 impl Notification {
     pub(crate) fn subject_type(&self) -> Option<SubjectType> {
         self.subject_type
@@ -488,11 +505,13 @@ pub(crate) struct IssueContext {
     labels: Vec<Label>,
 }
 
-impl From<issue_query::ResponseData> for IssueContext {
-    fn from(data: issue_query::ResponseData) -> Self {
+impl TryFrom<issue_query::ResponseData> for IssueContext {
+    type Error = SubjectContextDecodeError;
+
+    fn try_from(data: issue_query::ResponseData) -> Result<Self, Self::Error> {
         let repo = data
             .repository
-            .expect("ResponseData does not have repository");
+            .ok_or(SubjectContextDecodeError::RepositoryNotFound)?;
         let topics: Vec<String> = repo
             .repository_topics
             .nodes
@@ -500,7 +519,7 @@ impl From<issue_query::ResponseData> for IssueContext {
             .into_iter()
             .filter_map(|node| node.map(|node| node.topic.name))
             .collect();
-        let issue = repo.issue.expect("ResponseData does not have issue");
+        let issue = repo.issue.ok_or(SubjectContextDecodeError::IssueNotFound)?;
         let author: Option<String> = issue.author.map(|author| author.login);
         let state = match issue.state {
             issue_query::IssueState::OPEN | issue_query::IssueState::Other(_) => IssueState::Open,
@@ -537,7 +556,7 @@ impl From<issue_query::ResponseData> for IssueContext {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             author,
             topics,
             state,
@@ -545,7 +564,7 @@ impl From<issue_query::ResponseData> for IssueContext {
             body,
             last_comment,
             labels,
-        }
+        })
     }
 }
 
@@ -568,12 +587,13 @@ pub(crate) struct PullRequestContext {
     labels: Vec<Label>,
 }
 
-impl From<pull_request_query::ResponseData> for PullRequestContext {
-    fn from(data: pull_request_query::ResponseData) -> Self {
+impl TryFrom<pull_request_query::ResponseData> for PullRequestContext {
+    type Error = SubjectContextDecodeError;
+
+    fn try_from(data: pull_request_query::ResponseData) -> Result<Self, Self::Error> {
         let repo = data
             .repository
-            .expect("ResponseData does not have repository");
-
+            .ok_or(SubjectContextDecodeError::RepositoryNotFound)?;
         let topics: Vec<String> = repo
             .repository_topics
             .nodes
@@ -584,7 +604,7 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
 
         let pr = repo
             .pull_request
-            .expect("ResponseData does not have pull request");
+            .ok_or(SubjectContextDecodeError::PullRequestNotFound)?;
         let author: Option<String> = pr.author.map(|author| author.login);
         let state = match pr.state {
             pull_request_query::PullRequestState::OPEN
@@ -618,7 +638,7 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
             })
             .collect();
 
-        Self {
+        Ok(Self {
             author,
             topics,
             state,
@@ -626,7 +646,7 @@ impl From<pull_request_query::ResponseData> for PullRequestContext {
             body,
             last_comment,
             labels,
-        }
+        })
     }
 }
 
