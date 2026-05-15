@@ -12,7 +12,7 @@ use crate::{
     cli::{self, CacheOptions, TlsOptions},
     config,
     monitor::Monitors,
-    repository::sqlite::DbPool,
+    repository::sqlite::SqliteSubscriptionRepository,
     serve::{ServeOptions, auth::Authenticator},
     usecase::{MakeUsecase, Runtime, authorize::Authorizer},
 };
@@ -27,7 +27,7 @@ pub struct Dependency {
 
 impl Dependency {
     pub async fn new(
-        db: DbPool,
+        db: SqliteSubscriptionRepository,
         tls: TlsOptions,
         serve_options: cli::ServeOptions,
         cache: CacheOptions,

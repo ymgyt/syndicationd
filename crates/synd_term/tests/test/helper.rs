@@ -8,7 +8,7 @@ use synd_api::{
     cli::{CacheOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
-    repository::{SubscriptionRepository, sqlite::DbPool, types::FeedSubscription},
+    repository::{FeedSubscription, SubscriptionRepository, sqlite::SqliteSubscriptionRepository},
     shutdown::Shutdown,
 };
 use synd_auth::{
@@ -266,7 +266,10 @@ pub async fn serve_api(
     kvsd_root_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let db = {
-        let db = DbPool::connect(kvsd_root_dir.join(format!("{kvsd_port}_synd.db"))).await?;
+        let db = SqliteSubscriptionRepository::create_or_open(
+            kvsd_root_dir.join(format!("{kvsd_port}_synd.db")),
+        )
+        .await?;
         db.migrate().await?;
 
         if api_port == 6031 {

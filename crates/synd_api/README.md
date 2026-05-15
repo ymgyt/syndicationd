@@ -32,10 +32,7 @@ Following metrics are exported
 | `--timeout`             | Request timeout                                | `30s`                      |
 | `--body-limit-bytes`    | Request body limit                             | `2048`                     |
 | `--concurrency-limit`   | Request concurrency limit                      | `100`                      |
-| `--kvsd-host`           | Kvsd host                                      | `192.168.10.151`           |
-| `--kvsd-port`           | Kvsd port                                      | `7379`                     |
-| `--kvsd-username`       | Kvsd username                                  | `ferris`                   |
-| `--kvsd-password`       | Kvsd password                                  | `secret`                   |
+| `--sqlite-db`           | Sqlite database path                           | `/path/to/synd.db`         |
 | `--tls-cert`            | Tls certificate path                           | `/path/to/certificate.pem` |
 | `--tls-key`             | Tls private key path                           | `/path/to/secret.pem`      | 
 | `--show-code-location`  | Show code location(foo.rs:10) in signals(logs) | `false`                    |

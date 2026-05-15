@@ -5,7 +5,7 @@ use synd_o11y::metric;
 
 use crate::{
     principal::Principal,
-    repository::{self, SubscriptionRepository},
+    repository::{FeedSubscription, SubscriptionRepository},
     usecase::{Input, Output},
 };
 
@@ -53,7 +53,7 @@ impl Usecase for UnsubscribeFeed {
         tracing::debug!("Unsubscribe feed: {url}");
 
         self.repository
-            .delete_feed_subscription(repository::types::FeedSubscription {
+            .delete_feed_subscription(FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url,
                 requirement: None,

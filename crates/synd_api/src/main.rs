@@ -11,7 +11,7 @@ use synd_api::{
     cli::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
-    repository::{kvsd::ConnectKvsdFailed, sqlite::DbPool},
+    repository::sqlite::SqliteSubscriptionRepository,
     serve::listen_and_serve,
     shutdown::Shutdown,
 };
@@ -47,7 +47,7 @@ async fn run(
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
-    let db = DbPool::connect(sqlite.sqlite_db).await?;
+    let db = SqliteSubscriptionRepository::create_or_open(sqlite.sqlite_db).await?;
     db.migrate().await?;
     let dep = Dependency::new(db, tls, serve, cache.clone(), shutdown.cancellation_token()).await?;
 
@@ -94,11 +94,7 @@ async fn main() {
     init_file_descriptor_limit();
 
     if let Err(err) = run(args, shutdown).await {
-        if let Some(err) = err.downcast_ref::<ConnectKvsdFailed>() {
-            error!("{err}: make sure kvsd is running");
-        } else {
-            error!("{err:?}");
-        }
+        error!("{err:?}");
         std::process::exit(1);
     }
 }

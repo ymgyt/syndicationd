@@ -5427,7 +5427,6 @@ dependencies = [
  "futures-util",
  "graphql_client",
  "insta",
- "kvsd",
  "moka",
  "pin-project",
  "reqwest",

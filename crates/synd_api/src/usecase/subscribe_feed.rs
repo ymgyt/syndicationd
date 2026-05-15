@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     principal::Principal,
-    repository::{self, SubscriptionRepository},
+    repository::{FeedSubscription, SubscriptionRepository},
     usecase::{Input, Output},
 };
 
@@ -82,7 +82,7 @@ impl Usecase for SubscribeFeed {
         tracing::debug!("{:?}", feed.meta());
 
         self.repository
-            .put_feed_subscription(repository::types::FeedSubscription {
+            .put_feed_subscription(FeedSubscription {
                 user_id: principal.user_id().unwrap().to_owned(),
                 url: feed.meta().url().to_owned(),
                 requirement,

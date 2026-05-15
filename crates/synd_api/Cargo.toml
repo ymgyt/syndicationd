@@ -29,12 +29,11 @@ async-trait        = { workspace = true }
 axum               = { workspace = true, features = ["json"] }
 axum-server        = { workspace = true }
 chrono             = { workspace = true }
-clap               = { workspace = true, features = ["derive", "env"] }
+clap               = { workspace = true, features = ["derive", "env", "std"] }
 fdlimit            = { workspace = true }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
-kvsd               = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
 pin-project        = "1.1.11"
 reqwest            = { workspace = true }
@@ -43,7 +42,7 @@ serde              = { workspace = true }
 serde_json         = "1.0.149"
 sqlx               = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
 thiserror          = { workspace = true }
-tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
+tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "signal", "sync"] }
 tokio-metrics      = { version = "0.5.0", default-features = false, features = ["rt"] }
 tokio-util         = { workspace = true }
 tower              = { version = "0.5.3", default-features = false, features = ["limit", "timeout"] }

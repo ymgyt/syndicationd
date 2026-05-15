@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::{
     principal::Principal,
-    repository::{SubscriptionRepository, types::SubscribedFeeds},
+    repository::{SubscribedFeeds, SubscriptionRepository},
     usecase::{Error, Input, MakeUsecase, Output, Usecase, authorize::Unauthorized},
 };
 
