@@ -165,7 +165,8 @@ mod tests {
             })
         );
         assert_eq!(f2_span.events.len(), 1);
-        assert_eq!(f2_span.attributes.len(), 7);
+        assert!(f2_span.attributes.iter().any(|attr| attr.key == "target"));
+        assert_eq!(f2_span.attributes.len(), 8);
     }
 
     fn resource() -> Resource {
