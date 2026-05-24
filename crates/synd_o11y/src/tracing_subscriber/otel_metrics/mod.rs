@@ -114,7 +114,7 @@ mod tests {
         metrics::v1::{AggregationTemporality, metric::Data, number_data_point::Value},
     };
     use tokio::sync::mpsc::UnboundedSender;
-    use tonic::transport::Server;
+    use tonic::transport::{Server, server::TcpIncoming};
     use tracing::dispatcher;
     use tracing_subscriber::{Registry, layer::SubscriberExt};
 
@@ -152,19 +152,22 @@ mod tests {
     async fn layer_test() {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
         let dump = MetricsServiceServer::new(DumpMetrics { tx });
-        let addr: SocketAddr = ([127, 0, 0, 1], 48101).into();
-        let server = Server::builder().add_service(dump).serve(addr);
+        let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
+        let incoming = TcpIncoming::bind(addr).unwrap();
+        let endpoint = format!("https://{}", incoming.local_addr().unwrap());
+        let server = Server::builder()
+            .add_service(dump)
+            .serve_with_incoming(incoming);
         let _server = tokio::task::spawn(server);
         let resource = resource();
-        // The default interval is 60 seconds, which slows down the test
-        let interval = Duration::from_millis(100);
-        let (layer, _provider) = layer("https://localhost:48101", resource.clone(), interval);
+        let (layer, provider) = layer(endpoint, resource.clone(), Duration::from_secs(60));
         let subscriber = Registry::default().with(layer);
         let dispatcher = tracing::Dispatch::new(subscriber);
 
         dispatcher::with_default(&dispatcher, || {
             f1();
         });
+        provider.force_flush().unwrap();
 
         let req = rx.recv().await.unwrap().into_inner();
         assert_eq!(req.resource_metrics.len(), 1);
@@ -201,6 +204,7 @@ mod tests {
         dispatcher::with_default(&dispatcher, || {
             f2();
         });
+        provider.force_flush().unwrap();
         let req = rx.recv().await.unwrap().into_inner();
         insta::with_settings!({
             description => "graphql duration histogram metrics",
