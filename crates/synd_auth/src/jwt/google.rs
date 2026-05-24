@@ -6,7 +6,10 @@ use std::{
 };
 
 use chrono::{DateTime, TimeZone, Utc};
-use jsonwebtoken::{Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{
+    Algorithm, DecodingKey, Validation,
+    errors::{ErrorKind, new_error},
+};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -140,20 +143,21 @@ impl JwtService {
         id_token: &str,
         validate_exp: bool,
     ) -> Result<Claims, JwtError> {
-        let decoding_key = DecodingKey::from_secret(&[]);
-        let validation = {
-            let mut v = Validation::default();
-            v.insecure_disable_signature_validation();
-            v.set_audience(&[self.client_id.as_ref()]);
-            v.set_issuer(Self::ISSUERS);
-            v.set_required_spec_claims(&["exp"]);
-            v.validate_exp = validate_exp;
-            v
-        };
+        let claims = jsonwebtoken::dangerous::insecure_decode::<Claims>(id_token)
+            .map_err(JwtError::Decode)?
+            .claims;
 
-        jsonwebtoken::decode(id_token, &decoding_key, &validation)
-            .map_err(JwtError::Decode)
-            .map(|data| data.claims)
+        if claims.aud != self.client_id.as_ref() {
+            return Err(JwtError::Decode(new_error(ErrorKind::InvalidAudience)));
+        }
+        if !Self::ISSUERS.contains(&claims.iss.as_str()) {
+            return Err(JwtError::Decode(new_error(ErrorKind::InvalidIssuer)));
+        }
+        if validate_exp && claims.exp <= Utc::now().timestamp() {
+            return Err(JwtError::Decode(new_error(ErrorKind::ExpiredSignature)));
+        }
+
+        Ok(claims)
     }
 
     async fn lookup_decoding_pem(
