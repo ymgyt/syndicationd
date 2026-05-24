@@ -23,10 +23,13 @@
 [coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
 
-Syndicationd is a project for simple feed management on the terminal, and the following components are beging developed
+Syndicationd is a project for simple feed management on the terminal, and the following components are being developed
 
 * synd-term(`synd`): A TUI feed viewer based on [ratatui](https://github.com/ratatui-org/ratatui)
-* synd-api: A GraphQL api server utilizing [feed-rs](https://github.com/feed-rs/feed-rs) 
+* synd-api: A GraphQL API server utilizing [feed-rs](https://github.com/feed-rs/feed-rs)
+
+> [!IMPORTANT]
+> This README describes the current `main` branch. Local mode is being prepared as the default for the next release, but the latest published release may still default to the hosted remote API and require login for feed operations.
 
 **Table of Contents:**
 
@@ -35,7 +38,6 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
 - [Overview](#overview)
 - [Configuration](#configuration)
 - [Usage](#usage)
-  - [Authentication](#authentication)
   - [Keymap](#keymap)
   - [Subscribe Feed](#subscribe-feed)
   - [Open Feed Entry](#open-feed-entry)
@@ -85,7 +87,7 @@ brew install ymgyt/homebrew-syndicationd/synd-term
 ### shell
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2/synd-term-installer.sh | sh
 ```
 
 ### cargo
@@ -103,7 +105,7 @@ npm install @syndicationd/synd-term
 ### powershell
 
 ```sh
-powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2
+powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2/synd-term-installer.ps1 | iex"
 ```
 
 ### docker
@@ -112,7 +114,7 @@ powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-
 docker run -it ghcr.io/ymgyt/synd-term
 ```
 
-### pre-build binaries
+### pre-built binaries
 
 Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/syndicationd/releases).
 
@@ -123,6 +125,8 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 ```
 
+Use the source install to try the current `main` branch behavior before the next local-mode release.
+
 > [!NOTE]
 > `synd` requires [Nerd Fonts](https://www.nerdfonts.com/) to be installed on your system for rendering icons.
 
@@ -130,9 +134,11 @@ cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 
 ![Overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/overview.svg)
 
-The subscribed feeds are stored in synd-api. synd-api periodically fetches the feeds to retrieve the latest entries.  
-When the user views the feed list in synd, it retrieves the latest entries from synd-api's cache.   
-This project hosts the synd-api, but it can also be self-hosted.
+By default, `synd` runs an in-process `synd-api` and stores subscriptions in a local SQLite database. This keeps the TUI and CLI commands on the same API path while avoiding a hosted service requirement for normal feed management.
+
+When the user views the feed list, `synd` asks the local API for subscriptions and feed entries. The same local API path is used by `synd check`, `synd export`, and `synd import`.
+
+Remote API mode is still available for externally managed or self-hosted deployments by using `--backend remote --endpoint <URL>`.
 
 ## Configuration
 
@@ -167,17 +173,20 @@ synd config init > config.toml
 | `--log`            | `SYND_LOG_FILE`          | `[log.path]`             | see `synd check`                    | Log file path                                       |
 | `--cache-dir`      | `SYND_CACHE_DIR`         | `[cache.directory]`      | see `synd check`                    | Cache directory                                     |
 | `--theme`          | `SYND_THEME`             | `[theme.name]`           | `ferra`                             | Theme name                                          |
-| `--endpoint`       | `SYND_ENDPOINT`          | `[api.endpoint]`         | `https://api.syndicationd.ymgyt.io` | synd-api endpoint                                   |
-| `--client-timeout` | `SYND_CLIENT_TIMEOUT`    | `[api.timeout]`          | `30s`                               | synd-api client timeout                             |
-| `--entries-limit`  | `SYND_ENTRIES_LIMIT`     | `[feed.entries_limit]`   | `200`                               | Feed entreis to fetch                               |
+| `--backend`        | `SYND_BACKEND`           | `[backend.mode]`         | `local`                             | Backend mode: `local` or `remote`                   |
+| `--local`          | `SYND_LOCAL`             | \-                       | `false`                             | Use local backend mode                              |
+| `--local-sqlite-db` | `SYND_LOCAL_SQLITE_DB`  | `[backend.sqlite_db]`    | see `synd check`                    | Local SQLite database path                          |
+| `--endpoint`       | `SYND_ENDPOINT`          | `[api.endpoint]`         | `https://api.syndicationd.ymgyt.io` | Remote synd-api endpoint                            |
+| `--client-timeout` | `SYND_CLIENT_TIMEOUT`    | `[api.timeout]`          | `30s`                               | API client timeout                                  |
+| `--entries-limit`  | `SYND_ENTRIES_LIMIT`     | `[feed.entries_limit]`   | `200`                               | Feed entries to fetch                               |
 | `--browser`        | `SYND_FEED_BROWSER`      | `[feed.browser.command]` | \-                                  | Command to browse feed                              |
 | `--browser-args`   | `SYND_FEED_BROWSER_ARGS` | `[feed.browser.args]`    | `[]`                                | Command args to browse feed                         |
 | `--enable-gh`      | `SYND_ENABLE_GH`         | `[github.enable]`        | `false`                             | Enable github notification feature                  |
-| `--github-pat`     | `SYND_GH_PAT`            | `[github.pat]`           | \-                                  | Github personal access token to fetch notifications |
+| `--github-pat`     | `SYND_GH_PAT`            | `[github.pat]`           | \-                                  | GitHub personal access token to fetch notifications |
 
 ### Additional categories
 
-To add a category , add the following content to the configuration file
+To add a category, add the following content to the configuration file
 
 ```toml
 [categories.rust]
@@ -207,7 +216,8 @@ Options:
   -c, --config <CONFIG>        Configuration file path [env: SYND_CONFIG_FILE=]
       --log <LOG>              Log file path [env: SYND_LOG_FILE=]
       --cache-dir <CACHE_DIR>  Cache directory [env: SYND_CACHE_DIR=]
-      --theme <THEME>          Color theme [env: SYND_THEME=] [possible values: ferra, solarized-dark, helix]
+      --theme <THEME>          Color theme [env: SYND_THEME=] [possible values: dracula, eldritch,
+                               ferra, solarized-dark, helix]
   -h, --help                   Print help
   -V, --version                Print version
 
@@ -215,40 +225,28 @@ Api options:
       --endpoint <ENDPOINT>              `synd_api` endpoint [env: SYND_ENDPOINT=]
       --client-timeout <CLIENT_TIMEOUT>  Client timeout(ex. 30s) [env: SYND_CLIENT_TIMEOUT=]
 
+Backend options:
+      --backend <MODE>               Backend mode [env: SYND_BACKEND=] [possible values: remote,
+                                     local]
+      --local                        Use the in-process local API [env: SYND_LOCAL=]
+      --local-sqlite-db <SQLITE_DB>  Local SQLite database path [env: SYND_LOCAL_SQLITE_DB=]
+
 Feed options:
       --entries-limit <ENTRIES_LIMIT>  Feed entries limit to fetch [env: SYND_ENTRIES_LIMIT=]
       --browser <BROWSER>              Browser command to open feed entry [env: SYND_BROWSER=]
-      --browser-args <BROWSER_ARGS>    Args for launching the browser command [env: SYND_BROWSER_ARGS=]
+      --browser-args <BROWSER_ARGS>    Args for launching the browser command [env:
+                                       SYND_BROWSER_ARGS=]
 
 GitHub options:
   -G, --enable-github-notification <ENABLE_GITHUB_NOTIFICATION>
-          Enable GitHub notification feature [env: SYND_ENABLE_GH=] [aliases: enable-gh] [possible values: true, false]
+          Enable GitHub notification feature [env: SYND_ENABLE_GH=] [aliases: --enable-gh] [possible
+          values: true, false]
       --github-pat <GITHUB_PAT>
           GitHub personal access token to fetch notifications [env: SYND_GH_PAT]
 
 ```
 
 </details>
-
-### Authentication
-
-![Authentication overview](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/authentication.svg)
-
-Syndicationd maintains state (such as subscribed feeds) on the backend, and therefore requires authentication to make requests.  
-Currently, GitHub and Google are supported as authorize server/id provider.   
-The only scope required by syndicationd to authenticate users is the email address. please refer to the table below for details on the scopes for each provider.    
-
-| IdP/AuthServer | Scope                                                                                                            |
-| ---            | ---                                                                                                              |
-| GitHub         | [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)             |
-| Google         | [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url) | 
-
-> [!IMPORTANT]
-> **The user's email address is used only as an identifier after being hashed and never stored**.   
-
-for more info, please refer to the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html)  
-
-If you'd like support for additional ID providers, please feel free to request it.
 
 ### Keymap
 
@@ -264,8 +262,8 @@ If you'd like support for additional ID providers, please feel free to request i
 | `e`     | Edit subscribed feed(on Feeds Tab)            |
 | `d`     | Delete subscribed feed(on Feeds Tab)          |
 | `r`     | Reload entries/feeds                          |
-| `h/l`   | Change requirement filiter                    |
-| `c`     | Activate category filiter(Esc to deactivate)  |
+| `h/l`   | Change requirement filter                     |
+| `c`     | Activate category filter(Esc to deactivate)   |
 | `+`     | Activate all category(on Category filter)     |
 | `-`     | Deactivate all category(on Category filter)   |
 | `/`     | Activate keyword search(Esc to deactivate)    |
@@ -289,7 +287,7 @@ To subscribe a feed, type "Tab" to move to Feeds tab and then press "a".
 The feed to subscribe to should be entered in the format:  
 `Requirement` `Category` `URL`  
 
-When you close the editor, the subscription request is sent to the API.
+When you close the editor, the subscription request is sent to the selected backend API. In the default local mode this is the in-process API backed by the local SQLite database.
 
 #### Requirement
 
@@ -324,7 +322,7 @@ If you set the filter to `MUST`, only those marked as MUST will be displayed. Se
 
 #### By categories
 
-To filter bases on categories, presess "c". This will display a label with keys to control the activation/deactivation of each category, allowing you to toggle the visibility of categories.  
+To filter bases on categories, press "c". This will display a label with keys to control the activation/deactivation of each category, allowing you to toggle the visibility of categories.  
 Pressing "-" will deactivate all categories, and pressing "+" will activate all categories.  
 
 You can exit the filter category mode by pressing the "Esc" key.  
@@ -339,8 +337,14 @@ The command is executed as `$SYND_BROWSER $SYND_BROWSER_ARGS <entry url>`.
 
 ### Export subscribed feeds
 
-To export subscribed feeds, execute the `synd export` command.  
-You can check the JSON schema of the data to be exported with `synd export --print-schema`
+To export subscribed feeds from the selected backend, execute the `synd export` command. By default this exports from the local SQLite database through the in-process API.
+
+```sh
+synd export > feeds.json
+synd --backend remote --endpoint https://api.example.com export > feeds.json
+```
+
+You can check the JSON schema of the data to be exported with `synd export --print-schema`.
 
 <details>
 <summary>Click to show a export json schema</summary>
@@ -362,12 +366,35 @@ You can check the JSON schema of the data to be exported with `synd export --pri
     }
   },
   "definitions": {
+    "Category": {
+      "type": "string"
+    },
     "ExportedFeed": {
       "type": "object",
       "required": [
         "url"
       ],
       "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Category"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirement": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Requirement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "title": {
           "type": [
             "string",
@@ -375,9 +402,40 @@ You can check the JSON schema of the data to be exported with `synd export --pri
           ]
         },
         "url": {
-          "type": "string"
+          "$ref": "#/definitions/FeedUrl"
         }
       }
+    },
+    "FeedUrl": {
+      "description": "Feed Url which serve rss or atom",
+      "type": "string",
+      "format": "uri"
+    },
+    "Requirement": {
+      "description": "`Requirement` expresses how important the feed is using an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)",
+      "oneOf": [
+        {
+          "description": "`Must` indicates it must be read",
+          "type": "string",
+          "enum": [
+            "Must"
+          ]
+        },
+        {
+          "description": "`Should` suggests it should be read unless there is a special reason not to",
+          "type": "string",
+          "enum": [
+            "Should"
+          ]
+        },
+        {
+          "description": "`May` implies it is probably worth reading",
+          "type": "string",
+          "enum": [
+            "May"
+          ]
+        }
+      ]
     }
   }
 }
@@ -386,24 +444,28 @@ You can check the JSON schema of the data to be exported with `synd export --pri
 
 ### Import feeds
 
-You can subscribe to multiple feeds at once using the `synd import` command.  
-The input schema is the same as that of `synd export`. You can also check it with `synd import --print-schema`.  
+You can subscribe to multiple feeds at once using the `synd import` command. By default this imports into the local SQLite database through the in-process API.
+
+The input schema is the same as that of `synd export`. You can also check it with `synd import --print-schema`.
 
 ```sh
 # from stdin
-echo '{"feeds": [ {"url": "https://this-week-in-rust.org/atom.xml", "category": "rust", "requirement": "Must" } ]}' 
-| synd import -
+echo '{"feeds": [ {"url": "https://this-week-in-rust.org/atom.xml", "category": "rust", "requirement": "Must" } ]}' \
+  | synd import -
 
 # read from file
 synd export > feeds.json
 synd import feeds.json
+
+# import into a remote backend
+synd --backend remote --endpoint https://api.example.com import feeds.json
 ```
 
 ### GitHub Notifications
 
-<img alt="github notification screent shot" src="https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/ss/github_notification_ss.png" width="425"/> 
+<img alt="GitHub notification screenshot" src="https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/ss/github_notification_ss.png" width="425"/> 
 
-To enable GitHub notifications feature, specify the `--enable-github-notification | -G` flag or set the environment variable `SYND_ENABLE_GH=true`.  
+To enable the GitHub notifications feature, specify the `--enable-github-notification | -G` flag or set the environment variable `SYND_ENABLE_GH=true`.  
 When enabling the GitHub notifications feature, GitHub personal access token (PAT) is required. Specify the PAT using the `--github-pat` flag or the environment variable `SYND_GH_PAT`.  
 
 > [!TIP]
@@ -433,24 +495,60 @@ You can modify the [log directives](https://docs.rs/tracing-subscriber/latest/tr
 
 The theme can be changed using the `--theme` flag. Please refer to the help for the values that can be specified.
 
-### Backend api
+### Backend API
 
-By default, `synd` runs a local in-process [backend api](./crates/synd_api) and stores subscriptions in a local sqlite database.
+By default, `synd` runs a local in-process [backend API](./crates/synd_api) and stores subscriptions in a local SQLite database.
+
+The local database path can be set with `--local-sqlite-db`, `SYND_LOCAL_SQLITE_DB`, or `[backend.sqlite_db]`.
+
+```sh
+synd --local-sqlite-db ~/.local/share/syndicationd/synd.db
+synd --local-sqlite-db ~/.local/share/syndicationd/synd.db export
+synd --local-sqlite-db ~/.local/share/syndicationd/synd.db import feeds.json
+synd --local-sqlite-db ~/.local/share/syndicationd/synd.db check
+```
+
 Use `--backend remote --endpoint <URL>` to connect to an externally managed API.
+
+```sh
+synd --backend remote --endpoint https://api.example.com
+synd --backend remote --endpoint https://api.example.com export
+synd --backend remote --endpoint https://api.example.com import feeds.json
+synd --backend remote --endpoint https://api.example.com check
+```
+
+#### Remote Backend Authentication
+
+Local mode does not require authentication for feed management. Authentication is only used when
+connecting to a remote backend API.
+
+Remote backend authentication currently supports GitHub and Google. The only required scope is the
+email address, which is hashed and used as an identifier.
+
+| IdP/AuthServer | Scope                                                                                                            |
+| ---            | ---                                                                                                              |
+| GitHub         | [`user:email`](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)             |
+| Google         | [`email`](https://developers.google.com/identity/gsi/web/guides/devices#obtain_a_user_code_and_verification_url) |
+
+For more information, see the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html).
 
 ### Remove cache and logs
 
-Authentication credentials are cached. to remove them, execute `synd clean`.
+`synd clean` removes cache files and logs. In remote mode, authentication credentials are stored in the cache, so `synd clean` also removes the cached login state.
+
+`synd clean` does not remove the local SQLite database. Remove the file configured by `--local-sqlite-db` or `[backend.sqlite_db]` if you want to delete local subscriptions.
 
 ### Check application status
 
-`synd check [--format (human|json)]` return current application status.
+`synd check [--format (human|json)]` returns current application status. In local mode it starts the same in-process backend API used by the TUI, then checks its health.
 
 ```sh
 synd check
 
  Api Health: pass
-Api Version: 0.2.4
+Api Version: 0.2.6
+    Backend: local
+  SQLite DB: /home/ferris/.local/share/syndicationd/synd.db
      Config: /home/ferris/.config/syndicationd/config.toml
       Cache: /home/ferris/.cache/syndicationd
         Log: /home/ferris/.local/share/syndicationd/synd.log
