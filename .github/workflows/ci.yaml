@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: meta
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@v3
         # merge this PR if update is a semver patch 
       - if: ${{ steps.meta.outputs.update-type == 'version-update:semver-patch' }}
         run: |
