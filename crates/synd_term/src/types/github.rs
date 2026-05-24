@@ -215,17 +215,17 @@ impl From<models::activity::Notification> for Notification {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SubjectContextDecodeError {
-    RepositoryNotFound,
-    IssueNotFound,
-    PullRequestNotFound,
+    Repository,
+    Issue,
+    PullRequest,
 }
 
 impl Display for SubjectContextDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SubjectContextDecodeError::RepositoryNotFound => f.write_str("repository not found"),
-            SubjectContextDecodeError::IssueNotFound => f.write_str("issue not found"),
-            SubjectContextDecodeError::PullRequestNotFound => f.write_str("pull request not found"),
+            SubjectContextDecodeError::Repository => f.write_str("repository not found"),
+            SubjectContextDecodeError::Issue => f.write_str("issue not found"),
+            SubjectContextDecodeError::PullRequest => f.write_str("pull request not found"),
         }
     }
 }
@@ -511,7 +511,7 @@ impl TryFrom<issue_query::ResponseData> for IssueContext {
     fn try_from(data: issue_query::ResponseData) -> Result<Self, Self::Error> {
         let repo = data
             .repository
-            .ok_or(SubjectContextDecodeError::RepositoryNotFound)?;
+            .ok_or(SubjectContextDecodeError::Repository)?;
         let topics: Vec<String> = repo
             .repository_topics
             .nodes
@@ -519,7 +519,7 @@ impl TryFrom<issue_query::ResponseData> for IssueContext {
             .into_iter()
             .filter_map(|node| node.map(|node| node.topic.name))
             .collect();
-        let issue = repo.issue.ok_or(SubjectContextDecodeError::IssueNotFound)?;
+        let issue = repo.issue.ok_or(SubjectContextDecodeError::Issue)?;
         let author: Option<String> = issue.author.map(|author| author.login);
         let state = match issue.state {
             issue_query::IssueState::OPEN | issue_query::IssueState::Other(_) => IssueState::Open,
@@ -593,7 +593,7 @@ impl TryFrom<pull_request_query::ResponseData> for PullRequestContext {
     fn try_from(data: pull_request_query::ResponseData) -> Result<Self, Self::Error> {
         let repo = data
             .repository
-            .ok_or(SubjectContextDecodeError::RepositoryNotFound)?;
+            .ok_or(SubjectContextDecodeError::Repository)?;
         let topics: Vec<String> = repo
             .repository_topics
             .nodes
@@ -604,7 +604,7 @@ impl TryFrom<pull_request_query::ResponseData> for PullRequestContext {
 
         let pr = repo
             .pull_request
-            .ok_or(SubjectContextDecodeError::PullRequestNotFound)?;
+            .ok_or(SubjectContextDecodeError::PullRequest)?;
         let author: Option<String> = pr.author.map(|author| author.login);
         let state = match pr.state {
             pull_request_query::PullRequestState::OPEN

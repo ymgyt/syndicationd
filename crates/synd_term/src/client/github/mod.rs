@@ -249,13 +249,13 @@ mod err {
 
     pub(super) fn handle_decode_error(error: SubjectContextDecodeError) -> GithubError {
         match error {
-            SubjectContextDecodeError::RepositoryNotFound => {
+            SubjectContextDecodeError::Repository => {
                 GithubError::NotFound("repository not found in graphql response".to_owned())
             }
-            SubjectContextDecodeError::IssueNotFound => {
+            SubjectContextDecodeError::Issue => {
                 GithubError::NotFound("issue not found in graphql response".to_owned())
             }
-            SubjectContextDecodeError::PullRequestNotFound => {
+            SubjectContextDecodeError::PullRequest => {
                 GithubError::NotFound("pull request not found in graphql response".to_owned())
             }
         }
