@@ -1,6 +1,5 @@
 set shell := ["nu", "-c"]
 
-mod bpf 'etc/just/bpf.just'
 mod dep 'etc/just/dep.just'
 mod doc 'etc/just/doc.just'
 mod dot 'etc/just/dot.just'

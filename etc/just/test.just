@@ -35,7 +35,7 @@ review:
 coverage *flags:
     nix run nixpkgs#cargo-llvm-cov -- llvm-cov nextest \
         --all-features --open \
-        --ignore-filename-regex '(generated/.*.rs|crates/ebpf/.*)' \
+        --ignore-filename-regex '(generated/.*.rs)' \
         {{ flags }}
 
 [macos]

@@ -37,8 +37,3 @@ term-local *flags:
 [no-cd]
 @otelcol config:
     otelcontribcol --config=file:etc/dev/otelcol/{{ config }}.yaml
-
-# Run backends
-[no-cd]
-backend:
-    zellij action new-tab --layout etc/dev/backend_layout.kdl

@@ -16,7 +16,6 @@ digraph {
     feed [ label="synd_feed" ]
     test [ label="synd_test" ]
 
-    kvsd [ label="synd_kvsd", shape="box" ]
     term [ label="synd_term", shape="box" ]
     api  [ label="synd_api", shape="box" ]
 
@@ -33,9 +32,6 @@ digraph {
     api  -> auth
     api  -> feed
     api  -> test [ style="dotted" ]
-
-    kvsd -> stdx [ headport="s" ]
-    kvsd -> o11y
 
     test -> auth
 }
