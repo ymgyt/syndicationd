@@ -655,7 +655,11 @@ mod test {
 
         check_command_test(test_case.synd_api_port);
         export_command_test(test_case.synd_api_port, &test_case.cache_dir);
-        term_command_test(&test_case.cache_dir, &test_case.log_path);
+        term_command_test(
+            test_case.synd_api_port,
+            &test_case.cache_dir,
+            &test_case.log_path,
+        );
         // Exec clean last
         clean_command_test(&test_case.cache_dir);
 
@@ -663,10 +667,11 @@ mod test {
     }
 
     fn check_command_test(api_port: u16) {
-        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args([
+            "--backend",
+            "remote",
             "check",
             "--endpoint",
             &format!("https://localhost:{api_port}"),
@@ -678,10 +683,11 @@ mod test {
     }
 
     fn export_command_test(api_port: u16, cache_dir: &Path) {
-        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args([
+            "--backend",
+            "remote",
             "export",
             "--endpoint",
             &format!("https://localhost:{api_port}"),
@@ -695,7 +701,6 @@ mod test {
     }
 
     fn clean_command_test(cache_dir: &Path) {
-        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         cmd.args(["clean", "--cache-dir", &cache_dir.display().to_string()])
@@ -703,12 +708,15 @@ mod test {
             .success();
     }
 
-    fn term_command_test(cache_dir: &Path, log_path: &Path) {
-        #[expect(deprecated)]
+    fn term_command_test(api_port: u16, cache_dir: &Path, log_path: &Path) {
         let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
 
         // Nix do not allow to create log file in user directory
         cmd.args([
+            "--backend",
+            "remote",
+            "--endpoint",
+            &format!("https://localhost:{api_port}"),
             "--dry-run",
             "--cache-dir",
             &cache_dir.display().to_string(),

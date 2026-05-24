@@ -101,15 +101,15 @@ pub static INIT_CONFIG: &str = r#"
 # name = "ferra"
 
 [api]
-# Backend api endpoint
-# endpoint = "https://api.syndicationd.ymgyt.io"
+# Remote backend api endpoint
+# endpoint = "https://api.example.com"
 
 # Client timeout duration 
 # timeout = "30s"
 
 [backend]
 # Backend mode: remote | local
-# mode = "remote"
+# mode = "local"
 
 # Local sqlite database path
 # sqlite_db = "path/to/synd.db"

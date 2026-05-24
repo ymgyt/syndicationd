@@ -271,7 +271,7 @@ impl ConfigResolverBuilder {
                         .and_then(|cache| cache.directory.take()),
                 )
                 .with_flag(cache_dir_flag),
-            backend_mode: Entry::with_default(BackendMode::Remote)
+            backend_mode: Entry::with_default(BackendMode::Local)
                 .with_file(
                     config_file
                         .as_mut()

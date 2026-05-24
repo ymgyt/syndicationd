@@ -16,7 +16,6 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn api_command_test() -> anyhow::Result<()> {
         ensure_init();
-        #[expect(deprecated)]
         let mut cmd = assert_cmd::Command::cargo_bin("synd-api").unwrap();
 
         cmd.args([
