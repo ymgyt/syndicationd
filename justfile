@@ -20,8 +20,6 @@ mod oranda 'etc/just/oranda.just'
 mod graphql 'etc/just/graphql.just'
 mod license 'etc/just/license.just'
 
-mod tf 'hosting/terraform'
-
 # List recipe
 default:
     just --list --list-submodules

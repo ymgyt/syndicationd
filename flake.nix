@@ -32,12 +32,8 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        config = {
-          # terraform has an unfree license (‘bsl11’)
-          allowUnfreePredicate = pkg: builtins.elem (pkg.pname) [ "terraform" ];
-        };
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs { inherit system overlays config; };
+        pkgs = import nixpkgs { inherit system overlays; };
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
@@ -51,8 +47,6 @@
         ci_packages = with pkgs; [
           # >= 1.31.0 for modules
           just
-          # ~> 1.9.0 for remote workspace
-          terraform
           nushell # just set nu as shell
           cargo-bundle-licenses
           docker

@@ -21,9 +21,6 @@
 [workflow-audit-url]: https://github.com/ymgyt/syndicationd/actions/workflows/audit.yaml
 [coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov&color=brightgreen
 [coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
-[grafana-badge]: https://img.shields.io/badge/Grafana-Dashboard-orange?style=for-the-badge&logo=grafana
-[grafana-url]: https://ymgyt.grafana.net/public-dashboards/863ebddd82c44ddd9a28a68eaac848ff?orgId=1&refresh=1h&from=now-1h&to=now
-
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
 
 Syndicationd is a project for simple feed management on the terminal, and the following components are beging developed
@@ -438,16 +435,8 @@ The theme can be changed using the `--theme` flag. Please refer to the help for 
 
 ### Backend api
 
-By default, `synd` use `https://api.syndicationd.ymgyt.io` as the [backend api](./crates/synd_api)([hosted on my home Raspberry Pi](https://github.com/ymgyt/mynix/blob/main/homeserver/modules/syndicationd/default.nix)).  
-To change the endpoint, specify the `--endpoint` flag
-
-The hosted api is instrumented with OpenTelemetry. Basic signals(traces,metrics,logs) are published on the public [Grafana dashboard][grafana-url]  
-Dashboards are managed with [terraform](https://github.com/ymgyt/syndicationd/tree/main/hosting/terraform/grafana)
-
-<details>
-  <summary>Click to show a public dashboard image</summary>
-  <img alt="grafana dashboard" src="https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/grafana-dashboard.png">
-</details>
+By default, `synd` runs a local in-process [backend api](./crates/synd_api) and stores subscriptions in a local sqlite database.
+Use `--backend remote --endpoint <URL>` to connect to an externally managed API.
 
 ### Remove cache and logs
 
