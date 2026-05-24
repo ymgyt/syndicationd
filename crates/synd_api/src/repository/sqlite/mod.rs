@@ -16,6 +16,7 @@ pub struct SqliteSubscriptionRepository {
     pool: SqlitePool,
 }
 
+#[derive(Clone, Copy)]
 enum FileMode {
     Existing,
     CreateIfMissing,

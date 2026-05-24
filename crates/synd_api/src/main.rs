@@ -1,10 +1,11 @@
-use std::env;
+use std::{env, io};
 
 use fdlimit::Outcome;
 use synd_o11y::{
     opentelemetry::OpenTelemetryGuard, tracing_subscriber::initializer::TracingInitializer,
 };
 use synd_stdx::io::color::{ColorSupport, is_color_supported};
+use tokio::io::AsyncReadExt;
 use tracing::{error, info};
 
 use synd_api::{
@@ -41,6 +42,8 @@ async fn run(
         bind,
         serve,
         tls,
+        local,
+        lifecycle: _,
         o11y,
         cache,
         dry_run,
@@ -49,7 +52,7 @@ async fn run(
 ) -> anyhow::Result<()> {
     let db = SqliteSubscriptionRepository::create_or_open(sqlite.sqlite_db).await?;
     db.migrate().await?;
-    let dep = Dependency::new(db, tls, serve, cache.clone(), shutdown.cancellation_token()).await?;
+    let dep = Dependency::new(db, tls, serve, local, cache, shutdown.cancellation_token()).await?;
 
     info!(
         version = config::app::VERSION,
@@ -63,8 +66,36 @@ async fn run(
     );
 
     dry_run.then(|| shutdown.shutdown());
+    if shutdown.is_shutdown_requested() {
+        info!("Shutdown requested before serving");
+        return Ok(());
+    }
 
     listen_and_serve(dep, bind.into(), shutdown).await
+}
+
+async fn shutdown_signal(shutdown_on_stdin_eof: bool) -> io::Result<()> {
+    if shutdown_on_stdin_eof {
+        tokio::select! {
+            res = tokio::signal::ctrl_c() => res,
+            res = wait_for_stdin_eof() => res,
+        }
+    } else {
+        tokio::signal::ctrl_c().await
+    }
+}
+
+async fn wait_for_stdin_eof() -> io::Result<()> {
+    let mut stdin = tokio::io::stdin();
+    // The buffer must be non-empty; reading into an empty slice may return immediately.
+    let mut buf = [0_u8; 1];
+
+    loop {
+        if stdin.read(&mut buf).await? == 0 {
+            info!("Received stdin EOF");
+            return Ok(());
+        }
+    }
 }
 
 fn init_file_descriptor_limit() {
@@ -86,7 +117,8 @@ async fn main() {
         Err(err) => err.exit(),
     };
     let _guard = init_tracing(&args.o11y);
-    let shutdown = Shutdown::watch_signal(tokio::signal::ctrl_c(), || {});
+    let shutdown =
+        Shutdown::watch_signal(shutdown_signal(args.lifecycle.shutdown_on_stdin_eof), || {});
 
     rustls::crypto::ring::default_provider()
         .install_default()

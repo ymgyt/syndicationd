@@ -4,31 +4,19 @@ use axum_server::Handle;
 use tokio_util::sync::CancellationToken;
 
 /// `CancellationToken` wrapper
+#[derive(Clone)]
 pub struct Shutdown {
     root: CancellationToken,
     handle: Handle<SocketAddr>,
 }
 
 impl Shutdown {
-    /// When the given signal Future is resolved, call the `cancel` method of the held `CancellationToken`.
-    pub fn watch_signal<Fut, F>(signal: Fut, on_graceful_shutdown: F) -> Self
+    pub fn manual<F>(on_graceful_shutdown: F) -> Self
     where
         F: FnOnce() + Send + 'static,
-        Fut: Future<Output = io::Result<()>> + Send + 'static,
     {
-        // Root cancellation token which is cancelled when signal received
         let root = CancellationToken::new();
-        let notify = root.clone();
-        tokio::spawn(async move {
-            match signal.await {
-                Ok(()) => tracing::info!("Received signal"),
 
-                Err(err) => tracing::error!("Failed to handle signal {err}"),
-            }
-            notify.cancel();
-        });
-
-        // Notify graceful shutdown to axum server
         let ct = root.clone();
         let handle = axum_server::Handle::new();
         let notify = handle.clone();
@@ -42,9 +30,33 @@ impl Shutdown {
         Self { root, handle }
     }
 
+    /// When the given signal Future is resolved, call the `cancel` method of the held `CancellationToken`.
+    pub fn watch_signal<Fut, F>(signal: Fut, on_graceful_shutdown: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+        Fut: Future<Output = io::Result<()>> + Send + 'static,
+    {
+        let shutdown = Self::manual(on_graceful_shutdown);
+        let notify = shutdown.root.clone();
+        tokio::spawn(async move {
+            match signal.await {
+                Ok(()) => tracing::info!("Received signal"),
+
+                Err(err) => tracing::error!("Failed to handle signal {err}"),
+            }
+            notify.cancel();
+        });
+
+        shutdown
+    }
+
     /// Request shutdown
     pub fn shutdown(&self) {
         self.root.cancel();
+    }
+
+    pub fn is_shutdown_requested(&self) -> bool {
+        self.root.is_cancelled()
     }
 
     pub fn into_handle(self) -> Handle<SocketAddr> {
@@ -137,5 +149,6 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         assert!(ok, "cancelation does not work");
+        assert!(s.is_shutdown_requested());
     }
 }

@@ -109,10 +109,21 @@ pub async fn serve(
 
     tracing::info!("Serving...");
 
-    axum_server::from_tcp_rustls(listener.into_std()?, tls_config)?
-        .handle(shutdown.into_handle())
-        .serve(service.into_make_service())
-        .await?;
+    let listener = listener.into_std()?;
+    let handle = shutdown.into_handle();
+    let service = service.into_make_service();
+
+    if let Some(tls_config) = tls_config {
+        axum_server::from_tcp_rustls(listener, tls_config)?
+            .handle(handle)
+            .serve(service)
+            .await?;
+    } else {
+        axum_server::from_tcp(listener)?
+            .handle(handle)
+            .serve(service)
+            .await?;
+    }
 
     tracing::info!("Shutdown complete");
 

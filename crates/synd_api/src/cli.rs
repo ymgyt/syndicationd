@@ -20,6 +20,10 @@ pub struct Args {
     #[command(flatten)]
     pub tls: TlsOptions,
     #[command(flatten)]
+    pub local: LocalOptions,
+    #[command(flatten)]
+    pub lifecycle: LifecycleOptions,
+    #[command(flatten)]
     pub o11y: ObservabilityOptions,
     #[command(flatten)]
     pub cache: CacheOptions,
@@ -56,15 +60,41 @@ pub struct ServeOptions {
     pub concurrency_limit: usize,
 }
 
+impl Default for ServeOptions {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_secs(30),
+            body_limit_bytes: config::serve::DEFAULT_REQUEST_BODY_LIMIT_BYTES,
+            concurrency_limit: config::serve::DEFAULT_REQUEST_CONCURRENCY_LIMIT,
+        }
+    }
+}
+
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Tls options")]
 pub struct TlsOptions {
     /// Tls certificate file path
     #[arg(long = "tls-cert", env = env_key!("TLS_CERT"), value_name = "CERT_PATH")]
-    pub certificate: PathBuf,
+    pub certificate: Option<PathBuf>,
     /// Tls private key file path
     #[arg(long = "tls-key", env = env_key!("TLS_KEY"), value_name = "KEY_PATH")]
-    pub private_key: PathBuf,
+    pub private_key: Option<PathBuf>,
+}
+
+#[derive(clap::Args, Debug, Clone)]
+#[command(next_help_heading = "Local options")]
+pub struct LocalOptions {
+    /// Run as a local API child service
+    #[arg(long = "local", default_value_t = false, action = ArgAction::SetTrue, env = env_key!("LOCAL"))]
+    pub enabled: bool,
+}
+
+#[derive(clap::Args, Debug, Clone)]
+#[command(next_help_heading = "Lifecycle options")]
+pub struct LifecycleOptions {
+    /// Shutdown when stdin reaches EOF
+    #[arg(long, default_value_t = false, action = ArgAction::SetTrue)]
+    pub shutdown_on_stdin_eof: bool,
 }
 
 #[derive(clap::Args, Debug)]
@@ -87,7 +117,7 @@ pub struct ObservabilityOptions {
     pub trace_sampler_ratio: f64,
 }
 
-#[derive(clap::Args, Debug, Clone)]
+#[derive(clap::Args, Debug, Clone, Copy)]
 #[command(next_help_heading = "Cache options")]
 pub struct CacheOptions {
     /// Max feed cache size in MiB
@@ -97,6 +127,16 @@ pub struct CacheOptions {
     pub feed_cache_ttl: Duration,
     #[arg(long, value_parser = humantime::parse_duration, default_value = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL, env = env_key!("FEED_CACHE_REFRESH_INTERVAL"))]
     pub feed_cache_refresh_interval: Duration,
+}
+
+impl Default for CacheOptions {
+    fn default() -> Self {
+        Self {
+            feed_cache_size_mb: config::cache::DEFAULT_FEED_CACHE_SIZE_MB,
+            feed_cache_ttl: Duration::from_hours(3),
+            feed_cache_refresh_interval: Duration::from_hours(2),
+        }
+    }
 }
 
 pub fn try_parse<I, T>(iter: I) -> Result<Args, clap::Error>
@@ -143,5 +183,24 @@ mod tests {
             try_parse(["synd-api", "--help"]).unwrap_err().kind(),
             clap::error::ErrorKind::DisplayHelp,
         );
+    }
+
+    #[test]
+    fn parse_local() {
+        let args = try_parse([
+            "synd-api",
+            "--local",
+            "--shutdown-on-stdin-eof",
+            "--sqlite-db",
+            "synd.db",
+            "--tls-cert",
+            "cert.pem",
+            "--tls-key",
+            "key.pem",
+        ])
+        .unwrap();
+
+        assert!(args.local.enabled);
+        assert!(args.lifecycle.shutdown_on_stdin_eof);
     }
 }

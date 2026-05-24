@@ -13,9 +13,19 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Authenticator {
-    github: GithubClient,
-    google: GoogleJwtService,
-    cache: Cache<String, Principal>,
+    kind: AuthenticatorKind,
+}
+
+#[derive(Clone)]
+enum AuthenticatorKind {
+    Remote {
+        github: GithubClient,
+        google: Box<GoogleJwtService>,
+        cache: Cache<String, Principal>,
+    },
+    Local {
+        token: String,
+    },
 }
 
 impl Authenticator {
@@ -26,20 +36,53 @@ impl Authenticator {
             .build();
 
         Ok(Self {
-            github: GithubClient::new()?,
-            google: GoogleJwtService::default(),
-            cache,
+            kind: AuthenticatorKind::Remote {
+                github: GithubClient::new()?,
+                google: Box::default(),
+                cache,
+            },
+        })
+    }
+
+    pub fn local(token: impl Into<String>) -> anyhow::Result<Self> {
+        let token = token.into();
+        anyhow::ensure!(!token.is_empty(), "local token must not be empty");
+
+        Ok(Self {
+            kind: AuthenticatorKind::Local { token },
         })
     }
 
     #[must_use]
     pub fn with_github_client(self, github: GithubClient) -> Self {
-        Self { github, ..self }
+        match self.kind {
+            AuthenticatorKind::Remote { google, cache, .. } => Self {
+                kind: AuthenticatorKind::Remote {
+                    github,
+                    google,
+                    cache,
+                },
+            },
+            AuthenticatorKind::Local { token } => Self {
+                kind: AuthenticatorKind::Local { token },
+            },
+        }
     }
 
     #[must_use]
     pub fn with_google_jwt(self, google: GoogleJwtService) -> Self {
-        Self { google, ..self }
+        match self.kind {
+            AuthenticatorKind::Remote { github, cache, .. } => Self {
+                kind: AuthenticatorKind::Remote {
+                    github,
+                    google: Box::new(google),
+                    cache,
+                },
+            },
+            AuthenticatorKind::Local { token } => Self {
+                kind: AuthenticatorKind::Local { token },
+            },
+        }
     }
 
     /// Authenticate from given token
@@ -49,19 +92,37 @@ impl Authenticator {
         S: AsRef<str>,
     {
         let token = token.as_ref();
+        match &self.kind {
+            AuthenticatorKind::Remote {
+                github,
+                google,
+                cache,
+            } => Self::authenticate_remote(github, google, cache, token).await,
+            AuthenticatorKind::Local {
+                token: expected_token,
+            } => Self::authenticate_local(expected_token, token),
+        }
+    }
+
+    async fn authenticate_remote(
+        github: &GithubClient,
+        google: &GoogleJwtService,
+        cache: &Cache<String, Principal>,
+        token: &str,
+    ) -> Result<Principal, ()> {
         let mut split = token.splitn(2, ' ');
         match (split.next(), split.next()) {
             (Some("github"), Some(access_token)) => {
-                if let Some(principal) = self.cache.get(token).await {
+                if let Some(principal) = cache.get(token).await {
                     tracing::debug!("Principal cache hit");
                     return Ok(principal);
                 }
 
-                match self.github.authenticate(access_token).await {
+                match github.authenticate(access_token).await {
                     Ok(email) => {
                         let principal = Principal::User(User::from_email(email));
 
-                        self.cache.insert(token.to_owned(), principal.clone()).await;
+                        cache.insert(token.to_owned(), principal.clone()).await;
 
                         Ok(principal)
                     }
@@ -72,12 +133,12 @@ impl Authenticator {
                 }
             }
             (Some("google"), Some(id_token)) => {
-                if let Some(principal) = self.cache.get(id_token).await {
+                if let Some(principal) = cache.get(id_token).await {
                     tracing::debug!("Principal cache hit");
                     return Ok(principal);
                 }
 
-                match self.google.decode_id_token(id_token).await {
+                match google.decode_id_token(id_token).await {
                     Ok(claims) => {
                         if !claims.email_verified {
                             warn!("Google jwt claims email is not verified");
@@ -85,9 +146,7 @@ impl Authenticator {
                         }
                         let principal = Principal::User(User::from_email(claims.email));
 
-                        self.cache
-                            .insert(id_token.to_owned(), principal.clone())
-                            .await;
+                        cache.insert(id_token.to_owned(), principal.clone()).await;
 
                         Ok(principal)
                     }
@@ -100,6 +159,18 @@ impl Authenticator {
                         Err(())
                     }
                 }
+            }
+            _ => Err(()),
+        }
+    }
+
+    fn authenticate_local(expected_token: &str, token: &str) -> Result<Principal, ()> {
+        let mut split = token.splitn(2, ' ');
+        match (split.next(), split.next()) {
+            (Some(scheme), Some(actual_token))
+                if scheme.eq_ignore_ascii_case("Bearer") && actual_token == expected_token =>
+            {
+                Ok(Principal::User(User::local()))
             }
             _ => Err(()),
         }
@@ -117,5 +188,32 @@ impl Authenticate for Authenticator {
                 None => Err(()),
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn local_auth_accepts_matching_bearer_token() {
+        let authenticator = Authenticator::local("secret").unwrap();
+        let principal = authenticator.authenticate("Bearer secret").await.unwrap();
+
+        assert_eq!(principal.user_id(), Some("local"));
+    }
+
+    #[tokio::test]
+    async fn local_auth_rejects_missing_or_wrong_token() {
+        let authenticator = Authenticator::local("secret").unwrap();
+
+        assert!(authenticator.authenticate("Bearer wrong").await.is_err());
+        assert!(authenticator.authenticate("github secret").await.is_err());
+        assert!(authenticator.authenticate("").await.is_err());
+    }
+
+    #[test]
+    fn local_auth_requires_non_empty_token() {
+        assert!(Authenticator::local("").is_err());
     }
 }

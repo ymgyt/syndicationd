@@ -14,6 +14,8 @@ pub mod env {
         };
     }
     pub(crate) use env_key;
+
+    pub const LOCAL_TOKEN: &str = env_key!("LOCAL_TOKEN");
 }
 
 pub mod serve {

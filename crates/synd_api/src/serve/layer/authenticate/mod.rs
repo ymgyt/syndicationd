@@ -139,3 +139,93 @@ where
         AuthenticateFuture::new(req, auth_fut, inner)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        future::{Ready, ready},
+        task::{Context, Poll},
+    };
+
+    use axum::{
+        body::Body,
+        http::{StatusCode, header::AUTHORIZATION},
+    };
+
+    use crate::principal::{Principal, User};
+
+    use super::*;
+
+    #[derive(Clone)]
+    struct TestAuthenticator {
+        token: &'static str,
+    }
+
+    impl Authenticate for TestAuthenticator {
+        type Output = Ready<Result<Principal, ()>>;
+
+        fn authenticate(&self, token: Option<String>) -> Self::Output {
+            if token.as_deref() == Some(self.token) {
+                ready(Ok(Principal::User(User::local())))
+            } else {
+                ready(Err(()))
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    struct OkService;
+
+    impl Service<Request> for OkService {
+        type Response = Response;
+        type Error = Infallible;
+        type Future = Ready<Result<Response, Infallible>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: Request) -> Self::Future {
+            ready(Ok(StatusCode::OK.into_response()))
+        }
+    }
+
+    fn request(token: Option<&str>) -> Request {
+        let mut builder = Request::builder();
+        if let Some(token) = token {
+            builder = builder.header(AUTHORIZATION, token);
+        }
+
+        builder.body(Body::empty()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn valid_token_passes_request() {
+        let layer = AuthenticateLayer::new(TestAuthenticator {
+            token: "Bearer secret",
+        });
+        let mut service = layer.layer(OkService);
+
+        let response = service.call(request(Some("Bearer secret"))).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn missing_or_wrong_token_returns_unauthorized() {
+        let layer = AuthenticateLayer::new(TestAuthenticator {
+            token: "Bearer secret",
+        });
+
+        let mut missing_token_service = layer.layer(OkService);
+        let response = missing_token_service.call(request(None)).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        let mut wrong_token_service = layer.layer(OkService);
+        let response = wrong_token_service
+            .call(request(Some("Bearer wrong")))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+}

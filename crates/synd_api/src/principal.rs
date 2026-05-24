@@ -25,6 +25,13 @@ pub struct User {
 }
 
 impl User {
+    pub fn local() -> Self {
+        User {
+            id: String::from("local"),
+            email: String::from("local"),
+        }
+    }
+
     pub fn from_email(email: impl Into<String>) -> Self {
         let mut s = DefaultHasher::new();
         let email = email.into();
@@ -50,5 +57,11 @@ mod tests {
         let u = User::from_email("foo@ymgyt.io");
         assert_eq!(u.id().len(), 16);
         assert_eq!(u.id(), "585779d8c9b2e06d");
+    }
+
+    #[test]
+    fn local_user() {
+        let u = User::local();
+        assert_eq!(u.id(), "local");
     }
 }
