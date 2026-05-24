@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::{cli::Palette, config::categories};
+use crate::{
+    cli::{BackendMode, Palette},
+    config::categories,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CacheEntry {
@@ -44,6 +47,12 @@ pub struct ApiEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct BackendEntry {
+    pub(super) mode: Option<BackendMode>,
+    pub(super) sqlite_db: Option<PathBuf>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GithubEntry {
     pub(super) enable: Option<bool>,
     pub(super) pat: Option<String>,
@@ -62,6 +71,7 @@ pub struct ConfigFile {
     pub(super) cache: Option<CacheEntry>,
     pub(super) log: Option<LogEntry>,
     pub(super) theme: Option<ThemeEntry>,
+    pub(super) backend: Option<BackendEntry>,
     pub(super) api: Option<ApiEntry>,
     pub(super) feed: Option<FeedEntry>,
     pub(super) github: Option<GithubEntry>,
@@ -97,6 +107,13 @@ pub static INIT_CONFIG: &str = r#"
 # Client timeout duration 
 # timeout = "30s"
 
+[backend]
+# Backend mode: remote | local
+# mode = "remote"
+
+# Local sqlite database path
+# sqlite_db = "path/to/synd.db"
+
 [feed]
 # Feed entries to fetch
 # entries_limit = 200 
@@ -131,6 +148,10 @@ name = "ferra"
 [api]
 endpoint = "https://api.syndicationd.ymgyt.io"
 timeout = "30s"
+
+[backend]
+mode = "remote"
+sqlite_db = "/tmp/synd/synd.db"
 
 [feed]
 entries_limit = 100

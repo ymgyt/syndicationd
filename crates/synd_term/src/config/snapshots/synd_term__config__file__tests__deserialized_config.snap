@@ -1,5 +1,6 @@
 ---
 source: crates/synd_term/src/config/file.rs
+assertion_line: 174
 expression: config
 ---
 ConfigFile {
@@ -21,6 +22,16 @@ ConfigFile {
         ThemeEntry {
             name: Some(
                 Ferra,
+            ),
+        },
+    ),
+    backend: Some(
+        BackendEntry {
+            mode: Some(
+                Remote,
+            ),
+            sqlite_db: Some(
+                "/tmp/synd/synd.db",
             ),
         },
     ),

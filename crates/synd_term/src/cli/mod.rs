@@ -1,6 +1,6 @@
 use std::{path::PathBuf, time::Duration};
 
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -17,6 +17,13 @@ pub enum Palette {
     Ferra,
     SolarizedDark,
     Helix,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all(deserialize = "kebab-case"))]
+pub enum BackendMode {
+    Remote,
+    Local,
 }
 
 impl From<Palette> for theme::Palette {
@@ -51,6 +58,8 @@ pub struct Args {
     #[command(flatten)]
     pub api: ApiOptions,
     #[command(flatten)]
+    pub backend: BackendOptions,
+    #[command(flatten)]
     pub feed: FeedOptions,
     #[command(flatten)]
     pub github: GithubOptions,
@@ -67,6 +76,26 @@ pub struct ApiOptions {
     /// Client timeout(ex. 30s)
     #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::CLIENT_TIMEOUT)]
     pub client_timeout: Option<Duration>,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Backend options")]
+pub struct BackendOptions {
+    /// Backend mode
+    #[arg(long = "backend", value_enum, env = config::env::BACKEND)]
+    pub mode: Option<BackendMode>,
+    #[command(flatten)]
+    pub local: LocalOptions,
+    /// Local sqlite database path
+    #[arg(long = "local-sqlite-db", env = config::env::LOCAL_SQLITE_DB)]
+    pub sqlite_db: Option<PathBuf>,
+}
+
+#[derive(clap::Args, Debug, Default)]
+pub struct LocalOptions {
+    /// Use the in-process local API
+    #[arg(long = "local", default_value_t = false, action = ArgAction::SetTrue, env = config::env::LOCAL)]
+    pub enabled: bool,
 }
 
 #[derive(clap::Args, Debug)]

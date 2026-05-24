@@ -1,8 +1,9 @@
 use crate::{
-    application::{Application, Authenticator, Cache, Clock, Config},
+    application::{Application, Authenticator, Cache, Clock, Config, FeedApiSession, FeedBackend},
     client::{github::GithubClient, synd_api::Client},
     config::Categories,
     interact::Interact,
+    local_api::LocalApiRuntime,
     terminal::Terminal,
     ui::theme::Theme,
 };
@@ -18,6 +19,7 @@ pub struct ApplicationBuilder<
 > {
     pub(super) terminal: Terminal,
     pub(super) client: Client,
+    pub(super) feed_api_session: FeedApiSession,
     pub(super) categories: Categories,
     pub(super) cache: Cache,
     pub(super) config: Config,
@@ -26,6 +28,7 @@ pub struct ApplicationBuilder<
 
     pub(super) authenticator: Option<Authenticator>,
     pub(super) github_client: Option<GithubClient>,
+    pub(super) local_api_runtime: Option<LocalApiRuntime>,
     pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) dry_run: bool,
 }
@@ -35,6 +38,7 @@ impl Default for ApplicationBuilder {
         Self {
             terminal: (),
             client: (),
+            feed_api_session: FeedApiSession::UserCredentialRequired,
             categories: (),
             cache: (),
             config: (),
@@ -42,6 +46,7 @@ impl Default for ApplicationBuilder {
             interactor: (),
             authenticator: None,
             github_client: None,
+            local_api_runtime: None,
             clock: None,
             dry_run: false,
         }
@@ -57,6 +62,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal,
             client: self.client,
+            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -64,6 +70,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -76,6 +83,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client,
+            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -83,6 +91,30 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
+            clock: self.clock,
+            dry_run: self.dry_run,
+        }
+    }
+
+    #[must_use]
+    pub fn feed_backend(
+        self,
+        feed_backend: FeedBackend,
+    ) -> ApplicationBuilder<T1, Client, T2, T3, T4, T5, T6> {
+        let (client, feed_api_session, local_api_runtime) = feed_backend.into_parts();
+        ApplicationBuilder {
+            terminal: self.terminal,
+            client,
+            feed_api_session,
+            categories: self.categories,
+            cache: self.cache,
+            config: self.config,
+            theme: self.theme,
+            interactor: self.interactor,
+            authenticator: self.authenticator,
+            github_client: self.github_client,
+            local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -98,6 +130,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
+            feed_api_session: self.feed_api_session,
             categories,
             cache: self.cache,
             config: self.config,
@@ -105,6 +138,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -117,6 +151,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
+            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache,
             config: self.config,
@@ -124,6 +159,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -136,6 +172,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
+            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config,
@@ -143,6 +180,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -155,6 +193,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
+            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -162,6 +201,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -177,6 +217,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
         ApplicationBuilder {
             terminal: self.terminal,
             client: self.client,
+            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -184,6 +225,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
             interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
+            local_api_runtime: self.local_api_runtime,
             clock: self.clock,
             dry_run: self.dry_run,
         }

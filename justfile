@@ -25,3 +25,7 @@ mod tf 'hosting/terraform'
 # List recipe
 default:
     just --list --list-submodules
+
+# Run term with in-process local api
+run-local *flags:
+    just run term-local {{ flags }}

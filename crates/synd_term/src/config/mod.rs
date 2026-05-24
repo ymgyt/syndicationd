@@ -29,6 +29,9 @@ pub mod env {
     pub const CONFIG_FILE: &str = env_key!("CONFIG_FILE");
     pub const LOG_FILE: &str = env_key!("LOG_FILE");
     pub const CACHE_DIR: &str = env_key!("CACHE_DIR");
+    pub const BACKEND: &str = env_key!("BACKEND");
+    pub const LOCAL: &str = env_key!("LOCAL");
+    pub const LOCAL_SQLITE_DB: &str = env_key!("LOCAL_SQLITE_DB");
     pub const THEME: &str = env_key!("THEME");
     pub const FEED_ENTRIES_LIMIT: &str = env_key!("ENTRIES_LIMIT");
     pub const FEED_BROWSER: &str = env_key!("BROWSER");
@@ -76,6 +79,14 @@ pub mod cache {
 
     pub fn dir() -> &'static Path {
         super::project_dirs().cache_dir()
+    }
+}
+
+pub mod local {
+    use std::path::PathBuf;
+
+    pub fn sqlite_db() -> PathBuf {
+        super::project_dirs().data_dir().join("synd.db")
     }
 }
 

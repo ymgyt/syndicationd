@@ -1,14 +1,15 @@
-use std::{future, path::PathBuf, process::ExitCode};
+use std::{path::PathBuf, process::ExitCode};
 
 use anyhow::Context as _;
 use futures_util::TryFutureExt as _;
 use synd_stdx::fs::fsimpl::FileSystem;
 use synd_term::{
-    application::{Application, Cache, Config, Features},
-    cli::{self, Args},
+    application::{Application, Cache, Config, Features, FeedBackend},
+    cli::{self, Args, BackendMode},
     client::{github::GithubClient, synd_api::Client},
     config::{self, ConfigResolver},
     interact::{ProcessInteractor, TextBrowserInteractor},
+    local_api::{LocalApi, LocalApiConfig},
     terminal::{self, Terminal},
     ui::theme::Theme,
 };
@@ -62,14 +63,47 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
     Ok(guard)
 }
 
+mod crypto_provider {
+    use rustls::crypto::CryptoProvider;
+
+    pub(super) fn init() {
+        try_init().expect("failed to initialize rustls CryptoProvider");
+    }
+
+    pub(super) fn try_init() -> anyhow::Result<()> {
+        if CryptoProvider::get_default().is_some() {
+            return Ok(());
+        }
+
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .map_err(|_| anyhow::anyhow!("failed to install rustls ring CryptoProvider"))
+    }
+}
+
 #[allow(clippy::needless_pass_by_value)]
-fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Application> {
+async fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Application> {
+    let backend_mode = config.backend_mode();
+    let feed_backend = match backend_mode {
+        BackendMode::Remote => {
+            let client = Client::new(config.api_endpoint(), config.api_timeout())
+                .context("Failed to construct client")?;
+            FeedBackend::remote(client)
+        }
+        BackendMode::Local => {
+            let local_api = LocalApi::start(LocalApiConfig {
+                sqlite_db: config.local_sqlite_db(),
+                timeout: config.api_timeout(),
+            })
+            .await
+            .context("Failed to start local synd-api")?;
+            FeedBackend::local(local_api)
+        }
+    };
+
     let mut builder = Application::builder()
         .terminal(Terminal::new().context("Failed to construct terminal")?)
-        .client(
-            Client::new(config.api_endpoint(), config.api_timeout())
-                .context("Failed to construct client")?,
-        )
+        .feed_backend(feed_backend)
         .categories(config.categories())
         .config(Config {
             entries_limit: config.feed_entries_limit(),
@@ -96,6 +130,8 @@ fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Applicatio
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    crypto_provider::init();
+
     // parse args and resolve configuration
     let (config, command, dry_run) = {
         let Args {
@@ -103,6 +139,7 @@ async fn main() -> ExitCode {
             log,
             cache_dir,
             api,
+            backend,
             feed,
             github,
             command,
@@ -115,6 +152,7 @@ async fn main() -> ExitCode {
             .log_file(log)
             .cache_dir(cache_dir)
             .api_options(api)
+            .backend_options(backend)
             .feed_options(feed)
             .github_options(github)
             .palette(palette)
@@ -138,7 +176,13 @@ async fn main() -> ExitCode {
         } else {
             Some(config.log_file())
         };
-        init_tracing(log).unwrap()
+        match init_tracing(log) {
+            Ok(guard) => guard,
+            Err(err) => {
+                eprintln!("{err:?}");
+                return ExitCode::FAILURE;
+            }
+        }
     };
 
     // if subcommand is specified, execute it
@@ -154,7 +198,7 @@ async fn main() -> ExitCode {
 
     let mut event_stream = terminal::event_stream();
 
-    if let Err(err) = future::ready(build_app(config, dry_run))
+    if let Err(err) = build_app(config, dry_run)
         .and_then(|app| {
             tracing::info!("Running...");
             app.run(&mut event_stream)

@@ -12,7 +12,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::{
-    cli::{self, ApiOptions, FeedOptions, GithubOptions},
+    cli::{self, ApiOptions, BackendMode, BackendOptions, FeedOptions, GithubOptions},
     config::{
         self, Categories,
         file::{ConfigFile, ConfigFileError},
@@ -33,6 +33,8 @@ pub struct ConfigResolver {
     config_file: PathBuf,
     log_file: Entry<PathBuf>,
     cache_dir: Entry<PathBuf>,
+    backend_mode: Entry<BackendMode>,
+    local_sqlite_db: Entry<PathBuf>,
     api_endpoint: Entry<Url>,
     api_timeout: Entry<Duration>,
     feed_entries_limit: Entry<usize>,
@@ -59,6 +61,14 @@ impl ConfigResolver {
 
     pub fn cache_dir(&self) -> PathBuf {
         self.cache_dir.resolve_ref().clone()
+    }
+
+    pub fn backend_mode(&self) -> BackendMode {
+        self.backend_mode.resolve()
+    }
+
+    pub fn local_sqlite_db(&self) -> PathBuf {
+        self.local_sqlite_db.resolve_ref().clone()
     }
 
     pub fn api_endpoint(&self) -> Url {
@@ -126,6 +136,7 @@ pub struct ConfigResolverBuilder<FS = fsimpl::FileSystem> {
     log_file_flag: Option<PathBuf>,
     cache_dir_flag: Option<PathBuf>,
     api_flags: Option<ApiOptions>,
+    backend_flags: Option<BackendOptions>,
     feed_flags: Option<FeedOptions>,
     github_flags: Option<GithubOptions>,
     palette_flag: Option<cli::Palette>,
@@ -166,6 +177,14 @@ impl ConfigResolverBuilder {
     }
 
     #[must_use]
+    pub fn backend_options(self, backend_options: BackendOptions) -> Self {
+        Self {
+            backend_flags: Some(backend_options),
+            ..self
+        }
+    }
+
+    #[must_use]
     pub fn feed_options(self, feed_options: FeedOptions) -> Self {
         Self {
             feed_flags: Some(feed_options),
@@ -194,38 +213,7 @@ impl ConfigResolverBuilder {
     }
 
     pub fn try_build(self) -> Result<ConfigResolver, ConfigResolverBuildError> {
-        let (mut config_file, config_path) = if let Some(path) = self.config_file {
-            // If a configuration file path is explicitly specified, search for that file
-            // and return an error if it is not found.
-            match self.fs.open_file(&path) {
-                Ok(f) => (Some(ConfigFile::new(f)?), path),
-                Err(err) => {
-                    return Err(ConfigResolverBuildError::ConfigFileOpen {
-                        path: path.display().to_string(),
-                        err,
-                    });
-                }
-            }
-        // If the path is not specified, builder search for the default path
-        // but will not return an error even if it is not found.
-        } else {
-            let default_path = config::config_path();
-            match self.fs.open_file(&default_path) {
-                Ok(f) => (Some(ConfigFile::new(f)?), default_path),
-                Err(err) => match err.kind() {
-                    ErrorKind::NotFound => {
-                        tracing::debug!(path = %default_path.display(), "default config file not found");
-                        (None, default_path)
-                    }
-                    _ => {
-                        return Err(ConfigResolverBuildError::ConfigFileOpen {
-                            path: default_path.display().to_string(),
-                            err,
-                        });
-                    }
-                },
-            }
-        };
+        let (mut config_file, config_path) = self.load_config_file()?;
 
         // construct categories
         let mut categories = Categories::default_toml();
@@ -238,6 +226,12 @@ impl ConfigResolverBuilder {
                 Some(ApiOptions {
                     endpoint,
                     client_timeout,
+                }),
+            backend_flags:
+                Some(BackendOptions {
+                    mode: backend_mode,
+                    local,
+                    sqlite_db: local_sqlite_db,
                 }),
             feed_flags:
                 Some(FeedOptions {
@@ -277,6 +271,26 @@ impl ConfigResolverBuilder {
                         .and_then(|cache| cache.directory.take()),
                 )
                 .with_flag(cache_dir_flag),
+            backend_mode: Entry::with_default(BackendMode::Remote)
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.backend.as_mut())
+                        .and_then(|backend| backend.mode),
+                )
+                .with_flag(if local.enabled {
+                    Some(BackendMode::Local)
+                } else {
+                    backend_mode
+                }),
+            local_sqlite_db: Entry::with_default(config::local::sqlite_db())
+                .with_file(
+                    config_file
+                        .as_mut()
+                        .and_then(|c| c.backend.as_mut())
+                        .and_then(|backend| backend.sqlite_db.take()),
+                )
+                .with_flag(local_sqlite_db),
             api_endpoint: Entry::with_default(Url::parse(config::api::ENDPOINT).unwrap())
                 .with_file(
                     config_file
@@ -351,5 +365,36 @@ impl ConfigResolverBuilder {
         };
 
         resolver.validate()
+    }
+
+    fn load_config_file(&self) -> Result<(Option<ConfigFile>, PathBuf), ConfigResolverBuildError> {
+        if let Some(path) = &self.config_file {
+            // If a configuration file path is explicitly specified, search for that file
+            // and return an error if it is not found.
+            return match self.fs.open_file(path) {
+                Ok(f) => Ok((Some(ConfigFile::new(f)?), path.clone())),
+                Err(err) => Err(ConfigResolverBuildError::ConfigFileOpen {
+                    path: path.display().to_string(),
+                    err,
+                }),
+            };
+        }
+
+        // If the path is not specified, builder search for the default path
+        // but will not return an error even if it is not found.
+        let default_path = config::config_path();
+        match self.fs.open_file(&default_path) {
+            Ok(f) => Ok((Some(ConfigFile::new(f)?), default_path)),
+            Err(err) => match err.kind() {
+                ErrorKind::NotFound => {
+                    tracing::debug!(path = %default_path.display(), "default config file not found");
+                    Ok((None, default_path))
+                }
+                _ => Err(ConfigResolverBuildError::ConfigFileOpen {
+                    path: default_path.display().to_string(),
+                    err,
+                }),
+            },
+        }
     }
 }

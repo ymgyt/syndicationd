@@ -11,6 +11,7 @@ pub mod filesystem;
 pub mod interact;
 pub mod job;
 pub mod keymap;
+pub mod local_api;
 pub mod matcher;
 pub mod terminal;
 pub mod types;

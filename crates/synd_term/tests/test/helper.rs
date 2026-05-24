@@ -296,8 +296,8 @@ pub async fn serve_api(
         db
     };
     let tls_options = TlsOptions {
-        certificate: synd_test::certificate(),
-        private_key: synd_test::private_key(),
+        certificate: Some(synd_test::certificate()),
+        private_key: Some(synd_test::private_key()),
     };
     let serve_options = ServeOptions {
         timeout: Duration::from_secs(10),
@@ -314,6 +314,7 @@ pub async fn serve_api(
         db,
         tls_options,
         serve_options,
+        synd_api::cli::LocalOptions { enabled: false },
         cache_options,
         CancellationToken::new(),
     )

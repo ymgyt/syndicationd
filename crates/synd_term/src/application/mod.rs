@@ -32,6 +32,7 @@ use crate::{
     interact::Interact,
     job::Jobs,
     keymap::{KeymapId, Keymaps},
+    local_api::LocalApiRuntime,
     terminal::Terminal,
     types::github::{IssueOrPullRequest, Notification},
     ui::{
@@ -65,6 +66,9 @@ pub use cache::{Cache, LoadCacheError, PersistCacheError};
 mod builder;
 pub use builder::ApplicationBuilder;
 
+mod backend;
+pub use backend::{FeedApiSession, FeedBackend};
+
 mod app_config;
 pub use app_config::{Config, Features};
 
@@ -84,7 +88,9 @@ pub struct Application {
     clock: Box<dyn Clock>,
     terminal: Terminal,
     client: Client,
+    feed_api_session: FeedApiSession,
     github_client: Option<GithubClient>,
+    local_api_runtime: Option<LocalApiRuntime>,
     jobs: Jobs,
     background_jobs: Jobs,
     components: Components,
@@ -124,7 +130,9 @@ impl Application {
         let ApplicationBuilder {
             terminal,
             client,
+            feed_api_session,
             github_client,
+            local_api_runtime,
             categories,
             cache,
             config,
@@ -153,7 +161,9 @@ impl Application {
             clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
             terminal,
             client,
+            feed_api_session,
             github_client,
+            local_api_runtime,
             // The secondary rate limit of the GitHub API is 100 concurrent requests, so we have set it to 90.
             jobs: Jobs::new(NonZero::new(90).unwrap()),
             background_jobs: Jobs::new(NonZero::new(10).unwrap()),
@@ -192,6 +202,8 @@ impl Application {
 
         self.event_loop(input).await;
 
+        self.shutdown_local_api().await;
+
         self.cleanup().ok();
 
         Ok(())
@@ -225,9 +237,13 @@ impl Application {
             }
         }
 
-        match self.restore_credential().await {
-            Ok(cred) => self.handle_initial_credential(cred),
-            Err(err) => tracing::warn!("Restore credential: {err}"),
+        if self.feed_api_session.requires_user_credential() {
+            match self.restore_credential().await {
+                Ok(cred) => self.handle_restored_credential(cred),
+                Err(err) => tracing::warn!("Restore credential: {err}"),
+            }
+        } else {
+            self.enter_feed_api_session();
         }
 
         Ok(())
@@ -243,8 +259,12 @@ impl Application {
         restore.restore().await
     }
 
-    fn handle_initial_credential(&mut self, cred: Verified<Credential>) {
+    fn handle_restored_credential(&mut self, cred: Verified<Credential>) {
         self.set_credential(cred);
+        self.enter_feed_api_session();
+    }
+
+    fn enter_feed_api_session(&mut self) {
         self.initial_fetch();
         self.check_latest_release();
         self.components.auth.authenticated();
@@ -299,6 +319,12 @@ impl Application {
         // Make sure inform after terminal restored
         self.inform_latest_release();
         Ok(())
+    }
+
+    async fn shutdown_local_api(&mut self) {
+        if let Some(runtime) = self.local_api_runtime.take() {
+            runtime.shutdown().await;
+        }
     }
 
     async fn event_loop<S>(&mut self, input: &mut S)
@@ -800,7 +826,9 @@ impl Application {
                 }
                 Command::HandleApiError { error, request_seq } => {
                     let message = match Arc::into_inner(error).expect("error never cloned") {
-                        SyndApiError::Unauthorized { url } => {
+                        SyndApiError::Unauthorized { url }
+                            if self.feed_api_session.requires_user_credential() =>
+                        {
                             tracing::warn!(
                                 "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
                             );
@@ -808,6 +836,12 @@ impl Application {
 
                             format!(
                                 "{} unauthorized. please login again",
+                                url.map(|url| url.to_string()).unwrap_or_default(),
+                            )
+                        }
+                        SyndApiError::Unauthorized { url } => {
+                            format!(
+                                "{} unauthorized. local feed API session is invalid",
                                 url.map(|url| url.to_string()).unwrap_or_default(),
                             )
                         }
@@ -1350,7 +1384,7 @@ impl Application {
             tracing::error!("Failed to save credential to cache: {err}");
         }
 
-        self.handle_initial_credential(cred);
+        self.handle_restored_credential(cred);
     }
 
     fn schedule_credential_refreshing(&mut self, cred: &Verified<Credential>) {
@@ -1501,7 +1535,7 @@ impl Application {
 
     pub async fn reload_cache(&mut self) -> anyhow::Result<()> {
         match self.restore_credential().await {
-            Ok(cred) => self.handle_initial_credential(cred),
+            Ok(cred) => self.handle_restored_credential(cred),
             Err(err) => return Err(err.into()),
         }
         Ok(())

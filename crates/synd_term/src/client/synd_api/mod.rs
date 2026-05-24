@@ -86,6 +86,13 @@ impl Client {
         self.credential = Some(token);
     }
 
+    pub(crate) fn set_local_token(&mut self, token: &str) -> anyhow::Result<()> {
+        let mut token = HeaderValue::try_from(format!("Bearer {token}"))?;
+        token.set_sensitive(true);
+        self.credential = Some(token);
+        Ok(())
+    }
+
     #[tracing::instrument(skip(self))]
     pub async fn fetch_subscription(
         &self,
