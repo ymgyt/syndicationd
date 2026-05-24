@@ -16,7 +16,11 @@ use synd_term::{
 use tracing::error;
 use tracing_appender::non_blocking::WorkerGuard;
 
-fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>> {
+fn init_tracing(
+    log_path: Option<PathBuf>,
+    default_filter: &'static str,
+    stderr: bool,
+) -> anyhow::Result<Option<WorkerGuard>> {
     use synd_o11y::opentelemetry::init_propagation;
     use tracing_subscriber::{
         Registry,
@@ -36,6 +40,8 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
             .open(log_path)?;
         let (non_blocking, guard) = tracing_appender::non_blocking(log);
         (BoxMakeWriter::new(non_blocking), Some(guard))
+    } else if stderr {
+        (BoxMakeWriter::new(std::io::stderr), None)
     } else {
         (BoxMakeWriter::new(std::io::stdout), None)
     };
@@ -52,7 +58,7 @@ fn init_tracing(log_path: Option<PathBuf>) -> anyhow::Result<Option<WorkerGuard>
         )
         .with(
             EnvFilter::try_from_env(config::env::LOG_DIRECTIVE)
-                .or_else(|_| EnvFilter::try_new("info"))
+                .or_else(|_| EnvFilter::try_new(default_filter))
                 .unwrap(),
         )
         .try_init()?;
@@ -170,13 +176,14 @@ async fn main() -> ExitCode {
 
     // init tracing
     let _guard = {
-        // Subcommand logs to the terminal, while tui writes logs to a file.
-        let log = if command.is_some() {
+        let is_subcommand = command.is_some();
+        let log = if is_subcommand {
             None
         } else {
             Some(config.log_file())
         };
-        match init_tracing(log) {
+        let default_filter = if is_subcommand { "warn" } else { "info" };
+        match init_tracing(log, default_filter, is_subcommand) {
             Ok(guard) => guard,
             Err(err) => {
                 eprintln!("{err:?}");
@@ -190,8 +197,8 @@ async fn main() -> ExitCode {
         return match command {
             cli::Command::Clean(clean) => clean.run(&FileSystem::new()),
             cli::Command::Check(check) => check.run(config).await,
-            cli::Command::Export(export) => export.run(config.api_endpoint()).await,
-            cli::Command::Import(import) => import.run(config.api_endpoint()).await,
+            cli::Command::Export(export) => export.run(config).await,
+            cli::Command::Import(import) => import.run(config).await,
             cli::Command::Config(config) => config.run(),
         };
     }

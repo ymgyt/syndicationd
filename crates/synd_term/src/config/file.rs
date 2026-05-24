@@ -101,7 +101,7 @@ pub static INIT_CONFIG: &str = r#"
 # name = "ferra"
 
 [api]
-# Remote backend api endpoint
+# Remote backend API endpoint
 # endpoint = "https://api.example.com"
 
 # Client timeout duration 
@@ -111,7 +111,7 @@ pub static INIT_CONFIG: &str = r#"
 # Backend mode: remote | local
 # mode = "local"
 
-# Local sqlite database path
+# Local SQLite database path
 # sqlite_db = "path/to/synd.db"
 
 [feed]

@@ -653,6 +653,7 @@ mod test {
 
         test_case.init_app().await?;
 
+        local_port_commands_test();
         check_command_test(test_case.synd_api_port);
         export_command_test(test_case.synd_api_port, &test_case.cache_dir);
         term_command_test(
@@ -664,6 +665,43 @@ mod test {
         clean_command_test(&test_case.cache_dir);
 
         Ok(())
+    }
+
+    fn local_port_commands_test() {
+        let dir = temp_dir().keep();
+        let sqlite_db = dir.join("synd.db");
+        let input = dir.join("subscriptions.json");
+        std::fs::write(&input, r#"{"feeds":[]}"#).unwrap();
+
+        let sqlite_db = sqlite_db.display().to_string();
+        let input = input.display().to_string();
+
+        let check = assert_cmd::Command::cargo_bin("synd")
+            .unwrap()
+            .args(["--local-sqlite-db", &sqlite_db, "check"])
+            .assert()
+            .success();
+        let output = check.get_output();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("    Backend: local"));
+        assert!(stdout.contains(&format!("  SQLite DB: {sqlite_db}")));
+        assert!(
+            output.stderr.is_empty(),
+            "unexpected stderr: {}",
+            String::from_utf8_lossy(&output.stderr),
+        );
+
+        assert_cmd::Command::cargo_bin("synd")
+            .unwrap()
+            .args(["--local-sqlite-db", &sqlite_db, "export"])
+            .assert()
+            .success();
+
+        assert_cmd::Command::cargo_bin("synd")
+            .unwrap()
+            .args(["--local-sqlite-db", &sqlite_db, "import", &input])
+            .assert()
+            .success();
     }
 
     fn check_command_test(api_port: u16) {

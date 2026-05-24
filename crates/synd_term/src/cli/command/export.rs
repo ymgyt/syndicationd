@@ -3,9 +3,12 @@ use std::{path::PathBuf, process::ExitCode};
 use clap::Args;
 use schemars::JsonSchema;
 use serde::Serialize;
-use url::Url;
 
-use crate::{cli::port::PortContext, config, types::ExportedFeed};
+use crate::{
+    cli::port::{AuthMode, PortContext},
+    config::{self, ConfigResolver},
+    types::ExportedFeed,
+};
 
 #[derive(Serialize, JsonSchema)]
 struct Export {
@@ -32,11 +35,11 @@ pub struct ExportCommand {
 }
 
 impl ExportCommand {
-    pub async fn run(self, endpoint: Url) -> ExitCode {
+    pub async fn run(self, config: ConfigResolver) -> ExitCode {
         let err = if self.print_schema {
             Self::print_json_schema()
         } else {
-            self.export(endpoint).await
+            self.export(config).await
         };
         if let Err(err) = err {
             tracing::error!("{err:?}");
@@ -51,8 +54,14 @@ impl ExportCommand {
         serde_json::to_writer_pretty(std::io::stdout(), &schema).map_err(anyhow::Error::from)
     }
 
-    async fn export(self, endpoint: Url) -> anyhow::Result<()> {
-        let cx = PortContext::new(endpoint, self.cache_dir).await?;
+    async fn export(self, config: ConfigResolver) -> anyhow::Result<()> {
+        let cx = PortContext::new(
+            &config,
+            AuthMode::UserCredential {
+                cache_dir: self.cache_dir,
+            },
+        )
+        .await?;
 
         let mut after = None;
         let mut exported_feeds = Vec::new();

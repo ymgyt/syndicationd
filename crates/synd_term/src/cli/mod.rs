@@ -86,7 +86,7 @@ pub struct BackendOptions {
     pub mode: Option<BackendMode>,
     #[command(flatten)]
     pub local: LocalOptions,
-    /// Local sqlite database path
+    /// Local `SQLite` database path
     #[arg(long = "local-sqlite-db", env = config::env::LOCAL_SQLITE_DB)]
     pub sqlite_db: Option<PathBuf>,
 }

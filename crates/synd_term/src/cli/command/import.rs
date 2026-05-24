@@ -9,14 +9,13 @@ use clap::Args;
 use either::Either;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 use crate::{
-    cli::port::PortContext,
+    cli::port::{AuthMode, PortContext},
     client::synd_api::{
         Client, SubscribeFeedError, SyndApiError, mutation::subscribe_feed::SubscribeFeedInput,
     },
-    config,
+    config::{self, ConfigResolver},
     types::{self, ExportedFeed},
 };
 
@@ -48,11 +47,11 @@ pub struct ImportCommand {
 }
 
 impl ImportCommand {
-    pub async fn run(self, endpoint: Url) -> ExitCode {
+    pub async fn run(self, config: ConfigResolver) -> ExitCode {
         let err = if self.print_schema {
             Self::print_json_schema()
         } else {
-            self.import(endpoint).await
+            self.import(config).await
         };
         if let Err(err) = err {
             tracing::error!("{err:?}");
@@ -67,16 +66,22 @@ impl ImportCommand {
         serde_json::to_writer_pretty(std::io::stdout(), &schema).map_err(anyhow::Error::from)
     }
 
-    async fn import(self, endpoint: Url) -> anyhow::Result<()> {
-        let input = match self.input {
+    async fn import(self, config: ConfigResolver) -> anyhow::Result<()> {
+        let Self {
+            print_schema: _,
+            cache_dir,
+            input,
+        } = self;
+
+        let input = match input {
             Some(input) => Self::read_input(input.as_path())?,
             None => {
                 anyhow::bail!("input file path required")
             }
         };
-        let cx = PortContext::new(endpoint, self.cache_dir).await?;
+        let cx = PortContext::new(&config, AuthMode::UserCredential { cache_dir }).await?;
         let import = Import {
-            client: cx.client,
+            client: &cx.client,
             input,
             out: io::stdout(),
             interval: Duration::from_millis(500),
@@ -102,6 +107,12 @@ trait SubscribeFeed {
 }
 
 impl SubscribeFeed for Client {
+    async fn subscribe_feed(&self, input: SubscribeFeedInput) -> Result<types::Feed, SyndApiError> {
+        Client::subscribe_feed(self, input).await
+    }
+}
+
+impl SubscribeFeed for &Client {
     async fn subscribe_feed(&self, input: SubscribeFeedInput) -> Result<types::Feed, SyndApiError> {
         Client::subscribe_feed(self, input).await
     }

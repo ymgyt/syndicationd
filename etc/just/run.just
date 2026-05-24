@@ -2,7 +2,6 @@ import '.base.just'
 
 otlp_endpoint := env_var_or_default("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 synd_endpoint := env_var_or_default("SYND_ENDPOINT", "https://localhost:5959")
-local_sqlite_db := env_var_or_default("SYND_LOCAL_SQLITE_DB", "/tmp/synd-term-local.db")
 loki_endpoint := env_var_or_default("LOKI_ENDPOINT", "")
 
 # Run api
@@ -30,7 +29,7 @@ term *flags:
 term-local *flags:
 	cd crates/synd_term; \
 	cargo run -- \
-	--local --local-sqlite-db {{ local_sqlite_db }} \
+	--local \
 	--log /tmp/syndterm-local.log {{ flags }}
 
 # Run opentelemetry-collector-contrib
