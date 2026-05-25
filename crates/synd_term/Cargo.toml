@@ -21,8 +21,8 @@ path = "src/main.rs"
 synd-api = { path = "../synd_api", version = "0.2.6" }
 synd-auth = { path = "../synd_auth", version = "0.2.5" }
 synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["fake", "jsonschema"] }
-synd-o11y = { path = "../synd_o11y", version = "0.1.9" }
-synd-stdx = { path = "../synd_stdx", version = "0.1.1", features = ["humantime", "conf"] }
+synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
+synd-support = { path = "../synd_support", version = "0.1.0", features = ["humantime", "conf", "o11y"] }
 
 anyhow               = { workspace = true }
 bitflags             = { workspace = true }
@@ -33,7 +33,7 @@ crossterm            = { version = "0.29.0", features = ["event-stream"] }
 directories          = "6.0.0"
 edit                 = "0.1.5"
 either               = { workspace = true }
-futures-util         = { workspace = true }
+futures-util         = { workspace = true, features = ["sink"] }
 graphql_client       = { workspace = true, features = ["graphql_query_derive"] }
 html2text            = { version = "0.17.1" }
 itertools            = { workspace = true }
@@ -51,6 +51,7 @@ serde                = { workspace = true, features = ["derive"] }
 serde_json           = "1.0.149"
 thiserror            = { workspace = true }
 tokio                = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-tungstenite    = { version = "0.29.0", default-features = false, features = ["connect"] }
 tokio-stream         = { version = "0.1.18", optional = true }
 toml                 = { workspace = true }
 tracing              = { workspace = true }
@@ -66,6 +67,7 @@ url                  = { workspace = true }
 integration = ["dep:tokio-stream"]
 
 [dev-dependencies]
+synd-registry = { path = "../synd_registry", version = "0.1.0" }
 synd-test = { path = "../synd_test" }
 
 assert_cmd  = { workspace = true }

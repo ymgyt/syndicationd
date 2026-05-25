@@ -109,6 +109,7 @@ impl StatusLine {
                     RequestId::DeviceFlowPollAccessToken => Cow::Borrowed("Polling..."),
                     RequestId::FetchEntries => Cow::Borrowed("Fetch entries..."),
                     RequestId::FetchSubscription => Cow::Borrowed("Fetch subscription..."),
+                    RequestId::FetchFeedStatus => Cow::Borrowed("Fetch feed status..."),
                     RequestId::FetchGithubNotifications { page } => {
                         Cow::Owned(format!("Fetch github notifications(page: {page})..."))
                     }
@@ -119,6 +120,7 @@ impl StatusLine {
                         Cow::Owned(format!("Fetch github pull request(#{id})..."))
                     }
                     RequestId::SubscribeFeed => Cow::Borrowed("Subscribe feed..."),
+                    RequestId::RefreshFeed => Cow::Borrowed("Refresh feed..."),
                     RequestId::UnsubscribeFeed => Cow::Borrowed("Unsubscribe feed..."),
                     RequestId::MarkGithubNotificationAsDone { id } => {
                         Cow::Owned(format!("Mark notification({id}) as done..."))

@@ -2,7 +2,7 @@ use nom_language::error::{VerboseError, VerboseErrorKind};
 use thiserror::Error;
 
 use crate::{
-    client::synd_api::mutation::subscribe_feed::SubscribeFeedInput,
+    client::synd_api::payload::SubscribeFeedInput,
     config::Categories,
     types::{self},
 };
@@ -13,6 +13,7 @@ const CTX_REQUIREMENT: &str = "requirement";
 const CTX_CATEGORY: &str = "category";
 const CTX_CATEGORY_POST: &str = "category_post";
 const CTX_URL: &str = "url";
+const CTX_REFRESH_POLICY: &str = "refresh_policy";
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub(super) enum ParseFeedError {
@@ -28,18 +29,19 @@ impl<'a> InputParser<'a> {
     pub(super) const SUSBSCRIBE_FEED_PROMPT: &'static str =
         "# Please enter the requirement, category, and URL for subscription in the following format
 #
-# <requirement> <category> <url>
+# <requirement> <category> <url> [manual|interval:<duration>]
 #
 #   * The requirement must be one of 
 #     * \"MUST\" 
 #     * \"SHOULD\" 
 #     * \"MAY\"
 #   * For the category, please choose one category of the feed(for example, \"rust\")
+#   * Refresh policy is optional. Use \"manual\" or \"interval:2h\".
 #
 # with '#' will be ignored, and an empty URL aborts the subscription.
 #
 # Example:
-# MUST rust https://this-week-in-rust.org/atom.xml
+# MUST rust https://this-week-in-rust.org/atom.xml interval:2h
 ";
 
     pub(super) fn new(input: &'a str) -> Self {
@@ -70,6 +72,11 @@ impl<'a> InputParser<'a> {
                     Some((input, VerboseErrorKind::Context(CTX_URL))) => {
                         format!("Invalid url: {input}")
                     }
+                    Some((input, VerboseErrorKind::Context(CTX_REFRESH_POLICY))) => {
+                        format!(
+                            "Invalid refresh policy: use 'manual' or 'interval:<duration>'. {input}"
+                        )
+                    }
                     Some((input, _)) => format!("Failed to parse input: {input}"),
                     None => "Failed to parse input".to_owned(),
                 };
@@ -78,8 +85,14 @@ impl<'a> InputParser<'a> {
     }
 
     pub(super) fn edit_feed_prompt(feed: &types::Feed) -> String {
+        let refresh_policy = feed
+            .refresh_policy
+            .prompt_value()
+            .map(|policy| format!(" {policy}"))
+            .unwrap_or_default();
+
         format!(
-            "{}\n{requirement} {category} {feed_url}",
+            "{}\n{requirement} {category} {feed_url}{refresh_policy}",
             Self::SUSBSCRIBE_FEED_PROMPT,
             requirement = feed.requirement(),
             category = feed.category(),
@@ -94,37 +107,40 @@ mod feed {
         branch::alt,
         bytes::complete::{tag_no_case, take_while, take_while_m_n},
         character::complete::{multispace0, multispace1},
-        combinator::{map, value},
+        combinator::{all_consuming, map, opt, value},
         error::context,
         sequence::delimited,
     };
     use nom_language::error::{VerboseError, VerboseErrorKind};
-    use synd_feed::types::{Category, FeedUrl};
+    use synd_feed::types::{Category, FeedUrl, Requirement};
     use url::Url;
 
     use super::NomError;
     use crate::{
         application::input_parser::{
-            CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REQUIREMENT, CTX_URL, comment,
+            CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REFRESH_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
         },
-        client::synd_api::mutation::subscribe_feed::{Requirement, SubscribeFeedInput},
+        client::synd_api::payload::{
+            RefreshPolicyInput, RefreshPolicyInputKind, SubscribeFeedInput,
+        },
     };
 
     pub(super) fn parse(s: &'_ str) -> Result<SubscribeFeedInput, NomError<'_>> {
-        delimited(comment::comments, feed_input, comment::comments)
+        all_consuming(delimited(comment::comments, feed_input, comment::comments))
             .parse(s)
             .finish()
             .map(|(_, input)| input)
     }
 
     fn feed_input(s: &'_ str) -> IResult<&'_ str, SubscribeFeedInput, NomError<'_>> {
-        let (remain, (_, requirement, _, category, _, feed_url, _)) = (
+        let (remain, (_, requirement, _, category, _, feed_url, refresh_policy, _)) = (
             multispace0,
             requirement,
             multispace1,
             category,
             context(CTX_CATEGORY_POST, multispace1),
             url,
+            opt((multispace1, refresh_policy).map(|(_, policy)| policy)),
             multispace0,
         )
             .parse(s)?;
@@ -134,6 +150,8 @@ mod feed {
                 url: feed_url,
                 requirement: Some(requirement),
                 category: Some(category),
+                refresh_policy,
+                initial_refresh: None,
             },
         ))
     }
@@ -142,9 +160,9 @@ mod feed {
         context(
             CTX_REQUIREMENT,
             alt((
-                value(Requirement::MUST, tag_no_case("MUST")),
-                value(Requirement::SHOULD, tag_no_case("SHOULD")),
-                value(Requirement::MAY, tag_no_case("MAY")),
+                value(Requirement::Must, tag_no_case("MUST")),
+                value(Requirement::Should, tag_no_case("SHOULD")),
+                value(Requirement::May, tag_no_case("MAY")),
             )),
         )
         .parse(s)
@@ -183,21 +201,70 @@ mod feed {
         }
     }
 
+    fn refresh_policy(s: &'_ str) -> IResult<&'_ str, RefreshPolicyInput, NomError<'_>> {
+        let (remain, token) = context(
+            CTX_REFRESH_POLICY,
+            take_while_m_n(1, 64, |c: char| !c.is_whitespace()),
+        )
+        .parse(s)?;
+
+        if token.eq_ignore_ascii_case("manual") {
+            return Ok((
+                remain,
+                RefreshPolicyInput {
+                    kind: RefreshPolicyInputKind::Manual,
+                    interval_seconds: None,
+                },
+            ));
+        }
+
+        let Some((kind, duration)) = token.split_once(':') else {
+            return Err(invalid_refresh_policy(s));
+        };
+        if !kind.eq_ignore_ascii_case("interval") {
+            return Err(invalid_refresh_policy(s));
+        }
+
+        let duration = synd_support::time::humantime::parse_duration(duration)
+            .map_err(|_| invalid_refresh_policy(s))?;
+        if duration.subsec_nanos() != 0 {
+            return Err(invalid_refresh_policy(s));
+        }
+        let seconds = i64::try_from(duration.as_secs()).unwrap_or(i64::MAX);
+        if seconds == 0 {
+            return Err(invalid_refresh_policy(s));
+        }
+
+        Ok((
+            remain,
+            RefreshPolicyInput {
+                kind: RefreshPolicyInputKind::Interval,
+                interval_seconds: Some(seconds),
+            },
+        ))
+    }
+
+    fn invalid_refresh_policy(input: &'_ str) -> nom::Err<NomError<'_>> {
+        nom::Err::Failure(VerboseError {
+            errors: vec![(input, VerboseErrorKind::Context(CTX_REFRESH_POLICY))],
+        })
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
 
         #[test]
         fn parse_requirement() {
-            assert_eq!(requirement("must"), Ok(("", Requirement::MUST)));
-            assert_eq!(requirement("Must"), Ok(("", Requirement::MUST)));
-            assert_eq!(requirement("MUST"), Ok(("", Requirement::MUST)));
-            assert_eq!(requirement("should"), Ok(("", Requirement::SHOULD)));
-            assert_eq!(requirement("Should"), Ok(("", Requirement::SHOULD)));
-            assert_eq!(requirement("SHOULD"), Ok(("", Requirement::SHOULD)));
-            assert_eq!(requirement("may"), Ok(("", Requirement::MAY)));
-            assert_eq!(requirement("May"), Ok(("", Requirement::MAY)));
-            assert_eq!(requirement("MAY"), Ok(("", Requirement::MAY)));
+            assert_eq!(requirement("must"), Ok(("", Requirement::Must)));
+            assert_eq!(requirement("Must"), Ok(("", Requirement::Must)));
+            assert_eq!(requirement("MUST"), Ok(("", Requirement::Must)));
+            assert_eq!(requirement("should"), Ok(("", Requirement::Should)));
+            assert_eq!(requirement("Should"), Ok(("", Requirement::Should)));
+            assert_eq!(requirement("SHOULD"), Ok(("", Requirement::Should)));
+            assert_eq!(requirement("may"), Ok(("", Requirement::May)));
+            assert_eq!(requirement("May"), Ok(("", Requirement::May)));
+            assert_eq!(requirement("MAY"), Ok(("", Requirement::May)));
         }
 
         #[test]
@@ -214,8 +281,50 @@ mod feed {
                     "",
                     SubscribeFeedInput {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
-                        requirement: Some(Requirement::MUST),
-                        category: Some(Category::new("rust").unwrap())
+                        requirement: Some(Requirement::Must),
+                        category: Some(Category::new("rust").unwrap()),
+                        refresh_policy: None,
+                        initial_refresh: None,
+                    }
+                ))
+            );
+        }
+
+        #[test]
+        fn parse_feed_input_with_manual_refresh_policy() {
+            assert_eq!(
+                feed_input("MUST rust https://example.ymgyt.io/atom.xml manual"),
+                Ok((
+                    "",
+                    SubscribeFeedInput {
+                        url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
+                        requirement: Some(Requirement::Must),
+                        category: Some(Category::new("rust").unwrap()),
+                        refresh_policy: Some(RefreshPolicyInput {
+                            kind: RefreshPolicyInputKind::Manual,
+                            interval_seconds: None,
+                        }),
+                        initial_refresh: None,
+                    }
+                ))
+            );
+        }
+
+        #[test]
+        fn parse_feed_input_with_interval_refresh_policy() {
+            assert_eq!(
+                feed_input("MUST rust https://example.ymgyt.io/atom.xml interval:30m"),
+                Ok((
+                    "",
+                    SubscribeFeedInput {
+                        url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
+                        requirement: Some(Requirement::Must),
+                        category: Some(Category::new("rust").unwrap()),
+                        refresh_policy: Some(RefreshPolicyInput {
+                            kind: RefreshPolicyInputKind::Interval,
+                            interval_seconds: Some(1800),
+                        }),
+                        initial_refresh: None,
                     }
                 ))
             );
@@ -231,6 +340,14 @@ mod feed {
                 (
                     "should https://example.ymgyt.io/atom.xml",
                     CTX_CATEGORY_POST,
+                ),
+                (
+                    "should rust https://example.ymgyt.io/atom.xml interval:0s",
+                    CTX_REFRESH_POLICY,
+                ),
+                (
+                    "should rust https://example.ymgyt.io/atom.xml interval:1500ms",
+                    CTX_REFRESH_POLICY,
                 ),
             ];
 
@@ -249,6 +366,14 @@ mod feed {
                 .unwrap_err()
                 .errors;
             println!("{err:?}");
+        }
+
+        #[test]
+        fn parse_rejects_trailing_garbage() {
+            let err = parse("MUST rust https://example.ymgyt.io/atom.xml manual extra")
+                .unwrap_err()
+                .errors;
+            assert!(!err.is_empty());
         }
     }
 }

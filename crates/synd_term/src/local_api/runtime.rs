@@ -5,12 +5,12 @@ use std::{
 };
 
 use synd_api::{
-    cli::{CacheOptions, ServeOptions},
+    cli::{FeedRefreshOptions, ServeOptions},
     dependency::Dependency,
-    repository::sqlite::SqliteSubscriptionRepository,
     serve,
     shutdown::Shutdown,
 };
+use synd_persistence::sqlite::SqliteFeedRegistryStore;
 use tokio::{net::TcpListener, task::JoinHandle};
 use url::Url;
 
@@ -102,10 +102,11 @@ impl LocalApiSpawner {
                 timeout: launch.timeout(),
                 ..Default::default()
             },
-            CacheOptions::default(),
+            FeedRefreshOptions::default(),
             shutdown.cancellation_token(),
             launch.into_token().into_string(),
-        )?;
+        )
+        .await?;
 
         let task_shutdown = shutdown.clone();
         let task = tokio::spawn(async move { serve::serve(listener, dep, task_shutdown).await });
@@ -128,8 +129,8 @@ impl LocalApiSpawner {
         TcpListener::bind(addr).await.map_err(anyhow::Error::from)
     }
 
-    async fn open_repository(db_path: &Path) -> anyhow::Result<SqliteSubscriptionRepository> {
-        let db = SqliteSubscriptionRepository::create_or_open(db_path).await?;
+    async fn open_repository(db_path: &Path) -> anyhow::Result<SqliteFeedRegistryStore> {
+        let db = SqliteFeedRegistryStore::create_or_open(db_path).await?;
         db.migrate().await?;
         Ok(db)
     }

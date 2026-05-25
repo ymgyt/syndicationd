@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use synd_stdx::{
+use synd_support::{
     conf::Entry,
     fs::{FileSystem, fsimpl},
 };

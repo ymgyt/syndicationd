@@ -13,10 +13,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     cli::port::{AuthMode, PortContext},
     client::synd_api::{
-        Client, SubscribeFeedError, SyndApiError, mutation::subscribe_feed::SubscribeFeedInput,
+        Client, SubscribeFeedError, SyndApiError,
+        payload::{InitialRefreshModeInput, SubscribeFeedInput, SubscribeFeedPayload},
     },
     config::{self, ConfigResolver},
-    types::{self, ExportedFeed},
+    types::ExportedFeed,
 };
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -103,17 +104,26 @@ impl ImportCommand {
 
 #[cfg_attr(test, mockall::automock)]
 trait SubscribeFeed {
-    async fn subscribe_feed(&self, input: SubscribeFeedInput) -> Result<types::Feed, SyndApiError>;
+    async fn subscribe_feed(
+        &self,
+        input: SubscribeFeedInput,
+    ) -> Result<SubscribeFeedPayload, SyndApiError>;
 }
 
 impl SubscribeFeed for Client {
-    async fn subscribe_feed(&self, input: SubscribeFeedInput) -> Result<types::Feed, SyndApiError> {
+    async fn subscribe_feed(
+        &self,
+        input: SubscribeFeedInput,
+    ) -> Result<SubscribeFeedPayload, SyndApiError> {
         Client::subscribe_feed(self, input).await
     }
 }
 
 impl SubscribeFeed for &Client {
-    async fn subscribe_feed(&self, input: SubscribeFeedInput) -> Result<types::Feed, SyndApiError> {
+    async fn subscribe_feed(
+        &self,
+        input: SubscribeFeedInput,
+    ) -> Result<SubscribeFeedPayload, SyndApiError> {
         Client::subscribe_feed(self, input).await
     }
 }
@@ -157,15 +167,18 @@ where
         for feed in input.feeds {
             interval.tick().await;
             let url = feed.url.clone();
-            match client.subscribe_feed(SubscribeFeedInput::from(feed)).await {
-                Ok(imported) => {
+            let requirement = feed.requirement.unwrap_or(crate::ui::DEFAULT_REQUIREMNET);
+            let category = feed
+                .category
+                .clone()
+                .unwrap_or_else(|| crate::ui::default_category().clone());
+            let mut input = SubscribeFeedInput::from(feed);
+            input.initial_refresh = Some(InitialRefreshModeInput::RequireSuccess);
+            match client.subscribe_feed(input).await {
+                Ok(_) => {
                     writeln!(
                         &mut out,
-                        "OK    {req:<6} {category:<cat_width$} {url}",
-                        req = imported.requirement(),
-                        category = imported.category(),
-                        cat_width = max_category_width,
-                        url = imported.url,
+                        "OK    {requirement:<6} {category:<max_category_width$} {url}",
                     )?;
                     ok = ok.saturating_add(1);
                 }
@@ -192,11 +205,10 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::*;
-    use fake::{Fake as _, Faker};
     use synd_feed::types::{Category, FeedUrl, Requirement};
 
     #[tokio::test]
-    async fn usecase() {
+    async fn import_feeds_reports_success_and_failure() {
         let url_ok1: FeedUrl = "https://ok1.ymgyt.io/feed.xml".try_into().unwrap();
         let url_ok2: FeedUrl = "https://ok2.ymgyt.io/feed.xml".try_into().unwrap();
         let url_unavailable: FeedUrl = "https://err_unavailable.ymgyt.io/feed.xml"
@@ -212,23 +224,25 @@ mod tests {
                     url: url_ok1.clone(),
                     requirement: Some(Requirement::Must),
                     category: Some(cat_rust.clone()),
+                    refresh_policy: None,
                 },
                 ExportedFeed {
                     title: Some(String::from("err unuvailable")),
                     url: url_unavailable.clone(),
                     requirement: Some(Requirement::Must),
                     category: Some(cat_rust.clone()),
+                    refresh_policy: None,
                 },
                 ExportedFeed {
                     title: Some(String::from("ok2")),
                     url: url_ok2.clone(),
                     requirement: Some(Requirement::Should),
                     category: Some(cat_long.clone()),
+                    refresh_policy: None,
                 },
             ],
         };
 
-        let base_feed: types::Feed = Faker.fake();
         let interval = Duration::from_millis(100);
         let mut prev = None;
         let mut client = MockSubscribeFeed::new();
@@ -239,23 +253,36 @@ mod tests {
                 assert!(
                     // Dut to insability in the CI execution
                     // the interval assertion has been relaxed
-                    now.duration_since(prev) >= (interval - Duration::from_millis(50)),
+                    now.duration_since(prev)
+                        >= interval
+                            .checked_sub(Duration::from_millis(50))
+                            .unwrap_or_default(),
                     "the interval between requests is too short"
                 );
             }
             prev = Some(now);
+            assert_eq!(
+                input.initial_refresh,
+                Some(InitialRefreshModeInput::RequireSuccess)
+            );
 
             match input.url.as_str() {
-                "https://ok1.ymgyt.io/feed.xml" => Ok(base_feed
-                    .clone()
-                    .with_url(url_ok1.clone())
-                    .with_requirement(Requirement::Must)
-                    .with_category(cat_rust.clone())),
-                "https://ok2.ymgyt.io/feed.xml" => Ok(base_feed
-                    .clone()
-                    .with_url(url_ok2.clone())
-                    .with_requirement(Requirement::Should)
-                    .with_category(cat_long.clone())),
+                "https://ok1.ymgyt.io/feed.xml" => Ok(SubscribeFeedPayload {
+                    status: crate::client::synd_api::payload::ResponseStatus {
+                        code: crate::client::synd_api::payload::ResponseCode::Ok,
+                    },
+                    url: url_ok1.clone(),
+                    request_id: None,
+                    disposition: None,
+                }),
+                "https://ok2.ymgyt.io/feed.xml" => Ok(SubscribeFeedPayload {
+                    status: crate::client::synd_api::payload::ResponseStatus {
+                        code: crate::client::synd_api::payload::ResponseCode::Ok,
+                    },
+                    url: url_ok2.clone(),
+                    request_id: None,
+                    disposition: None,
+                }),
                 "https://err_unavailable.ymgyt.io/feed.xml" => Err(SyndApiError::SubscribeFeed(
                     SubscribeFeedError::FeedUnavailable {
                         feed_url: url_unavailable.clone(),
@@ -281,7 +308,7 @@ mod tests {
         insta::with_settings!({
             description => "import command output"
         }, {
-            insta::assert_snapshot!("import_usecase",buf);
+            insta::assert_snapshot!("import_feeds_reports_success_and_failure",buf);
         });
     }
 }

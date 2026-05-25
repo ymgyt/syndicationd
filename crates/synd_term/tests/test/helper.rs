@@ -5,10 +5,9 @@ use futures_util::future;
 use octocrab::Octocrab;
 use ratatui::backend::TestBackend;
 use synd_api::{
-    cli::{CacheOptions, ServeOptions, TlsOptions},
+    cli::{FeedRefreshOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
-    repository::{FeedSubscription, SubscriptionRepository, sqlite::SqliteSubscriptionRepository},
     shutdown::Shutdown,
 };
 use synd_auth::{
@@ -16,6 +15,12 @@ use synd_auth::{
     jwt,
 };
 use synd_feed::types::{Category, Requirement};
+use synd_feed::{feed::service::FeedService, types::FeedUrl};
+use synd_persistence::sqlite::SqliteFeedRegistryStore;
+use synd_registry::{
+    EffectiveRefreshPolicy, FeedRegistryStore, FeedSnapshot, FeedSubscription, RefreshInterval,
+    RefreshPolicy, RefreshSuccess, RegistryTransaction, SubscriberId,
+};
 pub use synd_term::integration::event_stream;
 use synd_term::{
     application::{
@@ -61,7 +66,7 @@ pub struct TestCase {
 }
 
 pub fn test_config() -> Config {
-    Config::default().with_idle_timer_interval(Duration::from_millis(1000))
+    Config::default().with_idle_timer_interval(Duration::from_secs(1))
 }
 
 impl Default for TestCase {
@@ -259,6 +264,63 @@ pub fn new_test_terminal(width: u16, height: u16) -> Terminal {
     Terminal::with(terminal)
 }
 
+fn refresh_interval(duration: Duration) -> RefreshInterval {
+    RefreshInterval::try_from(duration).unwrap()
+}
+
+struct CachedSubscriptionFixture {
+    subscriber_id: SubscriberId,
+    feed_url: FeedUrl,
+    requirement: Option<Requirement>,
+    category: Option<Category<'static>>,
+    refresh_policy: RefreshPolicy,
+    subscribed_at: DateTime<Utc>,
+}
+
+async fn seed_cached_subscription(
+    db: &SqliteFeedRegistryStore,
+    feed_service: &FeedService,
+    fixture: CachedSubscriptionFixture,
+) -> anyhow::Result<()> {
+    let fetched = feed_service
+        .fetch_feed_with_body(fixture.feed_url.clone())
+        .await?;
+    let succeeded_at = fetched.fetched_at;
+
+    let mut tx = db.begin().await?;
+    let subscription = FeedSubscription {
+        subscriber_id: fixture.subscriber_id,
+        feed_url: fixture.feed_url,
+        requirement: fixture.requirement,
+        category: fixture.category,
+        refresh_policy: fixture.refresh_policy,
+        created_at: fixture.subscribed_at,
+        updated_at: fixture.subscribed_at,
+    };
+    tx.upsert_subscription(subscription.clone()).await?;
+    let subscriptions = tx
+        .list_active_subscriptions_for_feed(&subscription.feed_url)
+        .await?;
+    let policy = EffectiveRefreshPolicy::from_subscriptions(&subscriptions)
+        .expect("seeded subscription should produce an effective policy");
+    tx.record_refresh_succeeded(RefreshSuccess {
+        snapshot: FeedSnapshot {
+            feed_url: fetched.url,
+            body: fetched.body,
+            content_type: fetched.content_type,
+            etag: fetched.etag,
+            last_modified: fetched.last_modified,
+            fetched_at: succeeded_at,
+        },
+        succeeded_at,
+        next_refresh_after: policy.next_after(succeeded_at),
+    })
+    .await?;
+    tx.commit().await?;
+
+    Ok(())
+}
+
 pub async fn serve_api(
     oauth_provider_port: u16,
     api_port: u16,
@@ -266,7 +328,7 @@ pub async fn serve_api(
     kvsd_root_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let db = {
-        let db = SqliteSubscriptionRepository::create_or_open(
+        let db = SqliteFeedRegistryStore::create_or_open(
             kvsd_root_dir.join(format!("{kvsd_port}_synd.db")),
         )
         .await?;
@@ -274,22 +336,38 @@ pub async fn serve_api(
 
         if api_port == 6031 {
             // setup fixtures
-            let test_user_id = "899cf3fa5afc0aa1";
-
-            db.put_feed_subscription(FeedSubscription {
-                user_id: test_user_id.into(),
-                url: "http://localhost:6030/feed/twir_atom".try_into().unwrap(),
-                requirement: Some(Requirement::Must),
-                category: Some(Category::new("rust").unwrap()),
-            })
+            let feed_service = FeedService::new(synd_api::config::USER_AGENT, 10 * 1024 * 1024);
+            let test_user_id = SubscriberId::new("899cf3fa5afc0aa1");
+            let now = Utc::now();
+            seed_cached_subscription(
+                &db,
+                &feed_service,
+                CachedSubscriptionFixture {
+                    subscriber_id: test_user_id.clone(),
+                    feed_url: "http://localhost:6030/feed/twir_atom".try_into().unwrap(),
+                    requirement: Some(Requirement::Must),
+                    category: Some(Category::new("rust").unwrap()),
+                    refresh_policy: RefreshPolicy::interval(refresh_interval(
+                        Duration::from_hours(1),
+                    )),
+                    subscribed_at: now,
+                },
+            )
             .await?;
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            db.put_feed_subscription(FeedSubscription {
-                user_id: test_user_id.into(),
-                url: "http://localhost:6030/feed/o11y_news".try_into().unwrap(),
-                requirement: Some(Requirement::Should),
-                category: Some(Category::new("opentelemetry").unwrap()),
-            })
+            seed_cached_subscription(
+                &db,
+                &feed_service,
+                CachedSubscriptionFixture {
+                    subscriber_id: test_user_id,
+                    feed_url: "http://localhost:6030/feed/o11y_news".try_into().unwrap(),
+                    requirement: Some(Requirement::Should),
+                    category: Some(Category::new("opentelemetry").unwrap()),
+                    refresh_policy: RefreshPolicy::interval(refresh_interval(
+                        Duration::from_hours(1),
+                    )),
+                    subscribed_at: now,
+                },
+            )
             .await?;
         }
 
@@ -304,10 +382,8 @@ pub async fn serve_api(
         body_limit_bytes: 1024 * 2,
         concurrency_limit: 100,
     };
-    let cache_options = CacheOptions {
-        feed_cache_size_mb: 1,
-        feed_cache_ttl: Duration::from_mins(1),
-        feed_cache_refresh_interval: Duration::from_hours(1),
+    let feed_refresh_options = FeedRefreshOptions {
+        default_feed_refresh_interval: refresh_interval(Duration::from_hours(1)),
     };
 
     let mut dep = Dependency::new(
@@ -315,7 +391,7 @@ pub async fn serve_api(
         tls_options,
         serve_options,
         synd_api::cli::LocalOptions { enabled: false },
-        cache_options,
+        feed_refresh_options,
         CancellationToken::new(),
     )
     .await

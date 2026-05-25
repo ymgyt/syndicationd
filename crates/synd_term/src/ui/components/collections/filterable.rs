@@ -76,6 +76,10 @@ impl<T, F> FilterableVec<T, F> {
         self.items.as_slice()
     }
 
+    pub(crate) fn unfiltered_len(&self) -> usize {
+        self.items.len()
+    }
+
     pub(crate) fn filter(&self) -> &F {
         &self.filterer
     }
@@ -89,17 +93,6 @@ where
         match populate {
             Populate::Append => self.items.extend(items),
             Populate::Replace => self.items = items,
-        }
-        self.refresh();
-    }
-
-    pub(crate) fn upsert_first<C>(&mut self, item: T, should_update: C)
-    where
-        C: Fn(&T) -> bool,
-    {
-        match self.items.iter_mut().find(|item| should_update(item)) {
-            Some(old) => *old = item,
-            None => self.items.insert(0, item),
         }
         self.refresh();
     }
@@ -145,6 +138,11 @@ where
         C: Fn(&T) -> bool,
     {
         self.items.retain(cond);
+        self.refresh();
+    }
+
+    pub(crate) fn truncate(&mut self, len: usize) {
+        self.items.truncate(len);
         self.refresh();
     }
 

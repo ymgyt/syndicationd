@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Context;
 use clap::Args;
-use synd_stdx::fs::FileSystem;
+use synd_support::fs::FileSystem;
 
 use crate::{application::Cache, config};
 
@@ -75,7 +75,7 @@ impl CleanCommand {
 mod tests {
     use std::io;
 
-    use synd_stdx::fs::fsimpl;
+    use synd_support::fs::fsimpl;
     use tempfile::{NamedTempFile, TempDir};
 
     use crate::filesystem::mock::MockFileSystem;

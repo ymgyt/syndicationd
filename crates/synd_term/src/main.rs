@@ -2,7 +2,7 @@ use std::{path::PathBuf, process::ExitCode};
 
 use anyhow::Context as _;
 use futures_util::TryFutureExt as _;
-use synd_stdx::fs::fsimpl::FileSystem;
+use synd_support::fs::fsimpl::FileSystem;
 use synd_term::{
     application::{Application, Cache, Config, Features, FeedBackend},
     cli::{self, Args, BackendMode},
@@ -21,7 +21,7 @@ fn init_tracing(
     default_filter: &'static str,
     stderr: bool,
 ) -> anyhow::Result<Option<WorkerGuard>> {
-    use synd_o11y::opentelemetry::init_propagation;
+    use synd_support::o11y::opentelemetry::init_propagation;
     use tracing_subscriber::{
         Registry,
         filter::EnvFilter,

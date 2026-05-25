@@ -6,7 +6,7 @@ pub(crate) mod mock {
         io,
         path::{Path, PathBuf},
     };
-    use synd_stdx::fs::FileSystem;
+    use synd_support::fs::FileSystem;
 
     #[derive(Default, Clone)]
     pub(crate) struct MockFileSystem {

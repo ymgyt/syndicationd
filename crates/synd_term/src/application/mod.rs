@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, HashSet, VecDeque},
     future,
     num::NonZero,
     ops::{ControlFlow, Sub},
@@ -16,7 +16,11 @@ use itertools::Itertools;
 use ratatui::widgets::Widget;
 use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_feed::types::FeedUrl;
-use tokio::time::{Instant, Sleep};
+use tokio::{
+    sync::mpsc,
+    task::JoinHandle,
+    time::{Instant, Sleep},
+};
 use update_informer::Version;
 use url::Url;
 
@@ -25,7 +29,7 @@ use crate::{
     auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
     client::{
         github::{FetchNotificationsParams, GithubClient},
-        synd_api::{Client, SyndApiError, mutation::subscribe_feed::SubscribeFeedInput},
+        synd_api::{Client, SyndApiError, payload},
     },
     command::{ApiResponse, Command},
     config::{self, Categories},
@@ -78,6 +82,12 @@ mod state;
 pub(crate) use state::TerminalFocus;
 use state::{Should, State};
 
+const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
+const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
+const FEED_VIEW_SYNC_INTERVAL: Duration = Duration::from_mins(5);
+const TIMELINE_INVALIDATION_DEBOUNCE: Duration = Duration::from_secs(1);
+const FEED_REGISTRY_EVENT_RECONNECT_DELAY: Duration = Duration::from_secs(2);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Populate {
     Append,
@@ -97,6 +107,12 @@ pub struct Application {
     interactor: Box<dyn Interact>,
     authenticator: Authenticator,
     in_flight: InFlight,
+    active_feed_refresh_requests: HashMap<RequestSequence, FeedUrl>,
+    active_feed_refresh_polls: HashSet<FeedRefreshPollKey>,
+    feed_registry_event_rx: mpsc::UnboundedReceiver<payload::FeedRegistryEvent>,
+    feed_registry_event_task: Option<JoinHandle<()>>,
+    timeline_invalidation: TimelineInvalidationState,
+    active_timeline_refetch: Option<RequestSequence>,
     cache: Cache,
     theme: Theme,
     idle_timer: Pin<Box<Sleep>>,
@@ -106,6 +122,26 @@ pub struct Application {
     latest_release: Option<Version>,
 
     state: State,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct FeedRefreshPollKey {
+    url: FeedUrl,
+    request_id: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TimelineInvalidationState {
+    Clean,
+    DirtyWaiting,
+    Refetching,
+    DirtyWhileRefetching,
+}
+
+impl FeedRefreshPollKey {
+    fn new(url: FeedUrl, request_id: String) -> Self {
+        Self { url, request_id }
+    }
 }
 
 impl Application {
@@ -156,6 +192,7 @@ impl Application {
         if dry_run {
             state.flags = Should::Quit;
         }
+        let (_feed_registry_event_tx, feed_registry_event_rx) = mpsc::unbounded_channel();
 
         Self {
             clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
@@ -171,6 +208,12 @@ impl Application {
             interactor,
             authenticator: authenticator.unwrap_or_else(Authenticator::new),
             in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
+            active_feed_refresh_requests: HashMap::new(),
+            active_feed_refresh_polls: HashSet::new(),
+            feed_registry_event_rx,
+            feed_registry_event_task: None,
+            timeline_invalidation: TimelineInvalidationState::Clean,
+            active_timeline_refetch: None,
             cache,
             theme,
             idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
@@ -288,18 +331,16 @@ impl Application {
 
     fn initial_fetch(&mut self) {
         tracing::info!("Initial fetch");
-        self.jobs.push(
-            future::ready(Ok(Command::FetchEntries {
-                after: None,
-                first: self.config.entries_per_pagination,
-            }))
-            .boxed(),
-        );
+        if self.client.supports_feed_registry_events() {
+            self.start_feed_registry_event_subscription();
+        }
+        self.fetch_initial_feed_registry();
         if self.config.features.enable_github_notification
             && let Some(fetch) = self.components.gh_notifications.fetch_next_if_needed()
         {
             self.jobs.push(future::ready(Ok(fetch)).boxed());
         }
+        self.schedule_feed_view_sync();
     }
 
     /// Restore terminal state and print something to console if necesseary
@@ -322,6 +363,7 @@ impl Application {
     }
 
     async fn shutdown_local_api(&mut self) {
+        self.stop_feed_registry_event_subscription();
         if let Some(runtime) = self.local_api_runtime.take() {
             runtime.shutdown().await;
         }
@@ -358,6 +400,9 @@ impl Application {
                 }
                 Some(command) = self.background_jobs.next() => {
                     Some(command.unwrap())
+                }
+                Some(event) = self.feed_registry_event_rx.recv() => {
+                    Some(Command::HandleFeedRegistryEvent { event })
                 }
                 ()  = self.in_flight.throbber_timer() => {
                     Some(Command::RenderThrobber)
@@ -435,16 +480,97 @@ impl Application {
                         ApiResponse::DeviceFlowCredential { credential } => {
                             self.complete_device_authroize_flow(credential);
                         }
-                        ApiResponse::SubscribeFeed { feed } => {
-                            self.components.subscription.upsert_subscribed_feed(*feed);
+                        ApiResponse::SubscribeFeed { url, payload } => {
+                            self.fetch_subscription(
+                                Populate::Replace,
+                                None,
+                                self.config.feeds_per_pagination,
+                            );
                             self.fetch_entries(
                                 Populate::Replace,
                                 None,
                                 self.config.entries_per_pagination,
                             );
+                            if let Some(request_id) = payload.request_id {
+                                self.ensure_feed_refresh_poll(
+                                    url,
+                                    request_id,
+                                    FEED_REFRESH_POLL_ATTEMPTS,
+                                );
+                            }
+                            self.should_render();
+                        }
+                        ApiResponse::RefreshFeed { url, payload } => {
+                            if self
+                                .active_feed_refresh_requests
+                                .remove(&request_seq)
+                                .is_none()
+                            {
+                                continue;
+                            }
+                            tracing::debug!(%url, "refresh request accepted");
+                            let refresh_status =
+                                crate::types::FeedRefreshStatus::from_refresh_receipt(&payload);
+                            self.components
+                                .subscription
+                                .update_refresh_status(&url, &refresh_status);
+                            self.fetch_subscription(
+                                Populate::Replace,
+                                None,
+                                self.config.feeds_per_pagination,
+                            );
+                            self.ensure_feed_refresh_poll(
+                                url,
+                                payload.request_id,
+                                FEED_REFRESH_POLL_ATTEMPTS,
+                            );
+                            self.should_render();
+                        }
+                        ApiResponse::FetchFeedRefreshStatus {
+                            url,
+                            request_id,
+                            remaining,
+                            status,
+                        } => {
+                            let poll_key = FeedRefreshPollKey::new(url.clone(), request_id.clone());
+                            if !self.active_feed_refresh_polls.contains(&poll_key) {
+                                continue;
+                            }
+
+                            let refresh_status = crate::types::FeedRefreshStatus::from(status);
+                            let current_request_id = refresh_status.request_id.clone();
+                            let is_current_request =
+                                current_request_id.as_deref() == Some(request_id.as_str());
+                            let is_active = refresh_status.is_active();
+                            self.components
+                                .subscription
+                                .update_refresh_status(&url, &refresh_status);
+
+                            if is_current_request && is_active && remaining > 1 {
+                                self.schedule_feed_refresh_poll_unchecked(
+                                    url,
+                                    request_id,
+                                    remaining.saturating_sub(1),
+                                );
+                            } else if is_current_request || !is_active {
+                                self.active_feed_refresh_polls.remove(&poll_key);
+                                self.fetch_subscription(
+                                    Populate::Replace,
+                                    None,
+                                    self.config.feeds_per_pagination,
+                                );
+                                self.fetch_entries(
+                                    Populate::Replace,
+                                    None,
+                                    self.config.entries_per_pagination,
+                                );
+                            } else {
+                                self.active_feed_refresh_polls.remove(&poll_key);
+                            }
                             self.should_render();
                         }
                         ApiResponse::UnsubscribeFeed { url } => {
+                            self.remove_feed_refresh_polls_for_url(&url);
                             self.components.subscription.remove_unsubscribed_feed(&url);
                             self.components.entries.remove_unsubscribed_entries(&url);
                             self.components.filter.update_categories(
@@ -458,6 +584,11 @@ impl Application {
                             populate,
                             subscription,
                         } => {
+                            let has_snapshot = subscription
+                                .feeds
+                                .nodes
+                                .iter()
+                                .any(|feed| feed.feed.is_some());
                             // paginate
                             subscription.feeds.page_info.has_next_page.then(|| {
                                 queue.push_back(Command::FetchSubscription {
@@ -465,40 +596,94 @@ impl Application {
                                     first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
                                 });
                             });
-                            // how we show fetched errors in ui?
-                            if !subscription.feeds.errors.is_empty() {
-                                tracing::warn!(
-                                    "Failed fetched feeds: {:?}",
-                                    subscription.feeds.errors
-                                );
-                            }
                             self.components
                                 .subscription
                                 .update_subscription(populate, subscription);
+                            if populate == Populate::Replace
+                                && self.components.entries.count() == 0
+                                && has_snapshot
+                            {
+                                self.fetch_entries(
+                                    Populate::Replace,
+                                    None,
+                                    self.config.entries_per_pagination,
+                                );
+                            }
                             self.should_render();
                         }
                         ApiResponse::FetchEntries { populate, payload } => {
+                            let page_info = payload.page_info.clone();
+                            let loaded_after_response =
+                                self.entries_loaded_after_response(populate, payload.entries.len());
+                            let next_first = self.next_entries_first(loaded_after_response);
                             self.components.filter.update_categories(
                                 &self.categories,
                                 populate,
                                 payload.entries.as_slice(),
                             );
-                            // paginate
-                            payload.page_info.has_next_page.then(|| {
+                            if page_info.has_next_page && next_first > 0 {
                                 queue.push_back(Command::FetchEntries {
-                                    after: payload.page_info.end_cursor.clone(),
-                                    first: self
-                                        .config
-                                        .entries_limit
-                                        .saturating_sub(
-                                            self.components.entries.count() + payload.entries.len(),
-                                        )
-                                        .min(payload.entries.len())
-                                        .try_into()
-                                        .unwrap_or(0),
+                                    after: page_info.end_cursor,
+                                    first: next_first,
                                 });
-                            });
-                            self.components.entries.update_entries(populate, payload);
+                            }
+                            self.components.entries.update_entries_with_limit(
+                                populate,
+                                payload,
+                                self.config.entries_limit,
+                            );
+                            self.complete_timeline_refetch(request_seq);
+                            self.should_render();
+                        }
+                        ApiResponse::FetchInitialFeedRegistry { payload } => {
+                            let (subscription, entries) = payload.into_parts();
+                            if let Some(subscription) = subscription {
+                                subscription.feeds.page_info.has_next_page.then(|| {
+                                    queue.push_back(Command::FetchSubscription {
+                                        after: subscription.feeds.page_info.end_cursor.clone(),
+                                        first: subscription
+                                            .feeds
+                                            .nodes
+                                            .len()
+                                            .try_into()
+                                            .unwrap_or(0),
+                                    });
+                                });
+                                self.components
+                                    .subscription
+                                    .update_subscription(Populate::Replace, subscription);
+                            } else {
+                                self.fetch_subscription(
+                                    Populate::Replace,
+                                    None,
+                                    self.config.feeds_per_pagination,
+                                );
+                            }
+                            if let Some(entries) = entries {
+                                let next_first = self.next_entries_first(entries.entries.len());
+                                if entries.page_info.has_next_page && next_first > 0 {
+                                    queue.push_back(Command::FetchEntries {
+                                        after: entries.page_info.end_cursor.clone(),
+                                        first: next_first,
+                                    });
+                                }
+                                self.components.filter.update_categories(
+                                    &self.categories,
+                                    Populate::Replace,
+                                    entries.entries.as_slice(),
+                                );
+                                self.components.entries.update_entries_with_limit(
+                                    Populate::Replace,
+                                    entries,
+                                    self.config.entries_limit,
+                                );
+                            } else {
+                                self.fetch_entries(
+                                    Populate::Replace,
+                                    None,
+                                    self.config.entries_per_pagination,
+                                );
+                            }
                             self.should_render();
                         }
                         ApiResponse::FetchGithubNotifications {
@@ -647,6 +832,41 @@ impl Application {
                 Command::SubscribeFeed { input } => {
                     self.subscribe_feed(input);
                     self.should_render();
+                }
+                Command::RefreshSelectedFeed => {
+                    if let Some(feed) = self.components.subscription.selected_feed() {
+                        queue.push_back(Command::RefreshFeed {
+                            url: feed.url.clone(),
+                        });
+                    }
+                }
+                Command::RefreshFeed { url } => {
+                    self.refresh_feed(url);
+                    self.should_render();
+                }
+                Command::PollFeedRefresh {
+                    url,
+                    request_id,
+                    remaining,
+                } => {
+                    if !self
+                        .active_feed_refresh_polls
+                        .contains(&FeedRefreshPollKey::new(url.clone(), request_id.clone()))
+                    {
+                        continue;
+                    }
+
+                    self.fetch_feed_refresh_status(url, request_id, remaining);
+                    self.should_render();
+                }
+                Command::SyncFeedView => {
+                    self.sync_feed_view();
+                }
+                Command::HandleFeedRegistryEvent { event } => {
+                    self.handle_feed_registry_event(event);
+                }
+                Command::DebouncedTimelineReload => {
+                    self.refetch_dirty_timeline();
                 }
                 Command::FetchSubscription { after, first } => {
                     self.fetch_subscription(Populate::Append, after, first);
@@ -825,37 +1045,27 @@ impl Application {
                     self.handle_error_message(message, None);
                 }
                 Command::HandleApiError { error, request_seq } => {
-                    let message = match Arc::into_inner(error).expect("error never cloned") {
-                        SyndApiError::Unauthorized { url }
-                            if self.feed_api_session.requires_user_credential() =>
-                        {
-                            tracing::warn!(
-                                "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
-                            );
-                            self.cache.clean().ok();
-
-                            format!(
-                                "{} unauthorized. please login again",
-                                url.map(|url| url.to_string()).unwrap_or_default(),
-                            )
-                        }
-                        SyndApiError::Unauthorized { url } => {
-                            format!(
-                                "{} unauthorized. local feed API session is invalid",
-                                url.map(|url| url.to_string()).unwrap_or_default(),
-                            )
-                        }
-                        SyndApiError::BuildRequest(err) => {
-                            format!("build request failed: {err} this is a BUG")
-                        }
-
-                        SyndApiError::Graphql { errors } => {
-                            errors.into_iter().map(|err| err.to_string()).join(", ")
-                        }
-                        SyndApiError::SubscribeFeed(err) => err.to_string(),
-
-                        SyndApiError::Internal(err) => format!("internal error: {err}"),
-                    };
+                    self.active_feed_refresh_requests.remove(&request_seq);
+                    self.fail_timeline_refetch(request_seq);
+                    let message = self.synd_api_error_message(
+                        Arc::into_inner(error).expect("error never cloned"),
+                    );
+                    self.handle_error_message(message, Some(request_seq));
+                }
+                Command::HandleFeedRefreshPollError {
+                    url,
+                    request_id,
+                    error,
+                    request_seq,
+                } => {
+                    let poll_key = FeedRefreshPollKey::new(url, request_id);
+                    if !self.active_feed_refresh_polls.remove(&poll_key) {
+                        self.in_flight.remove(request_seq);
+                        continue;
+                    }
+                    let message = self.synd_api_error_message(
+                        Arc::into_inner(error).expect("error never cloned"),
+                    );
                     self.handle_error_message(message, Some(request_seq));
                 }
                 Command::HandleOauthApiError { error, request_seq } => {
@@ -881,6 +1091,38 @@ impl Application {
 
         self.components.prompt.set_error_message(error_message);
         self.should_render();
+    }
+
+    fn synd_api_error_message(&mut self, error: SyndApiError) -> String {
+        match error {
+            SyndApiError::Unauthorized { url }
+                if self.feed_api_session.requires_user_credential() =>
+            {
+                tracing::warn!(
+                    "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
+                );
+                self.cache.clean().ok();
+
+                format!(
+                    "{} unauthorized. please login again",
+                    url.map(|url| url.to_string()).unwrap_or_default(),
+                )
+            }
+            SyndApiError::Unauthorized { url } => {
+                format!(
+                    "{} unauthorized. local feed API session is invalid",
+                    url.map(|url| url.to_string()).unwrap_or_default(),
+                )
+            }
+            SyndApiError::BuildRequest(err) => {
+                format!("build request failed: {err} this is a BUG")
+            }
+            SyndApiError::Graphql { errors } => {
+                errors.into_iter().map(|err| err.to_string()).join(", ")
+            }
+            SyndApiError::SubscribeFeed(err) => err.to_string(),
+            SyndApiError::Internal(err) => format!("internal error: {err}"),
+        }
     }
 
     #[inline]
@@ -1021,15 +1263,16 @@ impl Application {
         self.jobs.push(fut);
     }
 
-    fn subscribe_feed(&mut self, input: SubscribeFeedInput) {
+    fn subscribe_feed(&mut self, input: payload::SubscribeFeedInput) {
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
         let fut = async move {
             match client.subscribe_feed(input).await {
-                Ok(feed) => Ok(Command::HandleApiResponse {
+                Ok(payload) => Ok(Command::HandleApiResponse {
                     request_seq,
                     response: ApiResponse::SubscribeFeed {
-                        feed: Box::new(feed),
+                        url: payload.url.clone(),
+                        payload,
                     },
                 }),
                 Err(error) => Ok(Command::api_error(error, request_seq)),
@@ -1037,6 +1280,98 @@ impl Application {
         }
         .boxed();
         self.jobs.push(fut);
+    }
+
+    fn refresh_feed(&mut self, url: FeedUrl) {
+        let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::RefreshFeed);
+        self.active_feed_refresh_requests
+            .insert(request_seq, url.clone());
+        let fut = async move {
+            match client.refresh_feed(url.clone()).await {
+                Ok(payload) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::RefreshFeed { url, payload },
+                }),
+                Err(error) => Ok(Command::api_error(error, request_seq)),
+            }
+        }
+        .boxed();
+        self.jobs.push(fut);
+    }
+
+    fn ensure_feed_refresh_poll(&mut self, url: FeedUrl, request_id: String, remaining: u16) {
+        let key = FeedRefreshPollKey::new(url.clone(), request_id.clone());
+        if !self.active_feed_refresh_polls.insert(key) {
+            return;
+        }
+        self.schedule_feed_refresh_poll_unchecked(url, request_id, remaining);
+    }
+
+    fn schedule_feed_refresh_poll_unchecked(
+        &mut self,
+        url: FeedUrl,
+        request_id: String,
+        remaining: u16,
+    ) {
+        let fut = async move {
+            tokio::time::sleep(FEED_REFRESH_POLL_INTERVAL).await;
+            Ok(Command::PollFeedRefresh {
+                url,
+                request_id,
+                remaining,
+            })
+        }
+        .boxed();
+        self.background_jobs.push(fut);
+    }
+
+    fn fetch_feed_refresh_status(&mut self, url: FeedUrl, request_id: String, remaining: u16) {
+        let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::FetchFeedStatus);
+        let fut = async move {
+            match client.fetch_feed_status(url.clone()).await {
+                Ok(status) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::FetchFeedRefreshStatus {
+                        url,
+                        request_id: request_id.clone(),
+                        remaining,
+                        status,
+                    },
+                }),
+                Err(err) => Ok(Command::HandleFeedRefreshPollError {
+                    url,
+                    request_id,
+                    error: Arc::new(err),
+                    request_seq,
+                }),
+            }
+        }
+        .boxed();
+        self.jobs.push(fut);
+    }
+
+    fn remove_feed_refresh_polls_for_url(&mut self, url: &FeedUrl) {
+        self.active_feed_refresh_requests
+            .retain(|_, request_url| request_url != url);
+        self.active_feed_refresh_polls.retain(|key| &key.url != url);
+    }
+
+    fn sync_feed_view(&mut self) {
+        self.fetch_subscription(Populate::Replace, None, self.config.feeds_per_pagination);
+        self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
+        self.schedule_feed_view_sync();
+        self.should_render();
+    }
+
+    fn schedule_feed_view_sync(&mut self) {
+        let fut = async move {
+            tokio::time::sleep(FEED_VIEW_SYNC_INTERVAL).await;
+            Ok(Command::SyncFeedView)
+        }
+        .boxed();
+        self.background_jobs.push(fut);
     }
 
     fn unsubscribe_feed(&mut self, url: FeedUrl) {
@@ -1187,6 +1522,28 @@ impl Application {
 
 impl Application {
     #[tracing::instrument(skip(self))]
+    fn fetch_initial_feed_registry(&mut self) {
+        let client = self.client.clone();
+        let request_seq = self.in_flight.add(RequestId::FetchSubscription);
+        let subscriptions_first = self.config.feeds_per_pagination;
+        let timeline_first = self.next_entries_first(0);
+        let fut = async move {
+            match client
+                .fetch_initial_feed_registry(subscriptions_first, timeline_first)
+                .await
+            {
+                Ok(payload) => Ok(Command::HandleApiResponse {
+                    request_seq,
+                    response: ApiResponse::FetchInitialFeedRegistry { payload },
+                }),
+                Err(err) => Ok(Command::api_error(err, request_seq)),
+            }
+        }
+        .boxed();
+        self.jobs.push(fut);
+    }
+
+    #[tracing::instrument(skip(self))]
     fn fetch_subscription(&mut self, populate: Populate, after: Option<String>, first: i64) {
         if first <= 0 {
             return;
@@ -1211,8 +1568,19 @@ impl Application {
 
     #[tracing::instrument(skip(self))]
     fn fetch_entries(&mut self, populate: Populate, after: Option<String>, first: i64) {
+        let _ = self.spawn_fetch_entries(populate, after, first);
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn spawn_fetch_entries(
+        &mut self,
+        populate: Populate,
+        after: Option<String>,
+        first: i64,
+    ) -> Option<RequestSequence> {
+        let first = self.bounded_entries_first(populate, first);
         if first <= 0 {
-            return;
+            return None;
         }
         let client = self.client.clone();
         let request_seq = self.in_flight.add(RequestId::FetchEntries);
@@ -1230,6 +1598,156 @@ impl Application {
         }
         .boxed();
         self.jobs.push(fut);
+        Some(request_seq)
+    }
+
+    fn bounded_entries_first(&self, populate: Populate, requested_first: i64) -> i64 {
+        if requested_first <= 0 {
+            return 0;
+        }
+
+        let available = match populate {
+            Populate::Replace => self.config.entries_limit,
+            Populate::Append => self
+                .config
+                .entries_limit
+                .saturating_sub(self.components.entries.loaded_count()),
+        };
+        requested_first.min(i64::try_from(available).unwrap_or(i64::MAX))
+    }
+
+    fn entries_loaded_after_response(&self, populate: Populate, response_len: usize) -> usize {
+        match populate {
+            Populate::Replace => response_len,
+            Populate::Append => self.components.entries.loaded_count() + response_len,
+        }
+    }
+
+    fn next_entries_first(&self, loaded_after_response: usize) -> i64 {
+        let remaining = self
+            .config
+            .entries_limit
+            .saturating_sub(loaded_after_response);
+        let page_size = usize::try_from(self.config.entries_per_pagination).unwrap_or(0);
+
+        remaining.min(page_size).try_into().unwrap_or(i64::MAX)
+    }
+
+    fn start_feed_registry_event_subscription(&mut self) {
+        if self.feed_registry_event_task.is_some() {
+            return;
+        }
+
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        self.feed_registry_event_rx = event_rx;
+        let client = self.client.clone();
+        self.feed_registry_event_task = Some(tokio::spawn(async move {
+            loop {
+                if event_tx.is_closed() {
+                    break;
+                }
+
+                match client.run_feed_registry_events(event_tx.clone()).await {
+                    Ok(()) => tracing::debug!("feed registry event subscription stopped"),
+                    Err(error) => {
+                        tracing::warn!("feed registry event subscription failed: {error}")
+                    }
+                }
+
+                if event_tx.is_closed() {
+                    break;
+                }
+                tokio::time::sleep(FEED_REGISTRY_EVENT_RECONNECT_DELAY).await;
+            }
+        }));
+    }
+
+    fn stop_feed_registry_event_subscription(&mut self) {
+        if let Some(task) = self.feed_registry_event_task.take() {
+            task.abort();
+        }
+        let (_event_tx, event_rx) = mpsc::unbounded_channel();
+        self.feed_registry_event_rx = event_rx;
+    }
+
+    fn handle_feed_registry_event(&mut self, event: payload::FeedRegistryEvent) {
+        match event {
+            payload::FeedRegistryEvent::TimelineChanged(event) => {
+                tracing::debug!(
+                    changed_at = event.changed_at,
+                    affected_feeds = ?event.affected_feeds,
+                    "timeline changed"
+                );
+                self.mark_timeline_dirty();
+            }
+        }
+    }
+
+    fn mark_timeline_dirty(&mut self) {
+        match self.timeline_invalidation {
+            TimelineInvalidationState::Clean => {
+                self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
+                self.schedule_debounced_timeline_reload();
+            }
+            TimelineInvalidationState::DirtyWaiting => {}
+            TimelineInvalidationState::Refetching => {
+                self.timeline_invalidation = TimelineInvalidationState::DirtyWhileRefetching;
+            }
+            TimelineInvalidationState::DirtyWhileRefetching => {}
+        }
+    }
+
+    fn schedule_debounced_timeline_reload(&mut self) {
+        let fut = async move {
+            tokio::time::sleep(TIMELINE_INVALIDATION_DEBOUNCE).await;
+            Ok(Command::DebouncedTimelineReload)
+        }
+        .boxed();
+        self.background_jobs.push(fut);
+    }
+
+    fn refetch_dirty_timeline(&mut self) {
+        if self.timeline_invalidation != TimelineInvalidationState::DirtyWaiting {
+            return;
+        }
+
+        let Some(request_seq) =
+            self.spawn_fetch_entries(Populate::Replace, None, self.config.entries_per_pagination)
+        else {
+            self.timeline_invalidation = TimelineInvalidationState::Clean;
+            return;
+        };
+
+        self.active_timeline_refetch = Some(request_seq);
+        self.timeline_invalidation = TimelineInvalidationState::Refetching;
+    }
+
+    fn complete_timeline_refetch(&mut self, request_seq: RequestSequence) {
+        if self.active_timeline_refetch != Some(request_seq) {
+            return;
+        }
+
+        self.active_timeline_refetch = None;
+        match self.timeline_invalidation {
+            TimelineInvalidationState::Refetching => {
+                self.timeline_invalidation = TimelineInvalidationState::Clean;
+            }
+            TimelineInvalidationState::DirtyWhileRefetching => {
+                self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
+                self.schedule_debounced_timeline_reload();
+            }
+            TimelineInvalidationState::Clean | TimelineInvalidationState::DirtyWaiting => {}
+        }
+    }
+
+    fn fail_timeline_refetch(&mut self, request_seq: RequestSequence) {
+        if self.active_timeline_refetch != Some(request_seq) {
+            return;
+        }
+
+        self.active_timeline_refetch = None;
+        self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
+        self.schedule_debounced_timeline_reload();
     }
 
     #[tracing::instrument(skip(self))]

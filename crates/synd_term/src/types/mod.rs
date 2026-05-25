@@ -4,13 +4,7 @@ use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
 use tracing::warn;
 
-use crate::{
-    client::synd_api::{
-        mutation,
-        query::{self},
-    },
-    ui,
-};
+use crate::{client::synd_api::payload, ui};
 
 mod time;
 pub use time::{Time, TimeExt};
@@ -23,7 +17,8 @@ pub use requirement_ext::RequirementExt;
 
 pub(crate) mod github;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Link {
     pub href: String,
@@ -32,57 +27,13 @@ pub struct Link {
     pub title: Option<String>,
 }
 
-impl From<query::subscription::Link> for Link {
-    fn from(v: query::subscription::Link) -> Self {
-        Self {
-            href: v.href,
-            rel: v.rel,
-            media_type: v.media_type,
-            title: v.title,
-        }
-    }
-}
-
-impl From<mutation::subscribe_feed::Link> for Link {
-    fn from(v: mutation::subscribe_feed::Link) -> Self {
-        Self {
-            href: v.href,
-            rel: v.rel,
-            media_type: v.media_type,
-            title: v.title,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct EntryMeta {
     pub title: Option<String>,
     pub published: Option<Time>,
     pub updated: Option<Time>,
     pub summary: Option<String>,
-}
-
-impl From<query::subscription::EntryMeta> for EntryMeta {
-    fn from(e: query::subscription::EntryMeta) -> Self {
-        Self {
-            title: e.title,
-            published: e.published.map(parse_time),
-            updated: e.updated.map(parse_time),
-            summary: e.summary,
-        }
-    }
-}
-
-impl From<mutation::subscribe_feed::EntryMeta> for EntryMeta {
-    fn from(e: mutation::subscribe_feed::EntryMeta) -> Self {
-        Self {
-            title: e.title,
-            published: e.published.map(parse_time),
-            updated: e.updated.map(parse_time),
-            summary: e.summary,
-        }
-    }
 }
 
 impl EntryMeta {
@@ -101,6 +52,146 @@ impl EntryMeta {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(fake::Dummy))]
+pub struct FeedRefreshPolicy {
+    pub kind: FeedRefreshPolicyKind,
+    pub interval_seconds: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(fake::Dummy))]
+pub enum FeedRefreshPolicyKind {
+    Manual,
+    Interval,
+    Other(String),
+}
+
+impl From<payload::RefreshPolicy> for FeedRefreshPolicy {
+    fn from(value: payload::RefreshPolicy) -> Self {
+        Self {
+            kind: value.kind.into(),
+            interval_seconds: value.interval_seconds,
+        }
+    }
+}
+
+impl FeedRefreshPolicy {
+    pub fn prompt_value(&self) -> Option<String> {
+        match self.kind {
+            FeedRefreshPolicyKind::Manual => Some("manual".to_owned()),
+            FeedRefreshPolicyKind::Interval => self
+                .interval_seconds
+                .filter(|seconds| *seconds > 0)
+                .map(|seconds| format!("interval:{seconds}s")),
+            FeedRefreshPolicyKind::Other(_) => None,
+        }
+    }
+}
+
+impl From<payload::RefreshPolicyKind> for FeedRefreshPolicyKind {
+    fn from(value: payload::RefreshPolicyKind) -> Self {
+        match value {
+            payload::RefreshPolicyKind::Manual => Self::Manual,
+            payload::RefreshPolicyKind::Interval => Self::Interval,
+            payload::RefreshPolicyKind::Other(value) => Self::Other(value),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(test, derive(fake::Dummy))]
+pub struct FeedRefreshStatus {
+    pub state: FeedRefreshStatusState,
+    pub request_id: Option<String>,
+    pub last_attempt_at: Option<String>,
+    pub last_success_at: Option<String>,
+    pub last_failure_at: Option<String>,
+    pub last_error_message: Option<String>,
+}
+
+impl FeedRefreshStatus {
+    pub fn from_refresh_receipt(value: &payload::RefreshFeedPayload) -> Self {
+        Self {
+            state: FeedRefreshStatusState::from(&value.disposition),
+            request_id: Some(value.request_id.clone()),
+            last_attempt_at: None,
+            last_success_at: None,
+            last_failure_at: None,
+            last_error_message: None,
+        }
+    }
+
+    pub fn is_active(&self) -> bool {
+        matches!(
+            self.state,
+            FeedRefreshStatusState::Pending | FeedRefreshStatusState::Running
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(fake::Dummy))]
+pub enum FeedRefreshStatusState {
+    NeverRefreshed,
+    Idle,
+    Pending,
+    Running,
+    LastFailed,
+    Other(String),
+}
+
+impl FeedRefreshStatusState {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::NeverRefreshed => "Never",
+            Self::Idle => "Idle",
+            Self::Pending => "Pending",
+            Self::Running => "Running",
+            Self::LastFailed => "Failed",
+            Self::Other(_) => "Unknown",
+        }
+    }
+}
+
+impl From<payload::RefreshStatus> for FeedRefreshStatus {
+    fn from(value: payload::RefreshStatus) -> Self {
+        Self {
+            state: value.state.into(),
+            request_id: value.request_id,
+            last_attempt_at: value.last_attempt_at,
+            last_success_at: value.last_success_at,
+            last_failure_at: value.last_failure_at,
+            last_error_message: value.last_error_message,
+        }
+    }
+}
+
+impl From<payload::RefreshStatusState> for FeedRefreshStatusState {
+    fn from(value: payload::RefreshStatusState) -> Self {
+        match value {
+            payload::RefreshStatusState::NeverRefreshed => Self::NeverRefreshed,
+            payload::RefreshStatusState::Idle => Self::Idle,
+            payload::RefreshStatusState::Pending => Self::Pending,
+            payload::RefreshStatusState::Running => Self::Running,
+            payload::RefreshStatusState::LastFailed => Self::LastFailed,
+            payload::RefreshStatusState::Other(value) => Self::Other(value),
+        }
+    }
+}
+
+impl From<&payload::RefreshDisposition> for FeedRefreshStatusState {
+    fn from(value: &payload::RefreshDisposition) -> Self {
+        match value {
+            payload::RefreshDisposition::JoinedRunning => Self::Running,
+            payload::RefreshDisposition::Created
+            | payload::RefreshDisposition::Promoted
+            | payload::RefreshDisposition::CoalescedPending
+            | payload::RefreshDisposition::Other(_) => Self::Pending,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(test, derive(fake::Dummy))]
 pub struct Feed {
     pub feed_type: Option<FeedType>,
     pub title: Option<String>,
@@ -112,6 +203,8 @@ pub struct Feed {
     pub generator: Option<String>,
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
+    pub refresh_policy: FeedRefreshPolicy,
+    pub refresh_status: FeedRefreshStatus,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
 }
@@ -147,64 +240,50 @@ impl Feed {
     }
 }
 
-impl From<query::subscription::Feed> for Feed {
-    fn from(f: query::subscription::Feed) -> Self {
+impl From<payload::SubscribedFeed> for Feed {
+    fn from(f: payload::SubscribedFeed) -> Self {
+        let payload::SubscribedFeed {
+            url,
+            requirement,
+            category,
+            refresh_policy,
+            refresh_status,
+            feed: details,
+        } = f;
         Self {
-            feed_type: match f.type_ {
-                query::subscription::FeedType::ATOM => Some(FeedType::Atom),
-                query::subscription::FeedType::RSS1 => Some(FeedType::RSS1),
-                query::subscription::FeedType::RSS2 => Some(FeedType::RSS2),
-                query::subscription::FeedType::RSS0 => Some(FeedType::RSS0),
-                query::subscription::FeedType::JSON => Some(FeedType::JSON),
-                query::subscription::FeedType::Other(_) => None,
-            },
-            title: f.title,
-            url: f.url,
-            updated: f.updated.map(parse_time),
-            links: f.links.nodes.into_iter().map(From::from).collect(),
-            website_url: f.website_url,
-            description: f.description,
-            generator: f.generator,
-            entries: f.entries.nodes.into_iter().map(From::from).collect(),
-            authors: f.authors.nodes,
-            requirement: f.requirement.and_then(|r| match r {
-                query::subscription::Requirement::MUST => Some(Requirement::Must),
-                query::subscription::Requirement::SHOULD => Some(Requirement::Should),
-                query::subscription::Requirement::MAY => Some(Requirement::May),
-                query::subscription::Requirement::Other(_) => None,
-            }),
-            category: f.category,
-        }
-    }
-}
-
-impl From<mutation::subscribe_feed::Feed> for Feed {
-    fn from(f: mutation::subscribe_feed::Feed) -> Self {
-        Self {
-            feed_type: match f.type_ {
-                mutation::subscribe_feed::FeedType::ATOM => Some(FeedType::Atom),
-                mutation::subscribe_feed::FeedType::RSS1 => Some(FeedType::RSS1),
-                mutation::subscribe_feed::FeedType::RSS2 => Some(FeedType::RSS2),
-                mutation::subscribe_feed::FeedType::RSS0 => Some(FeedType::RSS0),
-                mutation::subscribe_feed::FeedType::JSON => Some(FeedType::JSON),
-                mutation::subscribe_feed::FeedType::Other(_) => None,
-            },
-            title: f.title,
-            url: f.url,
-            updated: f.updated.map(parse_time),
-            links: f.links.nodes.into_iter().map(From::from).collect(),
-            website_url: f.website_url,
-            description: f.description,
-            generator: f.generator,
-            entries: f.entries.nodes.into_iter().map(From::from).collect(),
-            authors: f.authors.nodes,
-            requirement: f.requirement.and_then(|r| match r {
-                mutation::subscribe_feed::Requirement::MUST => Some(Requirement::Must),
-                mutation::subscribe_feed::Requirement::SHOULD => Some(Requirement::Should),
-                mutation::subscribe_feed::Requirement::MAY => Some(Requirement::May),
-                mutation::subscribe_feed::Requirement::Other(_) => None,
-            }),
-            category: f.category,
+            feed_type: details
+                .as_ref()
+                .and_then(|details| details.feed_type.clone().into_feed_type()),
+            title: details.as_ref().and_then(|details| details.title.clone()),
+            url,
+            updated: details
+                .as_ref()
+                .and_then(|details| details.updated.as_ref().map(parse_time)),
+            links: details
+                .as_ref()
+                .map(|details| details.links.nodes.clone())
+                .unwrap_or_default(),
+            website_url: details
+                .as_ref()
+                .and_then(|details| details.website_url.clone()),
+            description: details
+                .as_ref()
+                .and_then(|details| details.description.clone()),
+            generator: details
+                .as_ref()
+                .and_then(|details| details.generator.clone()),
+            entries: details
+                .as_ref()
+                .map(|details| details.entries.nodes.clone())
+                .unwrap_or_default(),
+            authors: details
+                .as_ref()
+                .map(|details| details.authors.nodes.clone())
+                .unwrap_or_default(),
+            refresh_policy: refresh_policy.into(),
+            refresh_status: refresh_status.into(),
+            requirement,
+            category,
         }
     }
 }
@@ -242,8 +321,8 @@ impl Entry {
     }
 }
 
-impl From<query::entries::Entry> for Entry {
-    fn from(v: query::entries::Entry) -> Self {
+impl From<payload::Entry> for Entry {
+    fn from(v: payload::Entry) -> Self {
         Self {
             title: v.title,
             published: v.published.map(parse_time),
@@ -252,51 +331,85 @@ impl From<query::entries::Entry> for Entry {
             feed_title: v.feed.title,
             feed_url: v.feed.url,
             summary: v.summary,
-            requirement: match v.feed.requirement {
-                Some(query::entries::Requirement::MUST) => Some(Requirement::Must),
-                Some(query::entries::Requirement::SHOULD) => Some(Requirement::Should),
-                Some(query::entries::Requirement::MAY) => Some(Requirement::May),
-                _ => None,
-            },
+            requirement: v.feed.requirement,
             category: v.feed.category,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ExportedFeed {
     pub title: Option<String>,
     pub url: FeedUrl,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
+    #[serde(default)]
+    pub refresh_policy: Option<ExportedRefreshPolicy>,
 }
 
-impl From<query::export_subscription::ExportSubscriptionOutputFeedsNodes> for ExportedFeed {
-    fn from(v: query::export_subscription::ExportSubscriptionOutputFeedsNodes) -> Self {
-        Self {
-            title: v.title,
-            url: v.url,
-            requirement: v.requirement.and_then(|r| match r {
-                query::export_subscription::Requirement::MUST => Some(Requirement::Must),
-                query::export_subscription::Requirement::SHOULD => Some(Requirement::Should),
-                query::export_subscription::Requirement::MAY => Some(Requirement::May),
-                query::export_subscription::Requirement::Other(_) => None,
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportedRefreshPolicy {
+    pub kind: ExportedRefreshPolicyKind,
+    pub interval_seconds: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ExportedRefreshPolicyKind {
+    Manual,
+    Interval,
+}
+
+impl ExportedRefreshPolicy {
+    fn from_api(value: &payload::RefreshPolicy) -> Option<Self> {
+        match &value.kind {
+            payload::RefreshPolicyKind::Manual => Some(Self {
+                kind: ExportedRefreshPolicyKind::Manual,
+                interval_seconds: None,
             }),
-            category: v.category,
+            payload::RefreshPolicyKind::Interval => Some(Self {
+                kind: ExportedRefreshPolicyKind::Interval,
+                interval_seconds: value.interval_seconds,
+            }),
+            payload::RefreshPolicyKind::Other(_) => None,
         }
     }
 }
 
-impl From<ExportedFeed> for mutation::subscribe_feed::SubscribeFeedInput {
+impl From<ExportedRefreshPolicy> for payload::RefreshPolicyInput {
+    fn from(value: ExportedRefreshPolicy) -> Self {
+        Self {
+            kind: match value.kind {
+                ExportedRefreshPolicyKind::Manual => payload::RefreshPolicyInputKind::Manual,
+                ExportedRefreshPolicyKind::Interval => payload::RefreshPolicyInputKind::Interval,
+            },
+            interval_seconds: value.interval_seconds,
+        }
+    }
+}
+
+impl From<payload::SubscribedFeed> for ExportedFeed {
+    fn from(v: payload::SubscribedFeed) -> Self {
+        let refresh_policy = ExportedRefreshPolicy::from_api(&v.refresh_policy);
+        Self {
+            title: v.feed.and_then(|feed| feed.title),
+            url: v.url,
+            requirement: v.requirement,
+            category: v.category,
+            refresh_policy,
+        }
+    }
+}
+
+impl From<ExportedFeed> for crate::client::synd_api::payload::SubscribeFeedInput {
     fn from(feed: ExportedFeed) -> Self {
         Self {
             url: feed.url,
-            requirement: feed.requirement.map(|r| match r {
-                Requirement::Must => mutation::subscribe_feed::Requirement::MUST,
-                Requirement::Should => mutation::subscribe_feed::Requirement::SHOULD,
-                Requirement::May => mutation::subscribe_feed::Requirement::MAY,
-            }),
+            requirement: feed.requirement,
             category: feed.category,
+            refresh_policy: feed.refresh_policy.map(Into::into),
+            initial_refresh: None,
         }
     }
 }

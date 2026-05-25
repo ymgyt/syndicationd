@@ -5,7 +5,7 @@ use std::{
 };
 
 use serde::{Serialize, de::DeserializeOwned};
-use synd_stdx::fs::{FileSystem, fsimpl};
+use synd_support::fs::{FileSystem, fsimpl};
 use thiserror::Error;
 
 use crate::{

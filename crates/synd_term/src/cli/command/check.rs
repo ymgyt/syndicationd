@@ -2,7 +2,7 @@ use std::{io, path::Path, process::ExitCode};
 
 use anyhow::Context;
 use clap::Args;
-use synd_o11y::health_check::Health;
+use synd_support::o11y::health_check::Health;
 
 use crate::{
     cli::{

@@ -41,7 +41,7 @@ pub struct ApiEntry {
     pub(super) endpoint: Option<Url>,
     #[serde(
         default,
-        deserialize_with = "synd_stdx::time::humantime::de::parse_duration_opt"
+        deserialize_with = "synd_support::time::humantime::de::parse_duration_opt"
     )]
     pub(super) timeout: Option<Duration>,
 }

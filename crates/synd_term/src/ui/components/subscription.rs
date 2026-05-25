@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::ControlFlow};
 
 use itertools::Itertools;
 use ratatui::{
@@ -14,7 +14,7 @@ use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::{Direction, Populate},
-    client::synd_api::query::subscription::SubscriptionOutput,
+    client::synd_api::payload::SubscriptionPayload,
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{
         self, Context,
@@ -73,6 +73,21 @@ impl Subscription {
         self.feeds.selected()
     }
 
+    pub(crate) fn update_refresh_status(
+        &mut self,
+        url: &FeedUrl,
+        status: &types::FeedRefreshStatus,
+    ) {
+        self.feeds.with_mut(|feed| {
+            if &feed.url == url {
+                feed.refresh_status = status.clone();
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        });
+    }
+
     pub(crate) fn toggle_unsubscribe_popup(&mut self, show: bool) {
         if show {
             self.unsubscribe_popup.selected_feed = self.selected_feed().cloned();
@@ -93,7 +108,7 @@ impl Subscription {
     pub(crate) fn update_subscription(
         &mut self,
         populate: Populate,
-        subscription: SubscriptionOutput,
+        subscription: SubscriptionPayload,
     ) {
         let feeds = subscription
             .feeds
@@ -106,11 +121,6 @@ impl Subscription {
 
     pub(crate) fn update_filterer(&mut self, filterer: FeedFilterer) {
         self.feeds.update_filter(filterer);
-    }
-
-    pub(crate) fn upsert_subscribed_feed(&mut self, feed: types::Feed) {
-        let url = feed.url.clone();
-        self.feeds.upsert_first(feed, |x| x.url == url);
     }
 
     pub(crate) fn remove_unsubscribed_feed(&mut self, url: &FeedUrl) {
@@ -205,6 +215,7 @@ impl Subscription {
             Cell::from(format!("Feed {n}/{m}")),
             Cell::from("URL"),
             Cell::from("Description"),
+            Cell::from("Status"),
             Cell::from("Req"),
         ]);
 
@@ -213,6 +224,7 @@ impl Subscription {
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(2),
+            Constraint::Length(9),
             Constraint::Length(4),
         ];
 
@@ -252,6 +264,7 @@ impl Subscription {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
+                Cell::from(Span::from(feed_meta.refresh_status.state.label())),
                 Cell::from(Line::from(vec![requirement, Span::from(" ")])),
             ])
         };
@@ -278,7 +291,7 @@ impl Subscription {
             return;
         };
 
-        let vertical = Layout::vertical([Constraint::Length(3), Constraint::Min(0)]);
+        let vertical = Layout::vertical([Constraint::Length(4), Constraint::Min(0)]);
         let [meta_area, entries_area] = vertical.areas(inner);
         let entries_area = Block::new().padding(Padding::top(1)).inner(entries_area);
 
@@ -334,6 +347,19 @@ impl Subscription {
                     Span::styled(" Req  ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::from(feed.requirement().to_string()),
                 ])),
+            ]),
+            Row::new([
+                Cell::new(Span::styled(
+                    "󰑓 Refresh",
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Cell::new(Span::from(feed.refresh_status.state.label())),
+                Cell::new(Span::from(
+                    feed.refresh_status
+                        .last_error_message
+                        .as_deref()
+                        .unwrap_or(""),
+                )),
             ]),
         ];
 

@@ -36,12 +36,26 @@ impl Entries {
         self.entries.len()
     }
 
+    pub(crate) fn loaded_count(&self) -> usize {
+        self.entries.unfiltered_len()
+    }
+
     pub(crate) fn update_entries(
         &mut self,
         populate: Populate,
         payload: payload::FetchEntriesPayload,
     ) {
         self.entries.update(populate, payload.entries);
+    }
+
+    pub(crate) fn update_entries_with_limit(
+        &mut self,
+        populate: Populate,
+        payload: payload::FetchEntriesPayload,
+        limit: usize,
+    ) {
+        self.update_entries(populate, payload);
+        self.entries.truncate(limit);
     }
 
     pub(crate) fn update_filterer(&mut self, filterer: FeedFilterer) {

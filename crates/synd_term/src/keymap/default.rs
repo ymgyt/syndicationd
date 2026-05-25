@@ -27,7 +27,8 @@ pub fn default() -> KeymapsConfig {
         "d" => prompt_feed_unsubscription,
         "k" | "up" => move_up_subscribed_feed,
         "j" | "down" => move_down_subscribed_feed,
-        "r" => reload_subscription,
+        "r" => refresh_selected_feed,
+        "S-r" => reload_subscription,
         "enter" => open_feed,
         "g" => {
             "g" => move_subscribed_feed_first,

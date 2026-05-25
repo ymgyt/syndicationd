@@ -7,17 +7,11 @@ use crate::{
     auth::{AuthenticationProvider, Credential, Verified},
     client::{
         github::{FetchNotificationsParams, GithubError},
-        synd_api::{
-            SyndApiError, mutation::subscribe_feed::SubscribeFeedInput, payload,
-            query::subscription::SubscriptionOutput,
-        },
+        synd_api::{SyndApiError, payload},
     },
-    types::{
-        Feed,
-        github::{
-            IssueContext, IssueOrPullRequest, Notification, NotificationId, PullRequestContext,
-            PullRequestState, Reason,
-        },
+    types::github::{
+        IssueContext, IssueOrPullRequest, Notification, NotificationId, PullRequestContext,
+        PullRequestState, Reason,
     },
     ui::components::{filter::FilterLane, gh_notifications::GhNotificationFilterUpdater},
 };
@@ -32,18 +26,32 @@ pub(crate) enum ApiResponse {
         credential: Verified<Credential>,
     },
     SubscribeFeed {
-        feed: Box<Feed>,
+        url: FeedUrl,
+        payload: payload::SubscribeFeedPayload,
+    },
+    RefreshFeed {
+        url: FeedUrl,
+        payload: payload::RefreshFeedPayload,
+    },
+    FetchFeedRefreshStatus {
+        url: FeedUrl,
+        request_id: String,
+        remaining: u16,
+        status: payload::RefreshStatus,
     },
     UnsubscribeFeed {
         url: FeedUrl,
     },
     FetchSubscription {
         populate: Populate,
-        subscription: SubscriptionOutput,
+        subscription: payload::SubscriptionPayload,
     },
     FetchEntries {
         populate: Populate,
         payload: payload::FetchEntriesPayload,
+    },
+    FetchInitialFeedRegistry {
+        payload: payload::InitialFeedRegistryPayload,
     },
     FetchGithubNotifications {
         populate: Populate,
@@ -114,8 +122,22 @@ pub(crate) enum Command {
     SelectFeedUnsubscriptionPopup,
     CancelFeedUnsubscriptionPopup,
     SubscribeFeed {
-        input: SubscribeFeedInput,
+        input: payload::SubscribeFeedInput,
     },
+    RefreshSelectedFeed,
+    RefreshFeed {
+        url: FeedUrl,
+    },
+    PollFeedRefresh {
+        url: FeedUrl,
+        request_id: String,
+        remaining: u16,
+    },
+    SyncFeedView,
+    HandleFeedRegistryEvent {
+        event: payload::FeedRegistryEvent,
+    },
+    DebouncedTimelineReload,
     FetchSubscription {
         after: Option<String>,
         first: i64,
@@ -187,6 +209,12 @@ pub(crate) enum Command {
     },
     HandleApiError {
         // use Arc for impl Clone
+        error: Arc<SyndApiError>,
+        request_seq: RequestSequence,
+    },
+    HandleFeedRefreshPollError {
+        url: FeedUrl,
+        request_id: String,
         error: Arc<SyndApiError>,
         request_seq: RequestSequence,
     },
@@ -298,6 +326,9 @@ impl Command {
     }
     pub fn reload_subscription() -> Self {
         Command::ReloadSubscription
+    }
+    pub fn refresh_selected_feed() -> Self {
+        Command::RefreshSelectedFeed
     }
     pub fn open_feed() -> Self {
         Command::OpenFeed
