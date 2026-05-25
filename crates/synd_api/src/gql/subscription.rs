@@ -29,6 +29,8 @@ impl From<TimelineChanged> for TimelineChangedEvent {
 
 #[Subscription]
 impl RegistrySubscription {
+    // async-graphql requires subscription stream resolvers to be async.
+    #[allow(clippy::unused_async)]
     async fn timeline_changed(
         &self,
         cx: &Context<'_>,

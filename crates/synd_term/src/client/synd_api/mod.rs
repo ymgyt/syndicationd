@@ -489,7 +489,6 @@ where
         let value = next_ws_json(socket).await?;
         match value.get("type").and_then(serde_json::Value::as_str) {
             Some("connection_ack") => return Ok(()),
-            Some("ping") | Some("pong") => {}
             Some("connection_error" | "error") => {
                 return Err(SyndApiError::Internal(anyhow!(
                     "GraphQL subscription connection failed: {value}"
@@ -537,7 +536,6 @@ where
                     "GraphQL subscription completed before receiving an event"
                 )));
             }
-            Some("ping") | Some("pong") => {}
             _ => {}
         }
     }
@@ -567,8 +565,7 @@ where
                     "GraphQL subscription closed: {frame:?}"
                 )));
             }
-            Message::Ping(_) | Message::Pong(_) => {}
-            Message::Frame(_) => {}
+            Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => {}
         }
     }
 }

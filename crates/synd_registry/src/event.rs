@@ -30,10 +30,7 @@ impl RegistryEventPublisher {
     }
 
     pub fn publish(&self, event: RegistryEvent) -> usize {
-        match self.sender.send(event) {
-            Ok(receiver_count) => receiver_count,
-            Err(_) => 0,
-        }
+        self.sender.send(event).unwrap_or_default()
     }
 }
 

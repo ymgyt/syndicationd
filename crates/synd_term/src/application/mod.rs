@@ -1650,7 +1650,7 @@ impl Application {
                 match client.run_feed_registry_events(event_tx.clone()).await {
                     Ok(()) => tracing::debug!("feed registry event subscription stopped"),
                     Err(error) => {
-                        tracing::warn!("feed registry event subscription failed: {error}")
+                        tracing::warn!("feed registry event subscription failed: {error}");
                     }
                 }
 
@@ -1689,11 +1689,11 @@ impl Application {
                 self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
                 self.schedule_debounced_timeline_reload();
             }
-            TimelineInvalidationState::DirtyWaiting => {}
             TimelineInvalidationState::Refetching => {
                 self.timeline_invalidation = TimelineInvalidationState::DirtyWhileRefetching;
             }
-            TimelineInvalidationState::DirtyWhileRefetching => {}
+            TimelineInvalidationState::DirtyWaiting
+            | TimelineInvalidationState::DirtyWhileRefetching => {}
         }
     }
 
