@@ -187,4 +187,40 @@ mod tests {
             FetchFeedError::JsonUnsupportedVersion(_)
         ));
     }
+
+    #[test]
+    fn rss2_entry_updated_uses_item_pub_date() {
+        let service = FeedService::new("synd-test", 1024);
+        let feed = service
+            .parse(
+                FeedUrl::parse("https://example.com/rss.xml").unwrap(),
+                br#"
+                <rss version="2.0">
+                    <channel>
+                        <title>Example</title>
+                        <link>https://example.com/</link>
+                        <description>Example feed</description>
+                        <lastBuildDate>Mon, 01 Jan 2024 00:00:00 +0000</lastBuildDate>
+                        <item>
+                            <title>Entry</title>
+                            <link>https://example.com/entry</link>
+                            <description>Entry body</description>
+                            <pubDate>Tue, 02 Jan 2024 03:04:05 +0000</pubDate>
+                            <guid>https://example.com/entry</guid>
+                        </item>
+                    </channel>
+                </rss>
+                "#
+                .as_slice(),
+            )
+            .unwrap();
+
+        let entry = feed.entries().next().unwrap();
+        let feed_updated = "2024-01-01T00:00:00Z".parse().unwrap();
+        let entry_published = "2024-01-02T03:04:05Z".parse().unwrap();
+
+        assert_eq!(feed.meta().updated(), Some(feed_updated));
+        assert_eq!(entry.published(), Some(entry_published));
+        assert_eq!(entry.updated(), Some(entry_published));
+    }
 }
