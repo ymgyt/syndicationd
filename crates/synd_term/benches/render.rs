@@ -1,5 +1,4 @@
 use criterion::Criterion;
-use pprof::criterion::{Output, PProfProfiler};
 
 mod bench {
     use criterion::Criterion;
@@ -36,7 +35,7 @@ mod bench {
 
 pub fn benches() {
     let mut criterion: Criterion<_> = Criterion::default()
-        .with_profiler(PProfProfiler::new(100, Output::Flamegraph(None)))
+        .with_profiler(pprof_flamegraph::Profiler::new(100))
         .configure_from_args();
     bench::render(&mut criterion);
 }
@@ -46,4 +45,48 @@ fn main() {
     criterion::Criterion::default()
         .configure_from_args()
         .final_summary();
+}
+
+mod pprof_flamegraph {
+    use std::{fs::File, os::raw::c_int, path::Path};
+
+    use criterion::profiler;
+    use pprof::ProfilerGuard;
+
+    pub struct Profiler {
+        frequency: c_int,
+        active_profiler: Option<ProfilerGuard<'static>>,
+    }
+
+    impl Profiler {
+        pub fn new(frequency: c_int) -> Self {
+            Self {
+                frequency,
+                active_profiler: None,
+            }
+        }
+    }
+
+    impl profiler::Profiler for Profiler {
+        fn start_profiling(&mut self, _benchmark_id: &str, _benchmark_dir: &Path) {
+            self.active_profiler = Some(ProfilerGuard::new(self.frequency).unwrap());
+        }
+
+        fn stop_profiling(&mut self, _benchmark_id: &str, benchmark_dir: &Path) {
+            std::fs::create_dir_all(benchmark_dir).unwrap();
+            let output_path = benchmark_dir.join("flamegraph.svg");
+            let output_file = File::create(&output_path).unwrap_or_else(|_| {
+                panic!("File system error while creating {}", output_path.display())
+            });
+
+            if let Some(profiler) = self.active_profiler.take() {
+                profiler
+                    .report()
+                    .build()
+                    .unwrap()
+                    .flamegraph(output_file)
+                    .expect("Error while writing flamegraph");
+            }
+        }
+    }
 }
