@@ -120,7 +120,7 @@ mod tests {
             // The default interval is 5 seconds, which slows down the test
             .with_scheduled_delay(Duration::from_millis(10))
             .build();
-        let (layer, _provider) = layer("https://localhost:48100", resource.clone(), 1.0, config);
+        let (layer, _provider) = layer("http://localhost:48100", resource.clone(), 1.0, config);
         let subscriber = Registry::default().with(layer);
         let dispatcher = tracing::Dispatch::new(subscriber);
 

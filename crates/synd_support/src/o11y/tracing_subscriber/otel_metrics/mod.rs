@@ -154,7 +154,7 @@ mod tests {
         let dump = MetricsServiceServer::new(DumpMetrics { tx });
         let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
         let incoming = TcpIncoming::bind(addr).unwrap();
-        let endpoint = format!("https://{}", incoming.local_addr().unwrap());
+        let endpoint = format!("http://{}", incoming.local_addr().unwrap());
         let server = Server::builder()
             .add_service(dump)
             .serve_with_incoming(incoming);

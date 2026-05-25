@@ -82,7 +82,7 @@ mod tests {
         let config = BatchConfigBuilder::default()
             .with_scheduled_delay(Duration::from_millis(100))
             .build();
-        let (layer, provider) = layer("https://localhost:48102", resource.clone(), config);
+        let (layer, provider) = layer("http://localhost:48102", resource.clone(), config);
         let subscriber = Registry::default().with(layer);
         let dispatcher = tracing::Dispatch::new(subscriber);
 

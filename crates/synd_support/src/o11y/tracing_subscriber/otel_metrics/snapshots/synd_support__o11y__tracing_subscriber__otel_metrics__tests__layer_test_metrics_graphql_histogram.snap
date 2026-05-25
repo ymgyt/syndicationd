@@ -17,7 +17,7 @@ resourceMetrics:
             stringValue: opentelemetry
         - key: telemetry.sdk.version
           value:
-            stringValue: 0.31.0
+            stringValue: 0.32.0
       droppedAttributesCount: 0
       entityRefs: []
     scopeMetrics:
@@ -53,24 +53,24 @@ resourceMetrics:
                 - attributes: []
                   startTimeUnixNano: "[UNIX_TIMESTAMP]"
                   timeUnixNano: "[UNIX_TIMESTAMP]"
-                  count: 1
+                  count: "1"
                   sum: 0.5
                   bucketCounts:
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 1
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
-                    - 0
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "1"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
+                    - "0"
                   explicitBounds:
                     - 0.005
                     - 0.01
