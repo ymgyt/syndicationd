@@ -1,0 +1,30 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+edition.workspace    = true
+homepage.workspace   = true
+keywords.workspace   = true
+license.workspace    = true
+repository.workspace = true
+
+description = "Persistence adapters for syndicationd"
+name        = "synd-persistence"
+readme      = "README.md"
+version     = "0.1.0"
+
+[dependencies]
+synd-feed     = { path = "../synd_feed", version = "0.3.5", features = ["sqlx"] }
+synd-registry = { path = "../synd_registry", version = "0.1.0" }
+
+anyhow = { workspace = true }
+chrono = { workspace = true }
+sqlx   = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio    = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true
