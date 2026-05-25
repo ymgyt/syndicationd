@@ -1,4 +1,4 @@
 # Update flake lock of input
 [no-cd]
-update input:
+update +input:
     nix flake update {{input}}
