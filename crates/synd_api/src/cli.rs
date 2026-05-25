@@ -1,7 +1,8 @@
 use std::{ffi::OsString, net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
 use clap::{ArgAction, Parser};
-use synd_stdx::time::humantime;
+use synd_registry::RefreshInterval;
+use synd_support::time::humantime;
 
 use crate::{
     config::{self, env::env_key},
@@ -26,7 +27,7 @@ pub struct Args {
     #[command(flatten)]
     pub o11y: ObservabilityOptions,
     #[command(flatten)]
-    pub cache: CacheOptions,
+    pub feed_refresh: FeedRefreshOptions,
     #[arg(hide = true, long = "dry-run", hide_long_help = true)]
     pub dry_run: bool,
 }
@@ -118,25 +119,25 @@ pub struct ObservabilityOptions {
 }
 
 #[derive(clap::Args, Debug, Clone, Copy)]
-#[command(next_help_heading = "Cache options")]
-pub struct CacheOptions {
-    /// Max feed cache size in MiB
-    #[arg(long, default_value_t = config::cache::DEFAULT_FEED_CACHE_SIZE_MB, env = env_key!("FEED_CACHE_SIZE") )]
-    pub feed_cache_size_mb: u64,
-    #[arg(long, value_parser = humantime::parse_duration, default_value = config::cache::DEFAULT_FEED_CACHE_TTL, env = env_key!("FEED_CACHE_TTL"))]
-    pub feed_cache_ttl: Duration,
-    #[arg(long, value_parser = humantime::parse_duration, default_value = config::cache::DEFAULT_FEED_CACHE_REFRESH_INTERVAL, env = env_key!("FEED_CACHE_REFRESH_INTERVAL"))]
-    pub feed_cache_refresh_interval: Duration,
+#[command(next_help_heading = "Feed refresh options")]
+pub struct FeedRefreshOptions {
+    #[arg(long, value_parser = parse_refresh_interval, default_value = config::feed_refresh::DEFAULT_REFRESH_INTERVAL, env = env_key!("FEED_REFRESH_INTERVAL"))]
+    pub default_feed_refresh_interval: RefreshInterval,
 }
 
-impl Default for CacheOptions {
+impl Default for FeedRefreshOptions {
     fn default() -> Self {
         Self {
-            feed_cache_size_mb: config::cache::DEFAULT_FEED_CACHE_SIZE_MB,
-            feed_cache_ttl: Duration::from_hours(3),
-            feed_cache_refresh_interval: Duration::from_hours(2),
+            default_feed_refresh_interval: RefreshInterval::try_from(Duration::from_hours(2))
+                .expect("default feed refresh interval is non-zero"),
         }
     }
+}
+
+fn parse_refresh_interval(value: &str) -> Result<RefreshInterval, String> {
+    humantime::parse_duration(value)
+        .map_err(|err| err.to_string())
+        .and_then(|duration| RefreshInterval::try_from(duration).map_err(|err| err.to_string()))
 }
 
 pub fn try_parse<I, T>(iter: I) -> Result<Args, clap::Error>

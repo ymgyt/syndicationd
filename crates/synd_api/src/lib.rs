@@ -9,7 +9,5 @@ pub mod dependency;
 pub(crate) mod gql;
 pub mod monitor;
 pub(crate) mod principal;
-pub mod repository;
 pub mod serve;
 pub mod shutdown;
-pub mod usecase;

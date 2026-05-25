@@ -34,8 +34,6 @@ pub mod metrics {
     pub const MONITOR_INTERVAL: Duration = Duration::from_mins(1);
 }
 
-pub mod cache {
-    pub const DEFAULT_FEED_CACHE_SIZE_MB: u64 = 100;
-    pub const DEFAULT_FEED_CACHE_TTL: &str = "180min";
-    pub const DEFAULT_FEED_CACHE_REFRESH_INTERVAL: &str = "120min";
+pub mod feed_refresh {
+    pub const DEFAULT_REFRESH_INTERVAL: &str = "120min";
 }

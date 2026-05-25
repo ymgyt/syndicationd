@@ -18,14 +18,14 @@ path = "src/main.rs"
 
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.5" }
-synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["graphql", "sqlx"] }
-synd-o11y = { path = "../synd_o11y", version = "0.1.9" }
-synd-stdx = { path = "../synd_stdx", version = "0.1.1", features = ["color", "humantime"] }
+synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["graphql"] }
+synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
+synd-registry = { path = "../synd_registry", version = "0.1.0" }
+synd-support = { path = "../synd_support", version = "0.1.0", features = ["color", "humantime", "o11y"] }
 
 anyhow             = { workspace = true }
 async-graphql      = { workspace = true, features = ["tracing"] }
 async-graphql-axum = { version = "7.2.1" }
-async-trait        = { workspace = true }
 axum               = { workspace = true, features = ["json"] }
 axum-server        = { workspace = true }
 chrono             = { workspace = true }
@@ -39,9 +39,6 @@ pin-project        = "1.1.11"
 reqwest            = { workspace = true }
 rustls             = { workspace = true }
 serde              = { workspace = true }
-serde_json         = "1.0.149"
-sqlx               = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
-thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["io-std", "io-util", "macros", "rt-multi-thread", "signal", "sync"] }
 tokio-metrics      = { version = "0.5.0", default-features = false, features = ["rt"] }
 tokio-util         = { workspace = true }
@@ -54,7 +51,7 @@ tracing            = { workspace = true }
 integration = []
 # Enable graphql introspection
 introspection        = []
-opentelemetry-stdout = ["synd-o11y/opentelemetry-stdout"]
+opentelemetry-stdout = ["synd-support/opentelemetry-stdout"]
 
 [dev-dependencies]
 synd-test = { path = "../synd_test" }

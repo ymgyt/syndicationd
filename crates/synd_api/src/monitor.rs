@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use synd_o11y::metric;
+use synd_support::o11y::metric;
 use tokio_metrics::{RuntimeMetrics, RuntimeMonitor, TaskMetrics, TaskMonitor};
 use tokio_util::sync::CancellationToken;
 

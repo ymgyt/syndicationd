@@ -7,7 +7,7 @@ use std::{
 
 use axum::{extract::Request, http::Method, response::Response};
 use futures_util::Future;
-use synd_o11y::metric;
+use synd_support::o11y::metric;
 use tower::{Layer, Service};
 
 use crate::config;

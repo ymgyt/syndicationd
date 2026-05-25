@@ -1,130 +1,210 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use async_graphql::{
-    Context, Object, Result, SimpleObject,
+    Context, Enum, Object, Result, SimpleObject,
     connection::{Connection, Edge},
 };
-use synd_feed::types::FeedUrl;
-
-use crate::{
-    gql::{
-        object::{self, Entry, id},
-        run_usecase,
-    },
-    usecase::{
-        FetchEntries, FetchEntriesError, FetchEntriesInput, FetchEntriesOutput,
-        FetchSubscribedFeeds, FetchSubscribedFeedsError, FetchSubscribedFeedsInput,
-        FetchSubscribedFeedsOutput, Output,
-    },
+use synd_feed::types::{Annotated, Category, FeedUrl, Requirement};
+use synd_registry::{
+    EntryCursor, FeedStatusQuery, ListEntriesQuery, ListSubscriptionsQuery, RefreshSchedule,
+    RefreshStatusKind, SubscriberId,
 };
 
-#[derive(SimpleObject)]
-struct FeedsConnectionFields {
-    errors: Vec<FetchFeedError>,
+use crate::gql::{
+    object::{self, Entry},
+    registry, user_id,
+};
+
+#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+enum RefreshStatusState {
+    NeverRefreshed,
+    Idle,
+    Pending,
+    Running,
+    LastFailed,
+}
+
+impl From<RefreshStatusKind> for RefreshStatusState {
+    fn from(value: RefreshStatusKind) -> Self {
+        match value {
+            RefreshStatusKind::NeverRefreshed => Self::NeverRefreshed,
+            RefreshStatusKind::Idle => Self::Idle,
+            RefreshStatusKind::Pending => Self::Pending,
+            RefreshStatusKind::Running => Self::Running,
+            RefreshStatusKind::LastFailed => Self::LastFailed,
+        }
+    }
 }
 
 #[derive(SimpleObject)]
-struct FetchFeedError {
-    url: FeedUrl,
-    error_message: String,
+struct RefreshStatus {
+    state: RefreshStatusState,
+    request_id: Option<String>,
+    last_attempt_at: Option<crate::gql::scalar::Rfc3339Time>,
+    last_success_at: Option<crate::gql::scalar::Rfc3339Time>,
+    last_failure_at: Option<crate::gql::scalar::Rfc3339Time>,
+    last_error_message: Option<String>,
+}
+
+impl From<synd_registry::RefreshStatus> for RefreshStatus {
+    fn from(value: synd_registry::RefreshStatus) -> Self {
+        Self {
+            state: value.kind.into(),
+            request_id: value.active_request_id.map(|id| id.to_string()),
+            last_attempt_at: value.last_attempt_at.map(Into::into),
+            last_success_at: value.last_success_at.map(Into::into),
+            last_failure_at: value.last_failure_at.map(Into::into),
+            last_error_message: value.last_error_message,
+        }
+    }
+}
+
+#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+enum RefreshPolicyKind {
+    Manual,
+    Interval,
+}
+
+#[derive(SimpleObject)]
+struct RefreshPolicy {
+    kind: RefreshPolicyKind,
+    interval_seconds: Option<i64>,
+}
+
+impl From<synd_registry::RefreshPolicy> for RefreshPolicy {
+    fn from(value: synd_registry::RefreshPolicy) -> Self {
+        match value.schedule {
+            RefreshSchedule::Manual => Self {
+                kind: RefreshPolicyKind::Manual,
+                interval_seconds: None,
+            },
+            RefreshSchedule::Interval(duration) => Self {
+                kind: RefreshPolicyKind::Interval,
+                interval_seconds: Some(i64::try_from(duration.as_secs()).unwrap_or(i64::MAX)),
+            },
+        }
+    }
+}
+
+struct SubscribedFeed {
+    subscription: synd_registry::FeedSubscription,
+    feed: Option<object::Feed>,
+    refresh_status: RefreshStatus,
+}
+
+#[Object]
+impl SubscribedFeed {
+    async fn url(&self) -> &FeedUrl {
+        &self.subscription.feed_url
+    }
+
+    async fn requirement(&self) -> Option<Requirement> {
+        self.subscription.requirement
+    }
+
+    async fn category(&self) -> Option<&Category<'static>> {
+        self.subscription.category.as_ref()
+    }
+
+    async fn refresh_policy(&self) -> RefreshPolicy {
+        self.subscription.refresh_policy.into()
+    }
+
+    async fn refresh_status(&self) -> &RefreshStatus {
+        &self.refresh_status
+    }
+
+    async fn feed(&self) -> Option<&object::Feed> {
+        self.feed.as_ref()
+    }
+}
+
+impl From<synd_registry::FeedSubscriptionView> for SubscribedFeed {
+    fn from(value: synd_registry::FeedSubscriptionView) -> Self {
+        let annotations = Annotated {
+            feed: (),
+            requirement: value.subscription.requirement,
+            category: value.subscription.category.clone(),
+        };
+        let feed = value.feed.map(|feed| {
+            object::Feed::from(Annotated {
+                feed: Arc::new(feed),
+                requirement: annotations.requirement,
+                category: annotations.category,
+            })
+        });
+
+        Self {
+            subscription: value.subscription,
+            feed,
+            refresh_status: value.refresh_status.into(),
+        }
+    }
 }
 
 struct Subscription;
 
 #[Object]
 impl Subscription {
-    /// Return Subscribed feeds
     async fn feeds(
         &self,
         cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, object::Feed, FeedsConnectionFields>> {
-        #[allow(clippy::cast_sign_loss)]
-        let first = first.unwrap_or(10).min(100) as usize;
-        let has_prev = after.is_some();
-        let input = FetchSubscribedFeedsInput {
-            after,
-            first: first + 1,
-        };
-        let Output {
-            output: FetchSubscribedFeedsOutput { feeds },
-        } = run_usecase!(
-            FetchSubscribedFeeds,
-            cx,
-            input,
-            |err: FetchSubscribedFeedsError| Err(async_graphql::ErrorExtensions::extend(&err))
-        )?;
-
-        let has_next = feeds.len() > first;
-
-        let (feeds, errors): (Vec<_>, Vec<_>) = feeds.into_iter().partition(Result::is_ok);
-        let fields = FeedsConnectionFields {
-            errors: errors
-                .into_iter()
-                .map(|err| {
-                    let (url, fetch_err) = err.unwrap_err();
-                    FetchFeedError {
-                        url,
-                        error_message: fetch_err.to_string(),
-                    }
-                })
-                .collect::<Vec<_>>(),
-        };
-        let mut connection = Connection::with_additional_fields(has_prev, has_next, fields);
-
-        let edges = feeds
-            .into_iter()
-            .take(first)
-            .map(Result::unwrap)
-            .map(|feed| (feed.feed.meta().url().as_str().to_owned(), feed))
-            .map(|(cursor, feed)| (cursor, object::Feed::from(feed)))
-            .map(|(cursor, feed)| Edge::new(cursor, feed));
-
-        connection.edges.extend(edges);
-
-        Ok(connection)
+    ) -> Result<Connection<String, SubscribedFeed>> {
+        subscriptions_connection(cx, after, first).await
     }
 
-    /// Return subscribed latest entries order by published time.
     async fn entries<'cx>(
         &'_ self,
+        cx: &'cx Context<'cx>,
+        after: Option<String>,
+        #[graphql(default = 20)] first: Option<i32>,
+    ) -> Result<Connection<String, Entry<'cx>>> {
+        timeline_entries_connection(cx, after, first).await
+    }
+
+    async fn feed_status(&self, cx: &Context<'_>, url: FeedUrl) -> Result<RefreshStatus> {
+        registry(cx)
+            .feed_status(FeedStatusQuery {
+                subscriber_id: SubscriberId::new(user_id(cx)?),
+                feed_url: url,
+            })
+            .await
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+}
+
+struct FeedRegistry;
+
+#[Object]
+impl FeedRegistry {
+    async fn subscriptions(
+        &self,
         cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<id::EntryId<'_>, Entry<'cx>>> {
-        #[allow(clippy::cast_sign_loss)]
-        let first = first.unwrap_or(20).min(200) as usize;
-        let has_prev = after.is_some();
-        let input = FetchEntriesInput {
-            after: after.map(Into::into),
-            first: first + 1,
-        };
-        let Output {
-            output: FetchEntriesOutput { entries, feeds },
-        } = run_usecase!(FetchEntries, cx, input, |err: FetchEntriesError| Err(
-            async_graphql::ErrorExtensions::extend(&err)
-        ))?;
+    ) -> Result<Connection<String, SubscribedFeed>> {
+        subscriptions_connection(cx, after, first).await
+    }
 
-        let has_next = entries.len() > first;
-        let mut connection = Connection::new(has_prev, has_next);
+    async fn timeline(&self) -> Timeline {
+        Timeline
+    }
+}
 
-        let edges = entries
-            .into_iter()
-            .take(first)
-            .map(move |(entry, feed_url)| {
-                let meta = feeds
-                    .get(&feed_url)
-                    .expect("FeedMeta not found. this is a bug")
-                    .clone();
-                let cursor = entry.id().into();
-                let node = Entry::new(Cow::Owned(meta), entry);
-                Edge::new(cursor, node)
-            });
+struct Timeline;
 
-        connection.edges.extend(edges);
-
-        Ok(connection)
+#[Object]
+impl Timeline {
+    async fn entries<'cx>(
+        &'_ self,
+        cx: &'cx Context<'cx>,
+        after: Option<String>,
+        #[graphql(default = 20)] first: Option<i32>,
+    ) -> Result<Connection<String, Entry<'cx>>> {
+        timeline_entries_connection(cx, after, first).await
     }
 }
 
@@ -132,7 +212,67 @@ pub(crate) struct Query;
 
 #[Object]
 impl Query {
+    async fn feed_registry(&self) -> FeedRegistry {
+        FeedRegistry
+    }
+
     async fn subscription(&self) -> Subscription {
         Subscription {}
     }
+}
+
+async fn subscriptions_connection(
+    cx: &Context<'_>,
+    after: Option<String>,
+    first: Option<i32>,
+) -> Result<Connection<String, SubscribedFeed>> {
+    let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
+    let page = registry(cx)
+        .list_subscriptions(ListSubscriptionsQuery {
+            subscriber_id: SubscriberId::new(user_id(cx)?),
+            after,
+            first,
+        })
+        .await?;
+
+    let mut connection = Connection::new(false, page.has_next_page);
+    connection.edges.extend(
+        page.nodes
+            .into_iter()
+            .take(first)
+            .map(SubscribedFeed::from)
+            .map(|feed| Edge::new(feed.subscription.feed_url.to_string(), feed)),
+    );
+
+    Ok(connection)
+}
+
+async fn timeline_entries_connection<'cx>(
+    cx: &Context<'cx>,
+    after: Option<String>,
+    first: Option<i32>,
+) -> Result<Connection<String, Entry<'cx>>> {
+    let first = usize::try_from(first.unwrap_or(20).clamp(0, 200)).unwrap_or(0);
+    let after = after
+        .as_deref()
+        .map(EntryCursor::decode)
+        .transpose()
+        .map_err(|err| async_graphql::Error::new(err.to_string()))?;
+    let page = registry(cx)
+        .list_entries(ListEntriesQuery {
+            subscriber_id: SubscriberId::new(user_id(cx)?),
+            after,
+            first,
+        })
+        .await?;
+
+    let mut connection = Connection::new(false, page.has_next_page);
+    connection
+        .edges
+        .extend(page.nodes.into_iter().take(first).map(|view| {
+            let cursor = view.cursor.encode();
+            Edge::new(cursor, Entry::new(Cow::Owned(view.feed_meta), view.entry))
+        }));
+
+    Ok(connection)
 }

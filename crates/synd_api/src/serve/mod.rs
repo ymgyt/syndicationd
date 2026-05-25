@@ -65,7 +65,7 @@ pub async fn serve(
 ) -> anyhow::Result<()> {
     let Dependency {
         authenticator,
-        runtime,
+        registry,
         tls_config,
         serve_options:
             ServeOptions {
@@ -78,7 +78,7 @@ pub async fn serve(
 
     let cx = Context {
         gql_monitor: monitors.graphql_task_monitor(),
-        schema: gql::schema_builder().data(runtime).finish(),
+        schema: gql::schema_builder().data(registry).finish(),
     };
 
     tokio::spawn(monitors.emit_metrics(
@@ -88,6 +88,7 @@ pub async fn serve(
 
     let service = Router::new()
         .route("/graphql", post(gql::handler::graphql))
+        .route("/graphql/ws", get(gql::handler::graphql_ws))
         .layer(Extension(cx))
         .layer(authenticate::AuthenticateLayer::new(authenticator))
         .route("/graphql", get(gql::handler::graphiql))

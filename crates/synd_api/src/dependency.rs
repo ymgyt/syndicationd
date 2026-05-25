@@ -1,25 +1,27 @@
-use std::{env, sync::Arc};
+use std::env;
 
 use anyhow::Context;
 use axum_server::tls_rustls::RustlsConfig;
-use synd_feed::feed::{
-    cache::{CacheConfig, CacheLayer},
-    service::FeedService,
+use synd_feed::feed::service::FeedService;
+use synd_persistence::sqlite::SqliteFeedRegistryStore;
+use synd_registry::{
+    FeedRegistry, FeedRegistryConfig, RefreshExecutor, RefreshExecutorHandle,
+    RegistryEventPublisher, provider::SyndFeedProvider,
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    cli::{self, CacheOptions, LocalOptions, TlsOptions},
+    cli::{self, FeedRefreshOptions, LocalOptions, TlsOptions},
     config,
     monitor::Monitors,
-    repository::sqlite::SqliteSubscriptionRepository,
     serve::{ServeOptions, auth::Authenticator},
-    usecase::{MakeUsecase, Runtime, authorize::Authorizer},
 };
+
+pub type AppFeedRegistry = FeedRegistry<SqliteFeedRegistryStore, SyndFeedProvider>;
 
 pub struct Dependency {
     pub authenticator: Authenticator,
-    pub runtime: Runtime,
+    pub registry: AppFeedRegistry,
     pub tls_config: Option<RustlsConfig>,
     pub serve_options: ServeOptions,
     pub monitors: Monitors,
@@ -27,11 +29,11 @@ pub struct Dependency {
 
 impl Dependency {
     pub async fn new(
-        db: SqliteSubscriptionRepository,
+        store: SqliteFeedRegistryStore,
         tls: TlsOptions,
         serve_options: cli::ServeOptions,
         local: LocalOptions,
-        cache: CacheOptions,
+        feed_refresh: FeedRefreshOptions,
         ct: CancellationToken,
     ) -> anyhow::Result<Self> {
         let local_enabled = local.enabled;
@@ -62,80 +64,103 @@ impl Dependency {
         };
 
         Ok(Self::build(
-            db,
+            store,
             serve_options,
-            cache,
+            feed_refresh,
             ct,
             authenticator,
             tls_config,
-        ))
+        )
+        .await)
     }
 
-    pub fn new_local(
-        db: SqliteSubscriptionRepository,
+    pub async fn new_local(
+        store: SqliteFeedRegistryStore,
         serve_options: cli::ServeOptions,
-        cache: CacheOptions,
+        feed_refresh: FeedRefreshOptions,
         ct: CancellationToken,
         token: String,
     ) -> anyhow::Result<Self> {
         let authenticator = Authenticator::local(token)?;
-        Ok(Self::build(
-            db,
-            serve_options,
-            cache,
-            ct,
-            authenticator,
-            None,
-        ))
+        Ok(Self::build(store, serve_options, feed_refresh, ct, authenticator, None).await)
     }
 
-    fn build(
-        db: SqliteSubscriptionRepository,
+    #[allow(clippy::needless_pass_by_value)]
+    async fn build(
+        store: SqliteFeedRegistryStore,
         serve_options: cli::ServeOptions,
-        cache: CacheOptions,
+        feed_refresh: FeedRefreshOptions,
         ct: CancellationToken,
         authenticator: Authenticator,
         tls_config: Option<RustlsConfig>,
     ) -> Self {
-        let cache_feed_service = {
-            let CacheOptions {
-                feed_cache_size_mb,
-                feed_cache_ttl,
-                feed_cache_refresh_interval,
-            } = cache;
-            let feed_service = FeedService::new(config::USER_AGENT, 10 * 1024 * 1024);
-            let cache_feed_service = CacheLayer::with(
-                feed_service,
-                CacheConfig::default()
-                    .with_max_cache_size(feed_cache_size_mb * 1024 * 1024)
-                    .with_time_to_live(feed_cache_ttl),
-            );
-            let periodic_refresher = cache_feed_service
-                .periodic_refresher()
-                .with_emit_metrics(true);
-
-            tokio::spawn(periodic_refresher.run(feed_cache_refresh_interval, ct));
-
-            cache_feed_service
+        let registry_config = {
+            let FeedRefreshOptions {
+                default_feed_refresh_interval,
+            } = feed_refresh;
+            FeedRegistryConfig {
+                default_refresh_interval: default_feed_refresh_interval,
+                ..FeedRegistryConfig::default()
+            }
         };
-
-        let make_usecase = MakeUsecase {
-            subscription_repo: Arc::new(db),
-            fetch_feed: Arc::new(cache_feed_service),
-        };
-
-        let authorizer = Authorizer::new();
-
-        let runtime = Runtime::new(make_usecase, authorizer);
+        let provider =
+            SyndFeedProvider::new(FeedService::new(config::USER_AGENT, 10 * 1024 * 1024));
+        let executor_handle = RefreshExecutorHandle::new();
+        let events = RegistryEventPublisher::default();
+        let registry = FeedRegistry::with_events(
+            store.clone(),
+            provider.clone(),
+            executor_handle.clone(),
+            registry_config,
+            events.clone(),
+        );
+        let executor = RefreshExecutor::with_events(
+            store.clone(),
+            provider,
+            executor_handle,
+            registry_config,
+            events,
+        );
+        tokio::spawn(executor.run(ct.clone()));
+        let _ = registry
+            .reconcile_now(synd_registry::ReconcileTrigger::Startup)
+            .await
+            .inspect_err(|err| tracing::warn!("startup feed reconcile failed: {err}"));
+        spawn_scheduler(registry.clone(), registry_config, ct);
 
         let monitors = Monitors::new();
 
         Dependency {
             authenticator,
-            runtime,
+            registry,
             tls_config,
             serve_options: serve_options.into(),
             monitors,
         }
     }
+}
+
+fn spawn_scheduler(registry: AppFeedRegistry, config: FeedRegistryConfig, ct: CancellationToken) {
+    tokio::spawn(async move {
+        tokio::select! {
+            () = ct.cancelled() => return,
+            () = tokio::time::sleep(config.scheduler_tick_interval) => {}
+        }
+
+        let mut interval = tokio::time::interval(config.scheduler_tick_interval);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                () = ct.cancelled() => break,
+                _ = interval.tick() => {
+                    if let Err(err) = registry
+                        .reconcile_now(synd_registry::ReconcileTrigger::ScheduledTick)
+                        .await
+                    {
+                        tracing::warn!("scheduled feed reconcile failed: {err}");
+                    }
+                }
+            }
+        }
+    });
 }

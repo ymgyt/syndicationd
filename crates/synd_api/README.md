@@ -2,6 +2,13 @@
 
 syndicationd graphql api server
 
+## Responsibility
+
+`synd-api` is the transport boundary for syndicationd. It owns HTTP serving,
+GraphQL schema wiring, authentication, request limits, shutdown, and
+observability. Feed lifecycle behavior is delegated to `synd-registry`, and
+durable storage adapters are provided by `synd-persistence`.
+
 ## OpenTelemetry
 
 synd-api is instrumented with OpenTelemetry.
@@ -18,9 +25,7 @@ Following metrics are exported
 | ---                   | ---       | ---                                  |
 | `http.server.request` | Counter   | http request traffic per status code |
 | `graphql.duration`    | Histogram | graphql latency                      |
-| `usecase`             | Counter   | usecase traffic per operation        |
-| `cache.feed.count`    | Gauge     | feed cache entry count               |
-| `cache.feed.size`     | Gauge     | feed cache size                      |
+| `registry.reconcile`  | Counter   | feed registry reconciliation attempts |
 
 
 ## Configurations
@@ -38,8 +43,7 @@ Following metrics are exported
 | `--show-code-location`  | Show code location(foo.rs:10) in signals(logs) | `false`                    |
 | `--show-target`         | Show tracing target(module) ins signals(logs)  | `true`                     |
 | `--trace-sampler-ratio` | Trace sampler ratio                            | `1`                        |
-| `--feed-cache-ttl`      | Feed entry cache TTL                           | `180min`                   |
-| `-feed-cache-refresh-interval` | Feed entry cache refresh interval       | `120min`                   |
+| `--default-feed-refresh-interval` | Default interval refresh policy for subscribed feeds | `120min` |
 
 
 ## Features

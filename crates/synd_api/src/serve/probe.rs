@@ -3,7 +3,7 @@ use axum::{
     http::{StatusCode, header},
     response::IntoResponse,
 };
-use synd_o11y::health_check::Health;
+use synd_support::o11y::health_check::Health;
 
 use crate::config;
 

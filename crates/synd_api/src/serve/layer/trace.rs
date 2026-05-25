@@ -6,12 +6,12 @@ pub struct MakeSpan;
 
 impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
     fn make_span(&mut self, request: &axum::http::Request<B>) -> tracing::Span {
-        use synd_o11y::opentelemetry::extension::*;
-        let cx = synd_o11y::opentelemetry::http::extract(request.headers());
+        use synd_support::o11y::opentelemetry::extension::*;
+        let cx = synd_support::o11y::opentelemetry::http::extract(request.headers());
 
         let request_id = cx
             .baggage()
-            .get(synd_o11y::REQUEST_ID_KEY)
+            .get(synd_support::o11y::REQUEST_ID_KEY)
             .map_or("?", |v| v.as_str());
 
         let span = tracing::span!(

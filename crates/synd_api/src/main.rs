@@ -1,10 +1,10 @@
 use std::{env, io};
 
 use fdlimit::Outcome;
-use synd_o11y::{
+use synd_support::io::color::{ColorSupport, is_color_supported};
+use synd_support::o11y::{
     opentelemetry::OpenTelemetryGuard, tracing_subscriber::initializer::TracingInitializer,
 };
-use synd_stdx::io::color::{ColorSupport, is_color_supported};
 use tokio::io::AsyncReadExt;
 use tracing::{error, info};
 
@@ -12,10 +12,10 @@ use synd_api::{
     cli::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
-    repository::sqlite::SqliteSubscriptionRepository,
     serve::listen_and_serve,
     shutdown::Shutdown,
 };
+use synd_persistence::sqlite::SqliteFeedRegistryStore;
 
 fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let ObservabilityOptions {
@@ -45,14 +45,22 @@ async fn run(
         local,
         lifecycle: _,
         o11y,
-        cache,
+        feed_refresh,
         dry_run,
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
-    let db = SqliteSubscriptionRepository::create_or_open(sqlite.sqlite_db).await?;
+    let db = SqliteFeedRegistryStore::create_or_open(sqlite.sqlite_db).await?;
     db.migrate().await?;
-    let dep = Dependency::new(db, tls, serve, local, cache, shutdown.cancellation_token()).await?;
+    let dep = Dependency::new(
+        db,
+        tls,
+        serve,
+        local,
+        feed_refresh,
+        shutdown.cancellation_token(),
+    )
+    .await?;
 
     info!(
         version = config::app::VERSION,
@@ -60,8 +68,7 @@ async fn run(
         request_timeout=?dep.serve_options.timeout,
         request_body_limit_bytes=dep.serve_options.body_limit_bytes,
         concurrency_limit=?dep.serve_options.concurrency_limit,
-        feed_cache_ttl_minutes=?cache.feed_cache_ttl.as_secs() / 60,
-        feed_cache_refresh_interval_minutes=?cache.feed_cache_refresh_interval.as_secs() / 60,
+        default_feed_refresh_interval_minutes=?feed_refresh.default_feed_refresh_interval.as_secs() / 60,
         "Runinng...",
     );
 
