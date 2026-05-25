@@ -1,0 +1,17 @@
+---
+source: crates/synd_support/src/o11y/tracing_subscriber/otel_log/mod.rs
+description: " log 1 record"
+expression: record
+---
+timeUnixNano: "0"
+observedTimeUnixNano: "[OBSERVED_TIME_UNIX_NANO]"
+severityNumber: 9
+severityText: INFO
+body:
+  stringValue: f1_message
+attributes: []
+droppedAttributesCount: 0
+flags: 0
+traceId: ""
+spanId: ""
+eventName: "event crates/synd_support/src/o11y/tracing_subscriber/otel_log/mod.rs:70"

@@ -10,27 +10,28 @@ digraph {
         newrank=true
     ];
 
-    stdx [ label="synd_stdx" ]
-    o11y [ label="synd_o11y" ]
+    support [ label="synd_support" ]
     auth [ label="synd_auth" ]
     feed [ label="synd_feed" ]
+    persistence [ label="synd_persistence" ]
+    registry [ label="synd_registry" ]
     test [ label="synd_test" ]
 
     term [ label="synd_term", shape="box" ]
     api  [ label="synd_api", shape="box" ]
 
-    feed -> o11y
-
-    term -> stdx [ headport="se" ]
-    term -> o11y
+    term -> support [ headport="se" ]
     term -> auth
     term -> feed
+    term -> api
+    term -> persistence
     term -> test [ style="dotted" ]
 
-    api  -> stdx [ headport="se" ]
-    api  -> o11y
+    api  -> support [ headport="se" ]
     api  -> auth
     api  -> feed
+    api  -> persistence
+    api  -> registry
     api  -> test [ style="dotted" ]
 
     test -> auth

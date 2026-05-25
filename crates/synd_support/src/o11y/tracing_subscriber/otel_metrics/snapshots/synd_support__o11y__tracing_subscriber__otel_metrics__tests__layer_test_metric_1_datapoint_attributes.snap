@@ -1,0 +1,8 @@
+---
+source: crates/synd_support/src/o11y/tracing_subscriber/otel_metrics/mod.rs
+description: " metric 1 datapoint attributes"
+expression: data.attributes
+---
+- key: key1
+  value:
+    stringValue: val1

@@ -1,4 +1,4 @@
-root_name = "synd-api, synd-auth, synd-feed, synd-o11y, synd-stdx, synd-test, synd-term"
+root_name = "synd-api, synd-auth, synd-feed, synd-persistence, synd-registry, synd-support, synd-test, synd-term"
 
 [[third_party_libraries]]
 package_name = "Inflector"

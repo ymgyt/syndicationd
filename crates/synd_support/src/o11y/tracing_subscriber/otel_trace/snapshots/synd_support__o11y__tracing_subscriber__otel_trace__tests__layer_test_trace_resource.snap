@@ -1,0 +1,20 @@
+---
+source: crates/synd_support/src/o11y/tracing_subscriber/otel_trace/mod.rs
+description: trace resource
+expression: "req.resource_spans[0].resource"
+---
+attributes:
+  - key: service.name
+    value:
+      stringValue: test
+  - key: telemetry.sdk.language
+    value:
+      stringValue: rust
+  - key: telemetry.sdk.name
+    value:
+      stringValue: opentelemetry
+  - key: telemetry.sdk.version
+    value:
+      stringValue: 0.31.0
+droppedAttributesCount: 0
+entityRefs: []
