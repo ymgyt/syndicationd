@@ -5471,7 +5471,6 @@ dependencies = [
  "assert_cmd",
  "async-graphql",
  "async-graphql-axum",
- "async-trait",
  "axum",
  "axum-server",
  "chrono",
@@ -5486,14 +5485,12 @@ dependencies = [
  "reqwest",
  "rustls 0.23.40",
  "serde",
- "serde_json",
- "sqlx",
  "synd-auth",
  "synd-feed",
- "synd-o11y",
- "synd-stdx",
+ "synd-persistence",
+ "synd-registry",
+ "synd-support",
  "synd-test",
- "thiserror 2.0.18",
  "tokio",
  "tokio-metrics",
  "tokio-util",
@@ -5531,28 +5528,59 @@ dependencies = [
  "fake",
  "feed-rs",
  "futures-util",
- "moka",
  "rand 0.10.1",
  "reqwest",
  "schemars 0.8.22",
  "serde",
  "serde_json",
  "sqlx",
- "synd-o11y",
  "thiserror 2.0.18",
- "tokio",
- "tokio-util",
  "tracing",
  "url",
 ]
 
 [[package]]
-name = "synd-o11y"
-version = "0.1.9"
+name = "synd-persistence"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "sqlx",
+ "synd-feed",
+ "synd-registry",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "synd-registry"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures-util",
+ "rand 0.10.1",
+ "serde",
+ "serde_json",
+ "synd-feed",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "synd-support"
+version = "0.1.0"
 dependencies = [
  "axum",
+ "byte-unit",
  "http",
+ "humantime",
  "insta",
+ "mockall",
  "opentelemetry",
  "opentelemetry-appender-tracing",
  "opentelemetry-http",
@@ -5564,24 +5592,13 @@ dependencies = [
  "rand 0.10.1",
  "reqwest",
  "serde",
+ "serde_json",
+ "supports-color",
  "tokio",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "synd-stdx"
-version = "0.1.1"
-dependencies = [
- "byte-unit",
- "humantime",
- "mockall",
- "serde",
- "serde_json",
- "supports-color",
- "tracing",
 ]
 
 [[package]]
@@ -5626,13 +5643,15 @@ dependencies = [
  "synd-api",
  "synd-auth",
  "synd-feed",
- "synd-o11y",
- "synd-stdx",
+ "synd-persistence",
+ "synd-registry",
+ "synd-support",
  "synd-test",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "tokio-tungstenite",
  "tokio-util",
  "toml",
  "tracing",
