@@ -46,6 +46,17 @@ pub trait FetchFeed: Send + Sync {
     async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed>;
 }
 
+#[derive(Debug, Clone)]
+pub struct FetchedFeed {
+    pub url: FeedUrl,
+    pub feed: Feed,
+    pub body: Vec<u8>,
+    pub fetched_at: chrono::DateTime<chrono::Utc>,
+    pub content_type: Option<String>,
+    pub etag: Option<String>,
+    pub last_modified: Option<String>,
+}
+
 #[async_trait]
 impl<T> FetchFeed for Arc<T>
 where
@@ -66,16 +77,41 @@ pub struct FeedService {
 #[async_trait]
 impl FetchFeed for FeedService {
     async fn fetch_feed(&self, url: FeedUrl) -> FetchFeedResult<Feed> {
+        self.fetch_feed_with_body(url)
+            .await
+            .map(|fetched| fetched.feed)
+    }
+}
+
+impl FeedService {
+    pub async fn fetch_feed_with_body(&self, url: FeedUrl) -> FetchFeedResult<FetchedFeed> {
         use futures_util::StreamExt;
-        let mut stream = self
+        let response = self
             .http
             .get(url.clone().into_inner())
             .send()
             .await
             .map_err(FetchFeedError::Fetch)?
             .error_for_status()
-            .map_err(FetchFeedError::Fetch)?
-            .bytes_stream();
+            .map_err(FetchFeedError::Fetch)?;
+
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map(ToOwned::to_owned);
+        let etag = response
+            .headers()
+            .get(reqwest::header::ETAG)
+            .and_then(|value| value.to_str().ok())
+            .map(ToOwned::to_owned);
+        let last_modified = response
+            .headers()
+            .get(reqwest::header::LAST_MODIFIED)
+            .and_then(|value| value.to_str().ok())
+            .map(ToOwned::to_owned);
+
+        let mut stream = response.bytes_stream();
 
         let mut buff = Vec::new();
 
@@ -87,11 +123,19 @@ impl FetchFeed for FeedService {
             buff.extend(chunk);
         }
 
-        self.parse(url, buff.as_slice())
-    }
-}
+        let feed = self.parse(url.clone(), buff.as_slice())?;
 
-impl FeedService {
+        Ok(FetchedFeed {
+            url,
+            feed,
+            body: buff,
+            fetched_at: chrono::Utc::now(),
+            content_type,
+            etag,
+            last_modified,
+        })
+    }
+
     pub fn new(user_agent: &str, buff_limit: usize) -> Self {
         let http = reqwest::ClientBuilder::new()
             .user_agent(user_agent)

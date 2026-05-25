@@ -13,16 +13,13 @@ readme      = "README.md"
 version     = "0.3.5"
 
 [dependencies]
-synd-o11y = { path = "../synd_o11y", version = "0.1.9" }
-
 anyhow        = { workspace = true }
 async-graphql = { workspace = true, optional = true }
 async-trait   = { workspace = true }
-chrono        = { workspace = true }
+chrono        = { workspace = true, features = ["clock", "std"] }
 fake          = { workspace = true, optional = true, features = ["derive"] }
 feed-rs       = { workspace = true }
 futures-util  = { workspace = true }
-moka          = { workspace = true, features = ["future"] }
 rand          = { workspace = true, optional = true }
 reqwest       = { workspace = true, features = ["stream"] }
 schemars      = { workspace = true, optional = true, features = ["derive", "url"] }
@@ -30,8 +27,6 @@ serde         = { workspace = true }
 serde_json    = { workspace = true }
 sqlx          = { workspace = true, optional = true, features = ["sqlite"] }
 thiserror     = { workspace = true }
-tokio         = { workspace = true, features = ["macros"] }
-tokio-util    = { workspace = true }
 tracing       = { workspace = true }
 url           = { workspace = true, features = ["serde"] }
 
