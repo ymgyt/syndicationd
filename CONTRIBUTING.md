@@ -27,6 +27,18 @@ nix develop
 | `synd_term`        | TUI and CLI app                             |
 | `synd_test`        | Test support lib                            |
 
+### Application Topology
+
+![Application overview](etc/dot/dist/overview.svg)
+
+For normal development and user workflows, `synd_term` starts an in-process
+`synd_api` backed by SQLite. This is the local backend path used by the TUI and
+by commands such as `check`, `export`, and `import`.
+
+The standalone `synd_api` binary is still useful when working on the API server
+itself or testing remote backend mode. In that mode, `synd_term` connects to the
+API over HTTP and uses the GraphQL schema generated from `synd_api`.
+
 ### Running Locally
 
 The normal development path is the in-process local backend:
