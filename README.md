@@ -29,7 +29,7 @@ Syndicationd is a project for simple feed management on the terminal, and the fo
 * synd-api: A GraphQL API server utilizing [feed-rs](https://github.com/feed-rs/feed-rs)
 
 > [!IMPORTANT]
-> This README describes the current `main` branch. Local mode is being prepared as the default for the next release, but the latest published release may still default to the hosted remote API and require login for feed operations.
+> This README describes the current `main` branch, where local mode is the default. The latest published release may still default to the hosted remote API and require login for feed operations.
 
 **Table of Contents:**
 
@@ -125,7 +125,7 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
 ```
 
-Use the source install to try the current `main` branch behavior before the next local-mode release.
+Use the source install to try the current `main` branch behavior before the next release.
 
 > [!NOTE]
 > `synd` requires [Nerd Fonts](https://www.nerdfonts.com/) to be installed on your system for rendering icons.
@@ -179,8 +179,8 @@ synd config init > config.toml
 | `--endpoint`       | `SYND_ENDPOINT`          | `[api.endpoint]`         | `https://api.syndicationd.ymgyt.io` | Remote synd-api endpoint                            |
 | `--client-timeout` | `SYND_CLIENT_TIMEOUT`    | `[api.timeout]`          | `30s`                               | API client timeout                                  |
 | `--entries-limit`  | `SYND_ENTRIES_LIMIT`     | `[feed.entries_limit]`   | `200`                               | Feed entries to fetch                               |
-| `--browser`        | `SYND_FEED_BROWSER`      | `[feed.browser.command]` | \-                                  | Command to browse feed                              |
-| `--browser-args`   | `SYND_FEED_BROWSER_ARGS` | `[feed.browser.args]`    | `[]`                                | Command args to browse feed                         |
+| `--browser`        | `SYND_BROWSER`           | `[feed.browser.command]` | \-                                  | Command to browse feed                              |
+| `--browser-args`   | `SYND_BROWSER_ARGS`      | `[feed.browser.args]`    | `[]`                                | Command args to browse feed                         |
 | `--enable-gh`      | `SYND_ENABLE_GH`         | `[github.enable]`        | `false`                             | Enable github notification feature                  |
 | `--github-pat`     | `SYND_GH_PAT`            | `[github.pat]`           | \-                                  | GitHub personal access token to fetch notifications |
 

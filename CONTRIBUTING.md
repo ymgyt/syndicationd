@@ -1,9 +1,16 @@
+# Contributing
+
 ## Development
 
-In syndicationd, we manage the development environment and CI with [Nix](https://nixos.org/).  
-For installing Nix, please refer to the [Nix install documentation](https://github.com/DeterminateSystems/nix-installer)
+syndicationd uses [Nix](https://nixos.org/) to prepare the development and CI
+toolchain. For installing Nix, refer to the
+[Nix install documentation](https://github.com/DeterminateSystems/nix-installer).
 
-By executing `nix develop`, the necessary tools for development can be prepared.
+Enter the development shell before running the project commands:
+
+```sh
+nix develop
+```
 
 ### Overview of Packages
 
@@ -15,34 +22,73 @@ By executing `nix develop`, the necessary tools for development can be prepared.
 | `synd_feed`        | RSS/Atom feed lib                           |
 | `synd_auth`        | Authentication lib                          |
 | `synd_registry`    | Feed registry domain lib                    |
-| `synd_persistence` | Persistence adapters                        |
-| `synd_api`         | GraphQL api bin                             |
-| `synd_term`        | TUI app bin                                 |
+| `synd_persistence` | Durable storage adapters                    |
+| `synd_api`         | GraphQL API server                          |
+| `synd_term`        | TUI and CLI app                             |
 | `synd_test`        | Test support lib                            |
 
-### Launching Develop Environment
+### Running Locally
 
-Launch three terminals.  
+The normal development path is the in-process local backend:
 
-1. the first one is for synd-api
-1. the second one is for kvsd, which serves as the persistent backend used by synd-api
-1. the last one is for synd.
+```sh
+just run-local
+```
 
-Execute in the following order: `just run kvsd`, `just run api`, `just run term`
+This is equivalent to running `synd` with `--local`; it starts the TUI and an
+in-process `synd-api` backed by a local SQLite database.
+
+When working on the standalone API server, use two terminals:
+
+```sh
+just run api
+just run term -- --backend remote
+```
+
+`just run api` starts `synd-api` with SQLite and local TLS certificates. The
+`just run term` recipe sets `SYND_ENDPOINT` to the local API endpoint used by
+the API recipe.
+
+List available recipes with:
+
+```sh
+just
+```
 
 ### Updating GraphQL Schema
 
-If you have updated the GraphQL schema of synd-api, execute `just graphql schema` This command updates the GraphQL schema of synd-term.   
-To generate synd-term's GraphQL client code, execute `just graphql generate`.
+If you update the `synd-api` GraphQL schema, first run a local API with
+introspection enabled:
+
+```sh
+just run api
+```
+
+Then update the schema used by `synd-term` and regenerate the client code:
+
+```sh
+just graphql schema
+just graphql generate
+```
+
+`just graphql schema` reads `GH_PAT` when the introspection request needs an
+authorization header.
 
 ## Testing
 
-* `just lint` : run linters
-* `just test unit` : run unit tests
-* `just test integration` : run integration test
-* `just bench` : run benchmarks
-* `just bench flamegraph` : generate flamegraph
+* `just lint`: run typo and clippy checks
+* `just test`: run unit and integration tests
+* `just test unit`: run unit tests with nextest
+* `just test integration`: run integration tests
+* `just bench`: run benchmarks
+* `just bench flamegraph`: generate a flamegraph
 
+For `synd-term` changes that touch feature-gated code, run both:
+
+```sh
+cargo clippy -p synd-term -- -D warnings
+cargo clippy -p synd-term --all-features -- -D warnings
+```
 
 ## Commit Message
 
@@ -60,18 +106,18 @@ type is one of the following.
 | `refactor`  | refactoring                         |
 | `chore`     | catch all                           |
 
-Please use the scope without `synd` prefix from the crate name.  
-For example, when making changes to `synd_term`, the commit message should be `feat(term): add new feature`.  
+Use the scope without the `synd` prefix from the crate name.
+For example, when making changes to `synd_term`, the commit message should be `feat(term): add new feature`.
 The commit will be used to generate the CHANGELOG for each crate.
 
 ## For Maintainers
 
-For information about CI, please refer to [ci.md](/docs/ci.md).  
+For information about CI, refer to [ci.md](/docs/ci.md).
 
 ### Release Flow
 
-To perform a release, run `just synd <package> release (patch|minor|major) [--execute]`.  
-For example, to release version v0.2.0 of `synd-api` when it is currently at version v0.1.0, you would run `just synd api release minor`.  
+To perform a release, run `just synd <package> release (patch|minor|major) [--execute]`.
+For example, to release version v0.2.0 of `synd-api` when it is currently at version v0.1.0, run `just synd api release minor`.
 
 This task will be executed in dry-run mode, allowing you to review the CHANGELOG generation and replacement processing. Once you have confirmed that there are no issues, return the command with the `--execute` flag.  
 
@@ -81,13 +127,13 @@ The git tag will trigger the release workflow, which will create a GitHub releas
 ### Update rust version
 
 The project's rust version is managed in the [rust-toolchain.toml](./rust-toolchain.toml).  
-If you encounter the following error after upgrading the rust version and running `nix develop`
+If you encounter the following error after upgrading the Rust version and running `nix develop`:
 
 ```
 error: Stable 1.x.y is not available  
 ```
 
-In that case, please execute `just nix update rust-overlay`.
+In that case, execute `just nix update rust-overlay`.
 
 ## License
 
