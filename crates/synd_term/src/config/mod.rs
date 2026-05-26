@@ -31,7 +31,7 @@ pub mod env {
     pub const CACHE_DIR: &str = env_key!("CACHE_DIR");
     pub const BACKEND: &str = env_key!("BACKEND");
     pub const LOCAL: &str = env_key!("LOCAL");
-    pub const LOCAL_SQLITE_DB: &str = env_key!("LOCAL_SQLITE_DB");
+    pub const SQLITE_DB: &str = env_key!("SQLITE_DB");
     pub const THEME: &str = env_key!("THEME");
     pub const FEED_ENTRIES_LIMIT: &str = env_key!("ENTRIES_LIMIT");
     pub const FEED_BROWSER: &str = env_key!("BROWSER");

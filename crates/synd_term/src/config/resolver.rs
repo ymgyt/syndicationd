@@ -34,7 +34,7 @@ pub struct ConfigResolver {
     log_file: Entry<PathBuf>,
     cache_dir: Entry<PathBuf>,
     backend_mode: Entry<BackendMode>,
-    local_sqlite_db: Entry<PathBuf>,
+    sqlite_db: Entry<PathBuf>,
     api_endpoint: Entry<Url>,
     api_timeout: Entry<Duration>,
     feed_entries_limit: Entry<usize>,
@@ -67,8 +67,8 @@ impl ConfigResolver {
         self.backend_mode.resolve()
     }
 
-    pub fn local_sqlite_db(&self) -> PathBuf {
-        self.local_sqlite_db.resolve_ref().clone()
+    pub fn sqlite_db(&self) -> PathBuf {
+        self.sqlite_db.resolve_ref().clone()
     }
 
     pub fn api_endpoint(&self) -> Url {
@@ -231,7 +231,7 @@ impl ConfigResolverBuilder {
                 Some(BackendOptions {
                     mode: backend_mode,
                     local,
-                    sqlite_db: local_sqlite_db,
+                    sqlite_db,
                 }),
             feed_flags:
                 Some(FeedOptions {
@@ -283,14 +283,14 @@ impl ConfigResolverBuilder {
                 } else {
                     backend_mode
                 }),
-            local_sqlite_db: Entry::with_default(config::local::sqlite_db())
+            sqlite_db: Entry::with_default(config::local::sqlite_db())
                 .with_file(
                     config_file
                         .as_mut()
                         .and_then(|c| c.backend.as_mut())
                         .and_then(|backend| backend.sqlite_db.take()),
                 )
-                .with_flag(local_sqlite_db),
+                .with_flag(sqlite_db),
             api_endpoint: Entry::with_default(Url::parse(config::api::ENDPOINT).unwrap())
                 .with_file(
                     config_file

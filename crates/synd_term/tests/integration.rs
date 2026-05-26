@@ -678,7 +678,7 @@ mod test {
 
         let check = assert_cmd::Command::cargo_bin("synd")
             .unwrap()
-            .args(["--local-sqlite-db", &sqlite_db, "check"])
+            .args(["--sqlite-db", &sqlite_db, "check"])
             .assert()
             .success();
         let output = check.get_output();
@@ -693,13 +693,13 @@ mod test {
 
         assert_cmd::Command::cargo_bin("synd")
             .unwrap()
-            .args(["--local-sqlite-db", &sqlite_db, "export"])
+            .args(["--sqlite-db", &sqlite_db, "export"])
             .assert()
             .success();
 
         assert_cmd::Command::cargo_bin("synd")
             .unwrap()
-            .args(["--local-sqlite-db", &sqlite_db, "import", &input])
+            .args(["--sqlite-db", &sqlite_db, "import", &input])
             .assert()
             .success();
     }

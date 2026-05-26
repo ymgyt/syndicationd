@@ -43,7 +43,7 @@ impl PortContext {
 
     async fn local(config: &ConfigResolver) -> anyhow::Result<Self> {
         let local_api = LocalApi::start(LocalApiConfig {
-            sqlite_db: config.local_sqlite_db(),
+            sqlite_db: config.sqlite_db(),
             timeout: config.api_timeout(),
         })
         .await?;

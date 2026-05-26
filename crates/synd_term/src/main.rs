@@ -98,7 +98,7 @@ async fn build_app(config: ConfigResolver, dry_run: bool) -> anyhow::Result<Appl
         }
         BackendMode::Local => {
             let local_api = LocalApi::start(LocalApiConfig {
-                sqlite_db: config.local_sqlite_db(),
+                sqlite_db: config.sqlite_db(),
                 timeout: config.api_timeout(),
             })
             .await

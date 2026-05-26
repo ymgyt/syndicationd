@@ -39,8 +39,8 @@ impl CheckCommand {
     async fn check(self, config: ConfigResolver) -> anyhow::Result<()> {
         let Self { format } = self;
         let backend_mode = config.backend_mode();
-        let local_sqlite_db = match backend_mode {
-            BackendMode::Local => Some(config.local_sqlite_db()),
+        let sqlite_db = match backend_mode {
+            BackendMode::Local => Some(config.sqlite_db()),
             BackendMode::Remote => None,
         };
         let endpoint = match backend_mode {
@@ -71,7 +71,7 @@ impl CheckCommand {
                         cache_dir: &cache_dir,
                         log_path: log_path.as_path(),
                         backend_mode,
-                        local_sqlite_db: local_sqlite_db.as_deref(),
+                        sqlite_db: sqlite_db.as_deref(),
                         endpoint: endpoint.as_ref(),
                     },
                 )?;
@@ -89,7 +89,7 @@ impl CheckCommand {
                         "cache": cache_dir.display().to_string(),
                         "log": log_path.display().to_string(),
                         "backend": Self::backend_mode_name(backend_mode),
-                        "local_sqlite_db": local_sqlite_db.map(|path| path.display().to_string()),
+                        "sqlite_db": sqlite_db.map(|path| path.display().to_string()),
                         "endpoint": endpoint.map(|endpoint| endpoint.to_string()),
                     })
                 );
@@ -107,7 +107,7 @@ impl CheckCommand {
             cache_dir,
             log_path,
             backend_mode,
-            local_sqlite_db,
+            sqlite_db,
             endpoint,
         } = output;
 
@@ -124,8 +124,8 @@ impl CheckCommand {
             health.and_then(|h| h.version).unwrap_or("unknown".into())
         )?;
         writeln!(w, "    Backend: {}", Self::backend_mode_name(backend_mode))?;
-        if let Some(local_sqlite_db) = local_sqlite_db {
-            writeln!(w, "  SQLite DB: {}", local_sqlite_db.display())?;
+        if let Some(sqlite_db) = sqlite_db {
+            writeln!(w, "  SQLite DB: {}", sqlite_db.display())?;
         }
         if let Some(endpoint) = endpoint {
             writeln!(w, "   Endpoint: {endpoint}")?;
@@ -151,6 +151,6 @@ struct CheckOutput<'a> {
     cache_dir: &'a Path,
     log_path: &'a Path,
     backend_mode: BackendMode,
-    local_sqlite_db: Option<&'a Path>,
+    sqlite_db: Option<&'a Path>,
     endpoint: Option<&'a url::Url>,
 }
