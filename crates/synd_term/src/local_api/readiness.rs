@@ -2,18 +2,18 @@ use std::time::{Duration, Instant};
 
 use crate::client::synd_api::Client;
 
-use super::runtime::LocalApiRuntime;
+use super::runtime::LocalApiHandle;
 
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(super) async fn wait_until_ready(
     client: &Client,
-    runtime: &LocalApiRuntime,
+    handle: &LocalApiHandle,
 ) -> anyhow::Result<()> {
     let deadline = Instant::now() + STARTUP_TIMEOUT;
 
     loop {
-        if runtime.is_finished() {
+        if handle.is_finished() {
             anyhow::bail!("local synd-api exited before readiness");
         }
 
@@ -25,6 +25,6 @@ pub(super) async fn wait_until_ready(
             anyhow::bail!("local synd-api did not become ready within {STARTUP_TIMEOUT:?}");
         }
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }

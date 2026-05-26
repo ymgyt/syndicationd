@@ -3,7 +3,7 @@ use crate::{
     client::{github::GithubClient, synd_api::Client},
     config::Categories,
     interact::Interact,
-    local_api::LocalApiRuntime,
+    local_api::LocalApiHandle,
     terminal::Terminal,
     ui::theme::Theme,
 };
@@ -28,7 +28,7 @@ pub struct ApplicationBuilder<
 
     pub(super) authenticator: Option<Authenticator>,
     pub(super) github_client: Option<GithubClient>,
-    pub(super) local_api_runtime: Option<LocalApiRuntime>,
+    pub(super) local_api_handle: Option<LocalApiHandle>,
     pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) dry_run: bool,
 }
@@ -46,7 +46,7 @@ impl Default for ApplicationBuilder {
             interactor: (),
             authenticator: None,
             github_client: None,
-            local_api_runtime: None,
+            local_api_handle: None,
             clock: None,
             dry_run: false,
         }
@@ -70,7 +70,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -91,7 +91,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -102,7 +102,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
         self,
         feed_backend: FeedBackend,
     ) -> ApplicationBuilder<T1, Client, T2, T3, T4, T5, T6> {
-        let (client, feed_api_session, local_api_runtime) = feed_backend.into_parts();
+        let (client, feed_api_session, local_api_handle) = feed_backend.into_parts();
         ApplicationBuilder {
             terminal: self.terminal,
             client,
@@ -114,7 +114,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime,
+            local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -138,7 +138,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -159,7 +159,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -180,7 +180,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -201,7 +201,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
             interactor: self.interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }
@@ -225,7 +225,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
             interactor,
             authenticator: self.authenticator,
             github_client: self.github_client,
-            local_api_runtime: self.local_api_runtime,
+            local_api_handle: self.local_api_handle,
             clock: self.clock,
             dry_run: self.dry_run,
         }

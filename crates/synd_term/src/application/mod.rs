@@ -1,6 +1,5 @@
-use std::{num::NonZero, ops::ControlFlow, time::Duration};
+use std::{ops::ControlFlow, time::Duration};
 
-use chrono::{DateTime, Utc};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
@@ -8,12 +7,11 @@ use synd_feed::types::FeedUrl;
 
 use crate::{
     application::key_handlers::KeyEventResult,
-    auth::{self, Credential, CredentialError, Verified},
-    client::synd_api::Client,
+    auth::{Credential, CredentialError, Verified},
+    client::synd_api::{Client, payload},
     config::Categories,
     event::Event,
     interact::Interact,
-    job::Jobs,
     keymap::{KeymapId, Keymaps},
     operation::Operation,
     terminal::Terminal,
@@ -32,7 +30,7 @@ pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
 
 mod input_parser;
 
-pub use auth::authenticator::{Authenticator, DeviceFlows, JwtService};
+pub use crate::auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
 mod clock;
 pub use clock::{Clock, SystemClock};
@@ -65,7 +63,7 @@ mod integration;
 mod operations;
 mod release;
 use component::AppComponent;
-use drivers::{Drivers, TimelineChangeSubscription};
+use drivers::{DriverParts, Drivers};
 
 const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
 const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -130,7 +128,7 @@ impl Application {
             client,
             feed_api_session,
             github_client,
-            local_api_runtime,
+            local_api_handle,
             categories,
             cache,
             config,
@@ -151,38 +149,26 @@ impl Application {
             key_handlers
         };
         let components = AppComponent::new(&config.features, theme, categories, dry_run);
+        let drivers = Drivers::new(DriverParts {
+            terminal,
+            client,
+            feed_api_session,
+            github_client,
+            local_api_handle,
+            cache,
+            authenticator,
+            interactor,
+            clock,
+            throbber_timer_interval: config.throbber_timer_interval,
+            idle_timer_interval: config.idle_timer_interval,
+        });
 
         Self {
-            drivers: Drivers {
-                clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
-                terminal,
-                client,
-                feed_api_session,
-                github_client,
-                local_api_runtime,
-                // The secondary rate limit of the GitHub API is 100 concurrent requests, so we have set it to 90.
-                jobs: Jobs::new(NonZero::new(90).unwrap()),
-                background_jobs: Jobs::new(NonZero::new(10).unwrap()),
-                interactor,
-                authenticator: authenticator.unwrap_or_else(Authenticator::new),
-                in_flight: InFlight::new()
-                    .with_throbber_timer_interval(config.throbber_timer_interval),
-                timeline_changes: TimelineChangeSubscription::new(),
-                cache,
-                idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
-            },
+            drivers,
             components,
             key_handlers,
             config,
         }
-    }
-
-    fn now(&self) -> DateTime<Utc> {
-        self.drivers.clock.now()
-    }
-
-    fn jwt_service(&self) -> &JwtService {
-        &self.drivers.authenticator.jwt_service
     }
 
     fn keymaps(&mut self) -> &mut Keymaps {
@@ -207,7 +193,7 @@ impl Application {
     /// Initialize application.
     /// Setup terminal and handle cache.
     async fn init(&mut self) -> anyhow::Result<()> {
-        match self.drivers.terminal.init() {
+        match self.drivers.init_terminal() {
             Ok(()) => Ok(()),
             Err(err) => {
                 if self.components.shell.should_quit() {
@@ -221,7 +207,7 @@ impl Application {
 
         if self.config.features.enable_github_notification {
             // Restore previous filter options
-            match self.drivers.cache.load_gh_notification_filter_options() {
+            match self.drivers.load_gh_notification_filter_options() {
                 Ok(options) => {
                     self.components.github.notifications =
                         GitHubNotificationsWidget::with_filter_options(options);
@@ -232,7 +218,7 @@ impl Application {
             }
         }
 
-        if self.drivers.feed_api_session.requires_user_credential() {
+        if self.drivers.feed_api_session_requires_user_credential() {
             match self.restore_credential().await {
                 Ok(cred) => self.handle_restored_credential(cred),
                 Err(err) => tracing::warn!("Restore credential: {err}"),
@@ -245,13 +231,7 @@ impl Application {
     }
 
     async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
-        let restore = auth::Restore {
-            jwt_service: self.jwt_service(),
-            cache: &self.drivers.cache,
-            now: self.now(),
-            persist_when_refreshed: true,
-        };
-        restore.restore().await
+        self.drivers.restore_credential().await
     }
 
     fn handle_restored_credential(&mut self, cred: Verified<Credential>) {
@@ -282,7 +262,7 @@ impl Application {
 
     fn initial_fetch(&mut self) {
         tracing::info!("Initial fetch");
-        if self.drivers.client.supports_timeline_change_subscription() {
+        if self.drivers.supports_timeline_change_subscription() {
             self.perform_operation(Operation::StartTimelineChangeSubscription);
         }
         self.perform_operation(Operation::FetchInitialFeedView {
@@ -301,11 +281,7 @@ impl Application {
     fn cleanup(&mut self) -> anyhow::Result<()> {
         if self.config.features.enable_github_notification {
             let options = self.components.github.notifications.filter_options();
-            match self
-                .drivers
-                .cache
-                .persist_gh_notification_filter_options(options)
-            {
+            match self.drivers.persist_gh_notification_filter_options(options) {
                 Ok(()) => {}
                 Err(err) => {
                     tracing::warn!("Failed to persist github notification filter options: {err}");
@@ -313,7 +289,7 @@ impl Application {
             }
         }
 
-        self.drivers.terminal.restore()?;
+        self.drivers.restore_terminal()?;
 
         // Make sure inform after terminal restored
         self.inform_latest_release();
@@ -321,10 +297,7 @@ impl Application {
     }
 
     async fn shutdown_local_api(&mut self) {
-        self.drivers.timeline_changes.stop();
-        if let Some(runtime) = self.drivers.local_api_runtime.take() {
-            runtime.shutdown().await;
-        }
+        self.drivers.shutdown().await;
     }
 
     async fn event_loop<S>(&mut self, input: &mut S)
@@ -344,26 +317,42 @@ impl Application {
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        loop {
-            tokio::select! {
-                biased;
+        enum PollResult {
+            Terminal(std::io::Result<CrosstermEvent>),
+            Job(anyhow::Result<Event>),
+            BackgroundJob(anyhow::Result<Event>),
+            Timeline(payload::TimelineChangeEvent),
+            Throbber,
+            Idle,
+        }
 
-                Some(event) = input.next() => {
-                    self.handle_terminal_event(event);
+        loop {
+            let result = {
+                let pollers = self.drivers.pollers();
+                tokio::select! {
+                    biased;
+
+                    Some(event) = input.next() => PollResult::Terminal(event),
+                    Some(event) = pollers.jobs.next() => PollResult::Job(event),
+                    Some(event) = pollers.background_jobs.next() => PollResult::BackgroundJob(event),
+                    Some(event) = pollers.timeline_changes.recv() => PollResult::Timeline(event),
+                    ()  = pollers.in_flight.throbber_timer() => PollResult::Throbber,
+                    () = &mut *pollers.idle_timer => PollResult::Idle,
                 }
-                Some(event) = self.drivers.jobs.next() => {
+            };
+
+            match result {
+                PollResult::Terminal(event) => self.handle_terminal_event(event),
+                PollResult::Job(event) | PollResult::BackgroundJob(event) => {
                     self.apply_job_result(event);
                 }
-                Some(event) = self.drivers.background_jobs.next() => {
-                    self.apply_job_result(event);
-                }
-                Some(event) = self.drivers.timeline_changes.recv() => {
+                PollResult::Timeline(event) => {
                     self.apply_event(Event::TimelineChanged { event });
                 }
-                ()  = self.drivers.in_flight.throbber_timer() => {
+                PollResult::Throbber => {
                     self.apply_event(Event::RenderThrobber);
                 }
-                () = &mut self.drivers.idle_timer => {
+                PollResult::Idle => {
                     self.apply_event(Event::Idle);
                 }
             };
@@ -391,19 +380,20 @@ impl Application {
     }
 
     fn render(&mut self) {
-        let cx = ui::Context {
-            theme: &self.components.shell.theme,
-            in_flight: &self.drivers.in_flight,
-            categories: &self.components.shell.categories,
-            focus: self.components.shell.focus(),
-            now: self.now(),
-            tab: self.components.shell.tabs.current(),
-        };
-        let root = AppWidget::new(&self.components, cx);
-
+        let components = &self.components;
         self.drivers
-            .terminal
-            .render(|frame| Widget::render(root, frame.area(), frame.buffer_mut()))
+            .render(|frame, in_flight, now| {
+                let cx = ui::Context {
+                    theme: &components.shell.theme,
+                    in_flight,
+                    categories: &components.shell.categories,
+                    focus: components.shell.focus(),
+                    now,
+                    tab: components.shell.tabs.current(),
+                };
+                let root = AppWidget::new(components, cx);
+                Widget::render(root, frame.area(), frame.buffer_mut());
+            })
             .expect("Failed to render");
     }
 

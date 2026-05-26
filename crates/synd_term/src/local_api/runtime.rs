@@ -25,17 +25,17 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct LocalApi {
     pub client: Client,
-    pub runtime: LocalApiRuntime,
+    pub handle: LocalApiHandle,
 }
 
-pub struct LocalApiRuntime {
+pub struct LocalApiHandle {
     shutdown: Shutdown,
     task: JoinHandle<anyhow::Result<()>>,
 }
 
 struct SpawnedLocalApi {
     endpoint: Url,
-    runtime: LocalApiRuntime,
+    handle: LocalApiHandle,
 }
 
 struct LocalApiSpawner;
@@ -50,14 +50,14 @@ impl LocalApi {
         let mut client = Client::new(spawned.endpoint, timeout)?;
         client.set_local_token(token.as_str())?;
 
-        let runtime = spawned.runtime;
-        wait_until_ready(&client, &runtime).await?;
+        let handle = spawned.handle;
+        wait_until_ready(&client, &handle).await?;
 
-        Ok(Self { client, runtime })
+        Ok(Self { client, handle })
     }
 }
 
-impl LocalApiRuntime {
+impl LocalApiHandle {
     pub(super) fn is_finished(&self) -> bool {
         self.task.is_finished()
     }
@@ -77,7 +77,7 @@ impl LocalApiRuntime {
     }
 }
 
-impl Drop for LocalApiRuntime {
+impl Drop for LocalApiHandle {
     fn drop(&mut self) {
         if !self.task.is_finished() {
             self.shutdown.shutdown();
@@ -113,7 +113,7 @@ impl LocalApiSpawner {
 
         Ok(SpawnedLocalApi {
             endpoint,
-            runtime: LocalApiRuntime { shutdown, task },
+            handle: LocalApiHandle { shutdown, task },
         })
     }
 

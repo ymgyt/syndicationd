@@ -1,12 +1,12 @@
 use crate::{
     client::synd_api::Client,
-    local_api::{LocalApi, LocalApiRuntime},
+    local_api::{LocalApi, LocalApiHandle},
 };
 
 pub struct FeedBackend {
     client: Client,
     session: FeedApiSession,
-    local_api_runtime: Option<LocalApiRuntime>,
+    local_api_handle: Option<LocalApiHandle>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,7 +20,7 @@ impl FeedBackend {
         Self {
             client,
             session: FeedApiSession::UserCredentialRequired,
-            local_api_runtime: None,
+            local_api_handle: None,
         }
     }
 
@@ -28,12 +28,12 @@ impl FeedBackend {
         Self {
             client: local_api.client,
             session: FeedApiSession::Established,
-            local_api_runtime: Some(local_api.runtime),
+            local_api_handle: Some(local_api.handle),
         }
     }
 
-    pub(super) fn into_parts(self) -> (Client, FeedApiSession, Option<LocalApiRuntime>) {
-        (self.client, self.session, self.local_api_runtime)
+    pub(super) fn into_parts(self) -> (Client, FeedApiSession, Option<LocalApiHandle>) {
+        (self.client, self.session, self.local_api_handle)
     }
 }
 

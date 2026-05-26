@@ -8,7 +8,7 @@ use futures_util::Stream;
 #[cfg(feature = "integration")]
 impl Application {
     pub fn buffer(&self) -> &ratatui::buffer::Buffer {
-        self.drivers.terminal.buffer()
+        self.drivers.buffer()
     }
 
     pub async fn wait_until_jobs_completed<S>(&mut self, input: &mut S)
@@ -23,7 +23,7 @@ impl Application {
             // feed-view sync are intentionally not drained here. Short feed
             // refresh polls and timeline reload debounce are component state, so
             // wait for those explicit states instead of the whole background queue.
-            if self.drivers.jobs.is_empty()
+            if self.drivers.foreground_jobs_is_empty()
                 && !self.components.feeds.has_pending_short_background_work()
             {
                 break;

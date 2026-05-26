@@ -18,8 +18,7 @@ impl Application {
                 self.should_render();
             }
             Event::RenderThrobber => {
-                self.drivers.in_flight.reset_throbber_timer();
-                self.drivers.in_flight.inc_throbber_step();
+                self.drivers.reset_throbber();
                 self.should_render();
             }
             Event::Idle => {
@@ -30,8 +29,7 @@ impl Application {
             }
             Event::CredentialRefreshed { credential } => {
                 self.set_credential(credential);
-                let client = self.drivers.client.clone();
-                if self.drivers.timeline_changes.restart_if_running(client) {
+                if self.drivers.restart_timeline_changes_if_running() {
                     let operations = self.components.mark_timeline_dirty();
                     self.perform_operations(operations);
                 }
@@ -111,7 +109,7 @@ impl Application {
                     .components
                     .apply_feed_refresh_poll_error(url, request_id)
                 {
-                    self.drivers.in_flight.remove(request_seq);
+                    self.drivers.remove_in_flight(request_seq);
                     return;
                 }
                 let message = self.synd_api_error_message(error.as_ref());
@@ -127,7 +125,7 @@ impl Application {
     }
 
     fn apply_api_event(&mut self, request_seq: RequestSequence, event: ApiEvent) {
-        self.drivers.in_flight.remove(request_seq);
+        self.drivers.remove_in_flight(request_seq);
 
         match event {
             ApiEvent::Auth(event) => self.apply_auth_api_event(event),
@@ -175,7 +173,7 @@ impl Application {
         tracing::error!("{error_message}");
 
         if let Some(request_seq) = request_seq {
-            self.drivers.in_flight.remove(request_seq);
+            self.drivers.remove_in_flight(request_seq);
         }
 
         self.components
@@ -188,12 +186,12 @@ impl Application {
     fn synd_api_error_message(&mut self, error: &SyndApiError) -> String {
         match error {
             SyndApiError::Unauthorized { url }
-                if self.drivers.feed_api_session.requires_user_credential() =>
+                if self.drivers.feed_api_session_requires_user_credential() =>
             {
                 tracing::warn!(
                     "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
                 );
-                self.drivers.cache.clean().ok();
+                self.drivers.clean_cache();
 
                 format!(
                     "{} unauthorized. please login again",

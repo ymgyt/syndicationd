@@ -8,12 +8,12 @@ use crate::{
     cli::BackendMode,
     client::synd_api::Client,
     config::ConfigResolver,
-    local_api::{LocalApi, LocalApiConfig, LocalApiRuntime},
+    local_api::{LocalApi, LocalApiConfig, LocalApiHandle},
 };
 
 pub(super) struct PortContext {
     pub(super) client: Client,
-    _local_api_runtime: Option<LocalApiRuntime>,
+    _local_api_handle: Option<LocalApiHandle>,
 }
 
 pub(super) enum AuthMode {
@@ -37,7 +37,7 @@ impl PortContext {
 
         Ok(Self {
             client,
-            _local_api_runtime: None,
+            _local_api_handle: None,
         })
     }
 
@@ -50,7 +50,7 @@ impl PortContext {
 
         Ok(Self {
             client: local_api.client,
-            _local_api_runtime: Some(local_api.runtime),
+            _local_api_handle: Some(local_api.handle),
         })
     }
 

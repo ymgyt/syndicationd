@@ -5,4 +5,4 @@ mod runtime;
 mod token;
 
 pub use config::LocalApiConfig;
-pub use runtime::{LocalApi, LocalApiRuntime};
+pub use runtime::{LocalApi, LocalApiHandle};
