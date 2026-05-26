@@ -10,15 +10,14 @@ use crate::{
     client::github::{FetchNotificationInclude, FetchNotificationParticipating},
     types::github::{Notification, PullRequestState, Reason, RepoVisibility, SubjectContext},
     ui::{
-        Context,
-        components::{
+        Context, icon,
+        widgets::{
             filter::{FilterResult, Filterable},
             gh_notifications::{
                 GhNotificationFilterOptions, GhNotificationFilterOptionsState,
                 GhNotificationFilterUpdater,
             },
         },
-        icon,
     },
 };
 

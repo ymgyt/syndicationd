@@ -18,9 +18,8 @@ use url::Url;
 use crate::{
     auth::{Credential, Verified},
     client::synd_api::payload::{
-        ExportSubscriptionPayload, FeedRegistryEvent, InitialFeedRegistryPayload,
-        RefreshFeedPayload, RefreshStatus, SubscribeFeedInput, SubscribeFeedPayload,
-        SubscriptionPayload,
+        ExportSubscriptionPayload, InitialFeedViewPayload, RefreshFeedPayload, RefreshStatus,
+        SubscribeFeedInput, SubscribeFeedPayload, SubscriptionPayload, TimelineChangeEvent,
     },
     config,
 };
@@ -97,16 +96,16 @@ impl Client {
         Ok(())
     }
 
-    pub(crate) fn supports_feed_registry_events(&self) -> bool {
+    pub(crate) fn supports_timeline_change_subscription(&self) -> bool {
         self.endpoint.scheme() == "http"
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn fetch_initial_feed_registry(
+    pub async fn fetch_initial_feed_view(
         &self,
         subscriptions_first: i64,
         timeline_first: i64,
-    ) -> Result<InitialFeedRegistryPayload, SyndApiError> {
+    ) -> Result<InitialFeedViewPayload, SyndApiError> {
         #[derive(Serialize, Debug)]
         #[serde(rename_all = "camelCase")]
         struct Variables {
@@ -115,12 +114,12 @@ impl Client {
         }
         #[derive(Debug, serde::Deserialize)]
         struct ResponseData {
-            output: InitialFeedRegistryPayload,
+            output: InitialFeedViewPayload,
         }
 
         let response: Response<ResponseData> = self
             .execute_graphql(&graphql(
-                INITIAL_FEED_REGISTRY_QUERY,
+                INITIAL_FEED_VIEW_QUERY,
                 Variables {
                     subscriptions_first,
                     timeline_first,
@@ -134,7 +133,7 @@ impl Client {
                 if !errors.is_empty() {
                     tracing::warn!(
                         errors = ?errors,
-                        "initial feed registry query returned partial GraphQL errors"
+                        "initial feed view query returned partial GraphQL errors"
                     );
                 }
                 Ok(data.output)
@@ -382,27 +381,27 @@ impl Client {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn next_feed_registry_event(&self) -> Result<FeedRegistryEvent, SyndApiError> {
-        let mut socket = self.connect_feed_registry_event_socket().await?;
-        wait_for_feed_registry_event(&mut socket).await
+    pub async fn next_timeline_change(&self) -> Result<TimelineChangeEvent, SyndApiError> {
+        let mut socket = self.connect_timeline_change_socket().await?;
+        wait_for_timeline_change(&mut socket).await
     }
 
     #[tracing::instrument(skip(self, events))]
-    pub async fn run_feed_registry_events(
+    pub async fn run_timeline_changes(
         &self,
-        events: mpsc::UnboundedSender<FeedRegistryEvent>,
+        events: mpsc::UnboundedSender<TimelineChangeEvent>,
     ) -> Result<(), SyndApiError> {
-        let mut socket = self.connect_feed_registry_event_socket().await?;
+        let mut socket = self.connect_timeline_change_socket().await?;
 
         loop {
-            let event = wait_for_feed_registry_event(&mut socket).await?;
+            let event = wait_for_timeline_change(&mut socket).await?;
             if events.send(event).is_err() {
                 return Ok(());
             }
         }
     }
 
-    async fn connect_feed_registry_event_socket(
+    async fn connect_timeline_change_socket(
         &self,
     ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, SyndApiError> {
         let ws_url = self.graphql_ws_endpoint()?;
@@ -499,7 +498,7 @@ where
     }
 }
 
-async fn wait_for_feed_registry_event<S>(socket: &mut S) -> Result<FeedRegistryEvent, SyndApiError>
+async fn wait_for_timeline_change<S>(socket: &mut S) -> Result<TimelineChangeEvent, SyndApiError>
 where
     S: Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
 {
@@ -524,7 +523,7 @@ where
                     })?;
                 let event = serde_json::from_value(event)
                     .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
-                return Ok(FeedRegistryEvent::TimelineChanged(event));
+                return Ok(event);
             }
             Some("error") => {
                 return Err(SyndApiError::Internal(anyhow!(
@@ -570,8 +569,8 @@ where
     }
 }
 
-const INITIAL_FEED_REGISTRY_QUERY: &str = r"
-query InitialFeedRegistry($subscriptionsFirst: Int!, $timelineFirst: Int!) {
+const INITIAL_FEED_VIEW_QUERY: &str = r"
+query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
   output: feedRegistry {
     subscriptions(first: $subscriptionsFirst) {
       nodes {

@@ -1,117 +1,32 @@
-use std::{fmt::Display, sync::Arc};
-use synd_auth::device_flow::DeviceAuthorizationResponse;
-use synd_feed::types::{Category, FeedUrl};
+use std::fmt::Display;
+use synd_feed::types::Category;
 
 use crate::{
-    application::{Direction, Populate, RequestSequence},
-    auth::{AuthenticationProvider, Credential, Verified},
-    client::{
-        github::{FetchNotificationsParams, GithubError},
-        synd_api::{SyndApiError, payload},
-    },
-    types::github::{
-        IssueContext, IssueOrPullRequest, Notification, NotificationId, PullRequestContext,
-        PullRequestState, Reason,
-    },
-    ui::components::{filter::FilterLane, gh_notifications::GhNotificationFilterUpdater},
+    application::Direction,
+    types::github::{PullRequestState, Reason},
+    ui::widgets::{filter::FilterLane, gh_notifications::GhNotificationFilterUpdater},
 };
 
-#[derive(Debug, Clone)]
-pub(crate) enum ApiResponse {
-    DeviceFlowAuthorization {
-        provider: AuthenticationProvider,
-        device_authorization: DeviceAuthorizationResponse,
-    },
-    DeviceFlowCredential {
-        credential: Verified<Credential>,
-    },
-    SubscribeFeed {
-        url: FeedUrl,
-        payload: payload::SubscribeFeedPayload,
-    },
-    RefreshFeed {
-        url: FeedUrl,
-        payload: payload::RefreshFeedPayload,
-    },
-    FetchFeedRefreshStatus {
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-        status: payload::RefreshStatus,
-    },
-    UnsubscribeFeed {
-        url: FeedUrl,
-    },
-    FetchSubscription {
-        populate: Populate,
-        subscription: payload::SubscriptionPayload,
-    },
-    FetchEntries {
-        populate: Populate,
-        payload: payload::FetchEntriesPayload,
-    },
-    FetchInitialFeedRegistry {
-        payload: payload::InitialFeedRegistryPayload,
-    },
-    FetchGithubNotifications {
-        populate: Populate,
-        notifications: Vec<Notification>,
-    },
-    FetchGithubIssue {
-        notification_id: NotificationId,
-        issue: IssueContext,
-    },
-    FetchGithubPullRequest {
-        notification_id: NotificationId,
-        pull_request: PullRequestContext,
-    },
-    MarkGithubNotificationAsDone {
-        notification_id: NotificationId,
-    },
-    UnsubscribeGithubThread {},
-}
-
-impl Display for ApiResponse {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ApiResponse::DeviceFlowCredential { .. } => f.write_str("DeviceFlowCredential"),
-            ApiResponse::FetchSubscription { .. } => f.write_str("FetchSubscription"),
-            ApiResponse::FetchEntries { .. } => f.write_str("FetchEntries"),
-            ApiResponse::FetchGithubNotifications { .. } => f.write_str("FetchGithubNotifications"),
-            ApiResponse::FetchGithubIssue { .. } => f.write_str("FetchGithubIssue"),
-            ApiResponse::FetchGithubPullRequest { .. } => f.write_str("FetchGithubPullRequest"),
-            cmd => write!(f, "{cmd:?}"),
-        }
-    }
-}
-
-#[expect(clippy::large_enum_variant)]
+/// Request for a component to perform an application action.
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
-    Nop,
-    Quit,
-    ResizeTerminal {
-        _columns: u16,
-        _rows: u16,
-    },
-    RenderThrobber,
-    Idle,
+    Shell(ShellCommand),
+    Feeds(FeedsCommand),
+    Filter(FilterCommand),
+    GitHub(GitHubCommand),
+}
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ShellCommand {
+    Quit,
     Authenticate,
     MoveAuthenticationProvider(Direction),
-
-    HandleApiResponse {
-        request_seq: RequestSequence,
-        response: ApiResponse,
-    },
-
-    RefreshCredential {
-        credential: Verified<Credential>,
-    },
-
     MoveTabSelection(Direction),
+    RotateTheme,
+}
 
-    // Subscription
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum FeedsCommand {
     MoveSubscribedFeed(Direction),
     MoveSubscribedFeedFirst,
     MoveSubscribedFeedLast,
@@ -121,43 +36,21 @@ pub(crate) enum Command {
     MoveFeedUnsubscriptionPopupSelection(Direction),
     SelectFeedUnsubscriptionPopup,
     CancelFeedUnsubscriptionPopup,
-    SubscribeFeed {
-        input: payload::SubscribeFeedInput,
-    },
     RefreshSelectedFeed,
-    RefreshFeed {
-        url: FeedUrl,
-    },
-    PollFeedRefresh {
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    },
-    SyncFeedView,
-    HandleFeedRegistryEvent {
-        event: payload::FeedRegistryEvent,
-    },
-    DebouncedTimelineReload,
-    FetchSubscription {
-        after: Option<String>,
-        first: i64,
-    },
     ReloadSubscription,
     OpenFeed,
 
     // Entries
-    FetchEntries {
-        after: Option<String>,
-        first: i64,
-    },
     ReloadEntries,
     MoveEntry(Direction),
     MoveEntryFirst,
     MoveEntryLast,
     OpenEntry,
     BrowseEntry,
+}
 
-    // Filter
+#[derive(Debug, Clone)]
+pub(crate) enum FilterCommand {
     MoveFilterRequirement(Direction),
     ActivateCategoryFilterling,
     ActivateSearchFiltering,
@@ -173,282 +66,242 @@ pub(crate) enum Command {
     DeactivateAllFilterCategories {
         lane: FilterLane,
     },
+}
 
-    // Theme
-    RotateTheme,
-
-    // Latest release check
-    InformLatestRelease(update_informer::Version),
-
-    // Github notifications
-    FetchGhNotifications {
-        populate: Populate,
-        params: FetchNotificationsParams,
-    },
-    FetchGhNotificationDetails {
-        contexts: Vec<IssueOrPullRequest>,
-    },
+#[derive(Debug, Clone)]
+pub(crate) enum GitHubCommand {
     MoveGhNotification(Direction),
     MoveGhNotificationFirst,
     MoveGhNotificationLast,
-    OpenGhNotification {
-        with_mark_as_done: bool,
-    },
+    OpenGhNotification { with_mark_as_done: bool },
     ReloadGhNotifications,
-    MarkGhNotificationAsDone {
-        all: bool,
-    },
+    MarkGhNotificationAsDone { all: bool },
     UnsubscribeGhThread,
     OpenGhNotificationFilterPopup,
     CloseGhNotificationFilterPopup,
     UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater),
-
-    // Error
-    HandleError {
-        message: String,
-    },
-    HandleApiError {
-        // use Arc for impl Clone
-        error: Arc<SyndApiError>,
-        request_seq: RequestSequence,
-    },
-    HandleFeedRefreshPollError {
-        url: FeedUrl,
-        request_id: String,
-        error: Arc<SyndApiError>,
-        request_seq: RequestSequence,
-    },
-    HandleOauthApiError {
-        // use Arc for impl Clone
-        error: Arc<anyhow::Error>,
-        request_seq: RequestSequence,
-    },
-    HandleGithubApiError {
-        // use Arc for impl Clone
-        error: Arc<GithubError>,
-        request_seq: RequestSequence,
-    },
 }
 
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::HandleApiResponse { response, .. } => response.fmt(f),
-            Command::FetchGhNotificationDetails { .. } => f
-                .debug_struct("FetchGhNotificationDetails")
-                .finish_non_exhaustive(),
-            _ => write!(f, "{self:?}"),
-        }
-    }
-}
-
-impl Command {
-    pub(crate) fn api_error(error: SyndApiError, request_seq: RequestSequence) -> Self {
-        Command::HandleApiError {
-            error: Arc::new(error),
-            request_seq,
-        }
-    }
-    pub(crate) fn oauth_api_error(error: anyhow::Error, request_seq: RequestSequence) -> Self {
-        Command::HandleOauthApiError {
-            error: Arc::new(error),
-            request_seq,
-        }
+        write!(f, "{self:?}")
     }
 }
 
 impl Command {
     pub fn quit() -> Self {
-        Command::Quit
+        Command::Shell(ShellCommand::Quit)
     }
     pub fn authenticate() -> Self {
-        Command::Authenticate
+        Command::Shell(ShellCommand::Authenticate)
     }
     pub fn move_right_tab_selection() -> Self {
-        Command::MoveTabSelection(Direction::Right)
+        Command::Shell(ShellCommand::MoveTabSelection(Direction::Right))
     }
     pub fn move_left_tab_selection() -> Self {
-        Command::MoveTabSelection(Direction::Left)
+        Command::Shell(ShellCommand::MoveTabSelection(Direction::Left))
     }
     pub fn move_up_authentication_provider() -> Self {
-        Command::MoveAuthenticationProvider(Direction::Up)
+        Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Up))
     }
     pub fn move_down_authentication_provider() -> Self {
-        Command::MoveAuthenticationProvider(Direction::Down)
+        Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Down))
     }
     pub fn move_up_entry() -> Self {
-        Command::MoveEntry(Direction::Up)
+        Command::Feeds(FeedsCommand::MoveEntry(Direction::Up))
     }
     pub fn move_down_entry() -> Self {
-        Command::MoveEntry(Direction::Down)
+        Command::Feeds(FeedsCommand::MoveEntry(Direction::Down))
     }
     pub fn reload_entries() -> Self {
-        Command::ReloadEntries
+        Command::Feeds(FeedsCommand::ReloadEntries)
     }
     pub fn open_entry() -> Self {
-        Command::OpenEntry
+        Command::Feeds(FeedsCommand::OpenEntry)
     }
     pub fn browse_entry() -> Self {
-        Command::BrowseEntry
+        Command::Feeds(FeedsCommand::BrowseEntry)
     }
     pub fn move_entry_first() -> Self {
-        Command::MoveEntryFirst
+        Command::Feeds(FeedsCommand::MoveEntryFirst)
     }
     pub fn move_entry_last() -> Self {
-        Command::MoveEntryLast
+        Command::Feeds(FeedsCommand::MoveEntryLast)
     }
     pub fn prompt_feed_subscription() -> Self {
-        Command::PromptFeedSubscription
+        Command::Feeds(FeedsCommand::PromptFeedSubscription)
     }
     pub fn prompt_feed_edition() -> Self {
-        Command::PromptFeedEdition
+        Command::Feeds(FeedsCommand::PromptFeedEdition)
     }
     pub fn prompt_feed_unsubscription() -> Self {
-        Command::PromptFeedUnsubscription
+        Command::Feeds(FeedsCommand::PromptFeedUnsubscription)
     }
     pub fn move_feed_unsubscription_popup_selection_left() -> Self {
-        Command::MoveFeedUnsubscriptionPopupSelection(Direction::Left)
+        Command::Feeds(FeedsCommand::MoveFeedUnsubscriptionPopupSelection(
+            Direction::Left,
+        ))
     }
     pub fn move_feed_unsubscription_popup_selection_right() -> Self {
-        Command::MoveFeedUnsubscriptionPopupSelection(Direction::Right)
+        Command::Feeds(FeedsCommand::MoveFeedUnsubscriptionPopupSelection(
+            Direction::Right,
+        ))
     }
     pub fn select_feed_unsubscription_popup() -> Self {
-        Command::SelectFeedUnsubscriptionPopup
+        Command::Feeds(FeedsCommand::SelectFeedUnsubscriptionPopup)
     }
     pub fn cancel_feed_unsubscription_popup() -> Self {
-        Command::CancelFeedUnsubscriptionPopup
+        Command::Feeds(FeedsCommand::CancelFeedUnsubscriptionPopup)
     }
     pub fn move_up_subscribed_feed() -> Self {
-        Command::MoveSubscribedFeed(Direction::Up)
+        Command::Feeds(FeedsCommand::MoveSubscribedFeed(Direction::Up))
     }
     pub fn move_down_subscribed_feed() -> Self {
-        Command::MoveSubscribedFeed(Direction::Down)
+        Command::Feeds(FeedsCommand::MoveSubscribedFeed(Direction::Down))
     }
     pub fn reload_subscription() -> Self {
-        Command::ReloadSubscription
+        Command::Feeds(FeedsCommand::ReloadSubscription)
     }
     pub fn refresh_selected_feed() -> Self {
-        Command::RefreshSelectedFeed
+        Command::Feeds(FeedsCommand::RefreshSelectedFeed)
     }
     pub fn open_feed() -> Self {
-        Command::OpenFeed
+        Command::Feeds(FeedsCommand::OpenFeed)
     }
     pub fn move_subscribed_feed_first() -> Self {
-        Command::MoveSubscribedFeedFirst
+        Command::Feeds(FeedsCommand::MoveSubscribedFeedFirst)
     }
     pub fn move_subscribed_feed_last() -> Self {
-        Command::MoveSubscribedFeedLast
+        Command::Feeds(FeedsCommand::MoveSubscribedFeedLast)
     }
     pub fn move_filter_requirement_left() -> Self {
-        Command::MoveFilterRequirement(Direction::Left)
+        Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Left))
     }
     pub fn move_filter_requirement_right() -> Self {
-        Command::MoveFilterRequirement(Direction::Right)
+        Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Right))
     }
     pub fn activate_category_filtering() -> Self {
-        Command::ActivateCategoryFilterling
+        Command::Filter(FilterCommand::ActivateCategoryFilterling)
     }
     pub fn activate_search_filtering() -> Self {
-        Command::ActivateSearchFiltering
+        Command::Filter(FilterCommand::ActivateSearchFiltering)
     }
     pub fn deactivate_filtering() -> Self {
-        Command::DeactivateFiltering
+        Command::Filter(FilterCommand::DeactivateFiltering)
     }
     pub fn rotate_theme() -> Self {
-        Command::RotateTheme
+        Command::Shell(ShellCommand::RotateTheme)
     }
     pub fn move_up_gh_notification() -> Self {
-        Command::MoveGhNotification(Direction::Up)
+        Command::GitHub(GitHubCommand::MoveGhNotification(Direction::Up))
     }
     pub fn move_down_gh_notification() -> Self {
-        Command::MoveGhNotification(Direction::Down)
+        Command::GitHub(GitHubCommand::MoveGhNotification(Direction::Down))
     }
     pub fn move_gh_notification_first() -> Self {
-        Command::MoveGhNotificationFirst
+        Command::GitHub(GitHubCommand::MoveGhNotificationFirst)
     }
     pub fn move_gh_notification_last() -> Self {
-        Command::MoveGhNotificationLast
+        Command::GitHub(GitHubCommand::MoveGhNotificationLast)
     }
     pub fn open_gh_notification() -> Self {
-        Command::OpenGhNotification {
+        Command::GitHub(GitHubCommand::OpenGhNotification {
             with_mark_as_done: false,
-        }
+        })
     }
     pub fn open_gh_notification_with_done() -> Self {
-        Command::OpenGhNotification {
+        Command::GitHub(GitHubCommand::OpenGhNotification {
             with_mark_as_done: true,
-        }
+        })
     }
     pub fn reload_gh_notifications() -> Self {
-        Command::ReloadGhNotifications
+        Command::GitHub(GitHubCommand::ReloadGhNotifications)
     }
     pub fn mark_gh_notification_as_done() -> Self {
-        Command::MarkGhNotificationAsDone { all: false }
+        Command::GitHub(GitHubCommand::MarkGhNotificationAsDone { all: false })
     }
     pub fn mark_gh_notification_as_done_all() -> Self {
-        Command::MarkGhNotificationAsDone { all: true }
+        Command::GitHub(GitHubCommand::MarkGhNotificationAsDone { all: true })
     }
     pub fn unsubscribe_gh_thread() -> Self {
-        Command::UnsubscribeGhThread
+        Command::GitHub(GitHubCommand::UnsubscribeGhThread)
     }
     pub fn open_gh_notification_filter_popup() -> Self {
-        Command::OpenGhNotificationFilterPopup
+        Command::GitHub(GitHubCommand::OpenGhNotificationFilterPopup)
     }
     pub fn close_gh_notification_filter_popup() -> Self {
-        Command::CloseGhNotificationFilterPopup
+        Command::GitHub(GitHubCommand::CloseGhNotificationFilterPopup)
     }
     pub fn toggle_gh_notification_filter_popup_include_unread() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_include: true,
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_include: true,
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_participating() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_participating: true,
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_participating: true,
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_visibility_public() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_visilibty_public: true,
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_visilibty_public: true,
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_visibility_private() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_visilibty_private: true,
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_visilibty_private: true,
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_pr_open() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_pull_request_condition: Some(PullRequestState::Open),
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_pull_request_condition: Some(PullRequestState::Open),
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_pr_closed() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_pull_request_condition: Some(PullRequestState::Closed),
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_pull_request_condition: Some(PullRequestState::Closed),
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_pr_merged() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_pull_request_condition: Some(PullRequestState::Merged),
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_pull_request_condition: Some(PullRequestState::Merged),
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_reason_mentioned() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_reason: Some(Reason::Mention),
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_reason: Some(Reason::Mention),
+                ..Default::default()
+            },
+        ))
     }
     pub fn toggle_gh_notification_filter_popup_reason_review() -> Self {
-        Command::UpdateGhnotificationFilterPopupOptions(GhNotificationFilterUpdater {
-            toggle_reason: Some(Reason::ReviewRequested),
-            ..Default::default()
-        })
+        Command::GitHub(GitHubCommand::UpdateGhnotificationFilterPopupOptions(
+            GhNotificationFilterUpdater {
+                toggle_reason: Some(Reason::ReviewRequested),
+                ..Default::default()
+            },
+        ))
     }
 }

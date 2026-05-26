@@ -7,10 +7,9 @@ use crate::{
     application::{InFlight, TerminalFocus},
     config::{Categories, Icon, IconColor},
     types::Time,
-    ui::{components::tabs::Tab, theme::Theme},
+    ui::{theme::Theme, widgets::tabs::Tab},
 };
 
-pub mod components;
 pub mod extension;
 pub mod theme;
 pub mod widgets;

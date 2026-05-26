@@ -19,7 +19,7 @@ impl From<EntriesOutput> for FetchEntriesPayload {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct InitialFeedRegistryPayload {
+pub struct InitialFeedViewPayload {
     #[serde(default)]
     pub subscriptions: InitialSubscriptionsPayload,
     #[serde(default)]
@@ -66,7 +66,7 @@ impl<'de> Deserialize<'de> for InitialTimelinePayload {
     }
 }
 
-impl InitialFeedRegistryPayload {
+impl InitialFeedViewPayload {
     pub fn into_parts(self) -> (Option<SubscriptionPayload>, Option<FetchEntriesPayload>) {
         let subscriptions = match self.subscriptions {
             InitialSubscriptionsPayload::Ready(feeds) => Some(SubscriptionPayload { feeds }),
@@ -234,14 +234,9 @@ pub struct FeedStatusResponseData {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TimelineChangedEvent {
+pub struct TimelineChangeEvent {
     pub changed_at: String,
     pub affected_feeds: Option<Vec<FeedUrl>>,
-}
-
-#[derive(Debug, Clone)]
-pub enum FeedRegistryEvent {
-    TimelineChanged(TimelineChangedEvent),
 }
 
 #[derive(Debug, Clone, Deserialize)]

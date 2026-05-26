@@ -2,7 +2,7 @@ use synd_feed::types::Requirement;
 
 use crate::{
     types,
-    ui::components::filter::{
+    ui::widgets::filter::{
         CategoryFilterer, ComposedFilterer, FilterResult, Filterable, MatcherFilterer,
         category::CategoriesState, composed::Composable,
     },

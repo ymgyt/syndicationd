@@ -19,11 +19,11 @@ use crate::{
 
 use super::tabs::Tab;
 
-pub struct StatusLine {
+pub struct StatusLineWidget {
     error_message: Option<String>,
 }
 
-impl StatusLine {
+impl StatusLineWidget {
     pub fn new() -> Self {
         Self {
             error_message: None,
@@ -39,7 +39,7 @@ impl StatusLine {
     }
 }
 
-impl StatusLine {
+impl StatusLineWidget {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
         match self.error_message.as_ref() {
             Some(error_message) => Self::render_error(area, buf, cx, error_message),

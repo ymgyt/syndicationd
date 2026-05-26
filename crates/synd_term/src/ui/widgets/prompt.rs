@@ -8,7 +8,10 @@ use ratatui::{
 };
 use unicode_segmentation::GraphemeCursor;
 
-use crate::{application::event::KeyEventResult, command::Command};
+use crate::{
+    application::key_handlers::KeyEventResult,
+    command::{Command, FilterCommand},
+};
 
 #[derive(Debug, Clone, Copy)]
 enum Move {
@@ -58,14 +61,16 @@ impl Prompt {
                 let pos = self.move_cursor(Move::BackwardChar(1));
                 self.line.replace_range(pos..self.cursor, "");
                 self.cursor = pos;
-                KeyEventResult::consumed(Command::PromptChanged).should_render(true)
+                KeyEventResult::consumed(Command::Filter(FilterCommand::PromptChanged))
+                    .should_render(true)
             }
             KeyEvent {
                 code: KeyCode::Char(c),
                 ..
             } => {
                 self.insert_char(*c);
-                KeyEventResult::consumed(Command::PromptChanged).should_render(true)
+                KeyEventResult::consumed(Command::Filter(FilterCommand::PromptChanged))
+                    .should_render(true)
             }
             _ => KeyEventResult::Ignored,
         }

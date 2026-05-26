@@ -25,13 +25,13 @@ pub(crate) enum AuthenticateState {
     Authenticated,
 }
 
-pub(crate) struct Authentication {
+pub(crate) struct AuthWidget {
     state: AuthenticateState,
     providers: Vec<AuthenticationProvider>,
     selected_provider_index: usize,
 }
 
-impl Authentication {
+impl AuthWidget {
     pub fn new(providers: Vec<AuthenticationProvider>) -> Self {
         debug_assert!(!providers.is_empty());
 
@@ -74,7 +74,7 @@ impl Authentication {
     }
 }
 
-impl Authentication {
+impl AuthWidget {
     pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         match self.state {
             AuthenticateState::NotAuthenticated => self.render_login(area, buf, cx),

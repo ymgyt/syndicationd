@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::{
     auth::{Credential, Unverified},
     config,
-    ui::components::gh_notifications::GhNotificationFilterOptions,
+    ui::widgets::gh_notifications::GhNotificationFilterOptions,
 };
 
 #[derive(Debug, Error)]

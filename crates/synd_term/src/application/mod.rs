@@ -1,52 +1,26 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    future,
-    num::NonZero,
-    ops::{ControlFlow, Sub},
-    pin::Pin,
-    sync::Arc,
-    time::Duration,
-};
+use std::{num::NonZero, ops::ControlFlow, time::Duration};
 
 use chrono::{DateTime, Utc};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
-use either::Either;
-use futures_util::{FutureExt, Stream, StreamExt};
-use itertools::Itertools;
+use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
-use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_feed::types::FeedUrl;
-use tokio::{
-    sync::mpsc,
-    task::JoinHandle,
-    time::{Instant, Sleep},
-};
-use update_informer::Version;
-use url::Url;
 
 use crate::{
-    application::event::KeyEventResult,
-    auth::{self, AuthenticationProvider, Credential, CredentialError, Verified},
-    client::{
-        github::{FetchNotificationsParams, GithubClient},
-        synd_api::{Client, SyndApiError, payload},
-    },
-    command::{ApiResponse, Command},
-    config::{self, Categories},
+    application::key_handlers::KeyEventResult,
+    auth::{self, Credential, CredentialError, Verified},
+    client::synd_api::Client,
+    config::Categories,
+    event::Event,
     interact::Interact,
     job::Jobs,
     keymap::{KeymapId, Keymaps},
-    local_api::LocalApiRuntime,
+    operation::Operation,
     terminal::Terminal,
-    types::github::{IssueOrPullRequest, Notification},
     ui::{
         self,
-        components::{
-            Components, authentication::AuthenticateState, filter::Filterer,
-            gh_notifications::GhNotifications, root::Root, subscription::UnsubscribeSelection,
-            tabs::Tab,
-        },
-        theme::{Palette, Theme},
+        theme::Theme,
+        widgets::{gh_notifications::GitHubNotificationsWidget, root::AppWidget},
     },
 };
 
@@ -57,7 +31,6 @@ mod in_flight;
 pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
 
 mod input_parser;
-use input_parser::InputParser;
 
 pub use auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
@@ -76,17 +49,28 @@ pub use backend::{FeedApiSession, FeedBackend};
 mod app_config;
 pub use app_config::{Config, Features};
 
-pub(crate) mod event;
+pub(crate) mod key_handlers;
 
 mod state;
 pub(crate) use state::TerminalFocus;
-use state::{Should, State};
+
+mod auth_flow;
+mod commands;
+pub(crate) mod component;
+mod drivers;
+mod events;
+mod feeds;
+mod idle;
+mod integration;
+mod operations;
+mod release;
+use component::AppComponent;
+use drivers::{Drivers, TimelineChangeSubscription};
 
 const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
 const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const FEED_VIEW_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const TIMELINE_INVALIDATION_DEBOUNCE: Duration = Duration::from_secs(1);
-const FEED_REGISTRY_EVENT_RECONNECT_DELAY: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Populate {
@@ -94,44 +78,22 @@ pub enum Populate {
     Replace,
 }
 
+/// Composition root that owns the event loop and connects components to drivers.
 pub struct Application {
-    clock: Box<dyn Clock>,
-    terminal: Terminal,
-    client: Client,
-    feed_api_session: FeedApiSession,
-    github_client: Option<GithubClient>,
-    local_api_runtime: Option<LocalApiRuntime>,
-    jobs: Jobs,
-    background_jobs: Jobs,
-    components: Components,
-    interactor: Box<dyn Interact>,
-    authenticator: Authenticator,
-    in_flight: InFlight,
-    active_feed_refresh_requests: HashMap<RequestSequence, FeedUrl>,
-    active_feed_refresh_polls: HashSet<FeedRefreshPollKey>,
-    feed_registry_event_rx: mpsc::UnboundedReceiver<payload::FeedRegistryEvent>,
-    feed_registry_event_task: Option<JoinHandle<()>>,
-    timeline_invalidation: TimelineInvalidationState,
-    active_timeline_refetch: Option<RequestSequence>,
-    cache: Cache,
-    theme: Theme,
-    idle_timer: Pin<Box<Sleep>>,
+    drivers: Drivers,
+    components: AppComponent,
+    key_handlers: key_handlers::KeyHandlers,
     config: Config,
-    key_handlers: event::KeyHandlers,
-    categories: Categories,
-    latest_release: Option<Version>,
-
-    state: State,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct FeedRefreshPollKey {
+pub(super) struct FeedRefreshPollKey {
     url: FeedUrl,
     request_id: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TimelineInvalidationState {
+pub(super) enum TimelineInvalidationState {
     Clean,
     DirtyWaiting,
     Refetching,
@@ -184,53 +146,43 @@ impl Application {
             keymaps.enable(KeymapId::Global);
             keymaps.enable(KeymapId::Login);
 
-            let mut key_handlers = event::KeyHandlers::new();
-            key_handlers.push(event::KeyHandler::Keymaps(keymaps));
+            let mut key_handlers = key_handlers::KeyHandlers::new();
+            key_handlers.push(key_handlers::KeyHandler::Keymaps(keymaps));
             key_handlers
         };
-        let mut state = State::new();
-        if dry_run {
-            state.flags = Should::Quit;
-        }
-        let (_feed_registry_event_tx, feed_registry_event_rx) = mpsc::unbounded_channel();
+        let components = AppComponent::new(&config.features, theme, categories, dry_run);
 
         Self {
-            clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
-            terminal,
-            client,
-            feed_api_session,
-            github_client,
-            local_api_runtime,
-            // The secondary rate limit of the GitHub API is 100 concurrent requests, so we have set it to 90.
-            jobs: Jobs::new(NonZero::new(90).unwrap()),
-            background_jobs: Jobs::new(NonZero::new(10).unwrap()),
-            components: Components::new(&config.features),
-            interactor,
-            authenticator: authenticator.unwrap_or_else(Authenticator::new),
-            in_flight: InFlight::new().with_throbber_timer_interval(config.throbber_timer_interval),
-            active_feed_refresh_requests: HashMap::new(),
-            active_feed_refresh_polls: HashSet::new(),
-            feed_registry_event_rx,
-            feed_registry_event_task: None,
-            timeline_invalidation: TimelineInvalidationState::Clean,
-            active_timeline_refetch: None,
-            cache,
-            theme,
-            idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
-            config,
+            drivers: Drivers {
+                clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
+                terminal,
+                client,
+                feed_api_session,
+                github_client,
+                local_api_runtime,
+                // The secondary rate limit of the GitHub API is 100 concurrent requests, so we have set it to 90.
+                jobs: Jobs::new(NonZero::new(90).unwrap()),
+                background_jobs: Jobs::new(NonZero::new(10).unwrap()),
+                interactor,
+                authenticator: authenticator.unwrap_or_else(Authenticator::new),
+                in_flight: InFlight::new()
+                    .with_throbber_timer_interval(config.throbber_timer_interval),
+                timeline_changes: TimelineChangeSubscription::new(),
+                cache,
+                idle_timer: Box::pin(tokio::time::sleep(config.idle_timer_interval)),
+            },
+            components,
             key_handlers,
-            categories,
-            latest_release: None,
-            state,
+            config,
         }
     }
 
     fn now(&self) -> DateTime<Utc> {
-        self.clock.now()
+        self.drivers.clock.now()
     }
 
     fn jwt_service(&self) -> &JwtService {
-        &self.authenticator.jwt_service
+        &self.drivers.authenticator.jwt_service
     }
 
     fn keymaps(&mut self) -> &mut Keymaps {
@@ -255,10 +207,10 @@ impl Application {
     /// Initialize application.
     /// Setup terminal and handle cache.
     async fn init(&mut self) -> anyhow::Result<()> {
-        match self.terminal.init() {
+        match self.drivers.terminal.init() {
             Ok(()) => Ok(()),
             Err(err) => {
-                if self.state.flags.contains(Should::Quit) {
+                if self.components.shell.should_quit() {
                     tracing::warn!("Failed to init terminal: {err}");
                     Ok(())
                 } else {
@@ -269,10 +221,10 @@ impl Application {
 
         if self.config.features.enable_github_notification {
             // Restore previous filter options
-            match self.cache.load_gh_notification_filter_options() {
+            match self.drivers.cache.load_gh_notification_filter_options() {
                 Ok(options) => {
-                    self.components.gh_notifications =
-                        GhNotifications::with_filter_options(options);
+                    self.components.github.notifications =
+                        GitHubNotificationsWidget::with_filter_options(options);
                 }
                 Err(err) => {
                     tracing::warn!("Load github notification filter options: {err}");
@@ -280,7 +232,7 @@ impl Application {
             }
         }
 
-        if self.feed_api_session.requires_user_credential() {
+        if self.drivers.feed_api_session.requires_user_credential() {
             match self.restore_credential().await {
                 Ok(cred) => self.handle_restored_credential(cred),
                 Err(err) => tracing::warn!("Restore credential: {err}"),
@@ -295,7 +247,7 @@ impl Application {
     async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
         let restore = auth::Restore {
             jwt_service: self.jwt_service(),
-            cache: &self.cache,
+            cache: &self.drivers.cache,
             now: self.now(),
             persist_when_refreshed: true,
         };
@@ -309,8 +261,8 @@ impl Application {
 
     fn enter_feed_api_session(&mut self) {
         self.initial_fetch();
-        self.check_latest_release();
-        self.components.auth.authenticated();
+        self.perform_operation(Operation::CheckLatestRelease);
+        self.components.shell.auth.authenticated();
         self.reset_idle_timer();
         self.should_render();
         self.keymaps()
@@ -325,29 +277,35 @@ impl Application {
     }
 
     fn set_credential(&mut self, cred: Verified<Credential>) {
-        self.schedule_credential_refreshing(&cred);
-        self.client.set_credential(cred);
+        self.drivers.set_credential(cred);
     }
 
     fn initial_fetch(&mut self) {
         tracing::info!("Initial fetch");
-        if self.client.supports_feed_registry_events() {
-            self.start_feed_registry_event_subscription();
+        if self.drivers.client.supports_timeline_change_subscription() {
+            self.perform_operation(Operation::StartTimelineChangeSubscription);
         }
-        self.fetch_initial_feed_registry();
+        self.perform_operation(Operation::FetchInitialFeedView {
+            subscriptions_first: self.config.feeds_per_pagination,
+            timeline_first: self.next_entries_first(0),
+        });
         if self.config.features.enable_github_notification
-            && let Some(fetch) = self.components.gh_notifications.fetch_next_if_needed()
+            && let Some(operation) = self.components.github.fetch_next_notifications_if_needed()
         {
-            self.jobs.push(future::ready(Ok(fetch)).boxed());
+            self.perform_operation(operation);
         }
-        self.schedule_feed_view_sync();
+        self.perform_operation(Operation::ScheduleFeedViewSync);
     }
 
     /// Restore terminal state and print something to console if necesseary
     fn cleanup(&mut self) -> anyhow::Result<()> {
         if self.config.features.enable_github_notification {
-            let options = self.components.gh_notifications.filter_options();
-            match self.cache.persist_gh_notification_filter_options(options) {
+            let options = self.components.github.notifications.filter_options();
+            match self
+                .drivers
+                .cache
+                .persist_gh_notification_filter_options(options)
+            {
                 Ok(()) => {}
                 Err(err) => {
                     tracing::warn!("Failed to persist github notification filter options: {err}");
@@ -355,7 +313,7 @@ impl Application {
             }
         }
 
-        self.terminal.restore()?;
+        self.drivers.terminal.restore()?;
 
         // Make sure inform after terminal restored
         self.inform_latest_release();
@@ -363,8 +321,8 @@ impl Application {
     }
 
     async fn shutdown_local_api(&mut self) {
-        self.stop_feed_registry_event_subscription();
-        if let Some(runtime) = self.local_api_runtime.take() {
+        self.drivers.timeline_changes.stop();
+        if let Some(runtime) = self.drivers.local_api_runtime.take() {
             runtime.shutdown().await;
         }
     }
@@ -386,784 +344,101 @@ impl Application {
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        let mut queue = VecDeque::with_capacity(2);
-
         loop {
-            let command = tokio::select! {
+            tokio::select! {
                 biased;
 
                 Some(event) = input.next() => {
-                    self.handle_terminal_event(event)
+                    self.handle_terminal_event(event);
                 }
-                Some(command) = self.jobs.next() => {
-                    Some(command.unwrap())
+                Some(event) = self.drivers.jobs.next() => {
+                    self.apply_job_result(event);
                 }
-                Some(command) = self.background_jobs.next() => {
-                    Some(command.unwrap())
+                Some(event) = self.drivers.background_jobs.next() => {
+                    self.apply_job_result(event);
                 }
-                Some(event) = self.feed_registry_event_rx.recv() => {
-                    Some(Command::HandleFeedRegistryEvent { event })
+                Some(event) = self.drivers.timeline_changes.recv() => {
+                    self.apply_event(Event::TimelineChanged { event });
                 }
-                ()  = self.in_flight.throbber_timer() => {
-                    Some(Command::RenderThrobber)
+                ()  = self.drivers.in_flight.throbber_timer() => {
+                    self.apply_event(Event::RenderThrobber);
                 }
-                () = &mut self.idle_timer => {
-                    Some(Command::Idle)
+                () = &mut self.drivers.idle_timer => {
+                    self.apply_event(Event::Idle);
                 }
             };
 
-            if let Some(command) = command {
-                queue.push_back(command);
-                self.apply(&mut queue);
-            }
-
-            if self.state.flags.contains(Should::Render) {
+            if self.components.shell.should_render() {
                 self.render();
-                self.state.flags.remove(Should::Render);
-                self.components.prompt.clear_error_message();
+                self.components.shell.clear_render_request();
+                self.components.shell.prompt.clear_error_message();
             }
 
-            if self.state.flags.contains(Should::Quit) {
-                self.state.flags.remove(Should::Quit); // for testing
+            if self.components.shell.should_quit() {
+                self.components.shell.clear_quit_request(); // for testing
                 break ControlFlow::Break(());
             }
         }
     }
 
-    #[expect(clippy::too_many_lines)]
-    #[tracing::instrument(skip_all)]
-    fn apply(&mut self, queue: &mut VecDeque<Command>) {
-        while let Some(command) = queue.pop_front() {
-            let _guard = tracing::info_span!("apply", %command).entered();
-
-            match command {
-                Command::Nop => {}
-                Command::Quit => self.state.flags.insert(Should::Quit),
-                Command::ResizeTerminal { .. } => {
-                    self.should_render();
-                }
-                Command::RenderThrobber => {
-                    self.in_flight.reset_throbber_timer();
-                    self.in_flight.inc_throbber_step();
-                    self.should_render();
-                }
-                Command::Idle => {
-                    self.handle_idle();
-                }
-                Command::Authenticate => {
-                    if self.components.auth.state() != &AuthenticateState::NotAuthenticated {
-                        continue;
-                    }
-                    let provider = self.components.auth.selected_provider();
-                    self.init_device_flow(provider);
-                }
-                Command::MoveAuthenticationProvider(direction) => {
-                    self.components.auth.move_selection(direction);
-                    self.should_render();
-                }
-                Command::HandleApiResponse {
-                    request_seq,
-                    response,
-                } => {
-                    self.in_flight.remove(request_seq);
-
-                    match response {
-                        ApiResponse::DeviceFlowAuthorization {
-                            provider,
-                            device_authorization,
-                        } => {
-                            self.handle_device_flow_authorization_response(
-                                provider,
-                                device_authorization,
-                            );
-                        }
-                        ApiResponse::DeviceFlowCredential { credential } => {
-                            self.complete_device_authroize_flow(credential);
-                        }
-                        ApiResponse::SubscribeFeed { url, payload } => {
-                            self.fetch_subscription(
-                                Populate::Replace,
-                                None,
-                                self.config.feeds_per_pagination,
-                            );
-                            self.fetch_entries(
-                                Populate::Replace,
-                                None,
-                                self.config.entries_per_pagination,
-                            );
-                            if let Some(request_id) = payload.request_id {
-                                self.ensure_feed_refresh_poll(
-                                    url,
-                                    request_id,
-                                    FEED_REFRESH_POLL_ATTEMPTS,
-                                );
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::RefreshFeed { url, payload } => {
-                            if self
-                                .active_feed_refresh_requests
-                                .remove(&request_seq)
-                                .is_none()
-                            {
-                                continue;
-                            }
-                            tracing::debug!(%url, "refresh request accepted");
-                            let refresh_status =
-                                crate::types::FeedRefreshStatus::from_refresh_receipt(&payload);
-                            self.components
-                                .subscription
-                                .update_refresh_status(&url, &refresh_status);
-                            self.fetch_subscription(
-                                Populate::Replace,
-                                None,
-                                self.config.feeds_per_pagination,
-                            );
-                            self.ensure_feed_refresh_poll(
-                                url,
-                                payload.request_id,
-                                FEED_REFRESH_POLL_ATTEMPTS,
-                            );
-                            self.should_render();
-                        }
-                        ApiResponse::FetchFeedRefreshStatus {
-                            url,
-                            request_id,
-                            remaining,
-                            status,
-                        } => {
-                            let poll_key = FeedRefreshPollKey::new(url.clone(), request_id.clone());
-                            if !self.active_feed_refresh_polls.contains(&poll_key) {
-                                continue;
-                            }
-
-                            let refresh_status = crate::types::FeedRefreshStatus::from(status);
-                            let current_request_id = refresh_status.request_id.clone();
-                            let is_current_request =
-                                current_request_id.as_deref() == Some(request_id.as_str());
-                            let is_active = refresh_status.is_active();
-                            self.components
-                                .subscription
-                                .update_refresh_status(&url, &refresh_status);
-
-                            if is_current_request && is_active && remaining > 1 {
-                                self.schedule_feed_refresh_poll_unchecked(
-                                    url,
-                                    request_id,
-                                    remaining.saturating_sub(1),
-                                );
-                            } else if is_current_request || !is_active {
-                                self.active_feed_refresh_polls.remove(&poll_key);
-                                self.fetch_subscription(
-                                    Populate::Replace,
-                                    None,
-                                    self.config.feeds_per_pagination,
-                                );
-                                self.fetch_entries(
-                                    Populate::Replace,
-                                    None,
-                                    self.config.entries_per_pagination,
-                                );
-                            } else {
-                                self.active_feed_refresh_polls.remove(&poll_key);
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::UnsubscribeFeed { url } => {
-                            self.remove_feed_refresh_polls_for_url(&url);
-                            self.components.subscription.remove_unsubscribed_feed(&url);
-                            self.components.entries.remove_unsubscribed_entries(&url);
-                            self.components.filter.update_categories(
-                                &self.categories,
-                                Populate::Replace,
-                                self.components.entries.entries(),
-                            );
-                            self.should_render();
-                        }
-                        ApiResponse::FetchSubscription {
-                            populate,
-                            subscription,
-                        } => {
-                            let has_snapshot = subscription
-                                .feeds
-                                .nodes
-                                .iter()
-                                .any(|feed| feed.feed.is_some());
-                            // paginate
-                            subscription.feeds.page_info.has_next_page.then(|| {
-                                queue.push_back(Command::FetchSubscription {
-                                    after: subscription.feeds.page_info.end_cursor.clone(),
-                                    first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
-                                });
-                            });
-                            self.components
-                                .subscription
-                                .update_subscription(populate, subscription);
-                            if populate == Populate::Replace
-                                && self.components.entries.count() == 0
-                                && has_snapshot
-                            {
-                                self.fetch_entries(
-                                    Populate::Replace,
-                                    None,
-                                    self.config.entries_per_pagination,
-                                );
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::FetchEntries { populate, payload } => {
-                            let page_info = payload.page_info.clone();
-                            let loaded_after_response =
-                                self.entries_loaded_after_response(populate, payload.entries.len());
-                            let next_first = self.next_entries_first(loaded_after_response);
-                            self.components.filter.update_categories(
-                                &self.categories,
-                                populate,
-                                payload.entries.as_slice(),
-                            );
-                            if page_info.has_next_page && next_first > 0 {
-                                queue.push_back(Command::FetchEntries {
-                                    after: page_info.end_cursor,
-                                    first: next_first,
-                                });
-                            }
-                            self.components.entries.update_entries_with_limit(
-                                populate,
-                                payload,
-                                self.config.entries_limit,
-                            );
-                            self.complete_timeline_refetch(request_seq);
-                            self.should_render();
-                        }
-                        ApiResponse::FetchInitialFeedRegistry { payload } => {
-                            let (subscription, entries) = payload.into_parts();
-                            if let Some(subscription) = subscription {
-                                subscription.feeds.page_info.has_next_page.then(|| {
-                                    queue.push_back(Command::FetchSubscription {
-                                        after: subscription.feeds.page_info.end_cursor.clone(),
-                                        first: subscription
-                                            .feeds
-                                            .nodes
-                                            .len()
-                                            .try_into()
-                                            .unwrap_or(0),
-                                    });
-                                });
-                                self.components
-                                    .subscription
-                                    .update_subscription(Populate::Replace, subscription);
-                            } else {
-                                self.fetch_subscription(
-                                    Populate::Replace,
-                                    None,
-                                    self.config.feeds_per_pagination,
-                                );
-                            }
-                            if let Some(entries) = entries {
-                                let next_first = self.next_entries_first(entries.entries.len());
-                                if entries.page_info.has_next_page && next_first > 0 {
-                                    queue.push_back(Command::FetchEntries {
-                                        after: entries.page_info.end_cursor.clone(),
-                                        first: next_first,
-                                    });
-                                }
-                                self.components.filter.update_categories(
-                                    &self.categories,
-                                    Populate::Replace,
-                                    entries.entries.as_slice(),
-                                );
-                                self.components.entries.update_entries_with_limit(
-                                    Populate::Replace,
-                                    entries,
-                                    self.config.entries_limit,
-                                );
-                            } else {
-                                self.fetch_entries(
-                                    Populate::Replace,
-                                    None,
-                                    self.config.entries_per_pagination,
-                                );
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::FetchGithubNotifications {
-                            notifications,
-                            populate,
-                        } => {
-                            self.components
-                                .gh_notifications
-                                .update_notifications(populate, notifications)
-                                .into_iter()
-                                .for_each(|command| queue.push_back(command));
-                            self.components
-                                .gh_notifications
-                                .fetch_next_if_needed()
-                                .into_iter()
-                                .for_each(|command| queue.push_back(command));
-                            if populate == Populate::Replace {
-                                self.components.filter.clear_gh_notifications_categories();
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::FetchGithubIssue {
-                            notification_id,
-                            issue,
-                        } => {
-                            if let Some(notification) = self
-                                .components
-                                .gh_notifications
-                                .update_issue(notification_id, issue, &self.categories)
-                            {
-                                let categories = notification.categories().cloned();
-                                self.components.filter.update_gh_notification_categories(
-                                    &self.categories,
-                                    Populate::Append,
-                                    categories,
-                                );
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::FetchGithubPullRequest {
-                            notification_id,
-                            pull_request,
-                        } => {
-                            if let Some(notification) =
-                                self.components.gh_notifications.update_pull_request(
-                                    notification_id,
-                                    pull_request,
-                                    &self.categories,
-                                )
-                            {
-                                let categories = notification.categories().cloned();
-                                self.components.filter.update_gh_notification_categories(
-                                    &self.categories,
-                                    Populate::Append,
-                                    categories,
-                                );
-                            }
-                            self.should_render();
-                        }
-                        ApiResponse::MarkGithubNotificationAsDone { notification_id } => {
-                            self.components
-                                .gh_notifications
-                                .marked_as_done(notification_id);
-                            self.should_render();
-                        }
-                        ApiResponse::UnsubscribeGithubThread { .. } => {
-                            // do nothing
-                        }
-                    }
-                }
-                Command::RefreshCredential { credential } => {
-                    self.set_credential(credential);
-                }
-                Command::MoveTabSelection(direction) => {
-                    self.keymaps()
-                        .disable(KeymapId::Subscription)
-                        .disable(KeymapId::Entries)
-                        .disable(KeymapId::GhNotification);
-
-                    match self.components.tabs.move_selection(direction) {
-                        Tab::Feeds => {
-                            self.keymaps().enable(KeymapId::Subscription);
-                            if !self.components.subscription.has_subscription() {
-                                queue.push_back(Command::FetchSubscription {
-                                    after: None,
-                                    first: self.config.feeds_per_pagination,
-                                });
-                            }
-                        }
-                        Tab::Entries => {
-                            self.keymaps().enable(KeymapId::Entries);
-                        }
-                        Tab::GitHub => {
-                            self.keymaps().enable(KeymapId::GhNotification);
-                        }
-                    }
-                    self.should_render();
-                }
-                Command::MoveSubscribedFeed(direction) => {
-                    self.components.subscription.move_selection(direction);
-                    self.should_render();
-                }
-                Command::MoveSubscribedFeedFirst => {
-                    self.components.subscription.move_first();
-                    self.should_render();
-                }
-                Command::MoveSubscribedFeedLast => {
-                    self.components.subscription.move_last();
-                    self.should_render();
-                }
-                Command::PromptFeedSubscription => {
-                    self.prompt_feed_subscription();
-                    self.should_render();
-                }
-                Command::PromptFeedEdition => {
-                    self.prompt_feed_edition();
-                    self.should_render();
-                }
-                Command::PromptFeedUnsubscription => {
-                    if self.components.subscription.selected_feed().is_some() {
-                        self.components.subscription.toggle_unsubscribe_popup(true);
-                        self.keymaps().enable(KeymapId::UnsubscribePopupSelection);
-                        self.should_render();
-                    }
-                }
-                Command::MoveFeedUnsubscriptionPopupSelection(direction) => {
-                    self.components
-                        .subscription
-                        .move_unsubscribe_popup_selection(direction);
-                    self.should_render();
-                }
-                Command::SelectFeedUnsubscriptionPopup => {
-                    if let (UnsubscribeSelection::Yes, Some(feed)) =
-                        self.components.subscription.unsubscribe_popup_selection()
-                    {
-                        self.unsubscribe_feed(feed.url.clone());
-                    }
-                    queue.push_back(Command::CancelFeedUnsubscriptionPopup);
-                    self.should_render();
-                }
-                Command::CancelFeedUnsubscriptionPopup => {
-                    self.components.subscription.toggle_unsubscribe_popup(false);
-                    self.keymaps().disable(KeymapId::UnsubscribePopupSelection);
-                    self.should_render();
-                }
-                Command::SubscribeFeed { input } => {
-                    self.subscribe_feed(input);
-                    self.should_render();
-                }
-                Command::RefreshSelectedFeed => {
-                    if let Some(feed) = self.components.subscription.selected_feed() {
-                        queue.push_back(Command::RefreshFeed {
-                            url: feed.url.clone(),
-                        });
-                    }
-                }
-                Command::RefreshFeed { url } => {
-                    self.refresh_feed(url);
-                    self.should_render();
-                }
-                Command::PollFeedRefresh {
-                    url,
-                    request_id,
-                    remaining,
-                } => {
-                    if !self
-                        .active_feed_refresh_polls
-                        .contains(&FeedRefreshPollKey::new(url.clone(), request_id.clone()))
-                    {
-                        continue;
-                    }
-
-                    self.fetch_feed_refresh_status(url, request_id, remaining);
-                    self.should_render();
-                }
-                Command::SyncFeedView => {
-                    self.sync_feed_view();
-                }
-                Command::HandleFeedRegistryEvent { event } => {
-                    self.handle_feed_registry_event(event);
-                }
-                Command::DebouncedTimelineReload => {
-                    self.refetch_dirty_timeline();
-                }
-                Command::FetchSubscription { after, first } => {
-                    self.fetch_subscription(Populate::Append, after, first);
-                }
-                Command::ReloadSubscription => {
-                    self.fetch_subscription(
-                        Populate::Replace,
-                        None,
-                        self.config.feeds_per_pagination,
-                    );
-                    self.should_render();
-                }
-                Command::OpenFeed => {
-                    self.open_feed();
-                }
-                Command::FetchEntries { after, first } => {
-                    self.fetch_entries(Populate::Append, after, first);
-                }
-                Command::ReloadEntries => {
-                    self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
-                    self.should_render();
-                }
-                Command::MoveEntry(direction) => {
-                    self.components.entries.move_selection(direction);
-                    self.should_render();
-                }
-                Command::MoveEntryFirst => {
-                    self.components.entries.move_first();
-                    self.should_render();
-                }
-                Command::MoveEntryLast => {
-                    self.components.entries.move_last();
-                    self.should_render();
-                }
-                Command::OpenEntry => {
-                    self.open_entry();
-                }
-                Command::BrowseEntry => {
-                    self.browse_entry();
-                }
-                Command::MoveFilterRequirement(direction) => {
-                    let filterer = self.components.filter.move_requirement(direction);
-                    self.apply_filterer(filterer)
-                        .into_iter()
-                        .for_each(|command| queue.push_back(command));
-                    self.should_render();
-                }
-                Command::ActivateCategoryFilterling => {
-                    let keymap = self
-                        .components
-                        .filter
-                        .activate_category_filtering(self.components.tabs.current().into());
-                    self.keymaps().update(KeymapId::CategoryFiltering, keymap);
-                    self.should_render();
-                }
-                Command::ActivateSearchFiltering => {
-                    let prompt = self.components.filter.activate_search_filtering();
-                    self.key_handlers.push(event::KeyHandler::Prompt(prompt));
-                    self.should_render();
-                }
-                Command::PromptChanged => {
-                    if self.components.filter.is_search_active() {
-                        let filterer = self
-                            .components
-                            .filter
-                            .filterer(self.components.tabs.current().into());
-                        self.apply_filterer(filterer)
-                            .into_iter()
-                            .for_each(|command| queue.push_back(command));
-                        self.should_render();
-                    }
-                }
-                Command::DeactivateFiltering => {
-                    self.components.filter.deactivate_filtering();
-                    self.keymaps().disable(KeymapId::CategoryFiltering);
-                    self.key_handlers.remove_prompt();
-                    self.should_render();
-                }
-                Command::ToggleFilterCategory { category, lane } => {
-                    let filter = self
-                        .components
-                        .filter
-                        .toggle_category_state(&category, lane);
-                    self.apply_filterer(filter)
-                        .into_iter()
-                        .for_each(|command| queue.push_back(command));
-                    self.should_render();
-                }
-                Command::ActivateAllFilterCategories { lane } => {
-                    let filterer = self.components.filter.activate_all_categories_state(lane);
-                    self.apply_filterer(filterer)
-                        .into_iter()
-                        .for_each(|command| queue.push_back(command));
-                    self.should_render();
-                }
-                Command::DeactivateAllFilterCategories { lane } => {
-                    let filterer = self.components.filter.deactivate_all_categories_state(lane);
-                    self.apply_filterer(filterer)
-                        .into_iter()
-                        .for_each(|command| queue.push_back(command));
-                    self.should_render();
-                }
-                Command::FetchGhNotifications { populate, params } => {
-                    self.fetch_gh_notifications(populate, params);
-                }
-                Command::MoveGhNotification(direction) => {
-                    self.components.gh_notifications.move_selection(direction);
-                    self.should_render();
-                }
-                Command::MoveGhNotificationFirst => {
-                    self.components.gh_notifications.move_first();
-                    self.should_render();
-                }
-                Command::MoveGhNotificationLast => {
-                    self.components.gh_notifications.move_last();
-                    self.should_render();
-                }
-                Command::OpenGhNotification { with_mark_as_done } => {
-                    self.open_notification();
-                    with_mark_as_done.then(|| self.mark_gh_notification_as_done(false));
-                }
-                Command::ReloadGhNotifications => {
-                    let params = self.components.gh_notifications.reload();
-                    self.fetch_gh_notifications(Populate::Replace, params);
-                }
-                Command::FetchGhNotificationDetails { contexts } => {
-                    self.fetch_gh_notification_details(contexts);
-                }
-                Command::MarkGhNotificationAsDone { all } => {
-                    self.mark_gh_notification_as_done(all);
-                }
-                Command::UnsubscribeGhThread => {
-                    // Unlike the web UI, simply unsubscribing does not mark it as done
-                    // and it remains as unread.
-                    // Therefore, when reloading, the unsubscribed notification is displayed again.
-                    // To address this, we will implicitly mark it as done when unsubscribing.
-                    self.unsubscribe_gh_thread();
-                    self.mark_gh_notification_as_done(false);
-                }
-                Command::OpenGhNotificationFilterPopup => {
-                    self.components.gh_notifications.open_filter_popup();
-                    self.keymaps().enable(KeymapId::GhNotificationFilterPopup);
-                    self.keymaps().disable(KeymapId::GhNotification);
-                    self.keymaps().disable(KeymapId::Filter);
-                    self.keymaps().disable(KeymapId::Entries);
-                    self.keymaps().disable(KeymapId::Subscription);
-                    self.should_render();
-                }
-                Command::CloseGhNotificationFilterPopup => {
-                    self.components
-                        .gh_notifications
-                        .close_filter_popup()
-                        .into_iter()
-                        .for_each(|command| queue.push_back(command));
-                    self.keymaps().disable(KeymapId::GhNotificationFilterPopup);
-                    self.keymaps().enable(KeymapId::GhNotification);
-                    self.keymaps().enable(KeymapId::Filter);
-                    self.keymaps().enable(KeymapId::Entries);
-                    self.keymaps().enable(KeymapId::Subscription);
-                    self.should_render();
-                }
-                Command::UpdateGhnotificationFilterPopupOptions(updater) => {
-                    self.components
-                        .gh_notifications
-                        .update_filter_options(&updater);
-                    self.should_render();
-                }
-                Command::RotateTheme => {
-                    self.rotate_theme();
-                    self.should_render();
-                }
-                Command::InformLatestRelease(version) => {
-                    self.latest_release = Some(version);
-                }
-                Command::HandleError { message } => {
-                    self.handle_error_message(message, None);
-                }
-                Command::HandleApiError { error, request_seq } => {
-                    self.active_feed_refresh_requests.remove(&request_seq);
-                    self.fail_timeline_refetch(request_seq);
-                    let message = self.synd_api_error_message(
-                        Arc::into_inner(error).expect("error never cloned"),
-                    );
-                    self.handle_error_message(message, Some(request_seq));
-                }
-                Command::HandleFeedRefreshPollError {
-                    url,
-                    request_id,
-                    error,
-                    request_seq,
-                } => {
-                    let poll_key = FeedRefreshPollKey::new(url, request_id);
-                    if !self.active_feed_refresh_polls.remove(&poll_key) {
-                        self.in_flight.remove(request_seq);
-                        continue;
-                    }
-                    let message = self.synd_api_error_message(
-                        Arc::into_inner(error).expect("error never cloned"),
-                    );
-                    self.handle_error_message(message, Some(request_seq));
-                }
-                Command::HandleOauthApiError { error, request_seq } => {
-                    self.handle_error_message(error.to_string(), Some(request_seq));
-                }
-                Command::HandleGithubApiError { error, request_seq } => {
-                    self.handle_error_message(error.to_string(), Some(request_seq));
-                }
-            }
+    fn apply_job_result(&mut self, result: anyhow::Result<Event>) {
+        match result {
+            Ok(event) => self.apply_event(event),
+            Err(err) => self.apply_event(Event::Error {
+                message: err.to_string(),
+            }),
         }
-    }
-
-    fn handle_error_message(
-        &mut self,
-        error_message: String,
-        request_seq: Option<RequestSequence>,
-    ) {
-        tracing::error!("{error_message}");
-
-        if let Some(request_seq) = request_seq {
-            self.in_flight.remove(request_seq);
-        }
-
-        self.components.prompt.set_error_message(error_message);
-        self.should_render();
-    }
-
-    fn synd_api_error_message(&mut self, error: SyndApiError) -> String {
-        match error {
-            SyndApiError::Unauthorized { url }
-                if self.feed_api_session.requires_user_credential() =>
-            {
-                tracing::warn!(
-                    "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
-                );
-                self.cache.clean().ok();
-
-                format!(
-                    "{} unauthorized. please login again",
-                    url.map(|url| url.to_string()).unwrap_or_default(),
-                )
-            }
-            SyndApiError::Unauthorized { url } => {
-                format!(
-                    "{} unauthorized. local feed API session is invalid",
-                    url.map(|url| url.to_string()).unwrap_or_default(),
-                )
-            }
-            SyndApiError::BuildRequest(err) => {
-                format!("build request failed: {err} this is a BUG")
-            }
-            SyndApiError::Graphql { errors } => {
-                errors.into_iter().map(|err| err.to_string()).join(", ")
-            }
-            SyndApiError::SubscribeFeed(err) => err.to_string(),
-            SyndApiError::Internal(err) => format!("internal error: {err}"),
-        }
-    }
-
-    #[inline]
-    fn should_render(&mut self) {
-        self.state.flags.insert(Should::Render);
     }
 
     fn render(&mut self) {
         let cx = ui::Context {
-            theme: &self.theme,
-            in_flight: &self.in_flight,
-            categories: &self.categories,
-            focus: self.state.focus(),
+            theme: &self.components.shell.theme,
+            in_flight: &self.drivers.in_flight,
+            categories: &self.components.shell.categories,
+            focus: self.components.shell.focus(),
             now: self.now(),
-            tab: self.components.tabs.current(),
+            tab: self.components.shell.tabs.current(),
         };
-        let root = Root::new(&self.components, cx);
+        let root = AppWidget::new(&self.components, cx);
 
-        self.terminal
+        self.drivers
+            .terminal
             .render(|frame| Widget::render(root, frame.area(), frame.buffer_mut()))
             .expect("Failed to render");
     }
 
-    fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) -> Option<Command> {
-        match event.unwrap() {
-            CrosstermEvent::Resize(columns, rows) => Some(Command::ResizeTerminal {
+    fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) {
+        let event = match event {
+            Ok(event) => event,
+            Err(err) => {
+                self.apply_event(Event::Error {
+                    message: format!("read terminal event failed: {err}"),
+                });
+                return;
+            }
+        };
+
+        match event {
+            CrosstermEvent::Resize(columns, rows) => self.apply_event(Event::TerminalResized {
                 _columns: columns,
                 _rows: rows,
             }),
             CrosstermEvent::FocusGained => {
                 self.should_render();
-                self.state.focus_gained()
+                if let Some(command) = self.components.shell.focus_gained() {
+                    self.apply_command(command);
+                }
             }
             CrosstermEvent::FocusLost => {
                 self.should_render();
-                self.state.focus_lost()
+                if let Some(command) = self.components.shell.focus_lost() {
+                    self.apply_command(command);
+                }
             }
             CrosstermEvent::Key(KeyEvent {
                 kind: KeyEventKind::Release,
                 ..
-            }) => None,
+            }) => {}
             CrosstermEvent::Key(key) => {
                 tracing::debug!("Handle key event: {key:?}");
 
@@ -1175,887 +450,14 @@ impl Application {
                         should_render,
                     } => {
                         should_render.then(|| self.should_render());
-                        command
-                    }
-                    KeyEventResult::Ignored => None,
-                }
-            }
-            _ => None,
-        }
-    }
-}
-
-impl Application {
-    fn prompt_feed_subscription(&mut self) {
-        let input = match self
-            .interactor
-            .open_editor(InputParser::SUSBSCRIBE_FEED_PROMPT)
-        {
-            Ok(input) => input,
-            Err(err) => {
-                tracing::warn!("{err}");
-                // TODO: Handle error case
-                return;
-            }
-        };
-        tracing::debug!("Got user modified feed subscription: {input}");
-        // the terminal state becomes strange after editing in the editor
-        self.terminal.force_redraw();
-
-        let fut = match InputParser::new(input.as_str()).parse_feed_subscription(&self.categories) {
-            Ok(input) => {
-                // Check for the duplicate subscription
-                if self
-                    .components
-                    .subscription
-                    .is_already_subscribed(&input.url)
-                {
-                    let message = format!("{} already subscribed", input.url);
-                    future::ready(Ok(Command::HandleError { message })).boxed()
-                } else {
-                    future::ready(Ok(Command::SubscribeFeed { input })).boxed()
-                }
-            }
-
-            Err(err) => async move {
-                Ok(Command::HandleError {
-                    message: err.to_string(),
-                })
-            }
-            .boxed(),
-        };
-
-        self.jobs.push(fut);
-    }
-
-    fn prompt_feed_edition(&mut self) {
-        let Some(feed) = self.components.subscription.selected_feed() else {
-            return;
-        };
-
-        let input = match self
-            .interactor
-            .open_editor(InputParser::edit_feed_prompt(feed).as_str())
-        {
-            Ok(input) => input,
-            Err(err) => {
-                // TODO: handle error case
-                tracing::warn!("{err}");
-                return;
-            }
-        };
-        // the terminal state becomes strange after editing in the editor
-        self.terminal.force_redraw();
-
-        let fut = match InputParser::new(input.as_str()).parse_feed_subscription(&self.categories) {
-            // Strictly, if the URL of the feed changed before and after an update
-            // it is not considered an edit, so it could be considered an error
-            // but currently we are allowing it
-            Ok(input) => async move { Ok(Command::SubscribeFeed { input }) }.boxed(),
-            Err(err) => async move {
-                Ok(Command::HandleError {
-                    message: err.to_string(),
-                })
-            }
-            .boxed(),
-        };
-
-        self.jobs.push(fut);
-    }
-
-    fn subscribe_feed(&mut self, input: payload::SubscribeFeedInput) {
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::SubscribeFeed);
-        let fut = async move {
-            match client.subscribe_feed(input).await {
-                Ok(payload) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::SubscribeFeed {
-                        url: payload.url.clone(),
-                        payload,
-                    },
-                }),
-                Err(error) => Ok(Command::api_error(error, request_seq)),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    fn refresh_feed(&mut self, url: FeedUrl) {
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::RefreshFeed);
-        self.active_feed_refresh_requests
-            .insert(request_seq, url.clone());
-        let fut = async move {
-            match client.refresh_feed(url.clone()).await {
-                Ok(payload) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::RefreshFeed { url, payload },
-                }),
-                Err(error) => Ok(Command::api_error(error, request_seq)),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    fn ensure_feed_refresh_poll(&mut self, url: FeedUrl, request_id: String, remaining: u16) {
-        let key = FeedRefreshPollKey::new(url.clone(), request_id.clone());
-        if !self.active_feed_refresh_polls.insert(key) {
-            return;
-        }
-        self.schedule_feed_refresh_poll_unchecked(url, request_id, remaining);
-    }
-
-    fn schedule_feed_refresh_poll_unchecked(
-        &mut self,
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    ) {
-        let fut = async move {
-            tokio::time::sleep(FEED_REFRESH_POLL_INTERVAL).await;
-            Ok(Command::PollFeedRefresh {
-                url,
-                request_id,
-                remaining,
-            })
-        }
-        .boxed();
-        self.background_jobs.push(fut);
-    }
-
-    fn fetch_feed_refresh_status(&mut self, url: FeedUrl, request_id: String, remaining: u16) {
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::FetchFeedStatus);
-        let fut = async move {
-            match client.fetch_feed_status(url.clone()).await {
-                Ok(status) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::FetchFeedRefreshStatus {
-                        url,
-                        request_id: request_id.clone(),
-                        remaining,
-                        status,
-                    },
-                }),
-                Err(err) => Ok(Command::HandleFeedRefreshPollError {
-                    url,
-                    request_id,
-                    error: Arc::new(err),
-                    request_seq,
-                }),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    fn remove_feed_refresh_polls_for_url(&mut self, url: &FeedUrl) {
-        self.active_feed_refresh_requests
-            .retain(|_, request_url| request_url != url);
-        self.active_feed_refresh_polls.retain(|key| &key.url != url);
-    }
-
-    fn sync_feed_view(&mut self) {
-        self.fetch_subscription(Populate::Replace, None, self.config.feeds_per_pagination);
-        self.fetch_entries(Populate::Replace, None, self.config.entries_per_pagination);
-        self.schedule_feed_view_sync();
-        self.should_render();
-    }
-
-    fn schedule_feed_view_sync(&mut self) {
-        let fut = async move {
-            tokio::time::sleep(FEED_VIEW_SYNC_INTERVAL).await;
-            Ok(Command::SyncFeedView)
-        }
-        .boxed();
-        self.background_jobs.push(fut);
-    }
-
-    fn unsubscribe_feed(&mut self, url: FeedUrl) {
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::UnsubscribeFeed);
-        let fut = async move {
-            match client.unsubscribe_feed(url.clone()).await {
-                Ok(()) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::UnsubscribeFeed { url },
-                }),
-                Err(err) => Ok(Command::api_error(err, request_seq)),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    fn mark_gh_notification_as_done(&mut self, all: bool) {
-        let ids = if all {
-            Either::Left(
-                self.components
-                    .gh_notifications
-                    .marking_as_done_all()
-                    .into_iter(),
-            )
-        } else {
-            let Some(id) = self.components.gh_notifications.marking_as_done() else {
-                return;
-            };
-            Either::Right(std::iter::once(id))
-        };
-
-        for id in ids {
-            let request_seq = self
-                .in_flight
-                .add(RequestId::MarkGithubNotificationAsDone { id });
-            let Some(client) = self.github_client.clone() else {
-                return;
-            };
-            let fut = async move {
-                match client.mark_thread_as_done(id).await {
-                    Ok(()) => Ok(Command::HandleApiResponse {
-                        request_seq,
-                        response: ApiResponse::MarkGithubNotificationAsDone {
-                            notification_id: id,
-                        },
-                    }),
-                    Err(error) => Ok(Command::HandleGithubApiError {
-                        error: Arc::new(error),
-                        request_seq,
-                    }),
-                }
-            }
-            .boxed();
-            self.jobs.push(fut);
-        }
-    }
-
-    fn unsubscribe_gh_thread(&mut self) {
-        let Some(id) = self
-            .components
-            .gh_notifications
-            .selected_notification()
-            .and_then(|n| n.thread_id)
-        else {
-            return;
-        };
-        let client = self.github_client.as_ref().unwrap().clone();
-        let request_seq = self.in_flight.add(RequestId::UnsubscribeGithubThread);
-        let fut = async move {
-            match client.unsubscribe_thread(id).await {
-                Ok(()) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::UnsubscribeGithubThread {},
-                }),
-                Err(error) => Ok(Command::HandleGithubApiError {
-                    error: Arc::new(error),
-                    request_seq,
-                }),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-}
-
-impl Application {
-    fn open_feed(&mut self) {
-        let Some(feed_website_url) = self
-            .components
-            .subscription
-            .selected_feed()
-            .and_then(|feed| feed.website_url.clone())
-        else {
-            return;
-        };
-        match Url::parse(&feed_website_url) {
-            Ok(url) => {
-                self.interactor.open_browser(url).ok();
-            }
-            Err(err) => {
-                tracing::warn!("Try to open invalid feed url: {feed_website_url} {err}");
-            }
-        }
-    }
-
-    fn open_entry(&mut self) {
-        if let Some(url) = self.selected_entry_url()
-            && let Err(err) = self.interactor.open_browser(url)
-        {
-            self.handle_error_message(format!("open browser: {err}"), None);
-        }
-    }
-
-    fn browse_entry(&mut self) {
-        if let Some(url) = self.selected_entry_url() {
-            if let Err(err) = self.interactor.open_text_browser(url) {
-                self.handle_error_message(format!("open browser: {err}"), None);
-            }
-            self.terminal.force_redraw();
-        }
-    }
-
-    fn selected_entry_url(&self) -> Option<Url> {
-        let entry_website_url = self.components.entries.selected_entry_website_url()?;
-        match Url::parse(entry_website_url) {
-            Ok(url) => Some(url),
-            Err(err) => {
-                tracing::warn!("Try to open/browse invalid entry url: {entry_website_url} {err}");
-                None
-            }
-        }
-    }
-
-    fn open_notification(&mut self) {
-        let Some(notification_url) = self
-            .components
-            .gh_notifications
-            .selected_notification()
-            .and_then(Notification::browser_url)
-        else {
-            return;
-        };
-        self.interactor.open_browser(notification_url).ok();
-    }
-}
-
-impl Application {
-    #[tracing::instrument(skip(self))]
-    fn fetch_initial_feed_registry(&mut self) {
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::FetchSubscription);
-        let subscriptions_first = self.config.feeds_per_pagination;
-        let timeline_first = self.next_entries_first(0);
-        let fut = async move {
-            match client
-                .fetch_initial_feed_registry(subscriptions_first, timeline_first)
-                .await
-            {
-                Ok(payload) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::FetchInitialFeedRegistry { payload },
-                }),
-                Err(err) => Ok(Command::api_error(err, request_seq)),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    #[tracing::instrument(skip(self))]
-    fn fetch_subscription(&mut self, populate: Populate, after: Option<String>, first: i64) {
-        if first <= 0 {
-            return;
-        }
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::FetchSubscription);
-        let fut = async move {
-            match client.fetch_subscription(after, Some(first)).await {
-                Ok(subscription) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::FetchSubscription {
-                        populate,
-                        subscription,
-                    },
-                }),
-                Err(err) => Ok(Command::api_error(err, request_seq)),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    #[tracing::instrument(skip(self))]
-    fn fetch_entries(&mut self, populate: Populate, after: Option<String>, first: i64) {
-        let _ = self.spawn_fetch_entries(populate, after, first);
-    }
-
-    #[tracing::instrument(skip(self))]
-    fn spawn_fetch_entries(
-        &mut self,
-        populate: Populate,
-        after: Option<String>,
-        first: i64,
-    ) -> Option<RequestSequence> {
-        let first = self.bounded_entries_first(populate, first);
-        if first <= 0 {
-            return None;
-        }
-        let client = self.client.clone();
-        let request_seq = self.in_flight.add(RequestId::FetchEntries);
-        let fut = async move {
-            match client.fetch_entries(after, first).await {
-                Ok(payload) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::FetchEntries { populate, payload },
-                }),
-                Err(error) => Ok(Command::HandleApiError {
-                    error: Arc::new(error),
-                    request_seq,
-                }),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-        Some(request_seq)
-    }
-
-    fn bounded_entries_first(&self, populate: Populate, requested_first: i64) -> i64 {
-        if requested_first <= 0 {
-            return 0;
-        }
-
-        let available = match populate {
-            Populate::Replace => self.config.entries_limit,
-            Populate::Append => self
-                .config
-                .entries_limit
-                .saturating_sub(self.components.entries.loaded_count()),
-        };
-        requested_first.min(i64::try_from(available).unwrap_or(i64::MAX))
-    }
-
-    fn entries_loaded_after_response(&self, populate: Populate, response_len: usize) -> usize {
-        match populate {
-            Populate::Replace => response_len,
-            Populate::Append => self.components.entries.loaded_count() + response_len,
-        }
-    }
-
-    fn next_entries_first(&self, loaded_after_response: usize) -> i64 {
-        let remaining = self
-            .config
-            .entries_limit
-            .saturating_sub(loaded_after_response);
-        let page_size = usize::try_from(self.config.entries_per_pagination).unwrap_or(0);
-
-        remaining.min(page_size).try_into().unwrap_or(i64::MAX)
-    }
-
-    fn start_feed_registry_event_subscription(&mut self) {
-        if self.feed_registry_event_task.is_some() {
-            return;
-        }
-
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
-        self.feed_registry_event_rx = event_rx;
-        let client = self.client.clone();
-        self.feed_registry_event_task = Some(tokio::spawn(async move {
-            loop {
-                if event_tx.is_closed() {
-                    break;
-                }
-
-                match client.run_feed_registry_events(event_tx.clone()).await {
-                    Ok(()) => tracing::debug!("feed registry event subscription stopped"),
-                    Err(error) => {
-                        tracing::warn!("feed registry event subscription failed: {error}");
-                    }
-                }
-
-                if event_tx.is_closed() {
-                    break;
-                }
-                tokio::time::sleep(FEED_REGISTRY_EVENT_RECONNECT_DELAY).await;
-            }
-        }));
-    }
-
-    fn stop_feed_registry_event_subscription(&mut self) {
-        if let Some(task) = self.feed_registry_event_task.take() {
-            task.abort();
-        }
-        let (_event_tx, event_rx) = mpsc::unbounded_channel();
-        self.feed_registry_event_rx = event_rx;
-    }
-
-    fn handle_feed_registry_event(&mut self, event: payload::FeedRegistryEvent) {
-        match event {
-            payload::FeedRegistryEvent::TimelineChanged(event) => {
-                tracing::debug!(
-                    changed_at = event.changed_at,
-                    affected_feeds = ?event.affected_feeds,
-                    "timeline changed"
-                );
-                self.mark_timeline_dirty();
-            }
-        }
-    }
-
-    fn mark_timeline_dirty(&mut self) {
-        match self.timeline_invalidation {
-            TimelineInvalidationState::Clean => {
-                self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
-                self.schedule_debounced_timeline_reload();
-            }
-            TimelineInvalidationState::Refetching => {
-                self.timeline_invalidation = TimelineInvalidationState::DirtyWhileRefetching;
-            }
-            TimelineInvalidationState::DirtyWaiting
-            | TimelineInvalidationState::DirtyWhileRefetching => {}
-        }
-    }
-
-    fn schedule_debounced_timeline_reload(&mut self) {
-        let fut = async move {
-            tokio::time::sleep(TIMELINE_INVALIDATION_DEBOUNCE).await;
-            Ok(Command::DebouncedTimelineReload)
-        }
-        .boxed();
-        self.background_jobs.push(fut);
-    }
-
-    fn refetch_dirty_timeline(&mut self) {
-        if self.timeline_invalidation != TimelineInvalidationState::DirtyWaiting {
-            return;
-        }
-
-        let Some(request_seq) =
-            self.spawn_fetch_entries(Populate::Replace, None, self.config.entries_per_pagination)
-        else {
-            self.timeline_invalidation = TimelineInvalidationState::Clean;
-            return;
-        };
-
-        self.active_timeline_refetch = Some(request_seq);
-        self.timeline_invalidation = TimelineInvalidationState::Refetching;
-    }
-
-    fn complete_timeline_refetch(&mut self, request_seq: RequestSequence) {
-        if self.active_timeline_refetch != Some(request_seq) {
-            return;
-        }
-
-        self.active_timeline_refetch = None;
-        match self.timeline_invalidation {
-            TimelineInvalidationState::Refetching => {
-                self.timeline_invalidation = TimelineInvalidationState::Clean;
-            }
-            TimelineInvalidationState::DirtyWhileRefetching => {
-                self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
-                self.schedule_debounced_timeline_reload();
-            }
-            TimelineInvalidationState::Clean | TimelineInvalidationState::DirtyWaiting => {}
-        }
-    }
-
-    fn fail_timeline_refetch(&mut self, request_seq: RequestSequence) {
-        if self.active_timeline_refetch != Some(request_seq) {
-            return;
-        }
-
-        self.active_timeline_refetch = None;
-        self.timeline_invalidation = TimelineInvalidationState::DirtyWaiting;
-        self.schedule_debounced_timeline_reload();
-    }
-
-    #[tracing::instrument(skip(self))]
-    fn fetch_gh_notifications(&mut self, populate: Populate, params: FetchNotificationsParams) {
-        let client = self
-            .github_client
-            .clone()
-            .expect("Github client not found, this is a BUG");
-        let request_seq = self
-            .in_flight
-            .add(RequestId::FetchGithubNotifications { page: params.page });
-        let fut = async move {
-            match client.fetch_notifications(params).await {
-                Ok(notifications) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::FetchGithubNotifications {
-                        populate,
-                        notifications,
-                    },
-                }),
-                Err(error) => Ok(Command::HandleGithubApiError {
-                    error: Arc::new(error),
-                    request_seq,
-                }),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    #[tracing::instrument(skip_all)]
-    fn fetch_gh_notification_details(&mut self, contexts: Vec<IssueOrPullRequest>) {
-        let client = self
-            .github_client
-            .clone()
-            .expect("Github client not found, this is a BUG");
-
-        for context in contexts {
-            let client = client.clone();
-
-            let fut = match context {
-                Either::Left(issue) => {
-                    let request_seq = self
-                        .in_flight
-                        .add(RequestId::FetchGithubIssue { id: issue.id });
-                    let notification_id = issue.notification_id;
-                    async move {
-                        match client.fetch_issue(issue).await {
-                            Ok(issue) => Ok(Command::HandleApiResponse {
-                                request_seq,
-                                response: ApiResponse::FetchGithubIssue {
-                                    notification_id,
-                                    issue,
-                                },
-                            }),
-                            Err(error) => Ok(Command::HandleGithubApiError {
-                                error: Arc::new(error),
-                                request_seq,
-                            }),
+                        if let Some(command) = command {
+                            self.apply_command(command);
                         }
                     }
-                    .boxed()
+                    KeyEventResult::Ignored => {}
                 }
-                Either::Right(pull_request) => {
-                    let request_seq = self.in_flight.add(RequestId::FetchGithubPullRequest {
-                        id: pull_request.id,
-                    });
-                    let notification_id = pull_request.notification_id;
-
-                    async move {
-                        match client.fetch_pull_request(pull_request).await {
-                            Ok(pull_request) => Ok(Command::HandleApiResponse {
-                                request_seq,
-                                response: ApiResponse::FetchGithubPullRequest {
-                                    notification_id,
-                                    pull_request,
-                                },
-                            }),
-                            Err(error) => Ok(Command::HandleGithubApiError {
-                                error: Arc::new(error),
-                                request_seq,
-                            }),
-                        }
-                    }
-                    .boxed()
-                }
-            };
-            self.jobs.push(fut);
-        }
-    }
-}
-
-impl Application {
-    #[tracing::instrument(skip(self))]
-    fn init_device_flow(&mut self, provider: AuthenticationProvider) {
-        tracing::info!("Start authenticate");
-
-        let authenticator = self.authenticator.clone();
-        let request_seq = self.in_flight.add(RequestId::DeviceFlowDeviceAuthorize);
-        let fut = async move {
-            match authenticator.init_device_flow(provider).await {
-                Ok(device_authorization) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::DeviceFlowAuthorization {
-                        provider,
-                        device_authorization,
-                    },
-                }),
-                Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
             }
+            _ => {}
         }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    fn handle_device_flow_authorization_response(
-        &mut self,
-        provider: AuthenticationProvider,
-        device_authorization: DeviceAuthorizationResponse,
-    ) {
-        self.components
-            .auth
-            .set_device_authorization_response(device_authorization.clone());
-        self.should_render();
-        // try to open input screen in the browser
-        if let Ok(url) = Url::parse(device_authorization.verification_uri().to_string().as_str()) {
-            self.interactor.open_browser(url).ok();
-        }
-
-        let authenticator = self.authenticator.clone();
-        let now = self.now();
-        let request_seq = self.in_flight.add(RequestId::DeviceFlowPollAccessToken);
-        let fut = async move {
-            match authenticator
-                .poll_device_flow_access_token(now, provider, device_authorization)
-                .await
-            {
-                Ok(credential) => Ok(Command::HandleApiResponse {
-                    request_seq,
-                    response: ApiResponse::DeviceFlowCredential { credential },
-                }),
-                Err(err) => Ok(Command::oauth_api_error(err, request_seq)),
-            }
-        }
-        .boxed();
-
-        self.jobs.push(fut);
-    }
-
-    fn complete_device_authroize_flow(&mut self, cred: Verified<Credential>) {
-        if let Err(err) = self.cache.persist_credential(&cred) {
-            tracing::error!("Failed to save credential to cache: {err}");
-        }
-
-        self.handle_restored_credential(cred);
-    }
-
-    fn schedule_credential_refreshing(&mut self, cred: &Verified<Credential>) {
-        match &**cred {
-            Credential::Github { .. } => {}
-            Credential::Google {
-                refresh_token,
-                expired_at,
-                ..
-            } => {
-                let until_expire = expired_at
-                    .sub(config::credential::EXPIRE_MARGIN)
-                    .sub(self.now())
-                    .to_std()
-                    .unwrap_or(config::credential::FALLBACK_EXPIRE);
-                let jwt_service = self.jwt_service().clone();
-                let refresh_token = refresh_token.clone();
-                let fut = async move {
-                    tokio::time::sleep(until_expire).await;
-
-                    tracing::debug!("Refresh google credential");
-                    match jwt_service.refresh_google_id_token(&refresh_token).await {
-                        Ok(credential) => Ok(Command::RefreshCredential { credential }),
-                        Err(err) => Ok(Command::HandleError {
-                            message: err.to_string(),
-                        }),
-                    }
-                }
-                .boxed();
-                self.background_jobs.push(fut);
-            }
-        }
-    }
-}
-
-impl Application {
-    #[must_use]
-    fn apply_filterer(&mut self, filterer: Filterer) -> Option<Command> {
-        match filterer {
-            Filterer::Feed(filterer) => {
-                self.components.entries.update_filterer(filterer.clone());
-                self.components.subscription.update_filterer(filterer);
-                None
-            }
-            Filterer::GhNotification(filterer) => {
-                self.components.gh_notifications.update_filterer(filterer);
-                self.components.gh_notifications.fetch_next_if_needed()
-            }
-        }
-    }
-
-    fn rotate_theme(&mut self) {
-        let p = match self.theme.name {
-            "ferra" => Palette::solarized_dark(),
-            "solarized_dark" => Palette::helix(),
-            "helix" => Palette::dracula(),
-            "dracula" => Palette::eldritch(),
-            _ => Palette::ferra(),
-        };
-        self.theme = Theme::with_palette(p);
-    }
-}
-
-impl Application {
-    fn check_latest_release(&mut self) {
-        use update_informer::{Check, registry};
-
-        // update informer use reqwest::blocking
-        let check = tokio::task::spawn_blocking(|| {
-            let name = env!("CARGO_PKG_NAME");
-            let version = env!("CARGO_PKG_VERSION");
-            #[cfg(not(test))]
-            let informer = update_informer::new(registry::Crates, name, version)
-                .interval(Duration::from_hours(24))
-                .timeout(Duration::from_secs(5));
-
-            #[cfg(test)]
-            let informer = update_informer::fake(registry::Crates, name, version, "v1.0.0");
-
-            informer.check_version().ok().flatten()
-        });
-        let fut = async move {
-            match check.await {
-                Ok(Some(version)) => Ok(Command::InformLatestRelease(version)),
-                _ => Ok(Command::Nop),
-            }
-        }
-        .boxed();
-        self.jobs.push(fut);
-    }
-
-    fn inform_latest_release(&self) {
-        let current_version = env!("CARGO_PKG_VERSION");
-        if let Some(new_version) = &self.latest_release {
-            println!("A new release of synd is available: v{current_version} -> {new_version}");
-        }
-    }
-}
-
-impl Application {
-    fn handle_idle(&mut self) {
-        self.clear_idle_timer();
-
-        #[cfg(feature = "integration")]
-        {
-            tracing::debug!("Quit for idle");
-            self.state.flags.insert(Should::Quit);
-        }
-    }
-
-    pub fn clear_idle_timer(&mut self) {
-        // https://github.com/tokio-rs/tokio/blob/e53b92a9939565edb33575fff296804279e5e419/tokio/src/time/instant.rs#L62
-        self.idle_timer
-            .as_mut()
-            .reset(Instant::now() + Duration::from_hours(24 * 365 * 30));
-    }
-
-    pub fn reset_idle_timer(&mut self) {
-        self.idle_timer
-            .as_mut()
-            .reset(Instant::now() + self.config.idle_timer_interval);
-    }
-}
-
-#[cfg(feature = "integration")]
-impl Application {
-    pub fn buffer(&self) -> &ratatui::buffer::Buffer {
-        self.terminal.buffer()
-    }
-
-    pub async fn wait_until_jobs_completed<S>(&mut self, input: &mut S)
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        loop {
-            let _ = self.event_loop_until_idle(input).await;
-            self.reset_idle_timer();
-
-            // In the current test implementation, we synchronie
-            // the assertion timing by waiting until jobs are empty.
-            // However the future of refreshing the id token sleeps until it expires and remains in the jobs for long time
-            // Therefore, we ignore scheduled jobs
-            if self.jobs.is_empty() {
-                break;
-            }
-        }
-    }
-
-    pub async fn reload_cache(&mut self) -> anyhow::Result<()> {
-        match self.restore_credential().await {
-            Ok(cred) => self.handle_restored_credential(cred),
-            Err(err) => return Err(err.into()),
-        }
-        Ok(())
     }
 }

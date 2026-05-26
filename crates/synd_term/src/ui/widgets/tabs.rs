@@ -26,12 +26,12 @@ impl Tab {
     }
 }
 
-pub struct Tabs {
+pub struct TabsWidget {
     pub selected: usize,
     pub tabs: Vec<Tab>,
 }
 
-impl Tabs {
+impl TabsWidget {
     const PADDING: &'static str = "    ";
 
     pub fn new(features: &'_ Features) -> Self {
@@ -59,7 +59,7 @@ impl Tabs {
     }
 }
 
-impl Tabs {
+impl TabsWidget {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let area = Rect {
             x: area.x + 2,

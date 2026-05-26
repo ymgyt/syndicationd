@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use crate::{
     application::{Direction, IndexOutOfRange, Populate},
-    ui::components::filter::{FilterResult, Filterable},
+    ui::widgets::filter::{FilterResult, Filterable},
 };
 
 pub(crate) struct FilterableVec<T, F> {
@@ -61,7 +61,7 @@ impl<T, F> FilterableVec<T, F> {
     }
 
     pub(crate) fn move_last(&mut self) {
-        if !self.items.is_empty() {
+        if !self.effective_items.is_empty() {
             self.selected_item_index = self.effective_items.len() - 1;
         }
     }
@@ -158,5 +158,50 @@ where
         self.selected_item_index = self
             .selected_item_index
             .min(self.effective_items.len().saturating_sub(1));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct UseAll;
+
+    impl Filterable<i32> for UseAll {
+        fn filter(&self, _item: &i32) -> FilterResult {
+            FilterResult::Use
+        }
+    }
+
+    #[derive(Default)]
+    struct RejectAll;
+
+    impl Filterable<i32> for RejectAll {
+        fn filter(&self, _item: &i32) -> FilterResult {
+            FilterResult::Discard
+        }
+    }
+
+    #[test]
+    fn move_last_selects_last_visible_item() {
+        let mut items = FilterableVec::from_filter(UseAll);
+        items.update(Populate::Replace, vec![1, 2, 3]);
+
+        items.move_last();
+
+        assert_eq!(items.selected(), Some(&3));
+        assert_eq!(items.selected_index(), 2);
+    }
+
+    #[test]
+    fn move_last_handles_empty_visible_items() {
+        let mut items = FilterableVec::from_filter(RejectAll);
+        items.update(Populate::Replace, vec![1, 2, 3]);
+
+        items.move_last();
+
+        assert_eq!(items.selected(), None);
+        assert_eq!(items.selected_index(), 0);
     }
 }

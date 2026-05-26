@@ -14,7 +14,7 @@ use synd_feed::types::{Category, Requirement};
 use crate::{
     application::{Direction, Populate},
     client::github::{FetchNotificationInclude, FetchNotificationParticipating},
-    command::Command,
+    command::{Command, FilterCommand},
     config::Categories,
     keymap::{KeyTrie, Keymap},
     matcher::Matcher,
@@ -23,8 +23,9 @@ use crate::{
         github::{PullRequestState, Reason, RepoVisibility},
     },
     ui::{
-        Context,
-        components::{
+        Context, icon,
+        widgets::prompt::{Prompt, RenderCursor},
+        widgets::{
             filter::{
                 category::{CategoriesState, FilterCategoryState},
                 feed::RequirementFilterer,
@@ -33,8 +34,6 @@ use crate::{
             gh_notifications::GhNotificationFilterOptions,
             tabs::Tab,
         },
-        icon,
-        widgets::prompt::{Prompt, RenderCursor},
     },
 };
 
@@ -86,7 +85,7 @@ pub(crate) enum FilterResult {
 }
 
 #[derive(Debug)]
-pub(crate) struct Filter {
+pub(crate) struct FilterWidget {
     state: State,
     feed: FeedHandler,
     gh_notification: GhNotificationHandler,
@@ -102,7 +101,7 @@ enum State {
     SearchFiltering,
 }
 
-impl Filter {
+impl FilterWidget {
     pub fn new() -> Self {
         Self {
             state: State::Normal,
@@ -130,21 +129,25 @@ impl Filter {
             HashMap::new(),
             |mut map, (category, state)| {
                 let key = KeyEvent::new(KeyCode::Char(state.label), KeyModifiers::NONE);
-                let command = Command::ToggleFilterCategory {
+                let command = Command::Filter(FilterCommand::ToggleFilterCategory {
                     lane,
                     category: category.clone(),
-                };
+                });
                 map.insert(key, KeyTrie::Command(command));
                 map
             },
         );
         map.insert(
             KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE),
-            KeyTrie::Command(Command::ActivateAllFilterCategories { lane }),
+            KeyTrie::Command(Command::Filter(
+                FilterCommand::ActivateAllFilterCategories { lane },
+            )),
         );
         map.insert(
             KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
-            KeyTrie::Command(Command::DeactivateAllFilterCategories { lane }),
+            KeyTrie::Command(Command::Filter(
+                FilterCommand::DeactivateAllFilterCategories { lane },
+            )),
         );
         Keymap::from_map(crate::keymap::KeymapId::CategoryFiltering, map)
     }
@@ -300,7 +303,7 @@ pub(super) struct FilterContext<'a> {
     pub(super) gh_options: &'a GhNotificationFilterOptions,
 }
 
-impl Filter {
+impl FilterWidget {
     pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &FilterContext<'_>) {
         let area = Block::new()
             .padding(Padding {

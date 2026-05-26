@@ -8,7 +8,7 @@ use crate::{
     types::{self, github::Notification},
     ui::{
         self,
-        components::filter::{Composable, FilterResult, Filterable},
+        widgets::filter::{Composable, FilterResult, Filterable},
     },
 };
 

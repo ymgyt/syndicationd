@@ -2,9 +2,9 @@ use std::{collections::VecDeque, num::NonZero};
 
 use futures_util::{StreamExt as _, future::BoxFuture, stream::FuturesUnordered};
 
-use crate::command::Command;
+use crate::event::Event;
 
-pub(crate) type JobFuture = BoxFuture<'static, anyhow::Result<Command>>;
+pub(crate) type JobFuture = BoxFuture<'static, anyhow::Result<Event>>;
 
 pub(crate) struct Jobs {
     futures: FuturesUnordered<JobFuture>,
@@ -39,7 +39,7 @@ impl Jobs {
         );
     }
 
-    pub(crate) async fn next(&mut self) -> Option<anyhow::Result<Command>> {
+    pub(crate) async fn next(&mut self) -> Option<anyhow::Result<Event>> {
         debug_assert!(self.concurrent_limit.get() >= self.futures.len());
 
         match self.futures.next().await {
@@ -71,7 +71,7 @@ mod tests {
         let mut job = Jobs::new(NonZero::new(2).unwrap());
 
         for _ in 0..3 {
-            job.push(future::ready(Ok(Command::Nop)).boxed());
+            job.push(future::ready(Ok(Event::Nop)).boxed());
         }
 
         assert_eq!(job.futures.len(), 2);
@@ -80,7 +80,7 @@ mod tests {
         let mut count = 0;
         loop {
             if let Some(result) = job.next().await {
-                assert!(matches!(result, Ok(Command::Nop)));
+                assert!(matches!(result, Ok(Event::Nop)));
                 count += 1;
             }
             if count == 3 {

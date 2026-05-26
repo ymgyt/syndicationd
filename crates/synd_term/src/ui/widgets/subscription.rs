@@ -6,8 +6,8 @@ use ratatui::{
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table as RatatuiTable, Tabs,
-        Widget,
+        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table as RatatuiTable,
+        Tabs as RatatuiTabs, Widget,
     },
 };
 use synd_feed::types::{FeedType, FeedUrl};
@@ -18,13 +18,13 @@ use crate::{
     types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
     ui::{
         self, Context,
-        components::{collections::FilterableVec, filter::FeedFilterer},
         extension::RectExt,
+        widgets::{collections::FilterableVec, filter::FeedFilterer},
         widgets::{scrollbar::Scrollbar, table::Table},
     },
 };
 
-pub struct Subscription {
+pub struct SubscriptionWidget {
     feeds: FilterableVec<types::Feed, FeedFilterer>,
 
     unsubscribe_popup: UnsubscribePopup,
@@ -50,7 +50,7 @@ struct UnsubscribePopup {
     selected_feed: Option<types::Feed>,
 }
 
-impl Subscription {
+impl SubscriptionWidget {
     pub(crate) fn new() -> Self {
         Self {
             feeds: FilterableVec::new(),
@@ -136,7 +136,7 @@ impl Subscription {
     }
 
     pub(crate) fn move_last(&mut self) {
-        self.feeds.move_first();
+        self.feeds.move_last();
     }
 
     pub(crate) fn move_unsubscribe_popup_selection(&mut self, direction: Direction) {
@@ -146,7 +146,7 @@ impl Subscription {
     }
 }
 
-impl Subscription {
+impl SubscriptionWidget {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [feeds_area, feed_detail_area] = vertical.areas(area);
@@ -469,7 +469,7 @@ impl Subscription {
             Layout::horizontal([Constraint::Fill(1), Constraint::Min(1), Constraint::Fill(1)]);
         let [_, selection_area, _] = horizontal.areas(selection_area);
 
-        Tabs::new([" Yes ", " No "])
+        RatatuiTabs::new([" Yes ", " No "])
             .style(cx.theme.tabs)
             .divider("")
             .padding("  ", "  ")
@@ -479,5 +479,40 @@ impl Subscription {
             })
             .highlight_style(cx.theme.selection_popup.highlight)
             .render(selection_area, buf);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fake::{Fake as _, Faker};
+    use synd_feed::types::Requirement;
+
+    use super::*;
+
+    fn feed(url: &str) -> types::Feed {
+        let feed: types::Feed = Faker.fake();
+        feed.with_url(url.try_into().unwrap())
+            .with_requirement(Requirement::May)
+    }
+
+    #[test]
+    fn move_last_selects_last_feed() {
+        let mut subscription = SubscriptionWidget::new();
+        subscription.feeds.update(
+            Populate::Replace,
+            vec![
+                feed("https://example.com/1.xml"),
+                feed("https://example.com/2.xml"),
+                feed("https://example.com/3.xml"),
+            ],
+        );
+
+        subscription.move_last();
+
+        assert_eq!(subscription.feeds.selected_index(), 2);
+        assert_eq!(
+            subscription.selected_feed().map(|feed| feed.url.as_str()),
+            Some("https://example.com/3.xml")
+        );
     }
 }

@@ -7,7 +7,7 @@ mod default;
 
 pub mod macros;
 
-use crate::{application::event::KeyEventResult, command::Command};
+use crate::{application::key_handlers::KeyEventResult, command::Command};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KeymapId {
@@ -158,7 +158,6 @@ impl Default for Keymaps {
     }
 }
 
-#[expect(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub(crate) enum KeyTrie {
     Command(Command),

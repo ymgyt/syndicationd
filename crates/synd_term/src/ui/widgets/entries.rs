@@ -5,9 +5,8 @@ use crate::{
     client::synd_api::payload,
     types::{self, RequirementExt, TimeExt},
     ui::{
-        self, Context,
-        components::{collections::FilterableVec, filter::FeedFilterer},
-        icon,
+        self, Context, icon,
+        widgets::{collections::FilterableVec, filter::FeedFilterer},
         widgets::{scrollbar::Scrollbar, table::Table},
     },
 };
@@ -20,11 +19,11 @@ use ratatui::{
 use synd_feed::types::FeedUrl;
 
 #[allow(clippy::struct_field_names)]
-pub(crate) struct Entries {
+pub(crate) struct EntriesWidget {
     entries: FilterableVec<types::Entry, FeedFilterer>,
 }
 
-impl Entries {
+impl EntriesWidget {
     pub(crate) fn new() -> Self {
         Self {
             entries: FilterableVec::new(),
@@ -93,7 +92,7 @@ impl Entries {
     }
 }
 
-impl Entries {
+impl EntriesWidget {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [entries_area, detail_area] = vertical.areas(area);

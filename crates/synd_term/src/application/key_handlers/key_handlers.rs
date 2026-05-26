@@ -2,7 +2,9 @@ use std::{cell::RefCell, ops::ControlFlow, rc::Rc};
 
 use crossterm::event::KeyEvent;
 
-use crate::{application::event::KeyEventResult, keymap::Keymaps, ui::widgets::prompt::Prompt};
+use crate::{
+    application::key_handlers::KeyEventResult, keymap::Keymaps, ui::widgets::prompt::Prompt,
+};
 
 pub enum KeyHandler {
     Prompt(Rc<RefCell<Prompt>>),

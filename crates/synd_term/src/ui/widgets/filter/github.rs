@@ -1,4 +1,4 @@
-use crate::ui::components::filter::category::CategoriesState;
+use crate::ui::widgets::filter::category::CategoriesState;
 
 #[derive(Debug)]
 pub(super) struct GhNotificationHandler {

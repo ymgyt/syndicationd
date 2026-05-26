@@ -1,0 +1,222 @@
+use itertools::Itertools;
+
+use crate::{
+    client::synd_api::SyndApiError,
+    event::{ApiEvent, AuthApiEvent, Event},
+};
+
+use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, RequestSequence};
+
+impl Application {
+    #[tracing::instrument(skip_all)]
+    pub(super) fn apply_event(&mut self, event: Event) {
+        let _guard = tracing::info_span!("apply_event", %event).entered();
+
+        match event {
+            Event::Nop => {}
+            Event::TerminalResized { .. } => {
+                self.should_render();
+            }
+            Event::RenderThrobber => {
+                self.drivers.in_flight.reset_throbber_timer();
+                self.drivers.in_flight.inc_throbber_step();
+                self.should_render();
+            }
+            Event::Idle => {
+                self.handle_idle();
+            }
+            Event::Api { request_seq, event } => {
+                self.apply_api_event(request_seq, event);
+            }
+            Event::CredentialRefreshed { credential } => {
+                self.set_credential(credential);
+                let client = self.drivers.client.clone();
+                if self.drivers.timeline_changes.restart_if_running(client) {
+                    let operations = self.components.mark_timeline_dirty();
+                    self.perform_operations(operations);
+                }
+            }
+            Event::FeedSubscriptionEditorClosed { input } => {
+                let operations = self
+                    .components
+                    .apply_feed_subscription_editor_closed(input.as_str());
+                self.perform_operations(operations);
+            }
+            Event::FeedEditionEditorClosed { input } => {
+                let operations = self
+                    .components
+                    .apply_feed_edition_editor_closed(input.as_str());
+                self.perform_operations(operations);
+            }
+            Event::FeedRefreshRequested { request_seq, url } => {
+                self.components
+                    .apply_feed_refresh_requested(request_seq, url);
+            }
+            Event::EntryFetchStarted {
+                request_seq,
+                populate,
+            } => {
+                self.components
+                    .apply_entry_fetch_started(request_seq, populate);
+            }
+            Event::TimelineRefetchStarted { request_seq } => {
+                self.components.apply_timeline_refetch_started(request_seq);
+            }
+            Event::LatestReleaseFound(version) => {
+                self.components.apply_latest_release_found(version);
+            }
+            Event::TimelineChanged { event } => {
+                let operations = self.components.apply_timeline_changed(&event);
+                self.perform_operations(operations);
+            }
+            Event::FeedRefreshPollElapsed {
+                url,
+                request_id,
+                remaining,
+            } => {
+                let operations = self
+                    .components
+                    .apply_feed_refresh_poll_elapsed(url, request_id, remaining);
+                self.perform_operations(operations);
+            }
+            Event::FeedViewSyncElapsed => {
+                let operations = self.components.apply_feed_view_sync_elapsed(
+                    self.config.feeds_per_pagination,
+                    self.next_entries_first(0),
+                );
+                self.perform_operations(operations);
+            }
+            Event::TimelineReloadDebounced => {
+                let operations = self
+                    .components
+                    .apply_timeline_reload_debounced(self.next_entries_first(0));
+                self.perform_operations(operations);
+            }
+            Event::Error { message } => {
+                self.handle_error_message(message, None);
+            }
+            Event::SyndApiError { error, request_seq } => {
+                let operations = self.components.apply_synd_api_error(request_seq);
+                self.perform_operations(operations);
+                let message = self.synd_api_error_message(error.as_ref());
+                self.handle_error_message(message, Some(request_seq));
+            }
+            Event::FeedRefreshPollError {
+                url,
+                request_id,
+                error,
+                request_seq,
+            } => {
+                if !self
+                    .components
+                    .apply_feed_refresh_poll_error(url, request_id)
+                {
+                    self.drivers.in_flight.remove(request_seq);
+                    return;
+                }
+                let message = self.synd_api_error_message(error.as_ref());
+                self.handle_error_message(message, Some(request_seq));
+            }
+            Event::OauthApiError { error, request_seq } => {
+                self.handle_error_message(error.to_string(), Some(request_seq));
+            }
+            Event::GithubApiError { error, request_seq } => {
+                self.handle_error_message(error.to_string(), Some(request_seq));
+            }
+        }
+    }
+
+    fn apply_api_event(&mut self, request_seq: RequestSequence, event: ApiEvent) {
+        self.drivers.in_flight.remove(request_seq);
+
+        match event {
+            ApiEvent::Auth(event) => self.apply_auth_api_event(event),
+            ApiEvent::Feeds(event) => {
+                let entries_first = self.next_entries_first(0);
+                let operations = self.components.apply_feeds_api_event(
+                    request_seq,
+                    event,
+                    self.config.feeds_per_pagination,
+                    entries_first,
+                    self.config.entries_limit,
+                    FEED_REFRESH_POLL_ATTEMPTS,
+                );
+                self.perform_operations(operations);
+            }
+            ApiEvent::GitHub(event) => {
+                let operations = self.components.apply_github_api_event(event);
+                self.perform_operations(operations);
+            }
+        }
+    }
+
+    fn apply_auth_api_event(&mut self, event: AuthApiEvent) {
+        match event {
+            AuthApiEvent::DeviceFlowAuthorizationReceived {
+                provider,
+                device_authorization,
+            } => {
+                let operations = self
+                    .components
+                    .apply_device_flow_authorization_received(provider, *device_authorization);
+                self.perform_operations(operations);
+            }
+            AuthApiEvent::DeviceFlowCredentialReceived { credential } => {
+                self.complete_device_authorize_flow(credential);
+            }
+        }
+    }
+
+    pub(super) fn handle_error_message(
+        &mut self,
+        error_message: String,
+        request_seq: Option<RequestSequence>,
+    ) {
+        tracing::error!("{error_message}");
+
+        if let Some(request_seq) = request_seq {
+            self.drivers.in_flight.remove(request_seq);
+        }
+
+        self.components
+            .shell
+            .prompt
+            .set_error_message(error_message);
+        self.should_render();
+    }
+
+    fn synd_api_error_message(&mut self, error: &SyndApiError) -> String {
+        match error {
+            SyndApiError::Unauthorized { url }
+                if self.drivers.feed_api_session.requires_user_credential() =>
+            {
+                tracing::warn!(
+                    "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
+                );
+                self.drivers.cache.clean().ok();
+
+                format!(
+                    "{} unauthorized. please login again",
+                    url.as_ref().map(ToString::to_string).unwrap_or_default(),
+                )
+            }
+            SyndApiError::Unauthorized { url } => {
+                format!(
+                    "{} unauthorized. local feed API session is invalid",
+                    url.as_ref().map(ToString::to_string).unwrap_or_default(),
+                )
+            }
+            SyndApiError::BuildRequest(err) => {
+                format!("build request failed: {err} this is a BUG")
+            }
+            SyndApiError::Graphql { errors } => errors.iter().map(ToString::to_string).join(", "),
+            SyndApiError::SubscribeFeed(err) => err.to_string(),
+            SyndApiError::Internal(err) => format!("internal error: {err}"),
+        }
+    }
+
+    #[inline]
+    pub(super) fn should_render(&mut self) {
+        self.components.shell.request_render();
+    }
+}

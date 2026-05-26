@@ -1,4 +1,4 @@
-use crate::ui::components::filter::{FilterResult, Filterable};
+use crate::ui::widgets::filter::{FilterResult, Filterable};
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct ComposedFilterer<L, R> {

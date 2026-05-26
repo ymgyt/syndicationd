@@ -1,7 +1,7 @@
 use crate::{
     matcher::Matcher,
     types::{self, github::Notification},
-    ui::components::filter::{FilterResult, Filterable},
+    ui::widgets::filter::{FilterResult, Filterable},
 };
 
 #[derive(Default, Clone, Debug)]

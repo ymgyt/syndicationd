@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Debug, ops::ControlFlow};
+use std::{borrow::Cow, fmt::Debug, ops::ControlFlow};
 
 use chrono_humanize::{Accuracy, HumanTime, Tense};
 use itertools::Itertools;
@@ -16,34 +16,29 @@ use crate::{
     client::github::{
         FetchNotificationInclude, FetchNotificationParticipating, FetchNotificationsParams,
     },
-    command::Command,
     config::{self, Categories},
     types::{
         TimeExt,
         github::{
-            Comment, IssueContext, Notification, NotificationId, PullRequestContext,
-            PullRequestState, Reason, RepoVisibility, SubjectContext, SubjectType,
+            Comment, IssueContext, IssueOrPullRequest, Notification, NotificationId,
+            PullRequestContext, PullRequestState, Reason, RepoVisibility, SubjectContext,
+            SubjectType,
         },
     },
     ui::{
         Context,
-        components::{
+        extension::RectExt,
+        icon,
+        widgets::{
             collections::FilterableVec,
             filter::{CategoryFilterer, ComposedFilterer, MatcherFilterer},
         },
-        extension::RectExt,
-        icon,
         widgets::{scrollbar::Scrollbar, table::Table},
     },
 };
 
 mod filter_popup;
 use filter_popup::{FilterPopup, OptionFilterer};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NotificationStatus {
-    MarkingAsDone,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum GhNotificationFilterOptionsState {
@@ -108,19 +103,17 @@ pub(crate) struct GhNotificationFilterUpdater {
 type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
 
 #[allow(clippy::struct_field_names)]
-pub(crate) struct GhNotifications {
+pub(crate) struct GitHubNotificationsWidget {
     max_repository_name: usize,
     notifications:
         FilterableVec<Notification, ComposedFilterer<CategoryAndMatcherFilterer, OptionFilterer>>,
 
-    #[allow(clippy::zero_sized_map_values)]
-    status: HashMap<NotificationId, NotificationStatus>,
     limit: usize,
     next_page: Option<u8>,
     filter_popup: FilterPopup,
 }
 
-impl GhNotifications {
+impl GitHubNotificationsWidget {
     pub(crate) fn new() -> Self {
         Self::with_filter_options(GhNotificationFilterOptions::default())
     }
@@ -132,8 +125,6 @@ impl GhNotifications {
         Self {
             notifications: FilterableVec::from_filter(filterer),
             max_repository_name: 0,
-            #[allow(clippy::zero_sized_map_values)]
-            status: HashMap::new(),
             limit: config::github::NOTIFICATION_PER_PAGE as usize,
             next_page: Some(config::github::INITIAL_PAGE_NUM),
             filter_popup: FilterPopup::new(),
@@ -158,10 +149,10 @@ impl GhNotifications {
         &mut self,
         populate: Populate,
         notifications: Vec<Notification>,
-    ) -> Option<Command> {
+    ) -> Vec<IssueOrPullRequest> {
         if notifications.is_empty() {
             self.next_page = None;
-            return None;
+            return Vec::new();
         }
 
         match populate {
@@ -184,20 +175,17 @@ impl GhNotifications {
 
         self.notifications.update(populate, notifications);
 
-        Some(Command::FetchGhNotificationDetails { contexts })
+        contexts
     }
 
-    pub(crate) fn fetch_next_if_needed(&self) -> Option<Command> {
+    pub(crate) fn fetch_next_if_needed(&self) -> Option<FetchNotificationsParams> {
         match self.next_page {
             Some(page) if self.notifications.len() < self.limit => {
                 tracing::debug!(
                     "Should fetch more. notifications: {} next_page {page}",
                     self.notifications.len(),
                 );
-                Some(Command::FetchGhNotifications {
-                    populate: Populate::Append,
-                    params: self.next_fetch_params(page),
-                })
+                Some(self.next_fetch_params(page))
             }
             _ => {
                 tracing::debug!(
@@ -260,18 +248,13 @@ impl GhNotifications {
         })
     }
 
-    pub(crate) fn marking_as_done(&mut self) -> Option<NotificationId> {
-        let id = self.selected_notification()?.id;
-        self.status.insert(id, NotificationStatus::MarkingAsDone);
-        Some(id)
+    pub(crate) fn selected_notification_id(&self) -> Option<NotificationId> {
+        self.selected_notification()
+            .map(|notification| notification.id)
     }
 
-    pub(crate) fn marking_as_done_all(&mut self) -> Vec<NotificationId> {
-        let ids: Vec<NotificationId> = self.notifications.iter().map(|n| n.id).collect();
-        for &id in &ids {
-            self.status.insert(id, NotificationStatus::MarkingAsDone);
-        }
-        ids
+    pub(crate) fn notification_ids(&self) -> Vec<NotificationId> {
+        self.notifications.iter().map(|n| n.id).collect()
     }
 
     pub(crate) fn marked_as_done(&mut self, id: NotificationId) {
@@ -295,16 +278,13 @@ impl GhNotifications {
     }
 
     #[must_use]
-    pub(crate) fn close_filter_popup(&mut self) -> Option<Command> {
+    pub(crate) fn close_filter_popup(&mut self) -> Option<FetchNotificationsParams> {
         self.filter_popup.is_active = false;
         match self.filter_popup.commit() {
             GhNotificationFilterOptionsState::Changed(new_options) => {
                 (&new_options != self.filter_options()).then(|| {
                     self.apply_filter_options(new_options);
-                    Command::FetchGhNotifications {
-                        populate: Populate::Replace,
-                        params: self.reload(),
-                    }
+                    self.reload()
                 })
             }
             GhNotificationFilterOptionsState::Unchanged => None,
@@ -322,7 +302,7 @@ impl GhNotifications {
     }
 }
 
-impl GhNotifications {
+impl GitHubNotificationsWidget {
     pub(crate) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [notifications_area, detail_area] = vertical.areas(area);
@@ -409,15 +389,7 @@ impl GhNotifications {
             let repo = n.repository.name.as_str();
             let reason = reason_label(&n.reason);
 
-            let is_marking_as_done = self
-                .status
-                .get(&n.id)
-                .is_some_and(|s| *s == NotificationStatus::MarkingAsDone);
-            let modifier = if is_marking_as_done {
-                Modifier::CROSSED_OUT | Modifier::DIM
-            } else {
-                Modifier::empty()
-            };
+            let modifier = Modifier::empty();
             Row::new([
                 Cell::from(Span::from(updated_at).add_modifier(modifier)),
                 Cell::from(
