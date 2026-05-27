@@ -5,15 +5,19 @@ use super::{
     interaction::InteractionDriver, release::ReleaseDriver, timeline::TimelineDriver,
 };
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct OperationDispatcher;
+#[derive(Clone, Copy, Debug)]
+pub(super) struct OperationDispatcher {
+    _marker: (),
+}
 
 impl OperationDispatcher {
     pub(super) fn new() -> Self {
-        Self
+        Self { _marker: () }
     }
 
-    pub(super) fn dispatch(&self, operation: Operation, cx: &mut DriverContext<'_>) -> Vec<Event> {
+    pub(super) fn dispatch(self, operation: Operation, cx: &mut DriverContext<'_>) -> Vec<Event> {
+        let Self { _marker: () } = self;
+
         match operation {
             Operation::StartDeviceFlow { provider } => AuthDriver::start_device_flow(cx, provider),
             Operation::PollDeviceFlowAccessToken {

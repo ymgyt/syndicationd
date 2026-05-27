@@ -355,7 +355,7 @@ impl Application {
                 PollResult::Idle => {
                     self.apply_event(Event::Idle);
                 }
-            };
+            }
 
             if self.components.shell.should_render() {
                 self.render();
