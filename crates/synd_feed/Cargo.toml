@@ -25,6 +25,7 @@ reqwest       = { workspace = true, features = ["stream"] }
 schemars      = { workspace = true, optional = true, features = ["derive", "url"] }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
+sha2          = { workspace = true }
 sqlx          = { workspace = true, optional = true, features = ["sqlite"] }
 thiserror     = { workspace = true }
 tracing       = { workspace = true }

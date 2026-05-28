@@ -155,13 +155,14 @@ impl FeedService {
 
         parser
             .parse(source)
-            .map(|feed| Feed::from((url, feed)))
+            .map(|feed| Feed::from_feed_rs(url, feed))
             .map_err(FetchFeedError::from)
     }
 
     fn build_parser(base_uri: impl AsRef<str>) -> Parser {
         feed_rs::parser::Builder::new()
             .base_uri(Some(base_uri))
+            .id_generator(|_, _, _| crate::types::feed_rs_missing_id_marker())
             .build()
     }
 }
@@ -222,5 +223,102 @@ mod tests {
         assert_eq!(feed.meta().updated(), Some(feed_updated));
         assert_eq!(entry.published(), Some(entry_published));
         assert_eq!(entry.updated(), Some(entry_published));
+        assert_synd_entry_id(entry.id_ref());
+        assert!(!entry.id().to_string().contains("https://example.com/entry"));
+    }
+
+    #[test]
+    fn atom_native_entry_id_is_not_exposed() {
+        let service = FeedService::new("synd-test", 1024);
+        let feed = service
+            .parse(
+                FeedUrl::parse("https://example.com/atom.xml").unwrap(),
+                br#"
+                <feed xmlns="http://www.w3.org/2005/Atom">
+                    <title>Example</title>
+                    <id>https://example.com/atom.xml</id>
+                    <updated>2026-05-24T00:00:00Z</updated>
+                    <entry>
+                        <title>Native id entry</title>
+                        <id>tag:example.com,2026:entry-1</id>
+                        <updated>2026-05-24T00:00:00Z</updated>
+                    </entry>
+                </feed>
+                "#
+                .as_slice(),
+            )
+            .unwrap();
+
+        let entry = feed.entries().next().unwrap();
+        assert_synd_entry_id(entry.id_ref());
+        assert!(!entry.id().to_string().contains("tag:example.com"));
+    }
+
+    #[test]
+    fn missing_native_entry_id_is_deterministic() {
+        let service = FeedService::new("synd-test", 1024);
+        let feed_url = FeedUrl::parse("https://example.com/atom.xml").unwrap();
+        let source = br#"
+            <feed xmlns="http://www.w3.org/2005/Atom">
+                <title>Example</title>
+                <id>https://example.com/atom.xml</id>
+                <updated>2026-05-24T00:00:00Z</updated>
+                <entry>
+                    <title>Missing id entry</title>
+                    <updated>2026-05-24T00:00:00Z</updated>
+                </entry>
+            </feed>
+            "#;
+
+        let first = service.parse(feed_url.clone(), source.as_slice()).unwrap();
+        let second = service.parse(feed_url, source.as_slice()).unwrap();
+
+        assert_eq!(
+            first.entries().next().unwrap().id(),
+            second.entries().next().unwrap().id()
+        );
+        assert_synd_entry_id(first.entries().next().unwrap().id_ref());
+    }
+
+    #[test]
+    fn entry_without_entry_id_source_is_skipped() {
+        let service = FeedService::new("synd-test", 1024);
+        let feed = service
+            .parse(
+                FeedUrl::parse("https://example.com/atom.xml").unwrap(),
+                br#"
+                <feed xmlns="http://www.w3.org/2005/Atom">
+                    <title>Example</title>
+                    <id>https://example.com/atom.xml</id>
+                    <updated>2026-05-24T00:00:00Z</updated>
+                    <entry>
+                        <updated>2026-05-24T00:00:00Z</updated>
+                    </entry>
+                    <entry>
+                        <title>Kept entry</title>
+                        <updated>2026-05-24T00:00:00Z</updated>
+                    </entry>
+                </feed>
+                "#
+                .as_slice(),
+            )
+            .unwrap();
+
+        let entries = feed.entries().collect::<Vec<_>>();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].title(), Some("Kept entry"));
+        assert_synd_entry_id(entries[0].id_ref());
+    }
+
+    fn assert_synd_entry_id(id: &crate::types::EntryId) {
+        let id = id.as_str();
+        assert!(id.starts_with("synd:entry:v1:"), "{id}");
+        assert_eq!(id.len(), "synd:entry:v1:".len() + 64);
+        assert!(
+            id["synd:entry:v1:".len()..]
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')),
+            "{id}"
+        );
     }
 }

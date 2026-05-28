@@ -50,6 +50,7 @@ rustls             = { version = "0.23.40", features = ["ring"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.149" }
+sha2               = { version = "0.10" }
 sqlx               = { version = "0.8.6", default-features = false }
 tempfile           = { version = "3" }
 thiserror          = { version = "2.0.18" }
