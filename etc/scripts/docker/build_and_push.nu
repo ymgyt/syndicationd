@@ -23,8 +23,13 @@ def main [tag: string] {
   let src_tag = $"($package):latest"
   let dst_tag = $"ghcr.io/ymgyt/($package):($image.version)"
   let dst_tag_latest = $"ghcr.io/ymgyt/($package):latest"
+  let tags = if ($image.version | str contains '-') {
+    [$dst_tag]
+  } else {
+    [$dst_tag $dst_tag_latest]
+  }
   
-  [$dst_tag $dst_tag_latest] | each {|tag| 
+  $tags | each {|tag|
     docker tag $src_tag $tag
     print $"Push ($tag)"
     docker image push $tag
