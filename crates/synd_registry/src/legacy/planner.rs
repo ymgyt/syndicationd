@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 
-use crate::model::{
+use super::model::{
     DesiredFeedRefresh, NewRefreshRequest, ReconcileTrigger, RefreshIntent, RefreshIntentKind,
-    RefreshInterval, RefreshRequest, RefreshRequestStatus, RefreshRequestUpdate, RefreshSchedule,
-    RefreshState,
+    RefreshInterval, RefreshRequest, RefreshRequestDisposition, RefreshRequestStatus,
+    RefreshRequestUpdate, RefreshSchedule, RefreshState,
 };
 
 #[derive(Debug, Clone)]
@@ -18,12 +18,12 @@ pub enum RefreshRequestDecision {
 }
 
 impl RefreshRequestDecision {
-    pub fn disposition(&self) -> crate::model::RefreshRequestDisposition {
+    pub fn disposition(&self) -> RefreshRequestDisposition {
         match self {
-            Self::Create(_) => crate::model::RefreshRequestDisposition::Created,
-            Self::Promote(_) => crate::model::RefreshRequestDisposition::Promoted,
-            Self::MergePending(_) => crate::model::RefreshRequestDisposition::CoalescedPending,
-            Self::JoinRunning(_) => crate::model::RefreshRequestDisposition::JoinedRunning,
+            Self::Create(_) => RefreshRequestDisposition::Created,
+            Self::Promote(_) => RefreshRequestDisposition::Promoted,
+            Self::MergePending(_) => RefreshRequestDisposition::CoalescedPending,
+            Self::JoinRunning(_) => RefreshRequestDisposition::JoinedRunning,
         }
     }
 }
@@ -144,8 +144,9 @@ mod tests {
     use synd_feed::types::FeedUrl;
 
     use super::*;
-    use crate::model::{
-        RefreshIntentKind, RefreshPolicy, RefreshPriority, RefreshRequestId, SubscriberId,
+    use crate::legacy::model::{
+        EffectiveRefreshPolicy, RefreshIntentKind, RefreshPolicy, RefreshPriority,
+        RefreshRequestId, SubscriberId,
     };
 
     fn url() -> FeedUrl {
@@ -223,7 +224,7 @@ mod tests {
     fn desired_feed(refresh_policy: RefreshPolicy) -> DesiredFeedRefresh {
         DesiredFeedRefresh {
             feed_url: url(),
-            policy: crate::model::EffectiveRefreshPolicy {
+            policy: EffectiveRefreshPolicy {
                 schedule: refresh_policy.schedule,
             },
         }

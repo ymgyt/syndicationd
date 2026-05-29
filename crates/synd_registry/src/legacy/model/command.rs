@@ -1,6 +1,10 @@
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use super::{FeedSubscription, RefreshPolicy, RefreshRequestReceipt, RefreshStatus, SubscriberId};
+use crate::{
+    command::{RegistryCommand, Subscribe, Unsubscribe},
+    subscription::Subscription,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InitialRefreshMode {
@@ -43,4 +47,26 @@ pub struct UnsubscribeFeedOutput {}
 pub struct RequestRefreshCommand {
     pub subscriber_id: SubscriberId,
     pub feed_url: FeedUrl,
+}
+
+impl From<&SubscribeFeedCommand> for RegistryCommand {
+    fn from(command: &SubscribeFeedCommand) -> Self {
+        Self::Subscribe(Subscribe {
+            subscription: Subscription::new(
+                command.subscriber_id.clone(),
+                command.feed_url.clone(),
+            ),
+        })
+    }
+}
+
+impl From<&UnsubscribeFeedCommand> for RegistryCommand {
+    fn from(command: &UnsubscribeFeedCommand) -> Self {
+        Self::Unsubscribe(Unsubscribe {
+            subscription: Subscription::new(
+                command.subscriber_id.clone(),
+                command.feed_url.clone(),
+            ),
+        })
+    }
 }

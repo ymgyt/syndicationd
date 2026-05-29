@@ -8,7 +8,7 @@ pub struct FeedRegistryConfig {
     pub scheduler_tick_interval: Duration,
     pub refresh_concurrency: usize,
     pub refresh_lease_duration: Duration,
-    pub store_retry_delay: Duration,
+    pub db_retry_delay: Duration,
 }
 
 impl Default for FeedRegistryConfig {
@@ -19,7 +19,7 @@ impl Default for FeedRegistryConfig {
             scheduler_tick_interval: Duration::from_mins(5),
             refresh_concurrency: 10,
             refresh_lease_duration: Duration::from_mins(10),
-            store_retry_delay: Duration::from_secs(30),
+            db_retry_delay: Duration::from_secs(30),
         }
     }
 }

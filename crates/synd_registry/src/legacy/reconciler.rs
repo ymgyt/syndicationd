@@ -3,25 +3,28 @@ use std::collections::HashMap;
 use chrono::Utc;
 
 use crate::{
+    db::{FeedRegistryDb, RegistryDbTransaction},
     error::FeedRegistryError,
+};
+
+use super::{
     executor::RefreshExecutorHandle,
     model::{DesiredFeedRefresh, ReconcileOutcome, ReconcileTrigger, RefreshRequestDisposition},
     planner::RefreshPlanner,
-    store::{FeedRegistryStore, RegistryTransaction},
 };
 
 #[derive(Clone)]
 pub struct Reconciler<S> {
-    store: S,
+    db: S,
     executor: RefreshExecutorHandle,
 }
 
 impl<S> Reconciler<S>
 where
-    S: FeedRegistryStore,
+    S: FeedRegistryDb,
 {
-    pub fn new(store: S, executor: RefreshExecutorHandle) -> Self {
-        Self { store, executor }
+    pub fn new(db: S, executor: RefreshExecutorHandle) -> Self {
+        Self { db, executor }
     }
 
     pub async fn reconcile_now(
@@ -29,7 +32,7 @@ where
         trigger: ReconcileTrigger,
     ) -> Result<ReconcileOutcome, FeedRegistryError> {
         let now = Utc::now();
-        let mut tx = self.store.begin().await?;
+        let mut tx = self.db.begin().await?;
         let subscriptions = tx.list_active_subscriptions().await?;
         let desired_feeds = DesiredFeedRefresh::from_subscriptions(subscriptions);
         let urls = desired_feeds

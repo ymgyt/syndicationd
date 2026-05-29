@@ -12,15 +12,18 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 use crate::{
-    event::RegistryEventPublisher,
+    db::{FeedRegistryDb, RegistryDbTransaction},
+    event::{RegistryNotification, RegistryNotificationPublisher, TimelineChanged},
+};
+
+use super::{
     model::{
-        ClaimedRefreshRequest, EffectiveRefreshPolicy, FeedRegistryConfig, RefreshErrorKind,
-        RefreshFailure, RefreshIntent, RefreshRequest, RefreshRequestReceipt, RefreshRequestStatus,
-        RefreshStarted, RefreshStatus, RefreshStatusKind, RefreshSuccess, TimelineChanged,
+        ClaimedRefreshRequest, EffectiveRefreshPolicy, FeedRegistryConfig, NewRefreshRequest,
+        RefreshErrorKind, RefreshFailure, RefreshIntent, RefreshRequest, RefreshRequestReceipt,
+        RefreshRequestStatus, RefreshStarted, RefreshStatus, RefreshStatusKind, RefreshSuccess,
     },
     planner::{RefreshRequestDecision, RefreshRequestPolicy},
     provider::{FeedProvider, FeedProviderError},
-    store::{FeedRegistryStore, RegistryTransaction},
 };
 
 #[derive(Default)]
@@ -185,11 +188,11 @@ impl Default for RefreshExecutorHandle {
 }
 
 pub struct RefreshExecutor<S, P> {
-    store: S,
+    db: S,
     provider: P,
     handle: RefreshExecutorHandle,
     config: FeedRegistryConfig,
-    events: RegistryEventPublisher,
+    notifications: RegistryNotificationPublisher,
 }
 
 enum ActiveFeedPolicy {
@@ -199,37 +202,37 @@ enum ActiveFeedPolicy {
 
 impl<S, P> RefreshExecutor<S, P>
 where
-    S: FeedRegistryStore,
+    S: FeedRegistryDb,
     P: FeedProvider,
 {
     pub fn new(
-        store: S,
+        db: S,
         provider: P,
         handle: RefreshExecutorHandle,
         config: FeedRegistryConfig,
     ) -> Self {
-        Self::with_events(
-            store,
+        Self::with_notifications(
+            db,
             provider,
             handle,
             config,
-            RegistryEventPublisher::default(),
+            RegistryNotificationPublisher::default(),
         )
     }
 
-    pub fn with_events(
-        store: S,
+    pub fn with_notifications(
+        db: S,
         provider: P,
         handle: RefreshExecutorHandle,
         config: FeedRegistryConfig,
-        events: RegistryEventPublisher,
+        notifications: RegistryNotificationPublisher,
     ) -> Self {
         Self {
-            store,
+            db,
             provider,
             handle,
             config,
-            events,
+            notifications,
         }
     }
 
@@ -269,7 +272,7 @@ where
             }
             Err(err) => {
                 warn!("failed to load active refresh policy: {err}");
-                self.release_after_store_error(&request).await;
+                self.release_after_db_error(&request).await;
                 return;
             }
         }
@@ -277,7 +280,7 @@ where
         let started_at = Utc::now();
         if let Err(err) = self.record_started(&request, started_at).await {
             warn!("failed to record refresh start: {err}");
-            self.release_after_store_error(&request).await;
+            self.release_after_db_error(&request).await;
             return;
         }
 
@@ -295,7 +298,7 @@ where
                     }
                     Err(err) => {
                         warn!("failed to load active refresh policy: {err}");
-                        self.release_after_store_error(&request).await;
+                        self.release_after_db_error(&request).await;
                         return;
                     }
                 };
@@ -306,7 +309,7 @@ where
                 };
                 if let Err(err) = self.record_success(result).await {
                     warn!("failed to record refresh success: {err}");
-                    self.release_after_store_error(&request).await;
+                    self.release_after_db_error(&request).await;
                     return;
                 }
                 self.publish_timeline_changed(TimelineChanged::for_feed(
@@ -328,7 +331,7 @@ where
                     }
                     Err(err) => {
                         warn!("failed to load active refresh policy: {err}");
-                        self.release_after_store_error(&request).await;
+                        self.release_after_db_error(&request).await;
                         return;
                     }
                 };
@@ -341,7 +344,7 @@ where
                 };
                 if let Err(err) = self.record_failure(failure).await {
                     warn!("failed to record refresh failure: {err}");
-                    self.release_after_store_error(&request).await;
+                    self.release_after_db_error(&request).await;
                     return;
                 }
                 self.handle.complete(&request).await;
@@ -352,7 +355,7 @@ where
     async fn active_policy(
         &self,
         request: &ClaimedRefreshRequest,
-    ) -> Result<ActiveFeedPolicy, crate::error::StoreError> {
+    ) -> Result<ActiveFeedPolicy, crate::error::RegistryDbError> {
         if !self.handle.is_current(request).await {
             return Ok(ActiveFeedPolicy::Absent);
         }
@@ -363,19 +366,19 @@ where
     async fn load_effective_policy(
         &self,
         feed_url: &FeedUrl,
-    ) -> Result<ActiveFeedPolicy, crate::error::StoreError> {
-        let mut tx = self.store.begin().await?;
+    ) -> Result<ActiveFeedPolicy, crate::error::RegistryDbError> {
+        let mut tx = self.db.begin().await?;
         let subscriptions = tx.list_active_subscriptions_for_feed(feed_url).await?;
         tx.commit().await?;
         Ok(EffectiveRefreshPolicy::from_subscriptions(&subscriptions)
             .map_or(ActiveFeedPolicy::Absent, ActiveFeedPolicy::Present))
     }
 
-    async fn release_after_store_error(&self, request: &ClaimedRefreshRequest) {
+    async fn release_after_db_error(&self, request: &ClaimedRefreshRequest) {
         self.handle
             .release(
                 request,
-                add_duration(Utc::now(), self.config.store_retry_delay),
+                add_duration(Utc::now(), self.config.db_retry_delay),
             )
             .await;
     }
@@ -384,8 +387,8 @@ where
         &self,
         request: &ClaimedRefreshRequest,
         started_at: chrono::DateTime<Utc>,
-    ) -> Result<(), crate::error::StoreError> {
-        let mut tx = self.store.begin().await?;
+    ) -> Result<(), crate::error::RegistryDbError> {
+        let mut tx = self.db.begin().await?;
         tx.record_refresh_started(RefreshStarted {
             feed_url: request.feed_url.clone(),
             started_at,
@@ -394,26 +397,32 @@ where
         tx.commit().await
     }
 
-    async fn record_success(&self, result: RefreshSuccess) -> Result<(), crate::error::StoreError> {
-        let mut tx = self.store.begin().await?;
+    async fn record_success(
+        &self,
+        result: RefreshSuccess,
+    ) -> Result<(), crate::error::RegistryDbError> {
+        let mut tx = self.db.begin().await?;
         tx.record_refresh_succeeded(result).await?;
         tx.commit().await
     }
 
-    async fn record_failure(&self, result: RefreshFailure) -> Result<(), crate::error::StoreError> {
-        let mut tx = self.store.begin().await?;
+    async fn record_failure(
+        &self,
+        result: RefreshFailure,
+    ) -> Result<(), crate::error::RegistryDbError> {
+        let mut tx = self.db.begin().await?;
         tx.record_refresh_failed(result).await?;
         tx.commit().await
     }
 
     fn publish_timeline_changed(&self, event: TimelineChanged) {
-        self.events
-            .publish(crate::model::RegistryEvent::TimelineChanged(event));
+        self.notifications
+            .publish(RegistryNotification::TimelineChanged(event));
     }
 }
 
-impl From<crate::model::NewRefreshRequest> for RefreshRequest {
-    fn from(request: crate::model::NewRefreshRequest) -> Self {
+impl From<NewRefreshRequest> for RefreshRequest {
+    fn from(request: NewRefreshRequest) -> Self {
         Self {
             id: request.id,
             feed_url: request.feed_url,
@@ -478,7 +487,7 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
-    use crate::model::{RefreshIntentKind, SubscriberId};
+    use crate::legacy::model::{RefreshIntentKind, SubscriberId};
 
     fn feed_url(path: &str) -> FeedUrl {
         FeedUrl::parse(&format!("https://example.com/{path}.xml")).unwrap()

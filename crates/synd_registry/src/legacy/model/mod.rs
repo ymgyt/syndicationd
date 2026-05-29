@@ -1,6 +1,5 @@
 mod command;
 mod config;
-mod event;
 mod identity;
 mod query;
 mod reconcile;
@@ -13,7 +12,6 @@ pub use command::{
     SubscribeFeedRefresh, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
 };
 pub use config::FeedRegistryConfig;
-pub use event::{AffectedFeeds, RegistryEvent, TimelineChanged};
 pub use identity::SubscriberId;
 pub use query::{
     EntriesPage, EntryCursor, EntryCursorError, EntryView, FeedStatusQuery, FeedSubscriptionPage,

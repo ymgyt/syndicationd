@@ -4,7 +4,7 @@ use synd_feed::{
 };
 use thiserror::Error;
 
-use crate::model::FeedSnapshot;
+use super::model::FeedSnapshot;
 
 #[derive(Debug, Clone)]
 pub struct FetchedFeed {
