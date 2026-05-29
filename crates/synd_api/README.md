@@ -1,4 +1,4 @@
-# synd_api
+# synd-api
 
 syndicationd graphql api server
 
@@ -7,7 +7,7 @@ syndicationd graphql api server
 `synd-api` is the transport boundary for syndicationd. It owns HTTP serving,
 GraphQL schema wiring, authentication, request limits, shutdown, and
 observability. Feed lifecycle behavior is delegated to `synd-registry`, and
-durable storage adapters are provided by `synd-persistence`.
+SQLite storage adapters are provided by `synd-persistence`.
 
 ## OpenTelemetry
 

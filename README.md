@@ -44,7 +44,6 @@ stored in SQLite by default.
   - [Theme](#theme)
   - [Log](#log)
   - [Clean](#remove-cache-and-logs)
-  - [Check](#check-application-status)
 - [Advanced](#advanced)
 - [Development](#development)
 - [Project Goals](#project-goals)
@@ -176,21 +175,28 @@ When creating a configuration file, you can use the following command:
 synd config init > config.toml
 ```
 
+To inspect the resolved configuration after flags, environment variables,
+configuration files, and defaults have been applied, use `config view`.
+
+```sh
+synd config view
+synd config view -o json
+```
+
 ### Common Settings
 
 | Flag               | Environment variable     | Configuration file       | Default                             | Description                                         |
 |--------------------|--------------------------|--------------------------|-------------------------------------|-----------------------------------------------------|
 | `--config`         | `SYND_CONFIG_FILE`       | \-                       | see [configuration](#configuration) | Configuration file path                             |
-| `--log`            | `SYND_LOG_FILE`          | `[log.path]`             | see `synd check`                    | Log file path                                       |
-| `--cache-dir`      | `SYND_CACHE_DIR`         | `[cache.directory]`      | see `synd check`                    | Cache directory                                     |
+| `--log`            | `SYND_LOG_FILE`          | `[log.path]`             | see `synd config view`              | Log file path                                       |
+| `--cache-dir`      | `SYND_CACHE_DIR`         | `[cache.directory]`      | see `synd config view`              | Cache directory                                     |
 | `--theme`          | `SYND_THEME`             | `[theme.name]`           | `ferra`                             | Theme name                                          |
-| `--sqlite-db`      | `SYND_SQLITE_DB`         | `[backend.sqlite_db]`    | see `synd check`                    | SQLite database path                                |
+| `--sqlite-db`      | `SYND_SQLITE_DB`         | `[backend.sqlite_db]`    | see `synd config view`              | SQLite database path                                |
 | `--entries-limit`  | `SYND_ENTRIES_LIMIT`     | `[feed.entries_limit]`   | `200`                               | Feed entries to fetch                               |
 | `--browser`        | `SYND_BROWSER`           | `[feed.browser.command]` | \-                                  | Command to browse feed                              |
 | `--browser-args`   | `SYND_BROWSER_ARGS`      | `[feed.browser.args]`    | `[]`                                | Command args to browse feed                         |
 
-Remote backend options and optional integrations are documented under
-[Advanced](#advanced).
+Optional integrations are documented under [Advanced](#advanced).
 
 ### Additional categories
 
@@ -239,6 +245,10 @@ The feed to subscribe to should be entered in the format:
 When you close the editor, the feed is saved to the local SQLite database by
 default.
 
+The command-line shape for direct subscription management is reserved as
+`synd feed subscribe` and `synd feed unsubscribe`, but these commands currently
+return `not_yet_implemented` while the client structure is being reworked.
+
 #### Requirement
 
 `Requirement` indicates the importance of the feed.
@@ -285,28 +295,36 @@ The command is executed as `$SYND_BROWSER $SYND_BROWSER_ARGS <entry url>`.
 
 ### Import and Export Feeds
 
-To export subscribed feeds from the local database, execute the `synd export`
-command.
+To export subscribed feeds from the local database, execute the
+`synd feed export` command.
 
 ```sh
-synd export > feeds.json
+synd feed export > feeds.json
 ```
 
-You can check the JSON schema of the data to be exported with `synd export --print-schema`.
+You can check the JSON schema of the data to be exported with
+`synd feed export --print-schema`.
 
-You can subscribe to multiple feeds at once using the `synd import` command. By
-default this imports into the local SQLite database.
+You can subscribe to multiple feeds at once using the `synd feed import`
+command. By default this imports into the local SQLite database.
 
-The input schema is the same as that of `synd export`. You can also check it with `synd import --print-schema`.
+The input schema is the same as that of `synd feed export`. You can also check
+it with `synd feed import --print-schema`.
 
 ```sh
 # from stdin
 echo '{"feeds": [ {"url": "https://this-week-in-rust.org/atom.xml", "category": "rust", "requirement": "Must" } ]}' \
-  | synd import -
+  | synd feed import -
 
 # read from file
-synd export > feeds.json
-synd import feeds.json
+synd feed export > feeds.json
+synd feed import feeds.json
+```
+
+Because export and import use the same JSON document, this also works:
+
+```sh
+synd feed export | synd feed import -
 ```
 
 ### Theme
@@ -316,36 +334,24 @@ The theme can be changed using the `--theme` flag. Please refer to the help for 
 ### Log
 
 The default log file path is based on [`ProjectDirs::data_dir()`](https://docs.rs/directories/latest/directories/struct.ProjectDirs.html#method.data_dir).
-Please refer to the `synd check` command for the output destination.
+Use `synd config view` to inspect the resolved output destination.
 
 You can modify the [log directives](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives) using the environment variable `SYND_LOG`. (for example, `SYND_LOG=synd=debug`)
 
 ### Remove cache and logs
 
-`synd clean` removes cache files and logs. In remote mode, authentication credentials are stored in the cache, so `synd clean` also removes the cached login state.
-
-`synd clean` does not remove the local SQLite database. Remove the file configured by `--sqlite-db` or `[backend.sqlite_db]` if you want to delete local subscriptions.
-
-### Check application status
-
-`synd check [--format (human|json)]` returns current application status. In local mode it starts the same in-process backend API used by the TUI, then checks its health.
+`synd clean` removes known cache files and logs. Use `--cache` or `--logs` to
+limit the target.
 
 ```sh
-synd check
-
- Api Health: pass
-Api Version: 0.2.6
-    Backend: local
-  SQLite DB: /home/ferris/.local/share/syndicationd/synd.db
-     Config: /home/ferris/.config/syndicationd/config.toml
-      Cache: /home/ferris/.cache/syndicationd
-        Log: /home/ferris/.local/share/syndicationd/synd.log
+synd clean
+synd clean --cache
+synd clean --logs
 ```
 
-```sh
-# open log file
-synd check --format json | from json | get log | bat $in
-```
+The cache directory itself is preserved, and only known cache files are removed.
+`synd clean` does not remove the local SQLite database. Database operations are
+handled separately from cache/log cleanup.
 
 ## Advanced
 
@@ -357,19 +363,6 @@ The local database path can be set with `--sqlite-db`, `SYND_SQLITE_DB`, or
 ```sh
 synd --sqlite-db ~/.local/share/syndicationd/synd.db
 ```
-
-### Remote Backend
-
-Local mode does not require authentication. Remote backend mode is available for
-externally managed or self-hosted deployments:
-
-```sh
-synd --backend remote --endpoint https://api.example.com
-```
-
-Remote backend authentication currently supports GitHub and Google. The only
-required scope is the email address, which is hashed and used as an identifier.
-For more information, see the [privacy policy](https://docs.syndicationd.ymgyt.io/synd-term/book/privacy_policy.html).
 
 ### GitHub Notifications
 
@@ -385,7 +378,7 @@ Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with developm
 
 * **A terminal-first feed reader**. Create a simple feed reader for terminal users that does not involve curation, recommendations, or user behavior analysis.
 
-* **Self-hostable when needed**. Keep remote backend mode available for users who want to manage their own service.
+* **Local by default**. Keep subscriptions and feed state in a local SQLite database.
 
 * **Longevity**. Maintain this project for as long as possible, with a minimum maintenance period of at least 5 years.
 

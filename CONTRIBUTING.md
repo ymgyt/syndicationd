@@ -18,48 +18,48 @@ nix develop
 
 | Package             | Description                                  |
 | ---                 | ---                                          |
+| `synd`             | Binary crate and composition root           |
 | `synd_support`     | Shared support and observability utilities  |
 | `synd_feed`        | RSS/Atom feed lib                           |
 | `synd_auth`        | Authentication lib                          |
 | `synd_registry`    | Feed registry domain lib                    |
-| `synd_persistence` | Durable storage adapters                    |
+| `synd_persistence` | SQLite storage adapters                     |
 | `synd_api`         | GraphQL API server                          |
-| `synd_term`        | TUI and CLI app                             |
+| `synd_client`      | API client and payload DTOs                 |
+| `synd_runtime`     | Runtime session and local API lifecycle     |
+| `synd_term`        | TUI application                             |
 | `synd_test`        | Test support lib                            |
 
 ### Application Topology
 
 ![Application overview](etc/dot/dist/overview.svg)
 
-For normal development and user workflows, `synd_term` starts an in-process
-`synd_api` backed by SQLite. This is the local backend path used by the TUI and
-by commands such as `check`, `export`, and `import`.
+For normal development and user workflows, `synd` is the composition root. It
+resolves CLI/configuration, acquires a `synd_runtime::Session`, and passes the
+session's `synd_client::Client` into `synd_term`.
+
+`synd_runtime` owns local API lifecycle concerns. The current implementation
+starts a loopback local `synd_api` backed by SQLite as the transitional runtime
+path. The singleton daemon, startup lock, and UDS transport should be added
+behind the same `Runtime`/`Session` API.
+
+`synd_term` owns the TUI application and event loop. It should receive an
+already configured `Client`; it must not start local API services or own runtime
+session lifecycle.
 
 The standalone `synd_api` binary is still useful when working on the API server
-itself or testing remote backend mode. In that mode, `synd_term` connects to the
-API over HTTP and uses the GraphQL schema generated from `synd_api`.
+itself or updating the GraphQL schema.
 
 ### Running Locally
 
 The normal development path is the in-process local backend:
 
 ```sh
-just run-local
+just run term
 ```
 
-This is equivalent to running `synd` with `--local`; it starts the TUI and an
-in-process `synd-api` backed by a local SQLite database.
-
-When working on the standalone API server, use two terminals:
-
-```sh
-just run api
-just run term -- --backend remote
-```
-
-`just run api` starts `synd-api` with SQLite and local TLS certificates. The
-`just run term` recipe sets `SYND_ENDPOINT` to the local API endpoint used by
-the API recipe.
+This starts the `synd` binary, which acquires a runtime session and then starts
+the TUI.
 
 List available recipes with:
 
@@ -69,14 +69,8 @@ just
 
 ### Updating GraphQL Schema
 
-If you update the `synd-api` GraphQL schema, first run a local API with
-introspection enabled:
-
-```sh
-just run api
-```
-
-Then update the schema used by `synd-term` and regenerate the client code:
+If you update the `synd-api` GraphQL schema, update the schema used by
+`synd-client` and regenerate the client code:
 
 ```sh
 just graphql schema
