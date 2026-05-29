@@ -1,14 +1,14 @@
 use thiserror::Error;
 
-pub type StoreResult<T> = Result<T, StoreError>;
+pub type RegistryDbResult<T> = Result<T, RegistryDbError>;
 
 #[derive(Debug, Error)]
-pub enum StoreError {
+pub enum RegistryDbError {
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
 
-impl StoreError {
+impl RegistryDbError {
     pub fn internal(err: impl Into<anyhow::Error>) -> Self {
         Self::Internal(err.into())
     }
@@ -17,9 +17,11 @@ impl StoreError {
 #[derive(Debug, Error)]
 pub enum FeedRegistryError {
     #[error(transparent)]
-    Store(#[from] StoreError),
+    Db(#[from] RegistryDbError),
     #[error(transparent)]
-    FeedProvider(#[from] crate::provider::FeedProviderError),
+    FeedProvider(#[from] crate::legacy::FeedProviderError),
+    #[error(transparent)]
+    EventRuntime(#[from] crate::event::EventRuntimeError),
     #[error("invalid command: {0}")]
     InvalidCommand(String),
     #[error("feed is not subscribed: {0}")]

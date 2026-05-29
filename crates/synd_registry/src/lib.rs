@@ -1,22 +1,20 @@
 //! Feed lifecycle registry.
 #![allow(async_fn_in_trait)]
 
+pub mod command;
+pub mod consumers;
+pub mod crawl;
+pub mod db;
 pub mod error;
 pub mod event;
-pub mod executor;
-pub mod model;
-pub mod planner;
-pub mod provider;
-pub mod reconciler;
+pub mod legacy;
 pub mod registry;
-pub mod store;
+pub mod subscriber;
+pub mod subscription;
 
-pub use error::{FeedRegistryError, StoreError, StoreResult};
-pub use event::{RegistryEventPublisher, RegistryEventRecvError, RegistryEventSubscriber};
-pub use executor::{RefreshExecutor, RefreshExecutorHandle};
-pub use model::*;
-pub use planner::{ReconcilePlan, RefreshPlanner, RefreshRequestDecision, RefreshRequestPolicy};
-pub use provider::{FeedProvider, FeedProviderError, FetchedFeed};
-pub use reconciler::Reconciler;
+pub use command::{RegistryCommand, Subscribe, Unsubscribe};
+pub use db::{FeedRegistryDb, RegistryDbTransaction};
+pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::FeedRegistry;
-pub use store::{FeedRegistryStore, RegistryTransaction};
+pub use subscriber::SubscriberId;
+pub use subscription::Subscription;
