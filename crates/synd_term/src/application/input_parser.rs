@@ -1,10 +1,10 @@
 use nom_language::error::{VerboseError, VerboseErrorKind};
+use synd_client::payload::SubscribeFeedInput;
 use thiserror::Error;
 
 use crate::{
-    client::synd_api::payload::SubscribeFeedInput,
     config::Categories,
-    types::{self},
+    types::{self, RefreshPolicyExt},
 };
 
 type NomError<'s> = VerboseError<&'s str>;
@@ -112,17 +112,13 @@ mod feed {
         sequence::delimited,
     };
     use nom_language::error::{VerboseError, VerboseErrorKind};
+    use synd_client::payload::{RefreshPolicyInput, RefreshPolicyInputKind, SubscribeFeedInput};
     use synd_feed::types::{Category, FeedUrl, Requirement};
     use url::Url;
 
     use super::NomError;
-    use crate::{
-        application::input_parser::{
-            CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REFRESH_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
-        },
-        client::synd_api::payload::{
-            RefreshPolicyInput, RefreshPolicyInputKind, SubscribeFeedInput,
-        },
+    use crate::application::input_parser::{
+        CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REFRESH_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
     };
 
     pub(super) fn parse(s: &'_ str) -> Result<SubscribeFeedInput, NomError<'_>> {

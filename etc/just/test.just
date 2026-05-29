@@ -20,7 +20,7 @@ integration *test_filter:
 integration-debug *case:
 	RUST_LOG="synd=debug,octocrab=debug" SYND_LOG_LOCATION="true" \
 	cargo nextest run \
-		--package synd-term \
+		--package synd \
 		--features integration \
 		--test integration {{ case }} \
 		--no-capture

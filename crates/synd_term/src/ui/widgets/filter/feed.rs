@@ -1,7 +1,8 @@
+use synd_client::payload;
 use synd_feed::types::Requirement;
 
 use crate::{
-    types,
+    types::{self, EntryExt},
     ui::widgets::filter::{
         CategoryFilterer, ComposedFilterer, FilterResult, Filterable, MatcherFilterer,
         category::CategoriesState, composed::Composable,
@@ -43,8 +44,8 @@ impl RequirementFilterer {
     }
 }
 
-impl Filterable<types::Entry> for RequirementFilterer {
-    fn filter(&self, entry: &types::Entry) -> FilterResult {
+impl Filterable<payload::Entry> for RequirementFilterer {
+    fn filter(&self, entry: &payload::Entry) -> FilterResult {
         if entry.requirement().is_satisfied(self.requirement) {
             FilterResult::Use
         } else {

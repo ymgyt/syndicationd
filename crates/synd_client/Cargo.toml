@@ -1,0 +1,41 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+edition.workspace    = true
+homepage.workspace   = true
+keywords.workspace   = true
+license.workspace    = true
+repository.workspace = true
+
+description = "syndicationd API client"
+name        = "synd-client"
+readme      = "README.md"
+version     = "0.1.0"
+
+[dependencies]
+synd-feed = { path = "../synd_feed", version = "0.3.5" }
+synd-support = { path = "../synd_support", version = "0.1.0", features = ["o11y"] }
+
+anyhow            = { workspace = true }
+chrono            = { workspace = true, features = ["serde"] }
+fake              = { workspace = true, optional = true }
+futures-util      = { workspace = true, features = ["sink"] }
+graphql_client    = { workspace = true }
+reqwest           = { workspace = true }
+serde             = { workspace = true, features = ["derive"] }
+serde_json        = { workspace = true }
+thiserror         = { workspace = true }
+tokio             = { workspace = true, features = ["net", "sync", "time"] }
+tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["connect"] }
+tracing           = { workspace = true }
+url               = { workspace = true }
+
+[features]
+fake = ["dep:fake", "synd-feed/fake"]
+
+[dev-dependencies]
+fake = { workspace = true }
+synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["fake"] }
+
+[lints]
+workspace = true

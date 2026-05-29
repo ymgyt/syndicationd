@@ -131,11 +131,26 @@ where
             .join(config::cache::GH_NOTIFICATION_FILTER_OPTION_FILE)
     }
 
-    /// Remove all cache files
-    pub(crate) fn clean(&self) -> io::Result<()> {
+    /// Remove all known cache files.
+    pub fn clean(&self) -> io::Result<()> {
         // User can specify any directory as the cache
         // so instead of deleting the entire directory with `remove_dir_all`, delete files individually.
-        match self.fs.remove_file(self.credential_file()) {
+        for path in [
+            self.credential_file(),
+            self.gh_notification_filter_option_file(),
+        ] {
+            self.remove_file_if_exists(&path)?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn clean_credential(&self) -> io::Result<()> {
+        self.remove_file_if_exists(&self.credential_file())
+    }
+
+    fn remove_file_if_exists(&self, path: &Path) -> io::Result<()> {
+        match self.fs.remove_file(path) {
             Ok(()) => Ok(()),
             Err(err) => match err.kind() {
                 io::ErrorKind::NotFound => Ok(()),
@@ -175,6 +190,27 @@ mod tests {
                 })
                 .is_err()
         );
+    }
+
+    #[test]
+    fn clean_removes_known_cache_files() {
+        let tmp = temp_dir();
+        std::fs::write(tmp.join(config::cache::CREDENTIAL_FILE), "{}").unwrap();
+        std::fs::write(
+            tmp.join(config::cache::GH_NOTIFICATION_FILTER_OPTION_FILE),
+            "{}",
+        )
+        .unwrap();
+
+        let cache = Cache::new(&tmp);
+        cache.clean().unwrap();
+
+        assert!(!tmp.join(config::cache::CREDENTIAL_FILE).exists());
+        assert!(
+            !tmp.join(config::cache::GH_NOTIFICATION_FILTER_OPTION_FILE)
+                .exists()
+        );
+        assert!(tmp.exists());
     }
 
     fn temp_dir() -> PathBuf {

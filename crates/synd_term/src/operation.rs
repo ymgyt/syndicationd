@@ -1,11 +1,12 @@
 use synd_auth::device_flow::DeviceAuthorizationResponse;
+use synd_client::payload;
 use synd_feed::types::FeedUrl;
 use url::Url;
 
 use crate::{
     application::Populate,
     auth::AuthenticationProvider,
-    client::{github::FetchNotificationsParams, synd_api::payload},
+    client::github::FetchNotificationsParams,
     types::github::{IssueOrPullRequest, NotificationId, ThreadId},
 };
 

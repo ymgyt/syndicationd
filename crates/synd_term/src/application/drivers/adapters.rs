@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
+use synd_client::Client;
 
 use crate::{
     application::{Authenticator, Cache, Clock, FeedApiSession, SystemClock},
-    client::{github::GithubClient, synd_api::Client},
+    client::github::GithubClient,
     interact::Interact,
-    local_api::LocalApiHandle,
     terminal::Terminal,
     ui::widgets::gh_notifications::GhNotificationFilterOptions,
 };
@@ -15,7 +15,6 @@ pub(super) struct DriverAdapters {
     pub(super) client: Client,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
-    pub(super) local_api_handle: Option<LocalApiHandle>,
     pub(super) cache: Cache,
     pub(super) interactor: Box<dyn Interact>,
     pub(super) authenticator: Authenticator,
@@ -26,7 +25,6 @@ pub(super) struct DriverAdapterParts {
     pub(super) client: Client,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
-    pub(super) local_api_handle: Option<LocalApiHandle>,
     pub(super) cache: Cache,
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Box<dyn Interact>,
@@ -40,7 +38,6 @@ impl DriverAdapters {
             client,
             feed_api_session,
             github_client,
-            local_api_handle,
             cache,
             authenticator,
             interactor,
@@ -53,7 +50,6 @@ impl DriverAdapters {
             client,
             feed_api_session,
             github_client,
-            local_api_handle,
             cache,
             interactor,
             authenticator: authenticator.unwrap_or_else(Authenticator::new),

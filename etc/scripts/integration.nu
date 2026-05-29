@@ -12,13 +12,13 @@ def main [
   }
   let filter = if ($filter == null) { "" } else { $filter | into string}
 
-  $env.RUST_LOG = "synd_term=info,integration=info,synd_test=info,synd_feed=warn,kvsd=warn,metrics=warn,tower_http=warn,info"
+  $env.RUST_LOG = "synd=info,synd_term=info,integration=info,synd_test=info,synd_feed=warn,metrics=warn,tower_http=warn,info"
   $env.INSTA_OUTPUT = "diff"
   $env.INSTA_UPDATE = "new" 
-  cd crates/synd_term
+  cd crates/synd
   (
     cargo insta test 
-      --package synd-term
+      --package synd
       --features "integration"
       --test integration
       --unreferenced $unreferenced

@@ -1,15 +1,13 @@
 use std::{fmt::Display, sync::Arc};
 
 use synd_auth::device_flow::DeviceAuthorizationResponse;
+use synd_client::{SyndApiError, payload};
 use synd_feed::types::FeedUrl;
 
 use crate::{
     application::{Populate, RequestSequence},
     auth::{AuthenticationProvider, Credential, Verified},
-    client::{
-        github::GithubError,
-        synd_api::{SyndApiError, payload},
-    },
+    client::github::GithubError,
     types::github::{IssueContext, Notification, NotificationId, PullRequestContext},
 };
 

@@ -1,0 +1,33 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+edition.workspace    = true
+homepage.workspace   = true
+keywords.workspace   = true
+license.workspace    = true
+repository.workspace = true
+
+description = "Runtime session and singleton daemon lifecycle for syndicationd"
+name        = "synd-runtime"
+readme      = "README.md"
+version     = "0.1.0"
+
+[dependencies]
+synd-api = { path = "../synd_api", version = "0.2.6" }
+synd-client = { path = "../synd_client", version = "0.1.0" }
+synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
+
+anyhow    = { workspace = true }
+rand      = { workspace = true }
+sha2      = { workspace = true }
+thiserror = { workspace = true }
+tokio     = { workspace = true, features = ["net", "rt", "time"] }
+tracing   = { workspace = true }
+url       = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

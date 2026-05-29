@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
+use synd_client::payload;
 use synd_feed::types::Category;
 
 use crate::{
     application::Populate,
     config::{Categories, Icon},
-    types::{self, github::Notification},
+    types::{self, EntryExt, github::Notification},
     ui::{
         self,
         widgets::filter::{Composable, FilterResult, Filterable},
@@ -146,8 +147,8 @@ impl CategoryFilterer {
     }
 }
 
-impl Filterable<types::Entry> for CategoryFilterer {
-    fn filter(&self, entry: &types::Entry) -> super::FilterResult {
+impl Filterable<payload::Entry> for CategoryFilterer {
+    fn filter(&self, entry: &payload::Entry) -> super::FilterResult {
         self.filter_by_category(entry.category())
     }
 }

@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 pub mod jwt;
-pub mod kvsd;
 pub mod mock;
 
 pub const TEST_EMAIL: &str = "ymgyt@ymgyt.io";

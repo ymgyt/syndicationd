@@ -1,9 +1,7 @@
 use itertools::Itertools;
+use synd_client::SyndApiError;
 
-use crate::{
-    client::synd_api::SyndApiError,
-    event::{ApiEvent, AuthApiEvent, Event},
-};
+use crate::event::{ApiEvent, AuthApiEvent, Event};
 
 use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, RequestSequence};
 

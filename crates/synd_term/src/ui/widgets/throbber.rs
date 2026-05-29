@@ -1,4 +1,4 @@
-// Currently throbber-widgets-tui dependes ratatui 0.24
+// Currently throbber-widgets-tui depends on ratatui 0.24
 // https://github.com/arkbig/throbber-widgets-tui/blob/cd6d1e1e1f38e221d8462df66172dcc370582bbd/Cargo.toml#L20
 
 use ratatui::{

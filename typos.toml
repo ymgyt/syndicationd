@@ -2,13 +2,19 @@
 extend-exclude = [
   # Could not fix github api typo
   "crates/synd_api/src/client/github/schema.json",
-  "crates/synd_term/gql/github/schema.json",
+  "crates/synd_term/src/client/github/schema.json",
   # Ignore commit message typo
   "CHANGELOG.md",
   # Ignore dependencies LICENSES
   "THIRDPARTY.toml",
   # Ignore snapshot
   "crates/synd_test/src/mock/feeddata",
+]
+
+[default]
+extend-ignore-re = [
+  # changelog grouping regex in cliff.toml
+  '\[Rr\]elease',
 ]
 
 [default.extend-words]

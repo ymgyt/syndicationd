@@ -25,4 +25,4 @@ default:
 
 # Run term with in-process local api
 run-local *flags:
-    just run term-local {{ flags }}
+    just run term {{ flags }}

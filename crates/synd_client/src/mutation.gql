@@ -1,0 +1,28 @@
+mutation SubscribeFeed($input: SubscribeFeedInput!) {
+  subscribeFeed(input: $input) {
+    status {
+      code
+    }
+    url
+    requestId
+    disposition
+  }
+}
+
+mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
+  unsubscribeFeed(input: $input) {
+    status {
+      code
+    }
+  }
+}
+
+mutation RefreshFeed($input: RefreshFeedInput!) {
+  refreshFeed(input: $input) {
+    status {
+      code
+    }
+    requestId
+    disposition
+  }
+}

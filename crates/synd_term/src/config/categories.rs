@@ -7,7 +7,7 @@ use synd_feed::types::Category;
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct Categories {
-    categories: HashMap<String, Entry>,
+    categories: HashMap<String, CategoryConfig>,
     #[serde(skip)]
     aliases: HashMap<String, String>,
 }
@@ -69,14 +69,14 @@ impl Categories {
         }
     }
 
-    pub(super) fn merge(&mut self, other: HashMap<String, Entry>) {
+    pub fn merge(&mut self, other: HashMap<String, CategoryConfig>) {
         self.categories.extend(other);
         self.update_aliases();
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct Entry {
+pub struct CategoryConfig {
     icon: Icon,
     #[serde(default)]
     aliases: Vec<String>,

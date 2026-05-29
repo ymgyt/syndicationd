@@ -2,14 +2,14 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use ratatui::Frame;
+use synd_client::Client;
 
 use crate::{
     application::{Authenticator, Cache, Clock, FeedApiSession, LoadCacheError, PersistCacheError},
     auth::{Credential, CredentialError, Verified},
-    client::{github::GithubClient, synd_api::Client},
+    client::github::GithubClient,
     event::Event,
     interact::Interact,
-    local_api::LocalApiHandle,
     operation::Operation,
     terminal::Terminal,
     ui::widgets::gh_notifications::GhNotificationFilterOptions,
@@ -43,7 +43,6 @@ pub(super) struct DriverParts {
     pub(super) client: Client,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
-    pub(super) local_api_handle: Option<LocalApiHandle>,
     pub(super) cache: Cache,
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Box<dyn Interact>,
@@ -65,7 +64,6 @@ impl Drivers {
             client,
             feed_api_session,
             github_client,
-            local_api_handle,
             cache,
             authenticator,
             interactor,
@@ -80,7 +78,6 @@ impl Drivers {
                 client,
                 feed_api_session,
                 github_client,
-                local_api_handle,
                 cache,
                 authenticator,
                 interactor,
@@ -185,7 +182,7 @@ impl Drivers {
     }
 
     pub(super) fn clean_cache(&self) {
-        self.adapters.cache.clean().ok();
+        self.adapters.cache.clean_credential().ok();
     }
 
     pub(super) fn clear_idle_timer(&mut self) {
@@ -196,11 +193,8 @@ impl Drivers {
         self.runtime.reset_idle_timer(interval);
     }
 
-    pub(super) async fn shutdown(&mut self) {
+    pub(super) fn shutdown(&mut self) {
         self.timeline_changes.stop();
-        if let Some(handle) = self.adapters.local_api_handle.take() {
-            handle.shutdown().await;
-        }
     }
 
     #[cfg(feature = "integration")]

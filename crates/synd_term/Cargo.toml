@@ -13,24 +13,17 @@ include = ["src/**/*", "gql/**/*", "CHANGELOG.md", "categories.toml"]
 name    = "synd-term"
 version = "0.3.2"
 
-[[bin]]
-name = "synd"
-path = "src/main.rs"
-
 [dependencies]
-synd-api = { path = "../synd_api", version = "0.2.6" }
 synd-auth = { path = "../synd_auth", version = "0.2.5" }
+synd-client = { path = "../synd_client", version = "0.1.0" }
 synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["fake", "jsonschema"] }
-synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
 synd-support = { path = "../synd_support", version = "0.1.0", features = ["humantime", "conf", "o11y"] }
 
 anyhow               = { workspace = true }
 bitflags             = { workspace = true }
 chrono               = { workspace = true, features = ["std", "now", "serde", "clock"] }
 chrono-humanize      = "0.2.3"
-clap                 = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env", "std"] }
 crossterm            = { version = "0.29.0", features = ["event-stream"] }
-directories          = "6.0.0"
 edit                 = "0.1.5"
 either               = { workspace = true }
 futures-util         = { workspace = true, features = ["sink"] }
@@ -43,9 +36,6 @@ nucleo               = "0.5.0"
 octocrab             = { workspace = true, features = ["timeout", "tracing"] }
 open                 = "5.3.2"
 ratatui              = { version = "0.30.0", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
-reqwest              = { workspace = true }
-rand                 = { workspace = true }
-rustls               = { workspace = true }
 schemars             = { workspace = true, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
 serde_json           = "1.0.149"
@@ -55,8 +45,6 @@ tokio-tungstenite    = { version = "0.29.0", default-features = false, features 
 tokio-stream         = { version = "0.1.18", optional = true }
 toml                 = { workspace = true }
 tracing              = { workspace = true }
-tracing-appender     = "0.2.3"
-tracing-subscriber   = { workspace = true }
 tui-widgets          = { version = "0.7.2", default-features = false, features = ["big-text"] }
 unicode-segmentation = "1.12.0"
 update-informer      = { version = "1.3.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
@@ -67,25 +55,19 @@ url                  = { workspace = true }
 integration = ["dep:tokio-stream"]
 
 [dev-dependencies]
-synd-registry = { path = "../synd_registry", version = "0.1.0" }
-synd-test = { path = "../synd_test" }
+synd-client = { path = "../synd_client", version = "0.1.0", features = ["fake"] }
 
-assert_cmd  = { workspace = true }
-axum-server = { workspace = true }
 criterion   = { workspace = true }
 fake        = { workspace = true }
 insta       = { workspace = true }
-kvsd        = { workspace = true }
-mockall     = { workspace = true }
 pprof       = { workspace = true }
 proptest    = { workspace = true }
-serial_test = { version = "3.2.0", default-features = false, features = ["async", "file_locks"] }
 tempfile    = { workspace = true }
-tokio-util  = { workspace = true }
 
 [[bench]]
 harness = false
 name    = "render"
+required-features = ["integration"]
 
 [lints]
 workspace = true

@@ -3,12 +3,12 @@ use std::{ops::ControlFlow, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
+use synd_client::{Client, payload};
 use synd_feed::types::FeedUrl;
 
 use crate::{
     application::key_handlers::KeyEventResult,
     auth::{Credential, CredentialError, Verified},
-    client::synd_api::{Client, payload},
     config::Categories,
     event::Event,
     interact::Interact,
@@ -128,7 +128,6 @@ impl Application {
             client,
             feed_api_session,
             github_client,
-            local_api_handle,
             categories,
             cache,
             config,
@@ -154,7 +153,6 @@ impl Application {
             client,
             feed_api_session,
             github_client,
-            local_api_handle,
             cache,
             authenticator,
             interactor,
@@ -183,7 +181,7 @@ impl Application {
 
         self.event_loop(input).await;
 
-        self.shutdown_local_api().await;
+        self.shutdown_drivers();
 
         self.cleanup().ok();
 
@@ -277,7 +275,7 @@ impl Application {
         self.perform_operation(Operation::ScheduleFeedViewSync);
     }
 
-    /// Restore terminal state and print something to console if necesseary
+    /// Restore terminal state and print something to console if necessary
     fn cleanup(&mut self) -> anyhow::Result<()> {
         if self.config.features.enable_github_notification {
             let options = self.components.github.notifications.filter_options();
@@ -296,8 +294,8 @@ impl Application {
         Ok(())
     }
 
-    async fn shutdown_local_api(&mut self) {
-        self.drivers.shutdown().await;
+    fn shutdown_drivers(&mut self) {
+        self.drivers.shutdown();
     }
 
     async fn event_loop<S>(&mut self, input: &mut S)

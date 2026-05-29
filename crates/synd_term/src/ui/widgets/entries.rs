@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
+use synd_client::payload;
+
 use crate::{
     application::{Direction, Populate},
-    client::synd_api::payload,
-    types::{self, RequirementExt, TimeExt},
+    types::{EntryExt, RequirementExt, TimeExt},
     ui::{
         self, Context, icon,
         widgets::{collections::FilterableVec, filter::FeedFilterer},
@@ -20,7 +21,7 @@ use synd_feed::types::FeedUrl;
 
 #[allow(clippy::struct_field_names)]
 pub(crate) struct EntriesWidget {
-    entries: FilterableVec<types::Entry, FeedFilterer>,
+    entries: FilterableVec<payload::Entry, FeedFilterer>,
 }
 
 impl EntriesWidget {
@@ -62,7 +63,7 @@ impl EntriesWidget {
     }
 
     pub(crate) fn remove_unsubscribed_entries(&mut self, url: &FeedUrl) {
-        self.entries.retain(|entry| &entry.feed_url != url);
+        self.entries.retain(|entry| &entry.feed.url != url);
     }
 
     pub(crate) fn move_selection(&mut self, direction: Direction) {
@@ -77,7 +78,7 @@ impl EntriesWidget {
         self.entries.move_last();
     }
 
-    pub(crate) fn entries(&self) -> &[types::Entry] {
+    pub(crate) fn entries(&self) -> &[payload::Entry] {
         self.entries.as_unfiltered_slice()
     }
 
@@ -87,7 +88,7 @@ impl EntriesWidget {
             .and_then(|entry| entry.website_url.as_deref())
     }
 
-    fn selected_entry(&self) -> Option<&types::Entry> {
+    fn selected_entry(&self) -> Option<&payload::Entry> {
         self.entries.selected()
     }
 }
@@ -166,7 +167,7 @@ impl EntriesWidget {
             Constraint::Length(4),
         ];
 
-        let row = |entry: &'a types::Entry| {
+        let row = |entry: &'a payload::Entry| {
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let published = entry
                 .published
@@ -179,7 +180,7 @@ impl EntriesWidget {
                 .icon(category)
                 .unwrap_or_else(|| ui::default_icon());
 
-            let feed_title = entry.feed_title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
+            let feed_title = entry.feed.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let requirement = entry.requirement().label(&cx.theme.requirement);
 
             Row::new([

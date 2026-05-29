@@ -259,11 +259,11 @@ impl AppComponent {
 
 #[cfg(test)]
 mod tests {
+    use synd_client::payload;
     use synd_feed::types::FeedUrl;
 
     use crate::{
         application::{Features, Populate},
-        client::synd_api::payload,
         command::FeedsCommand,
         config::Categories,
         operation::Operation,

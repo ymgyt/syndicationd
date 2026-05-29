@@ -1,7 +1,8 @@
+use synd_client::payload;
+
 use crate::{
     application::{Populate, RequestSequence, input_parser::InputParser},
     auth::AuthenticationProvider,
-    client::synd_api::payload,
     event::{FeedsApiEvent, GitHubApiEvent},
     operation::Operation,
     ui::widgets::filter::Filterer,
@@ -560,7 +561,7 @@ mod tests {
         )
     }
 
-    fn entry(index: usize) -> crate::types::Entry {
+    fn entry(index: usize) -> payload::Entry {
         payload::Entry {
             title: Some(format!("entry-{index}")),
             published: None,
@@ -574,7 +575,6 @@ mod tests {
                 category: None,
             },
         }
-        .into()
     }
 
     fn entries_payload(entry_count: usize, has_next_page: bool) -> payload::FetchEntriesPayload {

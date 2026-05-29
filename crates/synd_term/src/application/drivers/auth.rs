@@ -1,6 +1,7 @@
 use std::ops::Sub;
 
 use futures_util::FutureExt;
+use synd_client::ApiCredential;
 
 use crate::{
     application::RequestId,
@@ -16,7 +17,10 @@ pub(super) struct AuthDriver;
 impl AuthDriver {
     pub(super) fn set_credential(cx: &mut DriverContext<'_>, cred: Verified<Credential>) {
         Self::schedule_credential_refreshing(cx, &cred);
-        cx.adapters.client.set_credential(cred);
+        cx.adapters
+            .client
+            .set_credential(cred.into())
+            .expect("credential value must be a valid HTTP header");
     }
 
     pub(super) fn start_device_flow(
@@ -105,6 +109,15 @@ impl AuthDriver {
                 .boxed();
                 cx.runtime.push_background_job(fut);
             }
+        }
+    }
+}
+
+impl From<Verified<Credential>> for ApiCredential {
+    fn from(cred: Verified<Credential>) -> Self {
+        match cred.into_inner() {
+            Credential::Github { access_token } => Self::Github { access_token },
+            Credential::Google { id_token, .. } => Self::Google { id_token },
         }
     }
 }

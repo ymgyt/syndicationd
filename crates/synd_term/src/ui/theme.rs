@@ -73,6 +73,10 @@ pub struct Palette {
 }
 
 impl Palette {
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
     pub fn dracula() -> Self {
         Self {
             name: "dracula",

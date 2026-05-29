@@ -28,7 +28,7 @@ pub(crate) enum RequestId {
     UnsubscribeGithubThread,
 }
 
-/// Mangae in flight requests state
+/// Manage in flight requests state
 pub struct InFlight {
     next_request_sequence: AtomicU64,
     in_flights: HashMap<RequestSequence, InFlightEntry>,

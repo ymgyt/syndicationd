@@ -1,8 +1,7 @@
 use std::time::Duration;
 
+use synd_client::{Client, payload};
 use tokio::{sync::mpsc, task::JoinHandle};
-
-use crate::client::synd_api::{Client, payload};
 
 use super::DriverContext;
 

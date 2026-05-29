@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use futures_util::FutureExt;
+use synd_client::payload;
 use synd_feed::types::FeedUrl;
 
 use crate::{
@@ -8,7 +9,6 @@ use crate::{
         FEED_REFRESH_POLL_INTERVAL, FEED_VIEW_SYNC_INTERVAL, Populate, RequestId,
         TIMELINE_INVALIDATION_DEBOUNCE,
     },
-    client::synd_api::payload,
     event::{ApiEvent, Event, FeedsApiEvent},
 };
 

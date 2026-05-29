@@ -1,3 +1,5 @@
+use synd_client::payload;
+
 use crate::{
     matcher::Matcher,
     types::{self, github::Notification},
@@ -15,14 +17,14 @@ impl MatcherFilterer {
     }
 }
 
-impl Filterable<types::Entry> for MatcherFilterer {
-    fn filter(&self, entry: &types::Entry) -> super::FilterResult {
+impl Filterable<payload::Entry> for MatcherFilterer {
+    fn filter(&self, entry: &payload::Entry) -> super::FilterResult {
         if self
             .matcher
             .r#match(entry.title.as_deref().unwrap_or_default())
             || self
                 .matcher
-                .r#match(entry.feed_title.as_deref().unwrap_or_default())
+                .r#match(entry.feed.title.as_deref().unwrap_or_default())
         {
             FilterResult::Use
         } else {

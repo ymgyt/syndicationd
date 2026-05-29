@@ -10,12 +10,12 @@ use ratatui::{
         Tabs as RatatuiTabs, Widget,
     },
 };
+use synd_client::payload::{self, SubscriptionPayload};
 use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::{Direction, Populate},
-    client::synd_api::payload::SubscriptionPayload,
-    types::{self, EntryMeta, Feed, RequirementExt, TimeExt},
+    types::{self, EntryMeta, EntryMetaExt, Feed, RefreshStatusStateExt, RequirementExt, TimeExt},
     ui::{
         self, Context,
         extension::RectExt,
@@ -73,11 +73,7 @@ impl SubscriptionWidget {
         self.feeds.selected()
     }
 
-    pub(crate) fn update_refresh_status(
-        &mut self,
-        url: &FeedUrl,
-        status: &types::FeedRefreshStatus,
-    ) {
+    pub(crate) fn update_refresh_status(&mut self, url: &FeedUrl, status: &payload::RefreshStatus) {
         self.feeds.with_mut(|feed| {
             if &feed.url == url {
                 feed.refresh_status = status.clone();

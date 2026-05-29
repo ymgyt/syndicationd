@@ -1,17 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
+use synd_client::payload;
 use synd_feed::types::FeedUrl;
+use url::Url;
 
 use crate::{
-    client::synd_api::payload,
     operation::Operation,
-    types::FeedRefreshStatus,
     ui::widgets::{
         entries::EntriesWidget,
         subscription::{SubscriptionWidget, UnsubscribeSelection},
     },
 };
-use url::Url;
 
 use super::super::{
     Direction, FeedRefreshPollKey, Populate, RequestSequence, TimelineInvalidationState,
@@ -181,7 +180,7 @@ impl FeedsComponent {
             return None;
         }
 
-        let refresh_status = FeedRefreshStatus::from_refresh_receipt(&payload);
+        let refresh_status = payload::RefreshStatus::from(&payload);
         self.subscription
             .update_refresh_status(&url, &refresh_status);
 
@@ -209,7 +208,7 @@ impl FeedsComponent {
             return None;
         }
 
-        let refresh_status = FeedRefreshStatus::from(status);
+        let refresh_status = status;
         let current_request_id = refresh_status.request_id.clone();
         let is_current_request = current_request_id.as_deref() == Some(request_id.as_str());
         let is_active = refresh_status.is_active();
@@ -591,7 +590,7 @@ mod tests {
         assert_eq!(remaining, expected_remaining);
     }
 
-    fn assert_schedule_timeline_reload(operation: Option<Operation>) {
+    fn assert_schedule_timeline_reload(operation: Option<&Operation>) {
         assert!(matches!(operation, Some(Operation::ScheduleTimelineReload)));
     }
 
@@ -704,12 +703,12 @@ mod tests {
     fn timeline_change_while_refetching_schedules_another_reload_on_completion() {
         let mut timeline = TimelineInvalidation::new();
 
-        assert_schedule_timeline_reload(timeline.mark_dirty());
+        assert_schedule_timeline_reload(timeline.mark_dirty().as_ref());
         assert!(timeline.should_refetch());
         timeline.start_refetch(1);
         assert!(timeline.mark_dirty().is_none());
 
-        assert_schedule_timeline_reload(timeline.complete_refetch(1));
+        assert_schedule_timeline_reload(timeline.complete_refetch(1).as_ref());
         assert!(timeline.should_refetch());
     }
 
@@ -717,10 +716,10 @@ mod tests {
     fn timeline_refetch_failure_reschedules_reload() {
         let mut timeline = TimelineInvalidation::new();
 
-        assert_schedule_timeline_reload(timeline.mark_dirty());
+        assert_schedule_timeline_reload(timeline.mark_dirty().as_ref());
         timeline.start_refetch(1);
 
-        assert_schedule_timeline_reload(timeline.fail_refetch(1));
+        assert_schedule_timeline_reload(timeline.fail_refetch(1).as_ref());
         assert!(timeline.should_refetch());
     }
 
@@ -728,7 +727,7 @@ mod tests {
     fn timeline_refetch_ignores_unrelated_request() {
         let mut timeline = TimelineInvalidation::new();
 
-        assert_schedule_timeline_reload(timeline.mark_dirty());
+        assert_schedule_timeline_reload(timeline.mark_dirty().as_ref());
         timeline.start_refetch(1);
 
         assert!(timeline.complete_refetch(2).is_none());

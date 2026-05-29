@@ -9,6 +9,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Padding, Widget},
 };
+use synd_client::payload;
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
@@ -19,7 +20,7 @@ use crate::{
     keymap::{KeyTrie, Keymap},
     matcher::Matcher,
     types::{
-        self, RequirementExt,
+        EntryExt, RequirementExt,
         github::{PullRequestState, Reason, RepoVisibility},
     },
     ui::{
@@ -273,12 +274,12 @@ impl FilterWidget {
         &mut self,
         config: &Categories,
         populate: Populate,
-        entries: &[types::Entry],
+        entries: &[payload::Entry],
     ) {
         self.feed.categories_state.update(
             config,
             populate,
-            entries.iter().map(types::Entry::category).cloned(),
+            entries.iter().map(EntryExt::category).cloned(),
         );
     }
 

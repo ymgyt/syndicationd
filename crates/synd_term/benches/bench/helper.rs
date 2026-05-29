@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use ratatui::backend::TestBackend;
+use synd_client::{Client, ClientOptions};
 use synd_term::{
     application::{Application, Cache, Config},
-    client::synd_api::Client,
     config::Categories,
     interact::mock::MockInteractor,
     terminal::Terminal,
@@ -21,7 +21,7 @@ pub fn init_app() -> Application {
     let client = {
         Client::new(
             Url::parse("http://dummy.ymgyt.io").unwrap(),
-            Duration::from_secs(10),
+            ClientOptions::new(Duration::from_secs(10), "synd-term-bench"),
         )
         .unwrap()
     };
