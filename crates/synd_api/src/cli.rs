@@ -1,7 +1,7 @@
 use std::{ffi::OsString, net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
 use clap::{ArgAction, Parser};
-use synd_registry::RefreshInterval;
+use synd_registry::legacy::model::RefreshInterval;
 use synd_support::time::humantime;
 
 use crate::{

@@ -9,6 +9,7 @@ mod subscription;
 pub(crate) use subscription::RegistrySubscription;
 
 use crate::{dependency::AppFeedRegistry, principal::Principal};
+use synd_registry::SubscriberId;
 
 pub(crate) mod object;
 pub(crate) mod scalar;
@@ -89,9 +90,7 @@ pub(crate) fn registry<'a>(cx: &'a async_graphql::Context<'_>) -> &'a AppFeedReg
     cx.data_unchecked::<AppFeedRegistry>()
 }
 
-pub(crate) fn user_id(cx: &async_graphql::Context<'_>) -> async_graphql::Result<String> {
-    principal(cx)
-        .user_id()
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| async_graphql::Error::new("principal has no user id"))
+pub(crate) fn subscriber_id(cx: &async_graphql::Context<'_>) -> SubscriberId {
+    let principal = principal(cx);
+    SubscriberId::new(principal.principal_id())
 }

@@ -9,10 +9,13 @@ pub enum Principal {
 }
 
 impl Principal {
-    #[allow(clippy::unnecessary_wraps)]
-    pub fn user_id(&self) -> Option<&str> {
+    /// Stable identity of the authenticated principal in the API layer.
+    ///
+    /// Registry-facing code must convert this into a registry `SubscriberId`
+    /// at the API boundary instead of passing `Principal` through.
+    pub fn principal_id(&self) -> &str {
         match self {
-            Principal::User(User { id, .. }) => Some(id.as_str()),
+            Principal::User(User { id, .. }) => id.as_str(),
         }
     }
 }

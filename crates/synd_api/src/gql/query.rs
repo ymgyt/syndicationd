@@ -5,14 +5,15 @@ use async_graphql::{
     connection::{Connection, Edge},
 };
 use synd_feed::types::{Annotated, Category, FeedUrl, Requirement};
-use synd_registry::{
-    EntryCursor, FeedStatusQuery, ListEntriesQuery, ListSubscriptionsQuery, RefreshSchedule,
-    RefreshStatusKind, SubscriberId,
+use synd_registry::legacy::model::{
+    EntryCursor, FeedStatusQuery, FeedSubscription, FeedSubscriptionView, ListEntriesQuery,
+    ListSubscriptionsQuery, RefreshPolicy as RegistryRefreshPolicy, RefreshSchedule,
+    RefreshStatus as RegistryRefreshStatus, RefreshStatusKind,
 };
 
 use crate::gql::{
     object::{self, Entry},
-    registry, user_id,
+    registry, subscriber_id,
 };
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
@@ -46,8 +47,8 @@ struct RefreshStatus {
     last_error_message: Option<String>,
 }
 
-impl From<synd_registry::RefreshStatus> for RefreshStatus {
-    fn from(value: synd_registry::RefreshStatus) -> Self {
+impl From<RegistryRefreshStatus> for RefreshStatus {
+    fn from(value: RegistryRefreshStatus) -> Self {
         Self {
             state: value.kind.into(),
             request_id: value.active_request_id.map(|id| id.to_string()),
@@ -71,8 +72,8 @@ struct RefreshPolicy {
     interval_seconds: Option<i64>,
 }
 
-impl From<synd_registry::RefreshPolicy> for RefreshPolicy {
-    fn from(value: synd_registry::RefreshPolicy) -> Self {
+impl From<RegistryRefreshPolicy> for RefreshPolicy {
+    fn from(value: RegistryRefreshPolicy) -> Self {
         match value.schedule {
             RefreshSchedule::Manual => Self {
                 kind: RefreshPolicyKind::Manual,
@@ -87,7 +88,7 @@ impl From<synd_registry::RefreshPolicy> for RefreshPolicy {
 }
 
 struct SubscribedFeed {
-    subscription: synd_registry::FeedSubscription,
+    subscription: FeedSubscription,
     feed: Option<object::Feed>,
     refresh_status: RefreshStatus,
 }
@@ -119,8 +120,8 @@ impl SubscribedFeed {
     }
 }
 
-impl From<synd_registry::FeedSubscriptionView> for SubscribedFeed {
-    fn from(value: synd_registry::FeedSubscriptionView) -> Self {
+impl From<FeedSubscriptionView> for SubscribedFeed {
+    fn from(value: FeedSubscriptionView) -> Self {
         let annotations = Annotated {
             feed: (),
             requirement: value.subscription.requirement,
@@ -167,7 +168,7 @@ impl Subscription {
     async fn feed_status(&self, cx: &Context<'_>, url: FeedUrl) -> Result<RefreshStatus> {
         registry(cx)
             .feed_status(FeedStatusQuery {
-                subscriber_id: SubscriberId::new(user_id(cx)?),
+                subscriber_id: subscriber_id(cx),
                 feed_url: url,
             })
             .await
@@ -229,7 +230,7 @@ async fn subscriptions_connection(
     let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
     let page = registry(cx)
         .list_subscriptions(ListSubscriptionsQuery {
-            subscriber_id: SubscriberId::new(user_id(cx)?),
+            subscriber_id: subscriber_id(cx),
             after,
             first,
         })
@@ -260,7 +261,7 @@ async fn timeline_entries_connection<'cx>(
         .map_err(|err| async_graphql::Error::new(err.to_string()))?;
     let page = registry(cx)
         .list_entries(ListEntriesQuery {
-            subscriber_id: SubscriberId::new(user_id(cx)?),
+            subscriber_id: subscriber_id(cx),
             after,
             first,
         })

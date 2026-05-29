@@ -200,7 +200,7 @@ mod tests {
         let authenticator = Authenticator::local("secret").unwrap();
         let principal = authenticator.authenticate("Bearer secret").await.unwrap();
 
-        assert_eq!(principal.user_id(), Some("local"));
+        assert_eq!(principal.principal_id(), "local");
     }
 
     #[tokio::test]

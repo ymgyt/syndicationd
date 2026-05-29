@@ -3,10 +3,16 @@ use std::env;
 use anyhow::Context;
 use axum_server::tls_rustls::RustlsConfig;
 use synd_feed::feed::service::FeedService;
-use synd_persistence::sqlite::SqliteFeedRegistryStore;
+use synd_persistence::sqlite::{SqliteEventJournal, SqliteFeedRegistryDb};
 use synd_registry::{
-    FeedRegistry, FeedRegistryConfig, RefreshExecutor, RefreshExecutorHandle,
-    RegistryEventPublisher, provider::SyndFeedProvider,
+    FeedRegistry,
+    consumers::Consumers,
+    crawl::target_list::CrawlTargetListProj,
+    event::{EventRuntime, RegistryNotificationPublisher},
+    legacy::{
+        RefreshExecutor, RefreshExecutorHandle, SyndFeedProvider,
+        model::{FeedRegistryConfig, ReconcileTrigger},
+    },
 };
 use tokio_util::sync::CancellationToken;
 
@@ -17,7 +23,9 @@ use crate::{
     serve::{ServeOptions, auth::Authenticator},
 };
 
-pub type AppFeedRegistry = FeedRegistry<SqliteFeedRegistryStore, SyndFeedProvider>;
+pub type AppFeedRegistry = FeedRegistry<SqliteFeedRegistryDb, SyndFeedProvider, AppEventRuntime>;
+
+type AppEventRuntime = EventRuntime<SqliteEventJournal, Consumers>;
 
 pub struct Dependency {
     pub authenticator: Authenticator,
@@ -29,7 +37,7 @@ pub struct Dependency {
 
 impl Dependency {
     pub async fn new(
-        store: SqliteFeedRegistryStore,
+        db: SqliteFeedRegistryDb,
         tls: TlsOptions,
         serve_options: cli::ServeOptions,
         local: LocalOptions,
@@ -64,7 +72,7 @@ impl Dependency {
         };
 
         Ok(Self::build(
-            store,
+            db,
             serve_options,
             feed_refresh,
             ct,
@@ -75,19 +83,19 @@ impl Dependency {
     }
 
     pub async fn new_local(
-        store: SqliteFeedRegistryStore,
+        db: SqliteFeedRegistryDb,
         serve_options: cli::ServeOptions,
         feed_refresh: FeedRefreshOptions,
         ct: CancellationToken,
         token: String,
     ) -> anyhow::Result<Self> {
         let authenticator = Authenticator::local(token)?;
-        Ok(Self::build(store, serve_options, feed_refresh, ct, authenticator, None).await)
+        Ok(Self::build(db, serve_options, feed_refresh, ct, authenticator, None).await)
     }
 
     #[allow(clippy::needless_pass_by_value)]
     async fn build(
-        store: SqliteFeedRegistryStore,
+        db: SqliteFeedRegistryDb,
         serve_options: cli::ServeOptions,
         feed_refresh: FeedRefreshOptions,
         ct: CancellationToken,
@@ -106,24 +114,29 @@ impl Dependency {
         let provider =
             SyndFeedProvider::new(FeedService::new(config::USER_AGENT, 10 * 1024 * 1024));
         let executor_handle = RefreshExecutorHandle::new();
-        let events = RegistryEventPublisher::default();
-        let registry = FeedRegistry::with_events(
-            store.clone(),
+        let notifications = RegistryNotificationPublisher::default();
+        let event_runtime = EventRuntime::with_consumers(
+            db.event_journal(),
+            Consumers::new(CrawlTargetListProj::new()),
+        );
+        let registry = FeedRegistry::with_event_runtime(
+            db.clone(),
             provider.clone(),
             executor_handle.clone(),
             registry_config,
-            events.clone(),
+            notifications.clone(),
+            event_runtime,
         );
-        let executor = RefreshExecutor::with_events(
-            store.clone(),
+        let executor = RefreshExecutor::with_notifications(
+            db.clone(),
             provider,
             executor_handle,
             registry_config,
-            events,
+            notifications,
         );
         tokio::spawn(executor.run(ct.clone()));
         let _ = registry
-            .reconcile_now(synd_registry::ReconcileTrigger::Startup)
+            .reconcile_now(ReconcileTrigger::Startup)
             .await
             .inspect_err(|err| tracing::warn!("startup feed reconcile failed: {err}"));
         spawn_scheduler(registry.clone(), registry_config, ct);
@@ -154,7 +167,7 @@ fn spawn_scheduler(registry: AppFeedRegistry, config: FeedRegistryConfig, ct: Ca
                 () = ct.cancelled() => break,
                 _ = interval.tick() => {
                     if let Err(err) = registry
-                        .reconcile_now(synd_registry::ReconcileTrigger::ScheduledTick)
+                        .reconcile_now(ReconcileTrigger::ScheduledTick)
                         .await
                     {
                         tracing::warn!("scheduled feed reconcile failed: {err}");

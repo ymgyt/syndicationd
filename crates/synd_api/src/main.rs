@@ -15,7 +15,7 @@ use synd_api::{
     serve::listen_and_serve,
     shutdown::Shutdown,
 };
-use synd_persistence::sqlite::SqliteFeedRegistryStore;
+use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 
 fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let ObservabilityOptions {
@@ -50,8 +50,9 @@ async fn run(
     }: Args,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
-    let db = SqliteFeedRegistryStore::create_or_open(sqlite.sqlite_db).await?;
+    let db = SqliteDatabase::create_or_open(sqlite.sqlite_db).await?;
     db.migrate().await?;
+    let db = SqliteFeedRegistryDb::new(db);
     let dep = Dependency::new(
         db,
         tls,

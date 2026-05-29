@@ -1,12 +1,11 @@
 use async_graphql::{Context, Enum, Error, InputObject, Object, SimpleObject};
 use synd_feed::types::{Category, FeedUrl, Requirement};
-use synd_registry::{
+use synd_registry::legacy::model::{
     InitialRefreshMode, RefreshInterval, RefreshPolicy, RefreshRequestDisposition, RefreshSchedule,
-    RequestRefreshCommand, SubscribeFeedCommand, SubscribeFeedRefresh, SubscriberId,
-    UnsubscribeFeedCommand,
+    RequestRefreshCommand, SubscribeFeedCommand, SubscribeFeedRefresh, UnsubscribeFeedCommand,
 };
 
-use crate::gql::{registry, user_id};
+use crate::gql::{registry, subscriber_id};
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum ResponseCode {
@@ -156,7 +155,7 @@ impl Mutation {
         cx: &Context<'_>,
         input: SubscribeFeedInput,
     ) -> async_graphql::Result<SubscribeFeedPayload> {
-        let subscriber_id = SubscriberId::new(user_id(cx)?);
+        let subscriber_id = subscriber_id(cx);
         let refresh_policy = match input.refresh_policy {
             Some(policy) => policy.into_policy()?,
             None => registry(cx).default_refresh_policy(),
@@ -198,7 +197,7 @@ impl Mutation {
     ) -> async_graphql::Result<UnsubscribeFeedPayload> {
         registry(cx)
             .unsubscribe(UnsubscribeFeedCommand {
-                subscriber_id: SubscriberId::new(user_id(cx)?),
+                subscriber_id: subscriber_id(cx),
                 feed_url: input.url,
             })
             .await?;
@@ -215,7 +214,7 @@ impl Mutation {
     ) -> async_graphql::Result<RefreshFeedPayload> {
         let out = registry(cx)
             .request_refresh(RequestRefreshCommand {
-                subscriber_id: SubscriberId::new(user_id(cx)?),
+                subscriber_id: subscriber_id(cx),
                 feed_url: input.url,
             })
             .await?;

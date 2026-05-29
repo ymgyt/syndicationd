@@ -1,9 +1,11 @@
 use async_graphql::{Context, Result, SimpleObject, Subscription};
 use futures_util::{Stream, stream};
 use synd_feed::types::FeedUrl;
-use synd_registry::{AffectedFeeds, RegistryEvent, RegistryEventRecvError, TimelineChanged};
+use synd_registry::event::{
+    AffectedFeeds, RegistryNotification, RegistryNotificationRecvError, TimelineChanged,
+};
 
-use crate::gql::{registry, user_id};
+use crate::gql::{registry, subscriber_id};
 
 pub(crate) struct RegistrySubscription;
 
@@ -35,19 +37,21 @@ impl RegistrySubscription {
         &self,
         cx: &Context<'_>,
     ) -> Result<impl Stream<Item = Result<TimelineChangedEvent>>> {
-        let _subscriber_id = user_id(cx)?;
-        let subscriber = registry(cx).subscribe_events();
+        let _subscriber_id = subscriber_id(cx);
+        let subscriber = registry(cx).subscribe_notifications();
 
         Ok(stream::unfold(subscriber, |mut subscriber| async move {
             match subscriber.recv().await {
-                Ok(RegistryEvent::TimelineChanged(event)) => Some((Ok(event.into()), subscriber)),
-                Err(RegistryEventRecvError::Lagged(skipped)) => Some((
+                Ok(RegistryNotification::TimelineChanged(event)) => {
+                    Some((Ok(event.into()), subscriber))
+                }
+                Err(RegistryNotificationRecvError::Lagged(skipped)) => Some((
                     Err(async_graphql::Error::new(format!(
                         "registry event stream lagged by {skipped} messages"
                     ))),
                     subscriber,
                 )),
-                Err(RegistryEventRecvError::Closed) => None,
+                Err(RegistryNotificationRecvError::Closed) => None,
             }
         }))
     }
