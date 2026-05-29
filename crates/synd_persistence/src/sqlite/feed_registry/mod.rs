@@ -1,67 +1,52 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
-use std::path::Path;
-
 use sqlx::{Row, Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedRegistryStore, RegistryTransaction, StoreError, StoreResult,
-    model::{
+    FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryDbTransaction,
+    event::RegistryEvent,
+    legacy::model::{
         FeedSnapshot, FeedSubscription, FeedSubscriptionPage, ListSubscriptionsQuery,
         RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess, SubscriberId,
     },
 };
 
 use self::codec::{decode_refresh_state, decode_snapshot, decode_subscription, encode_policy};
-use super::SqliteDatabase;
+use super::event_journal::encode_event;
+use super::{SqliteDatabase, SqliteEventJournal};
 
 mod codec;
 
 #[derive(Clone)]
-pub struct SqliteFeedRegistryStore {
+pub struct SqliteFeedRegistryDb {
     db: SqliteDatabase,
 }
 
-pub struct SqliteRegistryTransaction<'a> {
+pub struct SqliteRegistryDbTransaction<'a> {
     tx: Transaction<'a, Sqlite>,
 }
 
-impl SqliteFeedRegistryStore {
-    pub async fn open(db_path: impl AsRef<Path>) -> Result<Self, StoreError> {
-        SqliteDatabase::open(db_path).await.map(Self::from_database)
-    }
-
-    pub async fn create_or_open(db_path: impl AsRef<Path>) -> Result<Self, StoreError> {
-        SqliteDatabase::create_or_open(db_path)
-            .await
-            .map(Self::from_database)
-    }
-
-    pub async fn migrate(&self) -> Result<(), StoreError> {
-        self.db.migrate().await
-    }
-
-    pub fn from_database(db: SqliteDatabase) -> Self {
+impl SqliteFeedRegistryDb {
+    pub fn new(db: SqliteDatabase) -> Self {
         Self { db }
     }
 
-    #[cfg(test)]
-    pub async fn in_memory() -> Result<Self, StoreError> {
-        SqliteDatabase::in_memory().await.map(Self::from_database)
+    pub fn event_journal(&self) -> SqliteEventJournal {
+        SqliteEventJournal::new(self.db.clone())
     }
 }
 
-impl FeedRegistryStore for SqliteFeedRegistryStore {
-    type Tx<'a> = SqliteRegistryTransaction<'a>;
+impl FeedRegistryDb for SqliteFeedRegistryDb {
+    type Tx<'a> = SqliteRegistryDbTransaction<'a>;
 
-    async fn begin(&self) -> Result<Self::Tx<'_>, StoreError> {
+    async fn begin(&self) -> Result<Self::Tx<'_>, RegistryDbError> {
         let tx = self.db.begin().await?;
-        Ok(SqliteRegistryTransaction { tx })
+        Ok(SqliteRegistryDbTransaction { tx })
     }
 }
 
-impl SqliteRegistryTransaction<'_> {
-    async fn upsert_snapshot(&mut self, snapshot: FeedSnapshot) -> StoreResult<()> {
+impl SqliteRegistryDbTransaction<'_> {
+    async fn upsert_snapshot(&mut self, snapshot: FeedSnapshot) -> RegistryDbResult<()> {
         sqlx::query(
             r#"
             INSERT INTO feed_snapshot (
@@ -93,14 +78,34 @@ impl SqliteRegistryTransaction<'_> {
         .bind(snapshot.feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
 }
 
-impl RegistryTransaction for SqliteRegistryTransaction<'_> {
-    async fn upsert_subscription(&mut self, subscription: FeedSubscription) -> StoreResult<()> {
+impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
+    async fn append_event(&mut self, event: RegistryEvent) -> RegistryDbResult<()> {
+        let encoded = encode_event(&event).map_err(RegistryDbError::internal)?;
+        sqlx::query(
+            r"
+            INSERT INTO event_journal (event_type, payload_json)
+            VALUES (?, ?)
+            ",
+        )
+        .bind(encoded.event_type)
+        .bind(encoded.payload_json)
+        .execute(&mut *self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        Ok(())
+    }
+
+    async fn upsert_subscription(
+        &mut self,
+        subscription: FeedSubscription,
+    ) -> RegistryDbResult<()> {
         let requirement = subscription.requirement.map(|r| r.to_string());
         let category = subscription.category.map(|c| c.to_string());
         let (policy_kind, interval_seconds) = encode_policy(subscription.refresh_policy);
@@ -136,7 +141,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(subscription.updated_at)
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
@@ -145,7 +150,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
-    ) -> StoreResult<()> {
+    ) -> RegistryDbResult<()> {
         sqlx::query(
             r#"
             DELETE FROM feed_subscription
@@ -156,7 +161,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
@@ -165,7 +170,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
-    ) -> StoreResult<bool> {
+    ) -> RegistryDbResult<bool> {
         let row = sqlx::query(
             r#"
             SELECT 1 AS found
@@ -178,7 +183,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(feed_url.as_str())
         .fetch_optional(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(row.is_some())
     }
@@ -186,7 +191,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
     async fn list_subscriptions(
         &mut self,
         query: ListSubscriptionsQuery,
-    ) -> StoreResult<FeedSubscriptionPage> {
+    ) -> RegistryDbResult<FeedSubscriptionPage> {
         let first = i64::try_from(query.first.saturating_add(1)).unwrap_or(i64::MAX);
         let rows = if let Some(after) = query.after {
             sqlx::query(
@@ -234,12 +239,12 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
             .fetch_all(&mut *self.tx)
             .await
         }
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         let mut nodes = rows
             .iter()
             .map(decode_subscription)
-            .collect::<StoreResult<Vec<_>>>()?;
+            .collect::<RegistryDbResult<Vec<_>>>()?;
         let has_next_page = nodes.len() > query.first;
         if has_next_page {
             nodes.truncate(query.first);
@@ -253,7 +258,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         })
     }
 
-    async fn list_active_subscriptions(&mut self) -> StoreResult<Vec<FeedSubscription>> {
+    async fn list_active_subscriptions(&mut self) -> RegistryDbResult<Vec<FeedSubscription>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -271,7 +276,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         )
         .fetch_all(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         rows.iter().map(decode_subscription).collect()
     }
@@ -279,7 +284,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
     async fn list_active_subscriptions_for_feed(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> StoreResult<Vec<FeedSubscription>> {
+    ) -> RegistryDbResult<Vec<FeedSubscription>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -299,7 +304,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(feed_url.as_str())
         .fetch_all(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         rows.iter().map(decode_subscription).collect()
     }
@@ -307,7 +312,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
     async fn list_subscriptions_for_subscriber(
         &mut self,
         subscriber_id: &SubscriberId,
-    ) -> StoreResult<Vec<FeedSubscription>> {
+    ) -> RegistryDbResult<Vec<FeedSubscription>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -327,12 +332,12 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(subscriber_id.as_str())
         .fetch_all(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         rows.iter().map(decode_subscription).collect()
     }
 
-    async fn list_active_feed_urls(&mut self) -> StoreResult<Vec<FeedUrl>> {
+    async fn list_active_feed_urls(&mut self) -> RegistryDbResult<Vec<FeedUrl>> {
         let rows = sqlx::query(
             r#"
             SELECT DISTINCT feed_url
@@ -342,17 +347,20 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         )
         .fetch_all(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         rows.into_iter()
             .map(|row| {
-                let url: String = row.try_get("feed_url").map_err(StoreError::internal)?;
-                FeedUrl::parse(&url).map_err(StoreError::internal)
+                let url: String = row.try_get("feed_url").map_err(RegistryDbError::internal)?;
+                FeedUrl::parse(&url).map_err(RegistryDbError::internal)
             })
             .collect()
     }
 
-    async fn load_snapshots(&mut self, feed_urls: &[FeedUrl]) -> StoreResult<Vec<FeedSnapshot>> {
+    async fn load_snapshots(
+        &mut self,
+        feed_urls: &[FeedUrl],
+    ) -> RegistryDbResult<Vec<FeedSnapshot>> {
         let mut snapshots = Vec::new();
         for feed_url in feed_urls {
             if let Some(row) = sqlx::query(
@@ -365,7 +373,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
             .bind(feed_url.as_str())
             .fetch_optional(&mut *self.tx)
             .await
-            .map_err(StoreError::internal)?
+            .map_err(RegistryDbError::internal)?
             {
                 snapshots.push(decode_snapshot(&row)?);
             }
@@ -376,7 +384,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
     async fn load_refresh_states(
         &mut self,
         feed_urls: &[FeedUrl],
-    ) -> StoreResult<Vec<RefreshState>> {
+    ) -> RegistryDbResult<Vec<RefreshState>> {
         let mut states = Vec::new();
         for feed_url in feed_urls {
             if let Some(row) = sqlx::query(
@@ -396,7 +404,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
             .bind(feed_url.as_str())
             .fetch_optional(&mut *self.tx)
             .await
-            .map_err(StoreError::internal)?
+            .map_err(RegistryDbError::internal)?
             {
                 states.push(decode_refresh_state(&row)?);
             }
@@ -404,7 +412,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         Ok(states)
     }
 
-    async fn delete_feed_state(&mut self, feed_url: &FeedUrl) -> StoreResult<()> {
+    async fn delete_feed_state(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<()> {
         sqlx::query(
             r#"
             DELETE FROM feed_refresh_state
@@ -414,7 +422,7 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         sqlx::query(
             r#"
@@ -425,12 +433,12 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
 
-    async fn record_refresh_started(&mut self, event: RefreshStarted) -> StoreResult<()> {
+    async fn record_refresh_started(&mut self, event: RefreshStarted) -> RegistryDbResult<()> {
         sqlx::query(
             r#"
             INSERT INTO feed_refresh_state (feed_url, last_attempt_at)
@@ -447,12 +455,12 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(event.feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
 
-    async fn record_refresh_succeeded(&mut self, result: RefreshSuccess) -> StoreResult<()> {
+    async fn record_refresh_succeeded(&mut self, result: RefreshSuccess) -> RegistryDbResult<()> {
         let feed_url = result.snapshot.feed_url.clone();
         self.upsert_snapshot(result.snapshot).await?;
 
@@ -485,12 +493,12 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
 
-    async fn record_refresh_failed(&mut self, result: RefreshFailure) -> StoreResult<()> {
+    async fn record_refresh_failed(&mut self, result: RefreshFailure) -> RegistryDbResult<()> {
         sqlx::query(
             r#"
             INSERT INTO feed_refresh_state (
@@ -522,13 +530,13 @@ impl RegistryTransaction for SqliteRegistryTransaction<'_> {
         .bind(result.feed_url.as_str())
         .execute(&mut *self.tx)
         .await
-        .map_err(StoreError::internal)?;
+        .map_err(RegistryDbError::internal)?;
 
         Ok(())
     }
 
-    async fn commit(self) -> StoreResult<()> {
-        self.tx.commit().await.map_err(StoreError::internal)
+    async fn commit(self) -> RegistryDbResult<()> {
+        self.tx.commit().await.map_err(RegistryDbError::internal)
     }
 }
 
@@ -542,11 +550,18 @@ mod tests {
         types::{Feed, FeedUrl},
     };
     use synd_registry::{
-        FeedProvider, FeedProviderError, FeedRegistry, FeedRegistryConfig, FetchedFeed,
-        RefreshExecutorHandle,
-        model::{
-            InitialRefreshMode, RefreshErrorKind, RefreshInterval, RefreshPolicy,
-            RefreshStatusKind, SubscribeFeedCommand, SubscribeFeedRefresh, UnsubscribeFeedCommand,
+        FeedRegistry,
+        event::{
+            EventConsumerId, EventJournal, EventReadFilter, EventRuntime, RegistryEventKind,
+            RegistryNotificationPublisher,
+        },
+        legacy::{
+            FeedProvider, FeedProviderError, FetchedFeed, RefreshExecutorHandle,
+            model::{
+                FeedRegistryConfig, InitialRefreshMode, ListEntriesQuery, RefreshErrorKind,
+                RefreshInterval, RefreshPolicy, RefreshStatusKind, SubscribeFeedCommand,
+                SubscribeFeedRefresh, UnsubscribeFeedCommand,
+            },
         },
     };
 
@@ -608,10 +623,10 @@ mod tests {
         }
     }
 
-    async fn migrated_store() -> Result<SqliteFeedRegistryStore, StoreError> {
-        let store = SqliteFeedRegistryStore::in_memory().await?;
-        store.migrate().await?;
-        Ok(store)
+    async fn migrated_db() -> Result<SqliteFeedRegistryDb, RegistryDbError> {
+        let db = SqliteDatabase::in_memory().await?;
+        db.migrate().await?;
+        Ok(SqliteFeedRegistryDb::new(db))
     }
 
     fn feed_url(path: &str) -> FeedUrl {
@@ -640,14 +655,58 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn uncommitted_subscription_is_rolled_back() -> Result<(), StoreError> {
-        let store = migrated_store().await?;
+    async fn subscribe_records_subscription_event() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let journal = db.event_journal();
+        let registry = FeedRegistry::with_event_runtime(
+            db.clone(),
+            StaticFeedProvider::new(ATOM_FEED),
+            RefreshExecutorHandle::new(),
+            FeedRegistryConfig::default(),
+            RegistryNotificationPublisher::default(),
+            EventRuntime::new(journal.clone()),
+        );
+        let subscriber_id = subscriber_id();
+        let feed_url = feed_url("event");
+
+        registry
+            .subscribe(SubscribeFeedCommand {
+                subscriber_id: subscriber_id.clone(),
+                feed_url: feed_url.clone(),
+                requirement: None,
+                category: None,
+                refresh_policy: RefreshPolicy::interval(interval(3600)),
+                initial_refresh: InitialRefreshMode::Async,
+            })
+            .await?;
+
+        let cursor = journal
+            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .await?;
+        let batch = journal
+            .read_after(
+                &cursor,
+                EventReadFilter::new(&[RegistryEventKind::FeedSubscribed]),
+            )
+            .await?;
+
+        assert_eq!(batch.events().len(), 1);
+        assert_eq!(
+            batch.events()[0].event().kind(),
+            RegistryEventKind::FeedSubscribed
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn uncommitted_subscription_is_rolled_back() -> Result<(), RegistryDbError> {
+        let db = migrated_db().await?;
         {
-            let mut tx = store.begin().await?;
+            let mut tx = db.begin().await?;
             tx.upsert_subscription(subscription("rollback")).await?;
         }
 
-        let mut tx = store.begin().await?;
+        let mut tx = db.begin().await?;
         let page = tx
             .list_subscriptions(ListSubscriptionsQuery {
                 subscriber_id: subscriber_id(),
@@ -661,13 +720,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refresh_success_writes_snapshot_and_state_atomically() -> Result<(), StoreError> {
-        let store = migrated_store().await?;
+    async fn refresh_success_writes_snapshot_and_state_atomically() -> Result<(), RegistryDbError> {
+        let db = migrated_db().await?;
         let feed_url = feed_url("success");
         let succeeded_at = Utc.with_ymd_and_hms(2026, 5, 24, 12, 30, 0).unwrap();
         let next_refresh_after = Some(succeeded_at + chrono::Duration::hours(1));
 
-        let mut tx = store.begin().await?;
+        let mut tx = db.begin().await?;
         tx.upsert_subscription(subscription("success")).await?;
         tx.record_refresh_succeeded(RefreshSuccess {
             snapshot: FeedSnapshot {
@@ -684,7 +743,7 @@ mod tests {
         .await?;
         tx.commit().await?;
 
-        let mut tx = store.begin().await?;
+        let mut tx = db.begin().await?;
         let snapshots = tx.load_snapshots(std::slice::from_ref(&feed_url)).await?;
         let states = tx
             .load_refresh_states(std::slice::from_ref(&feed_url))
@@ -711,13 +770,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refresh_records_do_not_recreate_state_without_subscription() -> Result<(), StoreError>
-    {
-        let store = migrated_store().await?;
+    async fn refresh_records_do_not_recreate_state_without_subscription()
+    -> Result<(), RegistryDbError> {
+        let db = migrated_db().await?;
         let feed_url = feed_url("orphan");
         let happened_at = Utc.with_ymd_and_hms(2026, 5, 24, 12, 30, 0).unwrap();
 
-        let mut tx = store.begin().await?;
+        let mut tx = db.begin().await?;
         tx.record_refresh_started(RefreshStarted {
             feed_url: feed_url.clone(),
             started_at: happened_at,
@@ -746,7 +805,7 @@ mod tests {
         .await?;
         tx.commit().await?;
 
-        let mut tx = store.begin().await?;
+        let mut tx = db.begin().await?;
         assert!(
             tx.load_snapshots(std::slice::from_ref(&feed_url))
                 .await?
@@ -764,12 +823,13 @@ mod tests {
     #[tokio::test]
     async fn require_success_subscription_persists_entries_before_returning() -> anyhow::Result<()>
     {
-        let store = migrated_store().await?;
+        let db = migrated_db().await?;
         let registry = FeedRegistry::new(
-            store.clone(),
+            db.clone(),
             StaticFeedProvider::new(ATOM_FEED),
             RefreshExecutorHandle::new(),
             FeedRegistryConfig::default(),
+            EventRuntime::new(db.event_journal()),
         );
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("success");
@@ -792,7 +852,7 @@ mod tests {
         ));
 
         let entries = registry
-            .list_entries(synd_registry::ListEntriesQuery {
+            .list_entries(ListEntriesQuery {
                 subscriber_id: subscriber_id.clone(),
                 after: None,
                 first: 10,
@@ -809,7 +869,7 @@ mod tests {
             })
             .await?;
 
-        let mut tx = store.begin().await?;
+        let mut tx = db.begin().await?;
         assert!(
             tx.load_snapshots(std::slice::from_ref(&feed_url))
                 .await?

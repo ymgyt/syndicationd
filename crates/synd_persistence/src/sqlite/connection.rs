@@ -4,7 +4,7 @@ use sqlx::{
     Sqlite, SqlitePool, Transaction,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
-use synd_registry::StoreError;
+use synd_registry::RegistryDbError;
 use tracing::info;
 
 #[derive(Clone)]
@@ -19,27 +19,27 @@ enum FileMode {
 }
 
 impl SqliteDatabase {
-    pub async fn open(db_path: impl AsRef<Path>) -> Result<Self, StoreError> {
+    pub async fn open(db_path: impl AsRef<Path>) -> Result<Self, RegistryDbError> {
         Self::open_file(db_path, FileMode::Existing).await
     }
 
-    pub async fn create_or_open(db_path: impl AsRef<Path>) -> Result<Self, StoreError> {
+    pub async fn create_or_open(db_path: impl AsRef<Path>) -> Result<Self, RegistryDbError> {
         Self::open_file(db_path, FileMode::CreateIfMissing).await
     }
 
-    pub async fn migrate(&self) -> Result<(), StoreError> {
+    pub async fn migrate(&self) -> Result<(), RegistryDbError> {
         info!("Run persistence migrations...");
         sqlx::migrate!("./migrations")
             .run(&self.pool)
             .await
-            .map_err(StoreError::internal)
+            .map_err(RegistryDbError::internal)
     }
 
-    pub async fn begin(&self) -> Result<Transaction<'_, Sqlite>, StoreError> {
-        self.pool.begin().await.map_err(StoreError::internal)
+    pub async fn begin(&self) -> Result<Transaction<'_, Sqlite>, RegistryDbError> {
+        self.pool.begin().await.map_err(RegistryDbError::internal)
     }
 
-    async fn open_file(db_path: impl AsRef<Path>, mode: FileMode) -> Result<Self, StoreError> {
+    async fn open_file(db_path: impl AsRef<Path>, mode: FileMode) -> Result<Self, RegistryDbError> {
         let opts = Self::file_options(db_path, mode);
         Self::build_pool(opts).await
     }
@@ -57,19 +57,19 @@ impl SqliteDatabase {
         opts.foreign_keys(true).busy_timeout(Duration::from_secs(5))
     }
 
-    async fn build_pool(opts: SqliteConnectOptions) -> Result<Self, StoreError> {
+    async fn build_pool(opts: SqliteConnectOptions) -> Result<Self, RegistryDbError> {
         info!(?opts, "Connecting to sqlite...");
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(opts)
             .await
-            .map_err(StoreError::internal)?;
+            .map_err(RegistryDbError::internal)?;
 
         Ok(Self { pool })
     }
 
     #[cfg(test)]
-    pub async fn in_memory() -> Result<Self, StoreError> {
+    pub async fn in_memory() -> Result<Self, RegistryDbError> {
         Self::build_pool(Self::common_options(
             SqliteConnectOptions::new().in_memory(true),
         ))

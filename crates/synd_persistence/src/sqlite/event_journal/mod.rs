@@ -1,0 +1,399 @@
+use serde::{Serialize, de::DeserializeOwned};
+use sqlx::{QueryBuilder, Row, Sqlite};
+use synd_registry::event::{
+    EventConsumerId, EventCursor, EventCursorPos, EventJournal, EventJournalError,
+    EventJournalResult, EventReadBatch, EventReadFilter, FeedSubscribed, FeedUnsubscribed,
+    JournaledEvent, RegistryEvent, RegistryEventKind, SubscriptionChanged, SubscriptionLifecycle,
+};
+
+use super::SqliteDatabase;
+
+const EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED: &str = "subscription_lifecycle.subscribed";
+const EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED: &str = "subscription_lifecycle.changed";
+const EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED: &str = "subscription_lifecycle.unsubscribed";
+
+pub(super) struct EncodedEvent {
+    pub event_type: &'static str,
+    pub payload_json: String,
+}
+
+#[derive(Clone)]
+pub struct SqliteEventJournal {
+    db: SqliteDatabase,
+}
+
+impl SqliteEventJournal {
+    pub fn new(db: SqliteDatabase) -> Self {
+        Self { db }
+    }
+}
+
+impl EventJournal for SqliteEventJournal {
+    async fn append(&self, event: RegistryEvent) -> EventJournalResult<()> {
+        let encoded = encode_event(&event)?;
+        let mut tx = self.db.begin().await.map_err(map_error)?;
+
+        sqlx::query(
+            r"
+            INSERT INTO event_journal (event_type, payload_json)
+            VALUES (?, ?)
+            ",
+        )
+        .bind(encoded.event_type)
+        .bind(encoded.payload_json)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_error)?;
+
+        tx.commit().await.map_err(map_error)?;
+        Ok(())
+    }
+
+    async fn read_after(
+        &self,
+        cursor: &EventCursor,
+        filter: EventReadFilter,
+    ) -> EventJournalResult<EventReadBatch> {
+        let position = decode_position(cursor.position())?;
+        let consumer = cursor.consumer();
+        let event_types = event_types_for(filter);
+        let mut tx = self.db.begin().await.map_err(map_error)?;
+
+        let scanned_position = sqlx::query(
+            r"
+            SELECT COALESCE(MAX(position), ?) AS scanned_position
+            FROM event_journal
+            WHERE position > ?
+            ",
+        )
+        .bind(position)
+        .bind(position)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_error)?
+        .try_get::<i64, _>("scanned_position")
+        .map_err(map_error)?;
+
+        let scanned_cursor = EventCursor::at(
+            consumer,
+            EventCursorPos::position(scanned_position.to_string()),
+        );
+
+        if event_types.is_empty() || scanned_position <= position {
+            tx.commit().await.map_err(map_error)?;
+            return Ok(EventReadBatch::empty(scanned_cursor));
+        }
+
+        let mut query = QueryBuilder::<Sqlite>::new(
+            r"
+            SELECT position, event_type, payload_json
+            FROM event_journal
+            WHERE position > ",
+        );
+        query.push_bind(position);
+        query.push(" AND position <= ");
+        query.push_bind(scanned_position);
+        query.push(" AND event_type IN (");
+        let mut separated = query.separated(", ");
+        for event_type in event_types {
+            separated.push_bind(event_type);
+        }
+        separated.push_unseparated(") ORDER BY position");
+
+        let rows = query.build().fetch_all(&mut *tx).await.map_err(map_error)?;
+        let mut events = Vec::with_capacity(rows.len());
+        for row in rows {
+            let position = row.try_get::<i64, _>("position").map_err(map_error)?;
+            let event_type = row.try_get::<String, _>("event_type").map_err(map_error)?;
+            let payload_json = row
+                .try_get::<String, _>("payload_json")
+                .map_err(map_error)?;
+            events.push(JournaledEvent::new(
+                EventCursor::at(consumer, EventCursorPos::position(position.to_string())),
+                decode_event(&event_type, &payload_json)?,
+            ));
+        }
+
+        tx.commit().await.map_err(map_error)?;
+        Ok(EventReadBatch::new(events, scanned_cursor))
+    }
+
+    async fn load_cursor(&self, consumer: EventConsumerId) -> EventJournalResult<EventCursor> {
+        let mut tx = self.db.begin().await.map_err(map_error)?;
+        let row = sqlx::query(
+            r"
+            SELECT position
+            FROM event_cursor
+            WHERE consumer = ?
+            ",
+        )
+        .bind(consumer.as_str())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_error)?;
+        tx.commit().await.map_err(map_error)?;
+
+        let Some(row) = row else {
+            return Ok(EventCursor::initial(consumer));
+        };
+        let position = row.try_get::<i64, _>("position").map_err(map_error)?;
+        Ok(EventCursor::at(
+            consumer,
+            EventCursorPos::position(position.to_string()),
+        ))
+    }
+
+    async fn commit_cursor(&self, cursor: &EventCursor) -> EventJournalResult<()> {
+        let position = decode_position(cursor.position())?;
+        let mut tx = self.db.begin().await.map_err(map_error)?;
+
+        sqlx::query(
+            r"
+            INSERT INTO event_cursor (consumer, position)
+            VALUES (?, ?)
+            ON CONFLICT(consumer) DO UPDATE SET
+                position = CASE
+                    WHEN excluded.position > event_cursor.position
+                    THEN excluded.position
+                    ELSE event_cursor.position
+                END
+            ",
+        )
+        .bind(cursor.consumer().as_str())
+        .bind(position)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_error)?;
+
+        tx.commit().await.map_err(map_error)?;
+        Ok(())
+    }
+}
+
+fn event_types_for(filter: EventReadFilter) -> Vec<&'static str> {
+    let mut event_types = Vec::new();
+    for kind in filter.kinds() {
+        match kind {
+            RegistryEventKind::FeedSubscribed => {
+                event_types.push(EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED);
+            }
+            RegistryEventKind::SubscriptionChanged => {
+                event_types.push(EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED);
+            }
+            RegistryEventKind::FeedUnsubscribed => {
+                event_types.push(EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED);
+            }
+        }
+    }
+    event_types
+}
+
+pub(super) fn encode_event(event: &RegistryEvent) -> EventJournalResult<EncodedEvent> {
+    match event {
+        RegistryEvent::SubscriptionLifecycle(event) => encode_subscription_lifecycle_event(event),
+    }
+}
+
+fn encode_subscription_lifecycle_event(
+    event: &SubscriptionLifecycle,
+) -> EventJournalResult<EncodedEvent> {
+    let (event_type, payload_json) = match event {
+        SubscriptionLifecycle::Subscribed(event) => (
+            EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED,
+            encode_payload(event)?,
+        ),
+        SubscriptionLifecycle::Changed(event) => (
+            EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED,
+            encode_payload(event)?,
+        ),
+        SubscriptionLifecycle::Unsubscribed(event) => (
+            EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED,
+            encode_payload(event)?,
+        ),
+    };
+    Ok(EncodedEvent {
+        event_type,
+        payload_json,
+    })
+}
+
+fn decode_event(event_type: &str, payload_json: &str) -> EventJournalResult<RegistryEvent> {
+    Ok(RegistryEvent::SubscriptionLifecycle(
+        decode_subscription_lifecycle_event(event_type, payload_json)?,
+    ))
+}
+
+fn decode_subscription_lifecycle_event(
+    event_type: &str,
+    payload_json: &str,
+) -> EventJournalResult<SubscriptionLifecycle> {
+    match event_type {
+        EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED => {
+            Ok(SubscriptionLifecycle::Subscribed(decode_payload::<
+                FeedSubscribed,
+            >(
+                payload_json
+            )?))
+        }
+        EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED => {
+            Ok(SubscriptionLifecycle::Changed(decode_payload::<
+                SubscriptionChanged,
+            >(payload_json)?))
+        }
+        EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED => {
+            Ok(SubscriptionLifecycle::Unsubscribed(decode_payload::<
+                FeedUnsubscribed,
+            >(
+                payload_json
+            )?))
+        }
+        event_type => Err(EventJournalError::Internal(anyhow::anyhow!(
+            "unknown registry event type: {event_type}"
+        ))),
+    }
+}
+
+fn encode_payload<T>(payload: &T) -> EventJournalResult<String>
+where
+    T: Serialize,
+{
+    serde_json::to_string(payload).map_err(map_error)
+}
+
+fn decode_payload<T>(payload_json: &str) -> EventJournalResult<T>
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_str(payload_json).map_err(map_error)
+}
+
+fn decode_position(position: &EventCursorPos) -> EventJournalResult<i64> {
+    match position {
+        EventCursorPos::Initial => Ok(0),
+        EventCursorPos::Position(position) => {
+            let position = position.parse::<i64>().map_err(map_error)?;
+            if position < 0 {
+                return Err(EventJournalError::Internal(anyhow::anyhow!(
+                    "event cursor position must be non-negative: {position}"
+                )));
+            }
+            Ok(position)
+        }
+    }
+}
+
+fn map_error(err: impl Into<anyhow::Error>) -> EventJournalError {
+    EventJournalError::Internal(err.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use synd_feed::types::FeedUrl;
+    use synd_registry::{SubscriberId, Subscription, event::EventJournalExt};
+
+    use super::*;
+
+    const SUBSCRIPTION_LIFECYCLE_KINDS: &[RegistryEventKind] = &[
+        RegistryEventKind::FeedSubscribed,
+        RegistryEventKind::SubscriptionChanged,
+        RegistryEventKind::FeedUnsubscribed,
+    ];
+
+    async fn migrated_journal() -> anyhow::Result<SqliteEventJournal> {
+        let db = SqliteDatabase::in_memory().await?;
+        db.migrate().await?;
+        Ok(SqliteEventJournal::new(db))
+    }
+
+    fn subscribed_event() -> RegistryEvent {
+        RegistryEvent::SubscriptionLifecycle(SubscriptionLifecycle::Subscribed(
+            FeedSubscribed::new(subscription("subscribed")),
+        ))
+    }
+
+    fn changed_event() -> RegistryEvent {
+        RegistryEvent::SubscriptionLifecycle(SubscriptionLifecycle::Changed(
+            SubscriptionChanged::new(subscription("changed")),
+        ))
+    }
+
+    fn subscription(path: &str) -> Subscription {
+        Subscription::new(
+            SubscriberId::new("local"),
+            FeedUrl::parse(&format!("https://example.com/{path}.xml")).unwrap(),
+        )
+    }
+
+    fn subscription_lifecycle_filter() -> EventReadFilter {
+        EventReadFilter::new(SUBSCRIPTION_LIFECYCLE_KINDS)
+    }
+
+    #[tokio::test]
+    async fn load_cursor_returns_initial_cursor_for_new_consumer() -> anyhow::Result<()> {
+        let journal = migrated_journal().await?;
+
+        let cursor = journal
+            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .await?;
+
+        assert_eq!(
+            cursor,
+            EventCursor::initial(EventConsumerId::CrawlTargetListProj)
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn append_and_read_subscription_events_for_consumer() -> anyhow::Result<()> {
+        let journal = migrated_journal().await?;
+        journal.append(subscribed_event()).await?;
+        journal.append(changed_event()).await?;
+
+        let cursor = journal
+            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .await?;
+        let batch = journal
+            .read_after(&cursor, subscription_lifecycle_filter())
+            .await?;
+
+        assert_eq!(batch.events().len(), 2);
+        assert_eq!(batch.events()[0].event(), &subscribed_event());
+        assert_eq!(batch.events()[1].event(), &changed_event());
+        assert_eq!(
+            batch.scanned_cursor(),
+            &EventCursor::at(
+                EventConsumerId::CrawlTargetListProj,
+                EventCursorPos::position("2")
+            )
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn process_pending_commits_consumer_cursor() -> anyhow::Result<()> {
+        let journal = migrated_journal().await?;
+        journal.append(subscribed_event()).await?;
+        journal.append(changed_event()).await?;
+
+        let processed = journal
+            .consumer(
+                EventConsumerId::CrawlTargetListProj,
+                subscription_lifecycle_filter(),
+            )
+            .process_pending(|_| async { Ok(()) })
+            .await?;
+
+        assert_eq!(processed, 2);
+        let cursor = journal
+            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .await?;
+        assert_eq!(
+            cursor,
+            EventCursor::at(
+                EventConsumerId::CrawlTargetListProj,
+                EventCursorPos::position("2")
+            )
+        );
+        Ok(())
+    }
+}
