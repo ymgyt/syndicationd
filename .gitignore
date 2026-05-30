@@ -10,3 +10,5 @@ public/
 
 # sqlite dbfile
 *synd.db
+*synd.db-shm
+*synd.db-wal

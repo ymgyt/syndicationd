@@ -1,6 +1,5 @@
 #[cfg(feature = "integration")]
 mod test {
-    use std::path::PathBuf;
     use std::sync::Once;
 
     use synd_term::{
@@ -315,12 +314,10 @@ mod test {
         helper::init_tracing();
 
         let test_case = TestCase {
-            // this port is hard coded in fixtures
             mock_port: 6030,
             synd_api_port: 6031,
             sqlite_db_id: 47409,
-            sqlite_root_dir: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/sqlite/20240609"),
+            sqlite_root_dir: temp_dir().keep(),
             terminal_col_row: (120, 30),
             config: Config {
                 // To test pagination
