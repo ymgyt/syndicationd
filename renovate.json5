@@ -1,0 +1,49 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Asia/Tokyo",
+  "dependencyDashboard": true,
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "enabledManagers": ["cargo", "github-actions"],
+  "reviewersFromCodeOwners": true,
+  "reviewersSampleSize": 1,
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 4,
+  "schedule": ["* 7 * * 1"],
+  "packageRules": [
+    {
+      "matchManagers": ["cargo"],
+      "addLabels": ["dependencies/rust"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["dependencies/github_actions"]
+    },
+    {
+      // Keep Dependabot's rust-patch group behavior and let Renovate merge it
+      // after required checks pass.
+      "groupName": "rust-patch",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
+      "groupName": "opentelemetry",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["/^opentelemetry([_-].*)?$/", "tracing-opentelemetry"]
+    },
+    {
+      "groupName": "axum",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["axum", "axum-server", "async-graphql", "async-graphql-axum"]
+    },
+    {
+      // Update Cargo.toml even when the new version already satisfies the
+      // existing requirement, and keep Renovate commit titles concise.
+      "matchManagers": ["cargo"],
+      "rangeStrategy": "bump",
+      "commitMessageTopic": "{{depName}}"
+    }
+  ]
+}

@@ -44,21 +44,3 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: result
-  dependabot-auto-merge:
-    if: ${{ github.actor == 'dependabot[bot]' }}
-    runs-on: ubuntu-latest
-    needs: [tests]
-    permissions:
-      contents: write
-      pull-requests: write
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-      - id: meta
-        uses: dependabot/fetch-metadata@v3
-        # merge this PR if update is a semver patch 
-      - if: ${{ steps.meta.outputs.update-type == 'version-update:semver-patch' }}
-        run: |
-          gh pr review "${GITHUB_HEAD_REF}" --approve
-          gh pr merge "${GITHUB_HEAD_REF}" --squash --auto

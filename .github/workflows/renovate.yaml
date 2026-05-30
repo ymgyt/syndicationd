@@ -1,0 +1,28 @@
+name: Renovate
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - renovate.json5
+      - .github/workflows/renovate.yaml
+  push:
+    branches:
+      - main
+    paths:
+      - renovate.json5
+      - .github/workflows/renovate.yaml
+jobs:
+  check-config:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+      - name: Validate Renovate configuration
+        run: |
+          npx --yes --package renovate@43.150.0 -c "renovate --version"
+          npx --yes --package renovate@43.150.0 -c "renovate-config-validator --strict"
