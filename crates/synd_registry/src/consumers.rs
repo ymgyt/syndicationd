@@ -178,15 +178,6 @@ where
             )
             .await
             .map_err(consumer_error)?;
-            let remaining = tx
-                .list_active_subscriptions_for_feed(&event.subscription.feed_url)
-                .await
-                .map_err(consumer_error)?;
-            if remaining.is_empty() {
-                tx.delete_feed_state(&event.subscription.feed_url)
-                    .await
-                    .map_err(consumer_error)?;
-            }
             Event::Sub(SubEvent::FeedUnsubscribed(
                 FeedUnsubscribed::new(event.subscription).with_request_id(event.request_id),
             ))
@@ -390,7 +381,7 @@ impl EventConsumer for ApiEventStream {
 #[derive(Debug, Clone)]
 pub enum RegisteredConsumer<S> {
     SubRequestWorker(SubRequestWorker<S>),
-    CrawlTargetListProj(CrawlTargetListProj),
+    CrawlTargetListProj(CrawlTargetListProj<S>),
     ApiEventProj(ApiEventProj),
     ApiEventStream(ApiEventStream),
 }
@@ -416,7 +407,8 @@ where
                 consumer.consume(input, session).await
             }
             Self::CrawlTargetListProj(mut consumer) => {
-                let Some(input) = <CrawlTargetListProj as EventConsumer>::Input::from_batch(batch)?
+                let Some(input) =
+                    <CrawlTargetListProj<S> as EventConsumer>::Input::from_batch(batch)?
                 else {
                     return Ok(());
                 };
@@ -443,7 +435,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Consumers<S> {
     sub_request_worker: SubRequestWorker<S>,
-    crawl_target_list_proj: CrawlTargetListProj,
+    crawl_target_list_proj: CrawlTargetListProj<S>,
     api_event_proj: ApiEventProj,
     api_event_stream: ApiEventStream,
 }
@@ -451,7 +443,7 @@ pub struct Consumers<S> {
 impl<S> Consumers<S> {
     pub fn new(
         sub_request_worker: SubRequestWorker<S>,
-        crawl_target_list_proj: CrawlTargetListProj,
+        crawl_target_list_proj: CrawlTargetListProj<S>,
         api_event_proj: ApiEventProj,
         api_event_stream: ApiEventStream,
     ) -> Self {
@@ -493,7 +485,7 @@ where
                 self.sub_request_worker.clone(),
             )),
             EventConsumerId::CrawlTargetListProj => Some(RegisteredConsumer::CrawlTargetListProj(
-                self.crawl_target_list_proj,
+                self.crawl_target_list_proj.clone(),
             )),
             EventConsumerId::ApiEventProj => {
                 Some(RegisteredConsumer::ApiEventProj(self.api_event_proj))

@@ -93,8 +93,8 @@ where
     );
 
     WorkerSet::new(vec![
-        spawn_worker.spawn(SubRequestWorker::new(db)),
-        spawn_worker.spawn(CrawlTargetListProj::new()),
+        spawn_worker.spawn(SubRequestWorker::new(db.clone())),
+        spawn_worker.spawn(CrawlTargetListProj::new(db)),
         spawn_worker.spawn(ApiEventProj::new()),
         spawn_worker.spawn(ApiEventStream::new(api_events)),
     ])

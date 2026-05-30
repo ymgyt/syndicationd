@@ -1,8 +1,48 @@
-use crate::event::{
-    ConsumerEventInput, Event, EventConsumer, EventConsumerId, EventConsumerResult,
-    EventConsumerSession, EventJournal, EventKind, EventReadBatch, EventReadFilter, JournaledEvent,
-    SubEvent, SubEventKind, SubscriptionLifecycle,
+use chrono::{DateTime, Utc};
+use synd_feed::types::FeedUrl;
+
+use crate::{
+    crawl::policy::PollingPolicy,
+    db::{FeedRegistryDb, RegistryDbTransaction},
+    event::{
+        ConsumerEventInput, Event, EventConsumer, EventConsumerError, EventConsumerId,
+        EventConsumerResult, EventConsumerSession, EventJournal, EventKind, EventReadBatch,
+        EventReadFilter, JournaledEvent, SubEvent, SubEventKind, SubscriptionLifecycle,
+    },
 };
+
+/// Current crawl target state derived from active subscriptions for one feed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrawlTarget {
+    pub feed_url: FeedUrl,
+    pub is_active: bool,
+    pub polling_policy: Option<PollingPolicy>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl CrawlTarget {
+    pub fn active(
+        feed_url: FeedUrl,
+        polling_policy: PollingPolicy,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            feed_url,
+            is_active: true,
+            polling_policy: Some(polling_policy),
+            updated_at,
+        }
+    }
+
+    pub fn inactive(feed_url: FeedUrl, updated_at: DateTime<Utc>) -> Self {
+        Self {
+            feed_url,
+            is_active: false,
+            polling_policy: None,
+            updated_at,
+        }
+    }
+}
 
 /// Subscription lifecycle events relevant to the crawl target list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +63,7 @@ impl CrawlTargetListInput {
 impl ConsumerEventInput for CrawlTargetListInput {
     const READ_FILTER: EventReadFilter = EventReadFilter::new(&[
         EventKind::Sub(SubEventKind::FeedSubscribed),
+        EventKind::Sub(SubEventKind::SubscriptionChanged),
         EventKind::Sub(SubEventKind::FeedUnsubscribed),
     ]);
 
@@ -34,6 +75,9 @@ impl ConsumerEventInput for CrawlTargetListInput {
             .map(|event| match event {
                 Event::Sub(SubEvent::FeedSubscribed(event)) => {
                     SubscriptionLifecycle::Subscribed(event)
+                }
+                Event::Sub(SubEvent::SubscriptionChanged(event)) => {
+                    SubscriptionLifecycle::Changed(event)
                 }
                 Event::Sub(SubEvent::FeedUnsubscribed(event)) => {
                     SubscriptionLifecycle::Unsubscribed(event)
@@ -47,16 +91,21 @@ impl ConsumerEventInput for CrawlTargetListInput {
 }
 
 /// Consumer that reacts to subscription events for the crawl target list.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct CrawlTargetListProj;
+#[derive(Debug, Clone)]
+pub struct CrawlTargetListProj<S> {
+    db: S,
+}
 
-impl CrawlTargetListProj {
-    pub fn new() -> Self {
-        Self
+impl<S> CrawlTargetListProj<S> {
+    pub fn new(db: S) -> Self {
+        Self { db }
     }
 }
 
-impl EventConsumer for CrawlTargetListProj {
+impl<S> EventConsumer for CrawlTargetListProj<S>
+where
+    S: FeedRegistryDb,
+{
     type Input = CrawlTargetListInput;
 
     fn id(&self) -> EventConsumerId {
@@ -71,8 +120,53 @@ impl EventConsumer for CrawlTargetListProj {
     where
         J: EventJournal,
     {
-        let event_count = input.into_events().len();
-        tracing::debug!(event_count, "crawl target list projector received events");
+        let feed_urls = affected_feed_urls(input.into_events());
+        if feed_urls.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.db.begin().await.map_err(consumer_error)?;
+        for feed_url in &feed_urls {
+            let subscriptions = tx
+                .list_active_subscriptions_for_feed(feed_url)
+                .await
+                .map_err(consumer_error)?;
+            let target = if let Some(policy) = PollingPolicy::from_subscriptions(&subscriptions) {
+                CrawlTarget::active(feed_url.clone(), policy, Utc::now())
+            } else {
+                CrawlTarget::inactive(feed_url.clone(), Utc::now())
+            };
+            tx.upsert_crawl_target(target)
+                .await
+                .map_err(consumer_error)?;
+        }
+        tx.commit().await.map_err(consumer_error)?;
+
+        tracing::debug!(
+            feed_count = feed_urls.len(),
+            "crawl target list projector reconciled feeds"
+        );
         Ok(())
     }
+}
+
+fn affected_feed_urls(events: Vec<SubscriptionLifecycle>) -> Vec<FeedUrl> {
+    let mut feed_urls = Vec::new();
+    for event in events {
+        let feed_url = match event {
+            SubscriptionLifecycle::Subscribed(event) => event.subscription.feed_url,
+            SubscriptionLifecycle::Changed(event) => event.subscription.feed_url,
+            SubscriptionLifecycle::Unsubscribed(event) => event.subscription.feed_url,
+        };
+        if !feed_urls.contains(&feed_url) {
+            feed_urls.push(feed_url);
+        }
+    }
+
+    feed_urls.sort_unstable_by(|a, b| a.as_str().cmp(b.as_str()));
+    feed_urls
+}
+
+fn consumer_error(err: impl Into<anyhow::Error>) -> EventConsumerError {
+    EventConsumerError::Internal(err.into())
 }

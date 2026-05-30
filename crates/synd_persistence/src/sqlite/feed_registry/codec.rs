@@ -5,8 +5,9 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
     crawl::{
-        policy::{RefreshPolicy, RefreshSchedule},
+        policy::{PollingPolicy, PollingSchedule, RefreshPolicy, RefreshSchedule},
         state::{FeedSnapshot, RefreshErrorKind, RefreshState},
+        target_list::CrawlTarget,
     },
 };
 
@@ -99,10 +100,67 @@ pub(super) fn decode_refresh_state(row: &SqliteRow) -> RegistryDbResult<RefreshS
     })
 }
 
+pub(super) fn decode_crawl_target(row: &SqliteRow) -> RegistryDbResult<CrawlTarget> {
+    let feed_url_raw: String = row.try_get("feed_url").map_err(RegistryDbError::internal)?;
+    let is_active_raw: i64 = row
+        .try_get("is_active")
+        .map_err(RegistryDbError::internal)?;
+    let policy_kind: Option<String> = row
+        .try_get("polling_policy_kind")
+        .map_err(RegistryDbError::internal)?;
+    let interval_seconds: Option<i64> = row
+        .try_get("polling_interval_seconds")
+        .map_err(RegistryDbError::internal)?;
+    let updated_at = row
+        .try_get("updated_at")
+        .map_err(RegistryDbError::internal)?;
+
+    let is_active = match is_active_raw {
+        0 => false,
+        1 => true,
+        value => {
+            return Err(RegistryDbError::internal(anyhow::anyhow!(
+                "invalid crawl target active flag: {value}"
+            )));
+        }
+    };
+    let polling_policy = match (is_active, policy_kind.as_deref()) {
+        (false, None) if interval_seconds.is_none() => None,
+        (true, Some(kind)) => Some(decode_polling_policy(kind, interval_seconds)?),
+        (false, _) => {
+            return Err(RegistryDbError::internal(anyhow::anyhow!(
+                "inactive crawl target must not have a polling policy"
+            )));
+        }
+        (true, None) => {
+            return Err(RegistryDbError::internal(anyhow::anyhow!(
+                "active crawl target requires a polling policy"
+            )));
+        }
+    };
+
+    Ok(CrawlTarget {
+        feed_url: FeedUrl::parse(&feed_url_raw).map_err(RegistryDbError::internal)?,
+        is_active,
+        polling_policy,
+        updated_at,
+    })
+}
+
 pub(super) fn encode_policy(policy: RefreshPolicy) -> (&'static str, Option<i64>) {
     match policy.schedule {
         RefreshSchedule::Manual => ("manual", None),
         RefreshSchedule::Interval(interval) => {
+            let seconds = i64::try_from(interval.as_secs()).unwrap_or(i64::MAX);
+            ("interval", Some(seconds))
+        }
+    }
+}
+
+pub(super) fn encode_polling_policy(policy: PollingPolicy) -> (&'static str, Option<i64>) {
+    match policy.schedule {
+        PollingSchedule::Manual => ("manual", None),
+        PollingSchedule::Interval(interval) => {
             let seconds = i64::try_from(interval.as_secs()).unwrap_or(i64::MAX);
             ("interval", Some(seconds))
         }
@@ -131,6 +189,35 @@ fn decode_policy(kind: &str, interval_seconds: Option<i64>) -> RegistryDbResult<
         },
         kind => Err(RegistryDbError::internal(anyhow::anyhow!(
             "unknown refresh policy kind: {kind}"
+        ))),
+    }
+}
+
+fn decode_polling_policy(
+    kind: &str,
+    interval_seconds: Option<i64>,
+) -> RegistryDbResult<PollingPolicy> {
+    match kind {
+        "manual" if interval_seconds.is_none() => Ok(PollingPolicy {
+            schedule: PollingSchedule::Manual,
+        }),
+        "manual" => Err(RegistryDbError::internal(anyhow::anyhow!(
+            "manual polling policy must not have interval seconds"
+        ))),
+        "interval" => match interval_seconds {
+            Some(seconds) if seconds > 0 => Ok(PollingPolicy {
+                schedule: PollingSchedule::Interval(
+                    Duration::from_secs(u64::try_from(seconds).map_err(RegistryDbError::internal)?)
+                        .try_into()
+                        .map_err(RegistryDbError::internal)?,
+                ),
+            }),
+            _ => Err(RegistryDbError::internal(anyhow::anyhow!(
+                "interval polling policy requires positive interval seconds"
+            ))),
+        },
+        kind => Err(RegistryDbError::internal(anyhow::anyhow!(
+            "unknown polling policy kind: {kind}"
         ))),
     }
 }

@@ -80,12 +80,27 @@ impl RefreshPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EffectiveRefreshPolicy {
-    pub schedule: RefreshSchedule,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PollingSchedule {
+    Manual,
+    Interval(RefreshInterval),
 }
 
-impl EffectiveRefreshPolicy {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PollingPolicy {
+    pub schedule: PollingSchedule,
+}
+
+impl PollingPolicy {
+    pub fn from_refresh_policy(policy: RefreshPolicy) -> Self {
+        Self {
+            schedule: match policy.schedule {
+                RefreshSchedule::Manual => PollingSchedule::Manual,
+                RefreshSchedule::Interval(interval) => PollingSchedule::Interval(interval),
+            },
+        }
+    }
+
     pub fn from_subscriptions<'a>(
         subscriptions: impl IntoIterator<Item = &'a Subscription>,
     ) -> Option<Self> {
@@ -94,7 +109,9 @@ impl EffectiveRefreshPolicy {
 
         for subscription in subscriptions {
             has_subscription = true;
-            if let RefreshSchedule::Interval(candidate) = subscription.refresh_policy.schedule {
+            if let PollingSchedule::Interval(candidate) =
+                Self::from_refresh_policy(subscription.refresh_policy).schedule
+            {
                 interval = Some(
                     interval.map_or(candidate, |current: RefreshInterval| current.min(candidate)),
                 );
@@ -102,25 +119,25 @@ impl EffectiveRefreshPolicy {
         }
 
         has_subscription.then_some(Self {
-            schedule: interval.map_or(RefreshSchedule::Manual, RefreshSchedule::Interval),
+            schedule: interval.map_or(PollingSchedule::Manual, PollingSchedule::Interval),
         })
     }
 
     pub fn next_after(self, refreshed_at: DateTime<Utc>) -> Option<DateTime<Utc>> {
         match self.schedule {
-            RefreshSchedule::Manual => None,
-            RefreshSchedule::Interval(interval) => Some(add_duration(refreshed_at, interval)),
+            PollingSchedule::Manual => None,
+            PollingSchedule::Interval(interval) => Some(add_duration(refreshed_at, interval)),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DesiredFeedRefresh {
+pub struct DesiredFeedPolling {
     pub feed_url: FeedUrl,
-    pub policy: EffectiveRefreshPolicy,
+    pub policy: PollingPolicy,
 }
 
-impl DesiredFeedRefresh {
+impl DesiredFeedPolling {
     pub fn from_subscriptions(subscriptions: Vec<Subscription>) -> Vec<Self> {
         let mut by_feed_url = HashMap::<FeedUrl, Vec<Subscription>>::new();
         for subscription in subscriptions {
@@ -133,7 +150,7 @@ impl DesiredFeedRefresh {
         let mut desired = by_feed_url
             .into_iter()
             .filter_map(|(feed_url, subscriptions)| {
-                EffectiveRefreshPolicy::from_subscriptions(&subscriptions)
+                PollingPolicy::from_subscriptions(&subscriptions)
                     .map(|policy| Self { feed_url, policy })
             })
             .collect::<Vec<_>>();
@@ -189,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn effective_refresh_policy_uses_shortest_interval() {
+    fn polling_policy_uses_shortest_interval() {
         let subscriptions = [
             subscription(RefreshPolicy::interval(interval(Duration::from_hours(1)))),
             subscription(RefreshPolicy::interval(interval(Duration::from_mins(10)))),
@@ -198,30 +215,30 @@ mod tests {
             }),
         ];
 
-        let policy = EffectiveRefreshPolicy::from_subscriptions(&subscriptions).unwrap();
+        let policy = PollingPolicy::from_subscriptions(&subscriptions).unwrap();
 
         assert_eq!(
             policy.schedule,
-            RefreshSchedule::Interval(interval(Duration::from_mins(10)))
+            PollingSchedule::Interval(interval(Duration::from_mins(10)))
         );
     }
 
     #[test]
-    fn effective_refresh_policy_is_manual_when_all_subscriptions_are_manual() {
+    fn polling_policy_is_manual_when_all_subscriptions_are_manual() {
         let subscriptions = [subscription(RefreshPolicy {
             schedule: RefreshSchedule::Manual,
         })];
 
-        let policy = EffectiveRefreshPolicy::from_subscriptions(&subscriptions).unwrap();
+        let policy = PollingPolicy::from_subscriptions(&subscriptions).unwrap();
 
-        assert_eq!(policy.schedule, RefreshSchedule::Manual);
+        assert_eq!(policy.schedule, PollingSchedule::Manual);
     }
 
     #[test]
-    fn desired_feed_refresh_groups_subscriptions_by_feed() {
+    fn desired_feed_polling_groups_subscriptions_by_feed() {
         let mut other = subscription(RefreshPolicy::interval(interval(Duration::from_mins(5))));
         other.subscriber_id = SubscriberId::new("other");
-        let desired = DesiredFeedRefresh::from_subscriptions(vec![
+        let desired = DesiredFeedPolling::from_subscriptions(vec![
             subscription(RefreshPolicy::interval(interval(Duration::from_hours(1)))),
             other,
         ]);
@@ -229,7 +246,7 @@ mod tests {
         assert_eq!(desired.len(), 1);
         assert_eq!(
             desired[0].policy.schedule,
-            RefreshSchedule::Interval(interval(Duration::from_mins(5)))
+            PollingSchedule::Interval(interval(Duration::from_mins(5)))
         );
     }
 }

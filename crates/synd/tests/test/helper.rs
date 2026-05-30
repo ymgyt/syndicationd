@@ -22,7 +22,7 @@ use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
     FeedRegistryDb, FeedRegistryRuntime, RegistryDbTransaction, SubscriberId, Subscription,
     crawl::{
-        policy::{EffectiveRefreshPolicy, RefreshInterval, RefreshPolicy},
+        policy::{PollingPolicy, RefreshInterval, RefreshPolicy},
         state::{FeedSnapshot, RefreshSuccess},
     },
 };
@@ -307,7 +307,7 @@ async fn seed_cached_subscription(
     let subscriptions = tx
         .list_active_subscriptions_for_feed(&subscription.feed_url)
         .await?;
-    let policy = EffectiveRefreshPolicy::from_subscriptions(&subscriptions)
+    let policy = PollingPolicy::from_subscriptions(&subscriptions)
         .expect("seeded subscription should produce an effective policy");
     tx.record_refresh_succeeded(RefreshSuccess {
         snapshot: FeedSnapshot {

@@ -4,6 +4,7 @@ use synd_feed::types::FeedUrl;
 
 use crate::{
     crawl::state::{FeedSnapshot, RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess},
+    crawl::target_list::CrawlTarget,
     error::{RegistryDbError, RegistryDbResult},
     event::Event,
     subscriber::SubscriberId,
@@ -61,6 +62,16 @@ pub trait RegistryDbTransaction {
     fn list_active_feed_urls(
         &mut self,
     ) -> impl Future<Output = RegistryDbResult<Vec<FeedUrl>>> + Send;
+
+    fn upsert_crawl_target(
+        &mut self,
+        target: CrawlTarget,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    fn load_crawl_target(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
 
     fn load_snapshots(
         &mut self,
