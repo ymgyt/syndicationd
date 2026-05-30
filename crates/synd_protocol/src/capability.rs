@@ -21,6 +21,7 @@ impl CapabilitySet {
         self.names.is_empty()
     }
 
+    #[must_use]
     pub fn missing_from(&self, available: &Self) -> Self {
         Self::new(
             self.names

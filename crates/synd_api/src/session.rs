@@ -37,6 +37,7 @@ impl SessionRegistry {
         Self::from_parts(supported_capabilities, None)
     }
 
+    #[must_use]
     pub fn with_idle_shutdown(&self, idle_shutdown: SessionIdleShutdown) -> Self {
         Self::from_parts(self.supported_capabilities().clone(), Some(idle_shutdown))
     }
@@ -57,7 +58,7 @@ impl SessionRegistry {
 
     pub fn open(
         &self,
-        request: OpenSessionRequest,
+        request: &OpenSessionRequest,
     ) -> Result<OpenSessionResponse, OpenSessionErrorResponse> {
         let context = SessionOpenContext::new(
             request.required_capabilities().clone(),
@@ -85,7 +86,7 @@ impl SessionRegistry {
 
     pub fn close(
         &self,
-        request: CloseSessionRequest,
+        request: &CloseSessionRequest,
     ) -> Result<CloseSessionResponse, CloseSessionErrorResponse> {
         let session_id = request.session_id().clone();
         let context = {
@@ -438,7 +439,7 @@ mod tests {
         let registry = SessionRegistry::new(CapabilitySet::new(["timeline.read"]));
 
         let opened = registry
-            .open(OpenSessionRequest::new(CapabilitySet::new([
+            .open(&OpenSessionRequest::new(CapabilitySet::new([
                 "timeline.read",
             ])))
             .unwrap();
@@ -446,7 +447,7 @@ mod tests {
         assert_eq!(registry.active_session_count(), 1);
 
         registry
-            .close(CloseSessionRequest::new(opened.session_id().clone()))
+            .close(&CloseSessionRequest::new(opened.session_id().clone()))
             .unwrap();
 
         assert_eq!(registry.active_session_count(), 0);
@@ -457,7 +458,7 @@ mod tests {
         let registry = SessionRegistry::default();
 
         let error = registry
-            .open(OpenSessionRequest::new(CapabilitySet::new([
+            .open(&OpenSessionRequest::new(CapabilitySet::new([
                 "timeline.read",
             ])))
             .unwrap_err();
@@ -508,11 +509,11 @@ mod tests {
             shutdown,
         ));
         let opened = registry
-            .open(OpenSessionRequest::new(CapabilitySet::default()))
+            .open(&OpenSessionRequest::new(CapabilitySet::default()))
             .unwrap();
 
         registry
-            .close(CloseSessionRequest::new(opened.session_id().clone()))
+            .close(&CloseSessionRequest::new(opened.session_id().clone()))
             .unwrap();
 
         tokio::time::timeout(Duration::from_secs(1), async {
@@ -540,14 +541,14 @@ mod tests {
             shutdown,
         ));
         let first = registry
-            .open(OpenSessionRequest::new(CapabilitySet::default()))
+            .open(&OpenSessionRequest::new(CapabilitySet::default()))
             .unwrap();
 
         registry
-            .close(CloseSessionRequest::new(first.session_id().clone()))
+            .close(&CloseSessionRequest::new(first.session_id().clone()))
             .unwrap();
         let _second = registry
-            .open(OpenSessionRequest::new(CapabilitySet::default()))
+            .open(&OpenSessionRequest::new(CapabilitySet::default()))
             .unwrap();
         tokio::time::sleep(Duration::from_millis(60)).await;
 

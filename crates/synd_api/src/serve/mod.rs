@@ -202,7 +202,7 @@ mod session_routes {
         Extension(registry): Extension<SessionRegistry>,
         Json(request): Json<OpenSessionRequest>,
     ) -> Response {
-        match registry.open(request) {
+        match registry.open(&request) {
             Ok(response) => (StatusCode::CREATED, Json(response)).into_response(),
             Err(error) => (StatusCode::CONFLICT, Json(error)).into_response(),
         }
@@ -212,7 +212,7 @@ mod session_routes {
         Extension(registry): Extension<SessionRegistry>,
         Json(request): Json<CloseSessionRequest>,
     ) -> Response {
-        match registry.close(request) {
+        match registry.close(&request) {
             Ok(response) => (StatusCode::OK, Json(response)).into_response(),
             Err(error) => (StatusCode::NOT_FOUND, Json(error)).into_response(),
         }
