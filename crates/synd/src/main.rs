@@ -24,9 +24,11 @@ fn init_tracing(
     default_filter: &'static str,
     stderr: bool,
 ) -> anyhow::Result<Option<WorkerGuard>> {
-    use synd_support::o11y::opentelemetry::init_propagation;
+    use synd_support::o11y::{
+        opentelemetry::init_propagation, tracing_subscriber::otel_metrics::metrics_event_filter,
+    };
     use tracing_subscriber::{
-        Registry,
+        Layer as _, Registry,
         filter::EnvFilter,
         fmt::{self, writer::BoxMakeWriter},
         layer::SubscriberExt,
@@ -57,7 +59,8 @@ fn init_tracing(
                 .with_file(false)
                 .with_line_number(false)
                 .with_target(true)
-                .with_writer(writer),
+                .with_writer(writer)
+                .with_filter(metrics_event_filter()),
         )
         .with(
             EnvFilter::try_from_env(config::env::LOG_DIRECTIVE)
@@ -164,12 +167,17 @@ async fn main() -> ExitCode {
 
     let _guard = {
         let is_subcommand = command.is_some();
+        let is_daemon_command = matches!(command, Some(cli::Command::Daemon(_)));
         let log = if is_subcommand {
             None
         } else {
             Some(config.log_file())
         };
-        let default_filter = if is_subcommand { "warn" } else { "info" };
+        let default_filter = if is_subcommand && !is_daemon_command {
+            "warn"
+        } else {
+            "info"
+        };
         match init_tracing(log, default_filter, is_subcommand) {
             Ok(guard) => guard,
             Err(err) => {
@@ -182,6 +190,7 @@ async fn main() -> ExitCode {
     if let Some(command) = command {
         return match command {
             cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
+            cli::Command::Daemon(daemon) => daemon.run(config).await,
             cli::Command::Doctor(doctor) => doctor.run(config).await,
             cli::Command::Feed(feed) => feed.run(config).await,
             cli::Command::Config(command) => command.run(&config),

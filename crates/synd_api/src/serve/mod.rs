@@ -8,6 +8,8 @@ use axum::{
     routing::{get, post},
 };
 use tokio::net::TcpListener;
+#[cfg(unix)]
+use tokio::net::UnixListener;
 use tokio_metrics::TaskMonitor;
 use tower::{ServiceBuilder, limit::ConcurrencyLimitLayer, timeout::TimeoutLayer};
 use tower_http::{
@@ -63,6 +65,61 @@ pub async fn serve(
     dep: Dependency,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
+    let ApiService { router, tls_config } = build_service(dep, &shutdown);
+
+    tracing::info!("Serving...");
+
+    let listener = listener.into_std()?;
+    let handle = shutdown.into_handle();
+
+    if let Some(tls_config) = tls_config {
+        axum_server::from_tcp_rustls(listener, tls_config)?
+            .handle(handle)
+            .serve(router.into_make_service())
+            .await?;
+    } else {
+        axum_server::from_tcp(listener)?
+            .handle(handle)
+            .serve(router.into_make_service())
+            .await?;
+    }
+
+    tracing::info!("Shutdown complete");
+
+    Ok(())
+}
+
+#[cfg(unix)]
+pub async fn serve_unix(
+    listener: UnixListener,
+    dep: Dependency,
+    shutdown: Shutdown,
+) -> anyhow::Result<()> {
+    let ApiService { router, .. } = build_service(dep, &shutdown);
+    let shutdown_requested = shutdown.cancellation_token();
+    let router = router
+        .route("/daemon/shutdown", post(control::shutdown))
+        .layer(Extension(shutdown));
+
+    tracing::info!("Serving on Unix socket...");
+
+    axum::serve(listener, router)
+        .with_graceful_shutdown(async move {
+            shutdown_requested.cancelled().await;
+        })
+        .await?;
+
+    tracing::info!("Shutdown complete");
+
+    Ok(())
+}
+
+struct ApiService {
+    router: Router,
+    tls_config: Option<axum_server::tls_rustls::RustlsConfig>,
+}
+
+fn build_service(dep: Dependency, shutdown: &Shutdown) -> ApiService {
     let Dependency {
         authenticator,
         registry,
@@ -86,7 +143,7 @@ pub async fn serve(
         shutdown.cancellation_token(),
     ));
 
-    let service = Router::new()
+    let router = Router::new()
         .route("/graphql", post(gql::handler::graphql))
         .route("/graphql/ws", get(gql::handler::graphql_ws))
         .layer(Extension(cx))
@@ -108,27 +165,18 @@ pub async fn serve(
         .layer(RequestMetricsLayer::new())
         .fallback(not_found);
 
-    tracing::info!("Serving...");
+    ApiService { router, tls_config }
+}
 
-    let listener = listener.into_std()?;
-    let handle = shutdown.into_handle();
-    let service = service.into_make_service();
+mod control {
+    use axum::{Extension, http::StatusCode};
 
-    if let Some(tls_config) = tls_config {
-        axum_server::from_tcp_rustls(listener, tls_config)?
-            .handle(handle)
-            .serve(service)
-            .await?;
-    } else {
-        axum_server::from_tcp(listener)?
-            .handle(handle)
-            .serve(service)
-            .await?;
+    use crate::shutdown::Shutdown;
+
+    pub(super) async fn shutdown(Extension(shutdown): Extension<Shutdown>) -> StatusCode {
+        shutdown.shutdown();
+        StatusCode::ACCEPTED
     }
-
-    tracing::info!("Shutdown complete");
-
-    Ok(())
 }
 
 async fn handle_middleware_error(err: BoxError) -> (StatusCode, String) {

@@ -15,15 +15,18 @@ version     = "0.1.0"
 [dependencies]
 synd-api = { path = "../synd_api", version = "0.2.6" }
 synd-client = { path = "../synd_client", version = "0.1.0" }
+synd-feed = { path = "../synd_feed", version = "0.3.5" }
 synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
+synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
+synd-registry = { path = "../synd_registry", version = "0.1.0" }
+synd-support = { path = "../synd_support", version = "0.1.0" }
 
 anyhow    = { workspace = true }
-rand      = { workspace = true }
+rustix    = { version = "1.1.4", features = ["fs"] }
 sha2      = { workspace = true }
 thiserror = { workspace = true }
-tokio     = { workspace = true, features = ["net", "rt", "time"] }
+tokio     = { workspace = true, features = ["macros", "net", "rt", "time"] }
 tracing   = { workspace = true }
-url       = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -5499,6 +5499,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "synd-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "synd-registry"
 version = "0.1.0"
 dependencies = [
@@ -5520,16 +5528,19 @@ name = "synd-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "rand 0.10.1",
+ "rustix 1.1.4",
  "sha2",
  "synd-api",
  "synd-client",
+ "synd-feed",
  "synd-persistence",
+ "synd-protocol",
+ "synd-registry",
+ "synd-support",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "url",
 ]
 
 [[package]]

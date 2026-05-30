@@ -115,6 +115,7 @@ pub struct GithubOptions {
 pub enum Command {
     #[command(alias = "clear")]
     Clean(command::clean::CleanCommand),
+    Daemon(command::daemon::DaemonCommand),
     Doctor(command::doctor::DoctorCommand),
     Feed(command::feed::FeedCommand),
     Config(command::config::ConfigCommand),

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     DaemonControl, DaemonLaunchConfig, Result, RuntimeDatabase, Session, SessionConfig,
-    SessionRequirements, loopback::LoopbackApi,
+    SessionRequirements, acquisition::SessionAcquisition, placement::RuntimePlacementEnvironment,
 };
 
 #[derive(Debug, Clone)]
@@ -20,12 +20,7 @@ impl Runtime {
     }
 
     pub async fn acquire_session(&self) -> Result<Session> {
-        let loopback = LoopbackApi::start(&self.config).await?;
-        Ok(Session::new(
-            loopback.client,
-            self.config.requirements().capabilities().clone(),
-            loopback.handle.into(),
-        ))
+        SessionAcquisition::new(&self.config).acquire().await
     }
 
     pub fn daemon(&self) -> DaemonControl<'_> {
@@ -40,6 +35,7 @@ pub struct Config {
     session: SessionConfig,
     daemon: DaemonLaunchConfig,
     requirements: SessionRequirements,
+    placement_environment: RuntimePlacementEnvironment,
 }
 
 impl Config {
@@ -56,6 +52,7 @@ impl Config {
             session,
             daemon,
             requirements,
+            placement_environment: RuntimePlacementEnvironment::capture(),
         }
     }
 
@@ -77,6 +74,19 @@ impl Config {
 
     pub fn requirements(&self) -> &SessionRequirements {
         &self.requirements
+    }
+
+    pub(crate) fn placement_environment(&self) -> RuntimePlacementEnvironment {
+        self.placement_environment.clone()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_placement_environment(
+        mut self,
+        placement_environment: RuntimePlacementEnvironment,
+    ) -> Self {
+        self.placement_environment = placement_environment;
+        self
     }
 }
 
@@ -112,19 +122,19 @@ mod tests {
         SessionConfig, SessionRequirements,
     };
 
-    #[tokio::test]
-    async fn acquire_session_starts_loopback_api() {
+    #[test]
+    fn runtime_keeps_daemon_launch_config() {
         let tempdir = tempfile::tempdir().unwrap();
-        let runtime = Runtime::new(RuntimeConfig::new(
+        let config = RuntimeConfig::new(
             RuntimeDatabase::sqlite(tempdir.path().join("synd.db")),
             ApiClientConfig::new(Duration::from_secs(5), "synd-runtime-test"),
             SessionConfig::new(Duration::from_secs(5)),
             DaemonLaunchConfig::default(),
             SessionRequirements::default(),
-        ));
+        );
 
-        let session = runtime.acquire_session().await.unwrap();
-        session.client().health().await.unwrap();
-        session.close().await.unwrap();
+        let runtime = Runtime::new(config.clone());
+
+        assert_eq!(runtime.config().daemon(), config.daemon());
     }
 }

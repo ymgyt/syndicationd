@@ -3,12 +3,14 @@
 
 pub mod daemon;
 
-mod capability;
+mod acquisition;
+mod api;
+mod connection;
 mod database;
 mod error;
 #[allow(dead_code)]
-mod identity;
-mod loopback;
+mod instance;
+mod placement;
 mod runtime;
 mod session;
 #[allow(dead_code)]
@@ -16,10 +18,10 @@ mod startup;
 #[allow(dead_code)]
 mod uds;
 
-pub use capability::CapabilitySet;
 pub use daemon::{
-    Config as DaemonConfig, Control as DaemonControl, Daemon, LaunchConfig as DaemonLaunchConfig,
-    ShutdownResult, State as DaemonState, Status as DaemonStatus,
+    Control as DaemonControl, Daemon, DaemonConfig, DaemonLaunchCommand, DaemonLaunchConfig,
+    DaemonLaunchLog, RuntimePlacementSummary, ShutdownResult, State as DaemonState,
+    Status as DaemonStatus,
 };
 pub use database::RuntimeDatabase;
 pub use error::{Error, Result};
@@ -27,3 +29,4 @@ pub use runtime::{ApiClientConfig, Config as RuntimeConfig, Runtime};
 pub use session::{
     Config as SessionConfig, Handle as SessionHandle, Requirements as SessionRequirements, Session,
 };
+pub use synd_protocol::CapabilitySet;

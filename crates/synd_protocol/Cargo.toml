@@ -1,0 +1,22 @@
+[package]
+authors.workspace    = true
+categories.workspace = true
+edition.workspace    = true
+homepage.workspace   = true
+keywords.workspace   = true
+license.workspace    = true
+repository.workspace = true
+
+description = "Shared wire protocol contracts for syndicationd"
+name        = "synd-protocol"
+readme      = "README.md"
+version     = "0.1.0"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

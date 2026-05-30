@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{CapabilitySet, Result, loopback::LoopbackApiHandle};
+use crate::{CapabilitySet, Result};
 
 pub struct Session {
     client: synd_client::Client,
@@ -36,7 +36,6 @@ pub struct Handle {
 
 enum HandleKind {
     Inert,
-    Loopback(LoopbackApiHandle),
 }
 
 impl Handle {
@@ -46,18 +45,10 @@ impl Handle {
         }
     }
 
+    #[expect(clippy::unused_async)]
     pub async fn close(self) -> Result<()> {
         match self.kind {
             HandleKind::Inert => Ok(()),
-            HandleKind::Loopback(handle) => handle.shutdown().await,
-        }
-    }
-}
-
-impl From<LoopbackApiHandle> for Handle {
-    fn from(handle: LoopbackApiHandle) -> Self {
-        Self {
-            kind: HandleKind::Loopback(handle),
         }
     }
 }
