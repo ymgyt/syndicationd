@@ -1,40 +1,40 @@
 use std::{collections::HashMap, io, path::PathBuf, time::Duration};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use thiserror::Error;
 
-use synd_term::config::CategoryConfig;
+use synd_term::{config::CategoryConfig, keymap::v2::KeymapConfig};
 
 use crate::cli::Palette;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct CacheEntry {
     pub(super) directory: Option<PathBuf>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LogEntry {
     pub(super) path: Option<PathBuf>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ThemeEntry {
     pub(super) name: Option<Palette>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct FeedEntry {
     pub(super) entries_limit: Option<usize>,
     pub(super) browser: Option<FeedBrowserEntry>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct FeedBrowserEntry {
     pub(super) command: Option<PathBuf>,
     pub(super) args: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ApiEntry {
     #[serde(
         default,
@@ -43,12 +43,12 @@ pub struct ApiEntry {
     pub(super) timeout: Option<Duration>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct BackendEntry {
     pub(super) sqlite_db: Option<PathBuf>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct GithubEntry {
     pub(super) enable: Option<bool>,
     pub(super) pat: Option<String>,
@@ -62,7 +62,7 @@ pub enum ConfigFileError {
     Deserialize(#[from] toml::de::Error),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct ConfigFile {
     pub(super) cache: Option<CacheEntry>,
     pub(super) log: Option<LogEntry>,
@@ -72,6 +72,7 @@ pub struct ConfigFile {
     pub(super) feed: Option<FeedEntry>,
     pub(super) github: Option<GithubEntry>,
     pub(super) categories: Option<HashMap<String, CategoryConfig>>,
+    pub(super) keys: Option<KeymapConfig>,
 }
 
 impl ConfigFile {
@@ -117,6 +118,13 @@ pub static INIT_CONFIG: &str = r#"
 
 # Github Personal access token(PAT) to browse notifications
 # pat = "ghp_xxxx"
+
+[keys.entries]
+# keymap = [
+#   { on = "j", command = "entries.next", desc = "Next entry" },
+#   { on = ["g", "g"], command = "entries.first", desc = "Go to first entry" },
+#   { on = "up", command = "no_op" },
+# ]
 "#;
 
 #[cfg(test)]
@@ -152,6 +160,13 @@ pat = "ghp_xxxx"
 [categories.rust]
 icon = { symbol = "S", color = { rgb = 0xF74C00 }}
 aliases = ["rs"]
+
+[keys.entries]
+keymap = [
+  { on = "j", command = "entries.next", desc = "Next entry" },
+  { on = ["g", "g"], command = "entries.first", desc = "Go to first entry" },
+  { on = "up", command = "no_op" },
+]
 "#;
 
         let config = ConfigFile::new(src.as_bytes()).unwrap();

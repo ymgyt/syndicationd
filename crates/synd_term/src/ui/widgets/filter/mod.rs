@@ -17,7 +17,7 @@ use crate::{
     client::github::{FetchNotificationInclude, FetchNotificationParticipating},
     command::{Command, FilterCommand},
     config::Categories,
-    keymap::{KeyTrie, Keymap},
+    keymap::{KeyTrie, Keymap, v2},
     matcher::Matcher,
     types::{
         EntryExt, RequirementExt,
@@ -123,6 +123,49 @@ impl FilterWidget {
         self.state == State::SearchFiltering
     }
 
+    pub fn is_category_filtering_active(&self) -> bool {
+        matches!(self.state, State::CategoryFiltering(_))
+    }
+
+    pub(crate) fn category_filter_keymap_v2(&self) -> Option<v2::LayerKeymap> {
+        let State::CategoryFiltering(lane) = self.state else {
+            return None;
+        };
+
+        let mut keymap = v2::LayerKeymap::builder(v2::Layer::CategoryFilter);
+        for (category, state) in &self.categories_state_from_lane(lane).state {
+            if state.label == ' ' {
+                continue;
+            }
+            keymap
+                .bind_key(
+                    v2::KeyStroke::from_char(state.label),
+                    v2::KeymapAction::Filter(v2::FilterAction::ToggleCategory {
+                        lane,
+                        category: category.clone(),
+                    }),
+                    Some(format!("Toggle {category} category")),
+                )
+                .expect("valid category filter key binding");
+        }
+        keymap
+            .bind(
+                ["+"],
+                v2::KeymapAction::Filter(v2::FilterAction::ActivateAllCategories { lane }),
+                Some("Activate all categories"),
+            )
+            .expect("valid category filter key binding");
+        keymap
+            .bind(
+                ["-"],
+                v2::KeymapAction::Filter(v2::FilterAction::DeactivateAllCategories { lane }),
+                Some("Deactivate all categories"),
+            )
+            .expect("valid category filter key binding");
+
+        Some(keymap.build().expect("valid category filter keymap"))
+    }
+
     #[must_use]
     pub fn activate_category_filtering(&mut self, lane: FilterLane) -> Keymap {
         self.state = State::CategoryFiltering(lane);
@@ -169,6 +212,14 @@ impl FilterWidget {
 
     pub fn deactivate_filtering(&mut self) {
         self.state = State::Normal;
+    }
+
+    pub(crate) fn insert_prompt_char(&mut self, ch: char) {
+        self.prompt.borrow_mut().insert_char(ch);
+    }
+
+    pub(crate) fn delete_prompt_backward(&mut self) {
+        self.prompt.borrow_mut().delete_backward();
     }
 
     #[must_use]

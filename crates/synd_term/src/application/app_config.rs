@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::config;
+use crate::{config, keymap::v2::CompiledKeymaps};
 
 #[derive(Debug, Clone, Default)]
 pub struct Features {
@@ -15,6 +15,7 @@ pub struct Config {
     pub entries_per_pagination: i64,
     pub feeds_per_pagination: i64,
     pub features: Features,
+    pub keymaps: CompiledKeymaps,
 }
 
 impl Default for Config {
@@ -26,6 +27,7 @@ impl Default for Config {
             entries_per_pagination: config::client::DEFAULT_ENTRIES_PER_PAGINATION,
             feeds_per_pagination: config::client::DEFAULT_FEEDS_PER_PAGINATION,
             features: Features::default(),
+            keymaps: CompiledKeymaps::default_keymaps(),
         }
     }
 }

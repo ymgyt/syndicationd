@@ -36,12 +36,18 @@ impl Prompt {
         self.line.as_str()
     }
 
-    fn insert_char(&mut self, c: char) {
+    pub(crate) fn insert_char(&mut self, c: char) {
         self.line.insert(self.cursor, c);
         let mut cursor = GraphemeCursor::new(self.cursor, self.line.len(), true);
         if let Ok(Some(pos)) = cursor.next_boundary(&self.line, 0) {
             self.cursor = pos;
         }
+    }
+
+    pub(crate) fn delete_backward(&mut self) {
+        let pos = self.move_cursor(Move::BackwardChar(1));
+        self.line.replace_range(pos..self.cursor, "");
+        self.cursor = pos;
     }
 }
 
@@ -58,9 +64,7 @@ impl Prompt {
                 code: KeyCode::Backspace,
                 ..
             } => {
-                let pos = self.move_cursor(Move::BackwardChar(1));
-                self.line.replace_range(pos..self.cursor, "");
-                self.cursor = pos;
+                self.delete_backward();
                 KeyEventResult::consumed(Command::Filter(FilterCommand::PromptChanged))
                     .should_render(true)
             }

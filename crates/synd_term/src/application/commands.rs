@@ -1,7 +1,6 @@
 use crate::{
     command::{Command, FeedsCommand, FilterCommand, GitHubCommand, ShellCommand},
-    keymap::KeymapId,
-    ui::widgets::tabs::Tab,
+    keymap::v2,
 };
 
 use super::Application;
@@ -21,29 +20,13 @@ impl Application {
 
     fn apply_shell_command(&mut self, command: ShellCommand) {
         let move_tab = matches!(command, ShellCommand::MoveTabSelection(_));
-        if move_tab {
-            self.keymaps()
-                .disable(KeymapId::Subscription)
-                .disable(KeymapId::Entries)
-                .disable(KeymapId::GhNotification);
-        }
 
         let operations = self
             .components
             .apply_shell_command(command, self.config.feeds_per_pagination);
 
         if move_tab {
-            match self.components.shell.tabs.current() {
-                Tab::Feeds => {
-                    self.keymaps().enable(KeymapId::Subscription);
-                }
-                Tab::Entries => {
-                    self.keymaps().enable(KeymapId::Entries);
-                }
-                Tab::GitHub => {
-                    self.keymaps().enable(KeymapId::GhNotification);
-                }
-            }
+            self.key_resolver_v2.clear_pending();
         }
 
         self.perform_operations(operations);
@@ -59,7 +42,7 @@ impl Application {
                 );
                 self.perform_operations(operations);
                 if self.components.is_feed_unsubscription_popup_open() {
-                    self.keymaps().enable(KeymapId::UnsubscribePopupSelection);
+                    self.key_resolver_v2.clear_pending();
                 }
             }
             FeedsCommand::SelectFeedUnsubscriptionPopup
@@ -70,7 +53,7 @@ impl Application {
                     self.next_entries_first(0),
                 );
                 self.perform_operations(operations);
-                self.keymaps().disable(KeymapId::UnsubscribePopupSelection);
+                self.key_resolver_v2.clear_pending();
             }
             command => {
                 let operations = self.components.apply_feeds_command(
@@ -90,13 +73,25 @@ impl Application {
                 self.perform_operations(operations);
             }
             FilterCommand::ActivateCategoryFilterling => {
-                let keymap = self.components.activate_category_filtering();
-                self.keymaps().update(KeymapId::CategoryFiltering, keymap);
+                let _ = self.components.activate_category_filtering();
+                if let Some(keymap) = self.components.category_filter_keymap_v2() {
+                    self.keymaps_v2.set_layer_keymap(keymap);
+                }
+                self.key_resolver_v2.clear_pending();
             }
             FilterCommand::ActivateSearchFiltering => {
-                let prompt = self.components.activate_search_filtering();
-                self.key_handlers
-                    .push(super::key_handlers::KeyHandler::Prompt(prompt));
+                let _ = self.components.activate_search_filtering();
+                self.keymaps_v2
+                    .set_layer_keymap(v2::LayerKeymap::search_prompt());
+                self.key_resolver_v2.clear_pending();
+            }
+            FilterCommand::PromptInsertChar(ch) => {
+                let operations = self.components.insert_prompt_char(ch);
+                self.perform_operations(operations);
+            }
+            FilterCommand::PromptDeleteBackward => {
+                let operations = self.components.delete_prompt_backward();
+                self.perform_operations(operations);
             }
             FilterCommand::PromptChanged => {
                 let operations = self.components.prompt_changed();
@@ -104,8 +99,10 @@ impl Application {
             }
             FilterCommand::DeactivateFiltering => {
                 self.components.deactivate_filtering();
-                self.keymaps().disable(KeymapId::CategoryFiltering);
-                self.key_handlers.remove_prompt();
+                self.keymaps_v2
+                    .clear_layer_keymap(v2::Layer::CategoryFilter);
+                self.keymaps_v2.clear_layer_keymap(v2::Layer::SearchPrompt);
+                self.key_resolver_v2.clear_pending();
             }
             FilterCommand::ToggleFilterCategory { category, lane } => {
                 let operations = self.components.toggle_filter_category(&category, lane);
@@ -124,23 +121,11 @@ impl Application {
 
     fn apply_github_command(&mut self, command: GitHubCommand) {
         match command {
-            GitHubCommand::OpenGhNotificationFilterPopup => {
+            GitHubCommand::OpenGhNotificationFilterPopup
+            | GitHubCommand::CloseGhNotificationFilterPopup => {
                 let operations = self.components.apply_github_command(command);
                 self.perform_operations(operations);
-                self.keymaps().enable(KeymapId::GhNotificationFilterPopup);
-                self.keymaps().disable(KeymapId::GhNotification);
-                self.keymaps().disable(KeymapId::Filter);
-                self.keymaps().disable(KeymapId::Entries);
-                self.keymaps().disable(KeymapId::Subscription);
-            }
-            GitHubCommand::CloseGhNotificationFilterPopup => {
-                let operations = self.components.apply_github_command(command);
-                self.perform_operations(operations);
-                self.keymaps().disable(KeymapId::GhNotificationFilterPopup);
-                self.keymaps().enable(KeymapId::GhNotification);
-                self.keymaps().enable(KeymapId::Filter);
-                self.keymaps().enable(KeymapId::Entries);
-                self.keymaps().enable(KeymapId::Subscription);
+                self.key_resolver_v2.clear_pending();
             }
             command => {
                 let operations = self.components.apply_github_command(command);

@@ -46,6 +46,7 @@ synd config view -o json
 | `--entries-limit`  | `SYND_ENTRIES_LIMIT`     | `[feed.entries_limit]`   | `200`                  | Feed entries to fetch       |
 | `--browser`        | `SYND_BROWSER`           | `[feed.browser.command]` | -                      | Command to browse feed      |
 | `--browser-args`   | `SYND_BROWSER_ARGS`      | `[feed.browser.args]`    | `[]`                   | Command args to browse feed |
+| -                  | -                        | `[keys.<layer>.keymap]`  | built-in keymap        | Custom key bindings         |
 
 ## Theme
 
@@ -81,3 +82,20 @@ To add a category, add the following content to the configuration file:
 icon = { symbol = "R", color = { rgb = 0xF74C00 } }
 aliases = ["rs"]
 ```
+
+## Keymap
+
+Custom key bindings are configured in the config file and merged with the
+built-in keymap.
+
+```toml
+[keys.entries]
+keymap = [
+  { on = "j", command = "entries.next", desc = "Next entry" },
+  { on = ["g", "g"], command = "entries.first", desc = "Go to first entry" },
+  { on = "up", command = "no_op" },
+]
+```
+
+See [Keymap](./keymap.md) for layer names, command names, key notation, and
+merge behavior.

@@ -109,6 +109,7 @@ async fn build_app(
             features: Features {
                 enable_github_notification: config.is_github_enable(),
             },
+            keymaps: config.keymaps(),
             ..Default::default()
         })
         .cache(Cache::new(config.cache_dir()))

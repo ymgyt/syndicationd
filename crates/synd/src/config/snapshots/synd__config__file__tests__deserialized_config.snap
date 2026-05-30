@@ -1,6 +1,6 @@
 ---
 source: crates/synd/src/config/file.rs
-assertion_line: 159
+assertion_line: 174
 expression: config
 ---
 ConfigFile {
@@ -86,6 +86,72 @@ ConfigFile {
                 },
                 aliases: [
                     "rs",
+                ],
+            },
+        },
+    ),
+    keys: Some(
+        KeymapConfig {
+            bindings: {
+                Entries: [
+                    KeyBinding {
+                        on: KeySequence {
+                            keys: [
+                                KeyStroke {
+                                    code: Char(
+                                        'j',
+                                    ),
+                                    modifiers: KeyModifiers(
+                                        0x0,
+                                    ),
+                                },
+                            ],
+                        },
+                        command: MoveEntryNext,
+                        desc: Some(
+                            "Next entry",
+                        ),
+                    },
+                    KeyBinding {
+                        on: KeySequence {
+                            keys: [
+                                KeyStroke {
+                                    code: Char(
+                                        'g',
+                                    ),
+                                    modifiers: KeyModifiers(
+                                        0x0,
+                                    ),
+                                },
+                                KeyStroke {
+                                    code: Char(
+                                        'g',
+                                    ),
+                                    modifiers: KeyModifiers(
+                                        0x0,
+                                    ),
+                                },
+                            ],
+                        },
+                        command: MoveEntryFirst,
+                        desc: Some(
+                            "Go to first entry",
+                        ),
+                    },
+                    KeyBinding {
+                        on: KeySequence {
+                            keys: [
+                                KeyStroke {
+                                    code: Up,
+                                    modifiers: KeyModifiers(
+                                        0x0,
+                                    ),
+                                },
+                            ],
+                        },
+                        command: NoOp,
+                        desc: None,
+                    },
                 ],
             },
         },

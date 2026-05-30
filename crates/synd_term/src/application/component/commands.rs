@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     command::{FeedsCommand, GitHubCommand, ShellCommand},
-    keymap::Keymap,
+    keymap::{Keymap, v2},
     operation::Operation,
     ui::widgets::{filter::FilterLane, prompt::Prompt},
 };
@@ -204,6 +204,10 @@ impl AppComponent {
         keymap
     }
 
+    pub(in crate::application) fn category_filter_keymap_v2(&self) -> Option<v2::LayerKeymap> {
+        self.shell.filter.category_filter_keymap_v2()
+    }
+
     pub(in crate::application) fn activate_search_filtering(&mut self) -> Rc<RefCell<Prompt>> {
         let prompt = self.shell.filter.activate_search_filtering();
         self.shell.request_render();
@@ -218,6 +222,16 @@ impl AppComponent {
         let operations = self.apply_filterer(filterer).into_iter().collect();
         self.shell.request_render();
         operations
+    }
+
+    pub(in crate::application) fn insert_prompt_char(&mut self, ch: char) -> Vec<Operation> {
+        self.shell.filter.insert_prompt_char(ch);
+        self.prompt_changed()
+    }
+
+    pub(in crate::application) fn delete_prompt_backward(&mut self) -> Vec<Operation> {
+        self.shell.filter.delete_prompt_backward();
+        self.prompt_changed()
     }
 
     pub(in crate::application) fn deactivate_filtering(&mut self) {

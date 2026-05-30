@@ -7,12 +7,11 @@ use synd_client::{Client, payload};
 use synd_feed::types::FeedUrl;
 
 use crate::{
-    application::key_handlers::KeyEventResult,
     auth::{Credential, CredentialError, Verified},
     config::Categories,
     event::Event,
     interact::Interact,
-    keymap::{KeymapId, Keymaps},
+    keymap,
     operation::Operation,
     terminal::Terminal,
     ui::{
@@ -29,6 +28,7 @@ mod in_flight;
 pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
 
 mod input_parser;
+mod keymap_v2;
 
 pub use crate::auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
@@ -80,7 +80,8 @@ pub enum Populate {
 pub struct Application {
     drivers: Drivers,
     components: AppComponent,
-    key_handlers: key_handlers::KeyHandlers,
+    keymaps_v2: keymap::v2::KeymapRuntime,
+    key_resolver_v2: keymap::v2::KeyResolver,
     config: Config,
 }
 
@@ -138,15 +139,6 @@ impl Application {
             dry_run,
         } = builder;
 
-        let key_handlers = {
-            let mut keymaps = Keymaps::default();
-            keymaps.enable(KeymapId::Global);
-            keymaps.enable(KeymapId::Login);
-
-            let mut key_handlers = key_handlers::KeyHandlers::new();
-            key_handlers.push(key_handlers::KeyHandler::Keymaps(keymaps));
-            key_handlers
-        };
         let components = AppComponent::new(&config.features, theme, categories, dry_run);
         let drivers = Drivers::new(DriverParts {
             terminal,
@@ -164,13 +156,10 @@ impl Application {
         Self {
             drivers,
             components,
-            key_handlers,
+            keymaps_v2: keymap::v2::KeymapRuntime::new(config.keymaps.clone()),
+            key_resolver_v2: keymap::v2::KeyResolver::new(),
             config,
         }
-    }
-
-    fn keymaps(&mut self) -> &mut Keymaps {
-        self.key_handlers.keymaps_mut().unwrap()
     }
 
     pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
@@ -243,15 +232,7 @@ impl Application {
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
         self.should_render();
-        self.keymaps()
-            .disable(KeymapId::Login)
-            .enable(KeymapId::Tabs)
-            .enable(KeymapId::Entries)
-            .enable(KeymapId::Filter);
-        self.config
-            .features
-            .enable_github_notification
-            .then(|| self.keymaps().enable(KeymapId::GhNotification));
+        self.key_resolver_v2.clear_pending();
     }
 
     fn set_credential(&mut self, cred: Verified<Credential>) {
@@ -432,18 +413,7 @@ impl Application {
 
                 self.reset_idle_timer();
 
-                match self.key_handlers.handle(key) {
-                    KeyEventResult::Consumed {
-                        command,
-                        should_render,
-                    } => {
-                        should_render.then(|| self.should_render());
-                        if let Some(command) = command {
-                            self.apply_command(command);
-                        }
-                    }
-                    KeyEventResult::Ignored => {}
-                }
+                self.handle_keymap_v2(key);
             }
             _ => {}
         }

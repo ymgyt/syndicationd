@@ -164,7 +164,7 @@ Basic keys:
 * `q`: quit
 
 See [docs/mdbook/src/keymap.md](./docs/mdbook/src/keymap.md) for the full
-keymap.
+keymap and custom key binding syntax.
 
 ### Subscribe Feed
 
@@ -278,7 +278,7 @@ handled separately from cache/log cleanup.
 Configuration can be set with flags, environment variables, or a config file.
 
 See [docs/mdbook/src/configuration.md](./docs/mdbook/src/configuration.md) for
-config file locations and available settings.
+config file locations, available settings, and keymap customization.
 
 ## Documentation
 

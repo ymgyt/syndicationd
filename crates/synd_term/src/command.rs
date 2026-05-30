@@ -54,6 +54,8 @@ pub(crate) enum FilterCommand {
     MoveFilterRequirement(Direction),
     ActivateCategoryFilterling,
     ActivateSearchFiltering,
+    PromptInsertChar(char),
+    PromptDeleteBackward,
     PromptChanged,
     DeactivateFiltering,
     ToggleFilterCategory {

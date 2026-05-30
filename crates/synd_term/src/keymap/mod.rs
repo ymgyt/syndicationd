@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{collections::HashMap, ops::ControlFlow};
 
 use anyhow::{anyhow, bail};
@@ -6,6 +8,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 mod default;
 
 pub mod macros;
+pub mod v2;
 
 use crate::{application::key_handlers::KeyEventResult, command::Command};
 
@@ -193,6 +196,7 @@ pub struct KeyTrieNode {
 fn parse(s: &str) -> anyhow::Result<KeyEvent> {
     let mut tokens: Vec<_> = s.split('-').collect();
     let code = match tokens.pop().ok_or_else(|| anyhow!("no token"))? {
+        "backspace" => KeyCode::Backspace,
         "enter" => KeyCode::Enter,
         "tab" => KeyCode::Tab,
         "backtab" => KeyCode::BackTab,

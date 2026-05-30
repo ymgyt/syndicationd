@@ -17,6 +17,7 @@ use crate::{
         file::{ConfigFile, ConfigFileError},
     },
 };
+use synd_term::keymap::v2::{CompiledKeymaps, KeymapError};
 use synd_term::{config::Categories, ui::theme::Palette};
 
 /// `ConfigResolver` is responsible for resolving the application's configuration
@@ -41,6 +42,7 @@ pub struct ConfigResolver {
     github_pat: Entry<String>,
     palette: Entry<Palette>,
     categories: Categories,
+    keymaps: CompiledKeymaps,
 }
 
 impl ConfigResolver {
@@ -95,6 +97,10 @@ impl ConfigResolver {
     pub fn categories(&self) -> Categories {
         self.categories.clone()
     }
+
+    pub fn keymaps(&self) -> CompiledKeymaps {
+        self.keymaps.clone()
+    }
 }
 
 impl ConfigResolver {
@@ -117,6 +123,8 @@ pub enum ConfigResolverBuildError {
     ConfigFileLoad(#[from] ConfigFileError),
     #[error("invalid configuration: {0}")]
     ValidateConfigFile(String),
+    #[error("invalid keymap configuration: {0}")]
+    Keymap(#[from] KeymapError),
 }
 
 #[derive(Default)]
@@ -205,6 +213,12 @@ impl ConfigResolverBuilder {
         if let Some(user_defined) = config_file.as_mut().and_then(|c| c.categories.take()) {
             categories.merge(user_defined);
         }
+
+        let user_keymaps = config_file
+            .as_mut()
+            .and_then(|config| config.keys.take())
+            .unwrap_or_default();
+        let keymaps = CompiledKeymaps::default_with_user_config(user_keymaps)?;
 
         let ConfigResolverBuilder {
             api_flags: Some(ApiOptions { client_timeout }),
@@ -318,6 +332,7 @@ impl ConfigResolverBuilder {
                 )
                 .with_flag(palette_flag.map(Into::into)),
             categories,
+            keymaps,
         };
 
         resolver.validate()

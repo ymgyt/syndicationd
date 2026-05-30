@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use crate::command::Command;
 
 mod key_handlers;
