@@ -2,7 +2,7 @@ use std::future::Future;
 
 use thiserror::Error;
 
-use crate::event::{EventConsumerId, EventReadFilter, RegistryEvent};
+use crate::event::{Event, EventConsumerId, EventReadFilter};
 
 pub type EventJournalResult<T> = Result<T, EventJournalError>;
 
@@ -15,20 +15,26 @@ pub enum EventJournalError {
 /// Appends registry events and tracks where each event consumer has read up to.
 pub trait EventJournal: Clone + Send + Sync + 'static {
     /// Records that the event happened.
-    async fn append(&self, event: RegistryEvent) -> EventJournalResult<()>;
+    fn append(&self, event: Event) -> impl Future<Output = EventJournalResult<()>> + Send;
 
     /// Reads filtered entries after the supplied cursor.
-    async fn read_after(
+    fn read_after(
         &self,
         cursor: &EventCursor,
         filter: EventReadFilter,
-    ) -> EventJournalResult<EventReadBatch>;
+    ) -> impl Future<Output = EventJournalResult<EventReadBatch>> + Send;
 
     /// Loads the cursor for a consumer, or `EventCursor::initial()` for a new consumer.
-    async fn load_cursor(&self, consumer: EventConsumerId) -> EventJournalResult<EventCursor>;
+    fn load_cursor(
+        &self,
+        consumer: EventConsumerId,
+    ) -> impl Future<Output = EventJournalResult<EventCursor>> + Send;
 
     /// Records that the cursor's consumer has fully processed events through the cursor.
-    async fn commit_cursor(&self, cursor: &EventCursor) -> EventJournalResult<()>;
+    fn commit_cursor(
+        &self,
+        cursor: &EventCursor,
+    ) -> impl Future<Output = EventJournalResult<()>> + Send;
 }
 
 pub trait EventJournalExt: EventJournal {
@@ -145,11 +151,11 @@ impl EventReadBatch {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JournaledEvent {
     cursor: EventCursor,
-    event: RegistryEvent,
+    event: Event,
 }
 
 impl JournaledEvent {
-    pub fn new(cursor: EventCursor, event: RegistryEvent) -> Self {
+    pub fn new(cursor: EventCursor, event: Event) -> Self {
         Self { cursor, event }
     }
 
@@ -157,11 +163,11 @@ impl JournaledEvent {
         &self.cursor
     }
 
-    pub fn event(&self) -> &RegistryEvent {
+    pub fn event(&self) -> &Event {
         &self.event
     }
 
-    pub fn into_event(self) -> RegistryEvent {
+    pub fn into_event(self) -> Event {
         self.event
     }
 }

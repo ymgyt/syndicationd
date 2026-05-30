@@ -5,6 +5,7 @@
 pub mod byte;
 #[cfg(feature = "conf")]
 pub mod conf;
+pub mod dirs;
 pub mod fs;
 pub mod io;
 #[cfg(feature = "o11y")]

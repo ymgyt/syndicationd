@@ -1,10 +1,15 @@
+use std::time::Duration;
+
 use tower_http::trace::HttpMakeClassifier;
-use tracing::Level;
+use tracing::{Level, Span};
+
+const SLOW_RESPONSE_THRESHOLD: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub struct MakeSpan;
 
 impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
+    #[expect(clippy::redundant_closure_for_method_calls)]
     fn make_span(&mut self, request: &axum::http::Request<B>) -> tracing::Span {
         use synd_support::o11y::opentelemetry::extension::*;
         let cx = synd_support::o11y::opentelemetry::http::extract(request.headers());
@@ -12,15 +17,18 @@ impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
         let request_id = cx
             .baggage()
             .get(synd_support::o11y::REQUEST_ID_KEY)
-            .map_or("?", |v| v.as_str());
+            .map(|v| v.as_str());
 
         let span = tracing::span!(
             Level::INFO,
             "http",
             method = %request.method(),
-            uri = %request.uri(),
-            %request_id,
+            path = %request.uri().path(),
+            request_id = tracing::field::Empty,
         );
+        if let Some(request_id) = request_id {
+            span.record("request_id", request_id);
+        }
 
         let _ = span.set_parent(cx);
         span
@@ -36,14 +44,30 @@ impl<B> tower_http::trace::OnRequest<B> for OnRequest {
     }
 }
 
-pub fn layer() -> tower_http::trace::TraceLayer<
-    HttpMakeClassifier,
-    MakeSpan,
-    OnRequest,
-    tower_http::trace::DefaultOnResponse,
-> {
+#[derive(Clone)]
+pub struct LogResponse;
+
+impl<B> tower_http::trace::OnResponse<B> for LogResponse {
+    fn on_response(self, response: &axum::http::Response<B>, latency: Duration, _span: &Span) {
+        let status = response.status();
+        let latency_ms = u64::try_from(latency.as_millis()).unwrap_or(u64::MAX);
+
+        if status.is_server_error() {
+            tracing::warn!(latency_ms, status = status.as_u16(), "request failed");
+        } else if status.is_client_error() {
+            tracing::info!(latency_ms, status = status.as_u16(), "request rejected");
+        } else if latency >= SLOW_RESPONSE_THRESHOLD {
+            tracing::info!(latency_ms, status = status.as_u16(), "slow request");
+        } else {
+            tracing::debug!(latency_ms, status = status.as_u16(), "request complete");
+        }
+    }
+}
+
+pub fn layer() -> tower_http::trace::TraceLayer<HttpMakeClassifier, MakeSpan, OnRequest, LogResponse>
+{
     tower_http::trace::TraceLayer::new_for_http()
         .make_span_with(MakeSpan)
         .on_request(OnRequest)
-        .on_response(tower_http::trace::DefaultOnResponse::default().level(Level::INFO))
+        .on_response(LogResponse)
 }

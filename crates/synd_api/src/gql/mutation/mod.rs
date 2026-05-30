@@ -1,8 +1,8 @@
 use async_graphql::{Context, Enum, Error, InputObject, Object, SimpleObject};
 use synd_feed::types::{Category, FeedUrl, Requirement};
-use synd_registry::legacy::model::{
-    InitialRefreshMode, RefreshInterval, RefreshPolicy, RefreshRequestDisposition, RefreshSchedule,
-    RequestRefreshCommand, SubscribeFeedCommand, SubscribeFeedRefresh, UnsubscribeFeedCommand,
+use synd_registry::{
+    SubscribeFeedCommand, UnsubscribeFeedCommand,
+    crawl::policy::{RefreshInterval, RefreshPolicy, RefreshSchedule},
 };
 
 use crate::gql::{registry, subscriber_id};
@@ -29,28 +29,12 @@ impl ResponseStatus {
     }
 }
 
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
-enum InitialRefreshModeInput {
-    Async,
-    RequireSuccess,
-}
-
-impl From<InitialRefreshModeInput> for InitialRefreshMode {
-    fn from(value: InitialRefreshModeInput) -> Self {
-        match value {
-            InitialRefreshModeInput::Async => Self::Async,
-            InitialRefreshModeInput::RequireSuccess => Self::RequireSuccess,
-        }
-    }
-}
-
 #[derive(InputObject)]
 struct SubscribeFeedInput {
     url: FeedUrl,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
     refresh_policy: Option<RefreshPolicyInput>,
-    initial_refresh: Option<InitialRefreshModeInput>,
 }
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
@@ -101,8 +85,7 @@ impl RefreshPolicyInput {
 struct SubscribeFeedPayload {
     status: ResponseStatus,
     url: FeedUrl,
-    request_id: Option<String>,
-    disposition: Option<RefreshDisposition>,
+    request_id: String,
 }
 
 #[derive(InputObject)]
@@ -120,30 +103,20 @@ struct RefreshFeedInput {
     url: FeedUrl,
 }
 
+#[derive(SimpleObject)]
+struct RefreshFeedPayload {
+    status: ResponseStatus,
+    request_id: String,
+    disposition: RefreshDisposition,
+}
+
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
 enum RefreshDisposition {
     Created,
     Promoted,
     CoalescedPending,
     JoinedRunning,
-}
-
-impl From<RefreshRequestDisposition> for RefreshDisposition {
-    fn from(value: RefreshRequestDisposition) -> Self {
-        match value {
-            RefreshRequestDisposition::Created => Self::Created,
-            RefreshRequestDisposition::Promoted => Self::Promoted,
-            RefreshRequestDisposition::CoalescedPending => Self::CoalescedPending,
-            RefreshRequestDisposition::JoinedRunning => Self::JoinedRunning,
-        }
-    }
-}
-
-#[derive(SimpleObject)]
-struct RefreshFeedPayload {
-    status: ResponseStatus,
-    request_id: String,
-    disposition: RefreshDisposition,
+    AlreadyFresh,
 }
 
 pub(crate) struct Mutation;
@@ -167,26 +140,13 @@ impl Mutation {
                 requirement: input.requirement,
                 category: input.category,
                 refresh_policy,
-                initial_refresh: input
-                    .initial_refresh
-                    .unwrap_or(InitialRefreshModeInput::Async)
-                    .into(),
             })
             .await?;
-
-        let (request_id, disposition) = match out.refresh {
-            SubscribeFeedRefresh::Enqueued(refresh) => (
-                Some(refresh.request_id.to_string()),
-                Some(refresh.disposition.into()),
-            ),
-            SubscribeFeedRefresh::Completed(_) => (None, None),
-        };
 
         Ok(SubscribeFeedPayload {
             status: ResponseStatus::ok(),
             url: out.subscription.feed_url,
-            request_id,
-            disposition,
+            request_id: out.request_id.to_string(),
         })
     }
 
@@ -207,22 +167,15 @@ impl Mutation {
         })
     }
 
+    #[expect(clippy::unused_async)]
     async fn refresh_feed(
         &self,
         cx: &Context<'_>,
         input: RefreshFeedInput,
     ) -> async_graphql::Result<RefreshFeedPayload> {
-        let out = registry(cx)
-            .request_refresh(RequestRefreshCommand {
-                subscriber_id: subscriber_id(cx),
-                feed_url: input.url,
-            })
-            .await?;
-
-        Ok(RefreshFeedPayload {
-            status: ResponseStatus::ok(),
-            request_id: out.request_id.to_string(),
-            disposition: out.disposition.into(),
-        })
+        let _ = (cx, input);
+        Err(Error::new(
+            "refreshFeed is not implemented while crawl runtime is redesigned",
+        ))
     }
 }

@@ -19,15 +19,13 @@ pub enum FeedRegistryError {
     #[error(transparent)]
     Db(#[from] RegistryDbError),
     #[error(transparent)]
-    FeedProvider(#[from] crate::legacy::FeedProviderError),
-    #[error(transparent)]
     EventRuntime(#[from] crate::event::EventRuntimeError),
     #[error("invalid command: {0}")]
     InvalidCommand(String),
     #[error("feed is not subscribed: {0}")]
     NotSubscribed(synd_feed::types::FeedUrl),
-    #[error("initial refresh failed: {0}")]
-    InitialRefreshFailed(String),
+    #[error("{0} is not implemented while crawl runtime is redesigned")]
+    NotImplemented(&'static str),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }

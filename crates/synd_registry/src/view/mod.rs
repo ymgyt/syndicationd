@@ -2,50 +2,44 @@ use std::{cmp::Ordering, fmt};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Annotated, Entry, Feed, FeedMeta, FeedUrl};
+use synd_feed::types::{Annotated, Entry, FeedMeta, FeedUrl};
 use thiserror::Error;
 
-use super::{FeedSubscription, RefreshStatus, SubscriberId};
+use crate::{subscriber::SubscriberId, subscription::Subscription};
 
 #[derive(Debug, Clone)]
-pub struct ListSubscriptionsQuery {
+pub struct SubscriptionsQuery {
     pub subscriber_id: SubscriberId,
     pub after: Option<String>,
     pub first: usize,
 }
 
 #[derive(Debug, Clone)]
-pub struct FeedStatusQuery {
-    pub subscriber_id: SubscriberId,
-    pub feed_url: FeedUrl,
-}
-
-#[derive(Debug, Clone)]
-pub struct ListEntriesQuery {
+pub struct EntriesQuery {
     pub subscriber_id: SubscriberId,
     pub after: Option<EntryCursor>,
     pub first: usize,
 }
 
 #[derive(Debug, Clone)]
-pub struct FeedSubscriptionView {
-    pub subscription: FeedSubscription,
-    pub feed: Option<Feed>,
-    pub refresh_status: RefreshStatus,
-}
-
-#[derive(Debug, Clone)]
-pub struct FeedSubscriptionsPage {
-    pub nodes: Vec<FeedSubscriptionView>,
+pub struct Subscriptions {
+    pub subscriptions: Vec<Subscription>,
     pub has_next_page: bool,
     pub end_cursor: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct FeedSubscriptionPage {
-    pub nodes: Vec<FeedSubscription>,
-    pub has_next_page: bool,
-    pub end_cursor: Option<String>,
+impl Subscriptions {
+    pub fn from_subscriptions(
+        subscriptions: Vec<Subscription>,
+        has_next_page: bool,
+        end_cursor: Option<String>,
+    ) -> Self {
+        Self {
+            subscriptions,
+            has_next_page,
+            end_cursor,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

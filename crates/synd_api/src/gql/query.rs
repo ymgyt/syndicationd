@@ -1,14 +1,12 @@
-use std::{borrow::Cow, sync::Arc};
-
 use async_graphql::{
     Context, Enum, Object, Result, SimpleObject,
     connection::{Connection, Edge},
 };
-use synd_feed::types::{Annotated, Category, FeedUrl, Requirement};
-use synd_registry::legacy::model::{
-    EntryCursor, FeedStatusQuery, FeedSubscription, FeedSubscriptionView, ListEntriesQuery,
-    ListSubscriptionsQuery, RefreshPolicy as RegistryRefreshPolicy, RefreshSchedule,
-    RefreshStatus as RegistryRefreshStatus, RefreshStatusKind,
+use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_registry::{
+    Subscription as RegistrySubscription,
+    crawl::policy::{RefreshPolicy as RegistryRefreshPolicy, RefreshSchedule},
+    view::SubscriptionsQuery,
 };
 
 use crate::gql::{
@@ -25,18 +23,6 @@ enum RefreshStatusState {
     LastFailed,
 }
 
-impl From<RefreshStatusKind> for RefreshStatusState {
-    fn from(value: RefreshStatusKind) -> Self {
-        match value {
-            RefreshStatusKind::NeverRefreshed => Self::NeverRefreshed,
-            RefreshStatusKind::Idle => Self::Idle,
-            RefreshStatusKind::Pending => Self::Pending,
-            RefreshStatusKind::Running => Self::Running,
-            RefreshStatusKind::LastFailed => Self::LastFailed,
-        }
-    }
-}
-
 #[derive(SimpleObject)]
 struct RefreshStatus {
     state: RefreshStatusState,
@@ -45,19 +31,6 @@ struct RefreshStatus {
     last_success_at: Option<crate::gql::scalar::Rfc3339Time>,
     last_failure_at: Option<crate::gql::scalar::Rfc3339Time>,
     last_error_message: Option<String>,
-}
-
-impl From<RegistryRefreshStatus> for RefreshStatus {
-    fn from(value: RegistryRefreshStatus) -> Self {
-        Self {
-            state: value.kind.into(),
-            request_id: value.active_request_id.map(|id| id.to_string()),
-            last_attempt_at: value.last_attempt_at.map(Into::into),
-            last_success_at: value.last_success_at.map(Into::into),
-            last_failure_at: value.last_failure_at.map(Into::into),
-            last_error_message: value.last_error_message,
-        }
-    }
 }
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
@@ -88,9 +61,9 @@ impl From<RegistryRefreshPolicy> for RefreshPolicy {
 }
 
 struct SubscribedFeed {
-    subscription: FeedSubscription,
+    subscription: RegistrySubscription,
     feed: Option<object::Feed>,
-    refresh_status: RefreshStatus,
+    refresh_status: Option<RefreshStatus>,
 }
 
 #[Object]
@@ -111,8 +84,8 @@ impl SubscribedFeed {
         self.subscription.refresh_policy.into()
     }
 
-    async fn refresh_status(&self) -> &RefreshStatus {
-        &self.refresh_status
+    async fn refresh_status(&self) -> Option<&RefreshStatus> {
+        self.refresh_status.as_ref()
     }
 
     async fn feed(&self) -> Option<&object::Feed> {
@@ -120,25 +93,12 @@ impl SubscribedFeed {
     }
 }
 
-impl From<FeedSubscriptionView> for SubscribedFeed {
-    fn from(value: FeedSubscriptionView) -> Self {
-        let annotations = Annotated {
-            feed: (),
-            requirement: value.subscription.requirement,
-            category: value.subscription.category.clone(),
-        };
-        let feed = value.feed.map(|feed| {
-            object::Feed::from(Annotated {
-                feed: Arc::new(feed),
-                requirement: annotations.requirement,
-                category: annotations.category,
-            })
-        });
-
+impl From<RegistrySubscription> for SubscribedFeed {
+    fn from(subscription: RegistrySubscription) -> Self {
         Self {
-            subscription: value.subscription,
-            feed,
-            refresh_status: value.refresh_status.into(),
+            subscription,
+            feed: None,
+            refresh_status: None,
         }
     }
 }
@@ -165,15 +125,12 @@ impl Subscription {
         timeline_entries_connection(cx, after, first).await
     }
 
+    #[expect(clippy::unused_async)]
     async fn feed_status(&self, cx: &Context<'_>, url: FeedUrl) -> Result<RefreshStatus> {
-        registry(cx)
-            .feed_status(FeedStatusQuery {
-                subscriber_id: subscriber_id(cx),
-                feed_url: url,
-            })
-            .await
-            .map(Into::into)
-            .map_err(Into::into)
+        let _ = (cx, url);
+        Err(async_graphql::Error::new(
+            "feedStatus is not implemented while crawl runtime is redesigned",
+        ))
     }
 }
 
@@ -229,7 +186,7 @@ async fn subscriptions_connection(
 ) -> Result<Connection<String, SubscribedFeed>> {
     let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
     let page = registry(cx)
-        .list_subscriptions(ListSubscriptionsQuery {
+        .list_subscriptions(SubscriptionsQuery {
             subscriber_id: subscriber_id(cx),
             after,
             first,
@@ -238,7 +195,7 @@ async fn subscriptions_connection(
 
     let mut connection = Connection::new(false, page.has_next_page);
     connection.edges.extend(
-        page.nodes
+        page.subscriptions
             .into_iter()
             .take(first)
             .map(SubscribedFeed::from)
@@ -248,32 +205,14 @@ async fn subscriptions_connection(
     Ok(connection)
 }
 
+#[expect(clippy::unused_async)]
 async fn timeline_entries_connection<'cx>(
     cx: &Context<'cx>,
     after: Option<String>,
     first: Option<i32>,
 ) -> Result<Connection<String, Entry<'cx>>> {
-    let first = usize::try_from(first.unwrap_or(20).clamp(0, 200)).unwrap_or(0);
-    let after = after
-        .as_deref()
-        .map(EntryCursor::decode)
-        .transpose()
-        .map_err(|err| async_graphql::Error::new(err.to_string()))?;
-    let page = registry(cx)
-        .list_entries(ListEntriesQuery {
-            subscriber_id: subscriber_id(cx),
-            after,
-            first,
-        })
-        .await?;
-
-    let mut connection = Connection::new(false, page.has_next_page);
-    connection
-        .edges
-        .extend(page.nodes.into_iter().take(first).map(|view| {
-            let cursor = view.cursor.encode();
-            Edge::new(cursor, Entry::new(Cow::Owned(view.feed_meta), view.entry))
-        }));
-
-    Ok(connection)
+    let _ = (cx, after, first);
+    Err(async_graphql::Error::new(
+        "timeline entries are not implemented while timeline projection is redesigned",
+    ))
 }

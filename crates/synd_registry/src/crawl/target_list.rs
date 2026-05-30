@@ -1,7 +1,7 @@
 use crate::event::{
-    ConsumerEventInput, EventConsumer, EventConsumerId, EventConsumerResult, EventConsumerSession,
-    EventJournal, EventReadBatch, EventReadFilter, JournaledEvent, RegistryEvent,
-    RegistryEventKind, SubscriptionLifecycle,
+    ConsumerEventInput, Event, EventConsumer, EventConsumerId, EventConsumerResult,
+    EventConsumerSession, EventJournal, EventKind, EventReadBatch, EventReadFilter, JournaledEvent,
+    SubEvent, SubEventKind, SubscriptionLifecycle,
 };
 
 /// Subscription lifecycle events relevant to the crawl target list.
@@ -22,8 +22,8 @@ impl CrawlTargetListInput {
 
 impl ConsumerEventInput for CrawlTargetListInput {
     const READ_FILTER: EventReadFilter = EventReadFilter::new(&[
-        RegistryEventKind::FeedSubscribed,
-        RegistryEventKind::FeedUnsubscribed,
+        EventKind::Sub(SubEventKind::FeedSubscribed),
+        EventKind::Sub(SubEventKind::FeedUnsubscribed),
     ]);
 
     fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>> {
@@ -32,7 +32,13 @@ impl ConsumerEventInput for CrawlTargetListInput {
             .into_iter()
             .map(JournaledEvent::into_event)
             .map(|event| match event {
-                RegistryEvent::SubscriptionLifecycle(event) => event,
+                Event::Sub(SubEvent::FeedSubscribed(event)) => {
+                    SubscriptionLifecycle::Subscribed(event)
+                }
+                Event::Sub(SubEvent::FeedUnsubscribed(event)) => {
+                    SubscriptionLifecycle::Unsubscribed(event)
+                }
+                event => unreachable!("unexpected crawl target list event: {event:?}"),
             })
             .collect::<Vec<_>>();
 
@@ -65,7 +71,8 @@ impl EventConsumer for CrawlTargetListProj {
     where
         J: EventJournal,
     {
-        let _events = input.into_events();
+        let event_count = input.into_events().len();
+        tracing::debug!(event_count, "crawl target list projector received events");
         Ok(())
     }
 }

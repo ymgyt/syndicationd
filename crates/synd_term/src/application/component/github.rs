@@ -89,6 +89,10 @@ impl GitHubComponent {
             .map(|params| Self::fetch_notifications(Populate::Replace, params))
     }
 
+    pub(in crate::application) fn is_filter_popup_open(&self) -> bool {
+        self.notifications.is_filter_popup_open()
+    }
+
     pub(in crate::application) fn update_filter_popup_options(
         &mut self,
         updater: &GhNotificationFilterUpdater,

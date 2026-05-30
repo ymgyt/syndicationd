@@ -26,6 +26,7 @@ enum AuthenticatorKind {
     Local {
         token: String,
     },
+    TrustedLocal,
 }
 
 impl Authenticator {
@@ -53,6 +54,12 @@ impl Authenticator {
         })
     }
 
+    pub fn trusted_local() -> Self {
+        Self {
+            kind: AuthenticatorKind::TrustedLocal,
+        }
+    }
+
     #[must_use]
     pub fn with_github_client(self, github: GithubClient) -> Self {
         match self.kind {
@@ -65,6 +72,9 @@ impl Authenticator {
             },
             AuthenticatorKind::Local { token } => Self {
                 kind: AuthenticatorKind::Local { token },
+            },
+            AuthenticatorKind::TrustedLocal => Self {
+                kind: AuthenticatorKind::TrustedLocal,
             },
         }
     }
@@ -81,6 +91,9 @@ impl Authenticator {
             },
             AuthenticatorKind::Local { token } => Self {
                 kind: AuthenticatorKind::Local { token },
+            },
+            AuthenticatorKind::TrustedLocal => Self {
+                kind: AuthenticatorKind::TrustedLocal,
             },
         }
     }
@@ -101,6 +114,17 @@ impl Authenticator {
             AuthenticatorKind::Local {
                 token: expected_token,
             } => Self::authenticate_local(expected_token, token),
+            AuthenticatorKind::TrustedLocal => Ok(Principal::User(User::local())),
+        }
+    }
+
+    async fn authenticate_optional(&self, token: Option<String>) -> Result<Principal, ()> {
+        match token {
+            Some(token) => self.authenticate(token).await,
+            None if matches!(self.kind, AuthenticatorKind::TrustedLocal) => {
+                Ok(Principal::User(User::local()))
+            }
+            None => Err(()),
         }
     }
 
@@ -182,12 +206,7 @@ impl Authenticate for Authenticator {
 
     fn authenticate(&self, token: Option<String>) -> Self::Output {
         let this = self.clone();
-        Box::pin(async move {
-            match token {
-                Some(token) => Authenticator::authenticate(&this, token).await,
-                None => Err(()),
-            }
-        })
+        Box::pin(async move { this.authenticate_optional(token).await })
     }
 }
 
@@ -215,5 +234,13 @@ mod tests {
     #[test]
     fn local_auth_requires_non_empty_token() {
         assert!(Authenticator::local("").is_err());
+    }
+
+    #[tokio::test]
+    async fn trusted_local_auth_accepts_missing_token() {
+        let authenticator = Authenticator::trusted_local();
+        let principal = authenticator.authenticate_optional(None).await.unwrap();
+
+        assert_eq!(principal.principal_id(), "local");
     }
 }

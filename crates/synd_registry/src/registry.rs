@@ -1,127 +1,115 @@
+use chrono::Utc;
+
 use crate::{
-    command::RegistryCommand,
-    db::FeedRegistryDb,
-    error::FeedRegistryError,
-    event::{EventSubmitter, RegistryNotificationPublisher, RegistryNotificationSubscriber},
-    legacy::{
-        FeedProvider, LegacyBridge, RefreshExecutorHandle,
-        model::{
-            EntriesPage, FeedRegistryConfig, FeedStatusQuery, FeedSubscriptionsPage,
-            ListEntriesQuery, ListSubscriptionsQuery, ReconcileOutcome, ReconcileTrigger,
-            RefreshPolicy, RefreshRequestReceipt, RefreshStatus, RequestRefreshCommand,
-            SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand,
-            UnsubscribeFeedOutput,
-        },
+    command::{
+        SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
     },
+    config::FeedRegistryConfig,
+    crawl::policy::RefreshPolicy,
+    db::{FeedRegistryDb, RegistryDbTransaction},
+    error::FeedRegistryError,
+    event::{
+        ApiEventPublisher, ApiEventSubscriber, EventSubmitter, RequestEvent, RequestId,
+        SubscribeFeedRequested, UnsubscribeFeedRequested,
+    },
+    subscriber::SubscriberId,
+    subscription::{Subscription, SubscriptionKey},
+    view::{Subscriptions, SubscriptionsQuery},
 };
 
 #[derive(Clone)]
-pub struct FeedRegistry<S, P, E> {
-    /// Current synchronous registry behavior.
-    ///
-    /// New event-flow components should be composed beside this field instead
-    /// of being folded into the legacy implementation.
-    legacy: LegacyBridge<S, P>,
+pub struct FeedRegistry<S, E> {
+    db: S,
+    config: FeedRegistryConfig,
+    api_events: ApiEventPublisher,
     events: E,
 }
 
-impl<S, P, E> FeedRegistry<S, P, E>
+impl<S, E> FeedRegistry<S, E>
 where
     S: FeedRegistryDb,
-    P: FeedProvider,
     E: EventSubmitter,
 {
-    pub fn new(
-        db: S,
-        provider: P,
-        executor: RefreshExecutorHandle,
-        config: FeedRegistryConfig,
-        events: E,
-    ) -> Self {
-        Self::with_event_runtime(
-            db,
-            provider,
-            executor,
-            config,
-            RegistryNotificationPublisher::default(),
-            events,
-        )
+    pub fn new(db: S, config: FeedRegistryConfig, events: E) -> Self {
+        Self::with_event_runtime(db, config, ApiEventPublisher::default(), events)
     }
 
     pub fn with_event_runtime(
         db: S,
-        provider: P,
-        executor: RefreshExecutorHandle,
         config: FeedRegistryConfig,
-        notifications: RegistryNotificationPublisher,
+        api_events: ApiEventPublisher,
         events: E,
     ) -> Self {
         Self {
-            legacy: LegacyBridge::with_notifications(db, provider, executor, config, notifications),
+            db,
+            config,
+            api_events,
             events,
         }
     }
 
-    pub fn subscribe_notifications(&self) -> RegistryNotificationSubscriber {
-        self.legacy.subscribe_notifications()
+    pub fn subscribe_api_events(&self, subscriber_id: SubscriberId) -> ApiEventSubscriber {
+        self.api_events.subscribe(subscriber_id)
     }
 
     pub fn default_refresh_policy(&self) -> RefreshPolicy {
-        self.legacy.default_refresh_policy()
+        RefreshPolicy::interval(self.config.default_refresh_interval)
     }
 
     pub async fn subscribe(
         &self,
         command: SubscribeFeedCommand,
     ) -> Result<SubscribeFeedOutput, FeedRegistryError> {
-        let event = RegistryCommand::from(&command);
-        let output = self.legacy.subscribe(command).await?;
-        self.events.submit(event.into_events()).await?;
-        Ok(output)
+        let request_id = RequestId::generate();
+        let subscription =
+            SubscriptionKey::new(command.subscriber_id.clone(), command.feed_url.clone());
+        let event = RequestEvent::SubscribeFeedRequested(SubscribeFeedRequested::new(
+            request_id.clone(),
+            subscription,
+            command.requirement,
+            command.category.clone(),
+            command.refresh_policy,
+        ));
+        self.events.submit(vec![event.into()]).await?;
+
+        let now = Utc::now();
+        Ok(SubscribeFeedOutput {
+            subscription: Subscription {
+                subscriber_id: command.subscriber_id,
+                feed_url: command.feed_url,
+                requirement: command.requirement,
+                category: command.category,
+                refresh_policy: command.refresh_policy,
+                created_at: now,
+                updated_at: now,
+            },
+            request_id,
+        })
     }
 
     pub async fn unsubscribe(
         &self,
         command: UnsubscribeFeedCommand,
     ) -> Result<UnsubscribeFeedOutput, FeedRegistryError> {
-        let event = RegistryCommand::from(&command);
-        let output = self.legacy.unsubscribe(command).await?;
-        self.events.submit(event.into_events()).await?;
-        Ok(output)
-    }
-
-    pub async fn request_refresh(
-        &self,
-        command: RequestRefreshCommand,
-    ) -> Result<RefreshRequestReceipt, FeedRegistryError> {
-        self.legacy.request_refresh(command).await
-    }
-
-    pub async fn reconcile_now(
-        &self,
-        trigger: ReconcileTrigger,
-    ) -> Result<ReconcileOutcome, FeedRegistryError> {
-        self.legacy.reconcile_now(trigger).await
+        let request_id = RequestId::generate();
+        let subscription = SubscriptionKey::new(command.subscriber_id, command.feed_url);
+        let event = RequestEvent::UnsubscribeFeedRequested(UnsubscribeFeedRequested::new(
+            request_id.clone(),
+            subscription,
+        ));
+        self.events.submit(vec![event.into()]).await?;
+        Ok(UnsubscribeFeedOutput {
+            request_id: Some(request_id),
+        })
     }
 
     pub async fn list_subscriptions(
         &self,
-        query: ListSubscriptionsQuery,
-    ) -> Result<FeedSubscriptionsPage, FeedRegistryError> {
-        self.legacy.list_subscriptions(query).await
-    }
-
-    pub async fn list_entries(
-        &self,
-        query: ListEntriesQuery,
-    ) -> Result<EntriesPage, FeedRegistryError> {
-        self.legacy.list_entries(query).await
-    }
-
-    pub async fn feed_status(
-        &self,
-        query: FeedStatusQuery,
-    ) -> Result<RefreshStatus, FeedRegistryError> {
-        self.legacy.feed_status(query).await
+        query: SubscriptionsQuery,
+    ) -> Result<Subscriptions, FeedRegistryError> {
+        let mut tx = self.db.begin().await?;
+        let page = tx.list_subscriptions(query).await?;
+        tx.commit().await?;
+        Ok(page)
     }
 }

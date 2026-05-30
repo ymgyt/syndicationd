@@ -147,7 +147,6 @@ mod feed {
                 requirement: Some(requirement),
                 category: Some(category),
                 refresh_policy,
-                initial_refresh: None,
             },
         ))
     }
@@ -280,7 +279,6 @@ mod feed {
                         requirement: Some(Requirement::Must),
                         category: Some(Category::new("rust").unwrap()),
                         refresh_policy: None,
-                        initial_refresh: None,
                     }
                 ))
             );
@@ -300,7 +298,6 @@ mod feed {
                             kind: RefreshPolicyInputKind::Manual,
                             interval_seconds: None,
                         }),
-                        initial_refresh: None,
                     }
                 ))
             );
@@ -320,7 +317,6 @@ mod feed {
                             kind: RefreshPolicyInputKind::Interval,
                             interval_seconds: Some(1800),
                         }),
-                        initial_refresh: None,
                     }
                 ))
             );

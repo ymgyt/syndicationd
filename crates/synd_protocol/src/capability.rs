@@ -20,4 +20,13 @@ impl CapabilitySet {
     pub fn is_empty(&self) -> bool {
         self.names.is_empty()
     }
+
+    pub fn missing_from(&self, available: &Self) -> Self {
+        Self::new(
+            self.names
+                .iter()
+                .filter(|name| !available.names.contains(name))
+                .cloned(),
+        )
+    }
 }

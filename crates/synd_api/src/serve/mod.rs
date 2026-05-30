@@ -22,6 +22,7 @@ use crate::{
     dependency::Dependency,
     gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
+    session::{DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE, SessionIdleShutdown},
     shutdown::Shutdown,
 };
 
@@ -95,10 +96,17 @@ pub async fn serve_unix(
     dep: Dependency,
     shutdown: Shutdown,
 ) -> anyhow::Result<()> {
+    let sessions = dep.sessions.with_idle_shutdown(SessionIdleShutdown::new(
+        DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE,
+        shutdown.clone(),
+    ));
     let ApiService { router, .. } = build_service(dep, &shutdown);
     let shutdown_requested = shutdown.cancellation_token();
     let router = router
+        .route("/session/open", post(session_routes::open))
+        .route("/session/close", post(session_routes::close))
         .route("/daemon/shutdown", post(control::shutdown))
+        .layer(Extension(sessions))
         .layer(Extension(shutdown));
 
     tracing::info!("Serving on Unix socket...");
@@ -131,6 +139,7 @@ fn build_service(dep: Dependency, shutdown: &Shutdown) -> ApiService {
                 concurrency_limit,
             },
         monitors,
+        sessions: _,
     } = dep;
 
     let cx = Context {
@@ -176,6 +185,37 @@ mod control {
     pub(super) async fn shutdown(Extension(shutdown): Extension<Shutdown>) -> StatusCode {
         shutdown.shutdown();
         StatusCode::ACCEPTED
+    }
+}
+
+mod session_routes {
+    use axum::{
+        Extension, Json,
+        http::StatusCode,
+        response::{IntoResponse, Response},
+    };
+    use synd_protocol::session::{CloseSessionRequest, OpenSessionRequest};
+
+    use crate::session::SessionRegistry;
+
+    pub(super) async fn open(
+        Extension(registry): Extension<SessionRegistry>,
+        Json(request): Json<OpenSessionRequest>,
+    ) -> Response {
+        match registry.open(request) {
+            Ok(response) => (StatusCode::CREATED, Json(response)).into_response(),
+            Err(error) => (StatusCode::CONFLICT, Json(error)).into_response(),
+        }
+    }
+
+    pub(super) async fn close(
+        Extension(registry): Extension<SessionRegistry>,
+        Json(request): Json<CloseSessionRequest>,
+    ) -> Response {
+        match registry.close(request) {
+            Ok(response) => (StatusCode::OK, Json(response)).into_response(),
+            Err(error) => (StatusCode::NOT_FOUND, Json(error)).into_response(),
+        }
     }
 }
 

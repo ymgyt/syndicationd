@@ -146,26 +146,16 @@ impl FeedsComponent {
     }
 
     pub(in crate::application) fn feed_subscribed(
-        &mut self,
-        url: FeedUrl,
-        payload: payload::SubscribeFeedPayload,
+        _url: FeedUrl,
+        _payload: payload::SubscribeFeedPayload,
         feeds_first: i64,
         entries_first: i64,
-        refresh_poll_attempts: u16,
+        _refresh_poll_attempts: u16,
     ) -> Vec<Operation> {
-        let mut operations = vec![
+        vec![
             Self::reload_subscription(feeds_first),
             Self::reload_entries(entries_first),
-        ];
-
-        if let Some(request_id) = payload.request_id
-            && let Some(operation) =
-                self.schedule_refresh_poll_if_needed(url, request_id, refresh_poll_attempts)
-        {
-            operations.push(operation);
-        }
-
-        operations
+        ]
     }
 
     pub(in crate::application) fn feed_refresh_accepted(

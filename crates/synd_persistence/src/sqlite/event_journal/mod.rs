@@ -1,21 +1,10 @@
-use serde::{Serialize, de::DeserializeOwned};
 use sqlx::{QueryBuilder, Row, Sqlite};
 use synd_registry::event::{
-    EventConsumerId, EventCursor, EventCursorPos, EventJournal, EventJournalError,
-    EventJournalResult, EventReadBatch, EventReadFilter, FeedSubscribed, FeedUnsubscribed,
-    JournaledEvent, RegistryEvent, RegistryEventKind, SubscriptionChanged, SubscriptionLifecycle,
+    Event, EventConsumerId, EventCursor, EventCursorPos, EventEncoding, EventJournal,
+    EventJournalError, EventJournalResult, EventReadBatch, EventReadFilter, JournaledEvent,
 };
 
 use super::SqliteDatabase;
-
-const EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED: &str = "subscription_lifecycle.subscribed";
-const EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED: &str = "subscription_lifecycle.changed";
-const EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED: &str = "subscription_lifecycle.unsubscribed";
-
-pub(super) struct EncodedEvent {
-    pub event_type: &'static str,
-    pub payload_json: String,
-}
 
 #[derive(Clone)]
 pub struct SqliteEventJournal {
@@ -29,8 +18,8 @@ impl SqliteEventJournal {
 }
 
 impl EventJournal for SqliteEventJournal {
-    async fn append(&self, event: RegistryEvent) -> EventJournalResult<()> {
-        let encoded = encode_event(&event)?;
+    async fn append(&self, event: Event) -> EventJournalResult<()> {
+        let encoded = event.encode().map_err(map_error)?;
         let mut tx = self.db.begin().await.map_err(map_error)?;
 
         sqlx::query(
@@ -56,7 +45,12 @@ impl EventJournal for SqliteEventJournal {
     ) -> EventJournalResult<EventReadBatch> {
         let position = decode_position(cursor.position())?;
         let consumer = cursor.consumer();
-        let event_types = event_types_for(filter);
+        let event_types = filter
+            .kinds()
+            .iter()
+            .copied()
+            .map(synd_registry::event::EventKind::event_type)
+            .collect::<Vec<_>>();
         let mut tx = self.db.begin().await.map_err(map_error)?;
 
         let scanned_position = sqlx::query(
@@ -110,7 +104,7 @@ impl EventJournal for SqliteEventJournal {
                 .map_err(map_error)?;
             events.push(JournaledEvent::new(
                 EventCursor::at(consumer, EventCursorPos::position(position.to_string())),
-                decode_event(&event_type, &payload_json)?,
+                Event::decode(&event_type, &payload_json).map_err(map_error)?,
             ));
         }
 
@@ -170,103 +164,6 @@ impl EventJournal for SqliteEventJournal {
     }
 }
 
-fn event_types_for(filter: EventReadFilter) -> Vec<&'static str> {
-    let mut event_types = Vec::new();
-    for kind in filter.kinds() {
-        match kind {
-            RegistryEventKind::FeedSubscribed => {
-                event_types.push(EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED);
-            }
-            RegistryEventKind::SubscriptionChanged => {
-                event_types.push(EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED);
-            }
-            RegistryEventKind::FeedUnsubscribed => {
-                event_types.push(EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED);
-            }
-        }
-    }
-    event_types
-}
-
-pub(super) fn encode_event(event: &RegistryEvent) -> EventJournalResult<EncodedEvent> {
-    match event {
-        RegistryEvent::SubscriptionLifecycle(event) => encode_subscription_lifecycle_event(event),
-    }
-}
-
-fn encode_subscription_lifecycle_event(
-    event: &SubscriptionLifecycle,
-) -> EventJournalResult<EncodedEvent> {
-    let (event_type, payload_json) = match event {
-        SubscriptionLifecycle::Subscribed(event) => (
-            EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED,
-            encode_payload(event)?,
-        ),
-        SubscriptionLifecycle::Changed(event) => (
-            EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED,
-            encode_payload(event)?,
-        ),
-        SubscriptionLifecycle::Unsubscribed(event) => (
-            EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED,
-            encode_payload(event)?,
-        ),
-    };
-    Ok(EncodedEvent {
-        event_type,
-        payload_json,
-    })
-}
-
-fn decode_event(event_type: &str, payload_json: &str) -> EventJournalResult<RegistryEvent> {
-    Ok(RegistryEvent::SubscriptionLifecycle(
-        decode_subscription_lifecycle_event(event_type, payload_json)?,
-    ))
-}
-
-fn decode_subscription_lifecycle_event(
-    event_type: &str,
-    payload_json: &str,
-) -> EventJournalResult<SubscriptionLifecycle> {
-    match event_type {
-        EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_SUBSCRIBED => {
-            Ok(SubscriptionLifecycle::Subscribed(decode_payload::<
-                FeedSubscribed,
-            >(
-                payload_json
-            )?))
-        }
-        EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_CHANGED => {
-            Ok(SubscriptionLifecycle::Changed(decode_payload::<
-                SubscriptionChanged,
-            >(payload_json)?))
-        }
-        EVENT_TYPE_SUBSCRIPTION_LIFECYCLE_UNSUBSCRIBED => {
-            Ok(SubscriptionLifecycle::Unsubscribed(decode_payload::<
-                FeedUnsubscribed,
-            >(
-                payload_json
-            )?))
-        }
-        event_type => Err(EventJournalError::Internal(anyhow::anyhow!(
-            "unknown registry event type: {event_type}"
-        ))),
-    }
-}
-
-fn encode_payload<T>(payload: &T) -> EventJournalResult<String>
-where
-    T: Serialize,
-{
-    serde_json::to_string(payload).map_err(map_error)
-}
-
-fn decode_payload<T>(payload_json: &str) -> EventJournalResult<T>
-where
-    T: DeserializeOwned,
-{
-    serde_json::from_str(payload_json).map_err(map_error)
-}
-
 fn decode_position(position: &EventCursorPos) -> EventJournalResult<i64> {
     match position {
         EventCursorPos::Initial => Ok(0),
@@ -289,14 +186,19 @@ fn map_error(err: impl Into<anyhow::Error>) -> EventJournalError {
 #[cfg(test)]
 mod tests {
     use synd_feed::types::FeedUrl;
-    use synd_registry::{SubscriberId, Subscription, event::EventJournalExt};
+    use synd_registry::{
+        SubscriberId, SubscriptionKey,
+        event::{
+            EventJournalExt, EventKind, FeedSubscribed, SubEvent, SubEventKind, SubscriptionChanged,
+        },
+    };
 
     use super::*;
 
-    const SUBSCRIPTION_LIFECYCLE_KINDS: &[RegistryEventKind] = &[
-        RegistryEventKind::FeedSubscribed,
-        RegistryEventKind::SubscriptionChanged,
-        RegistryEventKind::FeedUnsubscribed,
+    const SUBSCRIPTION_LIFECYCLE_KINDS: &[EventKind] = &[
+        EventKind::Sub(SubEventKind::FeedSubscribed),
+        EventKind::Sub(SubEventKind::SubscriptionChanged),
+        EventKind::Sub(SubEventKind::FeedUnsubscribed),
     ];
 
     async fn migrated_journal() -> anyhow::Result<SqliteEventJournal> {
@@ -305,20 +207,20 @@ mod tests {
         Ok(SqliteEventJournal::new(db))
     }
 
-    fn subscribed_event() -> RegistryEvent {
-        RegistryEvent::SubscriptionLifecycle(SubscriptionLifecycle::Subscribed(
-            FeedSubscribed::new(subscription("subscribed")),
-        ))
+    fn subscribed_event() -> Event {
+        Event::Sub(SubEvent::FeedSubscribed(FeedSubscribed::new(subscription(
+            "subscribed",
+        ))))
     }
 
-    fn changed_event() -> RegistryEvent {
-        RegistryEvent::SubscriptionLifecycle(SubscriptionLifecycle::Changed(
-            SubscriptionChanged::new(subscription("changed")),
-        ))
+    fn changed_event() -> Event {
+        Event::Sub(SubEvent::SubscriptionChanged(SubscriptionChanged::new(
+            subscription("changed"),
+        )))
     }
 
-    fn subscription(path: &str) -> Subscription {
-        Subscription::new(
+    fn subscription(path: &str) -> SubscriptionKey {
+        SubscriptionKey::new(
             SubscriberId::new("local"),
             FeedUrl::parse(&format!("https://example.com/{path}.xml")).unwrap(),
         )

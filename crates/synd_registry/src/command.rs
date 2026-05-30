@@ -1,48 +1,32 @@
+use synd_feed::types::{Category, FeedUrl, Requirement};
+
 use crate::{
-    event::{FeedSubscribed, FeedUnsubscribed, RegistryEvent, SubscriptionLifecycle},
+    crawl::policy::RefreshPolicy, event::RequestId, subscriber::SubscriberId,
     subscription::Subscription,
 };
 
-/// A request to change registry state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RegistryCommand {
-    Subscribe(Subscribe),
-    Unsubscribe(Unsubscribe),
+#[derive(Debug, Clone)]
+pub struct SubscribeFeedCommand {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
+    pub refresh_policy: RefreshPolicy,
 }
 
-impl RegistryCommand {
-    pub fn into_events(self) -> Vec<RegistryEvent> {
-        match self {
-            Self::Subscribe(command) => vec![command.into_event()],
-            Self::Unsubscribe(command) => vec![command.into_event()],
-        }
-    }
-}
-
-/// Request to start a subscription relation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Subscribe {
+#[derive(Debug, Clone)]
+pub struct SubscribeFeedOutput {
     pub subscription: Subscription,
+    pub request_id: RequestId,
 }
 
-impl Subscribe {
-    pub fn into_event(self) -> RegistryEvent {
-        RegistryEvent::SubscriptionLifecycle(SubscriptionLifecycle::Subscribed(
-            FeedSubscribed::new(self.subscription),
-        ))
-    }
+#[derive(Debug, Clone)]
+pub struct UnsubscribeFeedCommand {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
 }
 
-/// Request to end a subscription relation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unsubscribe {
-    pub subscription: Subscription,
-}
-
-impl Unsubscribe {
-    pub fn into_event(self) -> RegistryEvent {
-        RegistryEvent::SubscriptionLifecycle(SubscriptionLifecycle::Unsubscribed(
-            FeedUnsubscribed::new(self.subscription),
-        ))
-    }
+#[derive(Debug, Clone)]
+pub struct UnsubscribeFeedOutput {
+    pub request_id: Option<RequestId>,
 }

@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::{CapabilitySet, Result};
+use synd_protocol::session::{CloseSessionRequest, SessionId};
 
 pub struct Session {
     client: synd_client::Client,
@@ -36,6 +37,7 @@ pub struct Handle {
 
 enum HandleKind {
     Inert,
+    Daemon(DaemonSessionHandle),
 }
 
 impl Handle {
@@ -45,11 +47,37 @@ impl Handle {
         }
     }
 
-    #[expect(clippy::unused_async)]
+    pub(crate) fn daemon(client: synd_client::Client, session_id: SessionId) -> Self {
+        Self {
+            kind: HandleKind::Daemon(DaemonSessionHandle::new(client, session_id)),
+        }
+    }
+
     pub async fn close(self) -> Result<()> {
         match self.kind {
             HandleKind::Inert => Ok(()),
+            HandleKind::Daemon(handle) => handle.close().await,
         }
+    }
+}
+
+/// Client-side handle used to close an accepted daemon session.
+struct DaemonSessionHandle {
+    client: synd_client::Client,
+    session_id: SessionId,
+}
+
+impl DaemonSessionHandle {
+    fn new(client: synd_client::Client, session_id: SessionId) -> Self {
+        Self { client, session_id }
+    }
+
+    async fn close(self) -> Result<()> {
+        self.client
+            .close_session(CloseSessionRequest::new(self.session_id))
+            .await?;
+
+        Ok(())
     }
 }
 

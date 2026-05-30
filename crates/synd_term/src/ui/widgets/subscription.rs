@@ -76,7 +76,7 @@ impl SubscriptionWidget {
     pub(crate) fn update_refresh_status(&mut self, url: &FeedUrl, status: &payload::RefreshStatus) {
         self.feeds.with_mut(|feed| {
             if &feed.url == url {
-                feed.refresh_status = status.clone();
+                feed.refresh_status = Some(status.clone());
                 ControlFlow::Break(())
             } else {
                 ControlFlow::Continue(())
@@ -260,7 +260,12 @@ impl SubscriptionWidget {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
-                Cell::from(Span::from(feed_meta.refresh_status.state.label())),
+                Cell::from(Span::from(
+                    feed_meta
+                        .refresh_status
+                        .as_ref()
+                        .map_or("", |status| status.state.label()),
+                )),
                 Cell::from(Line::from(vec![requirement, Span::from(" ")])),
             ])
         };
@@ -349,11 +354,15 @@ impl SubscriptionWidget {
                     "󰑓 Refresh",
                     Style::default().add_modifier(Modifier::BOLD),
                 )),
-                Cell::new(Span::from(feed.refresh_status.state.label())),
                 Cell::new(Span::from(
                     feed.refresh_status
-                        .last_error_message
-                        .as_deref()
+                        .as_ref()
+                        .map_or("", |status| status.state.label()),
+                )),
+                Cell::new(Span::from(
+                    feed.refresh_status
+                        .as_ref()
+                        .and_then(|status| status.last_error_message.as_deref())
                         .unwrap_or(""),
                 )),
             ]),

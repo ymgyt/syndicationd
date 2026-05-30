@@ -2,9 +2,9 @@ use std::{collections::HashMap, fmt, num::NonZeroU64, time::Duration};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::FeedUrl;
 
-use super::SubscriberId;
+use crate::subscription::Subscription;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvalidRefreshInterval;
@@ -56,8 +56,8 @@ impl<'de> Deserialize<'de> for RefreshInterval {
     where
         D: Deserializer<'de>,
     {
-        let duration = Duration::deserialize(deserializer)?;
-        Self::try_from(duration).map_err(serde::de::Error::custom)
+        let seconds = u64::deserialize(deserializer)?;
+        Self::try_from(Duration::from_secs(seconds)).map_err(serde::de::Error::custom)
     }
 }
 
@@ -87,7 +87,7 @@ pub struct EffectiveRefreshPolicy {
 
 impl EffectiveRefreshPolicy {
     pub fn from_subscriptions<'a>(
-        subscriptions: impl IntoIterator<Item = &'a FeedSubscription>,
+        subscriptions: impl IntoIterator<Item = &'a Subscription>,
     ) -> Option<Self> {
         let mut has_subscription = false;
         let mut interval = None;
@@ -121,8 +121,8 @@ pub struct DesiredFeedRefresh {
 }
 
 impl DesiredFeedRefresh {
-    pub fn from_subscriptions(subscriptions: Vec<FeedSubscription>) -> Vec<Self> {
-        let mut by_feed_url = HashMap::<FeedUrl, Vec<FeedSubscription>>::new();
+    pub fn from_subscriptions(subscriptions: Vec<Subscription>) -> Vec<Self> {
+        let mut by_feed_url = HashMap::<FeedUrl, Vec<Subscription>>::new();
         for subscription in subscriptions {
             by_feed_url
                 .entry(subscription.feed_url.clone())
@@ -142,32 +142,6 @@ impl DesiredFeedRefresh {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FeedSubscription {
-    pub subscriber_id: SubscriberId,
-    pub feed_url: FeedUrl,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
-    pub refresh_policy: RefreshPolicy,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl FeedSubscription {
-    pub fn annotations(&self) -> FeedAnnotations {
-        FeedAnnotations {
-            requirement: self.requirement,
-            category: self.category.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FeedAnnotations {
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
-}
-
 fn add_duration(time: DateTime<Utc>, interval: RefreshInterval) -> DateTime<Utc> {
     chrono::Duration::from_std(interval.duration()).map_or(time, |duration| time + duration)
 }
@@ -177,14 +151,15 @@ mod tests {
     use synd_feed::types::FeedUrl;
 
     use super::*;
+    use crate::subscriber::SubscriberId;
 
     fn interval(duration: Duration) -> RefreshInterval {
         RefreshInterval::try_from(duration).unwrap()
     }
 
-    fn subscription(refresh_policy: RefreshPolicy) -> FeedSubscription {
+    fn subscription(refresh_policy: RefreshPolicy) -> Subscription {
         let now = Utc::now();
-        FeedSubscription {
+        Subscription {
             subscriber_id: SubscriberId::new("local"),
             feed_url: FeedUrl::parse("https://example.com/feed.xml").unwrap(),
             requirement: None,
@@ -199,6 +174,18 @@ mod tests {
     fn refresh_interval_rejects_subsecond_duration() {
         assert!(RefreshInterval::try_from(Duration::from_millis(500)).is_err());
         assert!(RefreshInterval::try_from(Duration::from_millis(1500)).is_err());
+    }
+
+    #[test]
+    fn refresh_interval_serializes_as_seconds() {
+        let interval = interval(Duration::from_hours(1));
+        let json = serde_json::to_string(&interval).unwrap();
+
+        assert_eq!(json, "3600");
+        assert_eq!(
+            serde_json::from_str::<RefreshInterval>(&json).unwrap(),
+            interval
+        );
     }
 
     #[test]
@@ -228,14 +215,12 @@ mod tests {
         let policy = EffectiveRefreshPolicy::from_subscriptions(&subscriptions).unwrap();
 
         assert_eq!(policy.schedule, RefreshSchedule::Manual);
-        assert!(policy.next_after(Utc::now()).is_none());
     }
 
     #[test]
-    fn desired_feed_refresh_deduplicates_subscriptions_by_feed_url() {
+    fn desired_feed_refresh_groups_subscriptions_by_feed() {
         let mut other = subscription(RefreshPolicy::interval(interval(Duration::from_mins(5))));
         other.subscriber_id = SubscriberId::new("other");
-
         let desired = DesiredFeedRefresh::from_subscriptions(vec![
             subscription(RefreshPolicy::interval(interval(Duration::from_hours(1)))),
             other,

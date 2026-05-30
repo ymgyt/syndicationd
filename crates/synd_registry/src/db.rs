@@ -1,12 +1,14 @@
+use std::future::Future;
+
 use synd_feed::types::FeedUrl;
 
 use crate::{
+    crawl::state::{FeedSnapshot, RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess},
     error::{RegistryDbError, RegistryDbResult},
-    event::RegistryEvent,
-    legacy::model::{
-        FeedSnapshot, FeedSubscription, FeedSubscriptionPage, ListSubscriptionsQuery,
-        RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess, SubscriberId,
-    },
+    event::Event,
+    subscriber::SubscriberId,
+    subscription::Subscription,
+    view::{Subscriptions, SubscriptionsQuery},
 };
 
 pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
@@ -14,63 +16,81 @@ pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
     where
         Self: 'a;
 
-    async fn begin(&self) -> Result<Self::Tx<'_>, RegistryDbError>;
+    fn begin(&self) -> impl Future<Output = Result<Self::Tx<'_>, RegistryDbError>> + Send;
 }
 
 pub trait RegistryDbTransaction {
-    async fn append_event(&mut self, event: RegistryEvent) -> RegistryDbResult<()>;
+    fn append_event(&mut self, event: Event) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn upsert_subscription(&mut self, subscription: FeedSubscription)
-    -> RegistryDbResult<()>;
+    fn upsert_subscription(
+        &mut self,
+        subscription: Subscription,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn delete_subscription(
+    fn delete_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<()>;
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn has_subscription(
+    fn has_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<bool>;
+    ) -> impl Future<Output = RegistryDbResult<bool>> + Send;
 
-    async fn list_subscriptions(
+    fn list_subscriptions(
         &mut self,
-        query: ListSubscriptionsQuery,
-    ) -> RegistryDbResult<FeedSubscriptionPage>;
+        query: SubscriptionsQuery,
+    ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    async fn list_active_subscriptions(&mut self) -> RegistryDbResult<Vec<FeedSubscription>>;
+    fn list_active_subscriptions(
+        &mut self,
+    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
 
-    async fn list_active_subscriptions_for_feed(
+    fn list_active_subscriptions_for_feed(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<Vec<FeedSubscription>>;
+    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
 
-    async fn list_subscriptions_for_subscriber(
+    fn list_subscriptions_for_subscriber(
         &mut self,
         subscriber_id: &SubscriberId,
-    ) -> RegistryDbResult<Vec<FeedSubscription>>;
+    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
 
-    async fn list_active_feed_urls(&mut self) -> RegistryDbResult<Vec<FeedUrl>>;
+    fn list_active_feed_urls(
+        &mut self,
+    ) -> impl Future<Output = RegistryDbResult<Vec<FeedUrl>>> + Send;
 
-    async fn load_snapshots(
+    fn load_snapshots(
         &mut self,
         feed_urls: &[FeedUrl],
-    ) -> RegistryDbResult<Vec<FeedSnapshot>>;
+    ) -> impl Future<Output = RegistryDbResult<Vec<FeedSnapshot>>> + Send;
 
-    async fn load_refresh_states(
+    fn load_refresh_states(
         &mut self,
         feed_urls: &[FeedUrl],
-    ) -> RegistryDbResult<Vec<RefreshState>>;
+    ) -> impl Future<Output = RegistryDbResult<Vec<RefreshState>>> + Send;
 
-    async fn delete_feed_state(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<()>;
+    fn delete_feed_state(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn record_refresh_started(&mut self, event: RefreshStarted) -> RegistryDbResult<()>;
+    fn record_refresh_started(
+        &mut self,
+        event: RefreshStarted,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn record_refresh_succeeded(&mut self, result: RefreshSuccess) -> RegistryDbResult<()>;
+    fn record_refresh_succeeded(
+        &mut self,
+        result: RefreshSuccess,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn record_refresh_failed(&mut self, result: RefreshFailure) -> RegistryDbResult<()>;
+    fn record_refresh_failed(
+        &mut self,
+        result: RefreshFailure,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    async fn commit(self) -> RegistryDbResult<()>;
+    fn commit(self) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }

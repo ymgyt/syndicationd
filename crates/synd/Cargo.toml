@@ -22,7 +22,6 @@ synd-term = { path = "../synd_term", version = "0.3.2" }
 
 anyhow             = { workspace = true }
 clap               = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env", "std"] }
-directories        = "6.0.0"
 either             = { workspace = true }
 rustls             = { workspace = true }
 schemars           = { workspace = true, features = ["derive"] }

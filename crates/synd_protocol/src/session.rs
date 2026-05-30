@@ -66,6 +66,37 @@ impl OpenSessionResponse {
     }
 }
 
+/// Machine-readable reason for rejecting a session open request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenSessionErrorCode {
+    MissingCapabilities,
+}
+
+/// Error body returned when the daemon rejects a session open request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenSessionErrorResponse {
+    code: OpenSessionErrorCode,
+    missing_capabilities: CapabilitySet,
+}
+
+impl OpenSessionErrorResponse {
+    pub fn from_missing_capabilities(missing_capabilities: CapabilitySet) -> Self {
+        Self {
+            code: OpenSessionErrorCode::MissingCapabilities,
+            missing_capabilities,
+        }
+    }
+
+    pub fn code(&self) -> OpenSessionErrorCode {
+        self.code
+    }
+
+    pub fn missing_capabilities(&self) -> &CapabilitySet {
+        &self.missing_capabilities
+    }
+}
+
 /// Request body used by a client to close a daemon session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CloseSessionRequest {
@@ -92,6 +123,37 @@ impl CloseSessionResponse {
     }
 }
 
+/// Machine-readable reason for rejecting a session close request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CloseSessionErrorCode {
+    UnknownSession,
+}
+
+/// Error body returned when the daemon rejects a session close request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CloseSessionErrorResponse {
+    code: CloseSessionErrorCode,
+    session_id: SessionId,
+}
+
+impl CloseSessionErrorResponse {
+    pub fn unknown_session(session_id: SessionId) -> Self {
+        Self {
+            code: CloseSessionErrorCode::UnknownSession,
+            session_id,
+        }
+    }
+
+    pub fn code(&self) -> CloseSessionErrorCode {
+        self.code
+    }
+
+    pub fn session_id(&self) -> &SessionId {
+        &self.session_id
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -99,8 +161,8 @@ mod tests {
     use crate::{
         CapabilitySet,
         session::{
-            CloseSessionRequest, CloseSessionResponse, OpenSessionRequest, OpenSessionResponse,
-            SessionId,
+            CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse,
+            OpenSessionErrorResponse, OpenSessionRequest, OpenSessionResponse, SessionId,
         },
     };
 
@@ -142,10 +204,43 @@ mod tests {
                 serde_json::to_value(CloseSessionResponse::new()).unwrap(),
                 json!({}),
             ),
+            (
+                serde_json::to_value(OpenSessionErrorResponse::from_missing_capabilities(
+                    CapabilitySet::new(["timeline.read"]),
+                ))
+                .unwrap(),
+                json!({
+                    "code": "missing_capabilities",
+                    "missing_capabilities": {
+                        "names": ["timeline.read"]
+                    }
+                }),
+            ),
+            (
+                serde_json::to_value(CloseSessionErrorResponse::unknown_session(SessionId::new(
+                    "session-1",
+                )))
+                .unwrap(),
+                json!({
+                    "code": "unknown_session",
+                    "session_id": "session-1"
+                }),
+            ),
         ];
 
         for (actual, expected) in cases {
             assert_eq!(actual, expected);
         }
+    }
+
+    #[test]
+    fn detects_missing_capabilities() {
+        let required = CapabilitySet::new(["timeline.read", "subscription.write"]);
+        let available = CapabilitySet::new(["timeline.read"]);
+
+        assert_eq!(
+            required.missing_from(&available),
+            CapabilitySet::new(["subscription.write"])
+        );
     }
 }

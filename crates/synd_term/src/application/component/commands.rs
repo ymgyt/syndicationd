@@ -296,14 +296,14 @@ mod tests {
                 kind: payload::RefreshPolicyKind::Manual,
                 interval_seconds: None,
             },
-            refresh_status: payload::RefreshStatus {
+            refresh_status: Some(payload::RefreshStatus {
                 state: payload::RefreshStatusState::Idle,
                 request_id: None,
                 last_attempt_at: None,
                 last_success_at: None,
                 last_failure_at: None,
                 last_error_message: None,
-            },
+            }),
             feed: None,
         }
     }

@@ -5,7 +5,6 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
     }
     url
     requestId
-    disposition
   }
 }
 

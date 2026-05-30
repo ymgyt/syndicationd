@@ -2,8 +2,8 @@ use futures_util::future;
 use thiserror::Error;
 
 use crate::event::{
-    ConsumerDispatch, ConsumerRegistry, EmptyConsumerRegistry, EventConsumerError, EventConsumerId,
-    EventConsumerSession, EventJournal, EventJournalError, RecordedEvents, RegistryEvent,
+    ConsumerDispatch, ConsumerRegistry, EmptyConsumerRegistry, Event, EventConsumerError,
+    EventConsumerId, EventConsumerSession, EventJournal, EventJournalError, RecordedEvents,
 };
 
 pub type EventRuntimeResult<T> = Result<T, EventRuntimeError>;
@@ -19,7 +19,7 @@ pub enum EventRuntimeError {
 }
 
 pub trait EventSubmitter: Clone + Send + Sync + 'static {
-    async fn submit(&self, events: Vec<RegistryEvent>) -> EventRuntimeResult<EventRuntimeOutput>;
+    async fn submit(&self, events: Vec<Event>) -> EventRuntimeResult<EventRuntimeOutput>;
 }
 
 /// Records submitted events into an event journal.
@@ -36,7 +36,7 @@ where
         Self { journal }
     }
 
-    pub async fn record(&self, events: Vec<RegistryEvent>) -> EventRuntimeResult<RecordedEvents> {
+    pub async fn record(&self, events: Vec<Event>) -> EventRuntimeResult<RecordedEvents> {
         let mut kinds = Vec::with_capacity(events.len());
         for event in events {
             kinds.push(event.kind());
@@ -218,7 +218,7 @@ where
     J: EventJournal,
     C: ConsumerRegistry,
 {
-    async fn submit(&self, events: Vec<RegistryEvent>) -> EventRuntimeResult<EventRuntimeOutput> {
+    async fn submit(&self, events: Vec<Event>) -> EventRuntimeResult<EventRuntimeOutput> {
         let recorded = self.recorder.record(events).await?;
         self.react_to(recorded).await
     }

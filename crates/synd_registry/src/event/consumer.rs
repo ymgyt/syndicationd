@@ -1,10 +1,10 @@
 use std::convert::Infallible;
+use std::future::Future;
 
 use thiserror::Error;
 
 use crate::event::{
-    EventJournal, EventJournalError, EventReadBatch, EventReadFilter, RegistryEvent,
-    RegistryEventKind,
+    Event, EventJournal, EventJournalError, EventKind, EventReadBatch, EventReadFilter,
 };
 
 pub type EventConsumerResult<T> = Result<T, EventConsumerError>;
@@ -20,7 +20,10 @@ pub enum EventConsumerError {
 /// Stable identity for a consumer cursor and consumer lookup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EventConsumerId {
+    SubRequestWorker,
     CrawlTargetListProj,
+    ApiEventProj,
+    ApiEventStream,
     EntryTLProj,
     CrawlScheduler,
     FeedRevProj,
@@ -30,7 +33,10 @@ pub enum EventConsumerId {
 impl EventConsumerId {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::SubRequestWorker => "SubRequestWorker",
             Self::CrawlTargetListProj => "CrawlTargetListProj",
+            Self::ApiEventProj => "ApiEventProj",
+            Self::ApiEventStream => "ApiEventStream",
             Self::EntryTLProj => "EntryTLProj",
             Self::CrawlScheduler => "CrawlScheduler",
             Self::FeedRevProj => "FeedRevProj",
@@ -40,14 +46,14 @@ impl EventConsumerId {
 }
 
 /// Typed input built from the journal entries a consumer is interested in.
-pub trait ConsumerEventInput: Sized {
+pub trait ConsumerEventInput: Sized + Send {
     const READ_FILTER: EventReadFilter;
 
     fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>>;
 }
 
 /// A component that consumes registry events through a cursor it owns.
-pub trait EventConsumer {
+pub trait EventConsumer: Send + 'static {
     type Input: ConsumerEventInput;
 
     fn id(&self) -> EventConsumerId;
@@ -56,11 +62,11 @@ pub trait EventConsumer {
         Self::Input::READ_FILTER
     }
 
-    async fn consume<J>(
+    fn consume<J>(
         &mut self,
         input: Self::Input,
         session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
+    ) -> impl Future<Output = EventConsumerResult<()>> + Send
     where
         J: EventJournal;
 }
@@ -92,11 +98,11 @@ impl ConsumerDispatch for Infallible {
 /// Summary of events recorded into the journal by one submit operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordedEvents {
-    kinds: Vec<RegistryEventKind>,
+    kinds: Vec<EventKind>,
 }
 
 impl RecordedEvents {
-    pub fn new(kinds: Vec<RegistryEventKind>) -> Self {
+    pub fn new(kinds: Vec<EventKind>) -> Self {
         Self { kinds }
     }
 
@@ -108,11 +114,15 @@ impl RecordedEvents {
         self.kinds.is_empty()
     }
 
-    pub fn kinds(&self) -> &[RegistryEventKind] {
+    pub fn len(&self) -> usize {
+        self.kinds.len()
+    }
+
+    pub fn kinds(&self) -> &[EventKind] {
         &self.kinds
     }
 
-    pub fn push(&mut self, kind: RegistryEventKind) {
+    pub fn push(&mut self, kind: EventKind) {
         self.kinds.push(kind);
     }
 
@@ -138,11 +148,15 @@ where
         }
     }
 
-    pub async fn record(&mut self, event: RegistryEvent) -> EventConsumerResult<()> {
+    pub async fn record(&mut self, event: Event) -> EventConsumerResult<()> {
         let kind = event.kind();
         self.journal.append(event).await?;
         self.recorded.push(kind);
         Ok(())
+    }
+
+    pub fn record_committed(&mut self, event: &Event) {
+        self.recorded.push(event.kind());
     }
 
     pub fn recorded(&self) -> &RecordedEvents {

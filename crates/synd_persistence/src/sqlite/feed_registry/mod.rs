@@ -3,16 +3,14 @@
 use sqlx::{Row, Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryDbTransaction,
-    event::RegistryEvent,
-    legacy::model::{
-        FeedSnapshot, FeedSubscription, FeedSubscriptionPage, ListSubscriptionsQuery,
-        RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess, SubscriberId,
-    },
+    FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryDbTransaction, SubscriberId,
+    Subscription,
+    crawl::state::{FeedSnapshot, RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess},
+    event::{Event, EventEncoding},
+    view::{Subscriptions, SubscriptionsQuery},
 };
 
 use self::codec::{decode_refresh_state, decode_snapshot, decode_subscription, encode_policy};
-use super::event_journal::encode_event;
 use super::{SqliteDatabase, SqliteEventJournal};
 
 mod codec;
@@ -85,8 +83,8 @@ impl SqliteRegistryDbTransaction<'_> {
 }
 
 impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
-    async fn append_event(&mut self, event: RegistryEvent) -> RegistryDbResult<()> {
-        let encoded = encode_event(&event).map_err(RegistryDbError::internal)?;
+    async fn append_event(&mut self, event: Event) -> RegistryDbResult<()> {
+        let encoded = event.encode().map_err(RegistryDbError::internal)?;
         sqlx::query(
             r"
             INSERT INTO event_journal (event_type, payload_json)
@@ -102,10 +100,7 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
         Ok(())
     }
 
-    async fn upsert_subscription(
-        &mut self,
-        subscription: FeedSubscription,
-    ) -> RegistryDbResult<()> {
+    async fn upsert_subscription(&mut self, subscription: Subscription) -> RegistryDbResult<()> {
         let requirement = subscription.requirement.map(|r| r.to_string());
         let category = subscription.category.map(|c| c.to_string());
         let (policy_kind, interval_seconds) = encode_policy(subscription.refresh_policy);
@@ -190,8 +185,8 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
 
     async fn list_subscriptions(
         &mut self,
-        query: ListSubscriptionsQuery,
-    ) -> RegistryDbResult<FeedSubscriptionPage> {
+        query: SubscriptionsQuery,
+    ) -> RegistryDbResult<Subscriptions> {
         let first = i64::try_from(query.first.saturating_add(1)).unwrap_or(i64::MAX);
         let rows = if let Some(after) = query.after {
             sqlx::query(
@@ -251,14 +246,14 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
         }
         let end_cursor = nodes.last().map(|sub| sub.feed_url.to_string());
 
-        Ok(FeedSubscriptionPage {
+        Ok(Subscriptions::from_subscriptions(
             nodes,
             has_next_page,
             end_cursor,
-        })
+        ))
     }
 
-    async fn list_active_subscriptions(&mut self) -> RegistryDbResult<Vec<FeedSubscription>> {
+    async fn list_active_subscriptions(&mut self) -> RegistryDbResult<Vec<Subscription>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -284,7 +279,7 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
     async fn list_active_subscriptions_for_feed(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<Vec<FeedSubscription>> {
+    ) -> RegistryDbResult<Vec<Subscription>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -312,7 +307,7 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
     async fn list_subscriptions_for_subscriber(
         &mut self,
         subscriber_id: &SubscriberId,
-    ) -> RegistryDbResult<Vec<FeedSubscription>> {
+    ) -> RegistryDbResult<Vec<Subscription>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -545,25 +540,19 @@ mod tests {
     use std::time::Duration;
 
     use chrono::{TimeZone, Utc};
-    use synd_feed::{
-        feed::service::FeedService,
-        types::{Feed, FeedUrl},
-    };
+    use synd_feed::types::FeedUrl;
     use synd_registry::{
-        FeedRegistry,
-        event::{
-            EventConsumerId, EventJournal, EventReadFilter, EventRuntime, RegistryEventKind,
-            RegistryNotificationPublisher,
+        FeedRegistry, FeedRegistryConfig, FeedRegistryRuntime, SubscribeFeedCommand,
+        crawl::{
+            policy::{RefreshInterval, RefreshPolicy},
+            state::RefreshErrorKind,
         },
-        legacy::{
-            FeedProvider, FeedProviderError, FetchedFeed, RefreshExecutorHandle,
-            model::{
-                FeedRegistryConfig, InitialRefreshMode, ListEntriesQuery, RefreshErrorKind,
-                RefreshInterval, RefreshPolicy, RefreshStatusKind, SubscribeFeedCommand,
-                SubscribeFeedRefresh, UnsubscribeFeedCommand,
-            },
+        event::{
+            ApiEvent, ApiEventPublisher, EventConsumerId, EventJournal, EventKind, EventReadFilter,
+            EventRuntime, RequestEventKind,
         },
     };
+    use tokio_util::sync::CancellationToken;
 
     use super::*;
 
@@ -581,47 +570,6 @@ mod tests {
   </entry>
 </feed>
 "#;
-
-    #[derive(Clone)]
-    struct StaticFeedProvider {
-        body: Vec<u8>,
-    }
-
-    impl StaticFeedProvider {
-        fn new(body: impl Into<Vec<u8>>) -> Self {
-            Self { body: body.into() }
-        }
-    }
-
-    impl FeedProvider for StaticFeedProvider {
-        async fn fetch(&self, feed_url: FeedUrl) -> Result<FetchedFeed, FeedProviderError> {
-            let feed = Self::parse(feed_url.clone(), self.body.as_slice())?;
-            Ok(FetchedFeed {
-                feed_url: feed_url.clone(),
-                feed,
-                snapshot: FeedSnapshot {
-                    feed_url,
-                    body: self.body.clone(),
-                    content_type: Some("application/atom+xml".to_owned()),
-                    etag: None,
-                    last_modified: None,
-                    fetched_at: Utc::now(),
-                },
-            })
-        }
-
-        fn parse_snapshot(&self, snapshot: &FeedSnapshot) -> Result<Feed, FeedProviderError> {
-            Self::parse(snapshot.feed_url.clone(), snapshot.body.as_slice())
-        }
-    }
-
-    impl StaticFeedProvider {
-        fn parse(feed_url: FeedUrl, body: &[u8]) -> Result<Feed, FeedProviderError> {
-            FeedService::new("synd-persistence-test", 1024 * 1024)
-                .parse(feed_url, body)
-                .map_err(FeedProviderError::from)
-        }
-    }
 
     async fn migrated_db() -> Result<SqliteFeedRegistryDb, RegistryDbError> {
         let db = SqliteDatabase::in_memory().await?;
@@ -641,9 +589,9 @@ mod tests {
         RefreshInterval::try_from(Duration::from_secs(seconds)).unwrap()
     }
 
-    fn subscription(path: &str) -> FeedSubscription {
+    fn subscription(path: &str) -> Subscription {
         let now = Utc.with_ymd_and_hms(2026, 5, 24, 12, 0, 0).unwrap();
-        FeedSubscription {
+        Subscription {
             subscriber_id: subscriber_id(),
             feed_url: feed_url(path),
             requirement: None,
@@ -655,15 +603,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn subscribe_records_subscription_event() -> anyhow::Result<()> {
+    async fn subscribe_records_request_event() -> anyhow::Result<()> {
         let db = migrated_db().await?;
         let journal = db.event_journal();
         let registry = FeedRegistry::with_event_runtime(
             db.clone(),
-            StaticFeedProvider::new(ATOM_FEED),
-            RefreshExecutorHandle::new(),
             FeedRegistryConfig::default(),
-            RegistryNotificationPublisher::default(),
+            ApiEventPublisher::default(),
             EventRuntime::new(journal.clone()),
         );
         let subscriber_id = subscriber_id();
@@ -676,25 +622,82 @@ mod tests {
                 requirement: None,
                 category: None,
                 refresh_policy: RefreshPolicy::interval(interval(3600)),
-                initial_refresh: InitialRefreshMode::Async,
             })
             .await?;
 
         let cursor = journal
-            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .load_cursor(EventConsumerId::SubRequestWorker)
             .await?;
         let batch = journal
             .read_after(
                 &cursor,
-                EventReadFilter::new(&[RegistryEventKind::FeedSubscribed]),
+                EventReadFilter::new(&[EventKind::Request(
+                    RequestEventKind::SubscribeFeedRequested,
+                )]),
             )
             .await?;
 
         assert_eq!(batch.events().len(), 1);
         assert_eq!(
             batch.events()[0].event().kind(),
-            RegistryEventKind::FeedSubscribed
+            EventKind::Request(RequestEventKind::SubscribeFeedRequested)
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn runtime_subscribe_projects_subscription_and_api_event() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let ct = CancellationToken::new();
+        let runtime = FeedRegistryRuntime::start(
+            db.clone(),
+            db.event_journal(),
+            FeedRegistryConfig {
+                event_worker_poll_interval: Duration::from_millis(10),
+                ..FeedRegistryConfig::default()
+            },
+            ct.clone(),
+        );
+        let registry = runtime.registry();
+        let subscriber_id = subscriber_id();
+        let feed_url = feed_url("runtime-subscribe");
+        let mut api_events = registry.subscribe_api_events(subscriber_id.clone());
+
+        let output = registry
+            .subscribe(SubscribeFeedCommand {
+                subscriber_id: subscriber_id.clone(),
+                feed_url: feed_url.clone(),
+                requirement: None,
+                category: None,
+                refresh_policy: RefreshPolicy::interval(interval(3600)),
+            })
+            .await?;
+
+        let api_event = tokio::time::timeout(Duration::from_secs(2), api_events.recv()).await?;
+        let api_event = match api_event {
+            Ok(event) => event,
+            Err(err) => anyhow::bail!("api event receive failed: {err:?}"),
+        };
+        let ApiEvent::FeedSubscribed(event) = api_event else {
+            anyhow::bail!("unexpected api event: {api_event:?}");
+        };
+        assert_eq!(event.request_id, output.request_id);
+        assert_eq!(event.subscription.subscriber_id, subscriber_id);
+        assert_eq!(event.subscription.feed_url, feed_url);
+
+        let page = registry
+            .list_subscriptions(SubscriptionsQuery {
+                subscriber_id,
+                after: None,
+                first: 10,
+            })
+            .await?;
+
+        assert_eq!(page.subscriptions.len(), 1);
+        assert_eq!(page.subscriptions[0].feed_url, feed_url);
+
+        ct.cancel();
+        drop(runtime);
         Ok(())
     }
 
@@ -708,14 +711,14 @@ mod tests {
 
         let mut tx = db.begin().await?;
         let page = tx
-            .list_subscriptions(ListSubscriptionsQuery {
+            .list_subscriptions(SubscriptionsQuery {
                 subscriber_id: subscriber_id(),
                 after: None,
                 first: 10,
             })
             .await?;
 
-        assert!(page.nodes.is_empty());
+        assert!(page.subscriptions.is_empty());
         Ok(())
     }
 
@@ -804,70 +807,6 @@ mod tests {
         })
         .await?;
         tx.commit().await?;
-
-        let mut tx = db.begin().await?;
-        assert!(
-            tx.load_snapshots(std::slice::from_ref(&feed_url))
-                .await?
-                .is_empty()
-        );
-        assert!(
-            tx.load_refresh_states(std::slice::from_ref(&feed_url))
-                .await?
-                .is_empty()
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn require_success_subscription_persists_entries_before_returning() -> anyhow::Result<()>
-    {
-        let db = migrated_db().await?;
-        let registry = FeedRegistry::new(
-            db.clone(),
-            StaticFeedProvider::new(ATOM_FEED),
-            RefreshExecutorHandle::new(),
-            FeedRegistryConfig::default(),
-            EventRuntime::new(db.event_journal()),
-        );
-        let subscriber_id = subscriber_id();
-        let feed_url = feed_url("success");
-
-        let output = registry
-            .subscribe(SubscribeFeedCommand {
-                subscriber_id: subscriber_id.clone(),
-                feed_url: feed_url.clone(),
-                requirement: None,
-                category: None,
-                refresh_policy: RefreshPolicy::interval(interval(3600)),
-                initial_refresh: InitialRefreshMode::RequireSuccess,
-            })
-            .await?;
-
-        assert!(matches!(
-            output.refresh,
-            SubscribeFeedRefresh::Completed(status)
-                if status.feed_url == feed_url && status.kind == RefreshStatusKind::Idle
-        ));
-
-        let entries = registry
-            .list_entries(ListEntriesQuery {
-                subscriber_id: subscriber_id.clone(),
-                after: None,
-                first: 10,
-            })
-            .await?;
-
-        assert_eq!(entries.nodes.len(), 1);
-        assert_eq!(entries.nodes[0].entry.title(), Some("Hello"));
-
-        registry
-            .unsubscribe(UnsubscribeFeedCommand {
-                subscriber_id,
-                feed_url: feed_url.clone(),
-            })
-            .await?;
 
         let mut tx = db.begin().await?;
         assert!(

@@ -82,7 +82,7 @@ pub struct Feed {
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
     pub refresh_policy: payload::RefreshPolicy,
-    pub refresh_status: payload::RefreshStatus,
+    pub refresh_status: Option<payload::RefreshStatus>,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
 }
@@ -236,7 +236,6 @@ impl From<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
             requirement: feed.requirement,
             category: feed.category,
             refresh_policy: feed.refresh_policy.map(Into::into),
-            initial_refresh: None,
         }
     }
 }

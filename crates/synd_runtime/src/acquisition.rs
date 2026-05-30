@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 #[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
 
+use synd_protocol::session::OpenSessionRequest;
 use tokio::time::sleep;
 
 use crate::{
@@ -61,7 +62,9 @@ impl<'a> SessionAcquisition<'a> {
 
         match decision {
             SessionAcquisitionDecision::AttachExistingRuntime { placement } => {
-                RuntimeSessionConnector::new(self.config, placement).connect()
+                RuntimeSessionConnector::new(self.config, placement)
+                    .connect()
+                    .await
             }
             SessionAcquisitionDecision::StartMissingRuntime { placement }
             | SessionAcquisitionDecision::RecoverStaleRuntime { placement } => {
@@ -219,7 +222,9 @@ impl<'a> RuntimeStartup<'a> {
         )
         .wait_until_connected()
         .await?;
-        RuntimeSessionConnector::new(self.config, self.placement).connect()
+        RuntimeSessionConnector::new(self.config, self.placement)
+            .connect()
+            .await
     }
 
     async fn execute(
@@ -236,7 +241,9 @@ impl<'a> RuntimeStartup<'a> {
         // runtime instance until the selected path has produced a session or failed.
         match decision {
             RuntimeStartupDecision::AttachStartedRuntime { placement } => {
-                RuntimeSessionConnector::new(self.config, placement).connect()
+                RuntimeSessionConnector::new(self.config, placement)
+                    .connect()
+                    .await
             }
             RuntimeStartupDecision::LaunchMissingRuntime { placement } => {
                 RuntimeDaemonStarter::new(self.config, placement)
@@ -327,7 +334,9 @@ impl<'a> RuntimeDaemonStarter<'a> {
         .wait_for_launched_daemon(&mut daemon_handle)
         .await?;
         daemon_handle.reap_in_background();
-        RuntimeSessionConnector::new(self.config, self.placement).connect()
+        RuntimeSessionConnector::new(self.config, self.placement)
+            .connect()
+            .await
     }
 }
 
@@ -487,7 +496,7 @@ impl<'a> RuntimeSessionConnector<'a> {
         Self { config, placement }
     }
 
-    fn connect(self) -> Result<Session> {
+    async fn connect(self) -> Result<Session> {
         #[cfg(unix)]
         {
             let client = synd_client::Client::new_unix(
@@ -497,11 +506,16 @@ impl<'a> RuntimeSessionConnector<'a> {
                     self.config.client().user_agent(),
                 ),
             )?;
+            let session = client
+                .open_session(OpenSessionRequest::new(
+                    self.config.requirements().capabilities().clone(),
+                ))
+                .await?;
 
             Ok(Session::new(
-                client,
-                self.config.requirements().capabilities().clone(),
-                crate::SessionHandle::inert(),
+                client.clone(),
+                session.capabilities().clone(),
+                crate::SessionHandle::daemon(client, session.session_id().clone()),
             ))
         }
 

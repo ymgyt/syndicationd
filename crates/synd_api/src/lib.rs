@@ -10,4 +10,5 @@ pub(crate) mod gql;
 pub mod monitor;
 pub(crate) mod principal;
 pub mod serve;
+pub mod session;
 pub mod shutdown;

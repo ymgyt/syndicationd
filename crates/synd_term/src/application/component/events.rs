@@ -218,7 +218,7 @@ impl AppComponent {
     ) -> Vec<Operation> {
         match event {
             FeedsApiEvent::FeedSubscribed { url, payload } => {
-                let operations = self.feeds.feed_subscribed(
+                let operations = FeedsComponent::feed_subscribed(
                     url,
                     payload,
                     feeds_first,

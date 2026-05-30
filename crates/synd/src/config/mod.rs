@@ -1,6 +1,6 @@
-use std::{path::PathBuf, sync::OnceLock};
+use std::path::PathBuf;
 
-use directories::ProjectDirs;
+use synd_support::dirs::SyndicationdDirs;
 
 mod file;
 pub use file::INIT_CONFIG;
@@ -50,7 +50,7 @@ pub mod cache {
     use std::path::Path;
 
     pub fn dir() -> &'static Path {
-        super::project_dirs().cache_dir()
+        super::dirs().cache_dir()
     }
 }
 
@@ -58,7 +58,7 @@ pub mod local {
     use std::path::PathBuf;
 
     pub fn sqlite_db() -> PathBuf {
-        super::project_dirs().data_dir().join("synd.db")
+        super::dirs().sqlite_db()
     }
 }
 
@@ -69,17 +69,13 @@ pub(crate) mod theme {
 }
 
 pub fn log_path() -> PathBuf {
-    project_dirs().data_dir().join("synd.log")
+    dirs().log_file()
 }
 
 pub fn config_path() -> PathBuf {
-    project_dirs().config_dir().join("config.toml")
+    dirs().config_file()
 }
 
-fn project_dirs() -> &'static ProjectDirs {
-    static PROJECT_DIRS: OnceLock<ProjectDirs> = OnceLock::new();
-
-    PROJECT_DIRS.get_or_init(|| {
-        ProjectDirs::from("", "", "syndicationd").expect("Failed to get project dirs")
-    })
+fn dirs() -> &'static SyndicationdDirs {
+    SyndicationdDirs::current()
 }

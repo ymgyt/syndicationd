@@ -151,7 +151,7 @@ pub struct SubscribedFeed {
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     pub refresh_policy: RefreshPolicy,
-    pub refresh_status: RefreshStatus,
+    pub refresh_status: Option<RefreshStatus>,
     pub feed: Option<FeedDetails>,
 }
 
@@ -379,14 +379,6 @@ pub struct SubscribeFeedInput {
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     pub refresh_policy: Option<RefreshPolicyInput>,
-    pub initial_refresh: Option<InitialRefreshModeInput>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum InitialRefreshModeInput {
-    Async,
-    RequireSuccess,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -408,8 +400,7 @@ pub enum RefreshPolicyInputKind {
 pub struct SubscribeFeedPayload {
     pub status: ResponseStatus,
     pub url: FeedUrl,
-    pub request_id: Option<String>,
-    pub disposition: Option<RefreshDisposition>,
+    pub request_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

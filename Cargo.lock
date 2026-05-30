@@ -5350,7 +5350,6 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
- "directories",
  "either",
  "fake",
  "futures-util",
@@ -5408,6 +5407,7 @@ dependencies = [
  "synd-auth",
  "synd-feed",
  "synd-persistence",
+ "synd-protocol",
  "synd-registry",
  "synd-support",
  "synd-test",
@@ -5450,6 +5450,7 @@ dependencies = [
  "serde",
  "serde_json",
  "synd-feed",
+ "synd-protocol",
  "synd-support",
  "thiserror 2.0.18",
  "tokio",
@@ -5495,6 +5496,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -5549,6 +5551,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "byte-unit",
+ "directories",
  "http",
  "humantime",
  "insta",

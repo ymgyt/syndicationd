@@ -3,14 +3,14 @@ use std::{str::FromStr, time::Duration};
 use sqlx::{Row, sqlite::SqliteRow};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
-    RegistryDbError, RegistryDbResult,
-    legacy::model::{
-        FeedSnapshot, FeedSubscription, RefreshErrorKind, RefreshPolicy, RefreshSchedule,
-        RefreshState, SubscriberId,
+    RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
+    crawl::{
+        policy::{RefreshPolicy, RefreshSchedule},
+        state::{FeedSnapshot, RefreshErrorKind, RefreshState},
     },
 };
 
-pub(super) fn decode_subscription(row: &SqliteRow) -> RegistryDbResult<FeedSubscription> {
+pub(super) fn decode_subscription(row: &SqliteRow) -> RegistryDbResult<Subscription> {
     let subscriber_id_raw: String = row
         .try_get("subscriber_id")
         .map_err(RegistryDbError::internal)?;
@@ -32,7 +32,7 @@ pub(super) fn decode_subscription(row: &SqliteRow) -> RegistryDbResult<FeedSubsc
         .try_get("updated_at")
         .map_err(RegistryDbError::internal)?;
 
-    Ok(FeedSubscription {
+    Ok(Subscription {
         subscriber_id: SubscriberId::new(subscriber_id_raw),
         feed_url: FeedUrl::parse(&feed_url_raw).map_err(RegistryDbError::internal)?,
         requirement: requirement

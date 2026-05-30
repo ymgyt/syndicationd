@@ -8,6 +8,7 @@ use synd_api::{
     cli::{FeedRefreshOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
+    serve::auth::Authenticator as ApiAuthenticator,
     shutdown::Shutdown,
 };
 use synd_auth::{
@@ -19,10 +20,10 @@ use synd_feed::types::{Category, Requirement};
 use synd_feed::{feed::service::FeedService, types::FeedUrl};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    FeedRegistryDb, RegistryDbTransaction, SubscriberId,
-    legacy::model::{
-        EffectiveRefreshPolicy, FeedSnapshot, FeedSubscription, RefreshInterval, RefreshPolicy,
-        RefreshSuccess,
+    FeedRegistryDb, FeedRegistryRuntime, RegistryDbTransaction, SubscriberId, Subscription,
+    crawl::{
+        policy::{EffectiveRefreshPolicy, RefreshInterval, RefreshPolicy},
+        state::{FeedSnapshot, RefreshSuccess},
     },
 };
 pub use synd_term::integration::event_stream;
@@ -40,7 +41,6 @@ use synd_term::{
 };
 use synd_test::temp_dir;
 use tokio::net::TcpListener;
-use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
@@ -294,7 +294,7 @@ async fn seed_cached_subscription(
     let succeeded_at = fetched.fetched_at;
 
     let mut tx = db.begin().await?;
-    let subscription = FeedSubscription {
+    let subscription = Subscription {
         subscriber_id: fixture.subscriber_id,
         feed_url: fixture.feed_url,
         requirement: fixture.requirement,
@@ -392,16 +392,20 @@ pub async fn serve_api(
         default_feed_refresh_interval: refresh_interval(Duration::from_hours(1)),
     };
 
+    let shutdown = Shutdown::watch_signal(future::pending(), || {});
+    let registry_runtime = FeedRegistryRuntime::start(
+        db.clone(),
+        db.event_journal(),
+        feed_refresh_options.registry_config(),
+        shutdown.cancellation_token(),
+    );
+    registry_runtime.reconcile_startup().await;
     let mut dep = Dependency::new(
-        db,
-        tls_options,
+        ApiAuthenticator::new().unwrap(),
+        registry_runtime.registry(),
+        tls_options.rustls_config(false).await.unwrap(),
         serve_options,
-        synd_api::cli::LocalOptions { enabled: false },
-        feed_refresh_options,
-        CancellationToken::new(),
-    )
-    .await
-    .unwrap();
+    );
 
     {
         let github_endpoint: &'static str =
@@ -424,11 +428,10 @@ pub async fn serve_api(
 
     let listener = TcpListener::bind(("localhost", api_port)).await?;
 
-    tokio::spawn(synd_api::serve::serve(
-        listener,
-        dep,
-        Shutdown::watch_signal(future::pending(), || {}),
-    ));
+    tokio::spawn(async move {
+        let _registry_runtime = registry_runtime;
+        synd_api::serve::serve(listener, dep, shutdown).await
+    });
 
     Ok(())
 }

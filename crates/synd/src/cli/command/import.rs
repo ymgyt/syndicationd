@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_client::{
     Client, SubscribeFeedError, SyndApiError,
-    payload::{InitialRefreshModeInput, SubscribeFeedInput, SubscribeFeedPayload},
+    payload::{SubscribeFeedInput, SubscribeFeedPayload},
 };
 use synd_term::{types::ExportedFeed, ui};
 
@@ -162,8 +162,7 @@ where
                 .category
                 .clone()
                 .unwrap_or_else(|| ui::default_category().clone());
-            let mut input = SubscribeFeedInput::from(feed);
-            input.initial_refresh = Some(InitialRefreshModeInput::RequireSuccess);
+            let input = SubscribeFeedInput::from(feed);
             match client.subscribe_feed(input).await {
                 Ok(_) => {
                     writeln!(
@@ -251,27 +250,20 @@ mod tests {
                 );
             }
             prev = Some(now);
-            assert_eq!(
-                input.initial_refresh,
-                Some(InitialRefreshModeInput::RequireSuccess)
-            );
-
             match input.url.as_str() {
                 "https://ok1.ymgyt.io/feed.xml" => Ok(SubscribeFeedPayload {
                     status: synd_client::payload::ResponseStatus {
                         code: synd_client::payload::ResponseCode::Ok,
                     },
                     url: url_ok1.clone(),
-                    request_id: None,
-                    disposition: None,
+                    request_id: "subscribe-ok1".to_owned(),
                 }),
                 "https://ok2.ymgyt.io/feed.xml" => Ok(SubscribeFeedPayload {
                     status: synd_client::payload::ResponseStatus {
                         code: synd_client::payload::ResponseCode::Ok,
                     },
                     url: url_ok2.clone(),
-                    request_id: None,
-                    disposition: None,
+                    request_id: "subscribe-ok2".to_owned(),
                 }),
                 "https://err_unavailable.ymgyt.io/feed.xml" => Err(SyndApiError::SubscribeFeed(
                     SubscribeFeedError::FeedUnavailable {

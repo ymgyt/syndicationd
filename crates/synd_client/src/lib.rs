@@ -7,6 +7,10 @@ use futures_util::{SinkExt, Stream, StreamExt};
 use graphql_client::Response;
 use reqwest::header::{self, HeaderValue};
 use serde::{Serialize, de::DeserializeOwned};
+use synd_protocol::session::{
+    CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse, OpenSessionErrorResponse,
+    OpenSessionRequest, OpenSessionResponse,
+};
 use synd_support::o11y::{health_check::Health, opentelemetry::extension::*};
 use thiserror::Error;
 use tokio::{net::TcpStream, sync::mpsc};
@@ -44,6 +48,10 @@ pub enum SyndApiError {
     Graphql { errors: Vec<graphql_client::Error> },
     #[error(transparent)]
     SubscribeFeed(SubscribeFeedError),
+    #[error("session open rejected: {0:?}")]
+    OpenSession(OpenSessionErrorResponse),
+    #[error("session close rejected: {0:?}")]
+    CloseSession(CloseSessionErrorResponse),
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
 }
@@ -151,6 +159,8 @@ fn fetch_entries_payload_from_response(
 impl Client {
     const GRAPHQL: &'static str = "/graphql";
     const HEALTH_CHECK: &'static str = "/health";
+    const SESSION_OPEN: &'static str = "/session/open";
+    const SESSION_CLOSE: &'static str = "/session/close";
     const DAEMON_SHUTDOWN: &'static str = "/daemon/shutdown";
 
     pub fn new(endpoint: Url, options: ClientOptions) -> anyhow::Result<Self> {
@@ -475,6 +485,81 @@ impl Client {
             .error_for_status()?;
 
         Ok(())
+    }
+
+    pub async fn open_session(
+        &self,
+        request: OpenSessionRequest,
+    ) -> Result<OpenSessionResponse, SyndApiError> {
+        let response = self.execute_json_post(Self::SESSION_OPEN, &request).await?;
+
+        if response.status().is_success() {
+            return response.json().await.map_err(SyndApiError::BuildRequest);
+        }
+
+        if response.status() == reqwest::StatusCode::CONFLICT {
+            return Err(SyndApiError::OpenSession(
+                response.json().await.map_err(SyndApiError::BuildRequest)?,
+            ));
+        }
+
+        response
+            .error_for_status()
+            .map_err(SyndApiError::BuildRequest)?;
+
+        Err(SyndApiError::Internal(anyhow!(
+            "Unexpected session open response"
+        )))
+    }
+
+    pub async fn close_session(
+        &self,
+        request: CloseSessionRequest,
+    ) -> Result<CloseSessionResponse, SyndApiError> {
+        let response = self
+            .execute_json_post(Self::SESSION_CLOSE, &request)
+            .await?;
+
+        if response.status().is_success() {
+            return response.json().await.map_err(SyndApiError::BuildRequest);
+        }
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(SyndApiError::CloseSession(
+                response.json().await.map_err(SyndApiError::BuildRequest)?,
+            ));
+        }
+
+        response
+            .error_for_status()
+            .map_err(SyndApiError::BuildRequest)?;
+
+        Err(SyndApiError::Internal(anyhow!(
+            "Unexpected session close response"
+        )))
+    }
+
+    async fn execute_json_post<T>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> Result<reqwest::Response, SyndApiError>
+    where
+        T: Serialize + Debug,
+    {
+        let mut request = self
+            .client
+            .post(self.endpoint.join(path).unwrap())
+            .json(body)
+            .build()
+            .map_err(SyndApiError::BuildRequest)?;
+        self.authentication
+            .apply_authorization_header(request.headers_mut())?;
+
+        self.client
+            .execute(request)
+            .await
+            .map_err(SyndApiError::BuildRequest)
     }
 
     #[tracing::instrument(skip(self))]

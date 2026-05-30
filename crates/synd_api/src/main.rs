@@ -1,5 +1,6 @@
 use std::{env, io};
 
+use anyhow::Context as _;
 use fdlimit::Outcome;
 use synd_support::io::color::{ColorSupport, is_color_supported};
 use synd_support::o11y::{
@@ -12,10 +13,11 @@ use synd_api::{
     cli::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
-    serve::listen_and_serve,
+    serve::{auth::Authenticator, listen_and_serve},
     shutdown::Shutdown,
 };
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
+use synd_registry::FeedRegistryRuntime;
 
 fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let ObservabilityOptions {
@@ -53,15 +55,29 @@ async fn run(
     let db = SqliteDatabase::create_or_open(sqlite.sqlite_db).await?;
     db.migrate().await?;
     let db = SqliteFeedRegistryDb::new(db);
-    let dep = Dependency::new(
-        db,
-        tls,
-        serve,
-        local,
-        feed_refresh,
+
+    let local_enabled = local.enabled;
+    let authenticator = if local_enabled {
+        let token =
+            env::var(config::env::LOCAL_TOKEN).context("local mode requires SYND_LOCAL_TOKEN")?;
+        Authenticator::local(token)?
+    } else {
+        Authenticator::new()?
+    };
+    let tls_config = tls.rustls_config(local_enabled).await?;
+    let registry_runtime = FeedRegistryRuntime::start(
+        db.clone(),
+        db.event_journal(),
+        feed_refresh.registry_config(),
         shutdown.cancellation_token(),
-    )
-    .await?;
+    );
+    registry_runtime.reconcile_startup().await;
+    let dep = Dependency::new(
+        authenticator,
+        registry_runtime.registry(),
+        tls_config,
+        serve,
+    );
 
     info!(
         version = config::app::VERSION,
@@ -79,7 +95,11 @@ async fn run(
         return Ok(());
     }
 
-    listen_and_serve(dep, bind.into(), shutdown).await
+    let result = listen_and_serve(dep, bind.into(), shutdown).await;
+    // Keep the registry runtime alive while API handlers can access the registry;
+    // dropping it shuts down the worker tasks behind the dependency graph.
+    drop(registry_runtime);
+    result
 }
 
 async fn shutdown_signal(shutdown_on_stdin_eof: bool) -> io::Result<()> {

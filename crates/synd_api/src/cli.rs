@@ -1,7 +1,9 @@
 use std::{ffi::OsString, net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
+use anyhow::Context as _;
+use axum_server::tls_rustls::RustlsConfig;
 use clap::{ArgAction, Parser};
-use synd_registry::legacy::model::RefreshInterval;
+use synd_registry::{FeedRegistryConfig, crawl::policy::RefreshInterval};
 use synd_support::time::humantime;
 
 use crate::{
@@ -82,6 +84,27 @@ pub struct TlsOptions {
     pub private_key: Option<PathBuf>,
 }
 
+impl TlsOptions {
+    pub async fn rustls_config(&self, local_enabled: bool) -> anyhow::Result<Option<RustlsConfig>> {
+        if local_enabled {
+            return Ok(None);
+        }
+
+        let certificate = self
+            .certificate
+            .as_ref()
+            .context("tls cert is required unless local mode is enabled")?;
+        let private_key = self
+            .private_key
+            .as_ref()
+            .context("tls key is required unless local mode is enabled")?;
+        RustlsConfig::from_pem_file(certificate, private_key)
+            .await
+            .with_context(|| format!("tls options: {self:?}"))
+            .map(Some)
+    }
+}
+
 #[derive(clap::Args, Debug, Clone)]
 #[command(next_help_heading = "Local options")]
 pub struct LocalOptions {
@@ -130,6 +153,15 @@ impl Default for FeedRefreshOptions {
         Self {
             default_feed_refresh_interval: RefreshInterval::try_from(Duration::from_hours(2))
                 .expect("default feed refresh interval is non-zero"),
+        }
+    }
+}
+
+impl FeedRefreshOptions {
+    pub fn registry_config(self) -> FeedRegistryConfig {
+        FeedRegistryConfig {
+            default_refresh_interval: self.default_feed_refresh_interval,
+            ..FeedRegistryConfig::default()
         }
     }
 }

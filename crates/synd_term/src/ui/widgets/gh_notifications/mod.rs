@@ -277,6 +277,10 @@ impl GitHubNotificationsWidget {
         self.filter_popup.is_active = true;
     }
 
+    pub(crate) fn is_filter_popup_open(&self) -> bool {
+        self.filter_popup.is_active
+    }
+
     #[must_use]
     pub(crate) fn close_filter_popup(&mut self) -> Option<FetchNotificationsParams> {
         self.filter_popup.is_active = false;

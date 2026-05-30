@@ -270,7 +270,10 @@ impl DaemonEndpointFileState {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, time::Duration};
+    use std::{
+        path::{Path, PathBuf},
+        time::Duration,
+    };
 
     use crate::{
         ApiClientConfig, DaemonLaunchCommand, DaemonLaunchConfig, DaemonLaunchLog, DaemonState,
@@ -281,6 +284,61 @@ mod tests {
     };
 
     use super::{Daemon, DaemonConfig, DaemonEndpointBinder};
+
+    #[cfg(unix)]
+    struct StartedDaemon {
+        probe: DaemonLifecycleProbe,
+        daemon_task: tokio::task::JoinHandle<crate::Result<()>>,
+    }
+
+    #[cfg(unix)]
+    impl StartedDaemon {
+        fn spawn(root: &Path) -> Self {
+            let database = RuntimeDatabase::sqlite(root.join("synd.db"));
+            let placement_environment =
+                RuntimePlacementEnvironment::new(RuntimeRoot::from(root.join("runtime")));
+            let placement =
+                RuntimePlacementResolver::with_environment(placement_environment.clone())
+                    .resolve_database(&database)
+                    .unwrap();
+            let runtime = Runtime::new(
+                RuntimeConfig::new(
+                    database.clone(),
+                    ApiClientConfig::new(Duration::from_secs(2), "synd-runtime-test"),
+                    SessionConfig::new(Duration::from_secs(2)),
+                    DaemonLaunchConfig::new(
+                        DaemonLaunchCommand::executable("unused"),
+                        DaemonLaunchLog::file(root.join("daemon.log")),
+                    ),
+                    SessionRequirements::default(),
+                )
+                .with_placement_environment(placement_environment.clone()),
+            );
+            let daemon = Daemon::new(
+                DaemonConfig::new(database).with_placement_environment(placement_environment),
+            );
+            let probe =
+                DaemonLifecycleProbe::new(runtime, placement.endpoint().path().to_path_buf());
+            let daemon_task = tokio::spawn(daemon.serve());
+
+            Self { probe, daemon_task }
+        }
+
+        async fn wait_until_running(&self) {
+            self.probe.wait_until_running().await;
+        }
+
+        async fn shutdown(self) {
+            self.probe.shutdown().await;
+            tokio::time::timeout(Duration::from_secs(5), self.daemon_task)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+
+            assert!(!self.probe.endpoint.exists());
+        }
+    }
 
     #[cfg(unix)]
     struct DaemonLifecycleProbe {
@@ -324,40 +382,24 @@ mod tests {
     #[tokio::test]
     async fn daemon_shutdown_stops_serving_endpoint() {
         let tmp = tempfile::tempdir().unwrap();
-        let database = RuntimeDatabase::sqlite(tmp.path().join("synd.db"));
-        let placement_environment =
-            RuntimePlacementEnvironment::new(RuntimeRoot::from(tmp.path().join("runtime")));
-        let placement = RuntimePlacementResolver::with_environment(placement_environment.clone())
-            .resolve_database(&database)
-            .unwrap();
-        let runtime = Runtime::new(
-            RuntimeConfig::new(
-                database.clone(),
-                ApiClientConfig::new(Duration::from_secs(2), "synd-runtime-test"),
-                SessionConfig::new(Duration::from_secs(2)),
-                DaemonLaunchConfig::new(
-                    DaemonLaunchCommand::executable("unused"),
-                    DaemonLaunchLog::file(tmp.path().join("daemon.log")),
-                ),
-                SessionRequirements::default(),
-            )
-            .with_placement_environment(placement_environment.clone()),
-        );
-        let daemon = Daemon::new(
-            DaemonConfig::new(database).with_placement_environment(placement_environment),
-        );
-        let probe = DaemonLifecycleProbe::new(runtime, placement.endpoint().path().to_path_buf());
-        let daemon_task = tokio::spawn(daemon.serve());
+        let daemon = StartedDaemon::spawn(tmp.path());
 
-        probe.wait_until_running().await;
-        probe.shutdown().await;
-        tokio::time::timeout(Duration::from_secs(5), daemon_task)
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        daemon.wait_until_running().await;
+        daemon.shutdown().await;
+    }
 
-        assert!(!probe.endpoint.exists());
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn daemon_accepts_and_closes_runtime_session() {
+        let tmp = tempfile::tempdir().unwrap();
+        let daemon = StartedDaemon::spawn(tmp.path());
+
+        daemon.wait_until_running().await;
+        let session = daemon.probe.runtime.acquire_session().await.unwrap();
+        assert!(session.capabilities().is_empty());
+        session.close().await.unwrap();
+
+        daemon.shutdown().await;
     }
 
     #[cfg(unix)]
