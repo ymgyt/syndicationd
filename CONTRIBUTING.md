@@ -12,9 +12,35 @@ Enter the development shell before running the project commands:
 nix develop
 ```
 
-### Overview of Packages
+### Application Topology
 
-![Overview](etc/dot/dist/packages.svg)
+![Application overview](etc/dot/dist/overview.svg)
+
+This diagram describes runtime interaction, not crate dependencies. For normal
+development and user workflows, `synd` is the composition root. It resolves
+CLI/configuration, asks `synd_runtime` to acquire a session, then either starts
+`synd_term` for interactive use or runs a feed CLI subcommand.
+
+`synd_runtime` owns the local daemon lifecycle. It resolves a runtime instance
+from the configured SQLite database, serializes daemon startup with an instance
+lock, starts or replaces the singleton daemon when needed, connects over the
+platform runtime endpoint, and opens/closes protocol sessions. Platform-specific
+placement and transport details should stay behind the `Runtime`/`Session` API.
+
+A successful session gives the application a configured `synd_client::Client`.
+The TUI and runtime-backed CLI commands use that client to talk to the local API;
+they should not start local API services or manage runtime sessions directly.
+
+`synd_api` owns the daemon's API surface. It implements session endpoints and the
+GraphQL/local API used by `synd_client`. Registry behavior stays in
+`synd_registry`, and SQLite storage concerns stay behind `synd_persistence`.
+
+`synd_protocol` owns the small wire contracts shared by the client, API server,
+and runtime daemon. Put session-open/session-close payloads, capability
+negotiation, and other cross-process protocol contracts here instead of in
+`synd_client` or `synd_api`.
+
+### Workspace Packages
 
 | Package             | Description                                                       |
 | ---                 | ---                                                               |
@@ -31,40 +57,9 @@ nix develop
 | `synd_term`        | TUI application and event loop                                    |
 | `synd_test`        | Test support utilities                                            |
 
-### Application Topology
-
-![Application overview](etc/dot/dist/overview.svg)
-
-For normal development and user workflows, `synd` is the composition root. It
-resolves CLI/configuration, builds the runtime configuration, acquires a
-`synd_runtime::Session`, and passes the session's `synd_client::Client` into
-`synd_term`.
-
-`synd_runtime` owns local API lifecycle concerns. It resolves a runtime instance
-from the configured SQLite database, serializes daemon startup with an instance
-lock, connects to the daemon over the platform runtime endpoint, opens and
-closes protocol sessions, and starts or replaces the singleton daemon when
-session acquisition requires it. Platform-specific placement and transport
-details should stay behind the `Runtime`/`Session` API.
-
-`synd_api` owns the API server surface. In daemon mode it serves the local API
-endpoint used by `synd_runtime`; as a standalone binary it is useful when
-working on the API server itself or updating the GraphQL schema. Feed lifecycle
-behavior is delegated to `synd_registry`, and SQLite storage adapters are
-provided by `synd_persistence`.
-
-`synd_protocol` owns the small wire contracts shared by the client, API server,
-and runtime daemon. Put session-open/session-close payloads, capability
-negotiation, and other cross-process protocol contracts here instead of in
-`synd_client` or `synd_api`.
-
-`synd_term` owns the TUI application and event loop. It should receive an
-already configured `Client`; it must not start local API services or own runtime
-session lifecycle.
-
 ### Running Locally
 
-The normal development path is the in-process local backend:
+The normal development path uses the local daemon-backed runtime:
 
 ```sh
 just run term

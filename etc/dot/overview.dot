@@ -2,52 +2,96 @@ digraph {
     graph [
         layout=dot,
         rankdir=TB,
-        label="Syndicationd overview",
-        labelloc="top", // t(top) | b(bottom)
-        labeljust="left", // l(left) | c(center) | r(right)
-        fontname="Helvetica,Arial,sans-serif"
-        compound=true; 
-        newrank=true
+        label="Syndicationd application topology",
+        labelloc="top",
+        labeljust="left",
+        fontname="Helvetica,Arial,sans-serif",
+        compound=true,
+        newrank=true,
+        nodesep=0.55,
+        ranksep=0.8
     ];
 
-    synd [
-        label="synd-term"
-    ]
+    node [
+        shape=box,
+        style="rounded,filled",
+        fillcolor="#f8fafc",
+        color="#64748b",
+        fontname="Helvetica,Arial,sans-serif",
+        margin="0.12,0.08"
+    ];
 
-    subgraph cluster_synd_api {
-        label="synd-api"
+    edge [
+        color="#475569",
+        fontname="Helvetica,Arial,sans-serif",
+        fontsize=10,
+        arrowsize=0.7
+    ];
 
-        feeds [
-            label="Feeds"
-            shape="box"
-        ]
+    user [
+        label="User",
+        shape=oval,
+        fillcolor="#f1f5f9"
+    ];
 
-        feed_entries_cache [
-            label="Feed entries cache"
-            shape="box"
-        ]
+    subgraph cluster_app {
+        label="User process";
+        color="#cbd5e1";
+        style="rounded";
+
+        synd [ label="synd\nCLI + config" ];
+        term [ label="synd_term\nTUI application" ];
+        feed_commands [ label="feed subcommands\nimport/export" ];
     }
 
-    feed_src [
-        label="Feed Src"
-    ]
+    subgraph cluster_runtime {
+        label="Runtime boundary";
+        color="#cbd5e1";
+        style="rounded";
 
-    synd -> feeds [
-        label="subscribe"
-    ]
+        runtime [ label="synd_runtime\nsession acquisition" ];
+        session [ label="Session\nclient + close handle" ];
+        client [ label="synd_client\nlocal API client" ];
+        daemon [ label="singleton daemon\nsynd daemon serve" ];
+    }
 
-    feeds -> feed_src [
-        label="periodically fetch"
-    ]
+    subgraph cluster_api {
+        label="Daemon process";
+        color="#cbd5e1";
+        style="rounded";
 
-    feed_src -> feed_entries_cache [
-        label="stored"
-    ]
+        api [ label="synd_api\nlocal API surface" ];
+        protocol [ label="synd_protocol\nsession contracts" ];
+    }
 
-    feed_entries_cache -> synd [
-        label="fetch"
-    ]
+    subgraph cluster_domain {
+        label="Domain and storage";
+        color="#cbd5e1";
+        style="rounded";
 
-    { rank=same; synd; feeds; }
-    { rank=same; feed_src; feed_entries_cache; }
+        registry [ label="synd_registry\nfeed registry workflow" ];
+        persistence [ label="synd_persistence\nSQLite adapters" ];
+        sqlite [ label="SQLite DB", shape=cylinder ];
+        feed_sources [ label="Feed sources", shape=oval ];
+    }
+
+    user -> synd [ label="runs" ];
+    synd -> runtime [ label="resolve config\nacquire session" ];
+    runtime -> daemon [ label="start/replace\nwhen needed" ];
+    daemon -> api [ label="hosts" ];
+    runtime -> api [ label="open/close session" ];
+    runtime -> session [ label="returns" ];
+    session -> client [ label="contains" ];
+
+    synd -> term [ label="interactive mode" ];
+    synd -> feed_commands [ label="feed CLI mode" ];
+    term -> client [ label="queries/subscribes" ];
+    feed_commands -> client [ label="commands/queries" ];
+
+    client -> api [ label="GraphQL/local HTTP" ];
+    api -> protocol [ label="implements" ];
+    api -> registry [ label="serves commands" ];
+    registry -> persistence [ label="persists state" ];
+    registry -> feed_sources [ label="refreshes" ];
+    persistence -> sqlite [ label="reads/writes" ];
 }

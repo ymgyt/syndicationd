@@ -3,17 +3,12 @@ import '.base.just'
 dot_dir := "etc/dot"
 format := "svg"
 
-default: overview packages authentication
+default: overview authentication
 
 # Generate overview image
 [no-cd]
 overview:
 	@just dot generate overview
-
-# Generate packages image
-[no-cd]
-packages:
-	@just dot generate packages
 
 [no-cd]
 authentication:
@@ -22,4 +17,4 @@ authentication:
 [no-cd]
 [private]
 generate src:
-	dot -T{{format}} {{dot_dir}}/{{src}}.dot out> {{dot_dir}}/dist/{{src}}.{{format}}
+	dot -T{{format}} {{justfile_directory()}}/{{dot_dir}}/{{src}}.dot out> {{justfile_directory()}}/{{dot_dir}}/dist/{{src}}.{{format}}
