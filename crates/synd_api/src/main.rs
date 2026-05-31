@@ -1,6 +1,5 @@
 use std::{env, io};
 
-use anyhow::Context as _;
 use fdlimit::Outcome;
 use synd_support::io::color::{ColorSupport, is_color_supported};
 use synd_support::o11y::{
@@ -10,6 +9,7 @@ use tokio::io::AsyncReadExt;
 use tracing::{error, info};
 
 use synd_api::{
+    Error, Result,
     cli::{self, Args, ObservabilityOptions},
     config,
     dependency::Dependency,
@@ -55,27 +55,25 @@ async fn run(
         dry_run,
     }: Args,
     shutdown: Shutdown,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let db = SqliteDatabase::create_or_open(sqlite.sqlite_db).await?;
     db.migrate().await?;
     let db = SqliteFeedRegistryDb::new(db);
 
     let local_enabled = local.enabled;
     let authenticator = if local_enabled {
-        let token =
-            env::var(config::env::LOCAL_TOKEN).context("local mode requires SYND_LOCAL_TOKEN")?;
+        let token = env::var(config::env::LOCAL_TOKEN).map_err(|_| Error::LocalTokenRequired)?;
         Authenticator::local(token)?
     } else {
         Authenticator::new()?
     };
     let tls_config = tls.rustls_config(local_enabled).await?;
     let registry_config = feed_refresh.registry_config();
-    let journal = db.event_journal();
     let api_events = ApiEventPublisher::default();
     let wake_publisher = EventWakePublisher::new(registry_config.event_wake_channel_capacity);
 
     let registry = {
-        let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+        let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
 
         FeedRegistry::with_api_events(
             db.clone(),
@@ -88,7 +86,6 @@ async fn run(
     let event_workers = {
         spawn_event_workers(
             db,
-            journal,
             &wake_publisher,
             api_events,
             registry_config,

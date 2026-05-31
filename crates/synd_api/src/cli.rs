@@ -1,12 +1,12 @@
 use std::{ffi::OsString, net::IpAddr, path::PathBuf, str::FromStr, time::Duration};
 
-use anyhow::Context as _;
 use axum_server::tls_rustls::RustlsConfig;
 use clap::{ArgAction, Parser};
 use synd_registry::{FeedRegistryConfig, crawl::policy::RefreshInterval};
 use synd_support::time::humantime;
 
 use crate::{
+    Error, Result as ApiResult,
     config::{self, env::env_key},
     serve,
 };
@@ -85,7 +85,7 @@ pub struct TlsOptions {
 }
 
 impl TlsOptions {
-    pub async fn rustls_config(&self, local_enabled: bool) -> anyhow::Result<Option<RustlsConfig>> {
+    pub async fn rustls_config(&self, local_enabled: bool) -> ApiResult<Option<RustlsConfig>> {
         if local_enabled {
             return Ok(None);
         }
@@ -93,14 +93,14 @@ impl TlsOptions {
         let certificate = self
             .certificate
             .as_ref()
-            .context("tls cert is required unless local mode is enabled")?;
+            .ok_or(Error::TlsOptionRequired { field: "tls cert" })?;
         let private_key = self
             .private_key
             .as_ref()
-            .context("tls key is required unless local mode is enabled")?;
+            .ok_or(Error::TlsOptionRequired { field: "tls key" })?;
         RustlsConfig::from_pem_file(certificate, private_key)
             .await
-            .with_context(|| format!("tls options: {self:?}"))
+            .map_err(|source| Error::TlsOptions { source })
             .map(Some)
     }
 }

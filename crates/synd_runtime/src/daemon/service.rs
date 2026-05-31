@@ -16,7 +16,7 @@ use tokio::net::UnixListener;
 use tracing::{debug, info, warn};
 
 use crate::{
-    Result, RuntimeDatabase,
+    Error, Result, RuntimeDatabase,
     api::RuntimeApiService,
     placement::{RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver},
 };
@@ -181,11 +181,9 @@ impl DaemonEndpointCleanup {
                 );
             }
             DaemonEndpointFileState::NonSocket => {
-                return Err(anyhow::anyhow!(
-                    "refusing to remove non-socket daemon endpoint {}",
-                    self.path.display()
-                )
-                .into());
+                return Err(Error::NonSocketEndpoint {
+                    path: self.path.clone(),
+                });
             }
         }
 
@@ -203,11 +201,9 @@ impl DaemonEndpointCleanup {
             }
             DaemonEndpointFileState::Missing | DaemonEndpointFileState::ConnectedSocket => {}
             DaemonEndpointFileState::NonSocket => {
-                return Err(anyhow::anyhow!(
-                    "refusing to remove non-socket daemon endpoint {}",
-                    self.path.display()
-                )
-                .into());
+                return Err(Error::NonSocketEndpoint {
+                    path: self.path.clone(),
+                });
             }
         }
 
@@ -466,7 +462,7 @@ mod tests {
         std::fs::write(endpoint.path(), "").unwrap();
         let error = cleanup.cleanup_stale_socket().unwrap_err();
 
-        assert!(error.to_string().contains("non-socket daemon endpoint"));
+        assert!(error.to_string().contains("non-socket runtime endpoint"));
         assert!(endpoint.path().exists());
     }
 

@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 
 #[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
@@ -17,7 +20,7 @@ use crate::{
 
 const ENDPOINT_WAIT_INTERVAL: Duration = Duration::from_millis(50);
 
-/// Controls the ordered decisions required to acquire a runtime session.
+/// Controls the ordered states required to acquire a runtime session.
 pub(crate) struct SessionAcquisition<'a> {
     runtime: &'a Runtime,
 }
@@ -28,654 +31,664 @@ impl<'a> SessionAcquisition<'a> {
     }
 
     pub(crate) async fn acquire(self) -> Result<Session> {
-        let context = self.resolve_context().await?;
-        context.trace();
+        let endpoint = Endpoint::probe(self.runtime.placement().clone()).await;
+        endpoint.trace("Resolved runtime session acquisition state");
 
-        let decision = SessionAcquisitionDecision::from(context);
-        decision.trace();
-
-        self.execute(decision).await
+        match endpoint {
+            Endpoint::Connected(connected) => self.open(connected).await,
+            Endpoint::Missing(missing) => self.start(missing).await,
+            Endpoint::Stale(stale) => self.recover_stale(stale).await,
+            Endpoint::Unavailable(unavailable) => unavailable.fail("runtime endpoint"),
+            #[cfg(not(unix))]
+            Endpoint::Unsupported(unsupported) => unsupported.fail("runtime endpoint"),
+        }
     }
 
-    async fn resolve_context(&self) -> Result<SessionAcquisitionContext> {
-        let placement = self.runtime.placement().clone();
-        let endpoint_connection = RuntimeEndpointConnector::new(placement.endpoint())
+    async fn open(&self, connected: Connected) -> Result<Session> {
+        match connected.open(self.runtime.config()).await? {
+            SessionAttempt::Opened(session) => Ok(*session),
+            SessionAttempt::Incompatible(incompatible) => self.recover(incompatible).await,
+        }
+    }
+
+    async fn start(&self, missing: Missing) -> Result<Session> {
+        match Startup::acquire(missing.placement())? {
+            Startup::Held(held) => self.after_lock(&held).await,
+            Startup::Busy(busy) => self.after_busy(busy).await,
+            #[cfg(not(unix))]
+            Startup::Unsupported(unsupported) => unsupported.fail("runtime startup lock"),
+        }
+    }
+
+    async fn recover_stale(&self, stale: Stale) -> Result<Session> {
+        match Startup::acquire(stale.placement())? {
+            Startup::Held(held) => self.after_lock(&held).await,
+            Startup::Busy(busy) => self.after_busy(busy).await,
+            #[cfg(not(unix))]
+            Startup::Unsupported(unsupported) => unsupported.fail("runtime startup lock"),
+        }
+    }
+
+    async fn recover(&self, incompatible: Incompatible) -> Result<Session> {
+        match Startup::acquire(incompatible.placement())? {
+            Startup::Held(held) => self.replace(incompatible, &held).await,
+            Startup::Busy(busy) => self.after_busy(busy).await,
+            #[cfg(not(unix))]
+            Startup::Unsupported(unsupported) => unsupported.fail("runtime startup lock"),
+        }
+    }
+
+    async fn after_lock(&self, held: &Held) -> Result<Session> {
+        let endpoint = Endpoint::probe(self.runtime.placement().clone()).await;
+        endpoint.trace("Resolved runtime session acquisition state after startup lock");
+
+        match endpoint {
+            Endpoint::Connected(connected) => match connected.open(self.runtime.config()).await? {
+                SessionAttempt::Opened(session) => Ok(*session),
+                SessionAttempt::Incompatible(incompatible) => {
+                    self.replace(incompatible, held).await
+                }
+            },
+            Endpoint::Missing(missing) => self.launch(missing, held).await,
+            Endpoint::Stale(stale) => {
+                let missing = stale.cleanup(held)?;
+                self.launch(missing, held).await
+            }
+            Endpoint::Unavailable(unavailable) => unavailable.fail("runtime endpoint"),
+            #[cfg(not(unix))]
+            Endpoint::Unsupported(unsupported) => unsupported.fail("runtime endpoint"),
+        }
+    }
+
+    async fn after_busy(&self, busy: Busy) -> Result<Session> {
+        let connected = busy.wait(self.runtime.config()).await?;
+        match connected.open(self.runtime.config()).await? {
+            SessionAttempt::Opened(session) => Ok(*session),
+            SessionAttempt::Incompatible(incompatible) => incompatible.fail(),
+        }
+    }
+
+    async fn replace(&self, incompatible: Incompatible, held: &Held) -> Result<Session> {
+        let stopped = incompatible.stop(self.runtime.config(), held).await?;
+        let missing = match stopped {
+            Stopped::Missing(missing) => missing,
+            Stopped::Stale(stale) => stale.cleanup(held)?,
+        };
+
+        self.launch(missing, held).await
+    }
+
+    async fn launch(&self, missing: Missing, held: &Held) -> Result<Session> {
+        let connected = missing.start(self.runtime.config(), held).await?;
+        match connected.open(self.runtime.config()).await? {
+            SessionAttempt::Opened(session) => Ok(*session),
+            SessionAttempt::Incompatible(incompatible) => incompatible.fail(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Endpoint {
+    Connected(Connected),
+    Missing(Missing),
+    Stale(Stale),
+    Unavailable(Unavailable),
+    #[cfg(not(unix))]
+    Unsupported(UnsupportedEndpoint),
+}
+
+impl Endpoint {
+    async fn probe(placement: RuntimePlacement) -> Self {
+        let connection = RuntimeEndpointConnector::new(placement.endpoint())
             .try_connect()
             .await;
 
-        Ok(SessionAcquisitionContext {
-            placement,
-            endpoint_connection,
-        })
+        Self::from_connection(placement, connection)
     }
 
-    async fn execute(&self, decision: SessionAcquisitionDecision) -> Result<Session> {
-        debug!(
-            runtime_session_path = decision.path_name(),
-            "Executing runtime session acquisition path"
-        );
-
-        match decision {
-            SessionAcquisitionDecision::AttachExistingRuntime { placement } => {
-                SessionConnector::new(self.runtime.config(), placement)
-                    .connect()
-                    .await
+    fn from_connection(
+        placement: RuntimePlacement,
+        connection: RuntimeEndpointConnectionStatus,
+    ) -> Self {
+        match connection {
+            RuntimeEndpointConnectionStatus::Connected => Self::Connected(Connected { placement }),
+            RuntimeEndpointConnectionStatus::Missing => Self::Missing(Missing { placement }),
+            RuntimeEndpointConnectionStatus::Stale => Self::Stale(Stale { placement }),
+            RuntimeEndpointConnectionStatus::Unavailable => {
+                Self::Unavailable(Unavailable { placement })
             }
-            SessionAcquisitionDecision::StartMissingRuntime { placement }
-            | SessionAcquisitionDecision::RecoverStaleRuntime { placement } => {
-                SessionStartup::new(self.runtime.config(), placement)
-                    .acquire_session()
-                    .await
-            }
-            SessionAcquisitionDecision::FailUnavailableEndpoint { .. } => {
-                Err(Error::NotImplemented("runtime endpoint unavailable"))
-            }
-            #[cfg(not(unix))]
-            SessionAcquisitionDecision::FailUnsupportedTransport { .. } => {
-                Err(Error::NotImplemented("runtime transport unsupported"))
-            }
-        }
-    }
-}
-
-/// Facts collected before selecting the session acquisition path.
-#[derive(Debug, Clone)]
-struct SessionAcquisitionContext {
-    placement: RuntimePlacement,
-    endpoint_connection: RuntimeEndpointConnectionStatus,
-}
-
-impl SessionAcquisitionContext {
-    fn trace(&self) {
-        trace_endpoint_context(
-            &self.placement,
-            self.endpoint_connection,
-            "Resolved runtime session acquisition context",
-        );
-    }
-}
-
-fn trace_endpoint_context(
-    placement: &RuntimePlacement,
-    endpoint_connection: RuntimeEndpointConnectionStatus,
-    message: &'static str,
-) {
-    debug!(
-        runtime_root = %placement.root().path().display(),
-        runtime_instance_id = %placement.instance().id(),
-        runtime_database = %placement.instance().canonical_database_path().display(),
-        runtime_endpoint = %placement.endpoint().path().display(),
-        runtime_startup_lock = %placement.startup_lock_path().path().display(),
-        runtime_endpoint_connection = ?endpoint_connection,
-        message
-    );
-}
-
-/// Branch selected from the session acquisition context.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum SessionAcquisitionDecision {
-    AttachExistingRuntime {
-        placement: RuntimePlacement,
-    },
-    StartMissingRuntime {
-        placement: RuntimePlacement,
-    },
-    RecoverStaleRuntime {
-        placement: RuntimePlacement,
-    },
-    FailUnavailableEndpoint {
-        placement: RuntimePlacement,
-    },
-    #[cfg(not(unix))]
-    FailUnsupportedTransport {
-        placement: RuntimePlacement,
-    },
-}
-
-impl From<SessionAcquisitionContext> for SessionAcquisitionDecision {
-    fn from(context: SessionAcquisitionContext) -> Self {
-        match context.endpoint_connection {
-            RuntimeEndpointConnectionStatus::Connected => Self::AttachExistingRuntime {
-                placement: context.placement,
-            },
-            RuntimeEndpointConnectionStatus::Missing => Self::StartMissingRuntime {
-                placement: context.placement,
-            },
-            RuntimeEndpointConnectionStatus::Stale => Self::RecoverStaleRuntime {
-                placement: context.placement,
-            },
-            RuntimeEndpointConnectionStatus::Unavailable => Self::FailUnavailableEndpoint {
-                placement: context.placement,
-            },
             #[cfg(not(unix))]
             RuntimeEndpointConnectionStatus::UnsupportedTransport => {
-                Self::FailUnsupportedTransport {
-                    placement: context.placement,
-                }
+                Self::Unsupported(UnsupportedEndpoint { placement })
             }
         }
     }
-}
 
-impl SessionAcquisitionDecision {
-    fn trace(&self) {
+    fn trace(&self, message: &'static str) {
+        let placement = self.placement();
         debug!(
-            runtime_session_path = self.path_name(),
-            "Selected runtime session acquisition path"
+            runtime_root = %placement.root().path().display(),
+            runtime_instance_id = %placement.instance().id(),
+            runtime_database = %placement.instance().canonical_database_path().display(),
+            runtime_endpoint = %placement.endpoint().path().display(),
+            runtime_startup_lock = %placement.startup_lock_path().path().display(),
+            runtime_endpoint_state = self.name(),
+            message
         );
     }
 
-    fn path_name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         match self {
-            Self::AttachExistingRuntime { .. } => "attach_existing_runtime",
-            Self::StartMissingRuntime { .. } => "start_missing_runtime",
-            Self::RecoverStaleRuntime { .. } => "recover_stale_runtime",
-            Self::FailUnavailableEndpoint { .. } => "fail_unavailable_endpoint",
+            Self::Connected(_) => "connected",
+            Self::Missing(_) => "missing",
+            Self::Stale(_) => "stale",
+            Self::Unavailable(_) => "unavailable",
             #[cfg(not(unix))]
-            Self::FailUnsupportedTransport { .. } => "fail_unsupported_transport",
+            Self::Unsupported(_) => "unsupported",
         }
     }
-}
 
-/// Starts or recovers a runtime while holding the instance startup lock.
-struct SessionStartup<'a> {
-    config: &'a RuntimeConfig,
-    placement: RuntimePlacement,
-}
-
-impl<'a> SessionStartup<'a> {
-    fn new(config: &'a RuntimeConfig, placement: RuntimePlacement) -> Self {
-        Self { config, placement }
-    }
-
-    async fn acquire_session(self) -> Result<Session> {
-        match StartupLockAcquirer::new(self.placement.startup_lock_path()).try_acquire()? {
-            StartupLockAcquisition::Acquired(startup_lock) => {
-                self.acquire_after_lock(startup_lock).await
-            }
-            StartupLockAcquisition::AlreadyHeld => self.wait_for_existing_startup().await,
+    fn placement(&self) -> &RuntimePlacement {
+        match self {
+            Self::Connected(state) => &state.placement,
+            Self::Missing(state) => &state.placement,
+            Self::Stale(state) => &state.placement,
+            Self::Unavailable(state) => &state.placement,
             #[cfg(not(unix))]
-            StartupLockAcquisition::UnsupportedTransport => {
-                Err(Error::NotImplemented("runtime startup lock unsupported"))
-            }
-        }
-    }
-
-    async fn acquire_after_lock(self, startup_lock: StartupLock) -> Result<Session> {
-        let context = self.resolve_context().await;
-        context.trace();
-
-        let decision = StartupDecision::from(context);
-        decision.trace();
-
-        self.execute(decision, startup_lock).await
-    }
-
-    async fn resolve_context(&self) -> StartupContext {
-        let endpoint_connection = RuntimeEndpointConnector::new(self.placement.endpoint())
-            .try_connect()
-            .await;
-
-        StartupContext {
-            placement: self.placement.clone(),
-            endpoint_connection,
-        }
-    }
-
-    async fn wait_for_existing_startup(self) -> Result<Session> {
-        EndpointWaiter::new(
-            self.placement.clone(),
-            self.config.session().acquire_timeout(),
-        )
-        .wait_until_connected()
-        .await?;
-        SessionConnector::new(self.config, self.placement)
-            .connect()
-            .await
-    }
-
-    async fn execute(
-        &self,
-        decision: StartupDecision,
-        _startup_lock: StartupLock,
-    ) -> Result<Session> {
-        debug!(
-            runtime_startup_path = decision.path_name(),
-            "Executing runtime startup path"
-        );
-
-        // Holding `_startup_lock` in this scope serializes startup/recovery for the
-        // runtime instance until the selected path has produced a session or failed.
-        match decision {
-            StartupDecision::AttachStartedRuntime { placement } => {
-                SessionConnector::new(self.config, placement)
-                    .connect()
-                    .await
-            }
-            StartupDecision::LaunchMissingRuntime { placement } => {
-                DaemonStarter::new(self.config, placement).start().await
-            }
-            StartupDecision::RecoverStaleEndpoint { placement } => {
-                let placement = recover_stale_endpoint(placement)?;
-
-                DaemonStarter::new(self.config, placement).start().await
-            }
-            StartupDecision::FailUnavailableEndpoint { .. } => Err(Error::NotImplemented(
-                "runtime endpoint unavailable after startup lock",
-            )),
-            #[cfg(not(unix))]
-            StartupDecision::FailUnsupportedTransport { .. } => Err(Error::NotImplemented(
-                "runtime transport unsupported after startup lock",
-            )),
+            Self::Unsupported(state) => &state.placement,
         }
     }
 }
 
-/// Removes a stale Unix socket endpoint while the startup lock is held.
-fn recover_stale_endpoint(placement: RuntimePlacement) -> Result<RuntimePlacement> {
-    #[cfg(unix)]
-    {
-        let endpoint_path = placement.endpoint().path();
-        match std::fs::symlink_metadata(endpoint_path) {
-            Ok(metadata) if metadata.file_type().is_socket() => {
-                std::fs::remove_file(endpoint_path)?;
-                info!(
-                    runtime_endpoint = %endpoint_path.display(),
-                    "Removed stale runtime endpoint"
-                );
-            }
-            Ok(_) => {
-                return Err(anyhow::anyhow!(
-                    "refusing to remove non-socket runtime endpoint {}",
-                    endpoint_path.display()
-                )
-                .into());
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.into()),
-        }
-
-        Ok(placement)
-    }
-
-    #[cfg(not(unix))]
-    {
-        let _ = placement;
-
-        Err(Error::NotImplemented("recovering stale runtime endpoint"))
-    }
-}
-
-/// Starts the daemon for one resolved runtime placement and returns a session.
-struct DaemonStarter<'a> {
-    config: &'a RuntimeConfig,
-    placement: RuntimePlacement,
-}
-
-impl<'a> DaemonStarter<'a> {
-    fn new(config: &'a RuntimeConfig, placement: RuntimePlacement) -> Self {
-        Self { config, placement }
-    }
-
-    async fn start(self) -> Result<Session> {
-        let mut daemon_handle =
-            DaemonLauncher::new(self.config.daemon(), self.placement.clone()).launch()?;
-        EndpointWaiter::new(
-            self.placement.clone(),
-            self.config.session().acquire_timeout(),
-        )
-        .wait_for_launched_daemon(&mut daemon_handle)
-        .await?;
-        daemon_handle.reap_in_background();
-        SessionConnector::new(self.config, self.placement)
-            .connect()
-            .await
-    }
-}
-
-/// Waits until a daemon endpoint is ready to accept connections.
-struct EndpointWaiter {
-    placement: RuntimePlacement,
-    timeout: Duration,
-}
-
-impl EndpointWaiter {
-    fn new(placement: RuntimePlacement, timeout: Duration) -> Self {
-        Self { placement, timeout }
-    }
-
-    async fn wait_until_connected(&self) -> Result<()> {
-        self.wait(None).await
-    }
-
-    async fn wait_for_launched_daemon(&self, daemon_handle: &mut DaemonHandle) -> Result<()> {
-        self.wait(Some(daemon_handle)).await
-    }
-
-    async fn wait(&self, mut daemon_handle: Option<&mut DaemonHandle>) -> Result<()> {
-        let deadline = Instant::now() + self.timeout;
-
-        loop {
-            if let Some(handle) = daemon_handle.as_deref_mut()
-                && let Some(status) = handle.try_wait()?
-            {
-                return Err(anyhow::anyhow!(
-                    "daemon exited before endpoint became ready: {status}"
-                )
-                .into());
-            }
-
-            let endpoint_connection = RuntimeEndpointConnector::new(self.placement.endpoint())
-                .try_connect()
-                .await;
-            if endpoint_connection == RuntimeEndpointConnectionStatus::Connected {
-                return Ok(());
-            }
-
-            let now = Instant::now();
-            if now >= deadline {
-                return Err(anyhow::anyhow!(
-                    "timed out waiting for daemon endpoint {} to become ready",
-                    self.placement.endpoint().path().display()
-                )
-                .into());
-            }
-
-            debug!(
-                runtime_endpoint = %self.placement.endpoint().path().display(),
-                runtime_endpoint_connection = ?endpoint_connection,
-                "Waiting for daemon endpoint"
-            );
-            sleep(ENDPOINT_WAIT_INTERVAL.min(deadline - now)).await;
-        }
-    }
-}
-
-/// Facts collected after acquiring the startup lock.
 #[derive(Debug, Clone)]
-struct StartupContext {
-    placement: RuntimePlacement,
-    endpoint_connection: RuntimeEndpointConnectionStatus,
-}
-
-impl StartupContext {
-    fn trace(&self) {
-        trace_endpoint_context(
-            &self.placement,
-            self.endpoint_connection,
-            "Resolved runtime startup context after acquiring startup lock",
-        );
-    }
-}
-
-/// Branch selected from the startup-lock-protected runtime context.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum StartupDecision {
-    AttachStartedRuntime {
-        placement: RuntimePlacement,
-    },
-    LaunchMissingRuntime {
-        placement: RuntimePlacement,
-    },
-    RecoverStaleEndpoint {
-        placement: RuntimePlacement,
-    },
-    FailUnavailableEndpoint {
-        placement: RuntimePlacement,
-    },
-    #[cfg(not(unix))]
-    FailUnsupportedTransport {
-        placement: RuntimePlacement,
-    },
-}
-
-impl From<StartupContext> for StartupDecision {
-    fn from(context: StartupContext) -> Self {
-        match context.endpoint_connection {
-            RuntimeEndpointConnectionStatus::Connected => Self::AttachStartedRuntime {
-                placement: context.placement,
-            },
-            RuntimeEndpointConnectionStatus::Missing => Self::LaunchMissingRuntime {
-                placement: context.placement,
-            },
-            RuntimeEndpointConnectionStatus::Stale => Self::RecoverStaleEndpoint {
-                placement: context.placement,
-            },
-            RuntimeEndpointConnectionStatus::Unavailable => Self::FailUnavailableEndpoint {
-                placement: context.placement,
-            },
-            #[cfg(not(unix))]
-            RuntimeEndpointConnectionStatus::UnsupportedTransport => {
-                Self::FailUnsupportedTransport {
-                    placement: context.placement,
-                }
-            }
-        }
-    }
-}
-
-impl StartupDecision {
-    fn trace(&self) {
-        debug!(
-            runtime_startup_path = self.path_name(),
-            "Selected runtime startup path"
-        );
-    }
-
-    fn path_name(&self) -> &'static str {
-        match self {
-            Self::AttachStartedRuntime { .. } => "attach_started_runtime",
-            Self::LaunchMissingRuntime { .. } => "launch_missing_runtime",
-            Self::RecoverStaleEndpoint { .. } => "recover_stale_endpoint",
-            Self::FailUnavailableEndpoint { .. } => "fail_unavailable_endpoint",
-            #[cfg(not(unix))]
-            Self::FailUnsupportedTransport { .. } => "fail_unsupported_transport",
-        }
-    }
-}
-
-/// Builds a session connected to an already-running runtime endpoint.
-struct SessionConnector<'a> {
-    config: &'a RuntimeConfig,
+struct Connected {
     placement: RuntimePlacement,
 }
 
-impl<'a> SessionConnector<'a> {
-    fn new(config: &'a RuntimeConfig, placement: RuntimePlacement) -> Self {
-        Self { config, placement }
-    }
-
-    async fn connect(self) -> Result<Session> {
-        #[cfg(unix)]
+impl Connected {
+    async fn open(self, config: &RuntimeConfig) -> Result<SessionAttempt> {
+        let client = daemon_client(config, &self.placement)?;
+        match client
+            .open_session(OpenSessionRequest::new(
+                config.requirements().capabilities().clone(),
+            ))
+            .await
         {
-            let client = synd_client::Client::new_unix(
-                self.placement.endpoint().path(),
-                synd_client::ClientOptions::new(
-                    self.config.client().request_timeout(),
-                    self.config.client().user_agent(),
-                ),
-            )?;
-            let session = client
-                .open_session(OpenSessionRequest::new(
-                    self.config.requirements().capabilities().clone(),
-                ))
-                .await?;
-
-            Ok(Session::new(
+            Ok(session) => Ok(SessionAttempt::Opened(Box::new(Session::new(
                 client.clone(),
                 session.capabilities().clone(),
                 crate::SessionHandle::daemon(client, session.session_id().clone()),
-            ))
+            )))),
+            Err(error) if session_endpoint_missing(&error) => {
+                Ok(SessionAttempt::Incompatible(Incompatible {
+                    placement: self.placement,
+                }))
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Missing {
+    placement: RuntimePlacement,
+}
+
+impl Missing {
+    fn placement(&self) -> &RuntimePlacement {
+        &self.placement
+    }
+
+    async fn start(self, config: &RuntimeConfig, _held: &Held) -> Result<Connected> {
+        let mut daemon_handle =
+            DaemonLauncher::new(config.daemon(), self.placement.clone()).launch()?;
+        let connected = wait_connected(
+            self.placement,
+            config.session().acquire_timeout(),
+            Some(&mut daemon_handle),
+        )
+        .await?;
+        daemon_handle.reap_in_background();
+
+        Ok(connected)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Stale {
+    placement: RuntimePlacement,
+}
+
+impl Stale {
+    fn placement(&self) -> &RuntimePlacement {
+        &self.placement
+    }
+
+    fn cleanup(self, _held: &Held) -> Result<Missing> {
+        #[cfg(unix)]
+        {
+            let endpoint_path = self.placement.endpoint().path();
+            match std::fs::symlink_metadata(endpoint_path) {
+                Ok(metadata) if metadata.file_type().is_socket() => {
+                    std::fs::remove_file(endpoint_path)?;
+                    info!(
+                        runtime_endpoint = %endpoint_path.display(),
+                        "Removed stale runtime endpoint"
+                    );
+                }
+                Ok(_) => {
+                    return Err(Error::NonSocketEndpoint {
+                        path: endpoint_path.to_path_buf(),
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+
+            Ok(Missing {
+                placement: self.placement,
+            })
         }
 
         #[cfg(not(unix))]
         {
-            Err(Error::NotImplemented(
-                "runtime endpoint session on non-Unix",
-            ))
+            let _ = self;
+            let _ = _held;
+
+            Err(Error::UnsupportedTransport {
+                context: "recovering stale runtime endpoint",
+            })
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct Unavailable {
+    placement: RuntimePlacement,
+}
+
+impl Unavailable {
+    fn fail<T>(self, context: &'static str) -> Result<T> {
+        Err(Error::EndpointUnavailable {
+            context,
+            endpoint: self.placement.endpoint().path().to_path_buf(),
+        })
+    }
+}
+
+#[cfg(not(unix))]
+#[derive(Debug, Clone)]
+struct UnsupportedEndpoint {
+    placement: RuntimePlacement,
+}
+
+#[cfg(not(unix))]
+impl UnsupportedEndpoint {
+    fn fail<T>(self, context: &'static str) -> Result<T> {
+        let _ = self;
+
+        Err(Error::UnsupportedTransport { context })
+    }
+}
+
+enum SessionAttempt {
+    Opened(Box<Session>),
+    Incompatible(Incompatible),
+}
+
+#[derive(Debug, Clone)]
+struct Incompatible {
+    placement: RuntimePlacement,
+}
+
+impl Incompatible {
+    fn placement(&self) -> &RuntimePlacement {
+        &self.placement
+    }
+
+    async fn stop(self, config: &RuntimeConfig, _held: &Held) -> Result<Stopped> {
+        let suggestion = daemon_stop_suggestion(&self.placement);
+        let client = daemon_client(config, &self.placement)?;
+        client.shutdown_daemon().await.map_err(|source| {
+            Error::IncompatibleRuntimeDaemonShutdown {
+                endpoint: self.placement.endpoint().path().to_path_buf(),
+                suggestion: suggestion.clone(),
+                source: Box::new(source),
+            }
+        })?;
+
+        match wait_stopped(self.placement.clone(), config.session().acquire_timeout()).await {
+            Ok(stopped) => Ok(stopped),
+            Err(Error::EndpointStopTimeout { .. }) => {
+                Err(Error::IncompatibleRuntimeDaemonStopTimeout {
+                    endpoint: self.placement.endpoint().path().to_path_buf(),
+                    suggestion,
+                })
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn fail<T>(self) -> Result<T> {
+        Err(Error::IncompatibleRuntimeDaemon {
+            endpoint: self.placement.endpoint().path().to_path_buf(),
+            suggestion: daemon_stop_suggestion(&self.placement),
+        })
+    }
+}
+
+enum Stopped {
+    Missing(Missing),
+    Stale(Stale),
+}
+
+enum Startup {
+    Held(Held),
+    Busy(Busy),
+    #[cfg(not(unix))]
+    Unsupported(UnsupportedStartup),
+}
+
+impl Startup {
+    fn acquire(placement: &RuntimePlacement) -> Result<Self> {
+        match StartupLockAcquirer::new(placement.startup_lock_path()).try_acquire()? {
+            StartupLockAcquisition::Acquired(lock) => Ok(Self::Held(Held { _lock: lock })),
+            StartupLockAcquisition::AlreadyHeld => Ok(Self::Busy(Busy {
+                placement: placement.clone(),
+            })),
+            #[cfg(not(unix))]
+            StartupLockAcquisition::UnsupportedTransport => {
+                Ok(Self::Unsupported(UnsupportedStartup {}))
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Held {
+    _lock: StartupLock,
+}
+
+#[derive(Debug, Clone)]
+struct Busy {
+    placement: RuntimePlacement,
+}
+
+impl Busy {
+    async fn wait(self, config: &RuntimeConfig) -> Result<Connected> {
+        wait_connected(self.placement, config.session().acquire_timeout(), None).await
+    }
+}
+
+#[cfg(not(unix))]
+struct UnsupportedStartup {}
+
+#[cfg(not(unix))]
+impl UnsupportedStartup {
+    fn fail<T>(self, context: &'static str) -> Result<T> {
+        let _ = self;
+
+        Err(Error::UnsupportedTransport { context })
+    }
+}
+
+#[cfg(unix)]
+fn daemon_client(
+    config: &RuntimeConfig,
+    placement: &RuntimePlacement,
+) -> Result<synd_client::Client> {
+    Ok(synd_client::Client::new_unix(
+        placement.endpoint().path(),
+        synd_client::ClientOptions::new(
+            config.client().request_timeout(),
+            config.client().user_agent(),
+        ),
+    )?)
+}
+
+#[cfg(not(unix))]
+fn daemon_client(
+    config: &RuntimeConfig,
+    placement: &RuntimePlacement,
+) -> Result<synd_client::Client> {
+    let _ = (config, placement);
+
+    Err(Error::UnsupportedTransport {
+        context: "runtime endpoint session",
+    })
+}
+
+async fn wait_connected(
+    placement: RuntimePlacement,
+    timeout: Duration,
+    mut daemon_handle: Option<&mut DaemonHandle>,
+) -> Result<Connected> {
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        if let Some(handle) = daemon_handle.as_deref_mut()
+            && let Some(status) = handle.try_wait()?
+        {
+            return Err(Error::DaemonExitedBeforeReady { status });
+        }
+
+        let endpoint = Endpoint::probe(placement.clone()).await;
+        if let Endpoint::Connected(connected) = endpoint {
+            return Ok(connected);
+        }
+
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(Error::EndpointReadyTimeout {
+                endpoint: placement.endpoint().path().to_path_buf(),
+            });
+        }
+
+        debug!(
+            runtime_endpoint = %placement.endpoint().path().display(),
+            runtime_endpoint_state = endpoint.name(),
+            "Waiting for daemon endpoint"
+        );
+        sleep(ENDPOINT_WAIT_INTERVAL.min(deadline - now)).await;
+    }
+}
+
+async fn wait_stopped(placement: RuntimePlacement, timeout: Duration) -> Result<Stopped> {
+    let deadline = Instant::now() + timeout;
+
+    loop {
+        match Endpoint::probe(placement.clone()).await {
+            Endpoint::Missing(missing) => return Ok(Stopped::Missing(missing)),
+            Endpoint::Stale(stale) => return Ok(Stopped::Stale(stale)),
+            Endpoint::Connected(_) => {}
+            Endpoint::Unavailable(unavailable) => return unavailable.fail("runtime endpoint"),
+            #[cfg(not(unix))]
+            Endpoint::Unsupported(unsupported) => return unsupported.fail("runtime endpoint"),
+        }
+
+        let now = Instant::now();
+        if now >= deadline {
+            return Err(Error::EndpointStopTimeout {
+                endpoint: placement.endpoint().path().to_path_buf(),
+            });
+        }
+
+        sleep(ENDPOINT_WAIT_INTERVAL.min(deadline - now)).await;
+    }
+}
+
+fn session_endpoint_missing(error: &synd_client::SyndApiError) -> bool {
+    matches!(
+        error,
+        synd_client::SyndApiError::HttpStatus {
+            status,
+            url: Some(url),
+        } if status.as_u16() == 404 && url.path() == "/session/open"
+    )
+}
+
+fn daemon_stop_suggestion(placement: &RuntimePlacement) -> String {
+    format!(
+        "run `synd --sqlite-db {} daemon shutdown` and retry",
+        shell_quote(placement.instance().canonical_database_path())
+    )
+}
+
+fn shell_quote(path: &Path) -> String {
+    let value = path.to_string_lossy();
+    if value.chars().all(|ch| {
+        ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | '+' | '=' | ':' | '@')
+    }) {
+        return value.into_owned();
+    }
+
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{
+        io::{Read, Write},
+        path::{Path, PathBuf},
+        time::Duration,
+    };
+
+    #[cfg(unix)]
+    use std::os::unix::net::UnixListener;
 
     use crate::{
-        RuntimeDatabase,
+        RuntimeConfig, RuntimeDatabase,
         connection::RuntimeEndpointConnectionStatus,
         instance::RuntimeInstance,
         placement::{RuntimePlacement, RuntimeRoot},
     };
-    #[cfg(unix)]
-    use std::os::unix::net::UnixListener;
 
     use super::{
-        SessionAcquisitionContext, SessionAcquisitionDecision, StartupContext, StartupDecision,
-        recover_stale_endpoint,
+        Connected, Endpoint, Held, Incompatible, SessionAttempt, Stale, Stopped,
+        daemon_stop_suggestion, shell_quote,
     };
 
     #[test]
-    fn selects_session_acquisition_decision_from_endpoint_connection() {
+    fn resolves_endpoint_state_from_connection() {
         let cases = [
-            (
-                RuntimeEndpointConnectionStatus::Connected,
-                "attach_existing_runtime",
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Missing,
-                "start_missing_runtime",
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Stale,
-                "recover_stale_runtime",
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Unavailable,
-                "fail_unavailable_endpoint",
-            ),
+            (RuntimeEndpointConnectionStatus::Connected, "connected"),
+            (RuntimeEndpointConnectionStatus::Missing, "missing"),
+            (RuntimeEndpointConnectionStatus::Stale, "stale"),
+            (RuntimeEndpointConnectionStatus::Unavailable, "unavailable"),
         ];
 
-        for (endpoint_connection, expected_path) in cases {
-            let decision =
-                SessionAcquisitionDecision::from(session_context_with(endpoint_connection));
+        for (connection, expected) in cases {
+            let endpoint = Endpoint::from_connection(placement(), connection);
 
-            assert_eq!(decision.path_name(), expected_path);
+            assert_eq!(endpoint.name(), expected);
         }
 
         #[cfg(not(unix))]
         {
-            let decision = SessionAcquisitionDecision::from(session_context_with(
+            let endpoint = Endpoint::from_connection(
+                placement(),
                 RuntimeEndpointConnectionStatus::UnsupportedTransport,
-            ));
+            );
 
-            assert_eq!(decision.path_name(), "fail_unsupported_transport");
+            assert_eq!(endpoint.name(), "unsupported");
         }
     }
 
     #[test]
-    fn selects_startup_decision_from_endpoint_connection() {
-        let cases = [
-            (
-                RuntimeEndpointConnectionStatus::Connected,
-                "attach_started_runtime",
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Missing,
-                "launch_missing_runtime",
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Stale,
-                "recover_stale_endpoint",
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Unavailable,
-                "fail_unavailable_endpoint",
-            ),
-        ];
+    fn daemon_stop_suggestion_uses_runtime_database() {
+        let placement = placement();
+        let expected_db = placement.instance().canonical_database_path().display();
 
-        for (endpoint_connection, expected_path) in cases {
-            let decision = StartupDecision::from(startup_context_with(endpoint_connection));
-
-            assert_eq!(decision.path_name(), expected_path);
-        }
-
-        #[cfg(not(unix))]
-        {
-            let decision = StartupDecision::from(startup_context_with(
-                RuntimeEndpointConnectionStatus::UnsupportedTransport,
-            ));
-
-            assert_eq!(decision.path_name(), "fail_unsupported_transport");
-        }
+        assert_eq!(
+            daemon_stop_suggestion(&placement),
+            format!("run `synd --sqlite-db {expected_db} daemon shutdown` and retry")
+        );
     }
 
     #[test]
-    fn selected_decisions_keep_runtime_placement() {
-        let context = session_context_with(RuntimeEndpointConnectionStatus::Missing);
-        let expected_endpoint = context.placement.endpoint().path().to_path_buf();
-
-        let decision = SessionAcquisitionDecision::from(context);
+    fn shell_quote_quotes_spaces() {
         assert_eq!(
-            session_decision_endpoint_path(&decision),
-            expected_endpoint.as_path()
+            shell_quote(Path::new("/tmp/synd db/synd's.db")),
+            "'/tmp/synd db/synd'\\''s.db'"
         );
+    }
 
-        let context = startup_context_with(RuntimeEndpointConnectionStatus::Missing);
-        let expected_endpoint = context.placement.endpoint().path().to_path_buf();
+    #[test]
+    fn session_endpoint_missing_detects_session_open_404() {
+        let error = synd_client::SyndApiError::HttpStatus {
+            status: 404.try_into().unwrap(),
+            url: Some(url::Url::parse("http://localhost/session/open").unwrap()),
+        };
 
-        let decision = StartupDecision::from(context);
-        assert_eq!(
-            startup_decision_endpoint_path(&decision),
-            expected_endpoint.as_path()
-        );
+        assert!(super::session_endpoint_missing(&error));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn connected_open_reports_incompatible_when_session_endpoint_is_missing() {
+        let placement = placement();
+        let server = spawn_old_daemon(placement.endpoint().path().to_path_buf());
+        let config = runtime_config_for(&placement);
+
+        let attempt = Connected {
+            placement: placement.clone(),
+        }
+        .open(&config)
+        .await
+        .unwrap();
+
+        assert!(matches!(attempt, SessionAttempt::Incompatible(_)));
+        server.join().unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn incompatible_stop_returns_stopped_endpoint_state() {
+        let held = held();
+        let placement = placement();
+        let server = spawn_old_daemon(placement.endpoint().path().to_path_buf());
+        let config = runtime_config_for(&placement);
+
+        let stopped = Incompatible {
+            placement: placement.clone(),
+        }
+        .stop(&config, &held)
+        .await
+        .unwrap();
+
+        assert!(matches!(stopped, Stopped::Stale(_)));
+        server.join().unwrap();
     }
 
     #[cfg(unix)]
     #[test]
     fn stale_endpoint_recovery_removes_socket_file() {
+        let held = held();
         let placement = placement();
         let endpoint = placement.endpoint().path().to_path_buf();
         std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
         let listener = UnixListener::bind(&endpoint).unwrap();
         drop(listener);
 
-        let recovered_placement = recover_stale_endpoint(placement).unwrap();
+        let recovered = Stale { placement }.cleanup(&held).unwrap();
 
-        assert_eq!(recovered_placement.endpoint().path(), endpoint.as_path());
+        assert_eq!(recovered.placement.endpoint().path(), endpoint.as_path());
         assert!(!endpoint.exists());
     }
 
     #[cfg(unix)]
     #[test]
     fn stale_endpoint_recovery_refuses_non_socket_file() {
+        let held = held();
         let placement = placement();
         let endpoint = placement.endpoint().path().to_path_buf();
         std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
         std::fs::write(&endpoint, "").unwrap();
 
-        let error = recover_stale_endpoint(placement).unwrap_err();
+        let error = Stale { placement }.cleanup(&held).unwrap_err();
 
         assert!(error.to_string().contains("non-socket runtime endpoint"));
         assert!(endpoint.exists());
-    }
-
-    fn session_context_with(
-        endpoint_connection: RuntimeEndpointConnectionStatus,
-    ) -> SessionAcquisitionContext {
-        SessionAcquisitionContext {
-            placement: placement(),
-            endpoint_connection,
-        }
-    }
-
-    fn startup_context_with(
-        endpoint_connection: RuntimeEndpointConnectionStatus,
-    ) -> StartupContext {
-        StartupContext {
-            placement: placement(),
-            endpoint_connection,
-        }
     }
 
     fn placement() -> RuntimePlacement {
@@ -686,29 +699,54 @@ mod tests {
         RuntimePlacement::from_instance(RuntimeRoot::from(tmp.path().join("runtime")), instance)
     }
 
-    fn session_decision_endpoint_path(decision: &SessionAcquisitionDecision) -> &Path {
-        match decision {
-            SessionAcquisitionDecision::AttachExistingRuntime { placement }
-            | SessionAcquisitionDecision::StartMissingRuntime { placement }
-            | SessionAcquisitionDecision::RecoverStaleRuntime { placement }
-            | SessionAcquisitionDecision::FailUnavailableEndpoint { placement } => {
-                placement.endpoint().path()
-            }
-            #[cfg(not(unix))]
-            SessionAcquisitionDecision::FailUnsupportedTransport { placement } => {
-                placement.endpoint().path()
-            }
-        }
+    fn runtime_config_for(placement: &RuntimePlacement) -> RuntimeConfig {
+        RuntimeConfig::new(RuntimeDatabase::sqlite(
+            placement.instance().canonical_database_path(),
+        ))
+        .with_api_timeout(Duration::from_secs(2), "synd-runtime-test")
+        .with_session_timeout(Duration::from_secs(2))
     }
 
-    fn startup_decision_endpoint_path(decision: &StartupDecision) -> &Path {
-        match decision {
-            StartupDecision::AttachStartedRuntime { placement }
-            | StartupDecision::LaunchMissingRuntime { placement }
-            | StartupDecision::RecoverStaleEndpoint { placement }
-            | StartupDecision::FailUnavailableEndpoint { placement } => placement.endpoint().path(),
+    #[cfg(unix)]
+    fn spawn_old_daemon(endpoint: PathBuf) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
+            let listener = UnixListener::bind(&endpoint).unwrap();
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buffer = [0_u8; 4096];
+            let len = stream.read(&mut buffer).unwrap();
+            let request = String::from_utf8_lossy(&buffer[..len]);
+            let response = if request.starts_with("POST /daemon/shutdown ") {
+                "HTTP/1.1 204 No Content\r\ncontent-length: 0\r\n\r\n"
+            } else if request.starts_with("POST /session/open ") {
+                "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n"
+            } else {
+                "HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\n\r\n"
+            };
+            stream.write_all(response.as_bytes()).unwrap();
+        })
+    }
+
+    #[cfg(unix)]
+    fn held() -> Held {
+        let tmp = tempfile::tempdir().unwrap();
+        let placement = placement();
+        let lock_path = crate::startup::StartupLockPath::from_instance_id(
+            tmp.path(),
+            placement.instance().id(),
+        );
+        match crate::startup::StartupLockAcquirer::new(&lock_path)
+            .try_acquire()
+            .unwrap()
+        {
+            crate::startup::StartupLockAcquisition::Acquired(lock) => Held { _lock: lock },
+            crate::startup::StartupLockAcquisition::AlreadyHeld => {
+                panic!("startup lock should be available")
+            }
             #[cfg(not(unix))]
-            StartupDecision::FailUnsupportedTransport { placement } => placement.endpoint().path(),
+            crate::startup::StartupLockAcquisition::UnsupportedTransport => {
+                panic!("startup lock should be supported")
+            }
         }
     }
 }

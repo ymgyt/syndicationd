@@ -1,3 +1,5 @@
+use std::{path::PathBuf, process::ExitStatus};
+
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -5,17 +7,70 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
-    Internal(#[from] anyhow::Error),
-
-    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     #[error(transparent)]
     RegistryDb(#[from] synd_registry::RegistryDbError),
 
     #[error(transparent)]
-    Api(#[from] synd_client::SyndApiError),
+    Api(Box<synd_client::SyndApiError>),
+
+    #[error(transparent)]
+    RuntimeApi(Box<synd_api::Error>),
+
+    #[error("{context} endpoint unavailable: {}", endpoint.display())]
+    EndpointUnavailable {
+        context: &'static str,
+        endpoint: PathBuf,
+    },
+
+    #[error("{context} transport unsupported")]
+    UnsupportedTransport { context: &'static str },
+
+    #[error("refusing to remove non-socket runtime endpoint {}", path.display())]
+    NonSocketEndpoint { path: PathBuf },
+
+    #[error("daemon exited before endpoint became ready: {status}")]
+    DaemonExitedBeforeReady { status: ExitStatus },
+
+    #[error("timed out waiting for daemon endpoint {} to become ready", endpoint.display())]
+    EndpointReadyTimeout { endpoint: PathBuf },
+
+    #[error("timed out waiting for daemon endpoint {} to stop", endpoint.display())]
+    EndpointStopTimeout { endpoint: PathBuf },
+
+    #[error("runtime daemon is incompatible at {}; {suggestion}", endpoint.display())]
+    IncompatibleRuntimeDaemon {
+        endpoint: PathBuf,
+        suggestion: String,
+    },
+
+    #[error("failed to stop incompatible runtime daemon at {}; {suggestion}", endpoint.display())]
+    IncompatibleRuntimeDaemonShutdown {
+        endpoint: PathBuf,
+        suggestion: String,
+        #[source]
+        source: Box<synd_client::SyndApiError>,
+    },
+
+    #[error("timed out stopping incompatible runtime daemon at {}; {suggestion}", endpoint.display())]
+    IncompatibleRuntimeDaemonStopTimeout {
+        endpoint: PathBuf,
+        suggestion: String,
+    },
 
     #[error("{0} is not implemented yet")]
     NotImplemented(&'static str),
+}
+
+impl From<synd_client::SyndApiError> for Error {
+    fn from(source: synd_client::SyndApiError) -> Self {
+        Self::Api(Box::new(source))
+    }
+}
+
+impl From<synd_api::Error> for Error {
+    fn from(source: synd_api::Error) -> Self {
+        Self::RuntimeApi(Box::new(source))
+    }
 }

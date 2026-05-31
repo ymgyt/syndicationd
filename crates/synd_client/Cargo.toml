@@ -17,7 +17,6 @@ synd-feed = { path = "../synd_feed", version = "0.3.5" }
 synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
 synd-support = { path = "../synd_support", version = "0.1.0", features = ["o11y"] }
 
-anyhow            = { workspace = true }
 chrono            = { workspace = true, features = ["serde"] }
 fake              = { workspace = true, optional = true }
 futures-util      = { workspace = true, features = ["sink"] }

@@ -3,9 +3,22 @@ use std::{fmt::Debug, time::Duration};
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{Serialize, de::DeserializeOwned};
+use thiserror::Error;
 use tracing::instrument;
 
 use crate::{client::github::query, config};
+
+#[derive(Debug, Error)]
+pub enum GithubClientError {
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[error(transparent)]
+    InvalidHeader(#[from] header::InvalidHeaderValue),
+    #[error("github graphql error: {errors:?}")]
+    Graphql { errors: Vec<graphql_client::Error> },
+    #[error("unexpected github graphql response")]
+    UnexpectedResponse,
+}
 
 #[derive(Clone)]
 pub struct GithubClient {
@@ -17,7 +30,7 @@ impl GithubClient {
     const ENDPOINT: &'static str = "https://api.github.com/graphql";
 
     /// Construct `GithubClient`.
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new() -> Result<Self, GithubClientError> {
         let client = reqwest::ClientBuilder::new()
             .user_agent(config::USER_AGENT)
             .timeout(Duration::from_secs(10))
@@ -39,7 +52,7 @@ impl GithubClient {
     }
 
     #[instrument(name = "github::authenticate", skip_all)]
-    pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<String> {
+    pub async fn authenticate(&self, access_token: &str) -> Result<String, GithubClientError> {
         let variables = query::authenticate::Variables {};
         let request = query::Authenticate::build_query(variables);
         let response: query::authenticate::ResponseData =
@@ -52,7 +65,7 @@ impl GithubClient {
         &self,
         access_token: &str,
         body: &Body,
-    ) -> anyhow::Result<ResponseData>
+    ) -> Result<ResponseData, GithubClientError>
     where
         Body: Serialize + ?Sized,
         ResponseData: DeserializeOwned + Debug,
@@ -72,11 +85,9 @@ impl GithubClient {
             .await?;
 
         match (res.data, res.errors) {
-            (_, Some(errs)) if !errs.is_empty() => {
-                Err(anyhow::anyhow!("failed to request github api: {errs:?}"))
-            }
+            (_, Some(errs)) if !errs.is_empty() => Err(GithubClientError::Graphql { errors: errs }),
             (Some(data), _) => Ok(data),
-            _ => Err(anyhow::anyhow!("unexpected response")),
+            _ => Err(GithubClientError::UnexpectedResponse),
         }
     }
 }

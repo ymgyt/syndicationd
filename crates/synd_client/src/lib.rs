@@ -2,10 +2,12 @@
 
 use std::{fmt::Debug, time::Duration};
 
-use anyhow::anyhow;
 use futures_util::{SinkExt, Stream, StreamExt};
 use graphql_client::Response;
-use reqwest::header::{self, HeaderValue};
+use reqwest::{
+    StatusCode,
+    header::{self, HeaderValue},
+};
 use serde::{Serialize, de::DeserializeOwned};
 use synd_protocol::session::{
     CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse, OpenSessionErrorResponse,
@@ -45,6 +47,11 @@ pub enum SyndApiError {
     Unauthorized { url: Option<Url> },
     #[error(transparent)]
     BuildRequest(#[from] reqwest::Error),
+    #[error("HTTP status client error ({status}) for url ({url})", url = url.as_ref().map(ToString::to_string).unwrap_or_default())]
+    HttpStatus {
+        status: StatusCode,
+        url: Option<Url>,
+    },
     #[error("graphql error: {errors:?}")]
     Graphql { errors: Vec<graphql_client::Error> },
     #[error(transparent)]
@@ -53,8 +60,41 @@ pub enum SyndApiError {
     OpenSession(OpenSessionErrorResponse),
     #[error("session close rejected: {0:?}")]
     CloseSession(CloseSessionErrorResponse),
-    #[error(transparent)]
-    Internal(#[from] anyhow::Error),
+    #[error("credential is not configured")]
+    MissingCredential,
+    #[error("invalid authorization header")]
+    InvalidHeader(#[from] header::InvalidHeaderValue),
+    #[error("invalid url")]
+    InvalidUrl(#[from] url::ParseError),
+    #[error("websocket error")]
+    WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
+    #[error("json error")]
+    Json(#[from] serde_json::Error),
+    #[error("unexpected response: {context}")]
+    UnexpectedResponse { context: &'static str },
+    #[error("GraphQL subscription over TLS is not implemented in synd-term yet")]
+    TlsWebSocketUnsupported,
+    #[error("unsupported GraphQL subscription endpoint scheme: {scheme}")]
+    UnsupportedWebSocketScheme { scheme: String },
+    #[error("failed to set websocket scheme")]
+    SetWebSocketScheme,
+    #[error("GraphQL subscription protocol error: {message}")]
+    SubscriptionProtocol { message: String },
+}
+
+impl SyndApiError {
+    fn from_status_error(error: reqwest::Error) -> Self {
+        match error.status() {
+            Some(StatusCode::UNAUTHORIZED) => Self::Unauthorized {
+                url: error.url().cloned(),
+            },
+            Some(status) => Self::HttpStatus {
+                status,
+                url: error.url().cloned(),
+            },
+            None => Self::BuildRequest(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,7 +119,7 @@ pub enum ApiCredential {
 }
 
 impl ApiCredential {
-    fn into_header_value(self) -> anyhow::Result<HeaderValue> {
+    fn into_header_value(self) -> Result<HeaderValue, SyndApiError> {
         let value = match self {
             Self::Github { access_token } => format!("github {access_token}"),
             Self::Google { id_token } => format!("google {id_token}"),
@@ -114,7 +154,7 @@ impl ClientAuthentication {
         headers: &mut header::HeaderMap,
     ) -> Result<(), SyndApiError> {
         match self {
-            Self::Required => Err(SyndApiError::Internal(anyhow!("Credential not configured"))),
+            Self::Required => Err(SyndApiError::MissingCredential),
             Self::Header(value) => {
                 headers.insert(header::AUTHORIZATION, value.clone());
                 Ok(())
@@ -151,9 +191,9 @@ fn fetch_entries_payload_from_response(
             Ok(output.into())
         }
         None if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
-        None => Err(SyndApiError::Internal(anyhow!(
-            "Unexpected error. response does not contain data and errors"
-        ))),
+        None => Err(SyndApiError::UnexpectedResponse {
+            context: "response does not contain data and errors",
+        }),
     }
 }
 
@@ -164,7 +204,7 @@ impl Client {
     const SESSION_CLOSE: &'static str = "/session/close";
     const DAEMON_SHUTDOWN: &'static str = "/daemon/shutdown";
 
-    pub fn new(endpoint: Url, options: ClientOptions) -> anyhow::Result<Self> {
+    pub fn new(endpoint: Url, options: ClientOptions) -> Result<Self, SyndApiError> {
         let client = Self::builder(options).build()?;
 
         Ok(Self {
@@ -179,7 +219,7 @@ impl Client {
     pub fn new_unix(
         socket_path: impl AsRef<std::path::Path>,
         options: ClientOptions,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, SyndApiError> {
         let client = Self::builder(options)
             .unix_socket(socket_path.as_ref())
             .build()?;
@@ -201,12 +241,12 @@ impl Client {
             .danger_accept_invalid_certs(true)
     }
 
-    pub fn set_credential(&mut self, credential: ApiCredential) -> anyhow::Result<()> {
+    pub fn set_credential(&mut self, credential: ApiCredential) -> Result<(), SyndApiError> {
         self.authentication = ClientAuthentication::Header(credential.into_header_value()?);
         Ok(())
     }
 
-    pub fn set_local_token(&mut self, token: &str) -> anyhow::Result<()> {
+    pub fn set_local_token(&mut self, token: &str) -> Result<(), SyndApiError> {
         self.set_credential(ApiCredential::LocalBearer {
             token: token.to_owned(),
         })
@@ -255,9 +295,9 @@ impl Client {
                 Ok(data.output)
             }
             None if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
-            None => Err(SyndApiError::Internal(anyhow!(
-                "Unexpected error. response does not contain data and errors"
-            ))),
+            None => Err(SyndApiError::UnexpectedResponse {
+                context: "response does not contain data and errors",
+            }),
         }
     }
 
@@ -418,9 +458,9 @@ impl Client {
         match (response.data, response.errors) {
             (_, Some(errors)) if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
             (Some(data), _) => Ok(data),
-            _ => Err(SyndApiError::Internal(anyhow!(
-                "Unexpected error. response does not contain data and errors"
-            ))),
+            _ => Err(SyndApiError::UnexpectedResponse {
+                context: "response does not contain data and errors",
+            }),
         }
     }
 
@@ -454,12 +494,7 @@ impl Client {
             .execute(request)
             .await?
             .error_for_status()
-            .map_err(|err| match err.status().map(|s| s.as_u16()) {
-                Some(401) => SyndApiError::Unauthorized {
-                    url: err.url().cloned(),
-                },
-                _ => SyndApiError::Internal(anyhow::Error::from(err)),
-            })?
+            .map_err(SyndApiError::from_status_error)?
             .json()
             .await?;
 
@@ -467,23 +502,25 @@ impl Client {
     }
 
     // call health check api
-    pub async fn health(&self) -> anyhow::Result<Health> {
+    pub async fn health(&self) -> Result<Health, SyndApiError> {
         self.client
             .get(self.endpoint.join(Self::HEALTH_CHECK).unwrap())
             .send()
             .await?
-            .error_for_status()?
+            .error_for_status()
+            .map_err(SyndApiError::from_status_error)?
             .json()
             .await
-            .map_err(anyhow::Error::from)
+            .map_err(SyndApiError::BuildRequest)
     }
 
-    pub async fn shutdown_daemon(&self) -> anyhow::Result<()> {
+    pub async fn shutdown_daemon(&self) -> Result<(), SyndApiError> {
         self.client
             .post(self.endpoint.join(Self::DAEMON_SHUTDOWN).unwrap())
             .send()
             .await?
-            .error_for_status()?;
+            .error_for_status()
+            .map_err(SyndApiError::from_status_error)?;
 
         Ok(())
     }
@@ -506,11 +543,11 @@ impl Client {
 
         response
             .error_for_status()
-            .map_err(SyndApiError::BuildRequest)?;
+            .map_err(SyndApiError::from_status_error)?;
 
-        Err(SyndApiError::Internal(anyhow!(
-            "Unexpected session open response"
-        )))
+        Err(SyndApiError::UnexpectedResponse {
+            context: "session open",
+        })
     }
 
     pub async fn close_session(
@@ -533,11 +570,11 @@ impl Client {
 
         response
             .error_for_status()
-            .map_err(SyndApiError::BuildRequest)?;
+            .map_err(SyndApiError::from_status_error)?;
 
-        Err(SyndApiError::Internal(anyhow!(
-            "Unexpected session close response"
-        )))
+        Err(SyndApiError::UnexpectedResponse {
+            context: "session close",
+        })
     }
 
     async fn execute_json_post<T>(
@@ -591,7 +628,7 @@ impl Client {
         let mut request = ws_url
             .as_str()
             .into_client_request()
-            .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+            .map_err(SyndApiError::WebSocket)?;
         request.headers_mut().insert(
             header::SEC_WEBSOCKET_PROTOCOL,
             HeaderValue::from_static("graphql-transport-ws"),
@@ -601,12 +638,12 @@ impl Client {
 
         let (mut socket, _) = connect_async(request)
             .await
-            .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+            .map_err(SyndApiError::WebSocket)?;
 
         socket
             .send(Message::text(r#"{"type":"connection_init"}"#))
             .await
-            .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+            .map_err(SyndApiError::WebSocket)?;
         wait_for_connection_ack(&mut socket).await?;
 
         let subscribe = serde_json::json!({
@@ -619,7 +656,7 @@ impl Client {
         socket
             .send(Message::text(subscribe.to_string()))
             .await
-            .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+            .map_err(SyndApiError::WebSocket)?;
 
         Ok(socket)
     }
@@ -628,22 +665,18 @@ impl Client {
         let mut url = self
             .endpoint
             .join("/graphql/ws")
-            .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+            .map_err(SyndApiError::InvalidUrl)?;
         let scheme = match url.scheme() {
             "http" => "ws",
-            "https" => {
-                return Err(SyndApiError::Internal(anyhow!(
-                    "GraphQL subscription over TLS is not implemented in synd-term yet"
-                )));
-            }
+            "https" => return Err(SyndApiError::TlsWebSocketUnsupported),
             scheme => {
-                return Err(SyndApiError::Internal(anyhow!(
-                    "unsupported GraphQL subscription endpoint scheme: {scheme}"
-                )));
+                return Err(SyndApiError::UnsupportedWebSocketScheme {
+                    scheme: scheme.to_owned(),
+                });
             }
         };
         url.set_scheme(scheme)
-            .map_err(|()| SyndApiError::Internal(anyhow!("failed to set websocket scheme")))?;
+            .map_err(|()| SyndApiError::SetWebSocketScheme)?;
         Ok(url)
     }
 }
@@ -667,9 +700,9 @@ where
         match value.get("type").and_then(serde_json::Value::as_str) {
             Some("connection_ack") => return Ok(()),
             Some("connection_error" | "error") => {
-                return Err(SyndApiError::Internal(anyhow!(
-                    "GraphQL subscription connection failed: {value}"
-                )));
+                return Err(SyndApiError::SubscriptionProtocol {
+                    message: format!("connection failed: {value}"),
+                });
             }
             _ => {}
         }
@@ -684,34 +717,36 @@ where
         let value = next_ws_json(socket).await?;
         match value.get("type").and_then(serde_json::Value::as_str) {
             Some("next") => {
-                let payload = value
-                    .get("payload")
-                    .ok_or_else(|| SyndApiError::Internal(anyhow!("missing payload")))?;
+                let payload =
+                    value
+                        .get("payload")
+                        .ok_or_else(|| SyndApiError::SubscriptionProtocol {
+                            message: "missing payload".to_owned(),
+                        })?;
                 if let Some(errors) = payload.get("errors") {
-                    return Err(SyndApiError::Internal(anyhow!(
-                        "GraphQL subscription error: {errors}"
-                    )));
+                    return Err(SyndApiError::SubscriptionProtocol {
+                        message: format!("subscription error: {errors}"),
+                    });
                 }
                 let event = payload
                     .get("data")
                     .and_then(|data| data.get("timelineChanged"))
                     .cloned()
-                    .ok_or_else(|| {
-                        SyndApiError::Internal(anyhow!("missing timelineChanged payload"))
+                    .ok_or_else(|| SyndApiError::SubscriptionProtocol {
+                        message: "missing timelineChanged payload".to_owned(),
                     })?;
-                let event = serde_json::from_value(event)
-                    .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+                let event = serde_json::from_value(event).map_err(SyndApiError::Json)?;
                 return Ok(event);
             }
             Some("error") => {
-                return Err(SyndApiError::Internal(anyhow!(
-                    "GraphQL subscription error: {value}"
-                )));
+                return Err(SyndApiError::SubscriptionProtocol {
+                    message: format!("subscription error: {value}"),
+                });
             }
             Some("complete") => {
-                return Err(SyndApiError::Internal(anyhow!(
-                    "GraphQL subscription completed before receiving an event"
-                )));
+                return Err(SyndApiError::SubscriptionProtocol {
+                    message: "subscription completed before receiving an event".to_owned(),
+                });
             }
             _ => {}
         }
@@ -726,21 +761,21 @@ where
         let message = socket
             .next()
             .await
-            .ok_or_else(|| SyndApiError::Internal(anyhow!("GraphQL subscription closed")))?
-            .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)))?;
+            .ok_or_else(|| SyndApiError::SubscriptionProtocol {
+                message: "subscription closed".to_owned(),
+            })?
+            .map_err(SyndApiError::WebSocket)?;
         match message {
             Message::Text(text) => {
-                return serde_json::from_str(text.as_ref())
-                    .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)));
+                return serde_json::from_str(text.as_ref()).map_err(SyndApiError::Json);
             }
             Message::Binary(bytes) => {
-                return serde_json::from_slice(&bytes)
-                    .map_err(|err| SyndApiError::Internal(anyhow::Error::from(err)));
+                return serde_json::from_slice(&bytes).map_err(SyndApiError::Json);
             }
             Message::Close(frame) => {
-                return Err(SyndApiError::Internal(anyhow!(
-                    "GraphQL subscription closed: {frame:?}"
-                )));
+                return Err(SyndApiError::SubscriptionProtocol {
+                    message: format!("subscription closed: {frame:?}"),
+                });
             }
             Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => {}
         }
@@ -782,7 +817,7 @@ mod tests {
             .apply_authorization_header(&mut headers)
             .unwrap_err();
 
-        assert!(err.to_string().contains("Credential not configured"));
+        assert!(matches!(err, SyndApiError::MissingCredential));
         assert!(!headers.contains_key(header::AUTHORIZATION));
     }
 

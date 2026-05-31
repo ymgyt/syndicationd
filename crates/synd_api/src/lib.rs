@@ -6,9 +6,12 @@ pub mod cli;
 pub mod client;
 pub mod config;
 pub mod dependency;
+mod error;
 pub(crate) mod gql;
 pub mod monitor;
 pub(crate) mod principal;
 pub mod serve;
 pub mod session;
 pub mod shutdown;
+
+pub use error::{Error, Result};

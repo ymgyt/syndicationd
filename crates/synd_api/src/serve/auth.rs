@@ -7,6 +7,7 @@ use tracing::warn;
 use tracing::{debug, instrument};
 
 use crate::{
+    Error, Result as ApiResult,
     client::github::GithubClient,
     principal::{Principal, User},
     serve::layer::authenticate::Authenticate,
@@ -31,7 +32,7 @@ enum AuthenticatorKind {
 }
 
 impl Authenticator {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new() -> ApiResult<Self> {
         let cache = Cache::builder()
             .max_capacity(1024 * 1024)
             .time_to_live(Duration::from_hours(1))
@@ -46,9 +47,11 @@ impl Authenticator {
         })
     }
 
-    pub fn local(token: impl Into<String>) -> anyhow::Result<Self> {
+    pub fn local(token: impl Into<String>) -> ApiResult<Self> {
         let token = token.into();
-        anyhow::ensure!(!token.is_empty(), "local token must not be empty");
+        if token.is_empty() {
+            return Err(Error::EmptyLocalToken);
+        }
 
         Ok(Self {
             kind: AuthenticatorKind::Local { token },

@@ -24,7 +24,6 @@ synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
 synd-registry = { path = "../synd_registry", version = "0.1.0" }
 synd-support = { path = "../synd_support", version = "0.1.0", features = ["color", "humantime", "o11y"] }
 
-anyhow             = { workspace = true }
 async-graphql      = { workspace = true, features = ["tracing"] }
 async-graphql-axum = { version = "7.2.1" }
 axum               = { workspace = true, features = ["json"] }
@@ -46,6 +45,7 @@ tokio-util         = { workspace = true }
 tower              = { version = "0.5.3", default-features = false, features = ["limit", "timeout"] }
 tower-http         = { version = "0.6.8", default-features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
 tracing            = { workspace = true }
+thiserror          = { workspace = true }
 
 [features]
 # Integration test

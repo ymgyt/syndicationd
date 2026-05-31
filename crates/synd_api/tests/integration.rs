@@ -14,7 +14,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn api_command_test() -> anyhow::Result<()> {
+    async fn api_command_test() -> Result<(), Box<dyn std::error::Error>> {
         ensure_init();
         let mut cmd = assert_cmd::Command::cargo_bin("synd-api").unwrap();
 

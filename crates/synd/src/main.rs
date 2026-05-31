@@ -199,24 +199,29 @@ async fn main() -> ExitCode {
         };
     }
 
+    let log_file = config.log_file();
+    let (app, session) = match build_app(config, dry_run).await {
+        Ok(started) => started,
+        Err(err) => {
+            error!("{err:?}");
+            eprintln!("error: {err:#}");
+            eprintln!("see log: {}", log_file.display());
+            return ExitCode::FAILURE;
+        }
+    };
+
     let mut event_stream = terminal::event_stream();
-
-    if let Err(err) = async {
-        let (app, session) = build_app(config, dry_run).await?;
-        let result = {
-            info!("Running...");
-            app.run(&mut event_stream)
-        }
-        .await;
-
-        if let Err(err) = session.close().await {
-            warn!("Failed to close runtime session: {err}");
-        }
-
-        result
+    let result = {
+        info!("Running...");
+        app.run(&mut event_stream)
     }
-    .await
-    {
+    .await;
+
+    if let Err(err) = session.close().await {
+        warn!("Failed to close runtime session: {err}");
+    }
+
+    if let Err(err) = result {
         error!("{err:?}");
         ExitCode::FAILURE
     } else {

@@ -206,11 +206,26 @@ impl Application {
             SyndApiError::BuildRequest(err) => {
                 format!("build request failed: {err} this is a BUG")
             }
+            SyndApiError::HttpStatus { status, url } => {
+                format!(
+                    "HTTP status client error ({status}) for url ({})",
+                    url.as_ref().map(ToString::to_string).unwrap_or_default()
+                )
+            }
             SyndApiError::Graphql { errors } => errors.iter().map(ToString::to_string).join(", "),
             SyndApiError::SubscribeFeed(err) => err.to_string(),
             SyndApiError::OpenSession(err) => format!("session open rejected: {err:?}"),
             SyndApiError::CloseSession(err) => format!("session close rejected: {err:?}"),
-            SyndApiError::Internal(err) => format!("internal error: {err}"),
+            SyndApiError::MissingCredential
+            | SyndApiError::InvalidHeader(_)
+            | SyndApiError::InvalidUrl(_)
+            | SyndApiError::WebSocket(_)
+            | SyndApiError::Json(_)
+            | SyndApiError::UnexpectedResponse { .. }
+            | SyndApiError::TlsWebSocketUnsupported
+            | SyndApiError::UnsupportedWebSocketScheme { .. }
+            | SyndApiError::SetWebSocketScheme
+            | SyndApiError::SubscriptionProtocol { .. } => error.to_string(),
         }
     }
 

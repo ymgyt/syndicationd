@@ -18,7 +18,7 @@ use tower_http::{
 use tracing::info;
 
 use crate::{
-    config,
+    Result, config,
     dependency::Dependency,
     gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
@@ -53,7 +53,7 @@ pub async fn listen_and_serve(
     dep: Dependency,
     bind: BindOptions,
     shutdown: Shutdown,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     info!(addr = %bind.addr, port = bind.port, "Listening...");
     let listener = TcpListener::bind((bind.addr, bind.port)).await?;
 
@@ -61,11 +61,7 @@ pub async fn listen_and_serve(
 }
 
 /// Start api server
-pub async fn serve(
-    listener: TcpListener,
-    dep: Dependency,
-    shutdown: Shutdown,
-) -> anyhow::Result<()> {
+pub async fn serve(listener: TcpListener, dep: Dependency, shutdown: Shutdown) -> Result<()> {
     let ApiService { router, tls_config } = build_service(dep, &shutdown);
 
     info!("Serving...");
@@ -91,11 +87,7 @@ pub async fn serve(
 }
 
 #[cfg(unix)]
-pub async fn serve_unix(
-    listener: UnixListener,
-    dep: Dependency,
-    shutdown: Shutdown,
-) -> anyhow::Result<()> {
+pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutdown) -> Result<()> {
     let sessions = dep.sessions.with_idle_shutdown(SessionIdleShutdown::new(
         DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE,
         shutdown.clone(),

@@ -230,11 +230,9 @@ impl DaemonShutdownWaiter {
 
             let now = Instant::now();
             if now >= deadline {
-                return Err(anyhow::anyhow!(
-                    "timed out waiting for daemon endpoint {} to stop",
-                    self.placement.endpoint().path().display()
-                )
-                .into());
+                return Err(Error::EndpointStopTimeout {
+                    endpoint: self.placement.endpoint().path().to_path_buf(),
+                });
             }
 
             sleep(SHUTDOWN_WAIT_INTERVAL.min(deadline - now)).await;
