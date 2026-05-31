@@ -16,39 +16,51 @@ nix develop
 
 ![Overview](etc/dot/dist/packages.svg)
 
-| Package             | Description                                  |
-| ---                 | ---                                          |
-| `synd`             | Binary crate and composition root           |
-| `synd_support`     | Shared support and observability utilities  |
-| `synd_feed`        | RSS/Atom feed lib                           |
-| `synd_auth`        | Authentication lib                          |
-| `synd_registry`    | Feed registry domain lib                    |
-| `synd_persistence` | SQLite storage adapters                     |
-| `synd_api`         | GraphQL API server                          |
-| `synd_client`      | API client and payload DTOs                 |
-| `synd_runtime`     | Runtime session and local API lifecycle     |
-| `synd_term`        | TUI application                             |
-| `synd_test`        | Test support lib                            |
+| Package             | Description                                                       |
+| ---                 | ---                                                               |
+| `synd`             | Binary composition root for CLI, configuration, and runtime setup |
+| `synd_support`     | Shared support helpers and observability utilities                |
+| `synd_feed`        | Feed model, retrieval, and parsing                                |
+| `synd_auth`        | Authentication helpers and auth-domain types                      |
+| `synd_protocol`    | Shared wire contracts for client/server session negotiation       |
+| `synd_registry`    | Feed registry domain, subscription commands, and event processors |
+| `synd_persistence` | SQLite adapters for registry state and event transactions         |
+| `synd_api`         | GraphQL/local API server and daemon session endpoints             |
+| `synd_client`      | Typed API client, GraphQL operations, and session protocol calls   |
+| `synd_runtime`     | Runtime session acquisition and singleton daemon lifecycle        |
+| `synd_term`        | TUI application and event loop                                    |
+| `synd_test`        | Test support utilities                                            |
 
 ### Application Topology
 
 ![Application overview](etc/dot/dist/overview.svg)
 
 For normal development and user workflows, `synd` is the composition root. It
-resolves CLI/configuration, acquires a `synd_runtime::Session`, and passes the
-session's `synd_client::Client` into `synd_term`.
+resolves CLI/configuration, builds the runtime configuration, acquires a
+`synd_runtime::Session`, and passes the session's `synd_client::Client` into
+`synd_term`.
 
-`synd_runtime` owns local API lifecycle concerns. The current implementation
-starts a loopback local `synd_api` backed by SQLite as the transitional runtime
-path. The singleton daemon, startup lock, and UDS transport should be added
-behind the same `Runtime`/`Session` API.
+`synd_runtime` owns local API lifecycle concerns. It resolves a runtime instance
+from the configured SQLite database, serializes daemon startup with an instance
+lock, connects to the daemon over the platform runtime endpoint, opens and
+closes protocol sessions, and starts or replaces the singleton daemon when
+session acquisition requires it. Platform-specific placement and transport
+details should stay behind the `Runtime`/`Session` API.
+
+`synd_api` owns the API server surface. In daemon mode it serves the local API
+endpoint used by `synd_runtime`; as a standalone binary it is useful when
+working on the API server itself or updating the GraphQL schema. Feed lifecycle
+behavior is delegated to `synd_registry`, and SQLite storage adapters are
+provided by `synd_persistence`.
+
+`synd_protocol` owns the small wire contracts shared by the client, API server,
+and runtime daemon. Put session-open/session-close payloads, capability
+negotiation, and other cross-process protocol contracts here instead of in
+`synd_client` or `synd_api`.
 
 `synd_term` owns the TUI application and event loop. It should receive an
 already configured `Client`; it must not start local API services or own runtime
 session lifecycle.
-
-The standalone `synd_api` binary is still useful when working on the API server
-itself or updating the GraphQL schema.
 
 ### Running Locally
 
@@ -58,8 +70,8 @@ The normal development path is the in-process local backend:
 just run term
 ```
 
-This starts the `synd` binary, which acquires a runtime session and then starts
-the TUI.
+This starts the `synd` binary, which acquires a runtime session by attaching to
+or starting the local singleton daemon and then starts the TUI.
 
 List available recipes with:
 

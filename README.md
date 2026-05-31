@@ -233,25 +233,14 @@ The command is executed as `$SYND_BROWSER $SYND_BROWSER_ARGS <entry url>`.
 
 ### Import and Export Feeds
 
-`synd feed export` writes subscribed feeds as JSON.
-
-```console
-synd feed export
-```
-
-To save the output to a file, redirect stdout with your shell.
+Export subscriptions as JSON and import the same format:
 
 ```console
 synd feed export > feeds.json
-```
-
-`synd feed import` reads the same JSON format.
-
-```console
 synd feed import feeds.json
 ```
 
-The schema can be printed with:
+Print the JSON schema when needed:
 
 ```console
 synd feed export --print-schema
