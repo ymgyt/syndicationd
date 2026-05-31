@@ -34,11 +34,7 @@ impl DaemonLaunchConfig {
 impl Default for DaemonLaunchConfig {
     fn default() -> Self {
         Self::new(
-            DaemonLaunchCommand::current_executable()
-                .with_literal("daemon")
-                .with_literal("serve")
-                .with_literal("--sqlite-db")
-                .with_runtime_database_path(),
+            DaemonLaunchCommand::current_executable(),
             DaemonLaunchLog::file(SyndicationdDirs::current().log_file()),
         )
     }
@@ -48,52 +44,25 @@ impl Default for DaemonLaunchConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DaemonLaunchCommand {
     executable: DaemonLaunchExecutable,
-    arguments: Vec<DaemonLaunchArgument>,
 }
 
 impl DaemonLaunchCommand {
     pub fn current_executable() -> Self {
         Self {
             executable: DaemonLaunchExecutable::CurrentExecutable,
-            arguments: Vec::new(),
         }
     }
 
     pub fn executable(path: impl Into<PathBuf>) -> Self {
         Self {
             executable: DaemonLaunchExecutable::Path(path.into()),
-            arguments: Vec::new(),
         }
     }
 
-    #[must_use]
-    pub fn with_literal(mut self, argument: impl Into<OsString>) -> Self {
-        self.arguments
-            .push(DaemonLaunchArgument::Literal(argument.into()));
-        self
-    }
-
-    #[must_use]
-    pub fn with_runtime_database_path(mut self) -> Self {
-        self.arguments
-            .push(DaemonLaunchArgument::RuntimeDatabasePath);
-        self
-    }
-
-    fn resolve(&self, database_path: &Path) -> Result<ResolvedDaemonLaunchCommand> {
-        let executable = match &self.executable {
+    fn resolve_executable(&self) -> Result<PathBuf> {
+        Ok(match &self.executable {
             DaemonLaunchExecutable::CurrentExecutable => std::env::current_exe()?,
             DaemonLaunchExecutable::Path(path) => path.clone(),
-        };
-        let arguments = self
-            .arguments
-            .iter()
-            .map(|argument| argument.resolve(database_path))
-            .collect();
-
-        Ok(ResolvedDaemonLaunchCommand {
-            executable,
-            arguments,
         })
     }
 }
@@ -102,21 +71,6 @@ impl DaemonLaunchCommand {
 enum DaemonLaunchExecutable {
     CurrentExecutable,
     Path(PathBuf),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum DaemonLaunchArgument {
-    Literal(OsString),
-    RuntimeDatabasePath,
-}
-
-impl DaemonLaunchArgument {
-    fn resolve(&self, database_path: &Path) -> OsString {
-        match self {
-            Self::Literal(argument) => argument.clone(),
-            Self::RuntimeDatabasePath => database_path.as_os_str().to_os_string(),
-        }
-    }
 }
 
 /// File target for daemon stdout and stderr.
@@ -160,6 +114,20 @@ struct ResolvedDaemonLaunchCommand {
     arguments: Vec<OsString>,
 }
 
+impl ResolvedDaemonLaunchCommand {
+    fn daemon_serve(executable: PathBuf, database_path: &Path) -> Self {
+        Self {
+            executable,
+            arguments: vec![
+                OsString::from("daemon"),
+                OsString::from("serve"),
+                OsString::from("--sqlite-db"),
+                database_path.as_os_str().to_os_string(),
+            ],
+        }
+    }
+}
+
 /// Starts a daemon process for a resolved runtime placement.
 pub(crate) struct DaemonLauncher<'a> {
     config: &'a DaemonLaunchConfig,
@@ -172,10 +140,10 @@ impl<'a> DaemonLauncher<'a> {
     }
 
     pub(crate) fn launch(self) -> Result<DaemonHandle> {
-        let command = self
-            .config
-            .command()
-            .resolve(self.placement.instance().canonical_database_path())?;
+        let command = ResolvedDaemonLaunchCommand::daemon_serve(
+            self.config.command().resolve_executable()?,
+            self.placement.instance().canonical_database_path(),
+        );
         let log = self.config.log().open()?;
         debug!(
             daemon_executable = %command.executable.display(),
@@ -224,18 +192,17 @@ mod tests {
     use super::{DaemonLaunchCommand, DaemonLaunchLog};
 
     #[test]
-    fn resolves_database_path_argument() {
-        let command = DaemonLaunchCommand::executable("/usr/bin/synd")
-            .with_literal("daemon")
-            .with_literal("serve")
-            .with_literal("--sqlite-db")
-            .with_runtime_database_path();
+    fn builds_daemon_serve_command_from_runtime_database_path() {
+        let command = super::ResolvedDaemonLaunchCommand::daemon_serve(
+            DaemonLaunchCommand::executable("/usr/bin/synd")
+                .resolve_executable()
+                .unwrap(),
+            Path::new("/tmp/synd.db"),
+        );
 
-        let resolved = command.resolve(Path::new("/tmp/synd.db")).unwrap();
-
-        assert_eq!(resolved.executable, Path::new("/usr/bin/synd"));
+        assert_eq!(command.executable, Path::new("/usr/bin/synd"));
         assert_eq!(
-            resolved.arguments,
+            command.arguments,
             [
                 OsString::from("daemon"),
                 OsString::from("serve"),

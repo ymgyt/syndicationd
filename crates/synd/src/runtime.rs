@@ -24,12 +24,7 @@ impl FeedRuntime {
                 ApiClientConfig::new(config.api_timeout(), API_USER_AGENT),
                 SessionConfig::new(SESSION_ACQUIRE_TIMEOUT),
                 DaemonLaunchConfig::new(
-                    DaemonLaunchCommand::current_executable()
-                        .with_literal("daemon")
-                        .with_literal("serve")
-                        .with_literal("--sqlite-db")
-                        // REVIEW: これはなに？ この時点でsqlite file pathわかっているのでそれを渡すべきでは？
-                        .with_runtime_database_path(),
+                    DaemonLaunchCommand::current_executable(),
                     DaemonLaunchLog::file(config.log_file()),
                 ),
                 SessionRequirements::default(),
