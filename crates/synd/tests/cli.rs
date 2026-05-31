@@ -1,6 +1,7 @@
 use synd_test::temp_dir;
 
 #[test]
+#[ignore = "requires runtime daemon endpoint creation"]
 fn local_port_commands() {
     let dir = temp_dir().keep();
     let sqlite_db = dir.join("synd.db");
@@ -51,6 +52,7 @@ fn check_command() {
 }
 
 #[test]
+#[ignore = "requires runtime daemon endpoint creation"]
 fn export_command() {
     let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
     let dir = temp_dir().keep();
