@@ -22,7 +22,9 @@ macro_rules! keymap {
             let mut map = ::std::collections::HashMap::with_capacity(capacity);
             $(
                 $(
-                    let key_event = $crate::keymap::parse($key).unwrap();
+                    let key_event = ::crossterm::event::KeyEvent::from(
+                        $key.parse::<$crate::keymap::KeyNotation>().unwrap()
+                    );
                     let trie = keymap!(@trie $value );
                     map.insert(key_event, trie);
                 )*

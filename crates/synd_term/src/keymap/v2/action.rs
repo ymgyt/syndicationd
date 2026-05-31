@@ -7,34 +7,31 @@ use crate::{
 
 use super::CommandId;
 
+/// Action produced after a key binding is resolved.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum KeymapAction {
     Command(CommandId),
     Prompt(PromptAction),
     Filter(FilterAction),
-    NoOp,
 }
 
 impl KeymapAction {
-    pub(crate) fn build_command(&self) -> Option<Command> {
+    pub(crate) fn build_command(&self) -> Command {
         match self {
             Self::Command(command) => command.build(),
-            Self::Prompt(action) => Some(Command::Filter(action.clone().into())),
-            Self::Filter(action) => Some(Command::Filter(action.clone().into())),
-            Self::NoOp => None,
+            Self::Prompt(action) => Command::Filter(action.clone().into()),
+            Self::Filter(action) => Command::Filter(action.clone().into()),
         }
     }
 }
 
 impl From<CommandId> for KeymapAction {
     fn from(command: CommandId) -> Self {
-        match command {
-            CommandId::NoOp => Self::NoOp,
-            command => Self::Command(command),
-        }
+        Self::Command(command)
     }
 }
 
+/// Text-editing action for prompt-style keymap layers.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum PromptAction {
     InsertChar(char),
@@ -50,6 +47,7 @@ impl From<PromptAction> for FilterCommand {
     }
 }
 
+/// Filter action whose target data is only known at runtime.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FilterAction {
     ToggleCategory {

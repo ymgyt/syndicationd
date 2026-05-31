@@ -27,11 +27,10 @@ fn command_registry_resolves_canonical_alias_and_typable_names() {
 
 #[test]
 fn default_keymap_matches_single_key_binding() {
-    let keymaps = KeymapRuntime::default_keymaps();
+    let mut keymap = Keymap::default_keymaps();
     let layers = LayerStack::from([Layer::App, Layer::Global, Layer::Entries]);
-    let mut resolver = KeyResolver::new();
 
-    let result = resolver.resolve(&keymaps, &layers, "j".parse().unwrap());
+    let result = keymap.resolve(&layers, key("j"));
 
     assert_eq!(
         matched_action(&result),
@@ -45,15 +44,14 @@ fn default_keymap_matches_single_key_binding() {
 
 #[test]
 fn resolver_keeps_sequence_on_highest_priority_first_key_layer() {
-    let keymaps = KeymapRuntime::default_keymaps();
+    let mut keymap = Keymap::default_keymaps();
     let layers = LayerStack::from([Layer::Feeds, Layer::Entries]);
-    let mut resolver = KeyResolver::new();
 
     assert!(matches!(
-        resolver.resolve(&keymaps, &layers, "g".parse().unwrap()),
+        keymap.resolve(&layers, key("g")),
         KeymapResult::Pending { .. }
     ));
-    let result = resolver.resolve(&keymaps, &layers, "e".parse().unwrap());
+    let result = keymap.resolve(&layers, key("e"));
 
     assert_eq!(
         matched_action(&result),
@@ -65,17 +63,16 @@ fn resolver_keeps_sequence_on_highest_priority_first_key_layer() {
 fn user_override_can_disable_default_binding_with_no_op() {
     let mut config = default_keymap_config();
     let mut user = KeymapConfig::new();
-    user.add(Layer::Entries, ["j"], CommandId::NoOp, None)
+    user.add(Layer::Entries, ["j"], CommandId::Nop, None)
         .unwrap();
     config.merge(user);
 
-    let keymaps = KeymapRuntime::new(CompiledKeymaps::compile(config, &CommandRegistry).unwrap());
+    let mut keymap = Keymap::new(CompiledKeymaps::compile(config, &CommandRegistry).unwrap());
     let layers = LayerStack::from([Layer::Entries]);
-    let mut resolver = KeyResolver::new();
 
-    let result = resolver.resolve(&keymaps, &layers, "j".parse().unwrap());
+    let result = keymap.resolve(&layers, key("j"));
 
-    assert!(matches!(result, KeymapResult::NoOp));
+    assert!(matches!(result_to_command(&result), Some(Command::Nop)));
 }
 
 #[test]
@@ -91,18 +88,17 @@ keymap = [
 "#,
     )
     .unwrap();
-    let keymaps = KeymapRuntime::new(CompiledKeymaps::default_with_user_config(user).unwrap());
+    let mut keymap = Keymap::new(CompiledKeymaps::default_with_user_config(user).unwrap());
     let layers = LayerStack::from([Layer::Entries]);
-    let mut resolver = KeyResolver::new();
 
-    let result = resolver.resolve(&keymaps, &layers, "up".parse().unwrap());
+    let result = keymap.resolve(&layers, key("up"));
 
-    assert!(matches!(result, KeymapResult::NoOp));
+    assert!(matches!(result_to_command(&result), Some(Command::Nop)));
 
-    let result = resolver.resolve(&keymaps, &layers, "g".parse().unwrap());
+    let result = keymap.resolve(&layers, key("g"));
     assert!(matches!(result, KeymapResult::Pending { .. }));
 
-    let result = resolver.resolve(&keymaps, &layers, "g".parse().unwrap());
+    let result = keymap.resolve(&layers, key("g"));
     assert_eq!(
         matched_action(&result),
         Some(&KeymapAction::Command(CommandId::MoveEntryFirst))
@@ -132,11 +128,10 @@ keymap = [
 
 #[test]
 fn app_layer_can_override_global_layer() {
-    let keymaps = KeymapRuntime::default_keymaps();
+    let mut keymap = Keymap::default_keymaps();
     let layers = LayerStack::from([Layer::Global, Layer::App]);
-    let mut resolver = KeyResolver::new();
 
-    let result = resolver.resolve(&keymaps, &layers, "C-c".parse().unwrap());
+    let result = keymap.resolve(&layers, key("C-c"));
 
     assert!(matches!(
         result_to_command(&result),
@@ -146,26 +141,25 @@ fn app_layer_can_override_global_layer() {
 
 #[test]
 fn search_prompt_layer_turns_text_input_into_actions() {
-    let mut keymaps = KeymapRuntime::default_keymaps();
-    keymaps.set_layer_keymap(LayerKeymap::search_prompt());
+    let mut keymap = Keymap::default_keymaps();
+    keymap.set_layer_keymap(LayerKeymap::search_prompt());
     let layers = LayerStack::from([Layer::App, Layer::Filter, Layer::SearchPrompt]);
-    let mut resolver = KeyResolver::new();
 
-    let result = resolver.resolve(&keymaps, &layers, "a".parse().unwrap());
+    let result = keymap.resolve(&layers, key("a"));
 
     assert_eq!(
         matched_action(&result),
         Some(&KeymapAction::Prompt(PromptAction::InsertChar('a')))
     );
 
-    let result = resolver.resolve(&keymaps, &layers, "esc".parse().unwrap());
+    let result = keymap.resolve(&layers, key("esc"));
 
     assert_eq!(
         matched_action(&result),
         Some(&KeymapAction::Command(CommandId::DeactivateFiltering))
     );
 
-    let result = resolver.resolve(&keymaps, &layers, "C-c".parse().unwrap());
+    let result = keymap.resolve(&layers, key("C-c"));
 
     assert_eq!(
         matched_action(&result),
@@ -188,12 +182,11 @@ fn dynamic_category_filter_layer_resolves_runtime_category_actions() {
         )
         .unwrap();
 
-    let mut keymaps = KeymapRuntime::default_keymaps();
-    keymaps.set_layer_keymap(category.build().unwrap());
+    let mut keymap = Keymap::default_keymaps();
+    keymap.set_layer_keymap(category.build().unwrap());
     let layers = LayerStack::from([Layer::Filter, Layer::CategoryFilter]);
-    let mut resolver = KeyResolver::new();
 
-    let result = resolver.resolve(&keymaps, &layers, "r".parse().unwrap());
+    let result = keymap.resolve(&layers, key("r"));
 
     assert_eq!(
         matched_action(&result),
@@ -206,8 +199,7 @@ fn dynamic_category_filter_layer_resolves_runtime_category_actions() {
 
 fn result_to_command(result: &KeymapResult) -> Option<Command> {
     match result {
-        KeymapResult::Matched(action) => action.build_command(),
-        KeymapResult::NoOp => None,
+        KeymapResult::Matched(action) => Some(action.build_command()),
         KeymapResult::Pending { .. } | KeymapResult::NotFound | KeymapResult::Cancelled { .. } => {
             None
         }
@@ -217,9 +209,15 @@ fn result_to_command(result: &KeymapResult) -> Option<Command> {
 fn matched_action(result: &KeymapResult) -> Option<&KeymapAction> {
     match result {
         KeymapResult::Matched(action) => Some(action),
-        KeymapResult::NoOp
-        | KeymapResult::Pending { .. }
-        | KeymapResult::NotFound
-        | KeymapResult::Cancelled { .. } => None,
+        KeymapResult::Pending { .. } | KeymapResult::NotFound | KeymapResult::Cancelled { .. } => {
+            None
+        }
     }
+}
+
+fn key(notation: &str) -> crossterm::event::KeyEvent {
+    notation
+        .parse::<crate::keymap::KeyNotation>()
+        .expect("valid key notation")
+        .into()
 }

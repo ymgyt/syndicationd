@@ -5,6 +5,7 @@ use super::{
     Layer, default::default_keymap_config,
 };
 
+/// Validated static keymaps compiled into layer-specific tries.
 #[derive(Clone, Debug)]
 pub struct CompiledKeymaps {
     layers: HashMap<Layer, KeyTrie>,
@@ -70,6 +71,7 @@ impl Default for CompiledKeymaps {
     }
 }
 
+/// Prefix tree used to resolve single-key and multi-key bindings.
 #[derive(Clone, Debug, Default)]
 pub(super) struct KeyTrie {
     binding: Option<CompiledBinding>,
@@ -136,12 +138,14 @@ impl KeyTrie {
     }
 }
 
+/// Compiled action stored at a terminal trie node.
 #[derive(Clone, Debug)]
 pub(super) struct CompiledBinding {
     pub(super) action: KeymapAction,
     pub(super) desc: Option<String>,
 }
 
+/// Next-key candidate returned while a key sequence is pending.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct KeymapCandidate {
     pub(crate) key: KeyStroke,
@@ -149,6 +153,7 @@ pub(crate) struct KeymapCandidate {
     pub(crate) desc: Option<String>,
 }
 
+/// Runtime binding whose action is not limited to static command ids.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct ActionBinding {
     pub(super) on: KeySequence,
@@ -172,6 +177,7 @@ impl From<KeyBinding> for ActionBinding {
     }
 }
 
+/// Result of searching a trie for a key sequence.
 pub(super) enum TrieSearch {
     Matched(CompiledBinding),
     Pending(Vec<KeymapCandidate>),

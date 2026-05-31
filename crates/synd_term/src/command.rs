@@ -10,6 +10,7 @@ use crate::{
 /// Request for a component to perform an application action.
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
+    Nop,
     Shell(ShellCommand),
     Feeds(FeedsCommand),
     Filter(FilterCommand),
@@ -91,6 +92,10 @@ impl Display for Command {
 }
 
 impl Command {
+    pub fn nop() -> Self {
+        Command::Nop
+    }
+
     pub fn quit() -> Self {
         Command::Shell(ShellCommand::Quit)
     }

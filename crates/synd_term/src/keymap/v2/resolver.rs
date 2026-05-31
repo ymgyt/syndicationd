@@ -1,22 +1,52 @@
+use std::collections::HashMap;
+
+use crossterm::event::KeyEvent;
+
 use super::{
-    CommandId, KeyStroke, KeymapAction, KeymapCandidate, KeymapRuntime, Layer,
+    CommandId, CompiledKeymaps, KeyStroke, KeymapAction, KeymapCandidate, Layer, LayerKeymap,
     compiled::CompiledBinding, compiled::TrieSearch,
 };
 
+const MAX_LAYER_STACK_LEN: usize = 8;
+
+/// Active keymap layers ordered from low to high priority.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LayerStack {
-    layers: Vec<Layer>,
+    layers: [Layer; MAX_LAYER_STACK_LEN],
+    len: usize,
 }
 
 impl LayerStack {
-    pub(crate) fn new(layers: impl IntoIterator<Item = Layer>) -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
-            layers: layers.into_iter().collect(),
+            layers: [Layer::App; MAX_LAYER_STACK_LEN],
+            len: 0,
         }
     }
 
+    pub(crate) fn new(layers: impl IntoIterator<Item = Layer>) -> Self {
+        let mut stack = Self::empty();
+        for layer in layers {
+            stack.push(layer);
+        }
+        stack
+    }
+
+    pub(crate) fn push(&mut self, layer: Layer) {
+        assert!(
+            self.len < MAX_LAYER_STACK_LEN,
+            "keymap layer stack capacity exceeded"
+        );
+        self.layers[self.len] = layer;
+        self.len += 1;
+    }
+
+    fn as_slice(&self) -> &[Layer] {
+        &self.layers[..self.len]
+    }
+
     fn iter_high_to_low(&self) -> impl Iterator<Item = Layer> + '_ {
-        self.layers.iter().rev().copied()
+        self.as_slice().iter().rev().copied()
     }
 }
 
@@ -26,42 +56,55 @@ impl<const N: usize> From<[Layer; N]> for LayerStack {
     }
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct KeyResolver {
+/// Converts key events into keymap actions for the active layer stack.
+#[derive(Debug)]
+pub(crate) struct Keymap {
+    static_keymaps: CompiledKeymaps,
+    dynamic_keymaps: HashMap<Layer, LayerKeymap>,
     pending: Vec<KeyStroke>,
 }
 
-impl KeyResolver {
-    pub(crate) fn new() -> Self {
-        Self::default()
+impl Keymap {
+    pub(crate) fn new(static_keymaps: CompiledKeymaps) -> Self {
+        Self {
+            static_keymaps,
+            dynamic_keymaps: HashMap::new(),
+            pending: Vec::new(),
+        }
+    }
+
+    pub(crate) fn default_keymaps() -> Self {
+        Self::new(CompiledKeymaps::default_keymaps())
     }
 
     pub(crate) fn clear_pending(&mut self) {
         self.pending.clear();
     }
 
-    pub(crate) fn resolve(
-        &mut self,
-        keymaps: &KeymapRuntime,
-        layers: &LayerStack,
-        key: KeyStroke,
-    ) -> KeymapResult {
+    pub(crate) fn set_layer_keymap(&mut self, keymap: LayerKeymap) {
+        self.dynamic_keymaps.insert(keymap.layer(), keymap);
+    }
+
+    pub(crate) fn clear_layer_keymap(&mut self, layer: Layer) {
+        self.dynamic_keymaps.remove(&layer);
+    }
+
+    pub(crate) fn resolve(&mut self, layers: &LayerStack, key: KeyEvent) -> KeymapResult {
+        self.resolve_stroke(layers, KeyStroke::from(key))
+    }
+
+    fn resolve_stroke(&mut self, layers: &LayerStack, key: KeyStroke) -> KeymapResult {
         if self.pending.is_empty() {
-            self.resolve_first_key(keymaps, layers, key)
+            self.resolve_first_key(layers, key)
         } else {
-            self.resolve_pending_key(keymaps, layers, key)
+            self.resolve_pending_key(layers, key)
         }
     }
 
-    fn resolve_first_key(
-        &mut self,
-        keymaps: &KeymapRuntime,
-        layers: &LayerStack,
-        key: KeyStroke,
-    ) -> KeymapResult {
+    fn resolve_first_key(&mut self, layers: &LayerStack, key: KeyStroke) -> KeymapResult {
         let keys = [key];
         for layer in layers.iter_high_to_low() {
-            match keymaps.search(layer, &keys) {
+            match self.search(layer, &keys) {
                 TrieSearch::Matched(binding) => return matched(binding),
                 TrieSearch::Pending(candidates) => {
                     self.pending.push(key);
@@ -76,23 +119,18 @@ impl KeyResolver {
         KeymapResult::NotFound
     }
 
-    fn resolve_pending_key(
-        &mut self,
-        keymaps: &KeymapRuntime,
-        layers: &LayerStack,
-        key: KeyStroke,
-    ) -> KeymapResult {
+    fn resolve_pending_key(&mut self, layers: &LayerStack, key: KeyStroke) -> KeymapResult {
         let first = self.pending[0];
         let Some(layer) = layers
             .iter_high_to_low()
-            .find(|layer| matches!(keymaps.search(*layer, &[first]), TrieSearch::Pending(_)))
+            .find(|layer| matches!(self.search(*layer, &[first]), TrieSearch::Pending(_)))
         else {
             let keys = std::mem::take(&mut self.pending);
             return KeymapResult::Cancelled { keys };
         };
 
         self.pending.push(key);
-        match keymaps.search(layer, &self.pending) {
+        match self.search(layer, &self.pending) {
             TrieSearch::Matched(binding) => {
                 self.pending.clear();
                 matched(binding)
@@ -107,15 +145,28 @@ impl KeyResolver {
             }
         }
     }
-}
 
-fn matched(binding: CompiledBinding) -> KeymapResult {
-    match binding.action {
-        KeymapAction::NoOp => KeymapResult::NoOp,
-        action => KeymapResult::Matched(action),
+    fn search(&self, layer: Layer, keys: &[KeyStroke]) -> TrieSearch {
+        if let Some(keymap) = self.dynamic_keymaps.get(&layer) {
+            return keymap.search(keys);
+        }
+        self.static_keymaps
+            .trie(layer)
+            .map_or(TrieSearch::NotFound, |trie| trie.search(keys))
     }
 }
 
+impl Default for Keymap {
+    fn default() -> Self {
+        Self::default_keymaps()
+    }
+}
+
+fn matched(binding: CompiledBinding) -> KeymapResult {
+    KeymapResult::Matched(binding.action)
+}
+
+/// Outcome of resolving one key event through the current keymap state.
 #[derive(Debug)]
 pub(crate) enum KeymapResult {
     Matched(KeymapAction),
@@ -127,14 +178,10 @@ pub(crate) enum KeymapResult {
     Cancelled {
         keys: Vec<KeyStroke>,
     },
-    NoOp,
 }
 
 impl From<CommandId> for KeymapResult {
     fn from(command: CommandId) -> Self {
-        match KeymapAction::from(command) {
-            KeymapAction::NoOp => Self::NoOp,
-            action => Self::Matched(action),
-        }
+        Self::Matched(KeymapAction::from(command))
     }
 }

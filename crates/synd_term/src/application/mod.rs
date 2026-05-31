@@ -81,8 +81,7 @@ pub enum Populate {
 pub struct Application {
     drivers: Drivers,
     components: AppComponent,
-    keymaps_v2: keymap::v2::KeymapRuntime,
-    key_resolver_v2: keymap::v2::KeyResolver,
+    keymap: keymap::v2::Keymap,
     config: Config,
 }
 
@@ -157,8 +156,7 @@ impl Application {
         Self {
             drivers,
             components,
-            keymaps_v2: keymap::v2::KeymapRuntime::new(config.keymaps.clone()),
-            key_resolver_v2: keymap::v2::KeyResolver::new(),
+            keymap: keymap::v2::Keymap::new(config.keymaps.clone()),
             config,
         }
     }
@@ -233,7 +231,7 @@ impl Application {
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
         self.should_render();
-        self.key_resolver_v2.clear_pending();
+        self.keymap.clear_pending();
     }
 
     fn set_credential(&mut self, cred: Verified<Credential>) {

@@ -4,6 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{CommandId, KeymapError};
 
+/// Normalized key used for keymap lookup.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct KeyStroke {
     code: KeyCode,
@@ -39,13 +40,21 @@ impl From<KeyEvent> for KeyStroke {
     }
 }
 
+impl From<crate::keymap::KeyNotation> for KeyStroke {
+    fn from(notation: crate::keymap::KeyNotation) -> Self {
+        let (code, modifiers) = notation.into_parts();
+        Self::new(code, modifiers)
+    }
+}
+
 impl FromStr for KeyStroke {
     type Err = KeymapError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let event = super::super::parse(value)
+        let notation = value
+            .parse::<crate::keymap::KeyNotation>()
             .map_err(|err| KeymapError::InvalidKeyNotation(value.to_owned(), err.to_string()))?;
-        Ok(Self::from(event))
+        Ok(Self::from(notation))
     }
 }
 
@@ -96,6 +105,7 @@ impl fmt::Display for KeyStroke {
     }
 }
 
+/// Ordered key strokes that must be typed to trigger one binding.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct KeySequence {
     keys: Vec<KeyStroke>,
@@ -135,6 +145,7 @@ impl fmt::Display for KeySequence {
     }
 }
 
+/// Static binding from a key sequence to a command id.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct KeyBinding {
     pub(crate) on: KeySequence,

@@ -1,46 +1,9 @@
-use std::collections::HashMap;
-
 use super::{
-    CompiledKeymaps, KeySequence, KeyStroke, KeymapAction, KeymapError, Layer, PromptAction,
+    KeySequence, KeyStroke, KeymapAction, KeymapError, Layer, PromptAction,
     compiled::{ActionBinding, CompiledBinding, KeyTrie, TrieSearch},
 };
 
-#[derive(Clone, Debug)]
-pub(crate) struct KeymapRuntime {
-    static_keymaps: CompiledKeymaps,
-    dynamic_keymaps: HashMap<Layer, LayerKeymap>,
-}
-
-impl KeymapRuntime {
-    pub(crate) fn new(static_keymaps: CompiledKeymaps) -> Self {
-        Self {
-            static_keymaps,
-            dynamic_keymaps: HashMap::new(),
-        }
-    }
-
-    pub(crate) fn default_keymaps() -> Self {
-        Self::new(CompiledKeymaps::default_keymaps())
-    }
-
-    pub(crate) fn set_layer_keymap(&mut self, keymap: LayerKeymap) {
-        self.dynamic_keymaps.insert(keymap.layer, keymap);
-    }
-
-    pub(crate) fn clear_layer_keymap(&mut self, layer: Layer) {
-        self.dynamic_keymaps.remove(&layer);
-    }
-
-    pub(super) fn search(&self, layer: Layer, keys: &[KeyStroke]) -> TrieSearch {
-        if let Some(keymap) = self.dynamic_keymaps.get(&layer) {
-            return keymap.search(keys);
-        }
-        self.static_keymaps
-            .trie(layer)
-            .map_or(TrieSearch::NotFound, |trie| trie.search(keys))
-    }
-}
-
+/// Keymap for one runtime-created layer.
 #[derive(Clone, Debug)]
 pub(crate) struct LayerKeymap {
     layer: Layer,
@@ -54,7 +17,11 @@ impl LayerKeymap {
         LayerKeymapBuilder::new(layer)
     }
 
-    fn search(&self, keys: &[KeyStroke]) -> TrieSearch {
+    pub(super) fn layer(&self) -> Layer {
+        self.layer
+    }
+
+    pub(super) fn search(&self, keys: &[KeyStroke]) -> TrieSearch {
         if self.input_chars
             && keys.len() == 1
             && let Some(ch) = keys[0].as_char()
@@ -82,6 +49,7 @@ impl LayerKeymap {
     }
 }
 
+/// Builder for dynamic layer keymaps.
 pub(crate) struct LayerKeymapBuilder {
     layer: Layer,
     bindings: Vec<ActionBinding>,

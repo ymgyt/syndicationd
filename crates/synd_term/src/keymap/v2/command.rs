@@ -5,10 +5,11 @@ use serde::Deserialize;
 
 use super::{KeyBinding, KeymapError, Layer};
 
+/// Stable command identifier accepted by keymap configuration.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum CommandId {
     #[default]
-    NoOp,
+    Nop,
     Quit,
     RotateTheme,
     Authenticate,
@@ -68,7 +69,7 @@ pub enum CommandId {
 impl CommandId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::NoOp => "no_op",
+            Self::Nop => "nop",
             Self::Quit => "app.quit",
             Self::RotateTheme => "theme.rotate",
             Self::Authenticate => "login.authenticate",
@@ -144,98 +145,86 @@ impl CommandId {
         }
     }
 
-    pub(super) fn build(self) -> Option<Command> {
+    pub(super) fn build(self) -> Command {
         match self {
-            Self::NoOp => None,
-            Self::Quit => Some(Command::quit()),
-            Self::RotateTheme => Some(Command::rotate_theme()),
-            Self::Authenticate => Some(Command::authenticate()),
-            Self::MoveAuthenticationProviderPrev => {
-                Some(Command::move_up_authentication_provider())
-            }
-            Self::MoveAuthenticationProviderNext => {
-                Some(Command::move_down_authentication_provider())
-            }
-            Self::MoveTabPrev => Some(Command::move_left_tab_selection()),
-            Self::MoveTabNext => Some(Command::move_right_tab_selection()),
-            Self::MoveEntryPrev => Some(Command::move_up_entry()),
-            Self::MoveEntryNext => Some(Command::move_down_entry()),
-            Self::MoveEntryFirst => Some(Command::move_entry_first()),
-            Self::MoveEntryLast => Some(Command::move_entry_last()),
-            Self::ReloadEntries => Some(Command::reload_entries()),
-            Self::OpenEntry => Some(Command::open_entry()),
-            Self::BrowseEntry => Some(Command::browse_entry()),
-            Self::MoveSubscribedFeedPrev => Some(Command::move_up_subscribed_feed()),
-            Self::MoveSubscribedFeedNext => Some(Command::move_down_subscribed_feed()),
-            Self::MoveSubscribedFeedFirst => Some(Command::move_subscribed_feed_first()),
-            Self::MoveSubscribedFeedLast => Some(Command::move_subscribed_feed_last()),
-            Self::PromptFeedSubscription => Some(Command::prompt_feed_subscription()),
-            Self::PromptFeedEdition => Some(Command::prompt_feed_edition()),
-            Self::PromptFeedUnsubscription => Some(Command::prompt_feed_unsubscription()),
-            Self::RefreshSelectedFeed => Some(Command::refresh_selected_feed()),
-            Self::ReloadSubscription => Some(Command::reload_subscription()),
-            Self::OpenFeed => Some(Command::open_feed()),
+            Self::Nop => Command::nop(),
+            Self::Quit => Command::quit(),
+            Self::RotateTheme => Command::rotate_theme(),
+            Self::Authenticate => Command::authenticate(),
+            Self::MoveAuthenticationProviderPrev => Command::move_up_authentication_provider(),
+            Self::MoveAuthenticationProviderNext => Command::move_down_authentication_provider(),
+            Self::MoveTabPrev => Command::move_left_tab_selection(),
+            Self::MoveTabNext => Command::move_right_tab_selection(),
+            Self::MoveEntryPrev => Command::move_up_entry(),
+            Self::MoveEntryNext => Command::move_down_entry(),
+            Self::MoveEntryFirst => Command::move_entry_first(),
+            Self::MoveEntryLast => Command::move_entry_last(),
+            Self::ReloadEntries => Command::reload_entries(),
+            Self::OpenEntry => Command::open_entry(),
+            Self::BrowseEntry => Command::browse_entry(),
+            Self::MoveSubscribedFeedPrev => Command::move_up_subscribed_feed(),
+            Self::MoveSubscribedFeedNext => Command::move_down_subscribed_feed(),
+            Self::MoveSubscribedFeedFirst => Command::move_subscribed_feed_first(),
+            Self::MoveSubscribedFeedLast => Command::move_subscribed_feed_last(),
+            Self::PromptFeedSubscription => Command::prompt_feed_subscription(),
+            Self::PromptFeedEdition => Command::prompt_feed_edition(),
+            Self::PromptFeedUnsubscription => Command::prompt_feed_unsubscription(),
+            Self::RefreshSelectedFeed => Command::refresh_selected_feed(),
+            Self::ReloadSubscription => Command::reload_subscription(),
+            Self::OpenFeed => Command::open_feed(),
             Self::MoveFeedUnsubscriptionPopupSelectionPrev => {
-                Some(Command::move_feed_unsubscription_popup_selection_left())
+                Command::move_feed_unsubscription_popup_selection_left()
             }
             Self::MoveFeedUnsubscriptionPopupSelectionNext => {
-                Some(Command::move_feed_unsubscription_popup_selection_right())
+                Command::move_feed_unsubscription_popup_selection_right()
             }
-            Self::SelectFeedUnsubscriptionPopup => {
-                Some(Command::select_feed_unsubscription_popup())
-            }
-            Self::CancelFeedUnsubscriptionPopup => {
-                Some(Command::cancel_feed_unsubscription_popup())
-            }
-            Self::MoveFilterRequirementPrev => Some(Command::move_filter_requirement_left()),
-            Self::MoveFilterRequirementNext => Some(Command::move_filter_requirement_right()),
-            Self::ActivateCategoryFiltering => Some(Command::activate_category_filtering()),
-            Self::ActivateSearchFiltering => Some(Command::activate_search_filtering()),
-            Self::DeactivateFiltering => Some(Command::deactivate_filtering()),
-            Self::MoveGithubNotificationPrev => Some(Command::move_up_gh_notification()),
-            Self::MoveGithubNotificationNext => Some(Command::move_down_gh_notification()),
-            Self::MoveGithubNotificationFirst => Some(Command::move_gh_notification_first()),
-            Self::MoveGithubNotificationLast => Some(Command::move_gh_notification_last()),
-            Self::OpenGithubNotification => Some(Command::open_gh_notification()),
-            Self::OpenGithubNotificationWithDone => Some(Command::open_gh_notification_with_done()),
-            Self::ReloadGithubNotifications => Some(Command::reload_gh_notifications()),
-            Self::MarkGithubNotificationAsDone => Some(Command::mark_gh_notification_as_done()),
-            Self::MarkGithubNotificationAsDoneAll => {
-                Some(Command::mark_gh_notification_as_done_all())
-            }
-            Self::UnsubscribeGithubThread => Some(Command::unsubscribe_gh_thread()),
-            Self::OpenGithubNotificationFilterPopup => {
-                Some(Command::open_gh_notification_filter_popup())
-            }
+            Self::SelectFeedUnsubscriptionPopup => Command::select_feed_unsubscription_popup(),
+            Self::CancelFeedUnsubscriptionPopup => Command::cancel_feed_unsubscription_popup(),
+            Self::MoveFilterRequirementPrev => Command::move_filter_requirement_left(),
+            Self::MoveFilterRequirementNext => Command::move_filter_requirement_right(),
+            Self::ActivateCategoryFiltering => Command::activate_category_filtering(),
+            Self::ActivateSearchFiltering => Command::activate_search_filtering(),
+            Self::DeactivateFiltering => Command::deactivate_filtering(),
+            Self::MoveGithubNotificationPrev => Command::move_up_gh_notification(),
+            Self::MoveGithubNotificationNext => Command::move_down_gh_notification(),
+            Self::MoveGithubNotificationFirst => Command::move_gh_notification_first(),
+            Self::MoveGithubNotificationLast => Command::move_gh_notification_last(),
+            Self::OpenGithubNotification => Command::open_gh_notification(),
+            Self::OpenGithubNotificationWithDone => Command::open_gh_notification_with_done(),
+            Self::ReloadGithubNotifications => Command::reload_gh_notifications(),
+            Self::MarkGithubNotificationAsDone => Command::mark_gh_notification_as_done(),
+            Self::MarkGithubNotificationAsDoneAll => Command::mark_gh_notification_as_done_all(),
+            Self::UnsubscribeGithubThread => Command::unsubscribe_gh_thread(),
+            Self::OpenGithubNotificationFilterPopup => Command::open_gh_notification_filter_popup(),
             Self::CloseGithubNotificationFilterPopup => {
-                Some(Command::close_gh_notification_filter_popup())
+                Command::close_gh_notification_filter_popup()
             }
             Self::ToggleGithubNotificationFilterPopupIncludeUnread => {
-                Some(Command::toggle_gh_notification_filter_popup_include_unread())
+                Command::toggle_gh_notification_filter_popup_include_unread()
             }
             Self::ToggleGithubNotificationFilterPopupParticipating => {
-                Some(Command::toggle_gh_notification_filter_popup_participating())
+                Command::toggle_gh_notification_filter_popup_participating()
             }
             Self::ToggleGithubNotificationFilterPopupVisibilityPublic => {
-                Some(Command::toggle_gh_notification_filter_popup_visibility_public())
+                Command::toggle_gh_notification_filter_popup_visibility_public()
             }
             Self::ToggleGithubNotificationFilterPopupVisibilityPrivate => {
-                Some(Command::toggle_gh_notification_filter_popup_visibility_private())
+                Command::toggle_gh_notification_filter_popup_visibility_private()
             }
             Self::ToggleGithubNotificationFilterPopupPullRequestOpen => {
-                Some(Command::toggle_gh_notification_filter_popup_pr_open())
+                Command::toggle_gh_notification_filter_popup_pr_open()
             }
             Self::ToggleGithubNotificationFilterPopupPullRequestClosed => {
-                Some(Command::toggle_gh_notification_filter_popup_pr_closed())
+                Command::toggle_gh_notification_filter_popup_pr_closed()
             }
             Self::ToggleGithubNotificationFilterPopupPullRequestMerged => {
-                Some(Command::toggle_gh_notification_filter_popup_pr_merged())
+                Command::toggle_gh_notification_filter_popup_pr_merged()
             }
             Self::ToggleGithubNotificationFilterPopupReasonMentioned => {
-                Some(Command::toggle_gh_notification_filter_popup_reason_mentioned())
+                Command::toggle_gh_notification_filter_popup_reason_mentioned()
             }
             Self::ToggleGithubNotificationFilterPopupReasonReviewRequested => {
-                Some(Command::toggle_gh_notification_filter_popup_reason_review())
+                Command::toggle_gh_notification_filter_popup_reason_review()
             }
         }
     }
@@ -265,8 +254,10 @@ impl<'de> Deserialize<'de> for CommandId {
     }
 }
 
+/// Metadata used to parse and validate a command id.
 pub(crate) struct CommandSpec {
     pub(crate) id: CommandId,
+    /// Additional names accepted in config besides the canonical id.
     pub(crate) aliases: &'static [&'static str],
     pub(crate) typable: Option<&'static str>,
     pub(crate) desc: &'static str,
@@ -274,11 +265,12 @@ pub(crate) struct CommandSpec {
 }
 
 impl CommandSpec {
-    fn allows_layer(&self, layer: Layer) -> bool {
-        self.id == CommandId::NoOp || self.layers.contains(&layer)
+    fn is_allowed_in_layer(&self, layer: Layer) -> bool {
+        self.id == CommandId::Nop || self.layers.contains(&layer)
     }
 }
 
+/// Catalog of command ids available to keymap configuration.
 pub(crate) struct CommandRegistry;
 
 impl CommandRegistry {
@@ -309,7 +301,7 @@ impl CommandRegistry {
         binding: &KeyBinding,
     ) -> Result<(), KeymapError> {
         let spec = self.spec(binding.command);
-        if spec.allows_layer(layer) {
+        if spec.is_allowed_in_layer(layer) {
             Ok(())
         } else {
             Err(KeymapError::CommandNotAllowed {
@@ -352,8 +344,8 @@ macro_rules! specs {
 }
 
 const COMMAND_SPECS: &[CommandSpec] = specs![
-    NoOp {
-        aliases: [],
+    Nop {
+        aliases: ["no_op"],
         typable: None,
         desc: "Do nothing",
         layers: [],

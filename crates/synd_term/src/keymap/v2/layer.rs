@@ -2,6 +2,7 @@ use std::{fmt, str::FromStr};
 
 use serde::Deserialize;
 
+/// Scope in which key bindings are active and prioritized.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Layer {
     App,

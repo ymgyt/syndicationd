@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{collections::HashMap, ops::ControlFlow};
+use std::{collections::HashMap, ops::ControlFlow, str::FromStr};
 
 use anyhow::{anyhow, bail};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -193,36 +193,59 @@ pub struct KeyTrieNode {
     map: HashMap<KeyEvent, KeyTrie>,
 }
 
-fn parse(s: &str) -> anyhow::Result<KeyEvent> {
-    let mut tokens: Vec<_> = s.split('-').collect();
-    let code = match tokens.pop().ok_or_else(|| anyhow!("no token"))? {
-        "backspace" => KeyCode::Backspace,
-        "enter" => KeyCode::Enter,
-        "tab" => KeyCode::Tab,
-        "backtab" => KeyCode::BackTab,
-        "left" => KeyCode::Left,
-        "right" => KeyCode::Right,
-        "up" => KeyCode::Up,
-        "down" => KeyCode::Down,
-        "esc" => KeyCode::Esc,
-        "space" => KeyCode::Char(' '),
-        single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),
-        undefined => bail!("`{undefined}` is not implemented yet"),
-    };
+/// Parsed key notation used by static keymap definitions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct KeyNotation {
+    code: KeyCode,
+    modifiers: KeyModifiers,
+}
 
-    let mut modifiers = KeyModifiers::NONE;
-    for token in tokens {
-        let modifier = match token {
-            "C" => KeyModifiers::CONTROL,
-            "S" => KeyModifiers::SHIFT,
-            "A" => KeyModifiers::ALT,
-            undefined => bail!("`{undefined}` modifier is not implemented yet"),
+impl KeyNotation {
+    pub(crate) fn into_parts(self) -> (KeyCode, KeyModifiers) {
+        (self.code, self.modifiers)
+    }
+}
+
+impl From<KeyNotation> for KeyEvent {
+    fn from(notation: KeyNotation) -> Self {
+        let (code, modifiers) = notation.into_parts();
+        Self::new(code, modifiers)
+    }
+}
+
+impl FromStr for KeyNotation {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut tokens: Vec<_> = s.split('-').collect();
+        let code = match tokens.pop().ok_or_else(|| anyhow!("no token"))? {
+            "backspace" => KeyCode::Backspace,
+            "enter" => KeyCode::Enter,
+            "tab" => KeyCode::Tab,
+            "backtab" => KeyCode::BackTab,
+            "left" => KeyCode::Left,
+            "right" => KeyCode::Right,
+            "up" => KeyCode::Up,
+            "down" => KeyCode::Down,
+            "esc" => KeyCode::Esc,
+            "space" => KeyCode::Char(' '),
+            single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),
+            undefined => bail!("`{undefined}` is not implemented yet"),
         };
-        modifiers.insert(modifier);
+
+        let mut modifiers = KeyModifiers::NONE;
+        for token in tokens {
+            let modifier = match token {
+                "C" => KeyModifiers::CONTROL,
+                "S" => KeyModifiers::SHIFT,
+                "A" => KeyModifiers::ALT,
+                undefined => bail!("`{undefined}` modifier is not implemented yet"),
+            };
+            modifiers.insert(modifier);
+        }
+        if code == KeyCode::BackTab {
+            modifiers.insert(KeyModifiers::SHIFT);
+        }
+        Ok(Self { code, modifiers })
     }
-    // Handling special case
-    if code == KeyCode::BackTab {
-        modifiers.insert(KeyModifiers::SHIFT);
-    }
-    Ok(KeyEvent::new(code, modifiers))
 }

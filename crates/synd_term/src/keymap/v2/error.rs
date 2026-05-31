@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use super::{CommandId, KeySequence, Layer};
 
+/// Error raised while parsing, validating, or compiling keymaps.
 #[derive(Debug, Error)]
 pub enum KeymapError {
     #[error("unknown keymap layer: {0}")]

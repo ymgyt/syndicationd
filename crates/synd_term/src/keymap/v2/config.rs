@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use super::{CommandId, KeyBinding, KeySequence, KeymapError, Layer};
 
+/// User-facing keymap configuration before validation and compilation.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct KeymapConfig {
     pub(super) bindings: HashMap<Layer, Vec<KeyBinding>>,
@@ -59,6 +60,7 @@ impl<'de> Deserialize<'de> for KeymapConfig {
     }
 }
 
+/// TOML table for one keymap layer.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct LayerConfig {
@@ -66,6 +68,7 @@ struct LayerConfig {
     keymap: Vec<KeyBindingEntry>,
 }
 
+/// TOML entry for one key binding.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct KeyBindingEntry {
@@ -107,6 +110,7 @@ where
     KeySequence::new(keys).map_err(serde::de::Error::custom)
 }
 
+/// TOML shape accepted for a single key or a multi-key sequence.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum RawKeySequence {

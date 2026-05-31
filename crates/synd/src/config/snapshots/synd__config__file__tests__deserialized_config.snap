@@ -149,7 +149,7 @@ ConfigFile {
                                 },
                             ],
                         },
-                        command: NoOp,
+                        command: Nop,
                         desc: None,
                     },
                 ],
