@@ -1,9 +1,9 @@
+use tracing::event;
 use tracing::{
     Event, Level, Metadata, Subscriber, field,
     span::{self, Attributes},
     subscriber::Interest,
 };
-use tracing::{event, subscriber};
 use tracing_subscriber::{
     Layer,
     filter::{Directive, Filtered},
@@ -215,7 +215,7 @@ where
 mod tests {
     use std::sync::{Arc, Mutex};
 
-    use tracing::{info, info_span};
+    use tracing::{info, info_span, subscriber};
     use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
     use super::*;

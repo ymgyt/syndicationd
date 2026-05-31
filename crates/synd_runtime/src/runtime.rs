@@ -90,6 +90,7 @@ impl Config {
     }
 }
 
+/// Configuration for synd_api client
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApiClientConfig {
     request_timeout: Duration,

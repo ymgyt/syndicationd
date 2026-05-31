@@ -1,7 +1,6 @@
 use nom_language::error::{VerboseError, VerboseErrorKind};
 use synd_client::payload::SubscribeFeedInput;
 use thiserror::Error;
-use tracing::warn;
 
 use crate::{
     config::Categories,
@@ -115,6 +114,7 @@ mod feed {
     use nom_language::error::{VerboseError, VerboseErrorKind};
     use synd_client::payload::{RefreshPolicyInput, RefreshPolicyInputKind, SubscribeFeedInput};
     use synd_feed::types::{Category, FeedUrl, Requirement};
+    use tracing::{Level, event};
     use url::Url;
 
     use super::NomError;
@@ -188,7 +188,7 @@ mod feed {
         match Url::parse(&url) {
             Ok(url) => Ok((remain, FeedUrl::from(url))),
             Err(err) => {
-                warn!("Invalid url: {err}");
+                event!(Level::WARN, "Invalid url: {err}");
                 let nom_err = VerboseError {
                     errors: vec![(s, VerboseErrorKind::Context("url"))],
                 };

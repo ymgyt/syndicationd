@@ -2,27 +2,18 @@ use chrono::Utc;
 use tracing::debug;
 
 use crate::{
-    crawl::target_list::CrawlTargetListProj,
     db::{FeedRegistryDb, RegistryDbTransaction},
     event::{
         ApiEvent, ApiEventKind, ApiEventPublisher, ApiFeedSubscribeRejected, ApiFeedSubscribed,
         ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
-        ConsumerDispatch, ConsumerEventInput, ConsumerRegistry, Event, EventConsumer,
-        EventConsumerError, EventConsumerId, EventConsumerResult, EventConsumerSession,
-        EventJournal, EventKind, EventReadBatch, EventReadFilter, FeedSubscribed, FeedUnsubscribed,
-        JournaledEvent, RequestEvent, RequestEventKind, SubEvent, SubEventKind,
+        ConsumerEventInput, Event, EventConsumer, EventConsumerId, EventConsumerResult, EventKind,
+        EventReadBatch, EventReadFilter, FeedSubscribed, FeedUnsubscribed, JournaledEvent,
+        RecordedEvents, RequestEvent, RequestEventKind, SubEvent, SubEventKind,
         SubscribeFeedRequested, SubscriptionChanged, UnsubscribeFeedRejected,
         UnsubscribeFeedRequested,
     },
     subscription::Subscription,
 };
-
-const CONSUMER_IDS: &[EventConsumerId] = &[
-    EventConsumerId::SubRequestWorker,
-    EventConsumerId::CrawlTargetListProj,
-    EventConsumerId::ApiEventProj,
-    EventConsumerId::ApiEventStream,
-];
 
 /// Subscription request lifecycle events accepted by the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,26 +74,19 @@ where
         EventConsumerId::SubRequestWorker
     }
 
-    async fn consume<J>(
-        &mut self,
-        input: Self::Input,
-        session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
+    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
+        let mut recorded = RecordedEvents::empty();
         for event in input.into_events() {
-            match event {
-                RequestEvent::SubscribeFeedRequested(event) => {
-                    self.handle_subscribe(event, session).await?;
-                }
+            let kind = match event {
+                RequestEvent::SubscribeFeedRequested(event) => self.handle_subscribe(event).await?,
                 RequestEvent::UnsubscribeFeedRequested(event) => {
-                    self.handle_unsubscribe(event, session).await?;
+                    self.handle_unsubscribe(event).await?
                 }
                 event => unreachable!("unexpected subscription request event: {event:?}"),
-            }
+            };
+            recorded.push(kind);
         }
-        Ok(())
+        Ok(recorded)
     }
 }
 
@@ -110,14 +94,10 @@ impl<S> SubRequestWorker<S>
 where
     S: FeedRegistryDb,
 {
-    async fn handle_subscribe<J>(
+    async fn handle_subscribe(
         &self,
         event: SubscribeFeedRequested,
-        session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
+    ) -> EventConsumerResult<EventKind> {
         let now = Utc::now();
         let subscription = Subscription {
             subscriber_id: event.subscription.subscriber_id.clone(),
@@ -129,14 +109,11 @@ where
             updated_at: now,
         };
 
-        let mut tx = self.db.begin().await.map_err(consumer_error)?;
+        let mut tx = self.db.begin().await?;
         let already_subscribed = tx
             .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
-            .await
-            .map_err(consumer_error)?;
-        tx.upsert_subscription(subscription)
-            .await
-            .map_err(consumer_error)?;
+            .await?;
+        tx.upsert_subscription(subscription).await?;
 
         let event = if already_subscribed {
             Event::Sub(SubEvent::SubscriptionChanged(
@@ -147,38 +124,30 @@ where
                 FeedSubscribed::new(event.subscription).with_request_id(event.request_id),
             ))
         };
-        tx.append_event(event.clone())
-            .await
-            .map_err(consumer_error)?;
-        tx.commit().await.map_err(consumer_error)?;
-        session.record_committed(&event);
-        Ok(())
+        let kind = event.kind();
+        tx.append_event(event).await?;
+        tx.commit().await?;
+        Ok(kind)
     }
 
-    async fn handle_unsubscribe<J>(
+    async fn handle_unsubscribe(
         &self,
         event: UnsubscribeFeedRequested,
-        session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
-        let mut tx = self.db.begin().await.map_err(consumer_error)?;
+    ) -> EventConsumerResult<EventKind> {
+        let mut tx = self.db.begin().await?;
         let is_subscribed = tx
             .has_subscription(
                 &event.subscription.subscriber_id,
                 &event.subscription.feed_url,
             )
-            .await
-            .map_err(consumer_error)?;
+            .await?;
 
         let event = if is_subscribed {
             tx.delete_subscription(
                 &event.subscription.subscriber_id,
                 &event.subscription.feed_url,
             )
-            .await
-            .map_err(consumer_error)?;
+            .await?;
             Event::Sub(SubEvent::FeedUnsubscribed(
                 FeedUnsubscribed::new(event.subscription).with_request_id(event.request_id),
             ))
@@ -192,12 +161,10 @@ where
             ))
         };
 
-        tx.append_event(event.clone())
-            .await
-            .map_err(consumer_error)?;
-        tx.commit().await.map_err(consumer_error)?;
-        session.record_committed(&event);
-        Ok(())
+        let kind = event.kind();
+        tx.append_event(event).await?;
+        tx.commit().await?;
+        Ok(kind)
     }
 }
 
@@ -236,37 +203,40 @@ impl ConsumerEventInput for ApiEventInput {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct ApiEventProj;
+#[derive(Debug, Clone)]
+pub struct ApiEventProj<S> {
+    db: S,
+}
 
-impl ApiEventProj {
-    pub fn new() -> Self {
-        Self
+impl<S> ApiEventProj<S> {
+    pub fn new(db: S) -> Self {
+        Self { db }
     }
 }
 
-impl EventConsumer for ApiEventProj {
+impl<S> EventConsumer for ApiEventProj<S>
+where
+    S: FeedRegistryDb,
+{
     type Input = ApiEventInput;
 
     fn id(&self) -> EventConsumerId {
         EventConsumerId::ApiEventProj
     }
 
-    async fn consume<J>(
-        &mut self,
-        input: Self::Input,
-        session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
+    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
+        let mut recorded = RecordedEvents::empty();
+        let mut tx = self.db.begin().await?;
         for event in input.into_events() {
             let Some(api_event) = project_api_event(event) else {
                 continue;
             };
-            session.record(Event::Api(api_event)).await?;
+            let event = Event::Api(api_event);
+            recorded.push(event.kind());
+            tx.append_event(event).await?;
         }
-        Ok(())
+        tx.commit().await?;
+        Ok(recorded)
     }
 }
 
@@ -362,143 +332,11 @@ impl EventConsumer for ApiEventStream {
         EventConsumerId::ApiEventStream
     }
 
-    async fn consume<J>(
-        &mut self,
-        input: Self::Input,
-        _session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
+    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
         for event in input.into_events() {
             let receivers = self.publisher.publish(event);
             debug!(receivers, "published feed event");
         }
-        Ok(())
+        Ok(RecordedEvents::empty())
     }
-}
-
-/// One registered consumer selected for a journal batch.
-#[derive(Debug, Clone)]
-pub enum RegisteredConsumer<S> {
-    SubRequestWorker(SubRequestWorker<S>),
-    CrawlTargetListProj(CrawlTargetListProj<S>),
-    ApiEventProj(ApiEventProj),
-    ApiEventStream(ApiEventStream),
-}
-
-impl<S> ConsumerDispatch for RegisteredConsumer<S>
-where
-    S: FeedRegistryDb,
-{
-    async fn consume<J>(
-        self,
-        batch: EventReadBatch,
-        session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
-        match self {
-            Self::SubRequestWorker(mut consumer) => {
-                let Some(input) = <SubRequestWorker<S> as EventConsumer>::Input::from_batch(batch)?
-                else {
-                    return Ok(());
-                };
-                consumer.consume(input, session).await
-            }
-            Self::CrawlTargetListProj(mut consumer) => {
-                let Some(input) =
-                    <CrawlTargetListProj<S> as EventConsumer>::Input::from_batch(batch)?
-                else {
-                    return Ok(());
-                };
-                consumer.consume(input, session).await
-            }
-            Self::ApiEventProj(mut consumer) => {
-                let Some(input) = <ApiEventProj as EventConsumer>::Input::from_batch(batch)? else {
-                    return Ok(());
-                };
-                consumer.consume(input, session).await
-            }
-            Self::ApiEventStream(mut consumer) => {
-                let Some(input) = <ApiEventStream as EventConsumer>::Input::from_batch(batch)?
-                else {
-                    return Ok(());
-                };
-                consumer.consume(input, session).await
-            }
-        }
-    }
-}
-
-/// Concrete event consumers used by the registry event runtime.
-#[derive(Debug, Clone)]
-pub struct Consumers<S> {
-    sub_request_worker: SubRequestWorker<S>,
-    crawl_target_list_proj: CrawlTargetListProj<S>,
-    api_event_proj: ApiEventProj,
-    api_event_stream: ApiEventStream,
-}
-
-impl<S> Consumers<S> {
-    pub fn new(
-        sub_request_worker: SubRequestWorker<S>,
-        crawl_target_list_proj: CrawlTargetListProj<S>,
-        api_event_proj: ApiEventProj,
-        api_event_stream: ApiEventStream,
-    ) -> Self {
-        Self {
-            sub_request_worker,
-            crawl_target_list_proj,
-            api_event_proj,
-            api_event_stream,
-        }
-    }
-}
-
-impl<S> ConsumerRegistry for Consumers<S>
-where
-    S: FeedRegistryDb,
-{
-    type Dispatch<'a>
-        = RegisteredConsumer<S>
-    where
-        Self: 'a;
-
-    fn ids(&self) -> &'static [EventConsumerId] {
-        CONSUMER_IDS
-    }
-
-    fn read_filter(&self, id: EventConsumerId) -> Option<EventReadFilter> {
-        match id {
-            EventConsumerId::SubRequestWorker => Some(self.sub_request_worker.read_filter()),
-            EventConsumerId::CrawlTargetListProj => Some(self.crawl_target_list_proj.read_filter()),
-            EventConsumerId::ApiEventProj => Some(self.api_event_proj.read_filter()),
-            EventConsumerId::ApiEventStream => Some(self.api_event_stream.read_filter()),
-            _ => None,
-        }
-    }
-
-    fn dispatch(&self, id: EventConsumerId) -> Option<Self::Dispatch<'_>> {
-        match id {
-            EventConsumerId::SubRequestWorker => Some(RegisteredConsumer::SubRequestWorker(
-                self.sub_request_worker.clone(),
-            )),
-            EventConsumerId::CrawlTargetListProj => Some(RegisteredConsumer::CrawlTargetListProj(
-                self.crawl_target_list_proj.clone(),
-            )),
-            EventConsumerId::ApiEventProj => {
-                Some(RegisteredConsumer::ApiEventProj(self.api_event_proj))
-            }
-            EventConsumerId::ApiEventStream => Some(RegisteredConsumer::ApiEventStream(
-                self.api_event_stream.clone(),
-            )),
-            _ => None,
-        }
-    }
-}
-
-fn consumer_error(err: impl Into<anyhow::Error>) -> EventConsumerError {
-    EventConsumerError::Internal(err.into())
 }

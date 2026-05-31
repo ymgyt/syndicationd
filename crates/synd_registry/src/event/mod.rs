@@ -11,8 +11,8 @@ pub use codec::{
     EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult, EventPayload,
 };
 pub use consumer::{
-    ConsumerDispatch, ConsumerEventInput, ConsumerRegistry, EmptyConsumerRegistry, EventConsumer,
-    EventConsumerError, EventConsumerId, EventConsumerResult, EventConsumerSession, RecordedEvents,
+    ConsumerEventInput, EventConsumer, EventConsumerError, EventConsumerId, EventConsumerResult,
+    RecordedEvents,
 };
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
@@ -26,11 +26,8 @@ pub use journal::{
     EventCursor, EventCursorPos, EventJournal, EventJournalConsumer, EventJournalError,
     EventJournalExt, EventJournalResult, EventReadBatch, JournaledEvent,
 };
-pub use runtime::{
-    EventRecorder, EventRuntime, EventRuntimeError, EventRuntimeOutput, EventRuntimeResult,
-    EventSubmitter,
-};
+pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
 pub use worker::{
-    DrainOutcome, EventWakePublisher, EventWakeRecvError, EventWakeSubmitter, EventWakeSubscriber,
-    Trigger, Worker, WorkerError, WorkerHandle, WorkerResult, WorkerSet,
+    DrainOutcome, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, Worker,
+    WorkerError, WorkerHandle, WorkerResult, WorkerSet,
 };

@@ -5,7 +5,6 @@ use opentelemetry_sdk::{
     trace::{BatchConfig, BatchSpanProcessor, Sampler, SdkTracerProvider, Tracer},
 };
 use tracing::Subscriber;
-use tracing::{Dispatch, error, instrument};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{Layer, registry::LookupSpan};
 
@@ -69,7 +68,7 @@ mod tests {
     use opentelemetry_sdk::trace::BatchConfigBuilder;
     use tokio::sync::mpsc::UnboundedSender;
     use tonic::transport::Server;
-    use tracing::dispatcher;
+    use tracing::{Dispatch, dispatcher, error, instrument};
     use tracing_subscriber::{Registry, layer::SubscriberExt};
 
     use super::*;

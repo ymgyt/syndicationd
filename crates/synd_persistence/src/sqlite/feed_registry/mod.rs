@@ -597,18 +597,18 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use synd_feed::types::FeedUrl;
     use synd_registry::{
-        FeedRegistry, FeedRegistryConfig, FeedRegistryRuntime, SubscribeFeedCommand,
-        SubscriptionKey,
+        FeedRegistry, FeedRegistryConfig, SubscribeFeedCommand, SubscriptionKey,
         crawl::{
             policy::{PollingSchedule, RefreshInterval, RefreshPolicy, RefreshSchedule},
             state::RefreshErrorKind,
             target_list::{CrawlTargetListInput, CrawlTargetListProj},
         },
         event::{
-            ApiEvent, ApiEventPublisher, EventConsumer, EventConsumerId, EventConsumerSession,
-            EventJournal, EventKind, EventReadFilter, EventRuntime, FeedSubscribed,
-            FeedUnsubscribed, RequestEventKind, SubscriptionChanged, SubscriptionLifecycle,
+            ApiEvent, ApiEventPublisher, EventConsumer, EventConsumerId, EventJournal, EventKind,
+            EventReadFilter, EventSubmitter, EventWakePublisher, FeedSubscribed, FeedUnsubscribed,
+            RequestEventKind, SubscriptionChanged, SubscriptionLifecycle,
         },
+        runtime::spawn_event_workers,
     };
     use tokio_util::sync::CancellationToken;
 
@@ -683,12 +683,8 @@ mod tests {
         db: &SqliteFeedRegistryDb,
         events: Vec<SubscriptionLifecycle>,
     ) -> anyhow::Result<()> {
-        let journal = db.event_journal();
-        let mut session = EventConsumerSession::new(&journal);
         let mut projector = CrawlTargetListProj::new(db.clone());
-        projector
-            .consume(CrawlTargetListInput::new(events), &mut session)
-            .await?;
+        projector.consume(CrawlTargetListInput::new(events)).await?;
         Ok(())
     }
 
@@ -696,11 +692,16 @@ mod tests {
     async fn subscribe_records_request_event() -> anyhow::Result<()> {
         let db = migrated_db().await?;
         let journal = db.event_journal();
-        let registry = FeedRegistry::with_event_runtime(
+        let config = FeedRegistryConfig::default();
+        let event_submitter = EventSubmitter::new(
+            journal.clone(),
+            EventWakePublisher::new(config.event_wake_channel_capacity),
+        );
+        let registry = FeedRegistry::with_api_events(
             db.clone(),
-            FeedRegistryConfig::default(),
+            config,
             ApiEventPublisher::default(),
-            EventRuntime::new(journal.clone()),
+            event_submitter,
         );
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("event");

@@ -28,6 +28,7 @@ impl FeedRuntime {
                         .with_literal("daemon")
                         .with_literal("serve")
                         .with_literal("--sqlite-db")
+                        // REVIEW: これはなに？ この時点でsqlite file pathわかっているのでそれを渡すべきでは？
                         .with_runtime_database_path(),
                     DaemonLaunchLog::file(config.log_file()),
                 ),

@@ -1,6 +1,6 @@
 use axum_server::tls_rustls::RustlsConfig;
 use synd_persistence::sqlite::{SqliteEventJournal, SqliteFeedRegistryDb};
-use synd_registry::RuntimeFeedRegistry;
+use synd_registry::FeedRegistry;
 
 use crate::{
     monitor::Monitors,
@@ -8,7 +8,7 @@ use crate::{
     session::SessionRegistry,
 };
 
-pub type AppFeedRegistry = RuntimeFeedRegistry<SqliteFeedRegistryDb, SqliteEventJournal>;
+pub type AppFeedRegistry = FeedRegistry<SqliteFeedRegistryDb, SqliteEventJournal>;
 
 pub struct Dependency {
     pub authenticator: Authenticator,

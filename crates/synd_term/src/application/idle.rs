@@ -1,4 +1,5 @@
 use super::Application;
+#[cfg(feature = "integration")]
 use tracing::debug;
 
 impl Application {

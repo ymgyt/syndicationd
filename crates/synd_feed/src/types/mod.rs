@@ -188,6 +188,7 @@ impl Feed {
 
 mod link {
     use feed_rs::model::Link;
+    use tracing::warn;
 
     use crate::types::FeedType;
 

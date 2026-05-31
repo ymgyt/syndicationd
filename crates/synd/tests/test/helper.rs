@@ -20,11 +20,13 @@ use synd_feed::types::{Category, Requirement};
 use synd_feed::{feed::service::FeedService, types::FeedUrl};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    FeedRegistryDb, FeedRegistryRuntime, RegistryDbTransaction, SubscriberId, Subscription,
+    FeedRegistry, FeedRegistryDb, RegistryDbTransaction, SubscriberId, Subscription,
     crawl::{
         policy::{PollingPolicy, RefreshInterval, RefreshPolicy},
         state::{FeedSnapshot, RefreshSuccess},
     },
+    event::{ApiEventPublisher, EventSubmitter, EventWakePublisher},
+    runtime::spawn_event_workers,
 };
 pub use synd_term::integration::event_stream;
 use synd_term::{
@@ -393,16 +395,36 @@ pub async fn serve_api(
     };
 
     let shutdown = Shutdown::watch_signal(future::pending(), || {});
-    let registry_runtime = FeedRegistryRuntime::start(
-        db.clone(),
-        db.event_journal(),
-        feed_refresh_options.registry_config(),
-        shutdown.cancellation_token(),
-    );
-    registry_runtime.reconcile_startup().await;
+    let registry_config = feed_refresh_options.registry_config();
+    let journal = db.event_journal();
+    let api_events = ApiEventPublisher::default();
+    let wake_publisher = EventWakePublisher::new(registry_config.event_wake_channel_capacity);
+
+    let registry = {
+        let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+
+        FeedRegistry::with_api_events(
+            db.clone(),
+            registry_config,
+            api_events.clone(),
+            event_submitter,
+        )
+    };
+
+    let event_workers = {
+        spawn_event_workers(
+            db.clone(),
+            journal,
+            wake_publisher,
+            api_events,
+            registry_config,
+            shutdown.cancellation_token(),
+        )
+    };
+
     let mut dep = Dependency::new(
         ApiAuthenticator::new().unwrap(),
-        registry_runtime.registry(),
+        registry,
         tls_options.rustls_config(false).await.unwrap(),
         serve_options,
     );
@@ -429,7 +451,7 @@ pub async fn serve_api(
     let listener = TcpListener::bind(("localhost", api_port)).await?;
 
     tokio::spawn(async move {
-        let _registry_runtime = registry_runtime;
+        let _event_workers = event_workers;
         synd_api::serve::serve(listener, dep, shutdown).await
     });
 

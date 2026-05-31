@@ -6,9 +6,9 @@ use crate::{
     crawl::policy::PollingPolicy,
     db::{FeedRegistryDb, RegistryDbTransaction},
     event::{
-        ConsumerEventInput, Event, EventConsumer, EventConsumerError, EventConsumerId,
-        EventConsumerResult, EventConsumerSession, EventJournal, EventKind, EventReadBatch,
-        EventReadFilter, JournaledEvent, SubEvent, SubEventKind, SubscriptionLifecycle,
+        ConsumerEventInput, Event, EventConsumer, EventConsumerId, EventConsumerResult, EventKind,
+        EventReadBatch, EventReadFilter, JournaledEvent, RecordedEvents, SubEvent, SubEventKind,
+        SubscriptionLifecycle,
     },
 };
 
@@ -113,41 +113,29 @@ where
         EventConsumerId::CrawlTargetListProj
     }
 
-    async fn consume<J>(
-        &mut self,
-        input: Self::Input,
-        _session: &mut EventConsumerSession<'_, J>,
-    ) -> EventConsumerResult<()>
-    where
-        J: EventJournal,
-    {
+    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
         let feed_urls = affected_feed_urls(input.into_events());
         if feed_urls.is_empty() {
-            return Ok(());
+            return Ok(RecordedEvents::empty());
         }
 
-        let mut tx = self.db.begin().await.map_err(consumer_error)?;
+        let mut tx = self.db.begin().await?;
         for feed_url in &feed_urls {
-            let subscriptions = tx
-                .list_active_subscriptions_for_feed(feed_url)
-                .await
-                .map_err(consumer_error)?;
+            let subscriptions = tx.list_active_subscriptions_for_feed(feed_url).await?;
             let target = if let Some(policy) = PollingPolicy::from_subscriptions(&subscriptions) {
                 CrawlTarget::active(feed_url.clone(), policy, Utc::now())
             } else {
                 CrawlTarget::inactive(feed_url.clone(), Utc::now())
             };
-            tx.upsert_crawl_target(target)
-                .await
-                .map_err(consumer_error)?;
+            tx.upsert_crawl_target(target).await?;
         }
-        tx.commit().await.map_err(consumer_error)?;
+        tx.commit().await?;
 
         debug!(
             feed_count = feed_urls.len(),
             "crawl target list projector reconciled feeds"
         );
-        Ok(())
+        Ok(RecordedEvents::empty())
     }
 }
 
@@ -166,8 +154,4 @@ fn affected_feed_urls(events: Vec<SubscriptionLifecycle>) -> Vec<FeedUrl> {
 
     feed_urls.sort_unstable_by(|a, b| a.as_str().cmp(b.as_str()));
     feed_urls
-}
-
-fn consumer_error(err: impl Into<anyhow::Error>) -> EventConsumerError {
-    EventConsumerError::Internal(err.into())
 }

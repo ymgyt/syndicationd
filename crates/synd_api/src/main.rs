@@ -17,7 +17,11 @@ use synd_api::{
     shutdown::Shutdown,
 };
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
-use synd_registry::FeedRegistryRuntime;
+use synd_registry::{
+    FeedRegistry,
+    event::{ApiEventPublisher, EventSubmitter, EventWakePublisher},
+    runtime::spawn_event_workers,
+};
 
 fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let ObservabilityOptions {
@@ -65,19 +69,34 @@ async fn run(
         Authenticator::new()?
     };
     let tls_config = tls.rustls_config(local_enabled).await?;
-    let registry_runtime = FeedRegistryRuntime::start(
-        db.clone(),
-        db.event_journal(),
-        feed_refresh.registry_config(),
-        shutdown.cancellation_token(),
-    );
-    registry_runtime.reconcile_startup().await;
-    let dep = Dependency::new(
-        authenticator,
-        registry_runtime.registry(),
-        tls_config,
-        serve,
-    );
+    let registry_config = feed_refresh.registry_config();
+    let journal = db.event_journal();
+    let api_events = ApiEventPublisher::default();
+    let wake_publisher = EventWakePublisher::new(registry_config.event_wake_channel_capacity);
+
+    let registry = {
+        let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+
+        FeedRegistry::with_api_events(
+            db.clone(),
+            registry_config,
+            api_events.clone(),
+            event_submitter,
+        )
+    };
+
+    let event_workers = {
+        spawn_event_workers(
+            db,
+            journal,
+            wake_publisher,
+            api_events,
+            registry_config,
+            shutdown.cancellation_token(),
+        )
+    };
+
+    let dep = Dependency::new(authenticator, registry, tls_config, serve);
 
     info!(
         version = config::app::VERSION,
@@ -96,9 +115,7 @@ async fn run(
     }
 
     let result = listen_and_serve(dep, bind.into(), shutdown).await;
-    // Keep the registry runtime alive while API handlers can access the registry;
-    // dropping it shuts down the worker tasks behind the dependency graph.
-    drop(registry_runtime);
+    drop(event_workers);
     result
 }
 

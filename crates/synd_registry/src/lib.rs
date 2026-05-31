@@ -21,6 +21,5 @@ pub use config::FeedRegistryConfig;
 pub use db::{FeedRegistryDb, RegistryDbTransaction};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::FeedRegistry;
-pub use runtime::{FeedRegistryRuntime, RuntimeEventSubmitter, RuntimeFeedRegistry};
 pub use subscriber::SubscriberId;
 pub use subscription::{Subscription, SubscriptionAnnotations, SubscriptionKey};

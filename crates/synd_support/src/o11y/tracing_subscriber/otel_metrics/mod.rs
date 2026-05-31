@@ -6,7 +6,7 @@ use opentelemetry_sdk::{
     Resource,
     metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream},
 };
-use tracing::{Dispatch, debug, info};
+use tracing::debug;
 use tracing::{Metadata, Subscriber};
 use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::{Layer, filter::filter_fn, layer::Filter, registry::LookupSpan};
@@ -119,7 +119,7 @@ mod tests {
     };
     use tokio::sync::mpsc::UnboundedSender;
     use tonic::transport::{Server, server::TcpIncoming};
-    use tracing::dispatcher;
+    use tracing::{Dispatch, dispatcher, info};
     use tracing_subscriber::{Registry, layer::SubscriberExt};
 
     use super::*;

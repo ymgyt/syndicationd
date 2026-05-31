@@ -5,7 +5,6 @@ use opentelemetry_sdk::{
     logs::{BatchConfig, SdkLoggerProvider},
 };
 use tracing::Subscriber;
-use tracing::{Dispatch, info};
 use tracing_subscriber::{Layer, registry::LookupSpan};
 
 pub fn layer<S>(
@@ -42,7 +41,7 @@ mod tests {
     use opentelemetry_sdk::logs::BatchConfigBuilder;
     use tokio::sync::mpsc::UnboundedSender;
     use tonic::transport::Server;
-    use tracing::dispatcher;
+    use tracing::{Dispatch, dispatcher, info};
     use tracing_subscriber::{Registry, layer::SubscriberExt};
 
     use super::*;

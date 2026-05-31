@@ -9,8 +9,8 @@ use crate::{
     db::{FeedRegistryDb, RegistryDbTransaction},
     error::FeedRegistryError,
     event::{
-        ApiEventPublisher, ApiEventSubscriber, EventSubmitter, RequestEvent, RequestId,
-        SubscribeFeedRequested, UnsubscribeFeedRequested,
+        ApiEventPublisher, ApiEventSubscriber, EventJournal, EventSubmitter, RequestEvent,
+        RequestId, SubscribeFeedRequested, UnsubscribeFeedRequested,
     },
     subscriber::SubscriberId,
     subscription::{Subscription, SubscriptionKey},
@@ -18,27 +18,27 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub struct FeedRegistry<S, E> {
+pub struct FeedRegistry<S, J> {
     db: S,
     config: FeedRegistryConfig,
     api_events: ApiEventPublisher,
-    events: E,
+    events: EventSubmitter<J>,
 }
 
-impl<S, E> FeedRegistry<S, E>
+impl<S, J> FeedRegistry<S, J>
 where
     S: FeedRegistryDb,
-    E: EventSubmitter,
+    J: EventJournal,
 {
-    pub fn new(db: S, config: FeedRegistryConfig, events: E) -> Self {
-        Self::with_event_runtime(db, config, ApiEventPublisher::default(), events)
+    pub fn new(db: S, config: FeedRegistryConfig, events: EventSubmitter<J>) -> Self {
+        Self::with_api_events(db, config, ApiEventPublisher::default(), events)
     }
 
-    pub fn with_event_runtime(
+    pub fn with_api_events(
         db: S,
         config: FeedRegistryConfig,
         api_events: ApiEventPublisher,
-        events: E,
+        events: EventSubmitter<J>,
     ) -> Self {
         Self {
             db,

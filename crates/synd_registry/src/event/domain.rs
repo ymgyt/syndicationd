@@ -4,10 +4,7 @@ use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, Requirement};
 
-use crate::{
-    crawl::policy::RefreshPolicy,
-    subscription::SubscriptionKey,
-};
+use crate::{crawl::policy::RefreshPolicy, subscription::SubscriptionKey};
 
 /// A typed fact recorded in the registry event journal.
 #[derive(Debug, Clone, PartialEq, Eq)]

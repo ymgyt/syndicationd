@@ -3,17 +3,19 @@ use std::path::Path;
 use synd_api::{
     cli::ServeOptions, dependency::Dependency, serve::auth::Authenticator, shutdown::Shutdown,
 };
-use synd_persistence::sqlite::{SqliteDatabase, SqliteEventJournal, SqliteFeedRegistryDb};
-use synd_registry::{FeedRegistryConfig, FeedRegistryRuntime};
+use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
+use synd_registry::{
+    FeedRegistry, FeedRegistryConfig,
+    event::{ApiEventPublisher, EventSubmitter, EventWakePublisher, WorkerSet},
+    runtime::spawn_event_workers,
+};
 
 use crate::{Result, RuntimeDatabase};
-
-type ApiRegistryRuntime = FeedRegistryRuntime<SqliteFeedRegistryDb, SqliteEventJournal>;
 
 /// Prepared synd-api dependency graph for one runtime database.
 pub(crate) struct RuntimeApiService {
     dependency: Dependency,
-    registry_runtime: ApiRegistryRuntime,
+    event_workers: WorkerSet,
 }
 
 impl RuntimeApiService {
@@ -39,28 +41,38 @@ impl RuntimeApiService {
         shutdown: &Shutdown,
     ) -> Result<Self> {
         let db = RuntimeRepository::open(database_path).await?;
-        let registry_runtime = FeedRegistryRuntime::start(
-            db.clone(),
-            db.event_journal(),
-            FeedRegistryConfig::default(),
-            shutdown.cancellation_token(),
-        );
-        registry_runtime.reconcile_startup().await;
-        let dependency = Dependency::new(
-            authenticator,
-            registry_runtime.registry(),
-            None,
-            serve_options,
-        );
+        let config = FeedRegistryConfig::default();
+        let journal = db.event_journal();
+        let api_events = ApiEventPublisher::default();
+        let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
+
+        let registry = {
+            let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+
+            FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
+        };
+
+        let event_workers = {
+            spawn_event_workers(
+                db,
+                journal,
+                wake_publisher,
+                api_events,
+                config,
+                shutdown.cancellation_token(),
+            )
+        };
+
+        let dependency = Dependency::new(authenticator, registry, None, serve_options);
 
         Ok(Self {
             dependency,
-            registry_runtime,
+            event_workers,
         })
     }
 
-    pub(crate) fn into_parts(self) -> (Dependency, ApiRegistryRuntime) {
-        (self.dependency, self.registry_runtime)
+    pub(crate) fn into_parts(self) -> (Dependency, WorkerSet) {
+        (self.dependency, self.event_workers)
     }
 }
 

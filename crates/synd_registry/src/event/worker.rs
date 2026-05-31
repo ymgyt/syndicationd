@@ -6,9 +6,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, warn};
 
 use crate::event::{
-    ConsumerEventInput, Event, EventConsumer, EventConsumerError, EventConsumerId,
-    EventConsumerSession, EventCursor, EventJournal, EventJournalError, EventRuntimeOutput,
-    EventRuntimeResult, EventSubmitter, RecordedEvents,
+    ConsumerEventInput, EventConsumer, EventConsumerError, EventConsumerId, EventCursor,
+    EventJournal, EventJournalError, RecordedEvents,
 };
 
 pub type WorkerResult<T> = Result<T, WorkerError>;
@@ -70,12 +69,6 @@ pub struct WorkerHandle {
 #[derive(Debug)]
 pub struct WorkerSet {
     handles: Vec<WorkerHandle>,
-}
-
-#[derive(Debug, Clone)]
-pub struct EventWakeSubmitter<S> {
-    inner: S,
-    wake_publisher: EventWakePublisher,
 }
 
 impl EventWakePublisher {
@@ -156,9 +149,10 @@ impl WorkerSet {
         }
     }
 
-    pub async fn join(self) -> Vec<(EventConsumerId, Result<(), tokio::task::JoinError>)> {
-        let mut results = Vec::with_capacity(self.handles.len());
-        for handle in self.handles {
+    pub async fn join(mut self) -> Vec<(EventConsumerId, Result<(), tokio::task::JoinError>)> {
+        let handles = std::mem::take(&mut self.handles);
+        let mut results = Vec::with_capacity(handles.len());
+        for handle in handles {
             let consumer = handle.consumer();
             results.push((consumer, handle.join().await));
         }
@@ -166,25 +160,9 @@ impl WorkerSet {
     }
 }
 
-impl<S> EventWakeSubmitter<S> {
-    pub fn new(inner: S, wake_publisher: EventWakePublisher) -> Self {
-        Self {
-            inner,
-            wake_publisher,
-        }
-    }
-}
-
-impl<S> EventSubmitter for EventWakeSubmitter<S>
-where
-    S: EventSubmitter,
-{
-    async fn submit(&self, events: Vec<Event>) -> EventRuntimeResult<EventRuntimeOutput> {
-        let output = self.inner.submit(events).await?;
-        self.wake_publisher.publish(output.recorded().clone());
-        self.wake_publisher
-            .publish(output.consumer_recorded().clone());
-        Ok(output)
+impl Drop for WorkerSet {
+    fn drop(&mut self) {
+        self.abort();
     }
 }
 
@@ -332,15 +310,13 @@ where
             .await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();
-        let mut session = EventConsumerSession::new(&self.journal);
-
-        if !batch.is_empty()
+        let recorded = if !batch.is_empty()
             && let Some(input) = C::Input::from_batch(batch)?
         {
-            self.consumer.consume(input, &mut session).await?;
-        }
-
-        let recorded = session.into_recorded();
+            self.consumer.consume(input).await?
+        } else {
+            RecordedEvents::empty()
+        };
         self.journal.commit_cursor(&scanned_cursor).await?;
         Ok(DrainOutcome {
             event_count,
