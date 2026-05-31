@@ -13,12 +13,12 @@ use synd_registry::{
 use crate::{Result, RuntimeDatabase};
 
 /// Prepared synd-api dependency graph for one runtime database.
-pub(crate) struct RuntimeApiService {
+pub(crate) struct ApiService {
     dependency: Dependency,
     event_workers: WorkerSet,
 }
 
-impl RuntimeApiService {
+impl ApiService {
     pub(crate) async fn from_database(
         database: &RuntimeDatabase,
         authenticator: Authenticator,
@@ -40,13 +40,13 @@ impl RuntimeApiService {
         serve_options: ServeOptions,
         shutdown: &Shutdown,
     ) -> Result<Self> {
-        let db = RuntimeRepository::open(database_path).await?;
+        let db = Repository::open(database_path).await?;
         let config = FeedRegistryConfig::default();
         let api_events = ApiEventPublisher::default();
         let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
 
         let registry = {
-            let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
+            let event_submitter = EventSubmitter::new(db.clone(), wake_publisher.clone());
 
             FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
         };
@@ -75,9 +75,9 @@ impl RuntimeApiService {
 }
 
 /// Opens and migrates the `SQLite` repository used by a runtime API.
-struct RuntimeRepository;
+struct Repository;
 
-impl RuntimeRepository {
+impl Repository {
     async fn open(path: &Path) -> Result<SqliteFeedRegistryDb> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;

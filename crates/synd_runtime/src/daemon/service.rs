@@ -17,7 +17,7 @@ use tracing::{debug, info, warn};
 
 use crate::{
     Error, Result, RuntimeDatabase,
-    api::RuntimeApiService,
+    api::ApiService,
     placement::{RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver},
 };
 
@@ -72,7 +72,7 @@ impl Daemon {
             }
             info!("Gracefully shutdown synd-runtime daemon");
         });
-        let api_service = RuntimeApiService::from_database(
+        let api_service = ApiService::from_database(
             self.config.database(),
             Authenticator::trusted_local(),
             ServeOptions::default(),
