@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
 use feed_rs::model::{self as feedrs, Generator, Link, Person, Text};
+use tracing::warn;
 
 pub type Time = DateTime<Utc>;
 
@@ -144,7 +145,7 @@ impl Feed {
             .filter_map(|entry| match Entry::from_feed_rs(&url, feed_type, entry) {
                 Ok(entry) => Some(entry),
                 Err(err) => {
-                    tracing::warn!(
+                    warn!(
                         error = %err,
                         feed_url = url.as_str(),
                         "skip feed entry because EntryId cannot be generated"
@@ -212,7 +213,7 @@ mod link {
                 .map(|link| link.href.as_str()),
 
             FeedType::RSS0 => {
-                tracing::warn!("RSS0 is used! {:?}", links.collect::<Vec<_>>());
+                warn!("RSS0 is used! {:?}", links.collect::<Vec<_>>());
                 None
             }
 

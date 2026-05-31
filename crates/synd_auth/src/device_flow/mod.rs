@@ -4,6 +4,7 @@ use http::{StatusCode, Uri};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
+use tracing::instrument;
 
 use crate::USER_AGENT;
 
@@ -52,7 +53,7 @@ impl<P> DeviceFlow<P> {
 }
 
 impl<P: Provider> DeviceFlow<P> {
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn device_authorize_request(&self) -> anyhow::Result<DeviceAuthorizationResponse> {
         let response = self
             .client

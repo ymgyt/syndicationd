@@ -7,6 +7,7 @@ use std::{
 
 use clap::Args;
 use serde::Serialize;
+use tracing::error;
 
 use crate::{cli::OutputFormat, config::ConfigResolver};
 
@@ -21,7 +22,7 @@ pub struct ConfigViewCommand {
 impl ConfigViewCommand {
     pub fn run(self, config: &ConfigResolver) -> ExitCode {
         if let Err(err) = self.view(config) {
-            tracing::error!("{err:?}");
+            error!("{err:?}");
             ExitCode::from(1)
         } else {
             ExitCode::SUCCESS

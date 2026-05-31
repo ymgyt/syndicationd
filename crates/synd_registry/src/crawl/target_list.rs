@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
+use tracing::debug;
 
 use crate::{
     crawl::policy::PollingPolicy,
@@ -142,7 +143,7 @@ where
         }
         tx.commit().await.map_err(consumer_error)?;
 
-        tracing::debug!(
+        debug!(
             feed_count = feed_urls.len(),
             "crawl target list projector reconciled feeds"
         );

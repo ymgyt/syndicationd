@@ -4,6 +4,7 @@ use synd_client::{Client, payload};
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use super::DriverContext;
+use tracing::{debug, warn};
 
 const TIMELINE_CHANGE_RECONNECT_DELAY: Duration = Duration::from_secs(2);
 
@@ -33,8 +34,8 @@ impl TimelineChangeSubscription {
                 }
 
                 match client.run_timeline_changes(tx.clone()).await {
-                    Ok(()) => tracing::debug!("timeline change subscription stopped"),
-                    Err(error) => tracing::warn!("timeline change subscription failed: {error}"),
+                    Ok(()) => debug!("timeline change subscription stopped"),
+                    Err(error) => warn!("timeline change subscription failed: {error}"),
                 }
 
                 if tx.is_closed() {

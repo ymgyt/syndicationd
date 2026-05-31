@@ -2,6 +2,7 @@ use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::{debug, error, instrument};
 
 use crate::{
     config,
@@ -133,7 +134,7 @@ pub(crate) struct FetchNotificationsParams {
 }
 
 impl GithubClient {
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub(crate) async fn fetch_notifications(
         &self,
         FetchNotificationsParams {
@@ -159,7 +160,7 @@ impl GithubClient {
             .map(Notification::from)
             .collect();
 
-        tracing::debug!(
+        debug!(
             "Fetch {} github notifications: {page:?}",
             notifications.len()
         );
@@ -197,7 +198,7 @@ impl GithubClient {
 
         match response {
             Ok(data) => IssueContext::try_from(data).map_err(|error| {
-                tracing::error!(%error, "failed to decode github issue response");
+                error!(%error, "failed to decode github issue response");
                 err::handle_decode_error(error)
             }),
             Err(error) => Err(GithubError::from(error)),
@@ -236,7 +237,7 @@ impl GithubClient {
 
         match response {
             Ok(data) => PullRequestContext::try_from(data).map_err(|error| {
-                tracing::error!(%error, "failed to decode github pull request response");
+                error!(%error, "failed to decode github pull request response");
                 err::handle_decode_error(error)
             }),
             Err(error) => Err(GithubError::from(error)),

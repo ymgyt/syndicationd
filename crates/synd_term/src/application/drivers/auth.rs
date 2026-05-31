@@ -2,6 +2,7 @@ use std::ops::Sub;
 
 use futures_util::FutureExt;
 use synd_client::ApiCredential;
+use tracing::{debug, info};
 
 use crate::{
     application::RequestId,
@@ -27,7 +28,7 @@ impl AuthDriver {
         cx: &mut DriverContext<'_>,
         provider: AuthenticationProvider,
     ) -> Vec<Event> {
-        tracing::info!("Start authenticate");
+        info!("Start authenticate");
 
         let authenticator = cx.adapters.authenticator.clone();
         let request_seq = cx
@@ -98,7 +99,7 @@ impl AuthDriver {
                 let fut = async move {
                     tokio::time::sleep(until_expire).await;
 
-                    tracing::debug!("Refresh google credential");
+                    debug!("Refresh google credential");
                     match jwt_service.refresh_google_id_token(&refresh_token).await {
                         Ok(credential) => Ok(Event::CredentialRefreshed { credential }),
                         Err(err) => Ok(Event::Error {

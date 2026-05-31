@@ -8,6 +8,7 @@ use std::{
 use clap::Args;
 use serde::Serialize;
 use synd_persistence::sqlite::SqliteDatabase;
+use tracing::error;
 
 use crate::{cli::OutputFormat, config::ConfigResolver};
 
@@ -25,7 +26,7 @@ impl DoctorCommand {
             Ok(has_failures) if has_failures => ExitCode::from(1),
             Ok(_) => ExitCode::SUCCESS,
             Err(err) => {
-                tracing::error!("{err:?}");
+                error!("{err:?}");
                 ExitCode::from(1)
             }
         }

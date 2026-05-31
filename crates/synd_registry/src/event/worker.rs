@@ -3,6 +3,7 @@ use std::{fmt, time::Duration};
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, warn};
 
 use crate::event::{
     ConsumerEventInput, Event, EventConsumer, EventConsumerError, EventConsumerId,
@@ -244,7 +245,7 @@ where
 
     pub async fn run(mut self, ct: CancellationToken) {
         let consumer = self.consumer.id();
-        tracing::debug!(
+        debug!(
             consumer = consumer.as_str(),
             "registry event worker started"
         );
@@ -264,7 +265,7 @@ where
                         }
                         Ok(_) => {}
                         Err(EventWakeRecvError::Lagged(skipped)) => {
-                            tracing::warn!(
+                            warn!(
                                 consumer = consumer.as_str(),
                                 skipped,
                                 "registry event worker wake lagged"
@@ -272,7 +273,7 @@ where
                             self.process(Trigger::WakeLagged).await;
                         }
                         Err(EventWakeRecvError::Closed) => {
-                            tracing::warn!(
+                            warn!(
                                 consumer = consumer.as_str(),
                                 "registry event worker wake channel closed"
                             );
@@ -286,7 +287,7 @@ where
             }
         }
 
-        tracing::debug!(
+        debug!(
             consumer = consumer.as_str(),
             "registry event worker stopped"
         );
@@ -301,7 +302,7 @@ where
         let consumer = self.consumer.id();
         match self.drain().await {
             Ok(outcome) => {
-                tracing::debug!(
+                debug!(
                     consumer = consumer.as_str(),
                     trigger = trigger.as_str(),
                     event_count = outcome.event_count(),
@@ -312,7 +313,7 @@ where
                 self.publish_recorded(trigger, outcome.into_recorded());
             }
             Err(err) => {
-                tracing::error!(
+                error!(
                     consumer = consumer.as_str(),
                     trigger = trigger.as_str(),
                     error = %err,
@@ -352,7 +353,7 @@ where
         let recorded_count = recorded.len();
         let receivers = self.wake_publisher.publish(recorded);
         if recorded_count > 0 {
-            tracing::debug!(
+            debug!(
                 consumer = self.consumer.id().as_str(),
                 trigger = trigger.as_str(),
                 recorded_count,

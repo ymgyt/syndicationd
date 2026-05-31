@@ -4,6 +4,7 @@ use futures_util::future::BoxFuture;
 use moka::future::Cache;
 use synd_auth::jwt::google::JwtService as GoogleJwtService;
 use tracing::warn;
+use tracing::{debug, instrument};
 
 use crate::{
     client::github::GithubClient,
@@ -99,7 +100,7 @@ impl Authenticator {
     }
 
     /// Authenticate from given token
-    #[tracing::instrument(skip_all)]
+    #[instrument(skip_all)]
     pub async fn authenticate<S>(&self, token: S) -> Result<Principal, ()>
     where
         S: AsRef<str>,
@@ -138,7 +139,7 @@ impl Authenticator {
         match (split.next(), split.next()) {
             (Some("github"), Some(access_token)) => {
                 if let Some(principal) = cache.get(token).await {
-                    tracing::debug!("Principal cache hit");
+                    debug!("Principal cache hit");
                     return Ok(principal);
                 }
 
@@ -158,7 +159,7 @@ impl Authenticator {
             }
             (Some("google"), Some(id_token)) => {
                 if let Some(principal) = cache.get(id_token).await {
-                    tracing::debug!("Principal cache hit");
+                    debug!("Principal cache hit");
                     return Ok(principal);
                 }
 

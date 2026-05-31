@@ -13,6 +13,7 @@ use synd_api::{
 
 #[cfg(unix)]
 use tokio::net::UnixListener;
+use tracing::{debug, info, warn};
 
 use crate::{
     Result, RuntimeDatabase,
@@ -64,12 +65,12 @@ impl Daemon {
         let shutdown_endpoint_cleanup = endpoint_cleanup.clone();
         let shutdown = Shutdown::manual(move || {
             if let Err(error) = shutdown_endpoint_cleanup.unlink_socket() {
-                tracing::warn!(
+                warn!(
                     error = %error,
                     "Failed to cleanup daemon endpoint during shutdown"
                 );
             }
-            tracing::info!("Gracefully shutdown synd-runtime daemon");
+            info!("Gracefully shutdown synd-runtime daemon");
         });
         let api_service = RuntimeApiService::from_database(
             self.config.database(),
@@ -175,7 +176,7 @@ impl DaemonEndpointCleanup {
             DaemonEndpointFileState::Missing => {}
             DaemonEndpointFileState::ConnectedSocket | DaemonEndpointFileState::StaleSocket => {
                 std::fs::remove_file(&self.path)?;
-                tracing::debug!(
+                debug!(
                     daemon_endpoint = %self.path.display(),
                     "Removed daemon endpoint"
                 );
@@ -196,7 +197,7 @@ impl DaemonEndpointCleanup {
         match DaemonEndpointFileState::inspect(&self.path)? {
             DaemonEndpointFileState::StaleSocket => {
                 std::fs::remove_file(&self.path)?;
-                tracing::debug!(
+                debug!(
                     daemon_endpoint = %self.path.display(),
                     "Removed stale daemon endpoint"
                 );
@@ -219,7 +220,7 @@ impl DaemonEndpointCleanup {
 impl Drop for DaemonEndpointCleanup {
     fn drop(&mut self) {
         if let Err(error) = self.cleanup_stale_socket() {
-            tracing::warn!(
+            warn!(
                 daemon_endpoint = %self.path.display(),
                 error = %error,
                 "Failed to cleanup daemon endpoint"

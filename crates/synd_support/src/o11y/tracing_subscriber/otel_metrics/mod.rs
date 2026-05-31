@@ -6,6 +6,7 @@ use opentelemetry_sdk::{
     Resource,
     metrics::{Instrument, PeriodicReader, SdkMeterProvider, Stream},
 };
+use tracing::{Dispatch, debug, info};
 use tracing::{Metadata, Subscriber};
 use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::{Layer, filter::filter_fn, layer::Filter, registry::LookupSpan};
@@ -13,6 +14,9 @@ use tracing_subscriber::{Layer, filter::filter_fn, layer::Filter, registry::Look
 pub mod macros;
 
 pub const METRICS_EVENT_TARGET: &str = "metrics";
+
+#[doc(hidden)]
+pub use tracing::{Level as __TracingLevel, event as __tracing_event};
 
 pub fn metrics_event_filter<S: Subscriber>() -> impl Filter<S> {
     filter_fn(|metadata: &Metadata<'_>| metadata.target() != METRICS_EVENT_TARGET)
@@ -71,7 +75,7 @@ fn init_meter_provider(
 
 fn view() -> impl Fn(&Instrument) -> Option<Stream> + Send + Sync + 'static {
     |instrument: &Instrument| -> Option<Stream> {
-        tracing::debug!("{instrument:?}");
+        debug!("{instrument:?}");
 
         match instrument.name() {
             "graphql.duration" => Stream::builder()
@@ -93,7 +97,7 @@ fn view() -> impl Fn(&Instrument) -> Option<Stream> + Send + Sync + 'static {
                 .build()
                 .ok(),
             name => {
-                tracing::debug!(name, "There is no explicit view");
+                debug!(name, "There is no explicit view");
                 None
             }
         }
@@ -141,11 +145,11 @@ mod tests {
     }
 
     fn f1() {
-        tracing::info!(monotonic_counter.f1 = 1, key1 = "val1");
+        info!(monotonic_counter.f1 = 1, key1 = "val1");
     }
 
     fn f2() {
-        tracing::info!(histogram.graphql.duration = 0.5);
+        info!(histogram.graphql.duration = 0.5);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -162,7 +166,7 @@ mod tests {
         let resource = resource();
         let (layer, provider) = layer(endpoint, resource.clone(), Duration::from_mins(1));
         let subscriber = Registry::default().with(layer);
-        let dispatcher = tracing::Dispatch::new(subscriber);
+        let dispatcher = Dispatch::new(subscriber);
 
         dispatcher::with_default(&dispatcher, || {
             f1();

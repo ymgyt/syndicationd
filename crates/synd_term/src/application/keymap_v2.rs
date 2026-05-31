@@ -1,4 +1,5 @@
 use crossterm::event::KeyEvent;
+use tracing::trace;
 
 use crate::{
     application::Application,
@@ -22,10 +23,10 @@ impl Application {
             }
             KeymapResult::NoOp | KeymapResult::NotFound => {}
             KeymapResult::Pending { keys, candidates } => {
-                tracing::trace!(?keys, ?candidates, "keymap sequence pending");
+                trace!(?keys, ?candidates, "keymap sequence pending");
             }
             KeymapResult::Cancelled { keys } => {
-                tracing::trace!(?keys, "keymap sequence cancelled");
+                trace!(?keys, "keymap sequence cancelled");
             }
         }
     }

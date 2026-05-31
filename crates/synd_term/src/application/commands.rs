@@ -1,3 +1,5 @@
+use tracing::{info_span, instrument};
+
 use crate::{
     command::{Command, FeedsCommand, FilterCommand, GitHubCommand, ShellCommand},
     keymap::v2,
@@ -6,9 +8,9 @@ use crate::{
 use super::Application;
 
 impl Application {
-    #[tracing::instrument(skip_all)]
+    #[instrument(skip_all)]
     pub(super) fn apply_command(&mut self, command: Command) {
-        let _guard = tracing::info_span!("apply_command", %command).entered();
+        let _guard = info_span!("apply_command", %command).entered();
 
         match command {
             Command::Shell(command) => self.apply_shell_command(command),

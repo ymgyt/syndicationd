@@ -1,4 +1,5 @@
 use chrono::Utc;
+use tracing::debug;
 
 use crate::{
     crawl::target_list::CrawlTargetListProj,
@@ -371,7 +372,7 @@ impl EventConsumer for ApiEventStream {
     {
         for event in input.into_events() {
             let receivers = self.publisher.publish(event);
-            tracing::debug!(receivers, "published feed event");
+            debug!(receivers, "published feed event");
         }
         Ok(())
     }

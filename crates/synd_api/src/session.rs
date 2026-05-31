@@ -15,6 +15,7 @@ use synd_protocol::{
     },
 };
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 
 use crate::shutdown::Shutdown;
 
@@ -214,7 +215,7 @@ impl SessionIdleShutdown {
             tokio::select! {
                 () = timer.cancelled() => {}
                 () = tokio::time::sleep(grace) => {
-                    tracing::info!(
+                    info!(
                         idle_shutdown_grace_ms = grace.as_millis(),
                         "Daemon session idle grace elapsed"
                     );

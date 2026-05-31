@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use synd_client::payload;
 use synd_feed::types::FeedUrl;
+use tracing::warn;
 use url::Url;
 
 use crate::{
@@ -113,7 +114,7 @@ impl FeedsComponent {
         match Url::parse(feed_website_url) {
             Ok(url) => Some(Operation::OpenBrowser { url }),
             Err(err) => {
-                tracing::warn!("Try to open invalid feed url: {feed_website_url} {err}");
+                warn!("Try to open invalid feed url: {feed_website_url} {err}");
                 None
             }
         }
@@ -139,7 +140,7 @@ impl FeedsComponent {
         match Url::parse(entry_website_url) {
             Ok(url) => Some(url),
             Err(err) => {
-                tracing::warn!("Try to open/browse invalid entry url: {entry_website_url} {err}");
+                warn!("Try to open/browse invalid entry url: {entry_website_url} {err}");
                 None
             }
         }

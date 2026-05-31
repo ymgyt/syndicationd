@@ -11,6 +11,7 @@ use synd_term::{
     ui::theme::Theme,
 };
 use tracing::error;
+use tracing::{info, warn};
 use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::{cli::Args, config::ConfigResolver, runtime::FeedRuntime};
@@ -203,13 +204,13 @@ async fn main() -> ExitCode {
     if let Err(err) = async {
         let (app, session) = build_app(config, dry_run).await?;
         let result = {
-            tracing::info!("Running...");
+            info!("Running...");
             app.run(&mut event_stream)
         }
         .await;
 
         if let Err(err) = session.close().await {
-            tracing::warn!("Failed to close runtime session: {err}");
+            warn!("Failed to close runtime session: {err}");
         }
 
         result

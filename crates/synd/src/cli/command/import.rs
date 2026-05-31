@@ -14,6 +14,7 @@ use synd_client::{
     payload::{SubscribeFeedInput, SubscribeFeedPayload},
 };
 use synd_term::{types::ExportedFeed, ui};
+use tracing::error;
 
 use crate::{cli::port::PortContext, config::ConfigResolver};
 
@@ -46,7 +47,7 @@ impl ImportCommand {
             self.import(config).await
         };
         if let Err(err) = err {
-            tracing::error!("{err:?}");
+            error!("{err:?}");
             ExitCode::from(1)
         } else {
             ExitCode::SUCCESS

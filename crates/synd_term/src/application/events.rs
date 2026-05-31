@@ -1,14 +1,15 @@
 use itertools::Itertools;
 use synd_client::SyndApiError;
+use tracing::{error, info_span, instrument, warn};
 
 use crate::event::{ApiEvent, AuthApiEvent, Event};
 
 use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, RequestSequence};
 
 impl Application {
-    #[tracing::instrument(skip_all)]
+    #[instrument(skip_all)]
     pub(super) fn apply_event(&mut self, event: Event) {
-        let _guard = tracing::info_span!("apply_event", %event).entered();
+        let _guard = info_span!("apply_event", %event).entered();
 
         match event {
             Event::Nop => {}
@@ -168,7 +169,7 @@ impl Application {
         error_message: String,
         request_seq: Option<RequestSequence>,
     ) {
-        tracing::error!("{error_message}");
+        error!("{error_message}");
 
         if let Some(request_seq) = request_seq {
             self.drivers.remove_in_flight(request_seq);
@@ -186,7 +187,7 @@ impl Application {
             SyndApiError::Unauthorized { url }
                 if self.drivers.feed_api_session_requires_user_credential() =>
             {
-                tracing::warn!(
+                warn!(
                     "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
                 );
                 self.drivers.clean_cache();

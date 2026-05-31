@@ -3,6 +3,7 @@ use std::{fmt::Debug, time::Duration};
 use graphql_client::{GraphQLQuery, Response};
 use reqwest::header::{self, HeaderValue};
 use serde::{Serialize, de::DeserializeOwned};
+use tracing::instrument;
 
 use crate::{client::github::query, config};
 
@@ -37,7 +38,7 @@ impl GithubClient {
         }
     }
 
-    #[tracing::instrument(name = "github::authenticate", skip_all)]
+    #[instrument(name = "github::authenticate", skip_all)]
     pub async fn authenticate(&self, access_token: &str) -> anyhow::Result<String> {
         let variables = query::authenticate::Variables {};
         let request = query::Authenticate::build_query(variables);

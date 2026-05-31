@@ -9,6 +9,7 @@ use synd_support::{
     fs::{FileSystem, fsimpl},
 };
 use thiserror::Error;
+use tracing::debug;
 
 use crate::{
     cli::{self, ApiOptions, BackendOptions, FeedOptions, GithubOptions},
@@ -358,7 +359,7 @@ impl ConfigResolverBuilder {
             Ok(f) => Ok((Some(ConfigFile::new(f)?), default_path)),
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => {
-                    tracing::debug!(path = %default_path.display(), "default config file not found");
+                    debug!(path = %default_path.display(), "default config file not found");
                     Ok((None, default_path))
                 }
                 _ => Err(ConfigResolverBuildError::ConfigFileOpen {

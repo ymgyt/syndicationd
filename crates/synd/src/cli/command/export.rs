@@ -4,6 +4,7 @@ use clap::Args;
 use schemars::JsonSchema;
 use serde::Serialize;
 use synd_term::types::ExportedFeed;
+use tracing::error;
 
 use crate::{cli::port::PortContext, config::ConfigResolver};
 
@@ -33,7 +34,7 @@ impl ExportCommand {
             self.export(config).await
         };
         if let Err(err) = err {
-            tracing::error!("{err:?}");
+            error!("{err:?}");
             ExitCode::from(1)
         } else {
             ExitCode::SUCCESS

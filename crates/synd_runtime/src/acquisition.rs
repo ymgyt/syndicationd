@@ -5,6 +5,7 @@ use std::os::unix::fs::FileTypeExt;
 
 use synd_protocol::session::OpenSessionRequest;
 use tokio::time::sleep;
+use tracing::{debug, info};
 
 use crate::{
     Error, Result, RuntimeConfig, Session,
@@ -55,7 +56,7 @@ impl<'a> SessionAcquisition<'a> {
     }
 
     async fn execute(&self, decision: SessionAcquisitionDecision) -> Result<Session> {
-        tracing::debug!(
+        debug!(
             runtime_session_path = decision.path_name(),
             "Executing runtime session acquisition path"
         );
@@ -92,7 +93,7 @@ struct SessionAcquisitionContext {
 
 impl SessionAcquisitionContext {
     fn trace(&self) {
-        tracing::debug!(
+        debug!(
             runtime_root = %self.placement.root().path().display(),
             runtime_instance_id = %self.placement.instance().id(),
             runtime_database = %self.placement.instance().canonical_database_path().display(),
@@ -152,7 +153,7 @@ impl From<SessionAcquisitionContext> for SessionAcquisitionDecision {
 
 impl SessionAcquisitionDecision {
     fn trace(&self) {
-        tracing::debug!(
+        debug!(
             runtime_session_path = self.path_name(),
             "Selected runtime session acquisition path"
         );
@@ -232,7 +233,7 @@ impl<'a> RuntimeStartup<'a> {
         decision: RuntimeStartupDecision,
         _startup_lock: StartupLock,
     ) -> Result<Session> {
-        tracing::debug!(
+        debug!(
             runtime_startup_path = decision.path_name(),
             "Executing runtime startup path"
         );
@@ -285,7 +286,7 @@ impl RuntimeStaleEndpointRecovery {
             match std::fs::symlink_metadata(endpoint_path) {
                 Ok(metadata) if metadata.file_type().is_socket() => {
                     std::fs::remove_file(endpoint_path)?;
-                    tracing::info!(
+                    info!(
                         runtime_endpoint = %endpoint_path.display(),
                         "Removed stale runtime endpoint"
                     );
@@ -388,7 +389,7 @@ impl RuntimeEndpointWaiter {
                 .into());
             }
 
-            tracing::debug!(
+            debug!(
                 runtime_endpoint = %self.placement.endpoint().path().display(),
                 runtime_endpoint_connection = ?endpoint_connection,
                 "Waiting for daemon endpoint"
@@ -407,7 +408,7 @@ struct RuntimeStartupContext {
 
 impl RuntimeStartupContext {
     fn trace(&self) {
-        tracing::debug!(
+        debug!(
             runtime_root = %self.placement.root().path().display(),
             runtime_instance_id = %self.placement.instance().id(),
             runtime_database = %self.placement.instance().canonical_database_path().display(),
@@ -467,7 +468,7 @@ impl From<RuntimeStartupContext> for RuntimeStartupDecision {
 
 impl RuntimeStartupDecision {
     fn trace(&self) {
-        tracing::debug!(
+        debug!(
             runtime_startup_path = self.path_name(),
             "Selected runtime startup path"
         );

@@ -1,6 +1,7 @@
 use std::{collections::VecDeque, num::NonZero};
 
 use futures_util::{StreamExt as _, future::BoxFuture, stream::FuturesUnordered};
+use tracing::trace;
 
 use crate::event::Event;
 
@@ -32,7 +33,7 @@ impl Jobs {
             self.futures.push(job);
         }
 
-        tracing::trace!(
+        trace!(
             "Job delay_queue: {} futures: {}",
             self.delay_queue.len(),
             self.futures.len()

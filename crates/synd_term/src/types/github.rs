@@ -8,6 +8,7 @@ use ratatui::{
 };
 use serde::{Deserialize, Serialize};
 use synd_feed::types::Category;
+use tracing::warn;
 use url::Url;
 
 use crate::{
@@ -145,11 +146,11 @@ impl From<models::activity::Notification> for Notification {
             if let (Some(owner), Some(repo)) = (s.next(), s.next()) {
                 (owner.to_owned(), repo.to_owned())
             } else {
-                tracing::warn!("Unexpected repository full_name: `{full_name}`");
+                warn!("Unexpected repository full_name: `{full_name}`");
                 (String::new(), repository.name)
             }
         } else {
-            tracing::warn!("Repository full_name not found");
+            warn!("Repository full_name not found");
             (String::new(), repository.name)
         };
         let repository = Repository {
@@ -180,7 +181,7 @@ impl From<models::activity::Notification> for Notification {
             typ if typ.eq_ignore_ascii_case("release") => Some(SubjectType::Release),
             typ if typ.eq_ignore_ascii_case("discussion") => Some(SubjectType::Discussion),
             _ => {
-                tracing::warn!("Unknown url: {url:?} reason: {reason} subject: `{subject:?}`");
+                warn!("Unknown url: {url:?} reason: {reason} subject: `{subject:?}`");
                 None
             }
         };

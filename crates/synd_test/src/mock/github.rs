@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use serde_json::json;
+use tracing::info;
 
 pub mod notifications {
     use std::{ops::Sub, sync::LazyLock};
@@ -125,7 +126,7 @@ pub mod notifications {
     pub async fn mark_as_done(
         Path(MarkAsDoneParams { thread }): Path<MarkAsDoneParams>,
     ) -> impl IntoResponse {
-        tracing::info!("Mark as done thread: {thread}");
+        info!("Mark as done thread: {thread}");
         StatusCode::OK
     }
 
@@ -138,7 +139,7 @@ pub mod notifications {
     pub async fn unsubscribe_thread(
         Path(UnsubscribeThreadParams { thread }): Path<UnsubscribeThreadParams>,
     ) -> Json<UnsubscribeThreadResponse> {
-        tracing::info!("Unsubscribe thread: {thread}");
+        info!("Unsubscribe thread: {thread}");
         Json(UnsubscribeThreadResponse {})
     }
 }

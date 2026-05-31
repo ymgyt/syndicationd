@@ -5,6 +5,7 @@ use std::{
 
 #[cfg(unix)]
 use rustix::fs::{FlockOperation, flock};
+use tracing::warn;
 
 use crate::{Result, instance::RuntimeInstanceId};
 
@@ -106,7 +107,7 @@ impl Drop for StartupLock {
     fn drop(&mut self) {
         #[cfg(unix)]
         if let Err(error) = flock(&self.file, FlockOperation::Unlock) {
-            tracing::warn!(
+            warn!(
                 startup_lock = %self.path.path().display(),
                 error = %error,
                 "Failed to unlock startup lock"

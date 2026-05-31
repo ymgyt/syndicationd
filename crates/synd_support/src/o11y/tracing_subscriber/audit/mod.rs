@@ -3,6 +3,7 @@ use tracing::{
     span::{self, Attributes},
     subscriber::Interest,
 };
+use tracing::{event, subscriber};
 use tracing_subscriber::{
     Layer,
     filter::{Directive, Filtered},
@@ -15,7 +16,7 @@ mod macros {
     #[macro_export]
     macro_rules! audit_span {
         () => {
-            ::tracing::info_span!(
+            $crate::o11y::tracing_subscriber::audit::__tracing_info_span!(
                 target: $crate::o11y::tracing_subscriber::audit::Audit::TARGET,
                 $crate::o11y::tracing_subscriber::audit::Audit::SPAN_ROOT_NAME)
         };
@@ -24,13 +25,18 @@ mod macros {
     #[macro_export]
     macro_rules! audit {
         ($($arg:tt)*) => {
-            ::tracing::event!(
+            $crate::o11y::tracing_subscriber::audit::__tracing_event!(
                 name: $crate::o11y::tracing_subscriber::audit::Audit::EVENT_NAME,
                 target: $crate::o11y::tracing_subscriber::audit::Audit::TARGET,
-                ::tracing::Level::TRACE, $($arg)*)
+                $crate::o11y::tracing_subscriber::audit::__TracingLevel::TRACE, $($arg)*)
         };
     }
 }
+
+#[doc(hidden)]
+pub use tracing::{
+    Level as __TracingLevel, event as __tracing_event, info_span as __tracing_info_span,
+};
 
 pub struct Audit;
 
@@ -194,7 +200,7 @@ where
         let operation = operation.as_deref().unwrap_or("?");
         let result = result.as_deref().unwrap_or("?");
 
-        tracing::event!(
+        event!(
             name: Audit::EMIT_EVENT_NAME,
             target: Audit::EMIT_TARGET,
             Level::INFO,
@@ -278,7 +284,7 @@ mod tests {
             .with(layer())
             .with(test_layer);
 
-        tracing::subscriber::with_default(subscriber, || {
+        subscriber::with_default(subscriber, || {
             usecase_authorize_scenario::root();
         });
 
@@ -299,7 +305,7 @@ mod tests {
             .with(layer())
             .with(test_layer);
 
-        tracing::subscriber::with_default(subscriber, || {
+        subscriber::with_default(subscriber, || {
             let span = info_span!("ignore");
             let _enter = span.enter();
             info!("ignore");

@@ -68,7 +68,7 @@ pub async fn serve(
 ) -> anyhow::Result<()> {
     let ApiService { router, tls_config } = build_service(dep, &shutdown);
 
-    tracing::info!("Serving...");
+    info!("Serving...");
 
     let listener = listener.into_std()?;
     let handle = shutdown.into_handle();
@@ -85,7 +85,7 @@ pub async fn serve(
             .await?;
     }
 
-    tracing::info!("Shutdown complete");
+    info!("Shutdown complete");
 
     Ok(())
 }
@@ -109,7 +109,7 @@ pub async fn serve_unix(
         .layer(Extension(sessions))
         .layer(Extension(shutdown));
 
-    tracing::info!("Serving on Unix socket...");
+    info!("Serving on Unix socket...");
 
     axum::serve(listener, router)
         .with_graceful_shutdown(async move {
@@ -117,7 +117,7 @@ pub async fn serve_unix(
         })
         .await?;
 
-    tracing::info!("Shutdown complete");
+    info!("Shutdown complete");
 
     Ok(())
 }

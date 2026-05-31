@@ -4,6 +4,7 @@ use anyhow::Context;
 use clap::Args;
 use synd_support::fs::FileSystem;
 use synd_term::application::Cache;
+use tracing::{error, info};
 
 use crate::config::ConfigResolver;
 
@@ -34,7 +35,7 @@ impl CleanCommand {
         FS: FileSystem + Clone,
     {
         if let Err(err) = self.try_clean(fs, cache_dir, log) {
-            tracing::error!("{err}");
+            error!("{err}");
             1
         } else {
             0
@@ -57,7 +58,7 @@ impl CleanCommand {
         if targets.logs {
             match fs.remove_file(log) {
                 Ok(()) => {
-                    tracing::info!("Remove {}", log.display());
+                    info!("Remove {}", log.display());
                 }
                 Err(err) => match err.kind() {
                     ErrorKind::NotFound => {}

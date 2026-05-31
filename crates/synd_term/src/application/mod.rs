@@ -5,6 +5,7 @@ use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
 use synd_client::{Client, payload};
 use synd_feed::types::FeedUrl;
+use tracing::{debug, info, warn};
 
 use crate::{
     auth::{Credential, CredentialError, Verified},
@@ -184,7 +185,7 @@ impl Application {
             Ok(()) => Ok(()),
             Err(err) => {
                 if self.components.shell.should_quit() {
-                    tracing::warn!("Failed to init terminal: {err}");
+                    warn!("Failed to init terminal: {err}");
                     Ok(())
                 } else {
                     Err(err)
@@ -200,7 +201,7 @@ impl Application {
                         GitHubNotificationsWidget::with_filter_options(options);
                 }
                 Err(err) => {
-                    tracing::warn!("Load github notification filter options: {err}");
+                    warn!("Load github notification filter options: {err}");
                 }
             }
         }
@@ -208,7 +209,7 @@ impl Application {
         if self.drivers.feed_api_session_requires_user_credential() {
             match self.restore_credential().await {
                 Ok(cred) => self.handle_restored_credential(cred),
-                Err(err) => tracing::warn!("Restore credential: {err}"),
+                Err(err) => warn!("Restore credential: {err}"),
             }
         } else {
             self.enter_feed_api_session();
@@ -240,7 +241,7 @@ impl Application {
     }
 
     fn initial_fetch(&mut self) {
-        tracing::info!("Initial fetch");
+        info!("Initial fetch");
         if self.drivers.supports_timeline_change_subscription() {
             self.perform_operation(Operation::StartTimelineChangeSubscription);
         }
@@ -263,7 +264,7 @@ impl Application {
             match self.drivers.persist_gh_notification_filter_options(options) {
                 Ok(()) => {}
                 Err(err) => {
-                    tracing::warn!("Failed to persist github notification filter options: {err}");
+                    warn!("Failed to persist github notification filter options: {err}");
                 }
             }
         }
@@ -409,7 +410,7 @@ impl Application {
                 ..
             }) => {}
             CrosstermEvent::Key(key) => {
-                tracing::debug!("Handle key event: {key:?}");
+                debug!("Handle key event: {key:?}");
 
                 self.reset_idle_timer();
 

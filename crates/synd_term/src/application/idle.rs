@@ -1,4 +1,5 @@
 use super::Application;
+use tracing::debug;
 
 impl Application {
     pub(super) fn handle_idle(&mut self) {
@@ -6,7 +7,7 @@ impl Application {
 
         #[cfg(feature = "integration")]
         {
-            tracing::debug!("Quit for idle");
+            debug!("Quit for idle");
             self.components.shell.quit();
         }
     }

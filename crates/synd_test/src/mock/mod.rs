@@ -14,6 +14,7 @@ use synd_auth::device_flow::{
     provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
 };
 use tokio::net::TcpListener;
+use tracing::{debug, info};
 
 use crate::{GITHUB_INVALID_TOKEN, TEST_EMAIL, certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID};
 
@@ -23,7 +24,7 @@ pub mod github;
 async fn github_device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
 ) -> Result<Json<DeviceAuthorizationResponse>, StatusCode> {
-    tracing::debug!(%scope, "Handle device authorization request");
+    debug!(%scope, "Handle device authorization request");
 
     if scope != "user:email" {
         return Err(StatusCode::BAD_REQUEST);
@@ -44,7 +45,7 @@ async fn github_device_authorization(
 async fn google_device_authorization(
     Form(DeviceAuthorizationRequest { scope, .. }): Form<DeviceAuthorizationRequest<'static>>,
 ) -> Result<Json<DeviceAuthorizationResponse>, StatusCode> {
-    tracing::debug!(%scope, "Handle device authorization request");
+    debug!(%scope, "Handle device authorization request");
 
     if scope != "email" {
         return Err(StatusCode::BAD_REQUEST);
@@ -69,7 +70,7 @@ async fn github_device_access_token(
     static TRY: AtomicUsize = AtomicUsize::new(0);
     let count = TRY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-    tracing::debug!("Handle device access token request");
+    debug!("Handle device access token request");
 
     if device_code != "DC001" {
         return StatusCode::BAD_REQUEST.into_response();
@@ -113,7 +114,7 @@ async fn google_device_access_token(
         GoogleDeviceAccessTokenRequest<'static>,
     >,
 ) -> Result<Json<DeviceAccessTokenResponse>, StatusCode> {
-    tracing::debug!("Handle device access token request");
+    debug!("Handle device access token request");
 
     if code != "DCGGL1" {
         return Err(StatusCode::BAD_REQUEST);
@@ -143,7 +144,7 @@ async fn github_graphql_viewer(
     let auth = Authorization::<Bearer>::decode(&mut std::iter::once(auth)).unwrap();
     let token = auth.token();
 
-    tracing::debug!("Got token: `{token}`");
+    debug!("Got token: `{token}`");
 
     if token == GITHUB_INVALID_TOKEN {
         Err(StatusCode::UNAUTHORIZED)
@@ -222,7 +223,7 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
         .layer(axum::middleware::from_fn(debug_mw));
 
     let addr = listener.local_addr().ok();
-    tracing::info!(?addr, "Serving...");
+    info!(?addr, "Serving...");
     axum::serve(listener, router).await?;
 
     Ok(())
@@ -232,6 +233,6 @@ async fn debug_mw(
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    tracing::debug!("Incoming {req:?}");
+    debug!("Incoming {req:?}");
     next.run(req).await
 }

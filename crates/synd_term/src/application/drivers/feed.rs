@@ -3,6 +3,7 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 use synd_client::payload;
 use synd_feed::types::FeedUrl;
+use tracing::debug;
 
 use crate::{
     application::{
@@ -194,7 +195,7 @@ impl FeedDriver {
         if first <= 0 {
             return Vec::new();
         }
-        tracing::debug!(
+        debug!(
             ?populate,
             has_after = after.is_some(),
             first,

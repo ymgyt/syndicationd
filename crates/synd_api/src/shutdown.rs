@@ -2,6 +2,7 @@ use std::{future::Future, io, net::SocketAddr, time::Duration};
 
 use axum_server::Handle;
 use tokio_util::sync::CancellationToken;
+use tracing::{error, info};
 
 /// `CancellationToken` wrapper
 #[derive(Clone)]
@@ -23,7 +24,7 @@ impl Shutdown {
         tokio::spawn(async move {
             ct.cancelled().await;
             on_graceful_shutdown();
-            tracing::info!("Notify axum handler to shutdown");
+            info!("Notify axum handler to shutdown");
             notify.graceful_shutdown(Some(Duration::from_secs(3)));
         });
 
@@ -40,9 +41,9 @@ impl Shutdown {
         let notify = shutdown.root.clone();
         tokio::spawn(async move {
             match signal.await {
-                Ok(()) => tracing::info!("Received signal"),
+                Ok(()) => info!("Received signal"),
 
-                Err(err) => tracing::error!("Failed to handle signal {err}"),
+                Err(err) => error!("Failed to handle signal {err}"),
             }
             notify.cancel();
         });

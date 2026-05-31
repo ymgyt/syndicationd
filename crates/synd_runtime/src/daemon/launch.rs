@@ -6,6 +6,7 @@ use std::{
 };
 
 use synd_support::dirs::SyndicationdDirs;
+use tracing::{debug, warn};
 
 use crate::{Result, placement::RuntimePlacement};
 
@@ -176,7 +177,7 @@ impl<'a> DaemonLauncher<'a> {
             .command()
             .resolve(self.placement.instance().canonical_database_path())?;
         let log = self.config.log().open()?;
-        tracing::debug!(
+        debug!(
             daemon_executable = %command.executable.display(),
             daemon_arguments = ?command.arguments,
             daemon_log = %self.config.log().path().display(),
@@ -207,10 +208,10 @@ impl DaemonHandle {
     pub(crate) fn reap_in_background(mut self) {
         std::thread::spawn(move || match self.child.wait() {
             Ok(status) => {
-                tracing::debug!(%status, "Daemon process exited");
+                debug!(%status, "Daemon process exited");
             }
             Err(error) => {
-                tracing::warn!(%error, "Failed to wait for daemon process");
+                warn!(%error, "Failed to wait for daemon process");
             }
         });
     }

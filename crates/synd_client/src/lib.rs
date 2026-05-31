@@ -19,6 +19,7 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest},
 };
 use tracing::Span;
+use tracing::{debug, instrument, warn};
 use url::Url;
 
 use crate::payload::{
@@ -142,7 +143,7 @@ fn fetch_entries_payload_from_response(
     match response.data.and_then(|data| data.output) {
         Some(output) => {
             if !errors.is_empty() {
-                tracing::warn!(
+                warn!(
                     errors = ?errors,
                     "entries query returned partial GraphQL errors"
                 );
@@ -215,7 +216,7 @@ impl Client {
         self.transport == ClientTransport::Tcp && self.endpoint.scheme() == "http"
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn fetch_initial_feed_view(
         &self,
         subscriptions_first: i64,
@@ -246,7 +247,7 @@ impl Client {
         match response.data {
             Some(data) => {
                 if !errors.is_empty() {
-                    tracing::warn!(
+                    warn!(
                         errors = ?errors,
                         "initial feed view query returned partial GraphQL errors"
                     );
@@ -260,7 +261,7 @@ impl Client {
         }
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn fetch_subscription(
         &self,
         after: Option<String>,
@@ -282,7 +283,7 @@ impl Client {
         Ok(response.output)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn subscribe_feed(
         &self,
         input: SubscribeFeedInput,
@@ -313,7 +314,7 @@ impl Client {
         Ok(response.subscribe_feed)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn unsubscribe_feed(&self, url: FeedUrl) -> Result<(), SyndApiError> {
         #[derive(Serialize, Debug)]
         struct Variables {
@@ -383,13 +384,13 @@ impl Client {
         Ok(response.output.feed_status)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn fetch_entries(
         &self,
         after: Option<String>,
         first: i64,
     ) -> Result<payload::FetchEntriesPayload, SyndApiError> {
-        tracing::debug!("Fetch entries...");
+        debug!("Fetch entries...");
 
         #[derive(Serialize, Debug)]
         struct Variables {
@@ -401,12 +402,12 @@ impl Client {
             .execute_graphql(&graphql(ENTRIES_QUERY, Variables { after, first }))
             .await?;
 
-        tracing::debug!("Got response");
+        debug!("Got response");
 
         fetch_entries_payload_from_response(response)
     }
 
-    #[tracing::instrument(skip_all, err(Display))]
+    #[instrument(skip_all, err(Display))]
     async fn request<Body, ResponseData>(&self, body: &Body) -> Result<ResponseData, SyndApiError>
     where
         Body: Serialize + Debug + ?Sized,
@@ -446,7 +447,7 @@ impl Client {
             std::iter::once(synd_support::o11y::request_id_key_value()),
         );
 
-        tracing::debug!(url = request.url().as_str(), "Send request");
+        debug!(url = request.url().as_str(), "Send request");
 
         let response: Response<ResponseData> = self
             .client
@@ -562,13 +563,13 @@ impl Client {
             .map_err(SyndApiError::BuildRequest)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn next_timeline_change(&self) -> Result<TimelineChangeEvent, SyndApiError> {
         let mut socket = self.connect_timeline_change_socket().await?;
         wait_for_timeline_change(&mut socket).await
     }
 
-    #[tracing::instrument(skip(self, events))]
+    #[instrument(skip(self, events))]
     pub async fn run_timeline_changes(
         &self,
         events: mpsc::UnboundedSender<TimelineChangeEvent>,

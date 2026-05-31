@@ -10,6 +10,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
 };
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::{
     application::{Direction, Populate},
@@ -181,14 +182,14 @@ impl GitHubNotificationsWidget {
     pub(crate) fn fetch_next_if_needed(&self) -> Option<FetchNotificationsParams> {
         match self.next_page {
             Some(page) if self.notifications.len() < self.limit => {
-                tracing::debug!(
+                debug!(
                     "Should fetch more. notifications: {} next_page {page}",
                     self.notifications.len(),
                 );
                 Some(self.next_fetch_params(page))
             }
             _ => {
-                tracing::debug!(
+                debug!(
                     "Nothing to fetch. notifications: {} next_page {:?}",
                     self.notifications.len(),
                     self.next_page

@@ -5,6 +5,7 @@ use opentelemetry_sdk::{
     logs::{BatchConfig, SdkLoggerProvider},
 };
 use tracing::Subscriber;
+use tracing::{Dispatch, info};
 use tracing_subscriber::{Layer, registry::LookupSpan};
 
 pub fn layer<S>(
@@ -67,7 +68,7 @@ mod tests {
     }
 
     fn f1() {
-        tracing::info!("f1_message");
+        info!("f1_message");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -84,7 +85,7 @@ mod tests {
             .build();
         let (layer, provider) = layer("http://localhost:48102", resource.clone(), config);
         let subscriber = Registry::default().with(layer);
-        let dispatcher = tracing::Dispatch::new(subscriber);
+        let dispatcher = Dispatch::new(subscriber);
 
         dispatcher::with_default(&dispatcher, || {
             f1();

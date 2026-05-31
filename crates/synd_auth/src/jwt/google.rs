@@ -13,6 +13,7 @@ use jsonwebtoken::{
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::{error, warn};
 
 use crate::{USER_AGENT, config};
 
@@ -192,7 +193,7 @@ impl JwtService {
                     }
                     _ => {
                         let err = JwtError::UnexpectedAlgorithm(alg);
-                        tracing::error!("{err:?}");
+                        error!("{err:?}");
                         return None;
                     }
                 };
@@ -200,7 +201,7 @@ impl JwtService {
                 match result {
                     Ok(de_key) => Some((key.kid, Arc::new(de_key))),
                     Err(err) => {
-                        tracing::warn!("failed to create jwt decoding key from pem: {err}");
+                        warn!("failed to create jwt decoding key from pem: {err}");
                         None
                     }
                 }

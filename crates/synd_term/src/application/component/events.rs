@@ -1,4 +1,5 @@
 use synd_client::payload;
+use tracing::debug;
 
 use crate::{
     application::{Populate, RequestSequence, input_parser::InputParser},
@@ -80,7 +81,7 @@ impl AppComponent {
         &mut self,
         event: &payload::TimelineChangeEvent,
     ) -> Vec<Operation> {
-        tracing::debug!(
+        debug!(
             changed_at = event.changed_at,
             affected_feeds = ?event.affected_feeds,
             "timeline changed"
@@ -238,7 +239,7 @@ impl AppComponent {
                 ) else {
                     return Vec::new();
                 };
-                tracing::debug!(%url, "refresh request accepted");
+                debug!(%url, "refresh request accepted");
                 self.shell.request_render();
                 operations
             }
@@ -338,7 +339,7 @@ impl AppComponent {
     ) -> Vec<Operation> {
         let is_timeline_refetch = self.feeds.is_active_timeline_refetch(request_seq);
         if !self.feeds.accept_entry_response(request_seq) {
-            tracing::debug!(request_seq, ?populate, "ignore stale entries response");
+            debug!(request_seq, ?populate, "ignore stale entries response");
             if is_timeline_refetch {
                 return self
                     .feeds

@@ -1,3 +1,4 @@
+use tracing::{debug, warn};
 use url::Url;
 
 use crate::{application::input_parser::InputParser, event::Event};
@@ -14,12 +15,12 @@ impl InteractionDriver {
             .open_editor(InputParser::SUSBSCRIBE_FEED_PROMPT)
         {
             Ok(input) => {
-                tracing::debug!("Got user modified feed subscription: {input}");
+                debug!("Got user modified feed subscription: {input}");
                 cx.adapters.terminal.force_redraw();
                 vec![Event::FeedSubscriptionEditorClosed { input }]
             }
             Err(err) => {
-                tracing::warn!("{err}");
+                warn!("{err}");
                 vec![Event::Error {
                     message: err.to_string(),
                 }]
@@ -34,7 +35,7 @@ impl InteractionDriver {
                 vec![Event::FeedEditionEditorClosed { input }]
             }
             Err(err) => {
-                tracing::warn!("{err}");
+                warn!("{err}");
                 vec![Event::Error {
                     message: err.to_string(),
                 }]

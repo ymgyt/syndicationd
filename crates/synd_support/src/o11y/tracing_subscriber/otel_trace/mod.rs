@@ -5,6 +5,7 @@ use opentelemetry_sdk::{
     trace::{BatchConfig, BatchSpanProcessor, Sampler, SdkTracerProvider, Tracer},
 };
 use tracing::Subscriber;
+use tracing::{Dispatch, error, instrument};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{Layer, registry::LookupSpan};
 
@@ -93,19 +94,19 @@ mod tests {
         }
     }
 
-    #[tracing::instrument(fields(
+    #[instrument(fields(
         otel.name = "f1_custom",
         otel.kind = "Client",
     ) )]
     fn f1() {
         f2();
     }
-    #[tracing::instrument(fields(
+    #[instrument(fields(
         otel.name = "f2_custom",
         otel.kind = "Server",
     ))]
     fn f2() {
-        tracing::error!("error_f2");
+        error!("error_f2");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -122,7 +123,7 @@ mod tests {
             .build();
         let (layer, _provider) = layer("http://localhost:48100", resource.clone(), 1.0, config);
         let subscriber = Registry::default().with(layer);
-        let dispatcher = tracing::Dispatch::new(subscriber);
+        let dispatcher = Dispatch::new(subscriber);
 
         dispatcher::with_default(&dispatcher, || {
             f1();

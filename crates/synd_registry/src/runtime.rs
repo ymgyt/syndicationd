@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use tokio_util::sync::CancellationToken;
+use tracing::debug;
 
 use crate::{
     FeedRegistry,
@@ -59,7 +60,7 @@ where
 
     #[expect(clippy::unused_async)]
     pub async fn reconcile_startup(&self) {
-        tracing::debug!("startup feed reconcile is disabled while crawl runtime is redesigned");
+        debug!("startup feed reconcile is disabled while crawl runtime is redesigned");
     }
 }
 

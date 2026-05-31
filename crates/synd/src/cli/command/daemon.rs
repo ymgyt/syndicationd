@@ -2,6 +2,7 @@ use std::{path::PathBuf, process::ExitCode};
 
 use clap::{Args, Subcommand};
 use synd_runtime::{Daemon, DaemonConfig, DaemonState, DaemonStatus, RuntimeDatabase};
+use tracing::error;
 
 use crate::{config::ConfigResolver, runtime::FeedRuntime};
 
@@ -45,7 +46,7 @@ impl DaemonServeCommand {
         match daemon.serve().await {
             Ok(()) => ExitCode::SUCCESS,
             Err(err) => {
-                tracing::error!("{err:?}");
+                error!("{err:?}");
                 ExitCode::from(1)
             }
         }
@@ -64,7 +65,7 @@ impl DaemonStatusCommand {
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                tracing::error!("{err:?}");
+                error!("{err:?}");
                 ExitCode::from(1)
             }
         }
@@ -83,7 +84,7 @@ impl DaemonShutdownCommand {
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                tracing::error!("{err:?}");
+                error!("{err:?}");
                 ExitCode::from(1)
             }
         }

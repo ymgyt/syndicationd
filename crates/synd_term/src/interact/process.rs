@@ -5,6 +5,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use tracing::instrument;
 use url::Url;
 
 use crate::interact::{Interact, OpenBrowserError, OpenEditor, OpenTextBrowser, OpenWebBrowser};
@@ -53,7 +54,7 @@ impl TextBrowserInteractor {
 }
 
 impl OpenTextBrowser for TextBrowserInteractor {
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn open_text_browser(&self, url: Url) -> Result<(), OpenBrowserError> {
         let status = Command::new(self.command.as_os_str())
             .args(self.args.iter())
