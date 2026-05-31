@@ -276,8 +276,8 @@ mod tests {
     };
 
     use crate::{
-        ApiClientConfig, DaemonLaunchCommand, DaemonLaunchConfig, DaemonLaunchLog, DaemonState,
-        Runtime, RuntimeConfig, RuntimeDatabase, SessionConfig, SessionRequirements,
+        DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog, DaemonState, Runtime, RuntimeConfig,
+        RuntimeDatabase,
         instance::RuntimeInstance,
         placement::{RuntimePlacementEnvironment, RuntimePlacementResolver, RuntimeRoot},
         uds::UdsEndpoint,
@@ -302,17 +302,14 @@ mod tests {
                     .resolve_database(&database)
                     .unwrap();
             let runtime = Runtime::new(
-                RuntimeConfig::new(
-                    database.clone(),
-                    ApiClientConfig::new(Duration::from_secs(2), "synd-runtime-test"),
-                    SessionConfig::new(Duration::from_secs(2)),
-                    DaemonLaunchConfig::new(
-                        DaemonLaunchCommand::executable("unused"),
+                RuntimeConfig::new(database.clone())
+                    .with_api_timeout(Duration::from_secs(2), "synd-runtime-test")
+                    .with_session_timeout(Duration::from_secs(2))
+                    .with_daemon_launch(DaemonLaunchConfig::new(
+                        DaemonExecutable::path("unused"),
                         DaemonLaunchLog::file(root.join("daemon.log")),
-                    ),
-                    SessionRequirements::default(),
-                )
-                .with_placement_environment(placement_environment.clone()),
+                    ))
+                    .with_placement_environment(placement_environment.clone()),
             );
             let daemon = Daemon::new(
                 DaemonConfig::new(database).with_placement_environment(placement_environment),

@@ -1,11 +1,10 @@
 //! Runtime session and singleton daemon lifecycle.
 #![warn(rustdoc::broken_intra_doc_links)]
 
-pub mod daemon;
-
 mod acquisition;
 mod api;
 mod connection;
+mod daemon;
 mod database;
 mod error;
 #[allow(dead_code)]
@@ -19,7 +18,7 @@ mod startup;
 mod uds;
 
 pub use daemon::{
-    Control as DaemonControl, Daemon, DaemonConfig, DaemonLaunchCommand, DaemonLaunchConfig,
+    Control as DaemonControl, Daemon, DaemonConfig, DaemonExecutable, DaemonLaunchConfig,
     DaemonLaunchLog, RuntimePlacementSummary, ShutdownResult, State as DaemonState,
     Status as DaemonStatus,
 };

@@ -96,6 +96,12 @@ impl Config {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new(Duration::from_secs(5))
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Requirements {
     capabilities: CapabilitySet,

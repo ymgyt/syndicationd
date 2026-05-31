@@ -63,13 +63,13 @@ impl<'a> SessionAcquisition<'a> {
 
         match decision {
             SessionAcquisitionDecision::AttachExistingRuntime { placement } => {
-                RuntimeSessionConnector::new(self.config, placement)
+                SessionConnector::new(self.config, placement)
                     .connect()
                     .await
             }
             SessionAcquisitionDecision::StartMissingRuntime { placement }
             | SessionAcquisitionDecision::RecoverStaleRuntime { placement } => {
-                RuntimeStartup::new(self.config, placement)
+                SessionStartup::new(self.config, placement)
                     .acquire_session()
                     .await
             }
@@ -93,16 +93,28 @@ struct SessionAcquisitionContext {
 
 impl SessionAcquisitionContext {
     fn trace(&self) {
-        debug!(
-            runtime_root = %self.placement.root().path().display(),
-            runtime_instance_id = %self.placement.instance().id(),
-            runtime_database = %self.placement.instance().canonical_database_path().display(),
-            runtime_endpoint = %self.placement.endpoint().path().display(),
-            runtime_startup_lock = %self.placement.startup_lock_path().path().display(),
-            runtime_endpoint_connection = ?self.endpoint_connection,
-            "Resolved runtime session acquisition context"
+        trace_endpoint_context(
+            &self.placement,
+            self.endpoint_connection,
+            "Resolved runtime session acquisition context",
         );
     }
+}
+
+fn trace_endpoint_context(
+    placement: &RuntimePlacement,
+    endpoint_connection: RuntimeEndpointConnectionStatus,
+    message: &'static str,
+) {
+    debug!(
+        runtime_root = %placement.root().path().display(),
+        runtime_instance_id = %placement.instance().id(),
+        runtime_database = %placement.instance().canonical_database_path().display(),
+        runtime_endpoint = %placement.endpoint().path().display(),
+        runtime_startup_lock = %placement.startup_lock_path().path().display(),
+        runtime_endpoint_connection = ?endpoint_connection,
+        message
+    );
 }
 
 /// Branch selected from the session acquisition context.
@@ -172,12 +184,12 @@ impl SessionAcquisitionDecision {
 }
 
 /// Starts or recovers a runtime while holding the instance startup lock.
-struct RuntimeStartup<'a> {
+struct SessionStartup<'a> {
     config: &'a RuntimeConfig,
     placement: RuntimePlacement,
 }
 
-impl<'a> RuntimeStartup<'a> {
+impl<'a> SessionStartup<'a> {
     fn new(config: &'a RuntimeConfig, placement: RuntimePlacement) -> Self {
         Self { config, placement }
     }
@@ -199,38 +211,38 @@ impl<'a> RuntimeStartup<'a> {
         let context = self.resolve_context().await;
         context.trace();
 
-        let decision = RuntimeStartupDecision::from(context);
+        let decision = StartupDecision::from(context);
         decision.trace();
 
         self.execute(decision, startup_lock).await
     }
 
-    async fn resolve_context(&self) -> RuntimeStartupContext {
+    async fn resolve_context(&self) -> StartupContext {
         let endpoint_connection = RuntimeEndpointConnector::new(self.placement.endpoint())
             .try_connect()
             .await;
 
-        RuntimeStartupContext {
+        StartupContext {
             placement: self.placement.clone(),
             endpoint_connection,
         }
     }
 
     async fn wait_for_existing_startup(self) -> Result<Session> {
-        RuntimeEndpointWaiter::new(
+        EndpointWaiter::new(
             self.placement.clone(),
             self.config.session().acquire_timeout(),
         )
         .wait_until_connected()
         .await?;
-        RuntimeSessionConnector::new(self.config, self.placement)
+        SessionConnector::new(self.config, self.placement)
             .connect()
             .await
     }
 
     async fn execute(
         &self,
-        decision: RuntimeStartupDecision,
+        decision: StartupDecision,
         _startup_lock: StartupLock,
     ) -> Result<Session> {
         debug!(
@@ -241,28 +253,24 @@ impl<'a> RuntimeStartup<'a> {
         // Holding `_startup_lock` in this scope serializes startup/recovery for the
         // runtime instance until the selected path has produced a session or failed.
         match decision {
-            RuntimeStartupDecision::AttachStartedRuntime { placement } => {
-                RuntimeSessionConnector::new(self.config, placement)
+            StartupDecision::AttachStartedRuntime { placement } => {
+                SessionConnector::new(self.config, placement)
                     .connect()
                     .await
             }
-            RuntimeStartupDecision::LaunchMissingRuntime { placement } => {
-                RuntimeDaemonStarter::new(self.config, placement)
-                    .start()
-                    .await
+            StartupDecision::LaunchMissingRuntime { placement } => {
+                DaemonStarter::new(self.config, placement).start().await
             }
-            RuntimeStartupDecision::RecoverStaleEndpoint { placement } => {
-                let placement = RuntimeStaleEndpointRecovery::new(placement).recover()?;
+            StartupDecision::RecoverStaleEndpoint { placement } => {
+                let placement = recover_stale_endpoint(placement)?;
 
-                RuntimeDaemonStarter::new(self.config, placement)
-                    .start()
-                    .await
+                DaemonStarter::new(self.config, placement).start().await
             }
-            RuntimeStartupDecision::FailUnavailableEndpoint { .. } => Err(Error::NotImplemented(
+            StartupDecision::FailUnavailableEndpoint { .. } => Err(Error::NotImplemented(
                 "runtime endpoint unavailable after startup lock",
             )),
             #[cfg(not(unix))]
-            RuntimeStartupDecision::FailUnsupportedTransport { .. } => Err(Error::NotImplemented(
+            StartupDecision::FailUnsupportedTransport { .. } => Err(Error::NotImplemented(
                 "runtime transport unsupported after startup lock",
             )),
         }
@@ -270,57 +278,47 @@ impl<'a> RuntimeStartup<'a> {
 }
 
 /// Removes a stale Unix socket endpoint while the startup lock is held.
-struct RuntimeStaleEndpointRecovery {
-    placement: RuntimePlacement,
-}
+fn recover_stale_endpoint(placement: RuntimePlacement) -> Result<RuntimePlacement> {
+    #[cfg(unix)]
+    {
+        let endpoint_path = placement.endpoint().path();
+        match std::fs::symlink_metadata(endpoint_path) {
+            Ok(metadata) if metadata.file_type().is_socket() => {
+                std::fs::remove_file(endpoint_path)?;
+                info!(
+                    runtime_endpoint = %endpoint_path.display(),
+                    "Removed stale runtime endpoint"
+                );
+            }
+            Ok(_) => {
+                return Err(anyhow::anyhow!(
+                    "refusing to remove non-socket runtime endpoint {}",
+                    endpoint_path.display()
+                )
+                .into());
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
 
-impl RuntimeStaleEndpointRecovery {
-    fn new(placement: RuntimePlacement) -> Self {
-        Self { placement }
+        Ok(placement)
     }
 
-    fn recover(self) -> Result<RuntimePlacement> {
-        #[cfg(unix)]
-        {
-            let endpoint_path = self.placement.endpoint().path();
-            match std::fs::symlink_metadata(endpoint_path) {
-                Ok(metadata) if metadata.file_type().is_socket() => {
-                    std::fs::remove_file(endpoint_path)?;
-                    info!(
-                        runtime_endpoint = %endpoint_path.display(),
-                        "Removed stale runtime endpoint"
-                    );
-                }
-                Ok(_) => {
-                    return Err(anyhow::anyhow!(
-                        "refusing to remove non-socket runtime endpoint {}",
-                        endpoint_path.display()
-                    )
-                    .into());
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.into()),
-            }
+    #[cfg(not(unix))]
+    {
+        let _ = placement;
 
-            Ok(self.placement)
-        }
-
-        #[cfg(not(unix))]
-        {
-            let _ = self;
-
-            Err(Error::NotImplemented("recovering stale runtime endpoint"))
-        }
+        Err(Error::NotImplemented("recovering stale runtime endpoint"))
     }
 }
 
 /// Starts the daemon for one resolved runtime placement and returns a session.
-struct RuntimeDaemonStarter<'a> {
+struct DaemonStarter<'a> {
     config: &'a RuntimeConfig,
     placement: RuntimePlacement,
 }
 
-impl<'a> RuntimeDaemonStarter<'a> {
+impl<'a> DaemonStarter<'a> {
     fn new(config: &'a RuntimeConfig, placement: RuntimePlacement) -> Self {
         Self { config, placement }
     }
@@ -328,26 +326,26 @@ impl<'a> RuntimeDaemonStarter<'a> {
     async fn start(self) -> Result<Session> {
         let mut daemon_handle =
             DaemonLauncher::new(self.config.daemon(), self.placement.clone()).launch()?;
-        RuntimeEndpointWaiter::new(
+        EndpointWaiter::new(
             self.placement.clone(),
             self.config.session().acquire_timeout(),
         )
         .wait_for_launched_daemon(&mut daemon_handle)
         .await?;
         daemon_handle.reap_in_background();
-        RuntimeSessionConnector::new(self.config, self.placement)
+        SessionConnector::new(self.config, self.placement)
             .connect()
             .await
     }
 }
 
 /// Waits until a daemon endpoint is ready to accept connections.
-struct RuntimeEndpointWaiter {
+struct EndpointWaiter {
     placement: RuntimePlacement,
     timeout: Duration,
 }
 
-impl RuntimeEndpointWaiter {
+impl EndpointWaiter {
     fn new(placement: RuntimePlacement, timeout: Duration) -> Self {
         Self { placement, timeout }
     }
@@ -401,28 +399,24 @@ impl RuntimeEndpointWaiter {
 
 /// Facts collected after acquiring the startup lock.
 #[derive(Debug, Clone)]
-struct RuntimeStartupContext {
+struct StartupContext {
     placement: RuntimePlacement,
     endpoint_connection: RuntimeEndpointConnectionStatus,
 }
 
-impl RuntimeStartupContext {
+impl StartupContext {
     fn trace(&self) {
-        debug!(
-            runtime_root = %self.placement.root().path().display(),
-            runtime_instance_id = %self.placement.instance().id(),
-            runtime_database = %self.placement.instance().canonical_database_path().display(),
-            runtime_endpoint = %self.placement.endpoint().path().display(),
-            runtime_startup_lock = %self.placement.startup_lock_path().path().display(),
-            runtime_endpoint_connection = ?self.endpoint_connection,
-            "Resolved runtime startup context after acquiring startup lock"
+        trace_endpoint_context(
+            &self.placement,
+            self.endpoint_connection,
+            "Resolved runtime startup context after acquiring startup lock",
         );
     }
 }
 
 /// Branch selected from the startup-lock-protected runtime context.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum RuntimeStartupDecision {
+enum StartupDecision {
     AttachStartedRuntime {
         placement: RuntimePlacement,
     },
@@ -441,8 +435,8 @@ enum RuntimeStartupDecision {
     },
 }
 
-impl From<RuntimeStartupContext> for RuntimeStartupDecision {
-    fn from(context: RuntimeStartupContext) -> Self {
+impl From<StartupContext> for StartupDecision {
+    fn from(context: StartupContext) -> Self {
         match context.endpoint_connection {
             RuntimeEndpointConnectionStatus::Connected => Self::AttachStartedRuntime {
                 placement: context.placement,
@@ -466,7 +460,7 @@ impl From<RuntimeStartupContext> for RuntimeStartupDecision {
     }
 }
 
-impl RuntimeStartupDecision {
+impl StartupDecision {
     fn trace(&self) {
         debug!(
             runtime_startup_path = self.path_name(),
@@ -487,12 +481,12 @@ impl RuntimeStartupDecision {
 }
 
 /// Builds a session connected to an already-running runtime endpoint.
-struct RuntimeSessionConnector<'a> {
+struct SessionConnector<'a> {
     config: &'a RuntimeConfig,
     placement: RuntimePlacement,
 }
 
-impl<'a> RuntimeSessionConnector<'a> {
+impl<'a> SessionConnector<'a> {
     fn new(config: &'a RuntimeConfig, placement: RuntimePlacement) -> Self {
         Self { config, placement }
     }
@@ -543,8 +537,8 @@ mod tests {
     use std::os::unix::net::UnixListener;
 
     use super::{
-        RuntimeStaleEndpointRecovery, RuntimeStartupContext, RuntimeStartupDecision,
-        SessionAcquisitionContext, SessionAcquisitionDecision,
+        SessionAcquisitionContext, SessionAcquisitionDecision, StartupContext, StartupDecision,
+        recover_stale_endpoint,
     };
 
     #[test]
@@ -586,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn selects_runtime_startup_decision_from_endpoint_connection() {
+    fn selects_startup_decision_from_endpoint_connection() {
         let cases = [
             (
                 RuntimeEndpointConnectionStatus::Connected,
@@ -607,14 +601,14 @@ mod tests {
         ];
 
         for (endpoint_connection, expected_path) in cases {
-            let decision = RuntimeStartupDecision::from(startup_context_with(endpoint_connection));
+            let decision = StartupDecision::from(startup_context_with(endpoint_connection));
 
             assert_eq!(decision.path_name(), expected_path);
         }
 
         #[cfg(not(unix))]
         {
-            let decision = RuntimeStartupDecision::from(startup_context_with(
+            let decision = StartupDecision::from(startup_context_with(
                 RuntimeEndpointConnectionStatus::UnsupportedTransport,
             ));
 
@@ -636,7 +630,7 @@ mod tests {
         let context = startup_context_with(RuntimeEndpointConnectionStatus::Missing);
         let expected_endpoint = context.placement.endpoint().path().to_path_buf();
 
-        let decision = RuntimeStartupDecision::from(context);
+        let decision = StartupDecision::from(context);
         assert_eq!(
             startup_decision_endpoint_path(&decision),
             expected_endpoint.as_path()
@@ -652,9 +646,7 @@ mod tests {
         let listener = UnixListener::bind(&endpoint).unwrap();
         drop(listener);
 
-        let recovered_placement = RuntimeStaleEndpointRecovery::new(placement)
-            .recover()
-            .unwrap();
+        let recovered_placement = recover_stale_endpoint(placement).unwrap();
 
         assert_eq!(recovered_placement.endpoint().path(), endpoint.as_path());
         assert!(!endpoint.exists());
@@ -668,9 +660,7 @@ mod tests {
         std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
         std::fs::write(&endpoint, "").unwrap();
 
-        let error = RuntimeStaleEndpointRecovery::new(placement)
-            .recover()
-            .unwrap_err();
+        let error = recover_stale_endpoint(placement).unwrap_err();
 
         assert!(error.to_string().contains("non-socket runtime endpoint"));
         assert!(endpoint.exists());
@@ -687,8 +677,8 @@ mod tests {
 
     fn startup_context_with(
         endpoint_connection: RuntimeEndpointConnectionStatus,
-    ) -> RuntimeStartupContext {
-        RuntimeStartupContext {
+    ) -> StartupContext {
+        StartupContext {
             placement: placement(),
             endpoint_connection,
         }
@@ -717,18 +707,14 @@ mod tests {
         }
     }
 
-    fn startup_decision_endpoint_path(decision: &RuntimeStartupDecision) -> &Path {
+    fn startup_decision_endpoint_path(decision: &StartupDecision) -> &Path {
         match decision {
-            RuntimeStartupDecision::AttachStartedRuntime { placement }
-            | RuntimeStartupDecision::LaunchMissingRuntime { placement }
-            | RuntimeStartupDecision::RecoverStaleEndpoint { placement }
-            | RuntimeStartupDecision::FailUnavailableEndpoint { placement } => {
-                placement.endpoint().path()
-            }
+            StartupDecision::AttachStartedRuntime { placement }
+            | StartupDecision::LaunchMissingRuntime { placement }
+            | StartupDecision::RecoverStaleEndpoint { placement }
+            | StartupDecision::FailUnavailableEndpoint { placement } => placement.endpoint().path(),
             #[cfg(not(unix))]
-            RuntimeStartupDecision::FailUnsupportedTransport { placement } => {
-                placement.endpoint().path()
-            }
+            StartupDecision::FailUnsupportedTransport { placement } => placement.endpoint().path(),
         }
     }
 }

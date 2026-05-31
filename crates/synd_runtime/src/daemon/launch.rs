@@ -13,17 +13,17 @@ use crate::{Result, placement::RuntimePlacement};
 /// Configuration for starting a daemon process for a runtime instance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DaemonLaunchConfig {
-    command: DaemonLaunchCommand,
+    executable: DaemonExecutable,
     log: DaemonLaunchLog,
 }
 
 impl DaemonLaunchConfig {
-    pub fn new(command: DaemonLaunchCommand, log: DaemonLaunchLog) -> Self {
-        Self { command, log }
+    pub fn new(executable: DaemonExecutable, log: DaemonLaunchLog) -> Self {
+        Self { executable, log }
     }
 
-    pub fn command(&self) -> &DaemonLaunchCommand {
-        &self.command
+    pub fn executable(&self) -> &DaemonExecutable {
+        &self.executable
     }
 
     pub fn log(&self) -> &DaemonLaunchLog {
@@ -34,42 +34,42 @@ impl DaemonLaunchConfig {
 impl Default for DaemonLaunchConfig {
     fn default() -> Self {
         Self::new(
-            DaemonLaunchCommand::current_executable(),
+            DaemonExecutable::current(),
             DaemonLaunchLog::file(SyndicationdDirs::current().log_file()),
         )
     }
 }
 
-/// Command template used to start a daemon process.
+/// Executable used to start a daemon process.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DaemonLaunchCommand {
-    executable: DaemonLaunchExecutable,
+pub struct DaemonExecutable {
+    kind: DaemonExecutableKind,
 }
 
-impl DaemonLaunchCommand {
-    pub fn current_executable() -> Self {
+impl DaemonExecutable {
+    pub fn current() -> Self {
         Self {
-            executable: DaemonLaunchExecutable::CurrentExecutable,
+            kind: DaemonExecutableKind::Current,
         }
     }
 
-    pub fn executable(path: impl Into<PathBuf>) -> Self {
+    pub fn path(path: impl Into<PathBuf>) -> Self {
         Self {
-            executable: DaemonLaunchExecutable::Path(path.into()),
+            kind: DaemonExecutableKind::Path(path.into()),
         }
     }
 
-    fn resolve_executable(&self) -> Result<PathBuf> {
-        Ok(match &self.executable {
-            DaemonLaunchExecutable::CurrentExecutable => std::env::current_exe()?,
-            DaemonLaunchExecutable::Path(path) => path.clone(),
+    fn resolve(&self) -> Result<PathBuf> {
+        Ok(match &self.kind {
+            DaemonExecutableKind::Current => std::env::current_exe()?,
+            DaemonExecutableKind::Path(path) => path.clone(),
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum DaemonLaunchExecutable {
-    CurrentExecutable,
+enum DaemonExecutableKind {
+    Current,
     Path(PathBuf),
 }
 
@@ -141,7 +141,7 @@ impl<'a> DaemonLauncher<'a> {
 
     pub(crate) fn launch(self) -> Result<DaemonHandle> {
         let command = ResolvedDaemonLaunchCommand::daemon_serve(
-            self.config.command().resolve_executable()?,
+            self.config.executable().resolve()?,
             self.placement.instance().canonical_database_path(),
         );
         let log = self.config.log().open()?;
@@ -189,14 +189,12 @@ impl DaemonHandle {
 mod tests {
     use std::{ffi::OsString, path::Path};
 
-    use super::{DaemonLaunchCommand, DaemonLaunchLog};
+    use super::{DaemonExecutable, DaemonLaunchLog};
 
     #[test]
     fn builds_daemon_serve_command_from_runtime_database_path() {
         let command = super::ResolvedDaemonLaunchCommand::daemon_serve(
-            DaemonLaunchCommand::executable("/usr/bin/synd")
-                .resolve_executable()
-                .unwrap(),
+            DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
             Path::new("/tmp/synd.db"),
         );
 

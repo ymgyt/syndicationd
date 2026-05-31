@@ -4,7 +4,7 @@ mod service;
 mod status;
 
 pub use control::Control;
+pub use launch::{DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog};
 pub(crate) use launch::{DaemonHandle, DaemonLauncher};
-pub use launch::{DaemonLaunchCommand, DaemonLaunchConfig, DaemonLaunchLog};
 pub use service::{Daemon, DaemonConfig};
 pub use status::{RuntimePlacementSummary, ShutdownResult, State, Status};

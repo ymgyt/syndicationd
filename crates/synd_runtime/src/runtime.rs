@@ -1,8 +1,9 @@
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    DaemonControl, DaemonLaunchConfig, Result, RuntimeDatabase, Session, SessionConfig,
-    SessionRequirements, acquisition::SessionAcquisition, placement::RuntimePlacementEnvironment,
+    DaemonControl, DaemonLaunchConfig, DaemonLaunchLog, Result, RuntimeDatabase, Session,
+    SessionConfig, SessionRequirements, acquisition::SessionAcquisition,
+    placement::RuntimePlacementEnvironment,
 };
 
 #[derive(Debug, Clone)]
@@ -39,21 +40,60 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(
-        database: RuntimeDatabase,
-        client: ApiClientConfig,
-        session: SessionConfig,
-        daemon: DaemonLaunchConfig,
-        requirements: SessionRequirements,
-    ) -> Self {
+    pub fn new(database: RuntimeDatabase) -> Self {
         Self {
             database,
-            client,
-            session,
-            daemon,
-            requirements,
+            client: ApiClientConfig::default(),
+            session: SessionConfig::default(),
+            daemon: DaemonLaunchConfig::default(),
+            requirements: SessionRequirements::default(),
             placement_environment: RuntimePlacementEnvironment::capture(),
         }
+    }
+
+    #[must_use]
+    pub fn with_api_client(mut self, client: ApiClientConfig) -> Self {
+        self.client = client;
+        self
+    }
+
+    #[must_use]
+    pub fn with_api_timeout(
+        self,
+        request_timeout: Duration,
+        user_agent: impl Into<String>,
+    ) -> Self {
+        self.with_api_client(ApiClientConfig::new(request_timeout, user_agent))
+    }
+
+    #[must_use]
+    pub fn with_session(mut self, session: SessionConfig) -> Self {
+        self.session = session;
+        self
+    }
+
+    #[must_use]
+    pub fn with_session_timeout(self, acquire_timeout: Duration) -> Self {
+        self.with_session(SessionConfig::new(acquire_timeout))
+    }
+
+    #[must_use]
+    pub fn with_daemon_launch(mut self, daemon: DaemonLaunchConfig) -> Self {
+        self.daemon = daemon;
+        self
+    }
+
+    #[must_use]
+    pub fn with_daemon_log(mut self, log: impl Into<PathBuf>) -> Self {
+        self.daemon =
+            DaemonLaunchConfig::new(self.daemon.executable().clone(), DaemonLaunchLog::file(log));
+        self
+    }
+
+    #[must_use]
+    pub fn with_requirements(mut self, requirements: SessionRequirements) -> Self {
+        self.requirements = requirements;
+        self
     }
 
     pub fn database(&self) -> &RuntimeDatabase {
@@ -90,7 +130,7 @@ impl Config {
     }
 }
 
-/// Configuration for synd_api client
+/// Configuration for `synd_api` client
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApiClientConfig {
     request_timeout: Duration,
@@ -114,28 +154,54 @@ impl ApiClientConfig {
     }
 }
 
+impl Default for ApiClientConfig {
+    fn default() -> Self {
+        Self::new(
+            Duration::from_secs(30),
+            concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
     use crate::{
-        ApiClientConfig, DaemonLaunchConfig, Runtime, RuntimeConfig, RuntimeDatabase,
-        SessionConfig, SessionRequirements,
+        DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog, Runtime, RuntimeConfig,
+        RuntimeDatabase,
     };
 
     #[test]
     fn runtime_keeps_daemon_launch_config() {
         let tempdir = tempfile::tempdir().unwrap();
-        let config = RuntimeConfig::new(
-            RuntimeDatabase::sqlite(tempdir.path().join("synd.db")),
-            ApiClientConfig::new(Duration::from_secs(5), "synd-runtime-test"),
-            SessionConfig::new(Duration::from_secs(5)),
-            DaemonLaunchConfig::default(),
-            SessionRequirements::default(),
-        );
+        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
+            .with_api_timeout(Duration::from_secs(5), "synd-runtime-test")
+            .with_session_timeout(Duration::from_secs(5))
+            .with_daemon_launch(DaemonLaunchConfig::default());
 
         let runtime = Runtime::new(config.clone());
 
         assert_eq!(runtime.config().daemon(), config.daemon());
+    }
+
+    #[test]
+    fn runtime_config_sets_daemon_log_without_replacing_executable() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let log = tempdir.path().join("daemon.log");
+        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
+            .with_daemon_launch(DaemonLaunchConfig::new(
+                DaemonExecutable::path("/usr/bin/custom-synd"),
+                DaemonLaunchLog::file(tempdir.path().join("old.log")),
+            ))
+            .with_daemon_log(log.clone());
+
+        assert_eq!(
+            config.daemon(),
+            &DaemonLaunchConfig::new(
+                DaemonExecutable::path("/usr/bin/custom-synd"),
+                DaemonLaunchLog::file(log),
+            )
+        );
     }
 }

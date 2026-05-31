@@ -2,9 +2,7 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 use synd_runtime::{
-    ApiClientConfig, DaemonLaunchCommand, DaemonLaunchConfig, DaemonLaunchLog, DaemonStatus,
-    Runtime, RuntimeConfig, RuntimeDatabase, Session, SessionConfig, SessionRequirements,
-    ShutdownResult,
+    DaemonStatus, Runtime, RuntimeConfig, RuntimeDatabase, Session, ShutdownResult,
 };
 
 use crate::config::ConfigResolver;
@@ -19,16 +17,12 @@ pub(crate) struct FeedRuntime {
 impl FeedRuntime {
     pub(crate) fn new(config: &ConfigResolver) -> Self {
         Self {
-            runtime: Runtime::new(RuntimeConfig::new(
-                RuntimeDatabase::sqlite(config.sqlite_db()),
-                ApiClientConfig::new(config.api_timeout(), API_USER_AGENT),
-                SessionConfig::new(SESSION_ACQUIRE_TIMEOUT),
-                DaemonLaunchConfig::new(
-                    DaemonLaunchCommand::current_executable(),
-                    DaemonLaunchLog::file(config.log_file()),
-                ),
-                SessionRequirements::default(),
-            )),
+            runtime: Runtime::new(
+                RuntimeConfig::new(RuntimeDatabase::sqlite(config.sqlite_db()))
+                    .with_api_timeout(config.api_timeout(), API_USER_AGENT)
+                    .with_session_timeout(SESSION_ACQUIRE_TIMEOUT)
+                    .with_daemon_log(config.log_file()),
+            ),
         }
     }
 

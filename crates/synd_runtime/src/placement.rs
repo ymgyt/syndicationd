@@ -122,11 +122,8 @@ impl RuntimePlacement {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::{
-        ApiClientConfig, DaemonLaunchConfig, RuntimeConfig, RuntimeDatabase, SessionConfig,
-        SessionRequirements,
+        RuntimeConfig, RuntimeDatabase,
         instance::RuntimeInstance,
         placement::{
             RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver, RuntimeRoot,
@@ -161,13 +158,7 @@ mod tests {
         let default_root = RuntimeRoot::from(tmp.path().join("runtime"));
         let environment = RuntimePlacementEnvironment::new(default_root.clone());
         let resolver = RuntimePlacementResolver::with_environment(environment);
-        let config = RuntimeConfig::new(
-            RuntimeDatabase::sqlite(&db),
-            ApiClientConfig::new(Duration::from_secs(5), "synd-runtime-test"),
-            SessionConfig::new(Duration::from_secs(5)),
-            DaemonLaunchConfig::default(),
-            SessionRequirements::default(),
-        );
+        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(&db));
 
         let placement = resolver.resolve(&config).unwrap();
 
