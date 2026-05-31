@@ -22,4 +22,4 @@ pub use db::{FeedRegistryDb, RegistryDbTransaction};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::FeedRegistry;
 pub use subscriber::SubscriberId;
-pub use subscription::{Subscription, SubscriptionAnnotations, SubscriptionKey};
+pub use subscription::{Subscription, SubscriptionKey};

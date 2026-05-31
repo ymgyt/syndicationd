@@ -11,7 +11,6 @@ use crate::{crawl::policy::RefreshPolicy, subscription::SubscriptionKey};
 pub enum Event {
     Request(RequestEvent),
     Sub(SubEvent),
-    Crawl(CrawlEvent),
     Api(ApiEvent),
 }
 
@@ -20,7 +19,6 @@ impl Event {
         match self {
             Self::Request(event) => EventKind::Request(event.kind()),
             Self::Sub(event) => EventKind::Sub(event.kind()),
-            Self::Crawl(event) => match *event {},
             Self::Api(event) => EventKind::Api(event.kind()),
         }
     }
@@ -38,12 +36,6 @@ impl From<SubEvent> for Event {
     }
 }
 
-impl From<CrawlEvent> for Event {
-    fn from(event: CrawlEvent) -> Self {
-        Self::Crawl(event)
-    }
-}
-
 impl From<ApiEvent> for Event {
     fn from(event: ApiEvent) -> Self {
         Self::Api(event)
@@ -55,7 +47,6 @@ impl From<ApiEvent> for Event {
 pub enum EventKind {
     Request(RequestEventKind),
     Sub(SubEventKind),
-    Crawl(CrawlEventKind),
     Api(ApiEventKind),
 }
 
@@ -75,10 +66,6 @@ pub enum SubEventKind {
     SubscriptionChanged,
     FeedUnsubscribed,
 }
-
-/// A stable crawl event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CrawlEventKind {}
 
 /// A stable API contract event category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -265,16 +252,6 @@ impl SubEvent {
             Self::SubscriptionChanged(_) => SubEventKind::SubscriptionChanged,
             Self::FeedUnsubscribed(_) => SubEventKind::FeedUnsubscribed,
         }
-    }
-}
-
-/// A fact about crawl domain state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CrawlEvent {}
-
-impl CrawlEvent {
-    pub fn kind(&self) -> CrawlEventKind {
-        match *self {}
     }
 }
 

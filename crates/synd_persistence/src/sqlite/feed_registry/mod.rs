@@ -1,22 +1,16 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
-use sqlx::{Row, Sqlite, Transaction};
+use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
     FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryDbTransaction, SubscriberId,
     Subscription,
-    crawl::{
-        state::{FeedSnapshot, RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess},
-        target_list::CrawlTarget,
-    },
+    crawl::target_list::CrawlTarget,
     event::{Event, EventEncoding},
     view::{Subscriptions, SubscriptionsQuery},
 };
 
-use self::codec::{
-    decode_crawl_target, decode_refresh_state, decode_snapshot, decode_subscription, encode_policy,
-    encode_polling_policy,
-};
+use self::codec::{decode_crawl_target, decode_subscription, encode_policy, encode_polling_policy};
 use super::{SqliteDatabase, SqliteEventJournal};
 
 mod codec;
@@ -57,45 +51,6 @@ impl FeedRegistryDb for SqliteFeedRegistryDb {
     async fn begin(&self) -> Result<Self::Tx<'_>, RegistryDbError> {
         let tx = self.db.begin().await?;
         Ok(SqliteRegistryDbTransaction { tx })
-    }
-}
-
-impl SqliteRegistryDbTransaction<'_> {
-    async fn upsert_snapshot(&mut self, snapshot: FeedSnapshot) -> RegistryDbResult<()> {
-        sqlx::query(
-            r#"
-            INSERT INTO feed_snapshot (
-                feed_url,
-                body,
-                content_type,
-                etag,
-                last_modified,
-                fetched_at
-            )
-            SELECT ?, ?, ?, ?, ?, ?
-            WHERE EXISTS (
-                SELECT 1 FROM feed_subscription WHERE feed_url = ?
-            )
-            ON CONFLICT(feed_url) DO UPDATE SET
-                body = excluded.body,
-                content_type = excluded.content_type,
-                etag = excluded.etag,
-                last_modified = excluded.last_modified,
-                fetched_at = excluded.fetched_at
-            "#,
-        )
-        .bind(snapshot.feed_url.as_str())
-        .bind(snapshot.body)
-        .bind(snapshot.content_type)
-        .bind(snapshot.etag)
-        .bind(snapshot.last_modified)
-        .bind(snapshot.fetched_at)
-        .bind(snapshot.feed_url.as_str())
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(())
     }
 }
 
@@ -256,22 +211,6 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
         ))
     }
 
-    async fn list_active_subscriptions(&mut self) -> RegistryDbResult<Vec<Subscription>> {
-        let sql = format!(
-            r#"
-            SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-            FROM feed_subscription
-            ORDER BY feed_url
-            "#
-        );
-        let rows = sqlx::query(&sql)
-            .fetch_all(&mut *self.tx)
-            .await
-            .map_err(RegistryDbError::internal)?;
-
-        rows.iter().map(decode_subscription).collect()
-    }
-
     async fn list_active_subscriptions_for_feed(
         &mut self,
         feed_url: &FeedUrl,
@@ -291,47 +230,6 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
             .map_err(RegistryDbError::internal)?;
 
         rows.iter().map(decode_subscription).collect()
-    }
-
-    async fn list_subscriptions_for_subscriber(
-        &mut self,
-        subscriber_id: &SubscriberId,
-    ) -> RegistryDbResult<Vec<Subscription>> {
-        let sql = format!(
-            r#"
-            SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-            FROM feed_subscription
-            WHERE subscriber_id = ?
-            ORDER BY feed_url
-            "#
-        );
-        let rows = sqlx::query(&sql)
-            .bind(subscriber_id.as_str())
-            .fetch_all(&mut *self.tx)
-            .await
-            .map_err(RegistryDbError::internal)?;
-
-        rows.iter().map(decode_subscription).collect()
-    }
-
-    async fn list_active_feed_urls(&mut self) -> RegistryDbResult<Vec<FeedUrl>> {
-        let rows = sqlx::query(
-            r#"
-            SELECT DISTINCT feed_url
-            FROM feed_subscription
-            ORDER BY feed_url
-            "#,
-        )
-        .fetch_all(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        rows.into_iter()
-            .map(|row| {
-                let url: String = row.try_get("feed_url").map_err(RegistryDbError::internal)?;
-                FeedUrl::parse(&url).map_err(RegistryDbError::internal)
-            })
-            .collect()
     }
 
     async fn upsert_crawl_target(&mut self, target: CrawlTarget) -> RegistryDbResult<()> {
@@ -407,184 +305,6 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
         row.as_ref().map(decode_crawl_target).transpose()
     }
 
-    async fn load_snapshots(
-        &mut self,
-        feed_urls: &[FeedUrl],
-    ) -> RegistryDbResult<Vec<FeedSnapshot>> {
-        let mut snapshots = Vec::new();
-        for feed_url in feed_urls {
-            if let Some(row) = sqlx::query(
-                r#"
-                SELECT feed_url, body, content_type, etag, last_modified, fetched_at
-                FROM feed_snapshot
-                WHERE feed_url = ?
-                "#,
-            )
-            .bind(feed_url.as_str())
-            .fetch_optional(&mut *self.tx)
-            .await
-            .map_err(RegistryDbError::internal)?
-            {
-                snapshots.push(decode_snapshot(&row)?);
-            }
-        }
-        Ok(snapshots)
-    }
-
-    async fn load_refresh_states(
-        &mut self,
-        feed_urls: &[FeedUrl],
-    ) -> RegistryDbResult<Vec<RefreshState>> {
-        let mut states = Vec::new();
-        for feed_url in feed_urls {
-            if let Some(row) = sqlx::query(
-                r#"
-                SELECT
-                    feed_url,
-                    last_attempt_at,
-                    last_success_at,
-                    last_failure_at,
-                    last_error_kind,
-                    last_error_message,
-                    next_refresh_after
-                FROM feed_refresh_state
-                WHERE feed_url = ?
-                "#,
-            )
-            .bind(feed_url.as_str())
-            .fetch_optional(&mut *self.tx)
-            .await
-            .map_err(RegistryDbError::internal)?
-            {
-                states.push(decode_refresh_state(&row)?);
-            }
-        }
-        Ok(states)
-    }
-
-    async fn delete_feed_state(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<()> {
-        sqlx::query(
-            r#"
-            DELETE FROM feed_refresh_state
-            WHERE feed_url = ?
-            "#,
-        )
-        .bind(feed_url.as_str())
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        sqlx::query(
-            r#"
-            DELETE FROM feed_snapshot
-            WHERE feed_url = ?
-            "#,
-        )
-        .bind(feed_url.as_str())
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(())
-    }
-
-    async fn record_refresh_started(&mut self, event: RefreshStarted) -> RegistryDbResult<()> {
-        sqlx::query(
-            r#"
-            INSERT INTO feed_refresh_state (feed_url, last_attempt_at)
-            SELECT ?, ?
-            WHERE EXISTS (
-                SELECT 1 FROM feed_subscription WHERE feed_url = ?
-            )
-            ON CONFLICT(feed_url) DO UPDATE SET
-                last_attempt_at = excluded.last_attempt_at
-            "#,
-        )
-        .bind(event.feed_url.as_str())
-        .bind(event.started_at)
-        .bind(event.feed_url.as_str())
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(())
-    }
-
-    async fn record_refresh_succeeded(&mut self, result: RefreshSuccess) -> RegistryDbResult<()> {
-        let feed_url = result.snapshot.feed_url.clone();
-        self.upsert_snapshot(result.snapshot).await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO feed_refresh_state (
-                feed_url,
-                last_attempt_at,
-                last_success_at,
-                last_error_kind,
-                last_error_message,
-                next_refresh_after
-            )
-            SELECT ?, ?, ?, NULL, NULL, ?
-            WHERE EXISTS (
-                SELECT 1 FROM feed_subscription WHERE feed_url = ?
-            )
-            ON CONFLICT(feed_url) DO UPDATE SET
-                last_attempt_at = excluded.last_attempt_at,
-                last_success_at = excluded.last_success_at,
-                last_error_kind = NULL,
-                last_error_message = NULL,
-                next_refresh_after = excluded.next_refresh_after
-            "#,
-        )
-        .bind(feed_url.as_str())
-        .bind(result.succeeded_at)
-        .bind(result.succeeded_at)
-        .bind(result.next_refresh_after)
-        .bind(feed_url.as_str())
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(())
-    }
-
-    async fn record_refresh_failed(&mut self, result: RefreshFailure) -> RegistryDbResult<()> {
-        sqlx::query(
-            r#"
-            INSERT INTO feed_refresh_state (
-                feed_url,
-                last_attempt_at,
-                last_failure_at,
-                last_error_kind,
-                last_error_message,
-                next_refresh_after
-            )
-            SELECT ?, ?, ?, ?, ?, ?
-            WHERE EXISTS (
-                SELECT 1 FROM feed_subscription WHERE feed_url = ?
-            )
-            ON CONFLICT(feed_url) DO UPDATE SET
-                last_attempt_at = excluded.last_attempt_at,
-                last_failure_at = excluded.last_failure_at,
-                last_error_kind = excluded.last_error_kind,
-                last_error_message = excluded.last_error_message,
-                next_refresh_after = excluded.next_refresh_after
-            "#,
-        )
-        .bind(result.feed_url.as_str())
-        .bind(result.failed_at)
-        .bind(result.failed_at)
-        .bind(result.error_kind.as_str())
-        .bind(&result.error_message)
-        .bind(result.next_refresh_after)
-        .bind(result.feed_url.as_str())
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(())
-    }
-
     async fn commit(self) -> RegistryDbResult<()> {
         self.tx.commit().await.map_err(RegistryDbError::internal)
     }
@@ -600,7 +320,6 @@ mod tests {
         FeedRegistry, FeedRegistryConfig, SubscribeFeedCommand, SubscriptionKey,
         crawl::{
             policy::{PollingSchedule, RefreshInterval, RefreshPolicy, RefreshSchedule},
-            state::RefreshErrorKind,
             target_list::{CrawlTargetListInput, CrawlTargetListProj},
         },
         event::{
@@ -613,21 +332,6 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     use super::*;
-
-    const ATOM_FEED: &str = r#"<?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <title>Example Feed</title>
-  <id>https://example.com/success.xml</id>
-  <updated>2026-05-24T00:00:00Z</updated>
-  <entry>
-    <title>Hello</title>
-    <id>https://example.com/posts/1</id>
-    <updated>2026-05-24T00:00:00Z</updated>
-    <link href="https://example.com/posts/1" />
-    <summary>Hello from a persisted snapshot.</summary>
-  </entry>
-</feed>
-"#;
 
     async fn migrated_db() -> Result<SqliteFeedRegistryDb, RegistryDbError> {
         let db = SqliteDatabase::in_memory().await?;
@@ -740,16 +444,28 @@ mod tests {
     async fn runtime_subscribe_projects_subscription_and_api_event() -> anyhow::Result<()> {
         let db = migrated_db().await?;
         let ct = CancellationToken::new();
-        let runtime = FeedRegistryRuntime::start(
-            db.clone(),
-            db.event_journal(),
-            FeedRegistryConfig {
-                event_worker_poll_interval: Duration::from_millis(10),
-                ..FeedRegistryConfig::default()
-            },
-            ct.clone(),
-        );
-        let registry = runtime.registry();
+        let config = FeedRegistryConfig {
+            event_worker_poll_interval: Duration::from_millis(10),
+            ..FeedRegistryConfig::default()
+        };
+        let journal = db.event_journal();
+        let api_events = ApiEventPublisher::default();
+        let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
+        let registry = {
+            let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+
+            FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
+        };
+        let event_workers = {
+            spawn_event_workers(
+                db.clone(),
+                journal,
+                wake_publisher,
+                api_events,
+                config,
+                ct.clone(),
+            )
+        };
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("runtime-subscribe");
         let mut api_events = registry.subscribe_api_events(subscriber_id.clone());
@@ -788,7 +504,7 @@ mod tests {
         assert_eq!(page.subscriptions[0].feed_url, feed_url);
 
         ct.cancel();
-        drop(runtime);
+        drop(event_workers);
         Ok(())
     }
 
@@ -1012,107 +728,6 @@ mod tests {
 
         assert!(!target.is_active);
         assert_eq!(target.polling_policy, None);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn refresh_success_writes_snapshot_and_state_atomically() -> Result<(), RegistryDbError> {
-        let db = migrated_db().await?;
-        let feed_url = feed_url("success");
-        let succeeded_at = Utc.with_ymd_and_hms(2026, 5, 24, 12, 30, 0).unwrap();
-        let next_refresh_after = Some(succeeded_at + chrono::Duration::hours(1));
-
-        let mut tx = db.begin().await?;
-        tx.upsert_subscription(subscription("success")).await?;
-        tx.record_refresh_succeeded(RefreshSuccess {
-            snapshot: FeedSnapshot {
-                feed_url: feed_url.clone(),
-                body: br#"{"version":"https://jsonfeed.org/version/1.1"}"#.to_vec(),
-                content_type: Some("application/feed+json".to_owned()),
-                etag: Some(r#""feed-v1""#.to_owned()),
-                last_modified: Some("Sun, 24 May 2026 12:00:00 GMT".to_owned()),
-                fetched_at: succeeded_at,
-            },
-            succeeded_at,
-            next_refresh_after,
-        })
-        .await?;
-        tx.commit().await?;
-
-        let mut tx = db.begin().await?;
-        let snapshots = tx.load_snapshots(std::slice::from_ref(&feed_url)).await?;
-        let states = tx
-            .load_refresh_states(std::slice::from_ref(&feed_url))
-            .await?;
-
-        assert_eq!(snapshots.len(), 1);
-        assert_eq!(snapshots[0].feed_url, feed_url);
-        assert_eq!(
-            snapshots[0].content_type.as_deref(),
-            Some("application/feed+json")
-        );
-        assert_eq!(snapshots[0].etag.as_deref(), Some(r#""feed-v1""#));
-        assert_eq!(snapshots[0].fetched_at, succeeded_at);
-
-        assert_eq!(states.len(), 1);
-        assert_eq!(states[0].last_attempt_at, Some(succeeded_at));
-        assert_eq!(states[0].last_success_at, Some(succeeded_at));
-        assert_eq!(states[0].last_failure_at, None);
-        assert_eq!(states[0].last_error_kind, None);
-        assert_eq!(states[0].last_error_message, None);
-        assert_eq!(states[0].next_refresh_after, next_refresh_after);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn refresh_records_do_not_recreate_state_without_subscription()
-    -> Result<(), RegistryDbError> {
-        let db = migrated_db().await?;
-        let feed_url = feed_url("orphan");
-        let happened_at = Utc.with_ymd_and_hms(2026, 5, 24, 12, 30, 0).unwrap();
-
-        let mut tx = db.begin().await?;
-        tx.record_refresh_started(RefreshStarted {
-            feed_url: feed_url.clone(),
-            started_at: happened_at,
-        })
-        .await?;
-        tx.record_refresh_succeeded(RefreshSuccess {
-            snapshot: FeedSnapshot {
-                feed_url: feed_url.clone(),
-                body: ATOM_FEED.as_bytes().to_vec(),
-                content_type: Some("application/atom+xml".to_owned()),
-                etag: None,
-                last_modified: None,
-                fetched_at: happened_at,
-            },
-            succeeded_at: happened_at,
-            next_refresh_after: None,
-        })
-        .await?;
-        tx.record_refresh_failed(RefreshFailure {
-            feed_url: feed_url.clone(),
-            failed_at: happened_at,
-            error_kind: RefreshErrorKind::Fetch,
-            error_message: "network error".to_owned(),
-            next_refresh_after: None,
-        })
-        .await?;
-        tx.commit().await?;
-
-        let mut tx = db.begin().await?;
-        assert!(
-            tx.load_snapshots(std::slice::from_ref(&feed_url))
-                .await?
-                .is_empty()
-        );
-        assert!(
-            tx.load_refresh_states(std::slice::from_ref(&feed_url))
-                .await?
-                .is_empty()
-        );
-
         Ok(())
     }
 }

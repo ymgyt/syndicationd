@@ -31,18 +31,3 @@ pub struct Subscription {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-
-impl Subscription {
-    pub fn annotations(&self) -> SubscriptionAnnotations {
-        SubscriptionAnnotations {
-            requirement: self.requirement,
-            category: self.category.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SubscriptionAnnotations {
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
-}

@@ -79,10 +79,9 @@ impl Daemon {
             &shutdown,
         )
         .await?;
-        let (dependency, _registry_runtime) = api_service.into_parts();
+        let (dependency, _event_workers) = api_service.into_parts();
 
-        // Keep the registry runtime alive for the entire serve future; dropping it aborts
-        // event workers, refresh executor, and scheduler tasks.
+        // Keep event workers alive for the entire serve future.
         serve::serve_unix(listener, dependency, shutdown).await?;
 
         Ok(())

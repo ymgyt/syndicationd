@@ -188,9 +188,7 @@ mod tests {
     use synd_feed::types::FeedUrl;
     use synd_registry::{
         SubscriberId, SubscriptionKey,
-        event::{
-            EventJournalExt, EventKind, FeedSubscribed, SubEvent, SubEventKind, SubscriptionChanged,
-        },
+        event::{EventKind, FeedSubscribed, SubEvent, SubEventKind, SubscriptionChanged},
     };
 
     use super::*;
@@ -264,34 +262,6 @@ mod tests {
         assert_eq!(
             batch.scanned_cursor(),
             &EventCursor::at(
-                EventConsumerId::CrawlTargetListProj,
-                EventCursorPos::position("2")
-            )
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn process_pending_commits_consumer_cursor() -> anyhow::Result<()> {
-        let journal = migrated_journal().await?;
-        journal.append(subscribed_event()).await?;
-        journal.append(changed_event()).await?;
-
-        let processed = journal
-            .consumer(
-                EventConsumerId::CrawlTargetListProj,
-                subscription_lifecycle_filter(),
-            )
-            .process_pending(|_| async { Ok(()) })
-            .await?;
-
-        assert_eq!(processed, 2);
-        let cursor = journal
-            .load_cursor(EventConsumerId::CrawlTargetListProj)
-            .await?;
-        assert_eq!(
-            cursor,
-            EventCursor::at(
                 EventConsumerId::CrawlTargetListProj,
                 EventCursorPos::position("2")
             )

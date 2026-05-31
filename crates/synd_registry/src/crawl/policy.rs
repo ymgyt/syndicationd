@@ -1,8 +1,7 @@
-use std::{collections::HashMap, fmt, num::NonZeroU64, time::Duration};
+use std::{fmt, num::NonZeroU64, time::Duration};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
-use synd_feed::types::FeedUrl;
 
 use crate::subscription::Subscription;
 
@@ -131,34 +130,6 @@ impl PollingPolicy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DesiredFeedPolling {
-    pub feed_url: FeedUrl,
-    pub policy: PollingPolicy,
-}
-
-impl DesiredFeedPolling {
-    pub fn from_subscriptions(subscriptions: Vec<Subscription>) -> Vec<Self> {
-        let mut by_feed_url = HashMap::<FeedUrl, Vec<Subscription>>::new();
-        for subscription in subscriptions {
-            by_feed_url
-                .entry(subscription.feed_url.clone())
-                .or_default()
-                .push(subscription);
-        }
-
-        let mut desired = by_feed_url
-            .into_iter()
-            .filter_map(|(feed_url, subscriptions)| {
-                PollingPolicy::from_subscriptions(&subscriptions)
-                    .map(|policy| Self { feed_url, policy })
-            })
-            .collect::<Vec<_>>();
-        desired.sort_unstable_by(|a, b| a.feed_url.as_str().cmp(b.feed_url.as_str()));
-        desired
-    }
-}
-
 fn add_duration(time: DateTime<Utc>, interval: RefreshInterval) -> DateTime<Utc> {
     chrono::Duration::from_std(interval.duration()).map_or(time, |duration| time + duration)
 }
@@ -232,21 +203,5 @@ mod tests {
         let policy = PollingPolicy::from_subscriptions(&subscriptions).unwrap();
 
         assert_eq!(policy.schedule, PollingSchedule::Manual);
-    }
-
-    #[test]
-    fn desired_feed_polling_groups_subscriptions_by_feed() {
-        let mut other = subscription(RefreshPolicy::interval(interval(Duration::from_mins(5))));
-        other.subscriber_id = SubscriberId::new("other");
-        let desired = DesiredFeedPolling::from_subscriptions(vec![
-            subscription(RefreshPolicy::interval(interval(Duration::from_hours(1)))),
-            other,
-        ]);
-
-        assert_eq!(desired.len(), 1);
-        assert_eq!(
-            desired[0].policy.schedule,
-            PollingSchedule::Interval(interval(Duration::from_mins(5)))
-        );
     }
 }

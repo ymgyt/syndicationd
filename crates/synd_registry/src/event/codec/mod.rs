@@ -9,7 +9,6 @@ use super::domain::{
 };
 
 mod api;
-mod crawl;
 mod event_type;
 mod request;
 mod sub;
@@ -47,7 +46,6 @@ impl EventEncoding for Event {
         match self {
             Self::Request(event) => event.encode(),
             Self::Sub(event) => event.encode(),
-            Self::Crawl(event) => event.encode(),
             Self::Api(event) => event.encode(),
         }
     }
@@ -105,7 +103,6 @@ impl EventKind {
         match self {
             Self::Request(kind) => kind.event_type(),
             Self::Sub(kind) => kind.event_type(),
-            Self::Crawl(kind) => kind.event_type(),
             Self::Api(kind) => kind.event_type(),
         }
     }

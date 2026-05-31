@@ -24,10 +24,6 @@ pub enum EventConsumerId {
     CrawlTargetListProj,
     ApiEventProj,
     ApiEventStream,
-    EntryTLProj,
-    CrawlScheduler,
-    FeedRevProj,
-    EntryRevProj,
 }
 
 impl EventConsumerId {
@@ -37,10 +33,6 @@ impl EventConsumerId {
             Self::CrawlTargetListProj => "CrawlTargetListProj",
             Self::ApiEventProj => "ApiEventProj",
             Self::ApiEventStream => "ApiEventStream",
-            Self::EntryTLProj => "EntryTLProj",
-            Self::CrawlScheduler => "CrawlScheduler",
-            Self::FeedRevProj => "FeedRevProj",
-            Self::EntryRevProj => "EntryRevProj",
         }
     }
 }

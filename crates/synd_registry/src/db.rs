@@ -3,7 +3,6 @@ use std::future::Future;
 use synd_feed::types::FeedUrl;
 
 use crate::{
-    crawl::state::{FeedSnapshot, RefreshFailure, RefreshStarted, RefreshState, RefreshSuccess},
     crawl::target_list::CrawlTarget,
     error::{RegistryDbError, RegistryDbResult},
     event::Event,
@@ -45,23 +44,10 @@ pub trait RegistryDbTransaction {
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    fn list_active_subscriptions(
-        &mut self,
-    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
-
     fn list_active_subscriptions_for_feed(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
-
-    fn list_subscriptions_for_subscriber(
-        &mut self,
-        subscriber_id: &SubscriberId,
-    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
-
-    fn list_active_feed_urls(
-        &mut self,
-    ) -> impl Future<Output = RegistryDbResult<Vec<FeedUrl>>> + Send;
 
     fn upsert_crawl_target(
         &mut self,
@@ -72,36 +58,6 @@ pub trait RegistryDbTransaction {
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
-
-    fn load_snapshots(
-        &mut self,
-        feed_urls: &[FeedUrl],
-    ) -> impl Future<Output = RegistryDbResult<Vec<FeedSnapshot>>> + Send;
-
-    fn load_refresh_states(
-        &mut self,
-        feed_urls: &[FeedUrl],
-    ) -> impl Future<Output = RegistryDbResult<Vec<RefreshState>>> + Send;
-
-    fn delete_feed_state(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
-    fn record_refresh_started(
-        &mut self,
-        event: RefreshStarted,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
-    fn record_refresh_succeeded(
-        &mut self,
-        result: RefreshSuccess,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
-    fn record_refresh_failed(
-        &mut self,
-        result: RefreshFailure,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
     fn commit(self) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }

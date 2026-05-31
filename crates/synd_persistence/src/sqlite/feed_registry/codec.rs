@@ -6,7 +6,6 @@ use synd_registry::{
     RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
     crawl::{
         policy::{PollingPolicy, PollingSchedule, RefreshPolicy, RefreshSchedule},
-        state::{FeedSnapshot, RefreshErrorKind, RefreshState},
         target_list::CrawlTarget,
     },
 };
@@ -48,55 +47,6 @@ pub(super) fn decode_subscription(row: &SqliteRow) -> RegistryDbResult<Subscript
         refresh_policy: decode_policy(&policy_kind, interval_seconds)?,
         created_at,
         updated_at,
-    })
-}
-
-pub(super) fn decode_snapshot(row: &SqliteRow) -> RegistryDbResult<FeedSnapshot> {
-    let feed_url_raw: String = row.try_get("feed_url").map_err(RegistryDbError::internal)?;
-    Ok(FeedSnapshot {
-        feed_url: FeedUrl::parse(&feed_url_raw).map_err(RegistryDbError::internal)?,
-        body: row.try_get("body").map_err(RegistryDbError::internal)?,
-        content_type: row
-            .try_get("content_type")
-            .map_err(RegistryDbError::internal)?,
-        etag: row.try_get("etag").map_err(RegistryDbError::internal)?,
-        last_modified: row
-            .try_get("last_modified")
-            .map_err(RegistryDbError::internal)?,
-        fetched_at: row
-            .try_get("fetched_at")
-            .map_err(RegistryDbError::internal)?,
-    })
-}
-
-pub(super) fn decode_refresh_state(row: &SqliteRow) -> RegistryDbResult<RefreshState> {
-    let feed_url_raw: String = row.try_get("feed_url").map_err(RegistryDbError::internal)?;
-    let last_error_kind: Option<String> = row
-        .try_get("last_error_kind")
-        .map_err(RegistryDbError::internal)?;
-
-    Ok(RefreshState {
-        feed_url: FeedUrl::parse(&feed_url_raw).map_err(RegistryDbError::internal)?,
-        last_attempt_at: row
-            .try_get("last_attempt_at")
-            .map_err(RegistryDbError::internal)?,
-        last_success_at: row
-            .try_get("last_success_at")
-            .map_err(RegistryDbError::internal)?,
-        last_failure_at: row
-            .try_get("last_failure_at")
-            .map_err(RegistryDbError::internal)?,
-        last_error_kind: last_error_kind
-            .as_deref()
-            .map(RefreshErrorKind::try_from)
-            .transpose()
-            .map_err(RegistryDbError::internal)?,
-        last_error_message: row
-            .try_get("last_error_message")
-            .map_err(RegistryDbError::internal)?,
-        next_refresh_after: row
-            .try_get("next_refresh_after")
-            .map_err(RegistryDbError::internal)?,
     })
 }
 

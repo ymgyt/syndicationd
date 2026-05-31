@@ -16,15 +16,12 @@ use synd_auth::{
     jwt,
 };
 use synd_client::{Client, ClientOptions};
+use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
-use synd_feed::{feed::service::FeedService, types::FeedUrl};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
     FeedRegistry, FeedRegistryDb, RegistryDbTransaction, SubscriberId, Subscription,
-    crawl::{
-        policy::{PollingPolicy, RefreshInterval, RefreshPolicy},
-        state::{FeedSnapshot, RefreshSuccess},
-    },
+    crawl::policy::{RefreshInterval, RefreshPolicy},
     event::{ApiEventPublisher, EventSubmitter, EventWakePublisher},
     runtime::spawn_event_workers,
 };
@@ -276,7 +273,7 @@ fn refresh_interval(duration: Duration) -> RefreshInterval {
     RefreshInterval::try_from(duration).unwrap()
 }
 
-struct CachedSubscriptionFixture {
+struct SubscriptionFixture {
     subscriber_id: SubscriberId,
     feed_url: FeedUrl,
     requirement: Option<Requirement>,
@@ -285,16 +282,10 @@ struct CachedSubscriptionFixture {
     subscribed_at: DateTime<Utc>,
 }
 
-async fn seed_cached_subscription(
+async fn seed_subscription(
     db: &SqliteFeedRegistryDb,
-    feed_service: &FeedService,
-    fixture: CachedSubscriptionFixture,
+    fixture: SubscriptionFixture,
 ) -> anyhow::Result<()> {
-    let fetched = feed_service
-        .fetch_feed_with_body(fixture.feed_url.clone())
-        .await?;
-    let succeeded_at = fetched.fetched_at;
-
     let mut tx = db.begin().await?;
     let subscription = Subscription {
         subscriber_id: fixture.subscriber_id,
@@ -305,25 +296,7 @@ async fn seed_cached_subscription(
         created_at: fixture.subscribed_at,
         updated_at: fixture.subscribed_at,
     };
-    tx.upsert_subscription(subscription.clone()).await?;
-    let subscriptions = tx
-        .list_active_subscriptions_for_feed(&subscription.feed_url)
-        .await?;
-    let policy = PollingPolicy::from_subscriptions(&subscriptions)
-        .expect("seeded subscription should produce an effective policy");
-    tx.record_refresh_succeeded(RefreshSuccess {
-        snapshot: FeedSnapshot {
-            feed_url: fetched.url,
-            body: fetched.body,
-            content_type: fetched.content_type,
-            etag: fetched.etag,
-            last_modified: fetched.last_modified,
-            fetched_at: succeeded_at,
-        },
-        succeeded_at,
-        next_refresh_after: policy.next_after(succeeded_at),
-    })
-    .await?;
+    tx.upsert_subscription(subscription).await?;
     tx.commit().await?;
 
     Ok(())
@@ -344,13 +317,11 @@ pub async fn serve_api(
 
         if api_port == 6031 {
             // setup fixtures
-            let feed_service = FeedService::new(synd_api::config::USER_AGENT, 10 * 1024 * 1024);
             let test_user_id = SubscriberId::new("899cf3fa5afc0aa1");
             let now = Utc::now();
-            seed_cached_subscription(
+            seed_subscription(
                 &db,
-                &feed_service,
-                CachedSubscriptionFixture {
+                SubscriptionFixture {
                     subscriber_id: test_user_id.clone(),
                     feed_url: "http://localhost:6030/feed/twir_atom".try_into().unwrap(),
                     requirement: Some(Requirement::Must),
@@ -362,10 +333,9 @@ pub async fn serve_api(
                 },
             )
             .await?;
-            seed_cached_subscription(
+            seed_subscription(
                 &db,
-                &feed_service,
-                CachedSubscriptionFixture {
+                SubscriptionFixture {
                     subscriber_id: test_user_id,
                     feed_url: "http://localhost:6030/feed/o11y_news".try_into().unwrap(),
                     requirement: Some(Requirement::Should),

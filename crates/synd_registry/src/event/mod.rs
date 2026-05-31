@@ -16,15 +16,14 @@ pub use consumer::{
 };
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
-    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlEvent,
-    CrawlEventKind, Event, EventKind, EventReadFilter, FeedSubscribed, FeedUnsubscribed,
-    RequestEvent, RequestEventKind, RequestId, SubEvent, SubEventKind, SubscribeFeedRejected,
-    SubscribeFeedRequested, SubscriptionChanged, SubscriptionLifecycle, UnsubscribeFeedRejected,
-    UnsubscribeFeedRequested,
+    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event, EventKind,
+    EventReadFilter, FeedSubscribed, FeedUnsubscribed, RequestEvent, RequestEventKind, RequestId,
+    SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChanged,
+    SubscriptionLifecycle, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 pub use journal::{
-    EventCursor, EventCursorPos, EventJournal, EventJournalConsumer, EventJournalError,
-    EventJournalExt, EventJournalResult, EventReadBatch, JournaledEvent,
+    EventCursor, EventCursorPos, EventJournal, EventJournalError, EventJournalResult,
+    EventReadBatch, JournaledEvent,
 };
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
 pub use worker::{
