@@ -5,7 +5,7 @@ use synd_feed::types::FeedUrl;
 use crate::{
     crawl::target_list::CrawlTarget,
     error::{RegistryDbError, RegistryDbResult},
-    event::Event,
+    event::{Event, EventCursor},
     subscriber::SubscriberId,
     subscription::Subscription,
     view::{Subscriptions, SubscriptionsQuery},
@@ -58,6 +58,11 @@ pub trait RegistryDbTransaction {
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
+
+    fn advance_event_cursor(
+        &mut self,
+        cursor: &EventCursor,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
     fn commit(self) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }

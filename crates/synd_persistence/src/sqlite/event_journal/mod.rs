@@ -1,11 +1,12 @@
 use sqlx::{QueryBuilder, Row, Sqlite};
 use synd_registry::event::{
-    Event, EventConsumerId, EventCursor, EventCursorPos, EventEncoding, EventJournal,
-    EventJournalError, EventJournalResult, EventReadBatch, EventReadFilter, JournaledEvent,
+    Event, EventCursor, EventCursorPos, EventEncoding, EventInterests, EventJournal,
+    EventJournalError, EventJournalResult, EventReadBatch, JournaledEvent, ProcessorId,
 };
 
 use super::SqliteDatabase;
 
+/// SQLite-backed event journal for registry events.
 #[derive(Clone)]
 pub struct SqliteEventJournal {
     db: SqliteDatabase,
@@ -41,11 +42,11 @@ impl EventJournal for SqliteEventJournal {
     async fn read_after(
         &self,
         cursor: &EventCursor,
-        filter: EventReadFilter,
+        interests: EventInterests,
     ) -> EventJournalResult<EventReadBatch> {
         let position = decode_position(cursor.position())?;
-        let consumer = cursor.consumer();
-        let event_types = filter
+        let processor = cursor.processor();
+        let event_types = interests
             .kinds()
             .iter()
             .copied()
@@ -69,7 +70,7 @@ impl EventJournal for SqliteEventJournal {
         .map_err(map_error)?;
 
         let scanned_cursor = EventCursor::at(
-            consumer,
+            processor,
             EventCursorPos::position(scanned_position.to_string()),
         );
 
@@ -103,7 +104,7 @@ impl EventJournal for SqliteEventJournal {
                 .try_get::<String, _>("payload_json")
                 .map_err(map_error)?;
             events.push(JournaledEvent::new(
-                EventCursor::at(consumer, EventCursorPos::position(position.to_string())),
+                EventCursor::at(processor, EventCursorPos::position(position.to_string())),
                 Event::decode(&event_type, &payload_json).map_err(map_error)?,
             ));
         }
@@ -112,7 +113,7 @@ impl EventJournal for SqliteEventJournal {
         Ok(EventReadBatch::new(events, scanned_cursor))
     }
 
-    async fn load_cursor(&self, consumer: EventConsumerId) -> EventJournalResult<EventCursor> {
+    async fn load_cursor(&self, processor: ProcessorId) -> EventJournalResult<EventCursor> {
         let mut tx = self.db.begin().await.map_err(map_error)?;
         let row = sqlx::query(
             r"
@@ -121,46 +122,20 @@ impl EventJournal for SqliteEventJournal {
             WHERE consumer = ?
             ",
         )
-        .bind(consumer.as_str())
+        .bind(processor.as_str())
         .fetch_optional(&mut *tx)
         .await
         .map_err(map_error)?;
         tx.commit().await.map_err(map_error)?;
 
         let Some(row) = row else {
-            return Ok(EventCursor::initial(consumer));
+            return Ok(EventCursor::initial(processor));
         };
         let position = row.try_get::<i64, _>("position").map_err(map_error)?;
         Ok(EventCursor::at(
-            consumer,
+            processor,
             EventCursorPos::position(position.to_string()),
         ))
-    }
-
-    async fn commit_cursor(&self, cursor: &EventCursor) -> EventJournalResult<()> {
-        let position = decode_position(cursor.position())?;
-        let mut tx = self.db.begin().await.map_err(map_error)?;
-
-        sqlx::query(
-            r"
-            INSERT INTO event_cursor (consumer, position)
-            VALUES (?, ?)
-            ON CONFLICT(consumer) DO UPDATE SET
-                position = CASE
-                    WHEN excluded.position > event_cursor.position
-                    THEN excluded.position
-                    ELSE event_cursor.position
-                END
-            ",
-        )
-        .bind(cursor.consumer().as_str())
-        .bind(position)
-        .execute(&mut *tx)
-        .await
-        .map_err(map_error)?;
-
-        tx.commit().await.map_err(map_error)?;
-        Ok(())
     }
 }
 
@@ -188,16 +163,10 @@ mod tests {
     use synd_feed::types::FeedUrl;
     use synd_registry::{
         SubscriberId, SubscriptionKey,
-        event::{EventKind, FeedSubscribed, SubEvent, SubEventKind, SubscriptionChanged},
+        event::{FeedSubscribed, SubEvent, SubEventKind, SubscriptionChanged},
     };
 
     use super::*;
-
-    const SUBSCRIPTION_LIFECYCLE_KINDS: &[EventKind] = &[
-        EventKind::Sub(SubEventKind::FeedSubscribed),
-        EventKind::Sub(SubEventKind::SubscriptionChanged),
-        EventKind::Sub(SubEventKind::FeedUnsubscribed),
-    ];
 
     async fn migrated_journal() -> anyhow::Result<SqliteEventJournal> {
         let db = SqliteDatabase::in_memory().await?;
@@ -224,36 +193,40 @@ mod tests {
         )
     }
 
-    fn subscription_lifecycle_filter() -> EventReadFilter {
-        EventReadFilter::new(SUBSCRIPTION_LIFECYCLE_KINDS)
+    fn subscription_lifecycle_interests() -> EventInterests {
+        EventInterests::new([
+            SubEventKind::FeedSubscribed.into(),
+            SubEventKind::SubscriptionChanged.into(),
+            SubEventKind::FeedUnsubscribed.into(),
+        ])
     }
 
     #[tokio::test]
-    async fn load_cursor_returns_initial_cursor_for_new_consumer() -> anyhow::Result<()> {
+    async fn load_cursor_returns_initial_cursor_for_new_processor() -> anyhow::Result<()> {
         let journal = migrated_journal().await?;
 
         let cursor = journal
-            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .load_cursor(ProcessorId::CrawlTargetProjection)
             .await?;
 
         assert_eq!(
             cursor,
-            EventCursor::initial(EventConsumerId::CrawlTargetListProj)
+            EventCursor::initial(ProcessorId::CrawlTargetProjection)
         );
         Ok(())
     }
 
     #[tokio::test]
-    async fn append_and_read_subscription_events_for_consumer() -> anyhow::Result<()> {
+    async fn append_and_read_subscription_events_for_processor() -> anyhow::Result<()> {
         let journal = migrated_journal().await?;
         journal.append(subscribed_event()).await?;
         journal.append(changed_event()).await?;
 
         let cursor = journal
-            .load_cursor(EventConsumerId::CrawlTargetListProj)
+            .load_cursor(ProcessorId::CrawlTargetProjection)
             .await?;
         let batch = journal
-            .read_after(&cursor, subscription_lifecycle_filter())
+            .read_after(&cursor, subscription_lifecycle_interests())
             .await?;
 
         assert_eq!(batch.events().len(), 2);
@@ -262,7 +235,7 @@ mod tests {
         assert_eq!(
             batch.scanned_cursor(),
             &EventCursor::at(
-                EventConsumerId::CrawlTargetListProj,
+                ProcessorId::CrawlTargetProjection,
                 EventCursorPos::position("2")
             )
         );

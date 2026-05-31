@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::event::{Event, EventConsumerId, EventReadFilter};
+use crate::event::{Event, EventInterests, ProcessorId};
 
 pub type EventJournalResult<T> = Result<T, EventJournalError>;
 
@@ -10,36 +10,30 @@ pub enum EventJournalError {
     Internal(#[from] anyhow::Error),
 }
 
-/// Appends registry events and tracks where each event consumer has read up to.
+/// Stores registry events and reloads processor progress through the journal.
 pub trait EventJournal: Clone + Send + Sync + 'static {
     /// Records that the event happened.
     fn append(&self, event: Event) -> impl Future<Output = EventJournalResult<()>> + Send;
 
-    /// Reads filtered entries after the supplied cursor.
+    /// Reads interested entries after the supplied cursor.
     fn read_after(
         &self,
         cursor: &EventCursor,
-        filter: EventReadFilter,
+        interests: EventInterests,
     ) -> impl Future<Output = EventJournalResult<EventReadBatch>> + Send;
 
-    /// Loads the cursor for a consumer, or `EventCursor::initial()` for a new consumer.
+    /// Loads the cursor for a processor, or `EventCursor::initial()` for a new processor.
     fn load_cursor(
         &self,
-        consumer: EventConsumerId,
+        processor: ProcessorId,
     ) -> impl Future<Output = EventJournalResult<EventCursor>> + Send;
-
-    /// Records that the cursor's consumer has fully processed events through the cursor.
-    fn commit_cursor(
-        &self,
-        cursor: &EventCursor,
-    ) -> impl Future<Output = EventJournalResult<()>> + Send;
 }
 
-/// A batch of journal entries selected for one consumer.
+/// A batch of journal entries selected for one processor.
 ///
-/// `events` contains only entries the consumer should handle. `scanned_cursor`
+/// `events` contains only entries the processor should handle. `scanned_cursor`
 /// marks the journal position that was inspected, including entries that did
-/// not belong to the consumer.
+/// not belong to the processor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventReadBatch {
     events: Vec<JournaledEvent>,
@@ -75,7 +69,7 @@ impl EventReadBatch {
     }
 }
 
-/// A registry event returned from the journal with a consumer-owned cursor.
+/// A registry event returned from the journal with its journal position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JournaledEvent {
     cursor: EventCursor,
@@ -100,27 +94,30 @@ impl JournaledEvent {
     }
 }
 
-/// A consumer's read cursor in the event journal.
+/// A processor's read cursor in the event journal.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EventCursor {
-    consumer: EventConsumerId,
+    processor: ProcessorId,
     position: EventCursorPos,
 }
 
 impl EventCursor {
-    pub fn initial(consumer: EventConsumerId) -> Self {
+    pub fn initial(processor: ProcessorId) -> Self {
         Self {
-            consumer,
+            processor,
             position: EventCursorPos::initial(),
         }
     }
 
-    pub fn at(consumer: EventConsumerId, position: EventCursorPos) -> Self {
-        Self { consumer, position }
+    pub fn at(processor: ProcessorId, position: EventCursorPos) -> Self {
+        Self {
+            processor,
+            position,
+        }
     }
 
-    pub fn consumer(&self) -> EventConsumerId {
-        self.consumer
+    pub fn processor(&self) -> ProcessorId {
+        self.processor
     }
 
     pub fn position(&self) -> &EventCursorPos {

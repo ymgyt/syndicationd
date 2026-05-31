@@ -89,7 +89,7 @@ async fn run(
         spawn_event_workers(
             db,
             journal,
-            wake_publisher,
+            &wake_publisher,
             api_events,
             registry_config,
             shutdown.cancellation_token(),

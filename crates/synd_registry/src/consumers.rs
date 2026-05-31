@@ -1,14 +1,12 @@
 use chrono::Utc;
-use tracing::debug;
 
 use crate::{
     db::{FeedRegistryDb, RegistryDbTransaction},
     event::{
-        ApiEvent, ApiEventKind, ApiEventPublisher, ApiFeedSubscribeRejected, ApiFeedSubscribed,
-        ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
-        ConsumerEventInput, Event, EventConsumer, EventConsumerId, EventConsumerResult, EventKind,
-        EventReadBatch, EventReadFilter, FeedSubscribed, FeedUnsubscribed, JournaledEvent,
-        RecordedEvents, RequestEvent, RequestEventKind, SubEvent, SubEventKind,
+        ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
+        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Consumer, Event, EventInterests,
+        EventKind, FeedSubscribed, FeedUnsubscribed, Processor, ProcessorError, ProcessorId,
+        ProcessorResult, RecordedEvents, RequestEvent, RequestEventKind, SubEvent, SubEventKind,
         SubscribeFeedRequested, SubscriptionChanged, UnsubscribeFeedRejected,
         UnsubscribeFeedRequested,
     },
@@ -18,86 +16,92 @@ use crate::{
 /// Subscription request lifecycle events accepted by the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubRequestInput {
-    events: Vec<RequestEvent>,
+    event: RequestEvent,
 }
 
 impl SubRequestInput {
-    pub fn new(events: Vec<RequestEvent>) -> Self {
-        Self { events }
+    pub fn new(event: RequestEvent) -> Self {
+        Self { event }
     }
 
-    pub fn into_events(self) -> Vec<RequestEvent> {
-        self.events
-    }
-}
-
-impl ConsumerEventInput for SubRequestInput {
-    const READ_FILTER: EventReadFilter = EventReadFilter::new(&[
-        EventKind::Request(RequestEventKind::SubscribeFeedRequested),
-        EventKind::Request(RequestEventKind::UnsubscribeFeedRequested),
-    ]);
-
-    fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>> {
-        let events = batch
-            .into_events()
-            .into_iter()
-            .map(JournaledEvent::into_event)
-            .map(|event| match event {
-                Event::Request(event) => event,
-                event => unreachable!("unexpected subscription request event: {event:?}"),
-            })
-            .collect::<Vec<_>>();
-
-        Ok((!events.is_empty()).then_some(Self::new(events)))
+    pub fn into_event(self) -> RequestEvent {
+        self.event
     }
 }
 
-/// Worker that turns subscription request events into subscription domain events.
+impl TryFrom<Event> for SubRequestInput {
+    type Error = ProcessorError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::Request(
+                event @ (RequestEvent::SubscribeFeedRequested(_)
+                | RequestEvent::UnsubscribeFeedRequested(_)),
+            ) => Ok(Self::new(event)),
+            event => Err(unexpected_event("subscription request event", &event)),
+        }
+    }
+}
+
+/// Turns subscription request events into subscription domain events.
 #[derive(Debug, Clone)]
-pub struct SubRequestWorker<S> {
-    db: S,
-}
+pub struct SubRequestWorker;
 
-impl<S> SubRequestWorker<S> {
-    pub fn new(db: S) -> Self {
-        Self { db }
+impl SubRequestWorker {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl<S> EventConsumer for SubRequestWorker<S>
+impl Default for SubRequestWorker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Processor for SubRequestWorker {
+    type Input = SubRequestInput;
+
+    fn id(&self) -> ProcessorId {
+        ProcessorId::SubscriptionRequest
+    }
+
+    fn interests(&self) -> EventInterests {
+        EventInterests::new([
+            RequestEventKind::SubscribeFeedRequested.into(),
+            RequestEventKind::UnsubscribeFeedRequested.into(),
+        ])
+    }
+}
+
+impl<S> Consumer<S> for SubRequestWorker
 where
     S: FeedRegistryDb,
 {
-    type Input = SubRequestInput;
-
-    fn id(&self) -> EventConsumerId {
-        EventConsumerId::SubRequestWorker
-    }
-
-    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
+    async fn consume(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        input: Self::Input,
+    ) -> ProcessorResult<RecordedEvents> {
         let mut recorded = RecordedEvents::empty();
-        for event in input.into_events() {
-            let kind = match event {
-                RequestEvent::SubscribeFeedRequested(event) => self.handle_subscribe(event).await?,
-                RequestEvent::UnsubscribeFeedRequested(event) => {
-                    self.handle_unsubscribe(event).await?
-                }
-                event => unreachable!("unexpected subscription request event: {event:?}"),
-            };
-            recorded.push(kind);
-        }
+        let kind = match input.into_event() {
+            RequestEvent::SubscribeFeedRequested(event) => self.handle_subscribe(tx, event).await?,
+            RequestEvent::UnsubscribeFeedRequested(event) => {
+                self.handle_unsubscribe(tx, event).await?
+            }
+            event => unreachable!("unexpected subscription request event: {event:?}"),
+        };
+        recorded.push(kind);
         Ok(recorded)
     }
 }
 
-impl<S> SubRequestWorker<S>
-where
-    S: FeedRegistryDb,
-{
+impl SubRequestWorker {
     async fn handle_subscribe(
         &self,
+        tx: &mut impl RegistryDbTransaction,
         event: SubscribeFeedRequested,
-    ) -> EventConsumerResult<EventKind> {
+    ) -> ProcessorResult<EventKind> {
         let now = Utc::now();
         let subscription = Subscription {
             subscriber_id: event.subscription.subscriber_id.clone(),
@@ -109,7 +113,6 @@ where
             updated_at: now,
         };
 
-        let mut tx = self.db.begin().await?;
         let already_subscribed = tx
             .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
             .await?;
@@ -126,15 +129,14 @@ where
         };
         let kind = event.kind();
         tx.append_event(event).await?;
-        tx.commit().await?;
         Ok(kind)
     }
 
     async fn handle_unsubscribe(
         &self,
+        tx: &mut impl RegistryDbTransaction,
         event: UnsubscribeFeedRequested,
-    ) -> EventConsumerResult<EventKind> {
-        let mut tx = self.db.begin().await?;
+    ) -> ProcessorResult<EventKind> {
         let is_subscribed = tx
             .has_subscription(
                 &event.subscription.subscriber_id,
@@ -163,79 +165,94 @@ where
 
         let kind = event.kind();
         tx.append_event(event).await?;
-        tx.commit().await?;
         Ok(kind)
     }
 }
 
-/// Public feed events projected from request and subscription facts.
+/// Event input used to project public API events.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ApiEventInput {
-    events: Vec<Event>,
+pub struct ApiEventProjectionInput {
+    event: Event,
 }
 
-impl ApiEventInput {
-    pub fn new(events: Vec<Event>) -> Self {
-        Self { events }
+impl ApiEventProjectionInput {
+    pub fn new(event: Event) -> Self {
+        Self { event }
     }
 
-    pub fn into_events(self) -> Vec<Event> {
-        self.events
-    }
-}
-
-impl ConsumerEventInput for ApiEventInput {
-    const READ_FILTER: EventReadFilter = EventReadFilter::new(&[
-        EventKind::Request(RequestEventKind::SubscribeFeedRejected),
-        EventKind::Request(RequestEventKind::UnsubscribeFeedRejected),
-        EventKind::Sub(SubEventKind::FeedSubscribed),
-        EventKind::Sub(SubEventKind::SubscriptionChanged),
-        EventKind::Sub(SubEventKind::FeedUnsubscribed),
-    ]);
-
-    fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>> {
-        let events = batch
-            .into_events()
-            .into_iter()
-            .map(JournaledEvent::into_event)
-            .collect::<Vec<_>>();
-        Ok((!events.is_empty()).then_some(Self::new(events)))
+    pub fn into_event(self) -> Event {
+        self.event
     }
 }
 
+impl TryFrom<Event> for ApiEventProjectionInput {
+    type Error = ProcessorError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            event @ (Event::Request(
+                RequestEvent::SubscribeFeedRejected(_) | RequestEvent::UnsubscribeFeedRejected(_),
+            )
+            | Event::Sub(
+                SubEvent::FeedSubscribed(_)
+                | SubEvent::SubscriptionChanged(_)
+                | SubEvent::FeedUnsubscribed(_),
+            )) => Ok(Self::new(event)),
+            event => Err(unexpected_event("api projection event", &event)),
+        }
+    }
+}
+
+/// Projects request and subscription facts into public API events.
 #[derive(Debug, Clone)]
-pub struct ApiEventProj<S> {
-    db: S,
-}
+pub struct ApiEventProj;
 
-impl<S> ApiEventProj<S> {
-    pub fn new(db: S) -> Self {
-        Self { db }
+impl ApiEventProj {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl<S> EventConsumer for ApiEventProj<S>
+impl Default for ApiEventProj {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Processor for ApiEventProj {
+    type Input = ApiEventProjectionInput;
+
+    fn id(&self) -> ProcessorId {
+        ProcessorId::ApiEventProjection
+    }
+
+    fn interests(&self) -> EventInterests {
+        EventInterests::new([
+            RequestEventKind::SubscribeFeedRejected.into(),
+            RequestEventKind::UnsubscribeFeedRejected.into(),
+            SubEventKind::FeedSubscribed.into(),
+            SubEventKind::SubscriptionChanged.into(),
+            SubEventKind::FeedUnsubscribed.into(),
+        ])
+    }
+}
+
+impl<S> Consumer<S> for ApiEventProj
 where
     S: FeedRegistryDb,
 {
-    type Input = ApiEventInput;
-
-    fn id(&self) -> EventConsumerId {
-        EventConsumerId::ApiEventProj
-    }
-
-    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
+    async fn consume(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        input: Self::Input,
+    ) -> ProcessorResult<RecordedEvents> {
         let mut recorded = RecordedEvents::empty();
-        let mut tx = self.db.begin().await?;
-        for event in input.into_events() {
-            let Some(api_event) = project_api_event(event) else {
-                continue;
-            };
-            let event = Event::Api(api_event);
-            recorded.push(event.kind());
-            tx.append_event(event).await?;
-        }
-        tx.commit().await?;
+        let Some(api_event) = project_api_event(input.into_event()) else {
+            return Ok(recorded);
+        };
+        let event = Event::Api(api_event);
+        recorded.push(event.kind());
+        tx.append_event(event).await?;
         Ok(recorded)
     }
 }
@@ -276,67 +293,9 @@ fn project_api_event(event: Event) -> Option<ApiEvent> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ApiEventStreamInput {
-    events: Vec<ApiEvent>,
-}
-
-impl ApiEventStreamInput {
-    pub fn new(events: Vec<ApiEvent>) -> Self {
-        Self { events }
-    }
-
-    pub fn into_events(self) -> Vec<ApiEvent> {
-        self.events
-    }
-}
-
-impl ConsumerEventInput for ApiEventStreamInput {
-    const READ_FILTER: EventReadFilter = EventReadFilter::new(&[
-        EventKind::Api(ApiEventKind::FeedSubscribed),
-        EventKind::Api(ApiEventKind::FeedSubscribeRejected),
-        EventKind::Api(ApiEventKind::FeedSubscriptionChanged),
-        EventKind::Api(ApiEventKind::FeedUnsubscribed),
-        EventKind::Api(ApiEventKind::FeedUnsubscribeRejected),
-    ]);
-
-    fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>> {
-        let events = batch
-            .into_events()
-            .into_iter()
-            .map(JournaledEvent::into_event)
-            .map(|event| match event {
-                Event::Api(event) => event,
-                event => unreachable!("unexpected api event: {event:?}"),
-            })
-            .collect::<Vec<_>>();
-        Ok((!events.is_empty()).then_some(Self::new(events)))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ApiEventStream {
-    publisher: ApiEventPublisher,
-}
-
-impl ApiEventStream {
-    pub fn new(publisher: ApiEventPublisher) -> Self {
-        Self { publisher }
-    }
-}
-
-impl EventConsumer for ApiEventStream {
-    type Input = ApiEventStreamInput;
-
-    fn id(&self) -> EventConsumerId {
-        EventConsumerId::ApiEventStream
-    }
-
-    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
-        for event in input.into_events() {
-            let receivers = self.publisher.publish(event);
-            debug!(receivers, "published feed event");
-        }
-        Ok(RecordedEvents::empty())
+fn unexpected_event(expected: &'static str, event: &Event) -> ProcessorError {
+    ProcessorError::UnexpectedEvent {
+        expected,
+        actual: event.kind(),
     }
 }

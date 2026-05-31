@@ -3,61 +3,77 @@ use std::future::Future;
 use thiserror::Error;
 
 use crate::{
+    db::FeedRegistryDb,
     error::RegistryDbError,
-    event::{EventJournalError, EventKind, EventReadBatch, EventReadFilter},
+    event::{Event, EventInterests, EventJournalError, EventKind},
 };
 
-pub type EventConsumerResult<T> = Result<T, EventConsumerError>;
+/// Result type returned by event processors.
+pub type ProcessorResult<T> = Result<T, ProcessorError>;
 
+/// Error returned while converting or processing registry events.
 #[derive(Debug, Error)]
-pub enum EventConsumerError {
+pub enum ProcessorError {
     #[error(transparent)]
     Journal(#[from] EventJournalError),
     #[error(transparent)]
     RegistryDb(#[from] RegistryDbError),
+    #[error("unexpected event for {expected}: {actual:?}")]
+    UnexpectedEvent {
+        expected: &'static str,
+        actual: EventKind,
+    },
 }
 
-/// Stable identity for a consumer cursor and consumer lookup.
+/// Stable identity for an event processor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EventConsumerId {
-    SubRequestWorker,
-    CrawlTargetListProj,
-    ApiEventProj,
-    ApiEventStream,
+pub enum ProcessorId {
+    SubscriptionRequest,
+    CrawlTargetProjection,
+    ApiEventProjection,
+    ApiEventPublisher,
 }
 
-impl EventConsumerId {
+impl ProcessorId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::SubRequestWorker => "SubRequestWorker",
-            Self::CrawlTargetListProj => "CrawlTargetListProj",
-            Self::ApiEventProj => "ApiEventProj",
-            Self::ApiEventStream => "ApiEventStream",
+            Self::SubscriptionRequest => "SubscriptionRequest",
+            Self::CrawlTargetProjection => "CrawlTargetProjection",
+            Self::ApiEventProjection => "ApiEventProjection",
+            Self::ApiEventPublisher => "ApiEventPublisher",
         }
     }
 }
 
-/// Typed input built from the journal entries a consumer is interested in.
-pub trait ConsumerEventInput: Sized + Send {
-    const READ_FILTER: EventReadFilter;
+/// Typed input built from one event a processor is interested in.
+pub trait ProcessorInput: TryFrom<Event, Error = ProcessorError> + Send {}
 
-    fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>>;
+impl<T> ProcessorInput for T where T: TryFrom<Event, Error = ProcessorError> + Send {}
+
+/// Common declaration for event processors that advance through the journal.
+pub trait Processor: Send + 'static {
+    type Input: ProcessorInput;
+
+    fn id(&self) -> ProcessorId;
+
+    fn interests(&self) -> EventInterests;
 }
 
-/// A component that consumes registry events through a cursor it owns.
-pub trait EventConsumer: Send + 'static {
-    type Input: ConsumerEventInput;
-
-    fn id(&self) -> EventConsumerId;
-
-    fn read_filter(&self) -> EventReadFilter {
-        Self::Input::READ_FILTER
-    }
-
+/// A component that consumes registry events inside a registry transaction.
+pub trait Consumer<S>: Processor
+where
+    S: FeedRegistryDb,
+{
     fn consume(
         &mut self,
+        tx: &mut S::Tx<'_>,
         input: Self::Input,
-    ) -> impl Future<Output = EventConsumerResult<RecordedEvents>> + Send;
+    ) -> impl Future<Output = ProcessorResult<RecordedEvents>> + Send;
+}
+
+/// A terminal event processor that consumes committed events without recording new events.
+pub trait Sink: Processor {
+    fn consume(&mut self, input: Self::Input) -> impl Future<Output = ProcessorResult<()>> + Send;
 }
 
 /// Summary of events recorded into the journal by one submit operation.

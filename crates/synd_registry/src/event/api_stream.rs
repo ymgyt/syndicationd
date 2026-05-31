@@ -1,19 +1,29 @@
 use std::fmt;
 
 use tokio::sync::broadcast;
+use tracing::debug;
 
-use crate::{SubscriberId, event::ApiEvent};
+use crate::{
+    SubscriberId,
+    event::{
+        ApiEvent, ApiEventKind, Event, EventInterests, Processor, ProcessorError, ProcessorId,
+        ProcessorResult, Sink,
+    },
+};
 
+/// Broadcasts committed API events to subscriber-scoped listeners.
 #[derive(Clone)]
 pub struct ApiEventPublisher {
     sender: broadcast::Sender<ApiEvent>,
 }
 
+/// Receives API events for one subscriber.
 pub struct ApiEventSubscriber {
     subscriber_id: SubscriberId,
     receiver: broadcast::Receiver<ApiEvent>,
 }
 
+/// Error returned while receiving API events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiEventRecvError {
     Closed,
@@ -41,6 +51,46 @@ impl ApiEventPublisher {
 impl Default for ApiEventPublisher {
     fn default() -> Self {
         Self::new(1024)
+    }
+}
+
+impl Processor for ApiEventPublisher {
+    type Input = ApiEvent;
+
+    fn id(&self) -> ProcessorId {
+        ProcessorId::ApiEventPublisher
+    }
+
+    fn interests(&self) -> EventInterests {
+        EventInterests::new([
+            ApiEventKind::FeedSubscribed.into(),
+            ApiEventKind::FeedSubscribeRejected.into(),
+            ApiEventKind::FeedSubscriptionChanged.into(),
+            ApiEventKind::FeedUnsubscribed.into(),
+            ApiEventKind::FeedUnsubscribeRejected.into(),
+        ])
+    }
+}
+
+impl Sink for ApiEventPublisher {
+    async fn consume(&mut self, input: Self::Input) -> ProcessorResult<()> {
+        let receivers = self.publish(input);
+        debug!(receivers, "registry api event publisher delivered event");
+        Ok(())
+    }
+}
+
+impl TryFrom<Event> for ApiEvent {
+    type Error = ProcessorError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::Api(event) => Ok(event),
+            event => Err(ProcessorError::UnexpectedEvent {
+                expected: "api event",
+                actual: event.kind(),
+            }),
+        }
     }
 }
 

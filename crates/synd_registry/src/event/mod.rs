@@ -11,15 +11,15 @@ pub use codec::{
     EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult, EventPayload,
 };
 pub use consumer::{
-    ConsumerEventInput, EventConsumer, EventConsumerError, EventConsumerId, EventConsumerResult,
-    RecordedEvents,
+    Consumer, Processor, ProcessorError, ProcessorId, ProcessorInput, ProcessorResult,
+    RecordedEvents, Sink,
 };
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
-    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event, EventKind,
-    EventReadFilter, FeedSubscribed, FeedUnsubscribed, RequestEvent, RequestEventKind, RequestId,
-    SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChanged,
-    SubscriptionLifecycle, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event,
+    EventInterests, EventKind, FeedSubscribed, FeedUnsubscribed, RequestEvent, RequestEventKind,
+    RequestId, SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested,
+    SubscriptionChanged, SubscriptionLifecycle, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 pub use journal::{
     EventCursor, EventCursorPos, EventJournal, EventJournalError, EventJournalResult,
@@ -27,6 +27,6 @@ pub use journal::{
 };
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
 pub use worker::{
-    DrainOutcome, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, Worker,
-    WorkerError, WorkerHandle, WorkerResult, WorkerSet,
+    DrainOutcome, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, SinkWorker, Trigger,
+    Worker, WorkerError, WorkerHandle, WorkerResult, WorkerSet,
 };

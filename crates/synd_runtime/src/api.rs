@@ -56,7 +56,7 @@ impl RuntimeApiService {
             spawn_event_workers(
                 db,
                 journal,
-                wake_publisher,
+                &wake_publisher,
                 api_events,
                 config,
                 shutdown.cancellation_token(),

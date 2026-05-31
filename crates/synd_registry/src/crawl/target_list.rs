@@ -6,9 +6,8 @@ use crate::{
     crawl::policy::PollingPolicy,
     db::{FeedRegistryDb, RegistryDbTransaction},
     event::{
-        ConsumerEventInput, Event, EventConsumer, EventConsumerId, EventConsumerResult, EventKind,
-        EventReadBatch, EventReadFilter, JournaledEvent, RecordedEvents, SubEvent, SubEventKind,
-        SubscriptionLifecycle,
+        Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId, ProcessorResult,
+        RecordedEvents, SubEvent, SubEventKind, SubscriptionLifecycle,
     },
 };
 
@@ -48,110 +47,103 @@ impl CrawlTarget {
 /// Subscription lifecycle events relevant to the crawl target list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlTargetListInput {
-    events: Vec<SubscriptionLifecycle>,
+    event: SubscriptionLifecycle,
 }
 
 impl CrawlTargetListInput {
-    pub fn new(events: Vec<SubscriptionLifecycle>) -> Self {
-        Self { events }
+    pub fn new(event: SubscriptionLifecycle) -> Self {
+        Self { event }
     }
 
-    pub fn into_events(self) -> Vec<SubscriptionLifecycle> {
-        self.events
+    pub fn into_event(self) -> SubscriptionLifecycle {
+        self.event
     }
 }
 
-impl ConsumerEventInput for CrawlTargetListInput {
-    const READ_FILTER: EventReadFilter = EventReadFilter::new(&[
-        EventKind::Sub(SubEventKind::FeedSubscribed),
-        EventKind::Sub(SubEventKind::SubscriptionChanged),
-        EventKind::Sub(SubEventKind::FeedUnsubscribed),
-    ]);
+impl TryFrom<Event> for CrawlTargetListInput {
+    type Error = ProcessorError;
 
-    fn from_batch(batch: EventReadBatch) -> EventConsumerResult<Option<Self>> {
-        let events = batch
-            .into_events()
-            .into_iter()
-            .map(JournaledEvent::into_event)
-            .map(|event| match event {
-                Event::Sub(SubEvent::FeedSubscribed(event)) => {
-                    SubscriptionLifecycle::Subscribed(event)
-                }
-                Event::Sub(SubEvent::SubscriptionChanged(event)) => {
-                    SubscriptionLifecycle::Changed(event)
-                }
-                Event::Sub(SubEvent::FeedUnsubscribed(event)) => {
-                    SubscriptionLifecycle::Unsubscribed(event)
-                }
-                event => unreachable!("unexpected crawl target list event: {event:?}"),
-            })
-            .collect::<Vec<_>>();
-
-        Ok((!events.is_empty()).then_some(Self::new(events)))
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::Sub(SubEvent::FeedSubscribed(event)) => {
+                Ok(Self::new(SubscriptionLifecycle::Subscribed(event)))
+            }
+            Event::Sub(SubEvent::SubscriptionChanged(event)) => {
+                Ok(Self::new(SubscriptionLifecycle::Changed(event)))
+            }
+            Event::Sub(SubEvent::FeedUnsubscribed(event)) => {
+                Ok(Self::new(SubscriptionLifecycle::Unsubscribed(event)))
+            }
+            event => Err(ProcessorError::UnexpectedEvent {
+                expected: "crawl target list event",
+                actual: event.kind(),
+            }),
+        }
     }
 }
 
 /// Consumer that reacts to subscription events for the crawl target list.
 #[derive(Debug, Clone)]
-pub struct CrawlTargetListProj<S> {
-    db: S,
-}
+pub struct CrawlTargetListProj;
 
-impl<S> CrawlTargetListProj<S> {
-    pub fn new(db: S) -> Self {
-        Self { db }
+impl CrawlTargetListProj {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl<S> EventConsumer for CrawlTargetListProj<S>
+impl Default for CrawlTargetListProj {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Processor for CrawlTargetListProj {
+    type Input = CrawlTargetListInput;
+
+    fn id(&self) -> ProcessorId {
+        ProcessorId::CrawlTargetProjection
+    }
+
+    fn interests(&self) -> EventInterests {
+        EventInterests::new([
+            SubEventKind::FeedSubscribed.into(),
+            SubEventKind::SubscriptionChanged.into(),
+            SubEventKind::FeedUnsubscribed.into(),
+        ])
+    }
+}
+
+impl<S> Consumer<S> for CrawlTargetListProj
 where
     S: FeedRegistryDb,
 {
-    type Input = CrawlTargetListInput;
-
-    fn id(&self) -> EventConsumerId {
-        EventConsumerId::CrawlTargetListProj
-    }
-
-    async fn consume(&mut self, input: Self::Input) -> EventConsumerResult<RecordedEvents> {
-        let feed_urls = affected_feed_urls(input.into_events());
-        if feed_urls.is_empty() {
-            return Ok(RecordedEvents::empty());
-        }
-
-        let mut tx = self.db.begin().await?;
-        for feed_url in &feed_urls {
-            let subscriptions = tx.list_active_subscriptions_for_feed(feed_url).await?;
-            let target = if let Some(policy) = PollingPolicy::from_subscriptions(&subscriptions) {
-                CrawlTarget::active(feed_url.clone(), policy, Utc::now())
-            } else {
-                CrawlTarget::inactive(feed_url.clone(), Utc::now())
-            };
-            tx.upsert_crawl_target(target).await?;
-        }
-        tx.commit().await?;
+    async fn consume(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        input: Self::Input,
+    ) -> ProcessorResult<RecordedEvents> {
+        let feed_url = affected_feed_url(input.into_event());
+        let subscriptions = tx.list_active_subscriptions_for_feed(&feed_url).await?;
+        let target = if let Some(policy) = PollingPolicy::from_subscriptions(&subscriptions) {
+            CrawlTarget::active(feed_url.clone(), policy, Utc::now())
+        } else {
+            CrawlTarget::inactive(feed_url.clone(), Utc::now())
+        };
+        tx.upsert_crawl_target(target).await?;
 
         debug!(
-            feed_count = feed_urls.len(),
-            "crawl target list projector reconciled feeds"
+            feed_url = feed_url.as_str(),
+            "crawl target list projector reconciled feed"
         );
         Ok(RecordedEvents::empty())
     }
 }
 
-fn affected_feed_urls(events: Vec<SubscriptionLifecycle>) -> Vec<FeedUrl> {
-    let mut feed_urls = Vec::new();
-    for event in events {
-        let feed_url = match event {
-            SubscriptionLifecycle::Subscribed(event) => event.subscription.feed_url,
-            SubscriptionLifecycle::Changed(event) => event.subscription.feed_url,
-            SubscriptionLifecycle::Unsubscribed(event) => event.subscription.feed_url,
-        };
-        if !feed_urls.contains(&feed_url) {
-            feed_urls.push(feed_url);
-        }
+fn affected_feed_url(event: SubscriptionLifecycle) -> FeedUrl {
+    match event {
+        SubscriptionLifecycle::Subscribed(event) => event.subscription.feed_url,
+        SubscriptionLifecycle::Changed(event) => event.subscription.feed_url,
+        SubscriptionLifecycle::Unsubscribed(event) => event.subscription.feed_url,
     }
-
-    feed_urls.sort_unstable_by(|a, b| a.as_str().cmp(b.as_str()));
-    feed_urls
 }

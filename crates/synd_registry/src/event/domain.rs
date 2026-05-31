@@ -17,9 +17,9 @@ pub enum Event {
 impl Event {
     pub fn kind(&self) -> EventKind {
         match self {
-            Self::Request(event) => EventKind::Request(event.kind()),
-            Self::Sub(event) => EventKind::Sub(event.kind()),
-            Self::Api(event) => EventKind::Api(event.kind()),
+            Self::Request(event) => event.kind().into(),
+            Self::Sub(event) => event.kind().into(),
+            Self::Api(event) => event.kind().into(),
         }
     }
 }
@@ -50,6 +50,24 @@ pub enum EventKind {
     Api(ApiEventKind),
 }
 
+impl From<RequestEventKind> for EventKind {
+    fn from(kind: RequestEventKind) -> Self {
+        Self::Request(kind)
+    }
+}
+
+impl From<SubEventKind> for EventKind {
+    fn from(kind: SubEventKind) -> Self {
+        Self::Sub(kind)
+    }
+}
+
+impl From<ApiEventKind> for EventKind {
+    fn from(kind: ApiEventKind) -> Self {
+        Self::Api(kind)
+    }
+}
+
 /// A stable request event category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RequestEventKind {
@@ -77,30 +95,32 @@ pub enum ApiEventKind {
     FeedUnsubscribeRejected,
 }
 
-/// Event categories used by a journal read query.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EventReadFilter {
-    kinds: &'static [EventKind],
+/// Event categories a worker is interested in consuming.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventInterests {
+    kinds: Vec<EventKind>,
 }
 
-impl EventReadFilter {
-    pub const fn new(kinds: &'static [EventKind]) -> Self {
-        Self { kinds }
+impl EventInterests {
+    pub fn new(kinds: impl Into<Vec<EventKind>>) -> Self {
+        Self {
+            kinds: kinds.into(),
+        }
     }
 
-    pub const fn empty() -> Self {
-        Self::new(&[])
+    pub fn empty() -> Self {
+        Self::new(Vec::new())
     }
 
-    pub fn kinds(self) -> &'static [EventKind] {
-        self.kinds
+    pub fn kinds(&self) -> &[EventKind] {
+        &self.kinds
     }
 
-    pub fn contains(self, kind: EventKind) -> bool {
+    pub fn contains(&self, kind: EventKind) -> bool {
         self.kinds.contains(&kind)
     }
 
-    pub fn matches_any(self, kinds: &[EventKind]) -> bool {
+    pub fn matches_any(&self, kinds: &[EventKind]) -> bool {
         kinds.iter().any(|kind| self.contains(*kind))
     }
 }
