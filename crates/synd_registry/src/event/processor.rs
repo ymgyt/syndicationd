@@ -1,11 +1,15 @@
 use std::future::Future;
 
+use synd_feed::types::FeedUrl;
 use thiserror::Error;
 
 use crate::{
-    db::FeedRegistryDb,
-    error::RegistryDbError,
-    event::{Event, EventInterests, EventKind},
+    crawl::target_list::CrawlTarget,
+    db::{FeedRegistryDb, RegistryTx},
+    error::{RegistryDbError, RegistryDbResult},
+    event::{Event, EventInterests, EventKind, JournalTx},
+    query::{Subscriptions, SubscriptionsQuery},
+    subscription::{SubscriberId, Subscription},
 };
 
 /// Result type returned by event processors.
@@ -80,9 +84,9 @@ where
 {
     fn consume(
         &mut self,
-        tx: &mut S::Tx<'_>,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> impl Future<Output = ProcessorResult<RecordedEvents>> + Send;
+    ) -> impl Future<Output = ProcessorResult<()>> + Send;
 }
 
 /// A terminal event processor that consumes committed events without recording new events.
@@ -99,6 +103,10 @@ pub struct RecordedEvents {
 impl RecordedEvents {
     pub fn new(kinds: Vec<EventKind>) -> Self {
         Self { kinds }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::new(Vec::with_capacity(capacity))
     }
 
     pub fn empty() -> Self {
@@ -123,5 +131,100 @@ impl RecordedEvents {
 
     pub fn extend(&mut self, mut other: Self) {
         self.kinds.append(&mut other.kinds);
+    }
+}
+
+/// Transactional context passed to event consumers.
+///
+/// Domain database operations are delegated to the underlying transaction.
+/// New journal events must be recorded through `record_event` so journal writes
+/// and wake summaries stay in sync.
+pub struct ConsumeContext<'a, Tx> {
+    tx: &'a mut Tx,
+    recorded: RecordedEvents,
+}
+
+impl<'a, Tx> ConsumeContext<'a, Tx> {
+    pub fn new(tx: &'a mut Tx) -> Self {
+        Self::with_capacity(tx, 0)
+    }
+
+    pub fn with_capacity(tx: &'a mut Tx, capacity: usize) -> Self {
+        Self {
+            tx,
+            recorded: RecordedEvents::with_capacity(capacity),
+        }
+    }
+
+    pub fn into_recorded(self) -> RecordedEvents {
+        self.recorded
+    }
+}
+
+impl<Tx> ConsumeContext<'_, Tx>
+where
+    Tx: JournalTx + Send,
+{
+    pub async fn record_event(&mut self, event: Event) -> ProcessorResult<()> {
+        let kind = event.kind();
+        self.tx.append_event(event).await?;
+        self.recorded.push(kind);
+        Ok(())
+    }
+}
+
+impl<Tx> RegistryTx for ConsumeContext<'_, Tx>
+where
+    Tx: RegistryTx + Send,
+{
+    fn upsert_subscription(
+        &mut self,
+        subscription: Subscription,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
+        self.tx.upsert_subscription(subscription)
+    }
+
+    fn delete_subscription(
+        &mut self,
+        subscriber_id: &SubscriberId,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
+        self.tx.delete_subscription(subscriber_id, feed_url)
+    }
+
+    fn has_subscription(
+        &mut self,
+        subscriber_id: &SubscriberId,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<bool>> + Send {
+        self.tx.has_subscription(subscriber_id, feed_url)
+    }
+
+    fn list_subscriptions(
+        &mut self,
+        query: SubscriptionsQuery,
+    ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send {
+        self.tx.list_subscriptions(query)
+    }
+
+    fn list_active_subscriptions_for_feed(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send {
+        self.tx.list_active_subscriptions_for_feed(feed_url)
+    }
+
+    fn upsert_crawl_target(
+        &mut self,
+        target: CrawlTarget,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
+        self.tx.upsert_crawl_target(target)
+    }
+
+    fn load_crawl_target(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send {
+        self.tx.load_crawl_target(feed_url)
     }
 }

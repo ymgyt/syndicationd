@@ -4,11 +4,7 @@ use synd_api::{
     cli::ServeOptions, dependency::Dependency, serve::auth::Authenticator, shutdown::Shutdown,
 };
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
-use synd_registry::{
-    FeedRegistry, FeedRegistryConfig,
-    event::{ApiEventPublisher, EventSubmitter, EventWakePublisher, WorkerSet},
-    runtime::spawn_event_workers,
-};
+use synd_registry::{FeedRegistryConfig, RegistryService, event::WorkerSet};
 
 use crate::{Result, RuntimeDatabase};
 
@@ -42,24 +38,8 @@ impl ApiService {
     ) -> Result<Self> {
         let db = Repository::open(database_path).await?;
         let config = FeedRegistryConfig::default();
-        let api_events = ApiEventPublisher::default();
-        let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
-
-        let registry = {
-            let event_submitter = EventSubmitter::new(db.clone(), wake_publisher.clone());
-
-            FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
-        };
-
-        let event_workers = {
-            spawn_event_workers(
-                db,
-                &wake_publisher,
-                api_events,
-                config,
-                shutdown.cancellation_token(),
-            )
-        };
+        let registry_service = RegistryService::start(db, config, shutdown.cancellation_token());
+        let (registry, event_workers) = registry_service.into_parts();
 
         let dependency = Dependency::new(authenticator, registry, None, serve_options);
 

@@ -9,8 +9,8 @@ use crate::{
     db::{CommitTx, FeedRegistryDb},
     error::RegistryDbError,
     event::{
-        Consumer, EventCursor, JournalTx, PostCommit, Processor, ProcessorError, ProcessorId,
-        ProcessorResult, RecordedEvents, Sink, Transactional,
+        ConsumeContext, Consumer, EventCursor, JournalTx, PostCommit, Processor, ProcessorError,
+        ProcessorId, ProcessorResult, RecordedEvents, Sink, Transactional,
     },
 };
 
@@ -314,6 +314,30 @@ where
     }
 }
 
+pub(crate) fn spawn_worker<S, P>(
+    db: S,
+    wake_publisher: EventWakePublisher,
+    poll_interval: Duration,
+    ct: CancellationToken,
+    processor: P,
+) -> WorkerHandle
+where
+    S: FeedRegistryDb,
+    P: Processor,
+    P::Phase: WorkerPhase<S, P>,
+{
+    let wake_subscriber = wake_publisher.subscribe();
+
+    Worker::new(
+        db,
+        processor,
+        wake_publisher,
+        wake_subscriber,
+        poll_interval,
+    )
+    .spawn(ct)
+}
+
 pub(crate) trait WorkerPhase<S, P>: Sized
 where
     S: FeedRegistryDb,
@@ -336,12 +360,13 @@ where
         let batch = tx.read_after(&cursor, processor.interests()).await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();
-        let mut recorded = RecordedEvents::empty();
+        let mut cx = ConsumeContext::with_capacity(&mut tx, event_count);
 
         for journaled in batch.into_events() {
             let input = P::Input::try_from(journaled.into_event())?;
-            recorded.extend(processor.consume(&mut tx, input).await?);
+            processor.consume(&mut cx, input).await?;
         }
+        let recorded = cx.into_recorded();
 
         tx.advance_cursor(&scanned_cursor).await?;
         tx.commit().await?;

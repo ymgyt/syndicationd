@@ -464,17 +464,16 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use synd_feed::types::FeedUrl;
     use synd_registry::{
-        FeedRegistry, FeedRegistryConfig, SubscribeFeedCommand, SubscriptionKey,
+        FeedRegistry, FeedRegistryConfig, RegistryService, SubscribeFeedCommand, SubscriptionKey,
         crawl::{
             policy::{PollingSchedule, RefreshInterval, RefreshPolicy, RefreshSchedule},
             target_list::{CrawlTargetListInput, CrawlTargetListProj},
         },
         event::{
-            ApiEvent, ApiEventPublisher, Consumer, EventInterests, EventSubmitter,
-            EventWakePublisher, FeedSubscribed, FeedUnsubscribed, ProcessorId, RequestEventKind,
-            SubEvent, SubEventKind, SubscriptionChanged, SubscriptionLifecycle,
+            ApiEvent, ConsumeContext, Consumer, EventInterests, EventSubmitter, EventWakePublisher,
+            FeedSubscribed, FeedUnsubscribed, ProcessorId, RequestEventKind, SubEvent,
+            SubEventKind, SubscriptionChanged, SubscriptionLifecycle,
         },
-        runtime::spawn_event_workers,
     };
     use tokio_util::sync::CancellationToken;
 
@@ -556,13 +555,16 @@ mod tests {
     ) -> anyhow::Result<()> {
         let mut projector = CrawlTargetListProj::new();
         let mut tx = db.begin().await?;
-        for event in events {
-            <CrawlTargetListProj as Consumer<SqliteFeedRegistryDb>>::consume(
-                &mut projector,
-                &mut tx,
-                CrawlTargetListInput::new(event),
-            )
-            .await?;
+        {
+            let mut cx = ConsumeContext::new(&mut tx);
+            for event in events {
+                <CrawlTargetListProj as Consumer<SqliteFeedRegistryDb>>::consume(
+                    &mut projector,
+                    &mut cx,
+                    CrawlTargetListInput::new(event),
+                )
+                .await?;
+            }
         }
         tx.commit().await?;
         Ok(())
@@ -621,12 +623,7 @@ mod tests {
             db.clone(),
             EventWakePublisher::new(config.event_wake_channel_capacity),
         );
-        let registry = FeedRegistry::with_api_events(
-            db.clone(),
-            config,
-            ApiEventPublisher::default(),
-            event_submitter,
-        );
+        let registry = FeedRegistry::new(db.clone(), config, event_submitter);
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("event");
 
@@ -666,15 +663,8 @@ mod tests {
             event_worker_poll_interval: Duration::from_millis(10),
             ..FeedRegistryConfig::default()
         };
-        let api_events = ApiEventPublisher::default();
-        let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
-        let registry = {
-            let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
-
-            FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
-        };
-        let event_workers =
-            { spawn_event_workers(db.clone(), &wake_publisher, api_events, config, ct.clone()) };
+        let registry_service = RegistryService::start(db.clone(), config, ct.clone());
+        let (registry, event_workers) = registry_service.into_parts();
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("runtime-subscribe");
         let mut api_events = registry.subscribe_api_events(subscriber_id.clone());

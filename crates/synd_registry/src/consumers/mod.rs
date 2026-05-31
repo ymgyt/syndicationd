@@ -2,7 +2,7 @@ mod api_event;
 mod sub_request;
 
 pub use api_event::{ApiEventProj, ApiEventProjectionInput};
-pub use sub_request::{SubRequestInput, SubRequestWorker};
+pub use sub_request::{SubRequestInput, SubRequestProj};
 
 use crate::event::{Event, ProcessorError};
 

@@ -17,11 +17,7 @@ use synd_api::{
     shutdown::Shutdown,
 };
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
-use synd_registry::{
-    FeedRegistry,
-    event::{ApiEventPublisher, EventSubmitter, EventWakePublisher},
-    runtime::spawn_event_workers,
-};
+use synd_registry::RegistryService;
 
 fn init_tracing(options: &ObservabilityOptions) -> Option<OpenTelemetryGuard> {
     let ObservabilityOptions {
@@ -69,29 +65,9 @@ async fn run(
     };
     let tls_config = tls.rustls_config(local_enabled).await?;
     let registry_config = feed_refresh.registry_config();
-    let api_events = ApiEventPublisher::default();
-    let wake_publisher = EventWakePublisher::new(registry_config.event_wake_channel_capacity);
-
-    let registry = {
-        let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
-
-        FeedRegistry::with_api_events(
-            db.clone(),
-            registry_config,
-            api_events.clone(),
-            event_submitter,
-        )
-    };
-
-    let event_workers = {
-        spawn_event_workers(
-            db,
-            &wake_publisher,
-            api_events,
-            registry_config,
-            shutdown.cancellation_token(),
-        )
-    };
+    let registry_service =
+        RegistryService::start(db, registry_config, shutdown.cancellation_token());
+    let (registry, event_workers) = registry_service.into_parts();
 
     let dep = Dependency::new(authenticator, registry, tls_config, serve);
 

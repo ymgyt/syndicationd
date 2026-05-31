@@ -4,9 +4,9 @@ use crate::{
     consumers::unexpected_event,
     db::{FeedRegistryDb, RegistryTx},
     event::{
-        Consumer, Event, EventInterests, EventKind, FeedSubscribed, FeedUnsubscribed, JournalTx,
-        Processor, ProcessorError, ProcessorId, ProcessorResult, RecordedEvents, RequestEvent,
-        RequestEventKind, SubEvent, SubscribeFeedRequested, SubscriptionChanged, Transactional,
+        ConsumeContext, Consumer, Event, EventInterests, FeedSubscribed, FeedUnsubscribed,
+        Processor, ProcessorError, ProcessorId, ProcessorResult, RequestEvent, RequestEventKind,
+        SubEvent, SubscribeFeedRequested, SubscriptionChanged, Transactional,
         UnsubscribeFeedRejected, UnsubscribeFeedRequested,
     },
     subscription::Subscription,
@@ -14,18 +14,11 @@ use crate::{
 
 /// Subscription request lifecycle events accepted by the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SubRequestInput {
-    event: RequestEvent,
-}
-
-impl SubRequestInput {
-    pub fn new(event: RequestEvent) -> Self {
-        Self { event }
-    }
-
-    pub fn into_event(self) -> RequestEvent {
-        self.event
-    }
+pub enum SubRequestInput {
+    /// A request to subscribe one subscriber to one feed.
+    Subscribe(SubscribeFeedRequested),
+    /// A request to unsubscribe one subscriber from one feed.
+    Unsubscribe(UnsubscribeFeedRequested),
 }
 
 impl TryFrom<Event> for SubRequestInput {
@@ -33,10 +26,12 @@ impl TryFrom<Event> for SubRequestInput {
 
     fn try_from(event: Event) -> Result<Self, Self::Error> {
         match event {
-            Event::Request(
-                event @ (RequestEvent::SubscribeFeedRequested(_)
-                | RequestEvent::UnsubscribeFeedRequested(_)),
-            ) => Ok(Self::new(event)),
+            Event::Request(RequestEvent::SubscribeFeedRequested(event)) => {
+                Ok(Self::Subscribe(event))
+            }
+            Event::Request(RequestEvent::UnsubscribeFeedRequested(event)) => {
+                Ok(Self::Unsubscribe(event))
+            }
             event => Err(unexpected_event("subscription request event", &event)),
         }
     }
@@ -44,21 +39,21 @@ impl TryFrom<Event> for SubRequestInput {
 
 /// Turns subscription request events into subscription domain events.
 #[derive(Debug, Clone)]
-pub struct SubRequestWorker;
+pub struct SubRequestProj;
 
-impl SubRequestWorker {
+impl SubRequestProj {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Default for SubRequestWorker {
+impl Default for SubRequestProj {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Processor for SubRequestWorker {
+impl Processor for SubRequestProj {
     type Input = SubRequestInput;
     type Phase = Transactional;
 
@@ -74,36 +69,31 @@ impl Processor for SubRequestWorker {
     }
 }
 
-impl<S> Consumer<S> for SubRequestWorker
+impl<S> Consumer<S> for SubRequestProj
 where
     S: FeedRegistryDb,
 {
     async fn consume(
         &mut self,
-        tx: &mut S::Tx<'_>,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> ProcessorResult<RecordedEvents> {
-        let mut recorded = RecordedEvents::empty();
-        let kind = match input.into_event() {
-            RequestEvent::SubscribeFeedRequested(event) => self.handle_subscribe(tx, event).await?,
-            RequestEvent::UnsubscribeFeedRequested(event) => {
-                self.handle_unsubscribe(tx, event).await?
-            }
-            event => unreachable!("unexpected subscription request event: {event:?}"),
-        };
-        recorded.push(kind);
-        Ok(recorded)
+    ) -> ProcessorResult<()> {
+        match input {
+            SubRequestInput::Subscribe(event) => self.handle_subscribe::<S>(cx, event).await?,
+            SubRequestInput::Unsubscribe(event) => self.handle_unsubscribe::<S>(cx, event).await?,
+        }
+        Ok(())
     }
 }
 
-impl SubRequestWorker {
-    async fn handle_subscribe<T>(
+impl SubRequestProj {
+    async fn handle_subscribe<S>(
         &self,
-        tx: &mut T,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         event: SubscribeFeedRequested,
-    ) -> ProcessorResult<EventKind>
+    ) -> ProcessorResult<()>
     where
-        T: RegistryTx + JournalTx + Send,
+        S: FeedRegistryDb,
     {
         let now = Utc::now();
         let subscription = Subscription {
@@ -116,10 +106,10 @@ impl SubRequestWorker {
             updated_at: now,
         };
 
-        let already_subscribed = tx
+        let already_subscribed = cx
             .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
             .await?;
-        tx.upsert_subscription(subscription).await?;
+        cx.upsert_subscription(subscription).await?;
 
         let event = if already_subscribed {
             Event::Sub(SubEvent::SubscriptionChanged(
@@ -130,20 +120,18 @@ impl SubRequestWorker {
                 FeedSubscribed::new(event.subscription).with_request_id(event.request_id),
             ))
         };
-        let kind = event.kind();
-        tx.append_event(event).await?;
-        Ok(kind)
+        cx.record_event(event).await
     }
 
-    async fn handle_unsubscribe<T>(
+    async fn handle_unsubscribe<S>(
         &self,
-        tx: &mut T,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         event: UnsubscribeFeedRequested,
-    ) -> ProcessorResult<EventKind>
+    ) -> ProcessorResult<()>
     where
-        T: RegistryTx + JournalTx + Send,
+        S: FeedRegistryDb,
     {
-        let is_subscribed = tx
+        let is_subscribed = cx
             .has_subscription(
                 &event.subscription.subscriber_id,
                 &event.subscription.feed_url,
@@ -151,7 +139,7 @@ impl SubRequestWorker {
             .await?;
 
         let event = if is_subscribed {
-            tx.delete_subscription(
+            cx.delete_subscription(
                 &event.subscription.subscriber_id,
                 &event.subscription.feed_url,
             )
@@ -169,8 +157,6 @@ impl SubRequestWorker {
             ))
         };
 
-        let kind = event.kind();
-        tx.append_event(event).await?;
-        Ok(kind)
+        cx.record_event(event).await
     }
 }

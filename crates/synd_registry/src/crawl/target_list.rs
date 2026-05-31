@@ -6,8 +6,8 @@ use crate::{
     crawl::policy::PollingPolicy,
     db::{FeedRegistryDb, RegistryTx},
     event::{
-        Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId, ProcessorResult,
-        RecordedEvents, SubEvent, SubEventKind, SubscriptionLifecycle, Transactional,
+        ConsumeContext, Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId,
+        ProcessorResult, SubEvent, SubEventKind, SubscriptionLifecycle, Transactional,
     },
 };
 
@@ -121,23 +121,23 @@ where
 {
     async fn consume(
         &mut self,
-        tx: &mut S::Tx<'_>,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> ProcessorResult<RecordedEvents> {
+    ) -> ProcessorResult<()> {
         let feed_url = affected_feed_url(input.into_event());
-        let subscriptions = tx.list_active_subscriptions_for_feed(&feed_url).await?;
+        let subscriptions = cx.list_active_subscriptions_for_feed(&feed_url).await?;
         let target = if let Some(policy) = PollingPolicy::from_subscriptions(&subscriptions) {
             CrawlTarget::active(feed_url.clone(), policy, Utc::now())
         } else {
             CrawlTarget::inactive(feed_url.clone(), Utc::now())
         };
-        tx.upsert_crawl_target(target).await?;
+        cx.upsert_crawl_target(target).await?;
 
         debug!(
             feed_url = feed_url.as_str(),
             "crawl target list projector reconciled feed"
         );
-        Ok(RecordedEvents::empty())
+        Ok(())
     }
 }
 

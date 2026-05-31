@@ -19,12 +19,12 @@ pub use domain::{
 };
 pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
 pub use processor::{
-    Consumer, PostCommit, Processor, ProcessorError, ProcessorId, ProcessorInput, ProcessorPhase,
-    ProcessorResult, RecordedEvents, Sink, Transactional,
+    ConsumeContext, Consumer, PostCommit, Processor, ProcessorError, ProcessorId, ProcessorInput,
+    ProcessorPhase, ProcessorResult, RecordedEvents, Sink, Transactional,
 };
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
 pub use worker::{
     EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, WorkerError,
     WorkerHandle, WorkerResult, WorkerSet,
 };
-pub(crate) use worker::{Worker, WorkerPhase};
+pub(crate) use worker::{WorkerPhase, spawn_worker};

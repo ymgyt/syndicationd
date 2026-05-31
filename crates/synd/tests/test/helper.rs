@@ -20,10 +20,8 @@ use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    CommitTx, FeedRegistry, FeedRegistryDb, RegistryTx, SubscriberId, Subscription,
+    CommitTx, FeedRegistryDb, RegistryService, RegistryTx, SubscriberId, Subscription,
     crawl::policy::{RefreshInterval, RefreshPolicy},
-    event::{ApiEventPublisher, EventSubmitter, EventWakePublisher},
-    runtime::spawn_event_workers,
 };
 pub use synd_term::integration::event_stream;
 use synd_term::{
@@ -366,29 +364,9 @@ pub async fn serve_api(
 
     let shutdown = Shutdown::watch_signal(future::pending(), || {});
     let registry_config = feed_refresh_options.registry_config();
-    let api_events = ApiEventPublisher::default();
-    let wake_publisher = EventWakePublisher::new(registry_config.event_wake_channel_capacity);
-
-    let registry = {
-        let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
-
-        FeedRegistry::with_api_events(
-            db.clone(),
-            registry_config,
-            api_events.clone(),
-            event_submitter,
-        )
-    };
-
-    let event_workers = {
-        spawn_event_workers(
-            db.clone(),
-            &wake_publisher,
-            api_events,
-            registry_config,
-            shutdown.cancellation_token(),
-        )
-    };
+    let registry_service =
+        RegistryService::start(db.clone(), registry_config, shutdown.cancellation_token());
+    let (registry, event_workers) = registry_service.into_parts();
 
     let mut dep = Dependency::new(
         ApiAuthenticator::new().unwrap(),

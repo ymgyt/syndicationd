@@ -3,9 +3,9 @@ use crate::{
     db::FeedRegistryDb,
     event::{
         ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Consumer, Event, EventInterests,
-        JournalTx, Processor, ProcessorError, ProcessorId, ProcessorResult, RecordedEvents,
-        RequestEvent, RequestEventKind, SubEvent, SubEventKind, Transactional,
+        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ConsumeContext, Consumer, Event,
+        EventInterests, Processor, ProcessorError, ProcessorId, ProcessorResult, RequestEvent,
+        RequestEventKind, SubEvent, SubEventKind, Transactional,
     },
 };
 
@@ -84,17 +84,13 @@ where
 {
     async fn consume(
         &mut self,
-        tx: &mut S::Tx<'_>,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> ProcessorResult<RecordedEvents> {
-        let mut recorded = RecordedEvents::empty();
+    ) -> ProcessorResult<()> {
         let Some(api_event) = project_api_event(input.into_event()) else {
-            return Ok(recorded);
+            return Ok(());
         };
-        let event = Event::Api(api_event);
-        recorded.push(event.kind());
-        tx.append_event(event).await?;
-        Ok(recorded)
+        cx.record_event(Event::Api(api_event)).await
     }
 }
 
