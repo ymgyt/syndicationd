@@ -1,17 +1,20 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
-use sqlx::{Sqlite, Transaction};
+use sqlx::{QueryBuilder, Row, Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryDbTransaction, SubscriberId,
+    CommitTx, FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryTx, SubscriberId,
     Subscription,
     crawl::target_list::CrawlTarget,
-    event::{Event, EventCursor, EventCursorPos, EventEncoding},
-    view::{Subscriptions, SubscriptionsQuery},
+    event::{
+        Event, EventCursor, EventCursorPos, EventEncoding, EventInterests, EventReadBatch,
+        JournalTx, JournaledEvent, ProcessorId,
+    },
+    query::{Subscriptions, SubscriptionsQuery},
 };
 
 use self::codec::{decode_crawl_target, decode_subscription, encode_policy, encode_polling_policy};
-use super::{SqliteDatabase, SqliteEventJournal};
+use super::SqliteDatabase;
 
 mod codec;
 
@@ -33,7 +36,7 @@ pub struct SqliteFeedRegistryDb {
 }
 
 /// `SQLite` transaction used to atomically update registry state and event progress.
-pub struct SqliteRegistryDbTransaction<'a> {
+pub struct SqliteRegistryTx<'a> {
     tx: Transaction<'a, Sqlite>,
 }
 
@@ -41,22 +44,18 @@ impl SqliteFeedRegistryDb {
     pub fn new(db: SqliteDatabase) -> Self {
         Self { db }
     }
-
-    pub fn event_journal(&self) -> SqliteEventJournal {
-        SqliteEventJournal::new(self.db.clone())
-    }
 }
 
 impl FeedRegistryDb for SqliteFeedRegistryDb {
-    type Tx<'a> = SqliteRegistryDbTransaction<'a>;
+    type Tx<'a> = SqliteRegistryTx<'a>;
 
     async fn begin(&self) -> Result<Self::Tx<'_>, RegistryDbError> {
         let tx = self.db.begin().await?;
-        Ok(SqliteRegistryDbTransaction { tx })
+        Ok(SqliteRegistryTx { tx })
     }
 }
 
-impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
+impl JournalTx for SqliteRegistryTx<'_> {
     async fn append_event(&mut self, event: Event) -> RegistryDbResult<()> {
         let encoded = event.encode().map_err(RegistryDbError::internal)?;
         sqlx::query(
@@ -74,6 +73,135 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
         Ok(())
     }
 
+    async fn read_after(
+        &mut self,
+        cursor: &EventCursor,
+        interests: EventInterests,
+    ) -> RegistryDbResult<EventReadBatch> {
+        let position = decode_event_cursor_position(cursor.position())?;
+        let processor = cursor.processor();
+        let event_types = interests
+            .kinds()
+            .iter()
+            .copied()
+            .map(synd_registry::event::EventKind::event_type)
+            .collect::<Vec<_>>();
+
+        let scanned_position = sqlx::query(
+            r"
+            SELECT COALESCE(MAX(position), ?) AS scanned_position
+            FROM event_journal
+            WHERE position > ?
+            ",
+        )
+        .bind(position)
+        .bind(position)
+        .fetch_one(&mut *self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?
+        .try_get::<i64, _>("scanned_position")
+        .map_err(RegistryDbError::internal)?;
+
+        let scanned_cursor = EventCursor::at(
+            processor,
+            EventCursorPos::position(scanned_position.to_string()),
+        );
+
+        if event_types.is_empty() || scanned_position <= position {
+            return Ok(EventReadBatch::empty(scanned_cursor));
+        }
+
+        let mut query = QueryBuilder::<Sqlite>::new(
+            r"
+            SELECT position, event_type, payload_json
+            FROM event_journal
+            WHERE position > ",
+        );
+        query.push_bind(position);
+        query.push(" AND position <= ");
+        query.push_bind(scanned_position);
+        query.push(" AND event_type IN (");
+        let mut separated = query.separated(", ");
+        for event_type in event_types {
+            separated.push_bind(event_type);
+        }
+        separated.push_unseparated(") ORDER BY position");
+
+        let rows = query
+            .build()
+            .fetch_all(&mut *self.tx)
+            .await
+            .map_err(RegistryDbError::internal)?;
+        let mut events = Vec::with_capacity(rows.len());
+        for row in rows {
+            let position = row
+                .try_get::<i64, _>("position")
+                .map_err(RegistryDbError::internal)?;
+            let event_type = row
+                .try_get::<String, _>("event_type")
+                .map_err(RegistryDbError::internal)?;
+            let payload_json = row
+                .try_get::<String, _>("payload_json")
+                .map_err(RegistryDbError::internal)?;
+            events.push(JournaledEvent::new(
+                EventCursor::at(processor, EventCursorPos::position(position.to_string())),
+                Event::decode(&event_type, &payload_json).map_err(RegistryDbError::internal)?,
+            ));
+        }
+
+        Ok(EventReadBatch::new(events, scanned_cursor))
+    }
+
+    async fn load_cursor(&mut self, processor: ProcessorId) -> RegistryDbResult<EventCursor> {
+        let row = sqlx::query(
+            r"
+            SELECT position
+            FROM event_cursor
+            WHERE consumer = ?
+            ",
+        )
+        .bind(processor.as_str())
+        .fetch_optional(&mut *self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        let Some(row) = row else {
+            return Ok(EventCursor::initial(processor));
+        };
+        let position = row
+            .try_get::<i64, _>("position")
+            .map_err(RegistryDbError::internal)?;
+        Ok(EventCursor::at(
+            processor,
+            EventCursorPos::position(position.to_string()),
+        ))
+    }
+
+    async fn advance_cursor(&mut self, cursor: &EventCursor) -> RegistryDbResult<()> {
+        let position = decode_event_cursor_position(cursor.position())?;
+        sqlx::query(
+            r"
+            INSERT INTO event_cursor (consumer, position)
+            VALUES (?, ?)
+            ON CONFLICT(consumer) DO UPDATE SET
+                position = CASE
+                    WHEN excluded.position > event_cursor.position
+                    THEN excluded.position
+                    ELSE event_cursor.position
+                END
+            ",
+        )
+        .bind(cursor.processor().as_str())
+        .bind(position)
+        .execute(&mut *self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        Ok(())
+    }
+}
+
+impl RegistryTx for SqliteRegistryTx<'_> {
     async fn upsert_subscription(&mut self, subscription: Subscription) -> RegistryDbResult<()> {
         let requirement = subscription.requirement.map(|r| r.to_string());
         let category = subscription.category.map(|c| c.to_string());
@@ -306,30 +434,9 @@ impl RegistryDbTransaction for SqliteRegistryDbTransaction<'_> {
 
         row.as_ref().map(decode_crawl_target).transpose()
     }
+}
 
-    async fn advance_event_cursor(&mut self, cursor: &EventCursor) -> RegistryDbResult<()> {
-        let position = decode_event_cursor_position(cursor.position())?;
-        sqlx::query(
-            r"
-            INSERT INTO event_cursor (consumer, position)
-            VALUES (?, ?)
-            ON CONFLICT(consumer) DO UPDATE SET
-                position = CASE
-                    WHEN excluded.position > event_cursor.position
-                    THEN excluded.position
-                    ELSE event_cursor.position
-                END
-            ",
-        )
-        .bind(cursor.processor().as_str())
-        .bind(position)
-        .execute(&mut *self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(())
-    }
-
+impl CommitTx for SqliteRegistryTx<'_> {
     async fn commit(self) -> RegistryDbResult<()> {
         self.tx.commit().await.map_err(RegistryDbError::internal)
     }
@@ -363,9 +470,9 @@ mod tests {
             target_list::{CrawlTargetListInput, CrawlTargetListProj},
         },
         event::{
-            ApiEvent, ApiEventPublisher, Consumer, EventInterests, EventJournal, EventSubmitter,
+            ApiEvent, ApiEventPublisher, Consumer, EventInterests, EventSubmitter,
             EventWakePublisher, FeedSubscribed, FeedUnsubscribed, ProcessorId, RequestEventKind,
-            SubscriptionChanged, SubscriptionLifecycle,
+            SubEvent, SubEventKind, SubscriptionChanged, SubscriptionLifecycle,
         },
         runtime::spawn_event_workers,
     };
@@ -423,6 +530,26 @@ mod tests {
         )
     }
 
+    fn subscribed_event(path: &str) -> Event {
+        Event::Sub(SubEvent::FeedSubscribed(FeedSubscribed::new(
+            subscription_key(&subscription(path)),
+        )))
+    }
+
+    fn changed_event(path: &str) -> Event {
+        Event::Sub(SubEvent::SubscriptionChanged(SubscriptionChanged::new(
+            subscription_key(&subscription(path)),
+        )))
+    }
+
+    fn subscription_lifecycle_interests() -> EventInterests {
+        EventInterests::new([
+            SubEventKind::FeedSubscribed.into(),
+            SubEventKind::SubscriptionChanged.into(),
+            SubEventKind::FeedUnsubscribed.into(),
+        ])
+    }
+
     async fn project_crawl_targets(
         db: &SqliteFeedRegistryDb,
         events: Vec<SubscriptionLifecycle>,
@@ -442,12 +569,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn load_cursor_returns_initial_cursor_for_new_processor() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let mut tx = db.begin().await?;
+
+        let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
+        tx.commit().await?;
+
+        assert_eq!(
+            cursor,
+            EventCursor::initial(ProcessorId::CrawlTargetProjection)
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn append_and_read_subscription_events_for_processor() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        {
+            let mut tx = db.begin().await?;
+            tx.append_event(subscribed_event("subscribed")).await?;
+            tx.append_event(changed_event("changed")).await?;
+            tx.commit().await?;
+        }
+
+        let mut tx = db.begin().await?;
+        let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
+        let batch = tx
+            .read_after(&cursor, subscription_lifecycle_interests())
+            .await?;
+        tx.commit().await?;
+
+        assert_eq!(batch.events().len(), 2);
+        assert_eq!(batch.events()[0].event(), &subscribed_event("subscribed"));
+        assert_eq!(batch.events()[1].event(), &changed_event("changed"));
+        assert_eq!(
+            batch.scanned_cursor(),
+            &EventCursor::at(
+                ProcessorId::CrawlTargetProjection,
+                EventCursorPos::position("2")
+            )
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn subscribe_records_request_event() -> anyhow::Result<()> {
         let db = migrated_db().await?;
-        let journal = db.event_journal();
         let config = FeedRegistryConfig::default();
         let event_submitter = EventSubmitter::new(
-            journal.clone(),
+            db.clone(),
             EventWakePublisher::new(config.event_wake_channel_capacity),
         );
         let registry = FeedRegistry::with_api_events(
@@ -469,15 +640,15 @@ mod tests {
             })
             .await?;
 
-        let cursor = journal
-            .load_cursor(ProcessorId::SubscriptionRequest)
-            .await?;
-        let batch = journal
+        let mut tx = db.begin().await?;
+        let cursor = tx.load_cursor(ProcessorId::SubscriptionRequest).await?;
+        let batch = tx
             .read_after(
                 &cursor,
                 EventInterests::new([RequestEventKind::SubscribeFeedRequested.into()]),
             )
             .await?;
+        tx.commit().await?;
 
         assert_eq!(batch.events().len(), 1);
         assert_eq!(
@@ -495,24 +666,15 @@ mod tests {
             event_worker_poll_interval: Duration::from_millis(10),
             ..FeedRegistryConfig::default()
         };
-        let journal = db.event_journal();
         let api_events = ApiEventPublisher::default();
         let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
         let registry = {
-            let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+            let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
 
             FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
         };
-        let event_workers = {
-            spawn_event_workers(
-                db.clone(),
-                journal,
-                &wake_publisher,
-                api_events,
-                config,
-                ct.clone(),
-            )
-        };
+        let event_workers =
+            { spawn_event_workers(db.clone(), &wake_publisher, api_events, config, ct.clone()) };
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("runtime-subscribe");
         let mut api_events = registry.subscribe_api_events(subscriber_id.clone());

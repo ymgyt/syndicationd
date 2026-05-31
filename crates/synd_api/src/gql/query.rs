@@ -6,7 +6,7 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     Subscription as RegistrySubscription,
     crawl::policy::{RefreshPolicy as RegistryRefreshPolicy, RefreshSchedule},
-    view::SubscriptionsQuery,
+    query::SubscriptionsQuery,
 };
 
 use crate::gql::{

@@ -139,7 +139,7 @@ mod tests {
     use synd_feed::types::FeedUrl;
 
     use super::*;
-    use crate::subscriber::SubscriberId;
+    use crate::subscription::SubscriberId;
 
     fn interval(duration: Duration) -> RefreshInterval {
         RefreshInterval::try_from(duration).unwrap()

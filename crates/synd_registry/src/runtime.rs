@@ -8,14 +8,13 @@ use crate::{
     crawl::target_list::CrawlTargetListProj,
     db::FeedRegistryDb,
     event::{
-        ApiEventPublisher, Consumer, EventJournal, EventWakePublisher, Sink, SinkWorker, Worker,
-        WorkerHandle, WorkerSet,
+        ApiEventPublisher, EventWakePublisher, Processor, Worker, WorkerHandle, WorkerPhase,
+        WorkerSet,
     },
 };
 
-pub fn spawn_event_workers<S, J>(
+pub fn spawn_event_workers<S>(
     db: S,
-    journal: J,
     wake_publisher: &EventWakePublisher,
     api_events: ApiEventPublisher,
     config: FeedRegistryConfig,
@@ -23,46 +22,32 @@ pub fn spawn_event_workers<S, J>(
 ) -> WorkerSet
 where
     S: FeedRegistryDb,
-    J: EventJournal,
 {
     let poll_interval = config.event_worker_poll_interval;
-    let subscription_request_worker = {
-        let consumer = SubRequestWorker::new();
-        spawn_event_worker(
-            db.clone(),
-            journal.clone(),
-            wake_publisher.clone(),
-            poll_interval,
-            ct.clone(),
-            consumer,
-        )
-    };
-    let crawl_target_projection_worker = {
-        let consumer = CrawlTargetListProj::new();
-        spawn_event_worker(
-            db.clone(),
-            journal.clone(),
-            wake_publisher.clone(),
-            poll_interval,
-            ct.clone(),
-            consumer,
-        )
-    };
-    let api_event_projection_worker = {
-        let consumer = ApiEventProj::new();
-        spawn_event_worker(
-            db.clone(),
-            journal.clone(),
-            wake_publisher.clone(),
-            poll_interval,
-            ct.clone(),
-            consumer,
-        )
-    };
-    let api_event_publisher_worker = {
-        let sink = api_events;
-        spawn_event_sink_worker(db, journal, wake_publisher, poll_interval, ct, sink)
-    };
+
+    let subscription_request_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        poll_interval,
+        ct.clone(),
+        SubRequestWorker::new(),
+    );
+    let crawl_target_projection_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        poll_interval,
+        ct.clone(),
+        CrawlTargetListProj::new(),
+    );
+    let api_event_projection_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        poll_interval,
+        ct.clone(),
+        ApiEventProj::new(),
+    );
+    let api_event_publisher_worker =
+        spawn_event_worker(db, wake_publisher.clone(), poll_interval, ct, api_events);
 
     WorkerSet::new(vec![
         subscription_request_worker,
@@ -72,46 +57,26 @@ where
     ])
 }
 
-fn spawn_event_worker<S, J, C>(
+fn spawn_event_worker<S, P>(
     db: S,
-    journal: J,
     wake_publisher: EventWakePublisher,
     poll_interval: Duration,
     ct: CancellationToken,
-    consumer: C,
+    processor: P,
 ) -> WorkerHandle
 where
     S: FeedRegistryDb,
-    J: EventJournal,
-    C: Consumer<S>,
+    P: Processor,
+    P::Phase: WorkerPhase<S, P>,
 {
     let wake_subscriber = wake_publisher.subscribe();
 
     Worker::new(
         db,
-        journal,
-        consumer,
+        processor,
         wake_publisher,
         wake_subscriber,
         poll_interval,
     )
     .spawn(ct)
-}
-
-fn spawn_event_sink_worker<S, J, K>(
-    db: S,
-    journal: J,
-    wake_publisher: &EventWakePublisher,
-    poll_interval: Duration,
-    ct: CancellationToken,
-    sink: K,
-) -> WorkerHandle
-where
-    S: FeedRegistryDb,
-    J: EventJournal,
-    K: Sink,
-{
-    let wake_subscriber = wake_publisher.subscribe();
-
-    SinkWorker::new(db, journal, sink, wake_subscriber, poll_interval).spawn(ct)
 }

@@ -5,23 +5,22 @@ use synd_feed::types::FeedUrl;
 use crate::{
     crawl::target_list::CrawlTarget,
     error::{RegistryDbError, RegistryDbResult},
-    event::{Event, EventCursor},
-    subscriber::SubscriberId,
-    subscription::Subscription,
-    view::{Subscriptions, SubscriptionsQuery},
+    event::JournalTx,
+    query::{Subscriptions, SubscriptionsQuery},
+    subscription::{SubscriberId, Subscription},
 };
 
+/// Opens registry database transactions.
 pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
-    type Tx<'a>: RegistryDbTransaction + Send
+    type Tx<'a>: RegistryTx + JournalTx + CommitTx + Send
     where
         Self: 'a;
 
     fn begin(&self) -> impl Future<Output = Result<Self::Tx<'_>, RegistryDbError>> + Send;
 }
 
-pub trait RegistryDbTransaction {
-    fn append_event(&mut self, event: Event) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
+/// Transactional registry-domain operations.
+pub trait RegistryTx {
     fn upsert_subscription(
         &mut self,
         subscription: Subscription,
@@ -58,11 +57,9 @@ pub trait RegistryDbTransaction {
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
+}
 
-    fn advance_event_cursor(
-        &mut self,
-        cursor: &EventCursor,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
+/// Commits a registry database transaction.
+pub trait CommitTx {
     fn commit(self) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }

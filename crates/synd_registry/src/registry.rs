@@ -1,36 +1,32 @@
-use chrono::Utc;
-
 use crate::{
     command::{
         SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
     },
     config::FeedRegistryConfig,
     crawl::policy::RefreshPolicy,
-    db::{FeedRegistryDb, RegistryDbTransaction},
+    db::{CommitTx, FeedRegistryDb, RegistryTx},
     error::FeedRegistryError,
     event::{
-        ApiEventPublisher, ApiEventSubscriber, EventJournal, EventSubmitter, RequestEvent,
-        RequestId, SubscribeFeedRequested, UnsubscribeFeedRequested,
+        ApiEventPublisher, ApiEventSubscriber, EventSubmitter, RequestEvent, RequestId,
+        SubscribeFeedRequested, UnsubscribeFeedRequested,
     },
-    subscriber::SubscriberId,
-    subscription::{Subscription, SubscriptionKey},
-    view::{Subscriptions, SubscriptionsQuery},
+    query::{Subscriptions, SubscriptionsQuery},
+    subscription::{SubscriberId, SubscriptionKey},
 };
 
 #[derive(Clone)]
-pub struct FeedRegistry<S, J> {
+pub struct FeedRegistry<S> {
     db: S,
     config: FeedRegistryConfig,
     api_events: ApiEventPublisher,
-    events: EventSubmitter<J>,
+    events: EventSubmitter<S>,
 }
 
-impl<S, J> FeedRegistry<S, J>
+impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    J: EventJournal,
 {
-    pub fn new(db: S, config: FeedRegistryConfig, events: EventSubmitter<J>) -> Self {
+    pub fn new(db: S, config: FeedRegistryConfig, events: EventSubmitter<S>) -> Self {
         Self::with_api_events(db, config, ApiEventPublisher::default(), events)
     }
 
@@ -38,7 +34,7 @@ where
         db: S,
         config: FeedRegistryConfig,
         api_events: ApiEventPublisher,
-        events: EventSubmitter<J>,
+        events: EventSubmitter<S>,
     ) -> Self {
         Self {
             db,
@@ -61,29 +57,19 @@ where
         command: SubscribeFeedCommand,
     ) -> Result<SubscribeFeedOutput, FeedRegistryError> {
         let request_id = RequestId::generate();
-        let subscription =
-            SubscriptionKey::new(command.subscriber_id.clone(), command.feed_url.clone());
+        let subscription = SubscriptionKey::new(command.subscriber_id, command.feed_url);
         let event = RequestEvent::SubscribeFeedRequested(SubscribeFeedRequested::new(
             request_id.clone(),
-            subscription,
+            subscription.clone(),
             command.requirement,
-            command.category.clone(),
+            command.category,
             command.refresh_policy,
         ));
         self.events.submit(vec![event.into()]).await?;
 
-        let now = Utc::now();
         Ok(SubscribeFeedOutput {
-            subscription: Subscription {
-                subscriber_id: command.subscriber_id,
-                feed_url: command.feed_url,
-                requirement: command.requirement,
-                category: command.category,
-                refresh_policy: command.refresh_policy,
-                created_at: now,
-                updated_at: now,
-            },
             request_id,
+            subscription,
         })
     }
 
@@ -95,11 +81,12 @@ where
         let subscription = SubscriptionKey::new(command.subscriber_id, command.feed_url);
         let event = RequestEvent::UnsubscribeFeedRequested(UnsubscribeFeedRequested::new(
             request_id.clone(),
-            subscription,
+            subscription.clone(),
         ));
         self.events.submit(vec![event.into()]).await?;
         Ok(UnsubscribeFeedOutput {
-            request_id: Some(request_id),
+            request_id,
+            subscription,
         })
     }
 

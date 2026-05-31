@@ -1,32 +1,33 @@
-use thiserror::Error;
+use std::future::Future;
 
-use crate::event::{Event, EventInterests, ProcessorId};
+use crate::{
+    error::RegistryDbResult,
+    event::{Event, EventInterests, ProcessorId},
+};
 
-pub type EventJournalResult<T> = Result<T, EventJournalError>;
+/// Transactional event journal operations.
+pub trait JournalTx {
+    /// Records that the event happened in the current transaction.
+    fn append_event(&mut self, event: Event) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-#[derive(Debug, Error)]
-pub enum EventJournalError {
-    #[error(transparent)]
-    Internal(#[from] anyhow::Error),
-}
-
-/// Stores registry events and reloads processor progress through the journal.
-pub trait EventJournal: Clone + Send + Sync + 'static {
-    /// Records that the event happened.
-    fn append(&self, event: Event) -> impl Future<Output = EventJournalResult<()>> + Send;
-
-    /// Reads interested entries after the supplied cursor.
+    /// Reads interested entries after the supplied cursor in the current transaction.
     fn read_after(
-        &self,
+        &mut self,
         cursor: &EventCursor,
         interests: EventInterests,
-    ) -> impl Future<Output = EventJournalResult<EventReadBatch>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<EventReadBatch>> + Send;
 
     /// Loads the cursor for a processor, or `EventCursor::initial()` for a new processor.
     fn load_cursor(
-        &self,
+        &mut self,
         processor: ProcessorId,
-    ) -> impl Future<Output = EventJournalResult<EventCursor>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<EventCursor>> + Send;
+
+    /// Advances the processor cursor in the current transaction.
+    fn advance_cursor(
+        &mut self,
+        cursor: &EventCursor,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }
 
 /// A batch of journal entries selected for one processor.

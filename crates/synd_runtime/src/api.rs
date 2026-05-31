@@ -42,12 +42,11 @@ impl RuntimeApiService {
     ) -> Result<Self> {
         let db = RuntimeRepository::open(database_path).await?;
         let config = FeedRegistryConfig::default();
-        let journal = db.event_journal();
         let api_events = ApiEventPublisher::default();
         let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
 
         let registry = {
-            let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+            let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
 
             FeedRegistry::with_api_events(db.clone(), config, api_events.clone(), event_submitter)
         };
@@ -55,7 +54,6 @@ impl RuntimeApiService {
         let event_workers = {
             spawn_event_workers(
                 db,
-                journal,
                 &wake_publisher,
                 api_events,
                 config,

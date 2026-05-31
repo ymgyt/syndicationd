@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use synd_feed::types::{Annotated, Entry, FeedMeta, FeedUrl};
 use thiserror::Error;
 
-use crate::{subscriber::SubscriberId, subscription::Subscription};
+use crate::subscription::{SubscriberId, Subscription};
 
 #[derive(Debug, Clone)]
 pub struct SubscriptionsQuery {

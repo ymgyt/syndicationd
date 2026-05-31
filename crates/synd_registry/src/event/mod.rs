@@ -1,18 +1,14 @@
 mod api_stream;
 mod codec;
-mod consumer;
 mod domain;
 mod journal;
+mod processor;
 mod runtime;
 mod worker;
 
 pub use api_stream::{ApiEventPublisher, ApiEventRecvError, ApiEventSubscriber};
 pub use codec::{
     EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult, EventPayload,
-};
-pub use consumer::{
-    Consumer, Processor, ProcessorError, ProcessorId, ProcessorInput, ProcessorResult,
-    RecordedEvents, Sink,
 };
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
@@ -21,12 +17,14 @@ pub use domain::{
     RequestId, SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested,
     SubscriptionChanged, SubscriptionLifecycle, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
-pub use journal::{
-    EventCursor, EventCursorPos, EventJournal, EventJournalError, EventJournalResult,
-    EventReadBatch, JournaledEvent,
+pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
+pub use processor::{
+    Consumer, PostCommit, Processor, ProcessorError, ProcessorId, ProcessorInput, ProcessorPhase,
+    ProcessorResult, RecordedEvents, Sink, Transactional,
 };
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
 pub use worker::{
-    DrainOutcome, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, SinkWorker, Trigger,
-    Worker, WorkerError, WorkerHandle, WorkerResult, WorkerSet,
+    EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, WorkerError,
+    WorkerHandle, WorkerResult, WorkerSet,
 };
+pub(crate) use worker::{Worker, WorkerPhase};

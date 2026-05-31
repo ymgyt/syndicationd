@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{
     db::FeedRegistryDb,
     error::RegistryDbError,
-    event::{Event, EventInterests, EventJournalError, EventKind},
+    event::{Event, EventInterests, EventKind},
 };
 
 /// Result type returned by event processors.
@@ -14,8 +14,6 @@ pub type ProcessorResult<T> = Result<T, ProcessorError>;
 /// Error returned while converting or processing registry events.
 #[derive(Debug, Error)]
 pub enum ProcessorError {
-    #[error(transparent)]
-    Journal(#[from] EventJournalError),
     #[error(transparent)]
     RegistryDb(#[from] RegistryDbError),
     #[error("unexpected event for {expected}: {actual:?}")]
@@ -50,9 +48,25 @@ pub trait ProcessorInput: TryFrom<Event, Error = ProcessorError> + Send {}
 
 impl<T> ProcessorInput for T where T: TryFrom<Event, Error = ProcessorError> + Send {}
 
+/// Marker for how an event processor participates in transaction boundaries.
+pub trait ProcessorPhase: Send + Sync + 'static {}
+
+/// Processor phase that runs inside the registry database transaction.
+#[derive(Debug, Clone, Copy)]
+pub struct Transactional;
+
+/// Processor phase that runs only after cursor progress is committed.
+#[derive(Debug, Clone, Copy)]
+pub struct PostCommit;
+
+impl ProcessorPhase for Transactional {}
+
+impl ProcessorPhase for PostCommit {}
+
 /// Common declaration for event processors that advance through the journal.
 pub trait Processor: Send + 'static {
     type Input: ProcessorInput;
+    type Phase: ProcessorPhase;
 
     fn id(&self) -> ProcessorId;
 
@@ -60,7 +74,7 @@ pub trait Processor: Send + 'static {
 }
 
 /// A component that consumes registry events inside a registry transaction.
-pub trait Consumer<S>: Processor
+pub trait Consumer<S>: Processor<Phase = Transactional>
 where
     S: FeedRegistryDb,
 {
@@ -72,7 +86,7 @@ where
 }
 
 /// A terminal event processor that consumes committed events without recording new events.
-pub trait Sink: Processor {
+pub trait Sink: Processor<Phase = PostCommit> {
     fn consume(&mut self, input: Self::Input) -> impl Future<Output = ProcessorResult<()>> + Send;
 }
 

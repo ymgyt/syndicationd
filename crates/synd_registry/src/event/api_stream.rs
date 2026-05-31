@@ -6,8 +6,8 @@ use tracing::debug;
 use crate::{
     SubscriberId,
     event::{
-        ApiEvent, ApiEventKind, Event, EventInterests, Processor, ProcessorError, ProcessorId,
-        ProcessorResult, Sink,
+        ApiEvent, ApiEventKind, Event, EventInterests, PostCommit, Processor, ProcessorError,
+        ProcessorId, ProcessorResult, Sink,
     },
 };
 
@@ -56,6 +56,7 @@ impl Default for ApiEventPublisher {
 
 impl Processor for ApiEventPublisher {
     type Input = ApiEvent;
+    type Phase = PostCommit;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::ApiEventPublisher

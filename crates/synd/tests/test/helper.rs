@@ -20,7 +20,7 @@ use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    FeedRegistry, FeedRegistryDb, RegistryDbTransaction, SubscriberId, Subscription,
+    CommitTx, FeedRegistry, FeedRegistryDb, RegistryTx, SubscriberId, Subscription,
     crawl::policy::{RefreshInterval, RefreshPolicy},
     event::{ApiEventPublisher, EventSubmitter, EventWakePublisher},
     runtime::spawn_event_workers,
@@ -366,12 +366,11 @@ pub async fn serve_api(
 
     let shutdown = Shutdown::watch_signal(future::pending(), || {});
     let registry_config = feed_refresh_options.registry_config();
-    let journal = db.event_journal();
     let api_events = ApiEventPublisher::default();
     let wake_publisher = EventWakePublisher::new(registry_config.event_wake_channel_capacity);
 
     let registry = {
-        let event_submitter = { EventSubmitter::new(journal.clone(), wake_publisher.clone()) };
+        let event_submitter = { EventSubmitter::new(db.clone(), wake_publisher.clone()) };
 
         FeedRegistry::with_api_events(
             db.clone(),
@@ -384,7 +383,6 @@ pub async fn serve_api(
     let event_workers = {
         spawn_event_workers(
             db.clone(),
-            journal,
             &wake_publisher,
             api_events,
             registry_config,

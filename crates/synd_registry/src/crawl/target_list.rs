@@ -4,10 +4,10 @@ use tracing::debug;
 
 use crate::{
     crawl::policy::PollingPolicy,
-    db::{FeedRegistryDb, RegistryDbTransaction},
+    db::{FeedRegistryDb, RegistryTx},
     event::{
         Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId, ProcessorResult,
-        RecordedEvents, SubEvent, SubEventKind, SubscriptionLifecycle,
+        RecordedEvents, SubEvent, SubEventKind, SubscriptionLifecycle, Transactional,
     },
 };
 
@@ -100,6 +100,7 @@ impl Default for CrawlTargetListProj {
 
 impl Processor for CrawlTargetListProj {
     type Input = CrawlTargetListInput;
+    type Phase = Transactional;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::CrawlTargetProjection
