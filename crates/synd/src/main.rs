@@ -98,7 +98,7 @@ async fn build_app(
     config: ConfigResolver,
     dry_run: bool,
 ) -> anyhow::Result<(Application, Session)> {
-    let session = FeedRuntime::new(&config).acquire_session().await?;
+    let session = FeedRuntime::new(&config)?.acquire_session().await?;
     let feed_backend = FeedBackend::established(session.client().clone());
 
     let mut builder = Application::builder()

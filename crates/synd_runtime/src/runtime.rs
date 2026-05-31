@@ -2,26 +2,35 @@ use std::{path::PathBuf, time::Duration};
 
 use crate::{
     DaemonControl, DaemonLaunchConfig, DaemonLaunchLog, Result, RuntimeDatabase, Session,
-    SessionConfig, SessionRequirements, acquisition::SessionAcquisition,
-    placement::RuntimePlacementEnvironment,
+    SessionConfig, SessionRequirements,
+    acquisition::SessionAcquisition,
+    placement::{RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver},
 };
 
 #[derive(Debug, Clone)]
 pub struct Runtime {
     config: Config,
+    placement: RuntimePlacement,
 }
 
 impl Runtime {
-    pub fn new(config: Config) -> Self {
-        Self { config }
+    pub fn try_new(config: Config) -> Result<Self> {
+        let placement = RuntimePlacementResolver::with_environment(config.placement_environment())
+            .resolve(&config)?;
+
+        Ok(Self { config, placement })
     }
 
     pub fn config(&self) -> &Config {
         &self.config
     }
 
+    pub(crate) fn placement(&self) -> &RuntimePlacement {
+        &self.placement
+    }
+
     pub async fn acquire_session(&self) -> Result<Session> {
-        SessionAcquisition::new(&self.config).acquire().await
+        SessionAcquisition::new(self).acquire().await
     }
 
     pub fn daemon(&self) -> DaemonControl<'_> {
@@ -173,21 +182,22 @@ mod tests {
     };
 
     #[test]
-    fn runtime_keeps_daemon_launch_config() {
-        let tempdir = tempfile::tempdir().unwrap();
+    fn runtime_keeps_daemon_launch_config() -> crate::Result<()> {
+        let tempdir = tempfile::tempdir()?;
         let config = RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
             .with_api_timeout(Duration::from_secs(5), "synd-runtime-test")
             .with_session_timeout(Duration::from_secs(5))
             .with_daemon_launch(DaemonLaunchConfig::default());
 
-        let runtime = Runtime::new(config.clone());
+        let runtime = Runtime::try_new(config.clone())?;
 
         assert_eq!(runtime.config().daemon(), config.daemon());
+        Ok(())
     }
 
     #[test]
-    fn runtime_config_sets_daemon_log_without_replacing_executable() {
-        let tempdir = tempfile::tempdir().unwrap();
+    fn runtime_config_sets_daemon_log_without_replacing_executable() -> crate::Result<()> {
+        let tempdir = tempfile::tempdir()?;
         let log = tempdir.path().join("daemon.log");
         let config = RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
             .with_daemon_launch(DaemonLaunchConfig::new(
@@ -203,5 +213,6 @@ mod tests {
                 DaemonLaunchLog::file(log),
             )
         );
+        Ok(())
     }
 }

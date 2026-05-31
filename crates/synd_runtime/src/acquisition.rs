@@ -8,10 +8,10 @@ use tokio::time::sleep;
 use tracing::{debug, info};
 
 use crate::{
-    Error, Result, RuntimeConfig, Session,
+    Error, Result, Runtime, RuntimeConfig, Session,
     connection::{RuntimeEndpointConnectionStatus, RuntimeEndpointConnector},
     daemon::{DaemonHandle, DaemonLauncher},
-    placement::{RuntimePlacement, RuntimePlacementResolver},
+    placement::RuntimePlacement,
     startup::{StartupLock, StartupLockAcquirer, StartupLockAcquisition},
 };
 
@@ -19,18 +19,12 @@ const ENDPOINT_WAIT_INTERVAL: Duration = Duration::from_millis(50);
 
 /// Controls the ordered decisions required to acquire a runtime session.
 pub(crate) struct SessionAcquisition<'a> {
-    config: &'a RuntimeConfig,
-    placement_resolver: RuntimePlacementResolver,
+    runtime: &'a Runtime,
 }
 
 impl<'a> SessionAcquisition<'a> {
-    pub(crate) fn new(config: &'a RuntimeConfig) -> Self {
-        Self {
-            config,
-            placement_resolver: RuntimePlacementResolver::with_environment(
-                config.placement_environment(),
-            ),
-        }
+    pub(crate) fn new(runtime: &'a Runtime) -> Self {
+        Self { runtime }
     }
 
     pub(crate) async fn acquire(self) -> Result<Session> {
@@ -44,7 +38,7 @@ impl<'a> SessionAcquisition<'a> {
     }
 
     async fn resolve_context(&self) -> Result<SessionAcquisitionContext> {
-        let placement = self.placement_resolver.resolve(self.config)?;
+        let placement = self.runtime.placement().clone();
         let endpoint_connection = RuntimeEndpointConnector::new(placement.endpoint())
             .try_connect()
             .await;
@@ -63,13 +57,13 @@ impl<'a> SessionAcquisition<'a> {
 
         match decision {
             SessionAcquisitionDecision::AttachExistingRuntime { placement } => {
-                SessionConnector::new(self.config, placement)
+                SessionConnector::new(self.runtime.config(), placement)
                     .connect()
                     .await
             }
             SessionAcquisitionDecision::StartMissingRuntime { placement }
             | SessionAcquisitionDecision::RecoverStaleRuntime { placement } => {
-                SessionStartup::new(self.config, placement)
+                SessionStartup::new(self.runtime.config(), placement)
                     .acquire_session()
                     .await
             }

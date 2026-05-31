@@ -293,15 +293,14 @@ mod tests {
 
     #[cfg(unix)]
     impl StartedDaemon {
-        fn spawn(root: &Path) -> Self {
+        fn spawn(root: &Path) -> crate::Result<Self> {
             let database = RuntimeDatabase::sqlite(root.join("synd.db"));
             let placement_environment =
                 RuntimePlacementEnvironment::new(RuntimeRoot::from(root.join("runtime")));
             let placement =
                 RuntimePlacementResolver::with_environment(placement_environment.clone())
-                    .resolve_database(&database)
-                    .unwrap();
-            let runtime = Runtime::new(
+                    .resolve_database(&database)?;
+            let runtime = Runtime::try_new(
                 RuntimeConfig::new(database.clone())
                     .with_api_timeout(Duration::from_secs(2), "synd-runtime-test")
                     .with_session_timeout(Duration::from_secs(2))
@@ -310,7 +309,7 @@ mod tests {
                         DaemonLaunchLog::file(root.join("daemon.log")),
                     ))
                     .with_placement_environment(placement_environment.clone()),
-            );
+            )?;
             let daemon = Daemon::new(
                 DaemonConfig::new(database).with_placement_environment(placement_environment),
             );
@@ -318,7 +317,7 @@ mod tests {
                 DaemonLifecycleProbe::new(runtime, placement.endpoint().path().to_path_buf());
             let daemon_task = tokio::spawn(daemon.serve());
 
-            Self { probe, daemon_task }
+            Ok(Self { probe, daemon_task })
         }
 
         async fn wait_until_running(&self) {
@@ -377,26 +376,28 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn daemon_shutdown_stops_serving_endpoint() {
-        let tmp = tempfile::tempdir().unwrap();
-        let daemon = StartedDaemon::spawn(tmp.path());
+    async fn daemon_shutdown_stops_serving_endpoint() -> crate::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let daemon = StartedDaemon::spawn(tmp.path())?;
 
         daemon.wait_until_running().await;
         daemon.shutdown().await;
+        Ok(())
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn daemon_accepts_and_closes_runtime_session() {
-        let tmp = tempfile::tempdir().unwrap();
-        let daemon = StartedDaemon::spawn(tmp.path());
+    async fn daemon_accepts_and_closes_runtime_session() -> crate::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let daemon = StartedDaemon::spawn(tmp.path())?;
 
         daemon.wait_until_running().await;
-        let session = daemon.probe.runtime.acquire_session().await.unwrap();
+        let session = daemon.probe.runtime.acquire_session().await?;
         assert!(session.capabilities().is_empty());
-        session.close().await.unwrap();
+        session.close().await?;
 
         daemon.shutdown().await;
+        Ok(())
     }
 
     #[cfg(unix)]

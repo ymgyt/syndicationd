@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use crate::{
     DaemonState, DaemonStatus, Error, Result, Runtime, RuntimePlacementSummary, ShutdownResult,
     connection::{RuntimeEndpointConnectionStatus, RuntimeEndpointConnector},
-    placement::{RuntimePlacement, RuntimePlacementResolver},
+    placement::RuntimePlacement,
 };
 
 const SHUTDOWN_WAIT_INTERVAL: Duration = Duration::from_millis(50);
@@ -74,10 +74,7 @@ impl<'a> Control<'a> {
     }
 
     async fn resolve_context(&self) -> Result<DaemonControlContext> {
-        let placement = RuntimePlacementResolver::with_environment(
-            self.runtime.config().placement_environment(),
-        )
-        .resolve(self.runtime.config())?;
+        let placement = self.runtime.placement().clone();
         let endpoint_connection = RuntimeEndpointConnector::new(placement.endpoint())
             .try_connect()
             .await;

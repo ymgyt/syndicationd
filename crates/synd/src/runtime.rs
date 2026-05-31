@@ -15,15 +15,16 @@ pub(crate) struct FeedRuntime {
 }
 
 impl FeedRuntime {
-    pub(crate) fn new(config: &ConfigResolver) -> Self {
-        Self {
-            runtime: Runtime::new(
-                RuntimeConfig::new(RuntimeDatabase::sqlite(config.sqlite_db()))
-                    .with_api_timeout(config.api_timeout(), API_USER_AGENT)
-                    .with_session_timeout(SESSION_ACQUIRE_TIMEOUT)
-                    .with_daemon_log(config.log_file()),
-            ),
-        }
+    pub(crate) fn new(config: &ConfigResolver) -> anyhow::Result<Self> {
+        let runtime = Runtime::try_new(
+            RuntimeConfig::new(RuntimeDatabase::sqlite(config.sqlite_db()))
+                .with_api_timeout(config.api_timeout(), API_USER_AGENT)
+                .with_session_timeout(SESSION_ACQUIRE_TIMEOUT)
+                .with_daemon_log(config.log_file()),
+        )
+        .context("Failed to resolve runtime placement")?;
+
+        Ok(Self { runtime })
     }
 
     pub(crate) async fn acquire_session(&self) -> anyhow::Result<Session> {

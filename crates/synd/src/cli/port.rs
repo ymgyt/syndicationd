@@ -10,7 +10,7 @@ pub(super) struct PortContext {
 
 impl PortContext {
     pub(super) async fn new(config: &ConfigResolver) -> anyhow::Result<Self> {
-        let session = FeedRuntime::new(config).acquire_session().await?;
+        let session = FeedRuntime::new(config)?.acquire_session().await?;
         let client = session.client().clone();
 
         Ok(Self {

@@ -59,7 +59,7 @@ struct DaemonStatusCommand {}
 
 impl DaemonStatusCommand {
     async fn run(self, config: &ConfigResolver) -> ExitCode {
-        match FeedRuntime::new(config).inspect_daemon().await {
+        match inspect_daemon(config).await {
             Ok(status) => {
                 print_daemon_status(&status);
                 ExitCode::SUCCESS
@@ -78,7 +78,7 @@ struct DaemonShutdownCommand {}
 
 impl DaemonShutdownCommand {
     async fn run(self, config: &ConfigResolver) -> ExitCode {
-        match FeedRuntime::new(config).shutdown_daemon().await {
+        match shutdown_daemon(config).await {
             Ok(result) => {
                 print_daemon_status(result.status());
                 ExitCode::SUCCESS
@@ -89,6 +89,14 @@ impl DaemonShutdownCommand {
             }
         }
     }
+}
+
+async fn inspect_daemon(config: &ConfigResolver) -> anyhow::Result<DaemonStatus> {
+    FeedRuntime::new(config)?.inspect_daemon().await
+}
+
+async fn shutdown_daemon(config: &ConfigResolver) -> anyhow::Result<synd_runtime::ShutdownResult> {
+    FeedRuntime::new(config)?.shutdown_daemon().await
 }
 
 fn print_daemon_status(status: &DaemonStatus) {
