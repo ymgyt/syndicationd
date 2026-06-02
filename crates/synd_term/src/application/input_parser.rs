@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     config::Categories,
-    types::{self, RefreshPolicyExt},
+    types::{self, CrawlPolicyExt},
 };
 
 type NomError<'s> = VerboseError<&'s str>;
@@ -13,7 +13,7 @@ const CTX_REQUIREMENT: &str = "requirement";
 const CTX_CATEGORY: &str = "category";
 const CTX_CATEGORY_POST: &str = "category_post";
 const CTX_URL: &str = "url";
-const CTX_REFRESH_POLICY: &str = "refresh_policy";
+const CTX_CRAWL_POLICY: &str = "crawl_policy";
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub(super) enum ParseFeedError {
@@ -36,7 +36,7 @@ impl<'a> InputParser<'a> {
 #     * \"SHOULD\" 
 #     * \"MAY\"
 #   * For the category, please choose one category of the feed(for example, \"rust\")
-#   * Refresh policy is optional. Use \"manual\" or \"interval:2h\".
+#   * Crawl policy is optional. Use \"manual\" or \"interval:2h\".
 #
 # with '#' will be ignored, and an empty URL aborts the subscription.
 #
@@ -72,9 +72,9 @@ impl<'a> InputParser<'a> {
                     Some((input, VerboseErrorKind::Context(CTX_URL))) => {
                         format!("Invalid url: {input}")
                     }
-                    Some((input, VerboseErrorKind::Context(CTX_REFRESH_POLICY))) => {
+                    Some((input, VerboseErrorKind::Context(CTX_CRAWL_POLICY))) => {
                         format!(
-                            "Invalid refresh policy: use 'manual' or 'interval:<duration>'. {input}"
+                            "Invalid crawl policy: use 'manual' or 'interval:<duration>'. {input}"
                         )
                     }
                     Some((input, _)) => format!("Failed to parse input: {input}"),
@@ -85,14 +85,14 @@ impl<'a> InputParser<'a> {
     }
 
     pub(super) fn edit_feed_prompt(feed: &types::Feed) -> String {
-        let refresh_policy = feed
-            .refresh_policy
+        let crawl_policy = feed
+            .crawl_policy
             .prompt_value()
             .map(|policy| format!(" {policy}"))
             .unwrap_or_default();
 
         format!(
-            "{}\n{requirement} {category} {feed_url}{refresh_policy}",
+            "{}\n{requirement} {category} {feed_url}{crawl_policy}",
             Self::SUSBSCRIBE_FEED_PROMPT,
             requirement = feed.requirement(),
             category = feed.category(),
@@ -112,14 +112,16 @@ mod feed {
         sequence::delimited,
     };
     use nom_language::error::{VerboseError, VerboseErrorKind};
-    use synd_client::payload::{RefreshPolicyInput, RefreshPolicyInputKind, SubscribeFeedInput};
+    use synd_client::payload::{
+        CrawlPolicyInput, PollingPolicyInput, PollingPolicyInputKind, SubscribeFeedInput,
+    };
     use synd_feed::types::{Category, FeedUrl, Requirement};
     use tracing::{Level, event};
     use url::Url;
 
     use super::NomError;
     use crate::application::input_parser::{
-        CTX_CATEGORY, CTX_CATEGORY_POST, CTX_REFRESH_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
+        CTX_CATEGORY, CTX_CATEGORY_POST, CTX_CRAWL_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
     };
 
     pub(super) fn parse(s: &'_ str) -> Result<SubscribeFeedInput, NomError<'_>> {
@@ -130,14 +132,14 @@ mod feed {
     }
 
     fn feed_input(s: &'_ str) -> IResult<&'_ str, SubscribeFeedInput, NomError<'_>> {
-        let (remain, (_, requirement, _, category, _, feed_url, refresh_policy, _)) = (
+        let (remain, (_, requirement, _, category, _, feed_url, crawl_policy, _)) = (
             multispace0,
             requirement,
             multispace1,
             category,
             context(CTX_CATEGORY_POST, multispace1),
             url,
-            opt((multispace1, refresh_policy).map(|(_, policy)| policy)),
+            opt((multispace1, crawl_policy).map(|(_, policy)| policy)),
             multispace0,
         )
             .parse(s)?;
@@ -147,7 +149,7 @@ mod feed {
                 url: feed_url,
                 requirement: Some(requirement),
                 category: Some(category),
-                refresh_policy,
+                crawl_policy,
             },
         ))
     }
@@ -197,9 +199,9 @@ mod feed {
         }
     }
 
-    fn refresh_policy(s: &'_ str) -> IResult<&'_ str, RefreshPolicyInput, NomError<'_>> {
+    fn crawl_policy(s: &'_ str) -> IResult<&'_ str, CrawlPolicyInput, NomError<'_>> {
         let (remain, token) = context(
-            CTX_REFRESH_POLICY,
+            CTX_CRAWL_POLICY,
             take_while_m_n(1, 64, |c: char| !c.is_whitespace()),
         )
         .parse(s)?;
@@ -207,42 +209,46 @@ mod feed {
         if token.eq_ignore_ascii_case("manual") {
             return Ok((
                 remain,
-                RefreshPolicyInput {
-                    kind: RefreshPolicyInputKind::Manual,
-                    interval_seconds: None,
+                CrawlPolicyInput {
+                    polling: PollingPolicyInput {
+                        kind: PollingPolicyInputKind::Manual,
+                        interval_seconds: None,
+                    },
                 },
             ));
         }
 
         let Some((kind, duration)) = token.split_once(':') else {
-            return Err(invalid_refresh_policy(s));
+            return Err(invalid_crawl_policy(s));
         };
         if !kind.eq_ignore_ascii_case("interval") {
-            return Err(invalid_refresh_policy(s));
+            return Err(invalid_crawl_policy(s));
         }
 
         let duration = synd_support::time::humantime::parse_duration(duration)
-            .map_err(|_| invalid_refresh_policy(s))?;
+            .map_err(|_| invalid_crawl_policy(s))?;
         if duration.subsec_nanos() != 0 {
-            return Err(invalid_refresh_policy(s));
+            return Err(invalid_crawl_policy(s));
         }
         let seconds = i64::try_from(duration.as_secs()).unwrap_or(i64::MAX);
         if seconds == 0 {
-            return Err(invalid_refresh_policy(s));
+            return Err(invalid_crawl_policy(s));
         }
 
         Ok((
             remain,
-            RefreshPolicyInput {
-                kind: RefreshPolicyInputKind::Interval,
-                interval_seconds: Some(seconds),
+            CrawlPolicyInput {
+                polling: PollingPolicyInput {
+                    kind: PollingPolicyInputKind::Interval,
+                    interval_seconds: Some(seconds),
+                },
             },
         ))
     }
 
-    fn invalid_refresh_policy(input: &'_ str) -> nom::Err<NomError<'_>> {
+    fn invalid_crawl_policy(input: &'_ str) -> nom::Err<NomError<'_>> {
         nom::Err::Failure(VerboseError {
-            errors: vec![(input, VerboseErrorKind::Context(CTX_REFRESH_POLICY))],
+            errors: vec![(input, VerboseErrorKind::Context(CTX_CRAWL_POLICY))],
         })
     }
 
@@ -279,14 +285,14 @@ mod feed {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
                         requirement: Some(Requirement::Must),
                         category: Some(Category::new("rust").unwrap()),
-                        refresh_policy: None,
+                        crawl_policy: None,
                     }
                 ))
             );
         }
 
         #[test]
-        fn parse_feed_input_with_manual_refresh_policy() {
+        fn parse_feed_input_with_manual_crawl_policy() {
             assert_eq!(
                 feed_input("MUST rust https://example.ymgyt.io/atom.xml manual"),
                 Ok((
@@ -295,9 +301,11 @@ mod feed {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
                         requirement: Some(Requirement::Must),
                         category: Some(Category::new("rust").unwrap()),
-                        refresh_policy: Some(RefreshPolicyInput {
-                            kind: RefreshPolicyInputKind::Manual,
-                            interval_seconds: None,
+                        crawl_policy: Some(CrawlPolicyInput {
+                            polling: PollingPolicyInput {
+                                kind: PollingPolicyInputKind::Manual,
+                                interval_seconds: None,
+                            },
                         }),
                     }
                 ))
@@ -305,7 +313,7 @@ mod feed {
         }
 
         #[test]
-        fn parse_feed_input_with_interval_refresh_policy() {
+        fn parse_feed_input_with_interval_crawl_policy() {
             assert_eq!(
                 feed_input("MUST rust https://example.ymgyt.io/atom.xml interval:30m"),
                 Ok((
@@ -314,9 +322,11 @@ mod feed {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
                         requirement: Some(Requirement::Must),
                         category: Some(Category::new("rust").unwrap()),
-                        refresh_policy: Some(RefreshPolicyInput {
-                            kind: RefreshPolicyInputKind::Interval,
-                            interval_seconds: Some(1800),
+                        crawl_policy: Some(CrawlPolicyInput {
+                            polling: PollingPolicyInput {
+                                kind: PollingPolicyInputKind::Interval,
+                                interval_seconds: Some(1800),
+                            },
                         }),
                     }
                 ))
@@ -336,11 +346,11 @@ mod feed {
                 ),
                 (
                     "should rust https://example.ymgyt.io/atom.xml interval:0s",
-                    CTX_REFRESH_POLICY,
+                    CTX_CRAWL_POLICY,
                 ),
                 (
                     "should rust https://example.ymgyt.io/atom.xml interval:1500ms",
-                    CTX_REFRESH_POLICY,
+                    CTX_CRAWL_POLICY,
                 ),
             ];
 

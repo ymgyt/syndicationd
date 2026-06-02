@@ -292,9 +292,11 @@ mod tests {
             url,
             requirement: None,
             category: None,
-            refresh_policy: payload::RefreshPolicy {
-                kind: payload::RefreshPolicyKind::Manual,
-                interval_seconds: None,
+            crawl_policy: payload::CrawlPolicy {
+                polling: payload::PollingPolicy {
+                    kind: payload::PollingPolicyKind::Manual,
+                    interval_seconds: None,
+                },
             },
             refresh_status: Some(payload::RefreshStatus {
                 state: payload::RefreshStatusState::Idle,

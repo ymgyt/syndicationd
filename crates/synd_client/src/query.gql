@@ -66,9 +66,11 @@ fragment SubscribedFeed on SubscribedFeed {
   url
   requirement
   category
-  refreshPolicy {
-    kind
-    intervalSeconds
+  crawlPolicy {
+    polling {
+      kind
+      intervalSeconds
+    }
   }
   refreshStatus {
     ...RefreshStatus

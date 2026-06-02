@@ -34,6 +34,6 @@ pub mod metrics {
     pub const MONITOR_INTERVAL: Duration = Duration::from_mins(1);
 }
 
-pub mod feed_refresh {
-    pub const DEFAULT_REFRESH_INTERVAL: &str = "120min";
+pub mod feed_crawl {
+    pub const DEFAULT_CRAWL_INTERVAL: &str = "120min";
 }

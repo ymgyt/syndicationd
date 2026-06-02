@@ -3,23 +3,21 @@ use std::{fmt, num::NonZeroU64, time::Duration};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::subscription::Subscription;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InvalidRefreshInterval;
+pub struct InvalidPollingInterval;
 
-impl fmt::Display for InvalidRefreshInterval {
+impl fmt::Display for InvalidPollingInterval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("refresh interval must be whole seconds greater than zero")
+        f.write_str("polling interval must be whole seconds greater than zero")
     }
 }
 
-impl std::error::Error for InvalidRefreshInterval {}
+impl std::error::Error for InvalidPollingInterval {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct RefreshInterval(NonZeroU64);
+pub struct PollingInterval(NonZeroU64);
 
-impl RefreshInterval {
+impl PollingInterval {
     pub fn duration(self) -> Duration {
         Duration::from_secs(self.as_secs())
     }
@@ -34,23 +32,23 @@ impl RefreshInterval {
     }
 }
 
-impl TryFrom<Duration> for RefreshInterval {
-    type Error = InvalidRefreshInterval;
+impl TryFrom<Duration> for PollingInterval {
+    type Error = InvalidPollingInterval;
 
     fn try_from(value: Duration) -> Result<Self, Self::Error> {
         if value.subsec_nanos() != 0 {
-            return Err(InvalidRefreshInterval);
+            return Err(InvalidPollingInterval);
         }
 
         let Some(seconds) = NonZeroU64::new(value.as_secs()) else {
-            return Err(InvalidRefreshInterval);
+            return Err(InvalidPollingInterval);
         };
 
         Ok(Self(seconds))
     }
 }
 
-impl<'de> Deserialize<'de> for RefreshInterval {
+impl<'de> Deserialize<'de> for PollingInterval {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -61,147 +59,108 @@ impl<'de> Deserialize<'de> for RefreshInterval {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RefreshSchedule {
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PollingPolicy {
     Manual,
-    Interval(RefreshInterval),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RefreshPolicy {
-    pub schedule: RefreshSchedule,
-}
-
-impl RefreshPolicy {
-    pub fn interval(interval: RefreshInterval) -> Self {
-        Self {
-            schedule: RefreshSchedule::Interval(interval),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PollingSchedule {
-    Manual,
-    Interval(RefreshInterval),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PollingPolicy {
-    pub schedule: PollingSchedule,
+    Interval {
+        #[serde(rename = "interval_seconds")]
+        interval: PollingInterval,
+    },
 }
 
 impl PollingPolicy {
-    pub fn from_refresh_policy(policy: RefreshPolicy) -> Self {
-        Self {
-            schedule: match policy.schedule {
-                RefreshSchedule::Manual => PollingSchedule::Manual,
-                RefreshSchedule::Interval(interval) => PollingSchedule::Interval(interval),
-            },
-        }
+    pub fn manual() -> Self {
+        Self::Manual
     }
 
-    pub fn from_subscriptions<'a>(
-        subscriptions: impl IntoIterator<Item = &'a Subscription>,
-    ) -> Option<Self> {
-        let mut has_subscription = false;
-        let mut interval = None;
-
-        for subscription in subscriptions {
-            has_subscription = true;
-            if let PollingSchedule::Interval(candidate) =
-                Self::from_refresh_policy(subscription.refresh_policy).schedule
-            {
-                interval = Some(
-                    interval.map_or(candidate, |current: RefreshInterval| current.min(candidate)),
-                );
-            }
-        }
-
-        has_subscription.then_some(Self {
-            schedule: interval.map_or(PollingSchedule::Manual, PollingSchedule::Interval),
-        })
+    pub fn interval(interval: PollingInterval) -> Self {
+        Self::Interval { interval }
     }
 
-    pub fn next_after(self, refreshed_at: DateTime<Utc>) -> Option<DateTime<Utc>> {
-        match self.schedule {
-            PollingSchedule::Manual => None,
-            PollingSchedule::Interval(interval) => Some(add_duration(refreshed_at, interval)),
+    pub fn next_after(self, polled_at: DateTime<Utc>) -> Option<DateTime<Utc>> {
+        match self {
+            Self::Manual => None,
+            Self::Interval { interval } => Some(add_duration(polled_at, interval)),
         }
     }
 }
 
-fn add_duration(time: DateTime<Utc>, interval: RefreshInterval) -> DateTime<Utc> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlPolicy {
+    pub polling: PollingPolicy,
+}
+
+impl CrawlPolicy {
+    pub fn interval(interval: PollingInterval) -> Self {
+        Self {
+            polling: PollingPolicy::interval(interval),
+        }
+    }
+
+    pub fn manual() -> Self {
+        Self {
+            polling: PollingPolicy::manual(),
+        }
+    }
+}
+
+fn add_duration(time: DateTime<Utc>, interval: PollingInterval) -> DateTime<Utc> {
     chrono::Duration::from_std(interval.duration()).map_or(time, |duration| time + duration)
 }
 
 #[cfg(test)]
 mod tests {
-    use synd_feed::types::FeedUrl;
-
     use super::*;
-    use crate::subscription::SubscriberId;
 
-    fn interval(duration: Duration) -> RefreshInterval {
-        RefreshInterval::try_from(duration).unwrap()
-    }
-
-    fn subscription(refresh_policy: RefreshPolicy) -> Subscription {
-        let now = Utc::now();
-        Subscription {
-            subscriber_id: SubscriberId::new("local"),
-            feed_url: FeedUrl::parse("https://example.com/feed.xml").unwrap(),
-            requirement: None,
-            category: None,
-            refresh_policy,
-            created_at: now,
-            updated_at: now,
-        }
+    fn interval(duration: Duration) -> PollingInterval {
+        PollingInterval::try_from(duration).unwrap()
     }
 
     #[test]
-    fn refresh_interval_rejects_subsecond_duration() {
-        assert!(RefreshInterval::try_from(Duration::from_millis(500)).is_err());
-        assert!(RefreshInterval::try_from(Duration::from_millis(1500)).is_err());
+    fn polling_interval_rejects_subsecond_duration() {
+        assert!(PollingInterval::try_from(Duration::from_millis(500)).is_err());
+        assert!(PollingInterval::try_from(Duration::from_millis(1500)).is_err());
     }
 
     #[test]
-    fn refresh_interval_serializes_as_seconds() {
+    fn polling_interval_serializes_as_seconds() {
         let interval = interval(Duration::from_hours(1));
         let json = serde_json::to_string(&interval).unwrap();
 
         assert_eq!(json, "3600");
         assert_eq!(
-            serde_json::from_str::<RefreshInterval>(&json).unwrap(),
+            serde_json::from_str::<PollingInterval>(&json).unwrap(),
             interval
         );
     }
 
     #[test]
-    fn polling_policy_uses_shortest_interval() {
-        let subscriptions = [
-            subscription(RefreshPolicy::interval(interval(Duration::from_hours(1)))),
-            subscription(RefreshPolicy::interval(interval(Duration::from_mins(10)))),
-            subscription(RefreshPolicy {
-                schedule: RefreshSchedule::Manual,
-            }),
-        ];
-
-        let policy = PollingPolicy::from_subscriptions(&subscriptions).unwrap();
+    fn interval_policy_computes_next_poll_time() {
+        let polled_at = Utc::now();
+        let policy = PollingPolicy::interval(interval(Duration::from_mins(1)));
 
         assert_eq!(
-            policy.schedule,
-            PollingSchedule::Interval(interval(Duration::from_mins(10)))
+            policy.next_after(polled_at),
+            Some(polled_at + chrono::Duration::seconds(60))
         );
     }
 
     #[test]
-    fn polling_policy_is_manual_when_all_subscriptions_are_manual() {
-        let subscriptions = [subscription(RefreshPolicy {
-            schedule: RefreshSchedule::Manual,
-        })];
+    fn manual_policy_has_no_next_poll_time() {
+        let policy = PollingPolicy::manual();
 
-        let policy = PollingPolicy::from_subscriptions(&subscriptions).unwrap();
+        assert_eq!(policy.next_after(Utc::now()), None);
+    }
 
-        assert_eq!(policy.schedule, PollingSchedule::Manual);
+    #[test]
+    fn crawl_policy_serializes_polling_policy() {
+        let policy = CrawlPolicy::interval(interval(Duration::from_hours(1)));
+        let json = serde_json::to_string(&policy).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"polling":{"kind":"interval","interval_seconds":3600}}"#
+        );
+        assert_eq!(serde_json::from_str::<CrawlPolicy>(&json).unwrap(), policy);
     }
 }

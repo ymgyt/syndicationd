@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
-use crate::crawl::policy::RefreshPolicy;
+use crate::crawl::policy::CrawlPolicy;
 
 /// Opaque registry identity that owns subscriptions.
 ///
@@ -54,7 +54,7 @@ pub struct Subscription {
     pub feed_url: FeedUrl,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
-    pub refresh_policy: RefreshPolicy,
+    pub crawl_policy: CrawlPolicy,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

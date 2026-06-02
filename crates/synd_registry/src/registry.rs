@@ -8,7 +8,7 @@ use crate::{
     },
     config::FeedRegistryConfig,
     consumers::{ApiEventProj, SubRequestProj},
-    crawl::{policy::RefreshPolicy, target_list::CrawlTargetListProj},
+    crawl::{policy::CrawlPolicy, target_list::CrawlTargetListProj},
     db::{CommitTx, FeedRegistryDb, RegistryTx},
     error::FeedRegistryError,
     event::{
@@ -84,8 +84,8 @@ where
         self.api_events.subscribe(subscriber_id)
     }
 
-    pub fn default_refresh_policy(&self) -> RefreshPolicy {
-        RefreshPolicy::interval(self.config.default_refresh_interval)
+    pub fn default_crawl_policy(&self) -> CrawlPolicy {
+        self.config.default_crawl_policy
     }
 
     pub async fn subscribe(
@@ -99,7 +99,7 @@ where
             subscription.clone(),
             command.requirement,
             command.category,
-            command.refresh_policy,
+            command.crawl_policy,
         ));
         self.events.submit(vec![event.into()]).await?;
 

@@ -101,15 +101,16 @@ impl SubRequestProj {
             feed_url: event.subscription.feed_url.clone(),
             requirement: event.requirement,
             category: event.category,
-            refresh_policy: event.refresh_policy,
+            crawl_policy: event.crawl_policy,
             created_at: now,
             updated_at: now,
         };
 
         let already_subscribed = cx
-            .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
+            .has_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
             .await?;
-        cx.upsert_subscription(subscription).await?;
+        cx.upsert_feed_endpoint(&subscription.feed_url, now).await?;
+        cx.upsert_feed_subscription(subscription).await?;
 
         let event = if already_subscribed {
             Event::Sub(SubEvent::SubscriptionChanged(
@@ -132,14 +133,14 @@ impl SubRequestProj {
         S: FeedRegistryDb,
     {
         let is_subscribed = cx
-            .has_subscription(
+            .has_feed_subscription(
                 &event.subscription.subscriber_id,
                 &event.subscription.feed_url,
             )
             .await?;
 
         let event = if is_subscribed {
-            cx.delete_subscription(
+            cx.delete_feed_subscription(
                 &event.subscription.subscriber_id,
                 &event.subscription.feed_url,
             )

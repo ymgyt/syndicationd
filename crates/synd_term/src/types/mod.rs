@@ -34,19 +34,29 @@ impl EntryMetaExt for EntryMeta {
     }
 }
 
-pub trait RefreshPolicyExt {
+pub trait CrawlPolicyExt {
     fn prompt_value(&self) -> Option<String>;
 }
 
-impl RefreshPolicyExt for payload::RefreshPolicy {
+impl CrawlPolicyExt for payload::CrawlPolicy {
+    fn prompt_value(&self) -> Option<String> {
+        self.polling.prompt_value()
+    }
+}
+
+trait PollingPolicyExt {
+    fn prompt_value(&self) -> Option<String>;
+}
+
+impl PollingPolicyExt for payload::PollingPolicy {
     fn prompt_value(&self) -> Option<String> {
         match self.kind {
-            payload::RefreshPolicyKind::Manual => Some("manual".to_owned()),
-            payload::RefreshPolicyKind::Interval => self
+            payload::PollingPolicyKind::Manual => Some("manual".to_owned()),
+            payload::PollingPolicyKind::Interval => self
                 .interval_seconds
                 .filter(|seconds| *seconds > 0)
                 .map(|seconds| format!("interval:{seconds}s")),
-            payload::RefreshPolicyKind::Other(_) => None,
+            payload::PollingPolicyKind::Other(_) => None,
         }
     }
 }
@@ -81,7 +91,7 @@ pub struct Feed {
     pub generator: Option<String>,
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
-    pub refresh_policy: payload::RefreshPolicy,
+    pub crawl_policy: payload::CrawlPolicy,
     pub refresh_status: Option<payload::RefreshStatus>,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
@@ -124,7 +134,7 @@ impl From<payload::SubscribedFeed> for Feed {
             url,
             requirement,
             category,
-            refresh_policy,
+            crawl_policy,
             refresh_status,
             feed: details,
         } = f;
@@ -156,7 +166,7 @@ impl From<payload::SubscribedFeed> for Feed {
                 .as_ref()
                 .map(|details| details.authors.nodes.clone())
                 .unwrap_or_default(),
-            refresh_policy,
+            crawl_policy,
             refresh_status,
             requirement,
             category,
@@ -171,60 +181,74 @@ pub struct ExportedFeed {
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     #[serde(default)]
-    pub refresh_policy: Option<ExportedRefreshPolicy>,
+    pub crawl_policy: Option<ExportedCrawlPolicy>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct ExportedRefreshPolicy {
-    pub kind: ExportedRefreshPolicyKind,
+pub struct ExportedCrawlPolicy {
+    pub polling: ExportedPollingPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportedPollingPolicy {
+    pub kind: ExportedPollingPolicyKind,
     pub interval_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ExportedRefreshPolicyKind {
+pub enum ExportedPollingPolicyKind {
     Manual,
     Interval,
 }
 
-impl ExportedRefreshPolicy {
-    fn from_api(value: &payload::RefreshPolicy) -> Option<Self> {
-        match &value.kind {
-            payload::RefreshPolicyKind::Manual => Some(Self {
-                kind: ExportedRefreshPolicyKind::Manual,
-                interval_seconds: None,
+impl ExportedCrawlPolicy {
+    fn from_api(value: &payload::CrawlPolicy) -> Option<Self> {
+        match &value.polling.kind {
+            payload::PollingPolicyKind::Manual => Some(Self {
+                polling: ExportedPollingPolicy {
+                    kind: ExportedPollingPolicyKind::Manual,
+                    interval_seconds: None,
+                },
             }),
-            payload::RefreshPolicyKind::Interval => Some(Self {
-                kind: ExportedRefreshPolicyKind::Interval,
-                interval_seconds: value.interval_seconds,
+            payload::PollingPolicyKind::Interval => Some(Self {
+                polling: ExportedPollingPolicy {
+                    kind: ExportedPollingPolicyKind::Interval,
+                    interval_seconds: value.polling.interval_seconds,
+                },
             }),
-            payload::RefreshPolicyKind::Other(_) => None,
+            payload::PollingPolicyKind::Other(_) => None,
         }
     }
 }
 
-impl From<ExportedRefreshPolicy> for payload::RefreshPolicyInput {
-    fn from(value: ExportedRefreshPolicy) -> Self {
+impl From<ExportedCrawlPolicy> for payload::CrawlPolicyInput {
+    fn from(value: ExportedCrawlPolicy) -> Self {
         Self {
-            kind: match value.kind {
-                ExportedRefreshPolicyKind::Manual => payload::RefreshPolicyInputKind::Manual,
-                ExportedRefreshPolicyKind::Interval => payload::RefreshPolicyInputKind::Interval,
+            polling: payload::PollingPolicyInput {
+                kind: match value.polling.kind {
+                    ExportedPollingPolicyKind::Manual => payload::PollingPolicyInputKind::Manual,
+                    ExportedPollingPolicyKind::Interval => {
+                        payload::PollingPolicyInputKind::Interval
+                    }
+                },
+                interval_seconds: value.polling.interval_seconds,
             },
-            interval_seconds: value.interval_seconds,
         }
     }
 }
 
 impl From<payload::SubscribedFeed> for ExportedFeed {
     fn from(v: payload::SubscribedFeed) -> Self {
-        let refresh_policy = ExportedRefreshPolicy::from_api(&v.refresh_policy);
+        let crawl_policy = ExportedCrawlPolicy::from_api(&v.crawl_policy);
         Self {
             title: v.feed.and_then(|feed| feed.title),
             url: v.url,
             requirement: v.requirement,
             category: v.category,
-            refresh_policy,
+            crawl_policy,
         }
     }
 }
@@ -235,7 +259,7 @@ impl From<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
             url: feed.url,
             requirement: feed.requirement,
             category: feed.category,
-            refresh_policy: feed.refresh_policy.map(Into::into),
+            crawl_policy: feed.crawl_policy.map(Into::into),
         }
     }
 }

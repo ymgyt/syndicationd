@@ -21,18 +21,24 @@ pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
 
 /// Transactional registry-domain operations.
 pub trait RegistryTx {
-    fn upsert_subscription(
+    fn upsert_feed_endpoint(
+        &mut self,
+        feed_url: &FeedUrl,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    fn upsert_feed_subscription(
         &mut self,
         subscription: Subscription,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn delete_subscription(
+    fn delete_feed_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn has_subscription(
+    fn has_feed_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -43,7 +49,7 @@ pub trait RegistryTx {
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    fn list_active_subscriptions_for_feed(
+    fn list_active_subscriptions_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
@@ -53,7 +59,7 @@ pub trait RegistryTx {
         target: CrawlTarget,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn load_crawl_target(
+    fn load_crawl_target_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;

@@ -4,7 +4,7 @@ use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::{Category, Requirement};
 
-use crate::{crawl::policy::RefreshPolicy, subscription::SubscriptionKey};
+use crate::{crawl::policy::CrawlPolicy, subscription::SubscriptionKey};
 
 /// A typed fact recorded in the registry event journal.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,7 +176,7 @@ pub struct SubscribeFeedRequested {
     pub subscription: SubscriptionKey,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
-    pub refresh_policy: RefreshPolicy,
+    pub crawl_policy: CrawlPolicy,
 }
 
 impl SubscribeFeedRequested {
@@ -185,14 +185,14 @@ impl SubscribeFeedRequested {
         subscription: SubscriptionKey,
         requirement: Option<Requirement>,
         category: Option<Category<'static>>,
-        refresh_policy: RefreshPolicy,
+        crawl_policy: CrawlPolicy,
     ) -> Self {
         Self {
             request_id,
             subscription,
             requirement,
             category,
-            refresh_policy,
+            crawl_policy,
         }
     }
 }

@@ -1,7 +1,7 @@
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::{
-    crawl::policy::RefreshPolicy,
+    crawl::policy::CrawlPolicy,
     event::RequestId,
     subscription::{SubscriberId, SubscriptionKey},
 };
@@ -12,7 +12,7 @@ pub struct SubscribeFeedCommand {
     pub feed_url: FeedUrl,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
-    pub refresh_policy: RefreshPolicy,
+    pub crawl_policy: CrawlPolicy,
 }
 
 #[derive(Debug, Clone)]

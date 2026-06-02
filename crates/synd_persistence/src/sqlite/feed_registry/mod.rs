@@ -13,20 +13,19 @@ use synd_registry::{
     query::{Subscriptions, SubscriptionsQuery},
 };
 
-use self::codec::{decode_crawl_target, decode_subscription, encode_policy, encode_polling_policy};
+use self::codec::{decode_crawl_target, decode_subscription, encode_crawl_policy_json};
 use super::SqliteDatabase;
 
 mod codec;
 
 const SUBSCRIPTION_SELECT_COLUMNS: &str = r#"
-subscriber_id,
-feed_url,
-requirement,
-category,
-refresh_policy_kind,
-refresh_interval_seconds,
-created_at,
-updated_at
+s.subscriber_id AS subscriber_id,
+e.url AS feed_url,
+s.requirement AS requirement,
+s.category AS category,
+s.crawl_policy_json AS crawl_policy_json,
+s.created_at AS created_at,
+s.updated_at AS updated_at
 "#;
 
 /// SQLite-backed registry database handle.
@@ -201,39 +200,105 @@ impl JournalTx for SqliteRegistryTx<'_> {
     }
 }
 
-impl RegistryTx for SqliteRegistryTx<'_> {
-    async fn upsert_subscription(&mut self, subscription: Subscription) -> RegistryDbResult<()> {
-        let requirement = subscription.requirement.map(|r| r.to_string());
-        let category = subscription.category.map(|c| c.to_string());
-        let (policy_kind, interval_seconds) = encode_policy(subscription.refresh_policy);
-
-        sqlx::query(
+impl SqliteRegistryTx<'_> {
+    async fn upsert_feed_endpoint_row(
+        &mut self,
+        feed_url: &FeedUrl,
+        created_at: chrono::DateTime<chrono::Utc>,
+        updated_at: chrono::DateTime<chrono::Utc>,
+    ) -> RegistryDbResult<i64> {
+        let row = sqlx::query(
             r#"
-            INSERT INTO feed_subscription (
-                subscriber_id,
-                feed_url,
-                requirement,
-                category,
-                refresh_policy_kind,
-                refresh_interval_seconds,
+            INSERT INTO feed_endpoint (
+                url,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(subscriber_id, feed_url) DO UPDATE SET
+            VALUES (?, ?, ?)
+            ON CONFLICT(url) DO UPDATE SET
+                url = excluded.url
+            RETURNING pk
+            "#,
+        )
+        .bind(feed_url.as_str())
+        .bind(created_at)
+        .bind(updated_at)
+        .fetch_one(&mut *self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        row.try_get("pk").map_err(RegistryDbError::internal)
+    }
+
+    async fn resolve_feed_endpoint_pk(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<i64> {
+        let row = sqlx::query(
+            r#"
+            SELECT pk
+            FROM feed_endpoint
+            WHERE url = ?
+            "#,
+        )
+        .bind(feed_url.as_str())
+        .fetch_optional(&mut *self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        let Some(row) = row else {
+            return Err(RegistryDbError::internal(anyhow::anyhow!(
+                "feed endpoint not found: {}",
+                feed_url.as_str()
+            )));
+        };
+
+        row.try_get("pk").map_err(RegistryDbError::internal)
+    }
+}
+
+impl RegistryTx for SqliteRegistryTx<'_> {
+    async fn upsert_feed_endpoint(
+        &mut self,
+        feed_url: &FeedUrl,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> RegistryDbResult<()> {
+        self.upsert_feed_endpoint_row(feed_url, now, now).await?;
+        Ok(())
+    }
+
+    async fn upsert_feed_subscription(
+        &mut self,
+        subscription: Subscription,
+    ) -> RegistryDbResult<()> {
+        let requirement = subscription.requirement.map(|r| r.to_string());
+        let category = subscription.category.map(|c| c.to_string());
+        let policy_json = encode_crawl_policy_json(subscription.crawl_policy)?;
+        let feed_endpoint_pk = self
+            .resolve_feed_endpoint_pk(&subscription.feed_url)
+            .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO feed_endpoint_subscription (
+                subscriber_id,
+                feed_endpoint_pk,
+                requirement,
+                category,
+                crawl_policy_json,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(subscriber_id, feed_endpoint_pk) DO UPDATE SET
                 requirement = excluded.requirement,
                 category = excluded.category,
-                refresh_policy_kind = excluded.refresh_policy_kind,
-                refresh_interval_seconds = excluded.refresh_interval_seconds,
+                crawl_policy_json = excluded.crawl_policy_json,
                 updated_at = excluded.updated_at
             "#,
         )
         .bind(subscription.subscriber_id.as_str())
-        .bind(subscription.feed_url.as_str())
+        .bind(feed_endpoint_pk)
         .bind(requirement)
         .bind(category)
-        .bind(policy_kind)
-        .bind(interval_seconds)
+        .bind(policy_json)
         .bind(subscription.created_at)
         .bind(subscription.updated_at)
         .execute(&mut *self.tx)
@@ -243,15 +308,20 @@ impl RegistryTx for SqliteRegistryTx<'_> {
         Ok(())
     }
 
-    async fn delete_subscription(
+    async fn delete_feed_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<()> {
         sqlx::query(
             r#"
-            DELETE FROM feed_subscription
-            WHERE subscriber_id = ? AND feed_url = ?
+            DELETE FROM feed_endpoint_subscription
+            WHERE subscriber_id = ?
+              AND feed_endpoint_pk = (
+                  SELECT pk
+                  FROM feed_endpoint
+                  WHERE url = ?
+              )
             "#,
         )
         .bind(subscriber_id.as_str())
@@ -263,7 +333,7 @@ impl RegistryTx for SqliteRegistryTx<'_> {
         Ok(())
     }
 
-    async fn has_subscription(
+    async fn has_feed_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -271,8 +341,10 @@ impl RegistryTx for SqliteRegistryTx<'_> {
         let row = sqlx::query(
             r#"
             SELECT 1 AS found
-            FROM feed_subscription
-            WHERE subscriber_id = ? AND feed_url = ?
+            FROM feed_endpoint_subscription AS s
+            INNER JOIN feed_endpoint AS e
+                ON e.pk = s.feed_endpoint_pk
+            WHERE s.subscriber_id = ? AND e.url = ?
             LIMIT 1
             "#,
         )
@@ -294,9 +366,11 @@ impl RegistryTx for SqliteRegistryTx<'_> {
             let sql = format!(
                 r#"
                 SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-                FROM feed_subscription
-                WHERE subscriber_id = ? AND feed_url > ?
-                ORDER BY feed_url
+                FROM feed_endpoint_subscription AS s
+                INNER JOIN feed_endpoint AS e
+                    ON e.pk = s.feed_endpoint_pk
+                WHERE s.subscriber_id = ? AND e.url > ?
+                ORDER BY e.url
                 LIMIT ?
                 "#
             );
@@ -310,9 +384,11 @@ impl RegistryTx for SqliteRegistryTx<'_> {
             let sql = format!(
                 r#"
                 SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-                FROM feed_subscription
-                WHERE subscriber_id = ?
-                ORDER BY feed_url
+                FROM feed_endpoint_subscription AS s
+                INNER JOIN feed_endpoint AS e
+                    ON e.pk = s.feed_endpoint_pk
+                WHERE s.subscriber_id = ?
+                ORDER BY e.url
                 LIMIT ?
                 "#
             );
@@ -341,16 +417,18 @@ impl RegistryTx for SqliteRegistryTx<'_> {
         ))
     }
 
-    async fn list_active_subscriptions_for_feed(
+    async fn list_active_subscriptions_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<Vec<Subscription>> {
         let sql = format!(
             r#"
             SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-            FROM feed_subscription
-            WHERE feed_url = ?
-            ORDER BY subscriber_id
+            FROM feed_endpoint_subscription AS s
+            INNER JOIN feed_endpoint AS e
+                ON e.pk = s.feed_endpoint_pk
+            WHERE e.url = ?
+            ORDER BY s.subscriber_id
             "#
         );
         let rows = sqlx::query(&sql)
@@ -363,46 +441,50 @@ impl RegistryTx for SqliteRegistryTx<'_> {
     }
 
     async fn upsert_crawl_target(&mut self, target: CrawlTarget) -> RegistryDbResult<()> {
-        let (is_active, polling_policy_kind, polling_interval_seconds) =
-            match (target.is_active, target.polling_policy) {
-                (true, Some(policy)) => {
-                    let (kind, interval_seconds) = encode_polling_policy(policy);
-                    (1_i64, Some(kind), interval_seconds)
-                }
-                (false, None) => (0_i64, None, None),
-                (true, None) => {
-                    return Err(RegistryDbError::internal(anyhow::anyhow!(
-                        "active crawl target requires a polling policy"
-                    )));
-                }
-                (false, Some(_)) => {
-                    return Err(RegistryDbError::internal(anyhow::anyhow!(
-                        "inactive crawl target must not have a polling policy"
-                    )));
-                }
-            };
+        let feed_endpoint_pk = self.resolve_feed_endpoint_pk(&target.feed_url).await?;
+        let (state, effective_policy_json) = match (target.is_active, target.crawl_policy) {
+            (true, Some(policy)) => {
+                let policy_json = encode_crawl_policy_json(policy)?;
+                ("active", Some(policy_json))
+            }
+            (false, None) => ("inactive", None),
+            (true, None) => {
+                return Err(RegistryDbError::internal(anyhow::anyhow!(
+                    "active crawl target requires an effective policy"
+                )));
+            }
+            (false, Some(_)) => {
+                return Err(RegistryDbError::internal(anyhow::anyhow!(
+                    "inactive crawl target must not have an effective policy"
+                )));
+            }
+        };
+        let subscription_count =
+            i64::try_from(target.subscription_count).map_err(RegistryDbError::internal)?;
 
         sqlx::query(
             r#"
             INSERT INTO crawl_target (
-                feed_url,
-                is_active,
-                polling_policy_kind,
-                polling_interval_seconds,
+                feed_endpoint_pk,
+                state,
+                subscription_count,
+                effective_policy_json,
+                created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(feed_url) DO UPDATE SET
-                is_active = excluded.is_active,
-                polling_policy_kind = excluded.polling_policy_kind,
-                polling_interval_seconds = excluded.polling_interval_seconds,
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(feed_endpoint_pk) DO UPDATE SET
+                state = excluded.state,
+                subscription_count = excluded.subscription_count,
+                effective_policy_json = excluded.effective_policy_json,
                 updated_at = excluded.updated_at
             "#,
         )
-        .bind(target.feed_url.as_str())
-        .bind(is_active)
-        .bind(polling_policy_kind)
-        .bind(polling_interval_seconds)
+        .bind(feed_endpoint_pk)
+        .bind(state)
+        .bind(subscription_count)
+        .bind(effective_policy_json)
+        .bind(target.created_at)
         .bind(target.updated_at)
         .execute(&mut *self.tx)
         .await
@@ -411,20 +493,23 @@ impl RegistryTx for SqliteRegistryTx<'_> {
         Ok(())
     }
 
-    async fn load_crawl_target(
+    async fn load_crawl_target_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<Option<CrawlTarget>> {
         let row = sqlx::query(
             r#"
             SELECT
-                feed_url,
-                is_active,
-                polling_policy_kind,
-                polling_interval_seconds,
-                updated_at
-            FROM crawl_target
-            WHERE feed_url = ?
+                e.url AS feed_url,
+                ct.state AS state,
+                ct.subscription_count AS subscription_count,
+                ct.effective_policy_json AS effective_policy_json,
+                ct.created_at AS created_at,
+                ct.updated_at AS updated_at
+            FROM crawl_target AS ct
+            INNER JOIN feed_endpoint AS e
+                ON e.pk = ct.feed_endpoint_pk
+            WHERE e.url = ?
             "#,
         )
         .bind(feed_url.as_str())
@@ -466,7 +551,7 @@ mod tests {
     use synd_registry::{
         FeedRegistry, FeedRegistryConfig, RegistryService, SubscribeFeedCommand, SubscriptionKey,
         crawl::{
-            policy::{PollingSchedule, RefreshInterval, RefreshPolicy, RefreshSchedule},
+            policy::{CrawlPolicy, PollingInterval, PollingPolicy},
             target_list::{CrawlTargetListInput, CrawlTargetListProj},
         },
         event::{
@@ -493,22 +578,18 @@ mod tests {
         SubscriberId::new("local")
     }
 
-    fn interval(seconds: u64) -> RefreshInterval {
-        RefreshInterval::try_from(Duration::from_secs(seconds)).unwrap()
+    fn interval(seconds: u64) -> PollingInterval {
+        PollingInterval::try_from(Duration::from_secs(seconds)).unwrap()
     }
 
     fn subscription(path: &str) -> Subscription {
-        subscription_with(
-            subscriber_id(),
-            path,
-            RefreshPolicy::interval(interval(3600)),
-        )
+        subscription_with(subscriber_id(), path, CrawlPolicy::interval(interval(3600)))
     }
 
     fn subscription_with(
         subscriber_id: SubscriberId,
         path: &str,
-        refresh_policy: RefreshPolicy,
+        crawl_policy: CrawlPolicy,
     ) -> Subscription {
         let now = Utc.with_ymd_and_hms(2026, 5, 24, 12, 0, 0).unwrap();
         Subscription {
@@ -516,7 +597,7 @@ mod tests {
             feed_url: feed_url(path),
             requirement: None,
             category: None,
-            refresh_policy,
+            crawl_policy,
             created_at: now,
             updated_at: now,
         }
@@ -527,6 +608,15 @@ mod tests {
             subscription.subscriber_id.clone(),
             subscription.feed_url.clone(),
         )
+    }
+
+    async fn store_subscription(
+        tx: &mut SqliteRegistryTx<'_>,
+        subscription: Subscription,
+    ) -> RegistryDbResult<()> {
+        tx.upsert_feed_endpoint(&subscription.feed_url, subscription.created_at)
+            .await?;
+        tx.upsert_feed_subscription(subscription).await
     }
 
     fn subscribed_event(path: &str) -> Event {
@@ -633,7 +723,7 @@ mod tests {
                 feed_url: feed_url.clone(),
                 requirement: None,
                 category: None,
-                refresh_policy: RefreshPolicy::interval(interval(3600)),
+                crawl_policy: CrawlPolicy::interval(interval(3600)),
             })
             .await?;
 
@@ -675,7 +765,7 @@ mod tests {
                 feed_url: feed_url.clone(),
                 requirement: None,
                 category: None,
-                refresh_policy: RefreshPolicy::interval(interval(3600)),
+                crawl_policy: CrawlPolicy::interval(interval(3600)),
             })
             .await?;
 
@@ -712,7 +802,7 @@ mod tests {
         let db = migrated_db().await?;
         {
             let mut tx = db.begin().await?;
-            tx.upsert_subscription(subscription("rollback")).await?;
+            store_subscription(&mut tx, subscription("rollback")).await?;
         }
 
         let mut tx = db.begin().await?;
@@ -729,12 +819,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn feed_scoped_subscription_read_uses_subscription_model() -> anyhow::Result<()> {
+    async fn feed_subscription_reads_are_backed_by_feed_endpoint() -> anyhow::Result<()> {
         let db = migrated_db().await?;
         let subscription = subscription("shared-read");
 
         let mut tx = db.begin().await?;
-        tx.upsert_subscription(subscription.clone()).await?;
+        store_subscription(&mut tx, subscription.clone()).await?;
         tx.commit().await?;
 
         let mut tx = db.begin().await?;
@@ -745,12 +835,12 @@ mod tests {
                 first: 10,
             })
             .await?;
-        let feed_subscriptions = tx
-            .list_active_subscriptions_for_feed(&subscription.feed_url)
+        let endpoint_subscriptions = tx
+            .list_active_subscriptions_for_endpoint(&subscription.feed_url)
             .await?;
 
         assert_eq!(page.subscriptions, vec![subscription.clone()]);
-        assert_eq!(feed_subscriptions, vec![subscription]);
+        assert_eq!(endpoint_subscriptions, vec![subscription]);
         Ok(())
     }
 
@@ -760,7 +850,7 @@ mod tests {
         let subscription = subscription("crawl-target-subscribed");
 
         let mut tx = db.begin().await?;
-        tx.upsert_subscription(subscription.clone()).await?;
+        store_subscription(&mut tx, subscription.clone()).await?;
         tx.commit().await?;
 
         project_crawl_targets(
@@ -773,17 +863,20 @@ mod tests {
 
         let mut tx = db.begin().await?;
         let target = tx
-            .load_crawl_target(&subscription.feed_url)
+            .load_crawl_target_for_endpoint(&subscription.feed_url)
             .await?
             .expect("crawl target should be projected");
 
         assert!(target.is_active);
+        assert_eq!(target.subscription_count, 1);
         assert_eq!(
             target
-                .polling_policy
+                .crawl_policy
                 .expect("active target has policy")
-                .schedule,
-            PollingSchedule::Interval(interval(3600))
+                .polling,
+            PollingPolicy::Interval {
+                interval: interval(3600)
+            }
         );
         Ok(())
     }
@@ -794,25 +887,23 @@ mod tests {
         let one_hour = subscription_with(
             SubscriberId::new("one-hour"),
             "crawl-target-aggregate",
-            RefreshPolicy::interval(interval(3600)),
+            CrawlPolicy::interval(interval(3600)),
         );
         let ten_minutes = subscription_with(
             SubscriberId::new("ten-minutes"),
             "crawl-target-aggregate",
-            RefreshPolicy::interval(interval(600)),
+            CrawlPolicy::interval(interval(600)),
         );
         let manual = subscription_with(
             SubscriberId::new("manual"),
             "crawl-target-aggregate",
-            RefreshPolicy {
-                schedule: RefreshSchedule::Manual,
-            },
+            CrawlPolicy::manual(),
         );
 
         let mut tx = db.begin().await?;
-        tx.upsert_subscription(one_hour.clone()).await?;
-        tx.upsert_subscription(ten_minutes).await?;
-        tx.upsert_subscription(manual).await?;
+        store_subscription(&mut tx, one_hour.clone()).await?;
+        store_subscription(&mut tx, ten_minutes).await?;
+        store_subscription(&mut tx, manual).await?;
         tx.commit().await?;
 
         project_crawl_targets(
@@ -825,17 +916,20 @@ mod tests {
 
         let mut tx = db.begin().await?;
         let target = tx
-            .load_crawl_target(&one_hour.feed_url)
+            .load_crawl_target_for_endpoint(&one_hour.feed_url)
             .await?
             .expect("crawl target should be projected");
 
         assert!(target.is_active);
+        assert_eq!(target.subscription_count, 3);
         assert_eq!(
             target
-                .polling_policy
+                .crawl_policy
                 .expect("active target has policy")
-                .schedule,
-            PollingSchedule::Interval(interval(600))
+                .polling,
+            PollingPolicy::Interval {
+                interval: interval(600)
+            }
         );
         Ok(())
     }
@@ -847,7 +941,7 @@ mod tests {
         let mut subscription = subscription("crawl-target-changed");
 
         let mut tx = db.begin().await?;
-        tx.upsert_subscription(subscription.clone()).await?;
+        store_subscription(&mut tx, subscription.clone()).await?;
         tx.commit().await?;
 
         project_crawl_targets(
@@ -858,9 +952,9 @@ mod tests {
         )
         .await?;
 
-        subscription.refresh_policy = RefreshPolicy::interval(interval(300));
+        subscription.crawl_policy = CrawlPolicy::interval(interval(300));
         let mut tx = db.begin().await?;
-        tx.upsert_subscription(subscription.clone()).await?;
+        store_subscription(&mut tx, subscription.clone()).await?;
         tx.commit().await?;
 
         project_crawl_targets(
@@ -873,17 +967,20 @@ mod tests {
 
         let mut tx = db.begin().await?;
         let target = tx
-            .load_crawl_target(&subscription.feed_url)
+            .load_crawl_target_for_endpoint(&subscription.feed_url)
             .await?
             .expect("crawl target should be projected");
 
         assert!(target.is_active);
+        assert_eq!(target.subscription_count, 1);
         assert_eq!(
             target
-                .polling_policy
+                .crawl_policy
                 .expect("active target has policy")
-                .schedule,
-            PollingSchedule::Interval(interval(300))
+                .polling,
+            PollingPolicy::Interval {
+                interval: interval(300)
+            }
         );
         Ok(())
     }
@@ -895,7 +992,7 @@ mod tests {
         let subscription = subscription("crawl-target-unsubscribed");
 
         let mut tx = db.begin().await?;
-        tx.upsert_subscription(subscription.clone()).await?;
+        store_subscription(&mut tx, subscription.clone()).await?;
         tx.commit().await?;
 
         project_crawl_targets(
@@ -907,7 +1004,7 @@ mod tests {
         .await?;
 
         let mut tx = db.begin().await?;
-        tx.delete_subscription(&subscription.subscriber_id, &subscription.feed_url)
+        tx.delete_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
             .await?;
         tx.commit().await?;
 
@@ -921,12 +1018,13 @@ mod tests {
 
         let mut tx = db.begin().await?;
         let target = tx
-            .load_crawl_target(&subscription.feed_url)
+            .load_crawl_target_for_endpoint(&subscription.feed_url)
             .await?
             .expect("crawl target should be projected");
 
         assert!(!target.is_active);
-        assert_eq!(target.polling_policy, None);
+        assert_eq!(target.subscription_count, 0);
+        assert_eq!(target.crawl_policy, None);
         Ok(())
     }
 }

@@ -177,27 +177,35 @@ impl<Tx> RegistryTx for ConsumeContext<'_, Tx>
 where
     Tx: RegistryTx + Send,
 {
-    fn upsert_subscription(
+    fn upsert_feed_endpoint(
+        &mut self,
+        feed_url: &FeedUrl,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
+        self.tx.upsert_feed_endpoint(feed_url, now)
+    }
+
+    fn upsert_feed_subscription(
         &mut self,
         subscription: Subscription,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.upsert_subscription(subscription)
+        self.tx.upsert_feed_subscription(subscription)
     }
 
-    fn delete_subscription(
+    fn delete_feed_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.delete_subscription(subscriber_id, feed_url)
+        self.tx.delete_feed_subscription(subscriber_id, feed_url)
     }
 
-    fn has_subscription(
+    fn has_feed_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<bool>> + Send {
-        self.tx.has_subscription(subscriber_id, feed_url)
+        self.tx.has_feed_subscription(subscriber_id, feed_url)
     }
 
     fn list_subscriptions(
@@ -207,11 +215,11 @@ where
         self.tx.list_subscriptions(query)
     }
 
-    fn list_active_subscriptions_for_feed(
+    fn list_active_subscriptions_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send {
-        self.tx.list_active_subscriptions_for_feed(feed_url)
+        self.tx.list_active_subscriptions_for_endpoint(feed_url)
     }
 
     fn upsert_crawl_target(
@@ -221,10 +229,10 @@ where
         self.tx.upsert_crawl_target(target)
     }
 
-    fn load_crawl_target(
+    fn load_crawl_target_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send {
-        self.tx.load_crawl_target(feed_url)
+        self.tx.load_crawl_target_for_endpoint(feed_url)
     }
 }

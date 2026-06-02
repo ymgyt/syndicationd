@@ -5,7 +5,7 @@ use async_graphql::{
 use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     Subscription as RegistrySubscription,
-    crawl::policy::{RefreshPolicy as RegistryRefreshPolicy, RefreshSchedule},
+    crawl::policy::{CrawlPolicy as RegistryCrawlPolicy, PollingPolicy as RegistryPollingPolicy},
     query::SubscriptionsQuery,
 };
 
@@ -34,28 +34,41 @@ struct RefreshStatus {
 }
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
-enum RefreshPolicyKind {
+enum PollingPolicyKind {
     Manual,
     Interval,
 }
 
 #[derive(SimpleObject)]
-struct RefreshPolicy {
-    kind: RefreshPolicyKind,
+struct PollingPolicy {
+    kind: PollingPolicyKind,
     interval_seconds: Option<i64>,
 }
 
-impl From<RegistryRefreshPolicy> for RefreshPolicy {
-    fn from(value: RegistryRefreshPolicy) -> Self {
-        match value.schedule {
-            RefreshSchedule::Manual => Self {
-                kind: RefreshPolicyKind::Manual,
+impl From<RegistryPollingPolicy> for PollingPolicy {
+    fn from(value: RegistryPollingPolicy) -> Self {
+        match value {
+            RegistryPollingPolicy::Manual => Self {
+                kind: PollingPolicyKind::Manual,
                 interval_seconds: None,
             },
-            RefreshSchedule::Interval(duration) => Self {
-                kind: RefreshPolicyKind::Interval,
-                interval_seconds: Some(i64::try_from(duration.as_secs()).unwrap_or(i64::MAX)),
+            RegistryPollingPolicy::Interval { interval } => Self {
+                kind: PollingPolicyKind::Interval,
+                interval_seconds: Some(i64::try_from(interval.as_secs()).unwrap_or(i64::MAX)),
             },
+        }
+    }
+}
+
+#[derive(SimpleObject)]
+struct CrawlPolicy {
+    polling: PollingPolicy,
+}
+
+impl From<RegistryCrawlPolicy> for CrawlPolicy {
+    fn from(value: RegistryCrawlPolicy) -> Self {
+        Self {
+            polling: value.polling.into(),
         }
     }
 }
@@ -80,8 +93,8 @@ impl SubscribedFeed {
         self.subscription.category.as_ref()
     }
 
-    async fn refresh_policy(&self) -> RefreshPolicy {
-        self.subscription.refresh_policy.into()
+    async fn crawl_policy(&self) -> CrawlPolicy {
+        self.subscription.crawl_policy.into()
     }
 
     async fn refresh_status(&self) -> Option<&RefreshStatus> {

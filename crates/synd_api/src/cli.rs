@@ -2,7 +2,10 @@ use std::{ffi::OsString, net::IpAddr, path::PathBuf, str::FromStr, time::Duratio
 
 use axum_server::tls_rustls::RustlsConfig;
 use clap::{ArgAction, Parser};
-use synd_registry::{FeedRegistryConfig, crawl::policy::RefreshInterval};
+use synd_registry::{
+    FeedRegistryConfig,
+    crawl::policy::{CrawlPolicy, PollingInterval},
+};
 use synd_support::time::humantime;
 
 use crate::{
@@ -29,7 +32,7 @@ pub struct Args {
     #[command(flatten)]
     pub o11y: ObservabilityOptions,
     #[command(flatten)]
-    pub feed_refresh: FeedRefreshOptions,
+    pub feed_crawl: FeedCrawlOptions,
     #[arg(hide = true, long = "dry-run", hide_long_help = true)]
     pub dry_run: bool,
 }
@@ -142,34 +145,34 @@ pub struct ObservabilityOptions {
 }
 
 #[derive(clap::Args, Debug, Clone, Copy)]
-#[command(next_help_heading = "Feed refresh options")]
-pub struct FeedRefreshOptions {
-    #[arg(long, value_parser = parse_refresh_interval, default_value = config::feed_refresh::DEFAULT_REFRESH_INTERVAL, env = env_key!("FEED_REFRESH_INTERVAL"))]
-    pub default_feed_refresh_interval: RefreshInterval,
+#[command(next_help_heading = "Feed crawl options")]
+pub struct FeedCrawlOptions {
+    #[arg(long, value_parser = parse_crawl_interval, default_value = config::feed_crawl::DEFAULT_CRAWL_INTERVAL, env = env_key!("FEED_CRAWL_INTERVAL"))]
+    pub default_feed_crawl_interval: PollingInterval,
 }
 
-impl Default for FeedRefreshOptions {
+impl Default for FeedCrawlOptions {
     fn default() -> Self {
         Self {
-            default_feed_refresh_interval: RefreshInterval::try_from(Duration::from_hours(2))
-                .expect("default feed refresh interval is non-zero"),
+            default_feed_crawl_interval: PollingInterval::try_from(Duration::from_hours(2))
+                .expect("default feed crawl interval is non-zero"),
         }
     }
 }
 
-impl FeedRefreshOptions {
+impl FeedCrawlOptions {
     pub fn registry_config(self) -> FeedRegistryConfig {
         FeedRegistryConfig {
-            default_refresh_interval: self.default_feed_refresh_interval,
+            default_crawl_policy: CrawlPolicy::interval(self.default_feed_crawl_interval),
             ..FeedRegistryConfig::default()
         }
     }
 }
 
-fn parse_refresh_interval(value: &str) -> Result<RefreshInterval, String> {
+fn parse_crawl_interval(value: &str) -> Result<PollingInterval, String> {
     humantime::parse_duration(value)
         .map_err(|err| err.to_string())
-        .and_then(|duration| RefreshInterval::try_from(duration).map_err(|err| err.to_string()))
+        .and_then(|duration| PollingInterval::try_from(duration).map_err(|err| err.to_string()))
 }
 
 pub fn try_parse<I, T>(iter: I) -> Result<Args, clap::Error>

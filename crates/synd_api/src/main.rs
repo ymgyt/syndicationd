@@ -47,7 +47,7 @@ async fn run(
         local,
         lifecycle: _,
         o11y,
-        feed_refresh,
+        feed_crawl,
         dry_run,
     }: Args,
     shutdown: Shutdown,
@@ -64,7 +64,7 @@ async fn run(
         Authenticator::new()?
     };
     let tls_config = tls.rustls_config(local_enabled).await?;
-    let registry_config = feed_refresh.registry_config();
+    let registry_config = feed_crawl.registry_config();
     let registry_service =
         RegistryService::start(db, registry_config, shutdown.cancellation_token());
     let (registry, event_workers) = registry_service.into_parts();
@@ -77,7 +77,7 @@ async fn run(
         request_timeout=?dep.serve_options.timeout,
         request_body_limit_bytes=dep.serve_options.body_limit_bytes,
         concurrency_limit=?dep.serve_options.concurrency_limit,
-        default_feed_refresh_interval_minutes=?feed_refresh.default_feed_refresh_interval.as_secs() / 60,
+        default_feed_crawl_interval_minutes=?feed_crawl.default_feed_crawl_interval.as_secs() / 60,
         "Runinng...",
     );
 

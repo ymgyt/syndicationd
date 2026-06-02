@@ -150,7 +150,7 @@ pub struct SubscribedFeed {
     #[serde(default, with = "requirement_graphql")]
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
-    pub refresh_policy: RefreshPolicy,
+    pub crawl_policy: CrawlPolicy,
     pub refresh_status: Option<RefreshStatus>,
     pub feed: Option<FeedDetails>,
 }
@@ -158,20 +158,27 @@ pub struct SubscribedFeed {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub struct RefreshPolicy {
-    pub kind: RefreshPolicyKind,
+pub struct CrawlPolicy {
+    pub polling: PollingPolicy,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
+pub struct PollingPolicy {
+    pub kind: PollingPolicyKind,
     pub interval_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub enum RefreshPolicyKind {
+pub enum PollingPolicyKind {
     Manual,
     Interval,
     Other(String),
 }
 
-impl<'de> Deserialize<'de> for RefreshPolicyKind {
+impl<'de> Deserialize<'de> for PollingPolicyKind {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -378,19 +385,25 @@ pub struct SubscribeFeedInput {
     #[serde(default, with = "requirement_graphql")]
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
-    pub refresh_policy: Option<RefreshPolicyInput>,
+    pub crawl_policy: Option<CrawlPolicyInput>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RefreshPolicyInput {
-    pub kind: RefreshPolicyInputKind,
+pub struct CrawlPolicyInput {
+    pub polling: PollingPolicyInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PollingPolicyInput {
+    pub kind: PollingPolicyInputKind,
     pub interval_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum RefreshPolicyInputKind {
+pub enum PollingPolicyInputKind {
     Manual,
     Interval,
 }

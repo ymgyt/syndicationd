@@ -14,7 +14,7 @@ pub(crate) struct RegistrySubscription;
 enum FeedEvent {
     Subscribed(FeedSubscribed),
     SubscribeRejected(FeedSubscribeRejected),
-    SubscriptionChanged(FeedSubscriptionChanged),
+    SubscriptionChanged(SubscriptionChanged),
     Unsubscribed(FeedUnsubscribed),
     UnsubscribeRejected(FeedUnsubscribeRejected),
 }
@@ -33,7 +33,7 @@ struct FeedSubscribeRejected {
 }
 
 #[derive(SimpleObject)]
-struct FeedSubscriptionChanged {
+struct SubscriptionChanged {
     request_id: String,
     url: FeedUrl,
 }
@@ -70,7 +70,7 @@ impl From<ApiFeedSubscribeRejected> for FeedSubscribeRejected {
     }
 }
 
-impl From<ApiFeedSubscriptionChanged> for FeedSubscriptionChanged {
+impl From<ApiFeedSubscriptionChanged> for SubscriptionChanged {
     fn from(value: ApiFeedSubscriptionChanged) -> Self {
         Self {
             request_id: value.request_id.to_string(),

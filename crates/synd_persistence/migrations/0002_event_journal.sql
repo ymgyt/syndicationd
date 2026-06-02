@@ -1,5 +1,5 @@
 CREATE TABLE event_journal (
-    position     INTEGER PRIMARY KEY AUTOINCREMENT,
+    position     INTEGER PRIMARY KEY,
     event_type   TEXT NOT NULL,
     payload_json TEXT NOT NULL CHECK (json_valid(payload_json))
 );

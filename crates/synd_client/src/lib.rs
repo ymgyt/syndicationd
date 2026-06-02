@@ -885,9 +885,11 @@ query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
         url
         requirement
         category
-        refreshPolicy {
-          kind
-          intervalSeconds
+        crawlPolicy {
+          polling {
+            kind
+            intervalSeconds
+          }
         }
         refreshStatus {
           state
@@ -963,9 +965,11 @@ query Subscription($after: String, $first: Int) {
         url
         requirement
         category
-        refreshPolicy {
-          kind
-          intervalSeconds
+        crawlPolicy {
+          polling {
+            kind
+            intervalSeconds
+          }
         }
         refreshStatus {
           state

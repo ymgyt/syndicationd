@@ -2,7 +2,7 @@ use async_graphql::{Context, Enum, Error, InputObject, Object, SimpleObject};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     SubscribeFeedCommand, UnsubscribeFeedCommand,
-    crawl::policy::{RefreshInterval, RefreshPolicy, RefreshSchedule},
+    crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
 };
 
 use crate::gql::{registry, subscriber_id};
@@ -34,48 +34,57 @@ struct SubscribeFeedInput {
     url: FeedUrl,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
-    refresh_policy: Option<RefreshPolicyInput>,
+    crawl_policy: Option<CrawlPolicyInput>,
+}
+
+#[derive(InputObject)]
+struct CrawlPolicyInput {
+    polling: PollingPolicyInput,
+}
+
+impl CrawlPolicyInput {
+    fn into_policy(self) -> async_graphql::Result<CrawlPolicy> {
+        Ok(CrawlPolicy {
+            polling: self.polling.into_policy()?,
+        })
+    }
 }
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
-enum RefreshPolicyKindInput {
+enum PollingPolicyKindInput {
     Manual,
     Interval,
 }
 
 #[derive(InputObject)]
-struct RefreshPolicyInput {
-    kind: RefreshPolicyKindInput,
+struct PollingPolicyInput {
+    kind: PollingPolicyKindInput,
     interval_seconds: Option<i64>,
 }
 
-impl RefreshPolicyInput {
-    fn into_policy(self) -> async_graphql::Result<RefreshPolicy> {
+impl PollingPolicyInput {
+    fn into_policy(self) -> async_graphql::Result<PollingPolicy> {
         match self.kind {
-            RefreshPolicyKindInput::Manual => {
+            PollingPolicyKindInput::Manual => {
                 if self.interval_seconds.is_some() {
                     return Err(Error::new(
-                        "intervalSeconds must be omitted when refresh policy kind is MANUAL",
+                        "intervalSeconds must be omitted when polling policy kind is MANUAL",
                     ));
                 }
-                Ok(RefreshPolicy {
-                    schedule: RefreshSchedule::Manual,
-                })
+                Ok(PollingPolicy::manual())
             }
-            RefreshPolicyKindInput::Interval => {
+            PollingPolicyKindInput::Interval => {
                 let seconds = self.interval_seconds.ok_or_else(|| {
-                    Error::new("intervalSeconds is required when refresh policy kind is INTERVAL")
+                    Error::new("intervalSeconds is required when polling policy kind is INTERVAL")
                 })?;
                 let seconds = u64::try_from(seconds)
                     .map_err(|_| Error::new("intervalSeconds must be a positive integer"))?;
                 if seconds == 0 {
                     return Err(Error::new("intervalSeconds must be greater than zero"));
                 }
-                let interval = RefreshInterval::try_from(std::time::Duration::from_secs(seconds))
+                let interval = PollingInterval::try_from(std::time::Duration::from_secs(seconds))
                     .map_err(|err| Error::new(err.to_string()))?;
-                Ok(RefreshPolicy {
-                    schedule: RefreshSchedule::Interval(interval),
-                })
+                Ok(PollingPolicy::interval(interval))
             }
         }
     }
@@ -129,9 +138,9 @@ impl Mutation {
         input: SubscribeFeedInput,
     ) -> async_graphql::Result<SubscribeFeedPayload> {
         let subscriber_id = subscriber_id(cx);
-        let refresh_policy = match input.refresh_policy {
+        let crawl_policy = match input.crawl_policy {
             Some(policy) => policy.into_policy()?,
-            None => registry(cx).default_refresh_policy(),
+            None => registry(cx).default_crawl_policy(),
         };
         let out = registry(cx)
             .subscribe(SubscribeFeedCommand {
@@ -139,7 +148,7 @@ impl Mutation {
                 feed_url: input.url.clone(),
                 requirement: input.requirement,
                 category: input.category,
-                refresh_policy,
+                crawl_policy,
             })
             .await?;
 

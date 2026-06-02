@@ -5,7 +5,7 @@ use futures_util::future;
 use octocrab::Octocrab;
 use ratatui::backend::TestBackend;
 use synd_api::{
-    cli::{FeedRefreshOptions, ServeOptions, TlsOptions},
+    cli::{FeedCrawlOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
     serve::auth::Authenticator as ApiAuthenticator,
@@ -21,7 +21,7 @@ use synd_feed::types::{Category, Requirement};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
     CommitTx, FeedRegistryDb, RegistryService, RegistryTx, SubscriberId, Subscription,
-    crawl::policy::{RefreshInterval, RefreshPolicy},
+    crawl::policy::{CrawlPolicy, PollingInterval},
 };
 pub use synd_term::integration::event_stream;
 use synd_term::{
@@ -267,8 +267,8 @@ pub fn new_test_terminal(width: u16, height: u16) -> Terminal {
     Terminal::with(terminal)
 }
 
-fn refresh_interval(duration: Duration) -> RefreshInterval {
-    RefreshInterval::try_from(duration).unwrap()
+fn polling_interval(duration: Duration) -> PollingInterval {
+    PollingInterval::try_from(duration).unwrap()
 }
 
 struct SubscriptionFixture {
@@ -276,7 +276,7 @@ struct SubscriptionFixture {
     feed_url: FeedUrl,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
-    refresh_policy: RefreshPolicy,
+    crawl_policy: CrawlPolicy,
     subscribed_at: DateTime<Utc>,
 }
 
@@ -287,14 +287,16 @@ async fn seed_subscription(
     let mut tx = db.begin().await?;
     let subscription = Subscription {
         subscriber_id: fixture.subscriber_id,
-        feed_url: fixture.feed_url,
+        feed_url: fixture.feed_url.clone(),
         requirement: fixture.requirement,
         category: fixture.category,
-        refresh_policy: fixture.refresh_policy,
+        crawl_policy: fixture.crawl_policy,
         created_at: fixture.subscribed_at,
         updated_at: fixture.subscribed_at,
     };
-    tx.upsert_subscription(subscription).await?;
+    tx.upsert_feed_endpoint(&fixture.feed_url, fixture.subscribed_at)
+        .await?;
+    tx.upsert_feed_subscription(subscription).await?;
     tx.commit().await?;
 
     Ok(())
@@ -324,9 +326,7 @@ pub async fn serve_api(
                     feed_url: "http://localhost:6030/feed/twir_atom".try_into().unwrap(),
                     requirement: Some(Requirement::Must),
                     category: Some(Category::new("rust").unwrap()),
-                    refresh_policy: RefreshPolicy::interval(refresh_interval(
-                        Duration::from_hours(1),
-                    )),
+                    crawl_policy: CrawlPolicy::interval(polling_interval(Duration::from_hours(1))),
                     subscribed_at: now,
                 },
             )
@@ -338,9 +338,7 @@ pub async fn serve_api(
                     feed_url: "http://localhost:6030/feed/o11y_news".try_into().unwrap(),
                     requirement: Some(Requirement::Should),
                     category: Some(Category::new("opentelemetry").unwrap()),
-                    refresh_policy: RefreshPolicy::interval(refresh_interval(
-                        Duration::from_hours(1),
-                    )),
+                    crawl_policy: CrawlPolicy::interval(polling_interval(Duration::from_hours(1))),
                     subscribed_at: now,
                 },
             )
@@ -358,12 +356,12 @@ pub async fn serve_api(
         body_limit_bytes: 1024 * 2,
         concurrency_limit: 100,
     };
-    let feed_refresh_options = FeedRefreshOptions {
-        default_feed_refresh_interval: refresh_interval(Duration::from_hours(1)),
+    let feed_crawl_options = FeedCrawlOptions {
+        default_feed_crawl_interval: polling_interval(Duration::from_hours(1)),
     };
 
     let shutdown = Shutdown::watch_signal(future::pending(), || {});
-    let registry_config = feed_refresh_options.registry_config();
+    let registry_config = feed_crawl_options.registry_config();
     let registry_service =
         RegistryService::start(db.clone(), registry_config, shutdown.cancellation_token());
     let (registry, event_workers) = registry_service.into_parts();
