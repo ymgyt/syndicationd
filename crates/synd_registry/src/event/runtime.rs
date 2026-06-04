@@ -29,10 +29,16 @@ where
         Self { db, wake_publisher }
     }
 
-    pub async fn submit(&self, events: Vec<Event>) -> EventSubmitterResult<RecordedEvents> {
-        let mut kinds = Vec::with_capacity(events.len());
+    pub async fn submit<I, E>(&self, events: I) -> EventSubmitterResult<RecordedEvents>
+    where
+        I: IntoIterator<Item = E>,
+        E: Into<Event>,
+    {
+        let events = events.into_iter();
+        let mut kinds = Vec::with_capacity(events.size_hint().0);
         let mut tx = self.db.begin().await?;
         for event in events {
+            let event = event.into();
             kinds.push(event.kind());
             tx.append_event(event).await?;
         }

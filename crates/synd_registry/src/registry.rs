@@ -13,11 +13,10 @@ use crate::{
     error::FeedRegistryError,
     event::{
         ApiEventPublisher, ApiEventSubscriber, EventSubmitter, EventWakePublisher, Processor,
-        RequestEvent, RequestId, SubscribeFeedRequested, UnsubscribeFeedRequested, WorkerHandle,
-        WorkerPhase, WorkerSet, spawn_worker,
+        WorkerHandle, WorkerPhase, WorkerSet, spawn_worker,
     },
     query::{Subscriptions, SubscriptionsQuery},
-    subscription::{SubscriberId, SubscriptionKey},
+    subscription::SubscriberId,
 };
 
 /// Owns a registry facade together with the workers required to process its events.
@@ -92,38 +91,18 @@ where
         &self,
         command: SubscribeFeedCommand,
     ) -> Result<SubscribeFeedOutput, FeedRegistryError> {
-        let request_id = RequestId::generate();
-        let subscription = SubscriptionKey::new(command.subscriber_id, command.feed_url);
-        let event = RequestEvent::SubscribeFeedRequested(SubscribeFeedRequested::new(
-            request_id.clone(),
-            subscription.clone(),
-            command.requirement,
-            command.category,
-            command.crawl_policy,
-        ));
-        self.events.submit(vec![event.into()]).await?;
-
-        Ok(SubscribeFeedOutput {
-            request_id,
-            subscription,
-        })
+        let request = command.into_request();
+        self.events.submit([request.clone()]).await?;
+        Ok(request.into())
     }
 
     pub async fn unsubscribe(
         &self,
         command: UnsubscribeFeedCommand,
     ) -> Result<UnsubscribeFeedOutput, FeedRegistryError> {
-        let request_id = RequestId::generate();
-        let subscription = SubscriptionKey::new(command.subscriber_id, command.feed_url);
-        let event = RequestEvent::UnsubscribeFeedRequested(UnsubscribeFeedRequested::new(
-            request_id.clone(),
-            subscription.clone(),
-        ));
-        self.events.submit(vec![event.into()]).await?;
-        Ok(UnsubscribeFeedOutput {
-            request_id,
-            subscription,
-        })
+        let request = command.into_request();
+        self.events.submit([request.clone()]).await?;
+        Ok(request.into())
     }
 
     pub async fn list_subscriptions(

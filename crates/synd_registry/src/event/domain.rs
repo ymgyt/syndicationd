@@ -197,6 +197,12 @@ impl SubscribeFeedRequested {
     }
 }
 
+impl From<SubscribeFeedRequested> for Event {
+    fn from(event: SubscribeFeedRequested) -> Self {
+        Self::Request(RequestEvent::SubscribeFeedRequested(event))
+    }
+}
+
 /// A request to start a subscription relation was rejected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubscribeFeedRejected {
@@ -232,6 +238,12 @@ impl UnsubscribeFeedRequested {
             request_id,
             subscription,
         }
+    }
+}
+
+impl From<UnsubscribeFeedRequested> for Event {
+    fn from(event: UnsubscribeFeedRequested) -> Self {
+        Self::Request(RequestEvent::UnsubscribeFeedRequested(event))
     }
 }
 
