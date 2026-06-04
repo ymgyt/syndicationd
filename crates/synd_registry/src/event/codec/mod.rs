@@ -3,8 +3,8 @@ use thiserror::Error;
 
 use super::domain::{
     ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event, EventKind, FeedSubscribed,
-    FeedUnsubscribed, SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChanged,
+    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event, EventKind, FeedSubscribedEvent,
+    FeedUnsubscribedEvent, SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChangedEvent,
     UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 
@@ -66,14 +66,15 @@ impl EventEncoding for Event {
                 decode_payload::<UnsubscribeFeedRejected>(payload_json)
                     .map(EventPayload::into_event)
             }
-            <FeedSubscribed as EventPayload>::EVENT_TYPE => {
-                decode_payload::<FeedSubscribed>(payload_json).map(EventPayload::into_event)
+            <FeedSubscribedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<FeedSubscribedEvent>(payload_json).map(EventPayload::into_event)
             }
-            <SubscriptionChanged as EventPayload>::EVENT_TYPE => {
-                decode_payload::<SubscriptionChanged>(payload_json).map(EventPayload::into_event)
+            <SubscriptionChangedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<SubscriptionChangedEvent>(payload_json)
+                    .map(EventPayload::into_event)
             }
-            <FeedUnsubscribed as EventPayload>::EVENT_TYPE => {
-                decode_payload::<FeedUnsubscribed>(payload_json).map(EventPayload::into_event)
+            <FeedUnsubscribedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<FeedUnsubscribedEvent>(payload_json).map(EventPayload::into_event)
             }
             <ApiFeedSubscribed as EventPayload>::EVENT_TYPE => {
                 decode_payload::<ApiFeedSubscribed>(payload_json).map(EventPayload::into_event)

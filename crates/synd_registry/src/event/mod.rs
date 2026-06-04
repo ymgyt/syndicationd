@@ -13,14 +13,15 @@ pub use codec::{
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
     ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event,
-    EventInterests, EventKind, FeedSubscribed, FeedUnsubscribed, RequestEvent, RequestEventKind,
-    RequestId, SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested,
-    SubscriptionChanged, SubscriptionLifecycle, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    EventInterests, EventKind, FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent,
+    RequestEventKind, RequestId, SubEvent, SubEventKind, SubscribeFeedRejected,
+    SubscribeFeedRequested, SubscriptionChangedEvent, SubscriptionLifecycle,
+    UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
 pub use processor::{
     ConsumeContext, Consumer, PostCommit, Processor, ProcessorError, ProcessorId, ProcessorInput,
-    ProcessorPhase, ProcessorResult, RecordedEvents, Sink, Transactional,
+    ProcessorPhase, ProcessorResult, RecordedEvents, Sink, SubscriberScope, Transactional,
 };
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
 pub use worker::{

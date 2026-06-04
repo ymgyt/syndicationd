@@ -90,7 +90,7 @@ where
         let Some(api_event) = project_api_event(input.into_event()) else {
             return Ok(());
         };
-        cx.record_event(Event::Api(api_event)).await
+        cx.record_event(api_event).await
     }
 }
 

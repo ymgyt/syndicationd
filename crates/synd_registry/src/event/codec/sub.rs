@@ -1,6 +1,7 @@
 use super::{EncodedEvent, EventEncodingResult, EventPayload, encode_payload, event_type};
 use crate::event::{
-    Event, FeedSubscribed, FeedUnsubscribed, SubEvent, SubEventKind, SubscriptionChanged,
+    Event, FeedSubscribedEvent, FeedUnsubscribedEvent, SubEvent, SubEventKind,
+    SubscriptionChangedEvent,
 };
 
 impl SubEvent {
@@ -16,14 +17,14 @@ impl SubEvent {
 impl SubEventKind {
     pub const fn event_type(self) -> &'static str {
         match self {
-            Self::FeedSubscribed => <FeedSubscribed as EventPayload>::EVENT_TYPE,
-            Self::SubscriptionChanged => <SubscriptionChanged as EventPayload>::EVENT_TYPE,
-            Self::FeedUnsubscribed => <FeedUnsubscribed as EventPayload>::EVENT_TYPE,
+            Self::FeedSubscribed => <FeedSubscribedEvent as EventPayload>::EVENT_TYPE,
+            Self::SubscriptionChanged => <SubscriptionChangedEvent as EventPayload>::EVENT_TYPE,
+            Self::FeedUnsubscribed => <FeedUnsubscribedEvent as EventPayload>::EVENT_TYPE,
         }
     }
 }
 
-impl EventPayload for FeedSubscribed {
+impl EventPayload for FeedSubscribedEvent {
     const EVENT_TYPE: &'static str = event_type::SUB_FEED_SUBSCRIBED;
 
     fn into_event(self) -> Event {
@@ -31,7 +32,7 @@ impl EventPayload for FeedSubscribed {
     }
 }
 
-impl EventPayload for SubscriptionChanged {
+impl EventPayload for SubscriptionChangedEvent {
     const EVENT_TYPE: &'static str = event_type::SUB_SUBSCRIPTION_CHANGED;
 
     fn into_event(self) -> Event {
@@ -39,7 +40,7 @@ impl EventPayload for SubscriptionChanged {
     }
 }
 
-impl EventPayload for FeedUnsubscribed {
+impl EventPayload for FeedUnsubscribedEvent {
     const EVENT_TYPE: &'static str = event_type::SUB_FEED_UNSUBSCRIBED;
 
     fn into_event(self) -> Event {

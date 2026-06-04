@@ -225,6 +225,12 @@ impl SubscribeFeedRejected {
     }
 }
 
+impl From<SubscribeFeedRejected> for Event {
+    fn from(event: SubscribeFeedRejected) -> Self {
+        Self::Request(RequestEvent::SubscribeFeedRejected(event))
+    }
+}
+
 /// A request to end a subscription relation was accepted for async processing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnsubscribeFeedRequested {
@@ -269,12 +275,18 @@ impl UnsubscribeFeedRejected {
     }
 }
 
+impl From<UnsubscribeFeedRejected> for Event {
+    fn from(event: UnsubscribeFeedRejected) -> Self {
+        Self::Request(RequestEvent::UnsubscribeFeedRejected(event))
+    }
+}
+
 /// A fact about subscription domain state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubEvent {
-    FeedSubscribed(FeedSubscribed),
-    SubscriptionChanged(SubscriptionChanged),
-    FeedUnsubscribed(FeedUnsubscribed),
+    FeedSubscribed(FeedSubscribedEvent),
+    SubscriptionChanged(SubscriptionChangedEvent),
+    FeedUnsubscribed(FeedUnsubscribedEvent),
 }
 
 impl SubEvent {
@@ -400,11 +412,11 @@ impl ApiFeedUnsubscribeRejected {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubscriptionLifecycle {
     /// The subscriber started subscribing to the feed.
-    Subscribed(FeedSubscribed),
+    Subscribed(FeedSubscribedEvent),
     /// An active subscription changed its registry-owned attributes.
-    Changed(SubscriptionChanged),
+    Changed(SubscriptionChangedEvent),
     /// The subscriber stopped subscribing to the feed.
-    Unsubscribed(FeedUnsubscribed),
+    Unsubscribed(FeedUnsubscribedEvent),
 }
 
 impl SubscriptionLifecycle {
@@ -439,14 +451,14 @@ impl SubscriptionLifecycle {
 
 /// A subscription relation was created and became active.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FeedSubscribed {
+pub struct FeedSubscribedEvent {
     /// The subscription relation that was created.
     pub subscription: SubscriptionKey,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_id: Option<RequestId>,
 }
 
-impl FeedSubscribed {
+impl FeedSubscribedEvent {
     pub fn new(subscription: SubscriptionKey) -> Self {
         Self {
             subscription,
@@ -461,16 +473,28 @@ impl FeedSubscribed {
     }
 }
 
+impl From<FeedSubscribedEvent> for SubEvent {
+    fn from(event: FeedSubscribedEvent) -> Self {
+        Self::FeedSubscribed(event)
+    }
+}
+
+impl From<FeedSubscribedEvent> for Event {
+    fn from(event: FeedSubscribedEvent) -> Self {
+        Self::Sub(event.into())
+    }
+}
+
 /// An active subscription was updated without ending the subscription.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SubscriptionChanged {
+pub struct SubscriptionChangedEvent {
     /// The subscription relation whose registry-owned attributes changed.
     pub subscription: SubscriptionKey,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_id: Option<RequestId>,
 }
 
-impl SubscriptionChanged {
+impl SubscriptionChangedEvent {
     pub fn new(subscription: SubscriptionKey) -> Self {
         Self {
             subscription,
@@ -485,16 +509,28 @@ impl SubscriptionChanged {
     }
 }
 
+impl From<SubscriptionChangedEvent> for SubEvent {
+    fn from(event: SubscriptionChangedEvent) -> Self {
+        Self::SubscriptionChanged(event)
+    }
+}
+
+impl From<SubscriptionChangedEvent> for Event {
+    fn from(event: SubscriptionChangedEvent) -> Self {
+        Self::Sub(event.into())
+    }
+}
+
 /// A subscription relation was ended and is no longer active.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FeedUnsubscribed {
+pub struct FeedUnsubscribedEvent {
     /// The subscription relation that ended.
     pub subscription: SubscriptionKey,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_id: Option<RequestId>,
 }
 
-impl FeedUnsubscribed {
+impl FeedUnsubscribedEvent {
     pub fn new(subscription: SubscriptionKey) -> Self {
         Self {
             subscription,
@@ -506,5 +542,17 @@ impl FeedUnsubscribed {
     pub fn with_request_id(mut self, request_id: RequestId) -> Self {
         self.request_id = Some(request_id);
         self
+    }
+}
+
+impl From<FeedUnsubscribedEvent> for SubEvent {
+    fn from(event: FeedUnsubscribedEvent) -> Self {
+        Self::FeedUnsubscribed(event)
+    }
+}
+
+impl From<FeedUnsubscribedEvent> for Event {
+    fn from(event: FeedUnsubscribedEvent) -> Self {
+        Self::Sub(event.into())
     }
 }

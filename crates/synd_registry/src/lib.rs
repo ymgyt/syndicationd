@@ -19,4 +19,7 @@ pub use config::FeedRegistryConfig;
 pub use db::{CommitTx, FeedRegistryDb, RegistryTx};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::{FeedRegistry, RegistryService};
-pub use subscription::{SubscriberId, Subscription, SubscriptionKey};
+pub use subscription::{
+    FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, Subscription, SubscriptionKey,
+    UnsubscribeOutcome,
+};

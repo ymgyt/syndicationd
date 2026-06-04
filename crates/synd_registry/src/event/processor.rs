@@ -1,5 +1,6 @@
 use std::future::Future;
 
+use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 use thiserror::Error;
 
@@ -9,7 +10,10 @@ use crate::{
     error::{RegistryDbError, RegistryDbResult},
     event::{Event, EventInterests, EventKind, JournalTx},
     query::{Subscriptions, SubscriptionsQuery},
-    subscription::{SubscriberId, Subscription},
+    subscription::{
+        FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, Subscription, SubscriptionKey,
+        UnsubscribeOutcome,
+    },
 };
 
 /// Result type returned by event processors.
@@ -159,17 +163,89 @@ impl<'a, Tx> ConsumeContext<'a, Tx> {
     pub fn into_recorded(self) -> RecordedEvents {
         self.recorded
     }
+
+    pub fn subscriber_scope(&mut self, subscriber_id: SubscriberId) -> SubscriberScope<'_, Tx> {
+        SubscriberScope::new(&mut *self.tx, subscriber_id)
+    }
 }
 
 impl<Tx> ConsumeContext<'_, Tx>
 where
     Tx: JournalTx + Send,
 {
-    pub async fn record_event(&mut self, event: Event) -> ProcessorResult<()> {
+    pub async fn record_event<E>(&mut self, event: E) -> ProcessorResult<()>
+    where
+        E: Into<Event>,
+    {
+        let event = event.into();
         let kind = event.kind();
         self.tx.append_event(event).await?;
         self.recorded.push(kind);
         Ok(())
+    }
+}
+
+/// Subscriber-scoped operations over feed subscription state.
+pub struct SubscriberScope<'a, Tx> {
+    tx: &'a mut Tx,
+    subscriber_id: SubscriberId,
+}
+
+impl<'a, Tx> SubscriberScope<'a, Tx> {
+    fn new(tx: &'a mut Tx, subscriber_id: SubscriberId) -> Self {
+        Self { tx, subscriber_id }
+    }
+}
+
+impl<Tx> SubscriberScope<'_, Tx>
+where
+    Tx: RegistryTx + Send,
+{
+    pub async fn subscribe_feed(
+        &mut self,
+        feed_url: FeedUrl,
+        attrs: FeedSubscriptionAttrs,
+        now: DateTime<Utc>,
+    ) -> ProcessorResult<SubscribeOutcome> {
+        let subscription = SubscriptionKey::new(self.subscriber_id.clone(), feed_url);
+        let already_subscribed = self
+            .tx
+            .has_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
+            .await?;
+
+        self.tx
+            .upsert_feed_endpoint(&subscription.feed_url, now)
+            .await?;
+        self.tx
+            .upsert_feed_subscription(&subscription, attrs, now)
+            .await?;
+
+        let outcome = if already_subscribed {
+            SubscribeOutcome::Changed(subscription)
+        } else {
+            SubscribeOutcome::Subscribed(subscription)
+        };
+        Ok(outcome)
+    }
+
+    pub async fn unsubscribe_feed(
+        &mut self,
+        feed_url: FeedUrl,
+    ) -> ProcessorResult<UnsubscribeOutcome> {
+        let subscription = SubscriptionKey::new(self.subscriber_id.clone(), feed_url);
+        let is_subscribed = self
+            .tx
+            .has_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
+            .await?;
+
+        if is_subscribed {
+            self.tx
+                .delete_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
+                .await?;
+            Ok(UnsubscribeOutcome::Unsubscribed(subscription))
+        } else {
+            Ok(UnsubscribeOutcome::NotSubscribed(subscription))
+        }
     }
 }
 
@@ -187,9 +263,11 @@ where
 
     fn upsert_feed_subscription(
         &mut self,
-        subscription: Subscription,
+        subscription: &SubscriptionKey,
+        attrs: FeedSubscriptionAttrs,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.upsert_feed_subscription(subscription)
+        self.tx.upsert_feed_subscription(subscription, attrs, now)
     }
 
     fn delete_feed_subscription(

@@ -78,7 +78,7 @@ async fn run(
         request_body_limit_bytes=dep.serve_options.body_limit_bytes,
         concurrency_limit=?dep.serve_options.concurrency_limit,
         default_feed_crawl_interval_minutes=?feed_crawl.default_feed_crawl_interval.as_secs() / 60,
-        "Runinng...",
+        "Running...",
     );
 
     dry_run.then(|| shutdown.shutdown());

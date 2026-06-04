@@ -47,6 +47,28 @@ impl SubscriptionKey {
     }
 }
 
+/// Registry-owned attributes applied to one subscriber/feed relation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FeedSubscriptionAttrs {
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
+    pub crawl_policy: CrawlPolicy,
+}
+
+/// Result of applying a subscribe operation to current subscription state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SubscribeOutcome {
+    Subscribed(SubscriptionKey),
+    Changed(SubscriptionKey),
+}
+
+/// Result of applying an unsubscribe operation to current subscription state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnsubscribeOutcome {
+    Unsubscribed(SubscriptionKey),
+    NotSubscribed(SubscriptionKey),
+}
+
 /// Current subscription attributes for one subscriber/feed relation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Subscription {

@@ -20,7 +20,8 @@ use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    CommitTx, FeedRegistryDb, RegistryService, RegistryTx, SubscriberId, Subscription,
+    CommitTx, FeedRegistryDb, FeedSubscriptionAttrs, RegistryService, RegistryTx, SubscriberId,
+    SubscriptionKey,
     crawl::policy::{CrawlPolicy, PollingInterval},
 };
 pub use synd_term::integration::event_stream;
@@ -285,18 +286,16 @@ async fn seed_subscription(
     fixture: SubscriptionFixture,
 ) -> anyhow::Result<()> {
     let mut tx = db.begin().await?;
-    let subscription = Subscription {
-        subscriber_id: fixture.subscriber_id,
-        feed_url: fixture.feed_url.clone(),
+    let subscription = SubscriptionKey::new(fixture.subscriber_id, fixture.feed_url.clone());
+    let attrs = FeedSubscriptionAttrs {
         requirement: fixture.requirement,
         category: fixture.category,
         crawl_policy: fixture.crawl_policy,
-        created_at: fixture.subscribed_at,
-        updated_at: fixture.subscribed_at,
     };
     tx.upsert_feed_endpoint(&fixture.feed_url, fixture.subscribed_at)
         .await?;
-    tx.upsert_feed_subscription(subscription).await?;
+    tx.upsert_feed_subscription(&subscription, attrs, fixture.subscribed_at)
+        .await?;
     tx.commit().await?;
 
     Ok(())

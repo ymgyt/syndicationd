@@ -7,7 +7,7 @@ use crate::{
     error::{RegistryDbError, RegistryDbResult},
     event::JournalTx,
     query::{Subscriptions, SubscriptionsQuery},
-    subscription::{SubscriberId, Subscription},
+    subscription::{FeedSubscriptionAttrs, SubscriberId, Subscription, SubscriptionKey},
 };
 
 /// Opens registry database transactions.
@@ -29,7 +29,9 @@ pub trait RegistryTx {
 
     fn upsert_feed_subscription(
         &mut self,
-        subscription: Subscription,
+        subscription: &SubscriptionKey,
+        attrs: FeedSubscriptionAttrs,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
     fn delete_feed_subscription(

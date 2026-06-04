@@ -2,14 +2,14 @@ use chrono::Utc;
 
 use crate::{
     consumers::unexpected_event,
-    db::{FeedRegistryDb, RegistryTx},
+    db::FeedRegistryDb,
     event::{
-        ConsumeContext, Consumer, Event, EventInterests, FeedSubscribed, FeedUnsubscribed,
-        Processor, ProcessorError, ProcessorId, ProcessorResult, RequestEvent, RequestEventKind,
-        SubEvent, SubscribeFeedRequested, SubscriptionChanged, Transactional,
-        UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+        ConsumeContext, Consumer, Event, EventInterests, FeedSubscribedEvent,
+        FeedUnsubscribedEvent, Processor, ProcessorError, ProcessorId, ProcessorResult,
+        RequestEvent, RequestEventKind, SubscribeFeedRequested, SubscriptionChangedEvent,
+        Transactional, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
     },
-    subscription::Subscription,
+    subscription::{FeedSubscriptionAttrs, SubscribeOutcome, UnsubscribeOutcome},
 };
 
 /// Subscription request lifecycle events accepted by the registry.
@@ -96,32 +96,36 @@ impl SubRequestProj {
         S: FeedRegistryDb,
     {
         let now = Utc::now();
-        let subscription = Subscription {
-            subscriber_id: event.subscription.subscriber_id.clone(),
-            feed_url: event.subscription.feed_url.clone(),
-            requirement: event.requirement,
-            category: event.category,
-            crawl_policy: event.crawl_policy,
-            created_at: now,
-            updated_at: now,
+        let SubscribeFeedRequested {
+            request_id,
+            subscription,
+            requirement,
+            category,
+            crawl_policy,
+        } = event;
+        let attrs = FeedSubscriptionAttrs {
+            requirement,
+            category,
+            crawl_policy,
         };
 
-        let already_subscribed = cx
-            .has_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
+        let outcome = cx
+            .subscriber_scope(subscription.subscriber_id)
+            .subscribe_feed(subscription.feed_url, attrs, now)
             .await?;
-        cx.upsert_feed_endpoint(&subscription.feed_url, now).await?;
-        cx.upsert_feed_subscription(subscription).await?;
 
-        let event = if already_subscribed {
-            Event::Sub(SubEvent::SubscriptionChanged(
-                SubscriptionChanged::new(event.subscription).with_request_id(event.request_id),
-            ))
-        } else {
-            Event::Sub(SubEvent::FeedSubscribed(
-                FeedSubscribed::new(event.subscription).with_request_id(event.request_id),
-            ))
-        };
-        cx.record_event(event).await
+        match outcome {
+            SubscribeOutcome::Subscribed(subscription) => {
+                cx.record_event(FeedSubscribedEvent::new(subscription).with_request_id(request_id))
+                    .await
+            }
+            SubscribeOutcome::Changed(subscription) => {
+                cx.record_event(
+                    SubscriptionChangedEvent::new(subscription).with_request_id(request_id),
+                )
+                .await
+            }
+        }
     }
 
     async fn handle_unsubscribe<S>(
@@ -132,32 +136,31 @@ impl SubRequestProj {
     where
         S: FeedRegistryDb,
     {
-        let is_subscribed = cx
-            .has_feed_subscription(
-                &event.subscription.subscriber_id,
-                &event.subscription.feed_url,
-            )
+        let UnsubscribeFeedRequested {
+            request_id,
+            subscription,
+        } = event;
+
+        let outcome = cx
+            .subscriber_scope(subscription.subscriber_id)
+            .unsubscribe_feed(subscription.feed_url)
             .await?;
 
-        let event = if is_subscribed {
-            cx.delete_feed_subscription(
-                &event.subscription.subscriber_id,
-                &event.subscription.feed_url,
-            )
-            .await?;
-            Event::Sub(SubEvent::FeedUnsubscribed(
-                FeedUnsubscribed::new(event.subscription).with_request_id(event.request_id),
-            ))
-        } else {
-            Event::Request(RequestEvent::UnsubscribeFeedRejected(
-                UnsubscribeFeedRejected::new(
-                    event.request_id,
-                    event.subscription,
+        match outcome {
+            UnsubscribeOutcome::Unsubscribed(subscription) => {
+                cx.record_event(
+                    FeedUnsubscribedEvent::new(subscription).with_request_id(request_id),
+                )
+                .await
+            }
+            UnsubscribeOutcome::NotSubscribed(subscription) => {
+                cx.record_event(UnsubscribeFeedRejected::new(
+                    request_id,
+                    subscription,
                     "not subscribed",
-                ),
-            ))
-        };
-
-        cx.record_event(event).await
+                ))
+                .await
+            }
+        }
     }
 }

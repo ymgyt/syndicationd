@@ -3,8 +3,8 @@
 use sqlx::{QueryBuilder, Row, Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    CommitTx, FeedRegistryDb, RegistryDbError, RegistryDbResult, RegistryTx, SubscriberId,
-    Subscription,
+    CommitTx, FeedRegistryDb, FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, RegistryTx,
+    SubscriberId, Subscription, SubscriptionKey,
     crawl::target_list::CrawlTarget,
     event::{
         Event, EventCursor, EventCursorPos, EventEncoding, EventInterests, EventReadBatch,
@@ -266,11 +266,13 @@ impl RegistryTx for SqliteRegistryTx<'_> {
 
     async fn upsert_feed_subscription(
         &mut self,
-        subscription: Subscription,
+        subscription: &SubscriptionKey,
+        attrs: FeedSubscriptionAttrs,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> RegistryDbResult<()> {
-        let requirement = subscription.requirement.map(|r| r.to_string());
-        let category = subscription.category.map(|c| c.to_string());
-        let policy_json = encode_crawl_policy_json(subscription.crawl_policy)?;
+        let requirement = attrs.requirement.map(|r| r.to_string());
+        let category = attrs.category.map(|c| c.to_string());
+        let policy_json = encode_crawl_policy_json(attrs.crawl_policy)?;
         let feed_endpoint_pk = self
             .resolve_feed_endpoint_pk(&subscription.feed_url)
             .await?;
@@ -299,8 +301,8 @@ impl RegistryTx for SqliteRegistryTx<'_> {
         .bind(requirement)
         .bind(category)
         .bind(policy_json)
-        .bind(subscription.created_at)
-        .bind(subscription.updated_at)
+        .bind(now)
+        .bind(now)
         .execute(&mut *self.tx)
         .await
         .map_err(RegistryDbError::internal)?;
@@ -556,8 +558,8 @@ mod tests {
         },
         event::{
             ApiEvent, ConsumeContext, Consumer, EventInterests, EventSubmitter, EventWakePublisher,
-            FeedSubscribed, FeedUnsubscribed, ProcessorId, RequestEventKind, SubEvent,
-            SubEventKind, SubscriptionChanged, SubscriptionLifecycle,
+            FeedSubscribedEvent, FeedUnsubscribedEvent, ProcessorId, RequestEventKind, SubEvent,
+            SubEventKind, SubscriptionChangedEvent, SubscriptionLifecycle,
         },
     };
     use tokio_util::sync::CancellationToken;
@@ -614,21 +616,29 @@ mod tests {
         tx: &mut SqliteRegistryTx<'_>,
         subscription: Subscription,
     ) -> RegistryDbResult<()> {
-        tx.upsert_feed_endpoint(&subscription.feed_url, subscription.created_at)
+        let feed_url = subscription.feed_url.clone();
+        let key = subscription_key(&subscription);
+        let attrs = FeedSubscriptionAttrs {
+            requirement: subscription.requirement,
+            category: subscription.category,
+            crawl_policy: subscription.crawl_policy,
+        };
+        tx.upsert_feed_endpoint(&feed_url, subscription.created_at)
             .await?;
-        tx.upsert_feed_subscription(subscription).await
+        tx.upsert_feed_subscription(&key, attrs, subscription.created_at)
+            .await
     }
 
     fn subscribed_event(path: &str) -> Event {
-        Event::Sub(SubEvent::FeedSubscribed(FeedSubscribed::new(
+        Event::Sub(SubEvent::FeedSubscribed(FeedSubscribedEvent::new(
             subscription_key(&subscription(path)),
         )))
     }
 
     fn changed_event(path: &str) -> Event {
-        Event::Sub(SubEvent::SubscriptionChanged(SubscriptionChanged::new(
-            subscription_key(&subscription(path)),
-        )))
+        Event::Sub(SubEvent::SubscriptionChanged(
+            SubscriptionChangedEvent::new(subscription_key(&subscription(path))),
+        ))
     }
 
     fn subscription_lifecycle_interests() -> EventInterests {
@@ -798,6 +808,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn runtime_second_subscribe_emits_api_subscription_changed() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let ct = CancellationToken::new();
+        let config = FeedRegistryConfig {
+            event_worker_poll_interval: Duration::from_millis(10),
+            ..FeedRegistryConfig::default()
+        };
+        let registry_service = RegistryService::start(db.clone(), config, ct.clone());
+        let (registry, event_workers) = registry_service.into_parts();
+        let subscriber_id = subscriber_id();
+        let feed_url = feed_url("runtime-second-subscribe");
+        let mut api_events = registry.subscribe_api_events(subscriber_id.clone());
+
+        let first = registry
+            .subscribe(SubscribeFeedCommand {
+                subscriber_id: subscriber_id.clone(),
+                feed_url: feed_url.clone(),
+                requirement: None,
+                category: None,
+                crawl_policy: CrawlPolicy::interval(interval(3600)),
+            })
+            .await?;
+
+        let api_event = tokio::time::timeout(Duration::from_secs(2), api_events.recv()).await?;
+        let api_event = match api_event {
+            Ok(event) => event,
+            Err(err) => anyhow::bail!("api event receive failed: {err:?}"),
+        };
+        let ApiEvent::FeedSubscribed(event) = api_event else {
+            anyhow::bail!("unexpected api event: {api_event:?}");
+        };
+        assert_eq!(event.request_id, first.request_id);
+
+        let second = registry
+            .subscribe(SubscribeFeedCommand {
+                subscriber_id: subscriber_id.clone(),
+                feed_url: feed_url.clone(),
+                requirement: None,
+                category: None,
+                crawl_policy: CrawlPolicy::interval(interval(600)),
+            })
+            .await?;
+
+        let api_event = tokio::time::timeout(Duration::from_secs(2), api_events.recv()).await?;
+        let api_event = match api_event {
+            Ok(event) => event,
+            Err(err) => anyhow::bail!("api event receive failed: {err:?}"),
+        };
+        let ApiEvent::FeedSubscriptionChanged(event) = api_event else {
+            anyhow::bail!("unexpected api event: {api_event:?}");
+        };
+        assert_eq!(event.request_id, second.request_id);
+        assert_eq!(event.subscription.subscriber_id, subscriber_id);
+        assert_eq!(event.subscription.feed_url, feed_url);
+
+        ct.cancel();
+        drop(event_workers);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn uncommitted_subscription_is_rolled_back() -> Result<(), RegistryDbError> {
         let db = migrated_db().await?;
         {
@@ -855,7 +926,7 @@ mod tests {
 
         project_crawl_targets(
             &db,
-            vec![SubscriptionLifecycle::Subscribed(FeedSubscribed::new(
+            vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
                 subscription_key(&subscription),
             ))],
         )
@@ -908,7 +979,7 @@ mod tests {
 
         project_crawl_targets(
             &db,
-            vec![SubscriptionLifecycle::Subscribed(FeedSubscribed::new(
+            vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
                 subscription_key(&one_hour),
             ))],
         )
@@ -946,7 +1017,7 @@ mod tests {
 
         project_crawl_targets(
             &db,
-            vec![SubscriptionLifecycle::Subscribed(FeedSubscribed::new(
+            vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
                 subscription_key(&subscription),
             ))],
         )
@@ -959,9 +1030,9 @@ mod tests {
 
         project_crawl_targets(
             &db,
-            vec![SubscriptionLifecycle::Changed(SubscriptionChanged::new(
-                subscription_key(&subscription),
-            ))],
+            vec![SubscriptionLifecycle::Changed(
+                SubscriptionChangedEvent::new(subscription_key(&subscription)),
+            )],
         )
         .await?;
 
@@ -997,7 +1068,7 @@ mod tests {
 
         project_crawl_targets(
             &db,
-            vec![SubscriptionLifecycle::Subscribed(FeedSubscribed::new(
+            vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
                 subscription_key(&subscription),
             ))],
         )
@@ -1010,9 +1081,9 @@ mod tests {
 
         project_crawl_targets(
             &db,
-            vec![SubscriptionLifecycle::Unsubscribed(FeedUnsubscribed::new(
-                subscription_key(&subscription),
-            ))],
+            vec![SubscriptionLifecycle::Unsubscribed(
+                FeedUnsubscribedEvent::new(subscription_key(&subscription)),
+            )],
         )
         .await?;
 
