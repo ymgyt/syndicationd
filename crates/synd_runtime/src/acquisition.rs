@@ -709,9 +709,18 @@ mod tests {
 
     #[cfg(unix)]
     fn spawn_old_daemon(endpoint: PathBuf) -> std::thread::JoinHandle<()> {
-        std::thread::spawn(move || {
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+        let bind_endpoint = endpoint.clone();
+        let handle = std::thread::spawn(move || {
             std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
-            let listener = UnixListener::bind(&endpoint).unwrap();
+            let listener = match UnixListener::bind(&endpoint) {
+                Ok(listener) => listener,
+                Err(error) => {
+                    let _ = ready_tx.send(Err(error));
+                    return;
+                }
+            };
+            ready_tx.send(Ok(())).unwrap();
             let (mut stream, _) = listener.accept().unwrap();
             let mut buffer = [0_u8; 4096];
             let len = stream.read(&mut buffer).unwrap();
@@ -724,7 +733,23 @@ mod tests {
                 "HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\n\r\n"
             };
             stream.write_all(response.as_bytes()).unwrap();
-        })
+        });
+
+        match ready_rx.recv_timeout(Duration::from_secs(2)) {
+            Ok(Ok(())) => handle,
+            Ok(Err(error)) => panic!(
+                "failed to bind old daemon endpoint {}: {error}",
+                bind_endpoint.display()
+            ),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => panic!(
+                "timed out waiting for old daemon endpoint {} to bind",
+                bind_endpoint.display()
+            ),
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => panic!(
+                "old daemon thread exited before binding endpoint {}",
+                bind_endpoint.display()
+            ),
+        }
     }
 
     #[cfg(unix)]
