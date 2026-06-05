@@ -2,7 +2,7 @@ use std::fmt;
 
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Category, Requirement};
+use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::{crawl::policy::CrawlPolicy, subscription::SubscriptionKey};
 
@@ -425,6 +425,14 @@ impl SubscriptionLifecycle {
             Self::Subscribed(_) => SubEventKind::FeedSubscribed,
             Self::Changed(_) => SubEventKind::SubscriptionChanged,
             Self::Unsubscribed(_) => SubEventKind::FeedUnsubscribed,
+        }
+    }
+
+    pub fn affected_feed_url(&self) -> &FeedUrl {
+        match self {
+            Self::Subscribed(event) => &event.subscription.feed_url,
+            Self::Changed(event) => &event.subscription.feed_url,
+            Self::Unsubscribed(event) => &event.subscription.feed_url,
         }
     }
 }

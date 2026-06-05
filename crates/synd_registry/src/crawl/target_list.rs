@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 use tracing::debug;
@@ -9,46 +11,105 @@ use crate::{
         ConsumeContext, Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId,
         ProcessorResult, SubEvent, SubEventKind, SubscriptionLifecycle, Transactional,
     },
-    subscription::Subscription,
+    subscription::SubscriptionKey,
 };
 
 /// Current crawl target state derived from active subscriptions for one feed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlTarget {
     pub feed_url: FeedUrl,
-    pub is_active: bool,
-    pub subscription_count: usize,
-    pub crawl_policy: Option<CrawlPolicy>,
+    pub state: CrawlTargetState,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl CrawlTarget {
-    pub fn active(
-        feed_url: FeedUrl,
-        subscription_count: usize,
-        crawl_policy: CrawlPolicy,
-        now: DateTime<Utc>,
-    ) -> Self {
+    pub fn new(feed_url: FeedUrl, state: CrawlTargetState, now: DateTime<Utc>) -> Self {
         Self {
             feed_url,
-            is_active: true,
-            subscription_count,
-            crawl_policy: Some(crawl_policy),
+            state,
             created_at: now,
             updated_at: now,
         }
     }
 
     pub fn inactive(feed_url: FeedUrl, now: DateTime<Utc>) -> Self {
+        Self::new(feed_url, CrawlTargetState::Inactive, now)
+    }
+}
+
+/// Current state of one feed endpoint inside the crawl target list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrawlTargetState {
+    Active {
+        subscription_count: NonZeroUsize,
+        effective_policy: CrawlPolicy,
+    },
+    Inactive,
+}
+
+/// Current `feed_endpoint_subscription` row data used to derive a crawl target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FeedEndpointSubscription {
+    pub subscription: SubscriptionKey,
+    pub crawl_policy: CrawlPolicy,
+}
+
+impl FeedEndpointSubscription {
+    pub fn new(subscription: SubscriptionKey, crawl_policy: CrawlPolicy) -> Self {
+        Self {
+            subscription,
+            crawl_policy,
+        }
+    }
+}
+
+/// Current subscription relations for one feed endpoint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FeedEndpointSubscriptionSet {
+    pub feed_url: FeedUrl,
+    pub subscriptions: Vec<FeedEndpointSubscription>,
+}
+
+impl FeedEndpointSubscriptionSet {
+    pub fn new(feed_url: FeedUrl, subscriptions: Vec<FeedEndpointSubscription>) -> Self {
+        debug_assert!(
+            subscriptions
+                .iter()
+                .all(|subscription| subscription.subscription.feed_url == feed_url)
+        );
         Self {
             feed_url,
-            is_active: false,
-            subscription_count: 0,
-            crawl_policy: None,
-            created_at: now,
-            updated_at: now,
+            subscriptions,
         }
+    }
+
+    pub fn crawl_target_decision(self) -> CrawlTargetDecision {
+        let state = if let Some(subscription_count) = NonZeroUsize::new(self.subscriptions.len()) {
+            CrawlTargetState::Active {
+                subscription_count,
+                effective_policy: effective_policy(&self.subscriptions),
+            }
+        } else {
+            CrawlTargetState::Inactive
+        };
+
+        CrawlTargetDecision {
+            feed_url: self.feed_url,
+            state,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrawlTargetDecision {
+    feed_url: FeedUrl,
+    state: CrawlTargetState,
+}
+
+impl CrawlTargetDecision {
+    pub fn into_target(self, now: DateTime<Utc>) -> CrawlTarget {
+        CrawlTarget::new(self.feed_url, self.state, now)
     }
 }
 
@@ -61,10 +122,6 @@ pub struct CrawlTargetListInput {
 impl CrawlTargetListInput {
     pub fn new(event: SubscriptionLifecycle) -> Self {
         Self { event }
-    }
-
-    pub fn into_event(self) -> SubscriptionLifecycle {
-        self.event
     }
 }
 
@@ -132,53 +189,35 @@ where
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
     ) -> ProcessorResult<()> {
-        let feed_url = affected_feed_url(input.into_event());
-        let subscriptions = cx.list_active_subscriptions_for_endpoint(&feed_url).await?;
-        let subscription_count = subscriptions.len();
+        let Self::Input { event } = input;
+
+        let feed_url = event.affected_feed_url().clone();
+        let subscriptions = cx.load_feed_endpoint_subscriptions(&feed_url).await?;
         let now = Utc::now();
-        let target = if let Some(policy) = CrawlPolicyResolver::resolve(&subscriptions) {
-            CrawlTarget::active(feed_url.clone(), subscription_count, policy, now)
-        } else {
-            CrawlTarget::inactive(feed_url.clone(), now)
-        };
-        cx.upsert_crawl_target(target).await?;
+        let target = subscriptions.crawl_target_decision().into_target(now);
+        cx.upsert_crawl_target(&target).await?;
 
         debug!(
-            feed_url = feed_url.as_str(),
-            "crawl target list projector reconciled feed"
+            feed_url = target.feed_url.as_str(),
+            ?target.state,
+            "crawl target reconciled"
         );
         Ok(())
     }
 }
 
-fn affected_feed_url(event: SubscriptionLifecycle) -> FeedUrl {
-    match event {
-        SubscriptionLifecycle::Subscribed(event) => event.subscription.feed_url,
-        SubscriptionLifecycle::Changed(event) => event.subscription.feed_url,
-        SubscriptionLifecycle::Unsubscribed(event) => event.subscription.feed_url,
-    }
-}
-
-struct CrawlPolicyResolver;
-
-impl CrawlPolicyResolver {
-    fn resolve(subscriptions: &[Subscription]) -> Option<CrawlPolicy> {
-        if subscriptions.is_empty() {
-            return None;
-        }
-
-        let interval = subscriptions
-            .iter()
-            .filter_map(|subscription| match subscription.crawl_policy.polling {
-                PollingPolicy::Manual => None,
-                PollingPolicy::Interval { interval } => Some(interval),
-            })
-            .reduce(PollingInterval::min);
-
-        Some(match interval {
-            Some(interval) => CrawlPolicy::interval(interval),
-            None => CrawlPolicy::manual(),
+fn effective_policy(subscriptions: &[FeedEndpointSubscription]) -> CrawlPolicy {
+    let interval = subscriptions
+        .iter()
+        .filter_map(|subscription| match subscription.crawl_policy.polling {
+            PollingPolicy::Manual => None,
+            PollingPolicy::Interval { interval } => Some(interval),
         })
+        .reduce(PollingInterval::min);
+
+    match interval {
+        Some(interval) => CrawlPolicy::interval(interval),
+        None => CrawlPolicy::manual(),
     }
 }
 
@@ -189,37 +228,60 @@ mod tests {
     use synd_feed::types::FeedUrl;
 
     use super::*;
-    use crate::subscription::SubscriberId;
+    use crate::subscription::{SubscriberId, SubscriptionKey};
 
     fn interval(duration: Duration) -> PollingInterval {
         PollingInterval::try_from(duration).unwrap()
     }
 
-    fn subscription(crawl_policy: CrawlPolicy) -> Subscription {
-        let now = Utc::now();
-        Subscription {
-            subscriber_id: SubscriberId::new("local"),
-            feed_url: FeedUrl::parse("https://example.com/feed.xml").unwrap(),
-            requirement: None,
-            category: None,
+    fn feed_url() -> FeedUrl {
+        FeedUrl::parse("https://example.com/feed.xml").unwrap()
+    }
+
+    fn subscription(
+        subscriber_id: &'static str,
+        crawl_policy: CrawlPolicy,
+    ) -> FeedEndpointSubscription {
+        FeedEndpointSubscription::new(
+            SubscriptionKey::new(SubscriberId::new(subscriber_id), feed_url()),
             crawl_policy,
-            created_at: now,
-            updated_at: now,
-        }
+        )
+    }
+
+    fn subscription_set(
+        subscriptions: Vec<FeedEndpointSubscription>,
+    ) -> FeedEndpointSubscriptionSet {
+        FeedEndpointSubscriptionSet::new(feed_url(), subscriptions)
     }
 
     #[test]
-    fn crawl_policy_resolver_uses_shortest_interval_subscription() {
-        let subscriptions = [
-            subscription(CrawlPolicy::interval(interval(Duration::from_hours(1)))),
-            subscription(CrawlPolicy::interval(interval(Duration::from_mins(10)))),
-            subscription(CrawlPolicy::manual()),
-        ];
+    fn crawl_target_decision_uses_shortest_interval_subscription() {
+        let subscriptions = subscription_set(vec![
+            subscription(
+                "one-hour",
+                CrawlPolicy::interval(interval(Duration::from_hours(1))),
+            ),
+            subscription(
+                "ten-minutes",
+                CrawlPolicy::interval(interval(Duration::from_mins(10))),
+            ),
+            subscription("manual", CrawlPolicy::manual()),
+        ]);
 
-        let policy = CrawlPolicyResolver::resolve(&subscriptions).unwrap();
+        let target = subscriptions
+            .crawl_target_decision()
+            .into_target(Utc::now());
+        let CrawlTargetState::Active {
+            subscription_count,
+            effective_policy,
+        } = target.state
+        else {
+            panic!("target should be active");
+        };
 
+        assert_eq!(subscription_count.get(), 3);
         assert_eq!(
-            policy.polling,
+            effective_policy.polling,
             PollingPolicy::Interval {
                 interval: interval(Duration::from_mins(10))
             }
@@ -227,16 +289,30 @@ mod tests {
     }
 
     #[test]
-    fn crawl_policy_resolver_is_manual_when_all_subscriptions_are_manual() {
-        let subscriptions = [subscription(CrawlPolicy::manual())];
+    fn crawl_target_decision_is_manual_when_all_subscriptions_are_manual() {
+        let subscriptions = subscription_set(vec![subscription("manual", CrawlPolicy::manual())]);
 
-        let policy = CrawlPolicyResolver::resolve(&subscriptions).unwrap();
+        let target = subscriptions
+            .crawl_target_decision()
+            .into_target(Utc::now());
 
-        assert_eq!(policy, CrawlPolicy::manual());
+        assert_eq!(
+            target.state,
+            CrawlTargetState::Active {
+                subscription_count: NonZeroUsize::new(1).unwrap(),
+                effective_policy: CrawlPolicy::manual(),
+            }
+        );
     }
 
     #[test]
-    fn crawl_policy_resolver_returns_none_without_subscriptions() {
-        assert_eq!(CrawlPolicyResolver::resolve(&[]), None);
+    fn crawl_target_decision_is_inactive_without_subscriptions() {
+        let subscriptions = subscription_set(Vec::new());
+
+        let target = subscriptions
+            .crawl_target_decision()
+            .into_target(Utc::now());
+
+        assert_eq!(target.state, CrawlTargetState::Inactive);
     }
 }

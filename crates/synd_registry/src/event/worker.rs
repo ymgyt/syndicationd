@@ -273,6 +273,14 @@ where
         );
     }
 
+    #[tracing::instrument(
+        name = "registry.event.worker.process",
+        skip_all,
+        fields(
+            processor = self.processor.id().as_str(),
+            trigger = trigger.as_str()
+        )
+    )]
     async fn process(&mut self, trigger: Trigger) {
         let processor = self.processor.id();
         match P::Phase::process(&self.db, &mut self.processor).await {
@@ -355,8 +363,9 @@ where
     P: Consumer<S, Phase = Transactional>,
 {
     async fn process(db: &S, processor: &mut P) -> WorkerResult<ProcessReport> {
+        let processor_id = processor.id();
         let mut tx = db.begin().await?;
-        let cursor = tx.load_cursor(processor.id()).await?;
+        let cursor = tx.load_cursor(processor_id).await?;
         let batch = tx.read_after(&cursor, processor.interests()).await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();
@@ -385,8 +394,9 @@ where
     P: Sink<Phase = PostCommit>,
 {
     async fn process(db: &S, processor: &mut P) -> WorkerResult<ProcessReport> {
+        let processor_id = processor.id();
         let mut tx = db.begin().await?;
-        let cursor = tx.load_cursor(processor.id()).await?;
+        let cursor = tx.load_cursor(processor_id).await?;
         let batch = tx.read_after(&cursor, processor.interests()).await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();

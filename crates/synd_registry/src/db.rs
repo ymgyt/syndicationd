@@ -1,13 +1,14 @@
 use std::future::Future;
 
+use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 
 use crate::{
-    crawl::target_list::CrawlTarget,
+    crawl::target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     error::{RegistryDbError, RegistryDbResult},
     event::JournalTx,
     query::{Subscriptions, SubscriptionsQuery},
-    subscription::{FeedSubscriptionAttrs, SubscriberId, Subscription, SubscriptionKey},
+    subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
 };
 
 /// Opens registry database transactions.
@@ -24,14 +25,14 @@ pub trait RegistryTx {
     fn upsert_feed_endpoint(
         &mut self,
         feed_url: &FeedUrl,
-        now: chrono::DateTime<chrono::Utc>,
+        now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
     fn upsert_feed_subscription(
         &mut self,
         subscription: &SubscriptionKey,
         attrs: FeedSubscriptionAttrs,
-        now: chrono::DateTime<chrono::Utc>,
+        now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
     fn delete_feed_subscription(
@@ -51,14 +52,14 @@ pub trait RegistryTx {
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    fn list_active_subscriptions_for_endpoint(
+    fn load_feed_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send;
 
     fn upsert_crawl_target(
         &mut self,
-        target: CrawlTarget,
+        target: &CrawlTarget,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
     fn load_crawl_target_for_endpoint(

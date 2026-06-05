@@ -5,14 +5,13 @@ use synd_feed::types::FeedUrl;
 use thiserror::Error;
 
 use crate::{
-    crawl::target_list::CrawlTarget,
+    crawl::target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     db::{FeedRegistryDb, RegistryTx},
     error::{RegistryDbError, RegistryDbResult},
     event::{Event, EventInterests, EventKind, JournalTx},
     query::{Subscriptions, SubscriptionsQuery},
     subscription::{
-        FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, Subscription, SubscriptionKey,
-        UnsubscribeOutcome,
+        FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
     },
 };
 
@@ -256,7 +255,7 @@ where
     fn upsert_feed_endpoint(
         &mut self,
         feed_url: &FeedUrl,
-        now: chrono::DateTime<chrono::Utc>,
+        now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send {
         self.tx.upsert_feed_endpoint(feed_url, now)
     }
@@ -265,7 +264,7 @@ where
         &mut self,
         subscription: &SubscriptionKey,
         attrs: FeedSubscriptionAttrs,
-        now: chrono::DateTime<chrono::Utc>,
+        now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send {
         self.tx.upsert_feed_subscription(subscription, attrs, now)
     }
@@ -293,16 +292,16 @@ where
         self.tx.list_subscriptions(query)
     }
 
-    fn list_active_subscriptions_for_endpoint(
+    fn load_feed_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<Vec<Subscription>>> + Send {
-        self.tx.list_active_subscriptions_for_endpoint(feed_url)
+    ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send {
+        self.tx.load_feed_endpoint_subscriptions(feed_url)
     }
 
     fn upsert_crawl_target(
         &mut self,
-        target: CrawlTarget,
+        target: &CrawlTarget,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send {
         self.tx.upsert_crawl_target(target)
     }
