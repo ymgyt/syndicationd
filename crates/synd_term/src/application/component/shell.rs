@@ -112,9 +112,9 @@ impl ShellComponent {
         self.filter.move_requirement(direction)
     }
 
-    pub(in crate::application) fn activate_category_filtering(&mut self) -> crate::keymap::Keymap {
+    pub(in crate::application) fn activate_category_filtering(&mut self) {
         self.filter
-            .activate_category_filtering(self.tabs.current().into())
+            .activate_category_filtering(self.tabs.current().into());
     }
 
     pub(in crate::application) fn active_filterer(&self) -> Filterer {

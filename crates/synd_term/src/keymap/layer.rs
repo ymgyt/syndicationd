@@ -45,7 +45,7 @@ impl fmt::Display for Layer {
 }
 
 impl FromStr for Layer {
-    type Err = crate::keymap::v2::KeymapError;
+    type Err = crate::keymap::KeymapError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
@@ -61,9 +61,7 @@ impl FromStr for Layer {
             "unsubscribe-popup" => Ok(Self::UnsubscribePopup),
             "github-notifications" => Ok(Self::GithubNotifications),
             "github-notification-filter-popup" => Ok(Self::GithubNotificationFilterPopup),
-            unknown => Err(crate::keymap::v2::KeymapError::UnknownLayer(
-                unknown.to_owned(),
-            )),
+            unknown => Err(crate::keymap::KeymapError::UnknownLayer(unknown.to_owned())),
         }
     }
 }

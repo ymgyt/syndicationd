@@ -2,7 +2,7 @@ use tracing::{info_span, instrument};
 
 use crate::{
     command::{Command, FeedsCommand, FilterCommand, GitHubCommand, ShellCommand},
-    keymap::v2,
+    keymap,
 };
 
 use super::Application;
@@ -76,16 +76,16 @@ impl Application {
                 self.perform_operations(operations);
             }
             FilterCommand::ActivateCategoryFilterling => {
-                let _ = self.components.activate_category_filtering();
-                if let Some(keymap) = self.components.category_filter_keymap_v2() {
-                    self.keymap.set_layer_keymap(keymap);
+                self.components.activate_category_filtering();
+                if let Some(layer_keymap) = self.components.category_filter_keymap() {
+                    self.keymap.set_layer_keymap(layer_keymap);
                 }
                 self.keymap.clear_pending();
             }
             FilterCommand::ActivateSearchFiltering => {
-                let _ = self.components.activate_search_filtering();
+                self.components.activate_search_filtering();
                 self.keymap
-                    .set_layer_keymap(v2::LayerKeymap::search_prompt());
+                    .set_layer_keymap(keymap::LayerKeymap::search_prompt());
                 self.keymap.clear_pending();
             }
             FilterCommand::PromptInsertChar(ch) => {
@@ -96,14 +96,11 @@ impl Application {
                 let operations = self.components.delete_prompt_backward();
                 self.perform_operations(operations);
             }
-            FilterCommand::PromptChanged => {
-                let operations = self.components.prompt_changed();
-                self.perform_operations(operations);
-            }
             FilterCommand::DeactivateFiltering => {
                 self.components.deactivate_filtering();
-                self.keymap.clear_layer_keymap(v2::Layer::CategoryFilter);
-                self.keymap.clear_layer_keymap(v2::Layer::SearchPrompt);
+                self.keymap
+                    .clear_layer_keymap(keymap::Layer::CategoryFilter);
+                self.keymap.clear_layer_keymap(keymap::Layer::SearchPrompt);
                 self.keymap.clear_pending();
             }
             FilterCommand::ToggleFilterCategory { category, lane } => {

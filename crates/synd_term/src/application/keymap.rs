@@ -3,13 +3,13 @@ use tracing::trace;
 
 use crate::{
     application::Application,
-    keymap::v2::{KeymapResult, Layer, LayerStack},
+    keymap::{KeymapResult, Layer, LayerStack},
     ui::widgets::{authentication::AuthenticateState, tabs::Tab},
 };
 
 impl Application {
-    pub(super) fn handle_keymap_v2(&mut self, key: KeyEvent) {
-        let layers = self.active_keymap_layers_v2();
+    pub(super) fn handle_keymap(&mut self, key: KeyEvent) {
+        let layers = self.active_keymap_layers();
         let result = self.keymap.resolve(&layers, key);
 
         match result {
@@ -26,7 +26,7 @@ impl Application {
         }
     }
 
-    fn active_keymap_layers_v2(&self) -> LayerStack {
+    fn active_keymap_layers(&self) -> LayerStack {
         let mut layers = LayerStack::empty();
         layers.push(Layer::App);
         layers.push(Layer::Global);

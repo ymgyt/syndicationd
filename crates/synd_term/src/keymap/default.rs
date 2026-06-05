@@ -1,107 +1,419 @@
-use crate::keymap::{KeymapsConfig, macros::keymap};
+use super::{CommandId, KeymapConfig, Layer};
 
-pub fn default() -> KeymapsConfig {
-    let login = keymap!({
-        "enter" => authenticate,
-        "k" | "up" => move_up_authentication_provider,
-        "j" | "down" => move_down_authentication_provider,
-    });
-    let tabs = keymap!({
-        "tab" => move_right_tab_selection,
-        "backtab" => move_left_tab_selection,
-    });
-    let entries = keymap!({
-        "k" | "up" => move_up_entry,
-        "j" | "down" => move_down_entry,
-        "r" => reload_entries,
-        "enter" => open_entry,
-        "space" => browse_entry,
-        "g" => {
-           "g" => move_entry_first,
-           "e" => move_entry_last,
-        },
-    });
-    let subscription = keymap!({
-        "a" => prompt_feed_subscription,
-        "e" => prompt_feed_edition,
-        "d" => prompt_feed_unsubscription,
-        "k" | "up" => move_up_subscribed_feed,
-        "j" | "down" => move_down_subscribed_feed,
-        "r" => refresh_selected_feed,
-        "S-r" => reload_subscription,
-        "enter" => open_feed,
-        "g" => {
-            "g" => move_subscribed_feed_first,
-            "e" => move_subscribed_feed_last,
-        },
-    });
-    let gh_notification = keymap!({
-        "k" | "up" => move_up_gh_notification,
-        "j" | "down" => move_down_gh_notification,
-        "enter" => open_gh_notification,
-        "A-enter" => open_gh_notification_with_done,
-        "r" => reload_gh_notifications,
-        "d" => mark_gh_notification_as_done,
-        "S-d" => mark_gh_notification_as_done_all,
-        "u" => unsubscribe_gh_thread,
-        "g" => {
-            "g" => move_gh_notification_first,
-            "e" => move_gh_notification_last,
-        },
-        "f" => open_gh_notification_filter_popup,
-    });
-    let gh_notification_filter_popup = keymap!({
-        "u" => {
-            "n" => toggle_gh_notification_filter_popup_include_unread,
-        },
-        "c" => {
-            "l" => toggle_gh_notification_filter_popup_pr_closed,
-        },
-        "p" => {
-            "a" => toggle_gh_notification_filter_popup_participating,
-            "u" => toggle_gh_notification_filter_popup_visibility_public,
-            "r" => toggle_gh_notification_filter_popup_visibility_private,
-        },
-        "o" => {
-            "p" => toggle_gh_notification_filter_popup_pr_open,
+#[expect(clippy::too_many_lines)]
+pub(super) fn default_keymap_config() -> KeymapConfig {
+    let mut config = KeymapConfig::new();
 
-        },
-        "m" => {
-            "e" => toggle_gh_notification_filter_popup_reason_mentioned,
-            "r" => toggle_gh_notification_filter_popup_pr_merged,
-        },
-        "r" => {
-            "e" => toggle_gh_notification_filter_popup_reason_review,
-        },
-        "esc" | "enter" => close_gh_notification_filter_popup,
-    });
-    let filter = keymap!({
-       "h" | "left" => move_filter_requirement_left,
-       "l" | "right" => move_filter_requirement_right,
-       "c" => activate_category_filtering,
-       "/" => activate_search_filtering,
-       "esc" => deactivate_filtering,
-    });
-    let unsubscribe_popup = keymap!({
-        "h" | "left" => move_feed_unsubscription_popup_selection_left,
-        "l" | "right" => move_feed_unsubscription_popup_selection_right,
-        "enter" => select_feed_unsubscription_popup,
-        "esc" => cancel_feed_unsubscription_popup,
-    });
-    let global = keymap!({
-        "q" | "C-c" =>  quit ,
-        "S-t" => rotate_theme,
-    });
-
-    KeymapsConfig {
-        login,
-        tabs,
-        entries,
-        subscription,
-        gh_notification,
-        gh_notification_filter_popup,
-        filter,
-        unsubscribe_popup,
-        global,
+    macro_rules! bind {
+        ($layer:expr, [$($key:literal),+], $command:expr, $desc:literal) => {
+            config
+                .add($layer, [$($key),+], $command, Some($desc))
+                .expect("valid default keymap binding");
+        };
     }
+
+    bind!(Layer::App, ["C-c"], CommandId::Quit, "Quit app");
+
+    bind!(Layer::Global, ["q"], CommandId::Quit, "Quit app");
+    bind!(
+        Layer::Global,
+        ["S-t"],
+        CommandId::RotateTheme,
+        "Rotate theme"
+    );
+
+    bind!(
+        Layer::Login,
+        ["enter"],
+        CommandId::Authenticate,
+        "Authenticate"
+    );
+    bind!(
+        Layer::Login,
+        ["k"],
+        CommandId::MoveAuthenticationProviderPrev,
+        "Previous authentication provider"
+    );
+    bind!(
+        Layer::Login,
+        ["up"],
+        CommandId::MoveAuthenticationProviderPrev,
+        "Previous authentication provider"
+    );
+    bind!(
+        Layer::Login,
+        ["j"],
+        CommandId::MoveAuthenticationProviderNext,
+        "Next authentication provider"
+    );
+    bind!(
+        Layer::Login,
+        ["down"],
+        CommandId::MoveAuthenticationProviderNext,
+        "Next authentication provider"
+    );
+
+    bind!(Layer::Tabs, ["tab"], CommandId::MoveTabNext, "Next tab");
+    bind!(
+        Layer::Tabs,
+        ["backtab"],
+        CommandId::MoveTabPrev,
+        "Previous tab"
+    );
+
+    bind!(
+        Layer::Entries,
+        ["k"],
+        CommandId::MoveEntryPrev,
+        "Previous entry"
+    );
+    bind!(
+        Layer::Entries,
+        ["up"],
+        CommandId::MoveEntryPrev,
+        "Previous entry"
+    );
+    bind!(
+        Layer::Entries,
+        ["j"],
+        CommandId::MoveEntryNext,
+        "Next entry"
+    );
+    bind!(
+        Layer::Entries,
+        ["down"],
+        CommandId::MoveEntryNext,
+        "Next entry"
+    );
+    bind!(
+        Layer::Entries,
+        ["r"],
+        CommandId::ReloadEntries,
+        "Reload entries"
+    );
+    bind!(
+        Layer::Entries,
+        ["enter"],
+        CommandId::OpenEntry,
+        "Open entry with web browser"
+    );
+    bind!(
+        Layer::Entries,
+        ["space"],
+        CommandId::BrowseEntry,
+        "Browse entry with text browser"
+    );
+    bind!(
+        Layer::Entries,
+        ["g", "g"],
+        CommandId::MoveEntryFirst,
+        "Go to first entry"
+    );
+    bind!(
+        Layer::Entries,
+        ["g", "e"],
+        CommandId::MoveEntryLast,
+        "Go to last entry"
+    );
+
+    bind!(
+        Layer::Feeds,
+        ["a"],
+        CommandId::PromptFeedSubscription,
+        "Add feed subscription"
+    );
+    bind!(
+        Layer::Feeds,
+        ["e"],
+        CommandId::PromptFeedEdition,
+        "Edit feed subscription"
+    );
+    bind!(
+        Layer::Feeds,
+        ["d"],
+        CommandId::PromptFeedUnsubscription,
+        "Delete feed subscription"
+    );
+    bind!(
+        Layer::Feeds,
+        ["k"],
+        CommandId::MoveSubscribedFeedPrev,
+        "Previous feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["up"],
+        CommandId::MoveSubscribedFeedPrev,
+        "Previous feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["j"],
+        CommandId::MoveSubscribedFeedNext,
+        "Next feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["down"],
+        CommandId::MoveSubscribedFeedNext,
+        "Next feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["r"],
+        CommandId::RefreshSelectedFeed,
+        "Refresh selected feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["S-r"],
+        CommandId::ReloadSubscription,
+        "Reload subscriptions"
+    );
+    bind!(
+        Layer::Feeds,
+        ["enter"],
+        CommandId::OpenFeed,
+        "Open selected feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["g", "g"],
+        CommandId::MoveSubscribedFeedFirst,
+        "Go to first feed"
+    );
+    bind!(
+        Layer::Feeds,
+        ["g", "e"],
+        CommandId::MoveSubscribedFeedLast,
+        "Go to last feed"
+    );
+
+    bind!(
+        Layer::Filter,
+        ["h"],
+        CommandId::MoveFilterRequirementPrev,
+        "Previous requirement filter"
+    );
+    bind!(
+        Layer::Filter,
+        ["left"],
+        CommandId::MoveFilterRequirementPrev,
+        "Previous requirement filter"
+    );
+    bind!(
+        Layer::Filter,
+        ["l"],
+        CommandId::MoveFilterRequirementNext,
+        "Next requirement filter"
+    );
+    bind!(
+        Layer::Filter,
+        ["right"],
+        CommandId::MoveFilterRequirementNext,
+        "Next requirement filter"
+    );
+    bind!(
+        Layer::Filter,
+        ["c"],
+        CommandId::ActivateCategoryFiltering,
+        "Activate category filter"
+    );
+    bind!(
+        Layer::Filter,
+        ["/"],
+        CommandId::ActivateSearchFiltering,
+        "Activate search filter"
+    );
+    bind!(
+        Layer::Filter,
+        ["esc"],
+        CommandId::DeactivateFiltering,
+        "Deactivate filter"
+    );
+
+    bind!(
+        Layer::UnsubscribePopup,
+        ["h"],
+        CommandId::MoveFeedUnsubscriptionPopupSelectionPrev,
+        "Previous popup selection"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
+        ["left"],
+        CommandId::MoveFeedUnsubscriptionPopupSelectionPrev,
+        "Previous popup selection"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
+        ["l"],
+        CommandId::MoveFeedUnsubscriptionPopupSelectionNext,
+        "Next popup selection"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
+        ["right"],
+        CommandId::MoveFeedUnsubscriptionPopupSelectionNext,
+        "Next popup selection"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
+        ["enter"],
+        CommandId::SelectFeedUnsubscriptionPopup,
+        "Select popup item"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
+        ["esc"],
+        CommandId::CancelFeedUnsubscriptionPopup,
+        "Cancel popup"
+    );
+
+    bind!(
+        Layer::GithubNotifications,
+        ["k"],
+        CommandId::MoveGithubNotificationPrev,
+        "Previous GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["up"],
+        CommandId::MoveGithubNotificationPrev,
+        "Previous GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["j"],
+        CommandId::MoveGithubNotificationNext,
+        "Next GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["down"],
+        CommandId::MoveGithubNotificationNext,
+        "Next GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["enter"],
+        CommandId::OpenGithubNotification,
+        "Open GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["A-enter"],
+        CommandId::OpenGithubNotificationWithDone,
+        "Open GitHub notification and mark as done"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["r"],
+        CommandId::ReloadGithubNotifications,
+        "Reload GitHub notifications"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["d"],
+        CommandId::MarkGithubNotificationAsDone,
+        "Mark GitHub notification as done"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["S-d"],
+        CommandId::MarkGithubNotificationAsDoneAll,
+        "Mark all GitHub notifications as done"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["u"],
+        CommandId::UnsubscribeGithubThread,
+        "Unsubscribe GitHub thread"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["g", "g"],
+        CommandId::MoveGithubNotificationFirst,
+        "Go to first GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["g", "e"],
+        CommandId::MoveGithubNotificationLast,
+        "Go to last GitHub notification"
+    );
+    bind!(
+        Layer::GithubNotifications,
+        ["f"],
+        CommandId::OpenGithubNotificationFilterPopup,
+        "Open GitHub notification filter popup"
+    );
+
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["u", "n"],
+        CommandId::ToggleGithubNotificationFilterPopupIncludeUnread,
+        "Toggle unread filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["c", "l"],
+        CommandId::ToggleGithubNotificationFilterPopupPullRequestClosed,
+        "Toggle closed pull request filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["p", "a"],
+        CommandId::ToggleGithubNotificationFilterPopupParticipating,
+        "Toggle participating filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["p", "u"],
+        CommandId::ToggleGithubNotificationFilterPopupVisibilityPublic,
+        "Toggle public repository filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["p", "r"],
+        CommandId::ToggleGithubNotificationFilterPopupVisibilityPrivate,
+        "Toggle private repository filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["o", "p"],
+        CommandId::ToggleGithubNotificationFilterPopupPullRequestOpen,
+        "Toggle open pull request filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["m", "e"],
+        CommandId::ToggleGithubNotificationFilterPopupReasonMentioned,
+        "Toggle mentioned reason filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["m", "r"],
+        CommandId::ToggleGithubNotificationFilterPopupPullRequestMerged,
+        "Toggle merged pull request filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["r", "e"],
+        CommandId::ToggleGithubNotificationFilterPopupReasonReviewRequested,
+        "Toggle review requested reason filter"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["esc"],
+        CommandId::CloseGithubNotificationFilterPopup,
+        "Close GitHub notification filter popup"
+    );
+    bind!(
+        Layer::GithubNotificationFilterPopup,
+        ["enter"],
+        CommandId::CloseGithubNotificationFilterPopup,
+        "Close GitHub notification filter popup"
+    );
+
+    config
 }

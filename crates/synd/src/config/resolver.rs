@@ -18,7 +18,7 @@ use crate::{
         file::{ConfigFile, ConfigFileError},
     },
 };
-use synd_term::keymap::v2::{CompiledKeymaps, KeymapError};
+use synd_term::keymap::{CompiledKeymaps, KeymapError};
 use synd_term::{config::Categories, ui::theme::Palette};
 
 /// `ConfigResolver` is responsible for resolving the application's configuration

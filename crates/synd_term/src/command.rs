@@ -57,7 +57,6 @@ pub(crate) enum FilterCommand {
     ActivateSearchFiltering,
     PromptInsertChar(char),
     PromptDeleteBackward,
-    PromptChanged,
     DeactivateFiltering,
     ToggleFilterCategory {
         lane: FilterLane,

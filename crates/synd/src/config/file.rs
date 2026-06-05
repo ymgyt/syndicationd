@@ -3,7 +3,7 @@ use std::{collections::HashMap, io, path::PathBuf, time::Duration};
 use serde::Deserialize;
 use thiserror::Error;
 
-use synd_term::{config::CategoryConfig, keymap::v2::KeymapConfig};
+use synd_term::{config::CategoryConfig, keymap::KeymapConfig};
 
 use crate::cli::Palette;
 

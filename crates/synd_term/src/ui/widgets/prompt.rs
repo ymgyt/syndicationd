@@ -1,4 +1,3 @@
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -7,11 +6,6 @@ use ratatui::{
     widgets::Widget,
 };
 use unicode_segmentation::GraphemeCursor;
-
-use crate::{
-    application::key_handlers::KeyEventResult,
-    command::{Command, FilterCommand},
-};
 
 #[derive(Debug, Clone, Copy)]
 enum Move {
@@ -58,28 +52,6 @@ pub(crate) enum RenderCursor {
 }
 
 impl Prompt {
-    pub fn handle_key_event(&mut self, event: &KeyEvent) -> KeyEventResult {
-        match event {
-            KeyEvent {
-                code: KeyCode::Backspace,
-                ..
-            } => {
-                self.delete_backward();
-                KeyEventResult::consumed(Command::Filter(FilterCommand::PromptChanged))
-                    .should_render(true)
-            }
-            KeyEvent {
-                code: KeyCode::Char(c),
-                ..
-            } => {
-                self.insert_char(*c);
-                KeyEventResult::consumed(Command::Filter(FilterCommand::PromptChanged))
-                    .should_render(true)
-            }
-            _ => KeyEventResult::Ignored,
-        }
-    }
-
     fn move_cursor(&self, m: Move) -> usize {
         match m {
             Move::BackwardChar(n) => {
@@ -114,37 +86,27 @@ mod tests {
     #[test]
     fn prompt_ascii() {
         let mut p = Prompt::new();
-        assert!(matches!(
-            p.handle_key_event(&KeyEvent::from(KeyCode::Char('a'))),
-            KeyEventResult::Consumed { .. }
-        ));
-
-        p.handle_key_event(&KeyEvent::from(KeyCode::Char('b')));
-        p.handle_key_event(&KeyEvent::from(KeyCode::Char('c')));
+        p.insert_char('a');
+        p.insert_char('b');
+        p.insert_char('c');
         assert_eq!(p.line(), "abc");
-
-        assert!(matches!(
-            p.handle_key_event(&KeyEvent::from(KeyCode::Enter)),
-            KeyEventResult::Ignored
-        ));
     }
 
     #[test]
     fn prompt_grapheme() {
         let mut p = Prompt::new();
-        // insert multi byte
-        p.handle_key_event(&KeyEvent::from(KeyCode::Char('山')));
-        p.handle_key_event(&KeyEvent::from(KeyCode::Char('口')));
-        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        p.insert_char('山');
+        p.insert_char('口');
+        p.delete_backward();
 
         assert_eq!(p.line(), "山");
 
-        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        p.delete_backward();
         assert_eq!(p.line(), "");
 
-        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
-        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
-        p.handle_key_event(&KeyEvent::from(KeyCode::Backspace));
+        p.delete_backward();
+        p.delete_backward();
+        p.delete_backward();
         assert_eq!(p.line(), "");
     }
 }

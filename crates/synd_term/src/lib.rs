@@ -18,3 +18,47 @@ pub mod ui;
 
 #[cfg(feature = "integration")]
 pub mod integration;
+
+#[macro_export]
+macro_rules! key {
+    (backspace) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Backspace,
+            crossterm::event::KeyModifiers::NONE,
+        ))
+    };
+    (enter) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Enter,
+            crossterm::event::KeyModifiers::NONE,
+        ))
+    };
+    (tab) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Tab,
+            crossterm::event::KeyModifiers::NONE,
+        ))
+    };
+    (esc) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Esc,
+            crossterm::event::KeyModifiers::NONE,
+        ))
+    };
+    ($key:literal) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char($key),
+            crossterm::event::KeyModifiers::NONE,
+        ))
+    };
+}
+
+#[macro_export]
+macro_rules! shift {
+    ($key:literal) => {
+        crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char($key),
+            crossterm::event::KeyModifiers::SHIFT,
+        ))
+    };
+}

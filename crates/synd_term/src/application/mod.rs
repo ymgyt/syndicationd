@@ -12,7 +12,6 @@ use crate::{
     config::Categories,
     event::Event,
     interact::Interact,
-    keymap,
     operation::Operation,
     terminal::Terminal,
     ui::{
@@ -29,7 +28,7 @@ mod in_flight;
 pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
 
 mod input_parser;
-mod keymap_v2;
+mod keymap;
 
 pub use crate::auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
@@ -47,8 +46,6 @@ pub use backend::{FeedApiSession, FeedBackend};
 
 mod app_config;
 pub use app_config::{Config, Features};
-
-pub(crate) mod key_handlers;
 
 mod state;
 pub(crate) use state::TerminalFocus;
@@ -81,7 +78,7 @@ pub enum Populate {
 pub struct Application {
     drivers: Drivers,
     components: AppComponent,
-    keymap: keymap::v2::Keymap,
+    keymap: crate::keymap::Keymap,
     config: Config,
 }
 
@@ -156,7 +153,7 @@ impl Application {
         Self {
             drivers,
             components,
-            keymap: keymap::v2::Keymap::new(config.keymaps.clone()),
+            keymap: crate::keymap::Keymap::new(config.keymaps.clone()),
             config,
         }
     }
@@ -412,7 +409,7 @@ impl Application {
 
                 self.reset_idle_timer();
 
-                self.handle_keymap_v2(key);
+                self.handle_keymap(key);
             }
             _ => {}
         }

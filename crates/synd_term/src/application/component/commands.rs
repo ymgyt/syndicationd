@@ -1,10 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::{
     command::{FeedsCommand, GitHubCommand, ShellCommand},
-    keymap::{Keymap, v2},
+    keymap,
     operation::Operation,
-    ui::widgets::{filter::FilterLane, prompt::Prompt},
+    ui::widgets::filter::FilterLane,
 };
 use synd_feed::types::Category;
 
@@ -198,20 +196,18 @@ impl AppComponent {
         operations
     }
 
-    pub(in crate::application) fn activate_category_filtering(&mut self) -> Keymap {
-        let keymap = self.shell.activate_category_filtering();
+    pub(in crate::application) fn activate_category_filtering(&mut self) {
+        self.shell.activate_category_filtering();
         self.shell.request_render();
-        keymap
     }
 
-    pub(in crate::application) fn category_filter_keymap_v2(&self) -> Option<v2::LayerKeymap> {
-        self.shell.filter.category_filter_keymap_v2()
+    pub(in crate::application) fn category_filter_keymap(&self) -> Option<keymap::LayerKeymap> {
+        self.shell.filter.category_filter_keymap()
     }
 
-    pub(in crate::application) fn activate_search_filtering(&mut self) -> Rc<RefCell<Prompt>> {
-        let prompt = self.shell.filter.activate_search_filtering();
+    pub(in crate::application) fn activate_search_filtering(&mut self) {
+        self.shell.filter.activate_search_filtering();
         self.shell.request_render();
-        prompt
     }
 
     pub(in crate::application) fn prompt_changed(&mut self) -> Vec<Operation> {

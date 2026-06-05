@@ -217,7 +217,7 @@ fn matched_action(result: &KeymapResult) -> Option<&KeymapAction> {
 
 fn key(notation: &str) -> crossterm::event::KeyEvent {
     notation
-        .parse::<crate::keymap::KeyNotation>()
+        .parse::<KeyStroke>()
         .expect("valid key notation")
         .into()
 }

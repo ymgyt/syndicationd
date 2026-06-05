@@ -1,6 +1,5 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
@@ -15,9 +14,8 @@ use synd_feed::types::{Category, Requirement};
 use crate::{
     application::{Direction, Populate},
     client::github::{FetchNotificationInclude, FetchNotificationParticipating},
-    command::{Command, FilterCommand},
     config::Categories,
-    keymap::{KeyTrie, Keymap, v2},
+    keymap,
     matcher::Matcher,
     types::{
         EntryExt, RequirementExt,
@@ -113,10 +111,8 @@ impl FilterWidget {
         }
     }
 
-    #[must_use]
-    pub fn activate_search_filtering(&mut self) -> Rc<RefCell<Prompt>> {
+    pub fn activate_search_filtering(&mut self) {
         self.state = State::SearchFiltering;
-        self.prompt.clone()
     }
 
     pub fn is_search_active(&self) -> bool {
@@ -127,20 +123,20 @@ impl FilterWidget {
         matches!(self.state, State::CategoryFiltering(_))
     }
 
-    pub(crate) fn category_filter_keymap_v2(&self) -> Option<v2::LayerKeymap> {
+    pub(crate) fn category_filter_keymap(&self) -> Option<keymap::LayerKeymap> {
         let State::CategoryFiltering(lane) = self.state else {
             return None;
         };
 
-        let mut keymap = v2::LayerKeymap::builder(v2::Layer::CategoryFilter);
+        let mut keymap = keymap::LayerKeymap::builder(keymap::Layer::CategoryFilter);
         for (category, state) in &self.categories_state_from_lane(lane).state {
             if state.label == ' ' {
                 continue;
             }
             keymap
                 .bind_key(
-                    v2::KeyStroke::from_char(state.label),
-                    v2::KeymapAction::Filter(v2::FilterAction::ToggleCategory {
+                    keymap::KeyStroke::from_char(state.label),
+                    keymap::KeymapAction::Filter(keymap::FilterAction::ToggleCategory {
                         lane,
                         category: category.clone(),
                     }),
@@ -151,14 +147,16 @@ impl FilterWidget {
         keymap
             .bind(
                 ["+"],
-                v2::KeymapAction::Filter(v2::FilterAction::ActivateAllCategories { lane }),
+                keymap::KeymapAction::Filter(keymap::FilterAction::ActivateAllCategories { lane }),
                 Some("Activate all categories"),
             )
             .expect("valid category filter key binding");
         keymap
             .bind(
                 ["-"],
-                v2::KeymapAction::Filter(v2::FilterAction::DeactivateAllCategories { lane }),
+                keymap::KeymapAction::Filter(keymap::FilterAction::DeactivateAllCategories {
+                    lane,
+                }),
                 Some("Deactivate all categories"),
             )
             .expect("valid category filter key binding");
@@ -166,34 +164,8 @@ impl FilterWidget {
         Some(keymap.build().expect("valid category filter keymap"))
     }
 
-    #[must_use]
-    pub fn activate_category_filtering(&mut self, lane: FilterLane) -> Keymap {
+    pub fn activate_category_filtering(&mut self, lane: FilterLane) {
         self.state = State::CategoryFiltering(lane);
-        let mut map = self.categories_state_from_lane(lane).state.iter().fold(
-            HashMap::new(),
-            |mut map, (category, state)| {
-                let key = KeyEvent::new(KeyCode::Char(state.label), KeyModifiers::NONE);
-                let command = Command::Filter(FilterCommand::ToggleFilterCategory {
-                    lane,
-                    category: category.clone(),
-                });
-                map.insert(key, KeyTrie::Command(command));
-                map
-            },
-        );
-        map.insert(
-            KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE),
-            KeyTrie::Command(Command::Filter(
-                FilterCommand::ActivateAllFilterCategories { lane },
-            )),
-        );
-        map.insert(
-            KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
-            KeyTrie::Command(Command::Filter(
-                FilterCommand::DeactivateAllFilterCategories { lane },
-            )),
-        );
-        Keymap::from_map(crate::keymap::KeymapId::CategoryFiltering, map)
     }
 
     fn categories_state_from_lane(&self, lane: FilterLane) -> &CategoriesState {
@@ -541,6 +513,8 @@ impl FilterWidget {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use fake::{Fake, Faker};
 
     use crate::types::Feed;

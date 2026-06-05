@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::{config, keymap::v2::CompiledKeymaps};
+use crate::{config, keymap::CompiledKeymaps};
 
 #[derive(Debug, Clone, Default)]
 pub struct Features {

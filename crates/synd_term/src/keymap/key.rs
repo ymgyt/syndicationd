@@ -40,10 +40,9 @@ impl From<KeyEvent> for KeyStroke {
     }
 }
 
-impl From<crate::keymap::KeyNotation> for KeyStroke {
-    fn from(notation: crate::keymap::KeyNotation) -> Self {
-        let (code, modifiers) = notation.into_parts();
-        Self::new(code, modifiers)
+impl From<KeyStroke> for KeyEvent {
+    fn from(key: KeyStroke) -> Self {
+        Self::new(key.code, key.modifiers)
     }
 }
 
@@ -51,10 +50,8 @@ impl FromStr for KeyStroke {
     type Err = KeymapError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let notation = value
-            .parse::<crate::keymap::KeyNotation>()
-            .map_err(|err| KeymapError::InvalidKeyNotation(value.to_owned(), err.to_string()))?;
-        Ok(Self::from(notation))
+        parse_key_stroke(value)
+            .map_err(|err| KeymapError::InvalidKeyNotation(value.to_owned(), err))
     }
 }
 
@@ -103,6 +100,39 @@ impl fmt::Display for KeyStroke {
         parts.push(code);
         f.write_str(&parts.join("-"))
     }
+}
+
+fn parse_key_stroke(value: &str) -> Result<KeyStroke, String> {
+    let mut tokens = value.split('-').collect::<Vec<_>>();
+    let code = match tokens.pop().ok_or_else(|| "no token".to_owned())? {
+        "backspace" => KeyCode::Backspace,
+        "enter" => KeyCode::Enter,
+        "tab" => KeyCode::Tab,
+        "backtab" => KeyCode::BackTab,
+        "left" => KeyCode::Left,
+        "right" => KeyCode::Right,
+        "up" => KeyCode::Up,
+        "down" => KeyCode::Down,
+        "esc" => KeyCode::Esc,
+        "space" => KeyCode::Char(' '),
+        single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),
+        undefined => return Err(format!("`{undefined}` is not implemented yet")),
+    };
+
+    let mut modifiers = KeyModifiers::NONE;
+    for token in tokens {
+        let modifier = match token {
+            "C" => KeyModifiers::CONTROL,
+            "S" => KeyModifiers::SHIFT,
+            "A" => KeyModifiers::ALT,
+            undefined => return Err(format!("`{undefined}` modifier is not implemented yet")),
+        };
+        modifiers.insert(modifier);
+    }
+    if code == KeyCode::BackTab {
+        modifiers.insert(KeyModifiers::SHIFT);
+    }
+    Ok(KeyStroke::new(code, modifiers))
 }
 
 /// Ordered key strokes that must be typed to trigger one binding.
