@@ -1,12 +1,20 @@
 use std::time::{Duration, Instant};
 
+#[cfg(unix)]
+use rustix::process::Signal;
 use synd_protocol::daemon::DaemonStatusResponse;
 use tokio::time::sleep;
 
+#[cfg(unix)]
+use crate::daemon::{
+    DaemonClaim, DaemonClaimLockAcquirer, SignalTarget, remove_stale_claim,
+    wait_until_claim_released,
+};
 use crate::{
-    DaemonState, DaemonStatus, Error, Result, Runtime, RuntimePlacementSummary, ShutdownResult,
+    DaemonState, DaemonStatus, Error, PlacementSummary, Result, Runtime, ShutdownResult,
     connection::{RuntimeEndpointConnectionStatus, RuntimeEndpointConnector},
-    placement::RuntimePlacement,
+    placement::PlacementSpec,
+    startup::{StartupLock, StartupLockAcquirer, StartupLockAcquisition},
 };
 
 const SHUTDOWN_WAIT_INTERVAL: Duration = Duration::from_millis(50);
@@ -31,7 +39,7 @@ impl<'a> Control<'a> {
 
         match decision {
             DaemonStatusDecision::RequestStatus { placement } => {
-                let summary = RuntimePlacementSummary::from_placement(&placement);
+                let summary = PlacementSummary::from_placement(&placement);
                 match DaemonControlClient::new(self.runtime, &placement)?
                     .status()
                     .await
@@ -45,7 +53,7 @@ impl<'a> Control<'a> {
             }
             DaemonStatusDecision::AlreadyStopped { placement } => Ok(DaemonStatus::new(
                 DaemonState::NotRunning,
-                RuntimePlacementSummary::from_placement(&placement),
+                PlacementSummary::from_placement(&placement),
             )),
             DaemonStatusDecision::FailUnavailableEndpoint { placement } => {
                 Err(Error::EndpointUnavailable {
@@ -68,7 +76,7 @@ impl<'a> Control<'a> {
 
         match decision {
             DaemonShutdownDecision::RequestShutdown { placement } => {
-                let summary = RuntimePlacementSummary::from_placement(&placement);
+                let summary = PlacementSummary::from_placement(&placement);
                 DaemonControlClient::new(self.runtime, &placement)?
                     .shutdown()
                     .await?;
@@ -87,7 +95,7 @@ impl<'a> Control<'a> {
             DaemonShutdownDecision::AlreadyStopped { placement } => {
                 Ok(ShutdownResult::new(DaemonStatus::new(
                     DaemonState::NotRunning,
-                    RuntimePlacementSummary::from_placement(&placement),
+                    PlacementSummary::from_placement(&placement),
                 )))
             }
             DaemonShutdownDecision::FailUnavailableEndpoint { placement } => {
@@ -98,6 +106,129 @@ impl<'a> Control<'a> {
             }
             #[cfg(not(unix))]
             DaemonShutdownDecision::FailUnsupportedTransport { .. } => {
+                Err(Error::UnsupportedTransport {
+                    context: "daemon control transport",
+                })
+            }
+        }
+    }
+
+    pub async fn force_shutdown(&self) -> Result<ShutdownResult> {
+        #[cfg(unix)]
+        {
+            return self.force_shutdown_unix().await;
+        }
+
+        #[cfg(not(unix))]
+        {
+            Err(Error::UnsupportedTransport {
+                context: "daemon control transport",
+            })
+        }
+    }
+
+    #[cfg(unix)]
+    async fn force_shutdown_unix(&self) -> Result<ShutdownResult> {
+        let placement = self.runtime.placement().clone();
+        let summary = PlacementSummary::from_placement(&placement);
+        let _startup_lock = acquire_startup_lock(&placement)?;
+
+        let Some(claim) = DaemonClaim::read(placement.daemon_claim_path())? else {
+            return self.shutdown_without_claim(placement, summary).await;
+        };
+
+        let claim_lock = DaemonClaimLockAcquirer::new(placement.daemon_claim_lock_path());
+        if !claim_lock.is_held()? {
+            return self
+                .shutdown_with_stale_claim(placement, summary, "daemon claim lock is not held")
+                .await;
+        }
+
+        let target = SignalTarget::validate(&placement, &claim)?;
+        if !target.send(Signal::TERM)? {
+            remove_stale_claim(placement.daemon_claim_path())?;
+            return Ok(ShutdownResult::new(DaemonStatus::new(
+                DaemonState::NotRunning,
+                summary,
+            )));
+        }
+
+        let timeout = self.runtime.config().session().acquire_timeout();
+        if !wait_until_claim_released(placement.daemon_claim_lock_path(), timeout).await? {
+            let target = SignalTarget::validate(&placement, &claim)?;
+            let _ = target.send(Signal::KILL)?;
+            if !wait_until_claim_released(placement.daemon_claim_lock_path(), timeout).await? {
+                return Err(Error::ForceShutdownTimeout { pid: claim.pid() });
+            }
+        }
+
+        remove_stale_claim(placement.daemon_claim_path())?;
+
+        Ok(ShutdownResult::new(DaemonStatus::new(
+            DaemonState::NotRunning,
+            summary,
+        )))
+    }
+
+    #[cfg(unix)]
+    async fn shutdown_without_claim(
+        &self,
+        placement: PlacementSpec,
+        summary: PlacementSummary,
+    ) -> Result<ShutdownResult> {
+        match RuntimeEndpointConnector::new(placement.endpoint())
+            .try_connect()
+            .await
+        {
+            RuntimeEndpointConnectionStatus::Missing | RuntimeEndpointConnectionStatus::Stale => {
+                Ok(ShutdownResult::new(DaemonStatus::new(
+                    DaemonState::NotRunning,
+                    summary,
+                )))
+            }
+            RuntimeEndpointConnectionStatus::Connected
+            | RuntimeEndpointConnectionStatus::Unavailable => Err(Error::ForceShutdownRefused {
+                reason: format!(
+                    "daemon claim is missing at {}; cannot prove endpoint owner",
+                    placement.daemon_claim_path().path().display()
+                ),
+            }),
+            #[cfg(not(unix))]
+            RuntimeEndpointConnectionStatus::UnsupportedTransport => {
+                Err(Error::UnsupportedTransport {
+                    context: "daemon control transport",
+                })
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    async fn shutdown_with_stale_claim(
+        &self,
+        placement: PlacementSpec,
+        summary: PlacementSummary,
+        reason: &'static str,
+    ) -> Result<ShutdownResult> {
+        match RuntimeEndpointConnector::new(placement.endpoint())
+            .try_connect()
+            .await
+        {
+            RuntimeEndpointConnectionStatus::Missing | RuntimeEndpointConnectionStatus::Stale => {
+                remove_stale_claim(placement.daemon_claim_path())?;
+                Ok(ShutdownResult::new(DaemonStatus::new(
+                    DaemonState::NotRunning,
+                    summary,
+                )))
+            }
+            RuntimeEndpointConnectionStatus::Connected
+            | RuntimeEndpointConnectionStatus::Unavailable => Err(Error::ForceShutdownRefused {
+                reason: format!(
+                    "{reason}; refusing to use stale daemon claim while endpoint {} is not stopped",
+                    placement.endpoint().path().display()
+                ),
+            }),
+            #[cfg(not(unix))]
+            RuntimeEndpointConnectionStatus::UnsupportedTransport => {
                 Err(Error::UnsupportedTransport {
                     context: "daemon control transport",
                 })
@@ -118,10 +249,27 @@ impl<'a> Control<'a> {
     }
 }
 
+#[cfg(unix)]
+fn acquire_startup_lock(placement: &PlacementSpec) -> Result<StartupLock> {
+    match StartupLockAcquirer::new(placement.startup_lock_path()).try_acquire()? {
+        StartupLockAcquisition::Acquired(lock) => Ok(lock),
+        StartupLockAcquisition::AlreadyHeld => Err(Error::ForceShutdownRefused {
+            reason: format!(
+                "startup lock is already held at {}",
+                placement.startup_lock_path().path().display()
+            ),
+        }),
+        #[cfg(not(unix))]
+        StartupLockAcquisition::UnsupportedTransport => Err(Error::UnsupportedTransport {
+            context: "daemon startup lock",
+        }),
+    }
+}
+
 /// Facts collected before selecting a daemon control action.
 #[derive(Debug, Clone)]
 struct DaemonControlContext {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
     endpoint_connection: RuntimeEndpointConnectionStatus,
 }
 
@@ -129,17 +277,17 @@ struct DaemonControlContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DaemonStatusDecision {
     RequestStatus {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
     AlreadyStopped {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
     FailUnavailableEndpoint {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
     #[cfg(not(unix))]
     FailUnsupportedTransport {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
 }
 
@@ -171,17 +319,17 @@ impl From<DaemonControlContext> for DaemonStatusDecision {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DaemonShutdownDecision {
     RequestShutdown {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
     AlreadyStopped {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
     FailUnavailableEndpoint {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
     #[cfg(not(unix))]
     FailUnsupportedTransport {
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
     },
 }
 
@@ -216,7 +364,7 @@ struct DaemonControlClient {
 
 impl DaemonControlClient {
     #[cfg(unix)]
-    fn new(runtime: &Runtime, placement: &RuntimePlacement) -> Result<Self> {
+    fn new(runtime: &Runtime, placement: &PlacementSpec) -> Result<Self> {
         let client = synd_client::Client::new_unix(
             placement.endpoint().path(),
             synd_client::ClientOptions::new(
@@ -229,7 +377,7 @@ impl DaemonControlClient {
     }
 
     #[cfg(not(unix))]
-    fn new(runtime: &Runtime, placement: &RuntimePlacement) -> Result<Self> {
+    fn new(runtime: &Runtime, placement: &PlacementSpec) -> Result<Self> {
         let _ = (runtime, placement);
 
         Err(Error::UnsupportedTransport {
@@ -259,12 +407,12 @@ fn daemon_status_endpoint_missing(error: &synd_client::SyndApiError) -> bool {
 
 /// Waits until the daemon endpoint stops accepting connections.
 struct DaemonShutdownWaiter {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
     timeout: Duration,
 }
 
 impl DaemonShutdownWaiter {
-    fn new(placement: RuntimePlacement, timeout: Duration) -> Self {
+    fn new(placement: PlacementSpec, timeout: Duration) -> Self {
         Self { placement, timeout }
     }
 
@@ -313,7 +461,7 @@ mod tests {
         RuntimeDatabase,
         connection::RuntimeEndpointConnectionStatus,
         instance::RuntimeInstance,
-        placement::{RuntimePlacement, RuntimeRoot},
+        placement::{PlacementRoot, PlacementSpec},
     };
 
     use super::{DaemonControlContext, DaemonShutdownDecision, DaemonStatusDecision};
@@ -398,13 +546,13 @@ mod tests {
         }
     }
 
-    fn placement() -> RuntimePlacement {
+    fn placement() -> PlacementSpec {
         let tmp = tempfile::tempdir().unwrap();
         let instance =
             RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
                 .unwrap();
 
-        RuntimePlacement::from_instance(RuntimeRoot::from(tmp.path().join("runtime")), instance)
+        PlacementSpec::from_instance(PlacementRoot::from(tmp.path().join("runtime")), instance)
     }
 
     fn shutdown_decision_path(decision: &DaemonShutdownDecision) -> &'static str {

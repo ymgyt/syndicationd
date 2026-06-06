@@ -105,11 +105,14 @@ struct DaemonShutdownCommand {
     /// Output format
     #[arg(short = 'o', long = "output", value_enum, default_value_t = OutputFormat::Human)]
     output: OutputFormat,
+    /// Force stop the daemon process after validating its daemon claim
+    #[arg(long)]
+    force: bool,
 }
 
 impl DaemonShutdownCommand {
     async fn run(self, config: &ConfigResolver) -> ExitCode {
-        match shutdown_daemon(config).await {
+        match shutdown_daemon(config, self.force).await {
             Ok(result) => {
                 if let Err(err) = write_daemon_status(self.output, result.status()) {
                     CommandFailure::report(err)
@@ -126,8 +129,11 @@ async fn inspect_daemon(config: &ConfigResolver) -> anyhow::Result<DaemonStatus>
     FeedRuntime::new(config)?.inspect_daemon().await
 }
 
-async fn shutdown_daemon(config: &ConfigResolver) -> anyhow::Result<synd_runtime::ShutdownResult> {
-    FeedRuntime::new(config)?.shutdown_daemon().await
+async fn shutdown_daemon(
+    config: &ConfigResolver,
+    force: bool,
+) -> anyhow::Result<synd_runtime::ShutdownResult> {
+    FeedRuntime::new(config)?.shutdown_daemon(force).await
 }
 
 fn write_daemon_status(format: OutputFormat, status: &DaemonStatus) -> anyhow::Result<()> {
@@ -179,6 +185,16 @@ impl DaemonStatusOutput {
             "startup lock: {}",
             self.placement.startup_lock.display()
         )?;
+        writeln!(
+            writer,
+            "daemon claim: {}",
+            self.placement.daemon_claim.display()
+        )?;
+        writeln!(
+            writer,
+            "daemon claim lock: {}",
+            self.placement.daemon_claim_lock.display()
+        )?;
 
         if let Some(sessions) = &self.sessions {
             sessions.write_human(writer)?;
@@ -200,6 +216,8 @@ impl From<&DaemonStatus> for DaemonStatusOutput {
                 database: placement.database().to_path_buf(),
                 endpoint: placement.endpoint().to_path_buf(),
                 startup_lock: placement.startup_lock().to_path_buf(),
+                daemon_claim: placement.daemon_claim().to_path_buf(),
+                daemon_claim_lock: placement.daemon_claim_lock().to_path_buf(),
             },
             sessions: status.sessions().map(DaemonSessionsOutput::from),
         }
@@ -213,6 +231,8 @@ struct DaemonPlacementOutput {
     database: PathBuf,
     endpoint: PathBuf,
     startup_lock: PathBuf,
+    daemon_claim: PathBuf,
+    daemon_claim_lock: PathBuf,
 }
 
 #[derive(Debug, Serialize)]

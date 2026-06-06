@@ -18,10 +18,12 @@ use synd_api::{
 use tokio::net::UnixListener;
 use tracing::{debug, info, warn};
 
+#[cfg(unix)]
+use crate::daemon::DaemonClaimOwner;
 use crate::{
     Error, Result, RuntimeDatabase,
     api::ApiService,
-    placement::{RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver},
+    placement::{PlacementEnvironment, PlacementResolver, PlacementSpec},
 };
 
 #[cfg(unix)]
@@ -42,14 +44,13 @@ impl Daemon {
     }
 
     pub async fn serve(self) -> Result<()> {
-        let placement =
-            RuntimePlacementResolver::with_environment(self.config.placement_environment())
-                .resolve_database(self.config.database())?;
+        let placement = PlacementResolver::with_environment(self.config.placement_environment())
+            .resolve_database(self.config.database())?;
 
         self.serve_placement(placement).await
     }
 
-    async fn serve_placement(self, placement: RuntimePlacement) -> Result<()> {
+    async fn serve_placement(self, placement: PlacementSpec) -> Result<()> {
         #[cfg(unix)]
         {
             self.serve_unix(placement).await
@@ -64,7 +65,8 @@ impl Daemon {
     }
 
     #[cfg(unix)]
-    async fn serve_unix(self, placement: RuntimePlacement) -> Result<()> {
+    async fn serve_unix(self, placement: PlacementSpec) -> Result<()> {
+        let _claim = DaemonClaimOwner::create(&placement)?;
         let bound_endpoint = DaemonEndpointBinder::new(placement.endpoint()).bind()?;
         let (listener, endpoint_cleanup) = bound_endpoint.into_parts();
         let shutdown_endpoint_cleanup = endpoint_cleanup.clone();
@@ -97,7 +99,7 @@ impl Daemon {
 pub struct DaemonConfig {
     database: RuntimeDatabase,
     session: DaemonSessionConfig,
-    placement_environment: RuntimePlacementEnvironment,
+    placement_environment: PlacementEnvironment,
     #[cfg(test)]
     session_lease_policy: Option<DaemonSessionLeasePolicy>,
 }
@@ -107,7 +109,7 @@ impl DaemonConfig {
         Self {
             database,
             session: DaemonSessionConfig::default(),
-            placement_environment: RuntimePlacementEnvironment::capture(),
+            placement_environment: PlacementEnvironment::capture(),
             #[cfg(test)]
             session_lease_policy: None,
         }
@@ -117,7 +119,7 @@ impl DaemonConfig {
         &self.database
     }
 
-    pub(crate) fn placement_environment(&self) -> RuntimePlacementEnvironment {
+    pub(crate) fn placement_environment(&self) -> PlacementEnvironment {
         self.placement_environment.clone()
     }
 
@@ -135,7 +137,7 @@ impl DaemonConfig {
 
     #[must_use]
     pub fn with_runtime_root(mut self, root: impl Into<PathBuf>) -> Self {
-        self.placement_environment = RuntimePlacementEnvironment::from_root(root);
+        self.placement_environment = PlacementEnvironment::from_root(root);
         self
     }
 
@@ -155,10 +157,7 @@ impl DaemonConfig {
     }
 
     #[cfg(test)]
-    fn with_placement_environment(
-        mut self,
-        placement_environment: RuntimePlacementEnvironment,
-    ) -> Self {
+    fn with_placement_environment(mut self, placement_environment: PlacementEnvironment) -> Self {
         self.placement_environment = placement_environment;
         self
     }
@@ -329,7 +328,7 @@ mod tests {
         DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog, DaemonState, Runtime, RuntimeConfig,
         RuntimeDatabase, SessionConfig, SessionRequirements,
         instance::RuntimeInstance,
-        placement::{RuntimePlacementEnvironment, RuntimePlacementResolver, RuntimeRoot},
+        placement::{PlacementEnvironment, PlacementResolver, PlacementRoot},
         session::SessionRenewalObserver,
         uds::UdsEndpoint,
     };
@@ -417,10 +416,9 @@ mod tests {
         fn spawn_with_config(root: &Path, config: StartedDaemonConfig) -> crate::Result<Self> {
             let database = RuntimeDatabase::sqlite(root.join("synd.db"));
             let placement_environment =
-                RuntimePlacementEnvironment::new(RuntimeRoot::from(root.join("runtime")));
-            let placement =
-                RuntimePlacementResolver::with_environment(placement_environment.clone())
-                    .resolve_database(&database)?;
+                PlacementEnvironment::new(PlacementRoot::from(root.join("runtime")));
+            let placement = PlacementResolver::with_environment(placement_environment.clone())
+                .resolve_database(&database)?;
             let session_config = {
                 let session_config = SessionConfig::new(Duration::from_secs(2));
                 match config.renewal_observer {

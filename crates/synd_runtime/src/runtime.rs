@@ -1,22 +1,22 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    DaemonControl, DaemonLaunchConfig, DaemonLaunchLog, Result, RuntimeDatabase,
-    RuntimePlacementSummary, Session, SessionConfig, SessionRequirements,
+    DaemonControl, DaemonLaunchConfig, DaemonLaunchLog, PlacementSummary, Result, RuntimeDatabase,
+    Session, SessionConfig, SessionRequirements,
     acquisition::SessionAcquisition,
-    placement::{RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver},
+    placement::{PlacementEnvironment, PlacementResolver, PlacementSpec},
 };
 
 #[derive(Debug, Clone)]
 pub struct Runtime {
     config: Config,
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Runtime {
     pub fn try_new(config: Config) -> Result<Self> {
-        let placement = RuntimePlacementResolver::with_environment(config.placement_environment())
-            .resolve(&config)?;
+        let placement =
+            PlacementResolver::with_environment(config.placement_environment()).resolve(&config)?;
 
         Ok(Self { config, placement })
     }
@@ -25,12 +25,12 @@ impl Runtime {
         &self.config
     }
 
-    pub(crate) fn placement(&self) -> &RuntimePlacement {
+    pub(crate) fn placement(&self) -> &PlacementSpec {
         &self.placement
     }
 
-    pub fn placement_summary(&self) -> RuntimePlacementSummary {
-        RuntimePlacementSummary::from_placement(&self.placement)
+    pub fn placement_summary(&self) -> PlacementSummary {
+        PlacementSummary::from_placement(&self.placement)
     }
 
     pub async fn acquire_session(&self) -> Result<Session> {
@@ -49,7 +49,7 @@ pub struct Config {
     session: SessionConfig,
     daemon: DaemonLaunchConfig,
     requirements: SessionRequirements,
-    placement_environment: RuntimePlacementEnvironment,
+    placement_environment: PlacementEnvironment,
 }
 
 impl Config {
@@ -60,7 +60,7 @@ impl Config {
             session: SessionConfig::default(),
             daemon: DaemonLaunchConfig::default(),
             requirements: SessionRequirements::default(),
-            placement_environment: RuntimePlacementEnvironment::capture(),
+            placement_environment: PlacementEnvironment::capture(),
         }
     }
 
@@ -121,7 +121,7 @@ impl Config {
 
     #[must_use]
     pub fn with_runtime_root(mut self, root: impl Into<PathBuf>) -> Self {
-        self.placement_environment = RuntimePlacementEnvironment::from_root(root);
+        self.placement_environment = PlacementEnvironment::from_root(root);
         self
     }
 
@@ -151,14 +151,14 @@ impl Config {
         &self.requirements
     }
 
-    pub(crate) fn placement_environment(&self) -> RuntimePlacementEnvironment {
+    pub(crate) fn placement_environment(&self) -> PlacementEnvironment {
         self.placement_environment.clone()
     }
 
     #[cfg(test)]
     pub(crate) fn with_placement_environment(
         mut self,
-        placement_environment: RuntimePlacementEnvironment,
+        placement_environment: PlacementEnvironment,
     ) -> Self {
         self.placement_environment = placement_environment;
         self

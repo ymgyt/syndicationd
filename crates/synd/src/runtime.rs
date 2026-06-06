@@ -52,11 +52,13 @@ impl FeedRuntime {
             .context("Failed to inspect runtime daemon")
     }
 
-    pub(crate) async fn shutdown_daemon(&self) -> anyhow::Result<ShutdownResult> {
-        self.runtime
-            .daemon()
-            .shutdown()
-            .await
-            .context("Failed to shutdown runtime daemon")
+    pub(crate) async fn shutdown_daemon(&self, force: bool) -> anyhow::Result<ShutdownResult> {
+        let result = if force {
+            self.runtime.daemon().force_shutdown().await
+        } else {
+            self.runtime.daemon().shutdown().await
+        };
+
+        result.context("Failed to shutdown runtime daemon")
     }
 }

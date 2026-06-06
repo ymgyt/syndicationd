@@ -12,7 +12,7 @@ use std::os::unix::fs::FileTypeExt as _;
 use clap::Args;
 use serde::Serialize;
 use synd_persistence::sqlite::SqliteDatabase;
-use synd_runtime::{DaemonState, Runtime, RuntimeConfig, RuntimeDatabase, RuntimePlacementSummary};
+use synd_runtime::{DaemonState, PlacementSummary, Runtime, RuntimeConfig, RuntimeDatabase};
 
 use crate::{
     cli::{OutputFormat, command::CommandFailure},
@@ -273,7 +273,7 @@ impl From<&ConfigResolver> for RuntimeDoctorConfig {
 }
 
 struct RuntimeDoctorReport {
-    placement: RuntimePlacementSummary,
+    placement: PlacementSummary,
     daemon_status: synd_runtime::Result<synd_runtime::DaemonStatus>,
     log_file: PathBuf,
 }
@@ -301,6 +301,8 @@ impl RuntimeDoctorReport {
             self.runtime_root_check(),
             self.runtime_endpoint_check(daemon_state),
             self.startup_lock_check(),
+            self.daemon_claim_check(),
+            self.daemon_claim_lock_check(),
             self.daemon_log_check(),
         ];
         checks.push(self.daemon_status_check());
@@ -378,6 +380,44 @@ impl RuntimeDoctorReport {
                 "startup_lock",
                 path,
                 format!("failed to inspect startup lock: {err}"),
+            ),
+        }
+    }
+
+    fn daemon_claim_check(&self) -> DoctorCheck {
+        let path = self.placement.daemon_claim();
+        match fs::metadata(path) {
+            Ok(metadata) if metadata.is_file() => {
+                DoctorCheck::pass("daemon_claim", path, "daemon claim file exists")
+            }
+            Ok(_) => DoctorCheck::fail("daemon_claim", path, "path exists but is not a file"),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                DoctorCheck::pass("daemon_claim", path, "daemon claim file does not exist")
+            }
+            Err(err) => DoctorCheck::fail(
+                "daemon_claim",
+                path,
+                format!("failed to inspect daemon claim: {err}"),
+            ),
+        }
+    }
+
+    fn daemon_claim_lock_check(&self) -> DoctorCheck {
+        let path = self.placement.daemon_claim_lock();
+        match fs::metadata(path) {
+            Ok(metadata) if metadata.is_file() => {
+                DoctorCheck::pass("daemon_claim_lock", path, "daemon claim lock file exists")
+            }
+            Ok(_) => DoctorCheck::fail("daemon_claim_lock", path, "path exists but is not a file"),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => DoctorCheck::pass(
+                "daemon_claim_lock",
+                path,
+                "daemon claim lock file does not exist",
+            ),
+            Err(err) => DoctorCheck::fail(
+                "daemon_claim_lock",
+                path,
+                format!("failed to inspect daemon claim lock: {err}"),
             ),
         }
     }

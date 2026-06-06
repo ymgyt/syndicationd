@@ -5596,6 +5596,8 @@ name = "synd-runtime"
 version = "0.1.0"
 dependencies = [
  "rustix 1.1.4",
+ "serde",
+ "serde_json",
  "sha2",
  "synd-api",
  "synd-client",

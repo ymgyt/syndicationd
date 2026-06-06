@@ -15,7 +15,7 @@ use crate::{
     Error, Result, Runtime, RuntimeConfig, Session,
     connection::{RuntimeEndpointConnectionStatus, RuntimeEndpointConnector},
     daemon::{DaemonHandle, DaemonLauncher},
-    placement::RuntimePlacement,
+    placement::PlacementSpec,
     startup::{StartupLock, StartupLockAcquirer, StartupLockAcquisition},
 };
 
@@ -139,7 +139,7 @@ enum Endpoint {
 }
 
 impl Endpoint {
-    async fn probe(placement: RuntimePlacement) -> Self {
+    async fn probe(placement: PlacementSpec) -> Self {
         let connection = RuntimeEndpointConnector::new(placement.endpoint())
             .try_connect()
             .await;
@@ -148,7 +148,7 @@ impl Endpoint {
     }
 
     fn from_connection(
-        placement: RuntimePlacement,
+        placement: PlacementSpec,
         connection: RuntimeEndpointConnectionStatus,
     ) -> Self {
         match connection {
@@ -189,7 +189,7 @@ impl Endpoint {
         }
     }
 
-    fn placement(&self) -> &RuntimePlacement {
+    fn placement(&self) -> &PlacementSpec {
         match self {
             Self::Connected(state) => &state.placement,
             Self::Missing(state) => &state.placement,
@@ -203,7 +203,7 @@ impl Endpoint {
 
 #[derive(Debug, Clone)]
 struct Connected {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Connected {
@@ -264,11 +264,11 @@ impl Connected {
 
 #[derive(Debug, Clone)]
 struct Missing {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Missing {
-    fn placement(&self) -> &RuntimePlacement {
+    fn placement(&self) -> &PlacementSpec {
         &self.placement
     }
 
@@ -289,11 +289,11 @@ impl Missing {
 
 #[derive(Debug, Clone)]
 struct Stale {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Stale {
-    fn placement(&self) -> &RuntimePlacement {
+    fn placement(&self) -> &PlacementSpec {
         &self.placement
     }
 
@@ -337,7 +337,7 @@ impl Stale {
 
 #[derive(Debug, Clone)]
 struct Unavailable {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Unavailable {
@@ -357,7 +357,7 @@ impl Unavailable {
 #[cfg(not(unix))]
 #[derive(Debug, Clone)]
 struct UnsupportedEndpoint {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 #[cfg(not(unix))]
@@ -386,7 +386,7 @@ enum SessionOpenFailure {
 }
 
 impl SessionOpenFailure {
-    fn from_error(placement: RuntimePlacement, error: synd_client::SyndApiError) -> Self {
+    fn from_error(placement: PlacementSpec, error: synd_client::SyndApiError) -> Self {
         if session_endpoint_missing(&error) {
             debug!(
                 runtime_endpoint = %placement.endpoint().path().display(),
@@ -409,7 +409,7 @@ impl SessionOpenFailure {
 
 #[derive(Debug, Clone)]
 struct SessionOpenRejection {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
     response: OpenSessionErrorResponse,
 }
 
@@ -434,11 +434,11 @@ impl SessionOpenRejection {
 
 #[derive(Debug, Clone)]
 struct Incompatible {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Incompatible {
-    fn placement(&self) -> &RuntimePlacement {
+    fn placement(&self) -> &PlacementSpec {
         &self.placement
     }
 
@@ -492,7 +492,7 @@ enum Startup {
 }
 
 impl Startup {
-    fn acquire(placement: &RuntimePlacement) -> Result<Self> {
+    fn acquire(placement: &PlacementSpec) -> Result<Self> {
         match StartupLockAcquirer::new(placement.startup_lock_path()).try_acquire()? {
             StartupLockAcquisition::Acquired(lock) => Ok(Self::Held(Held { _lock: lock })),
             StartupLockAcquisition::AlreadyHeld => Ok(Self::Busy(Busy {
@@ -513,7 +513,7 @@ struct Held {
 
 #[derive(Debug, Clone)]
 struct Busy {
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl Busy {
@@ -541,10 +541,7 @@ impl UnsupportedStartup {
 }
 
 #[cfg(unix)]
-fn daemon_client(
-    config: &RuntimeConfig,
-    placement: &RuntimePlacement,
-) -> Result<synd_client::Client> {
+fn daemon_client(config: &RuntimeConfig, placement: &PlacementSpec) -> Result<synd_client::Client> {
     Ok(synd_client::Client::new_unix(
         placement.endpoint().path(),
         synd_client::ClientOptions::new(
@@ -555,10 +552,7 @@ fn daemon_client(
 }
 
 #[cfg(not(unix))]
-fn daemon_client(
-    config: &RuntimeConfig,
-    placement: &RuntimePlacement,
-) -> Result<synd_client::Client> {
+fn daemon_client(config: &RuntimeConfig, placement: &PlacementSpec) -> Result<synd_client::Client> {
     let _ = (config, placement);
 
     Err(Error::UnsupportedTransport {
@@ -567,7 +561,7 @@ fn daemon_client(
 }
 
 async fn wait_connected(
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
     timeout: Duration,
     mut daemon: EndpointReadyWaitDaemon<'_>,
 ) -> Result<Connected> {
@@ -624,7 +618,7 @@ impl EndpointReadyWaitDaemon<'_> {
         }
     }
 
-    fn timeout_error(&self, placement: &RuntimePlacement) -> Error {
+    fn timeout_error(&self, placement: &PlacementSpec) -> Error {
         let endpoint = placement.endpoint().path().to_path_buf();
         match self {
             Self::Launched(handle) => Error::DaemonEndpointReadyTimeout {
@@ -641,7 +635,7 @@ struct ExitedDaemon {
     launch: crate::DaemonLaunchInfo,
 }
 
-async fn wait_stopped(placement: RuntimePlacement, timeout: Duration) -> Result<Stopped> {
+async fn wait_stopped(placement: PlacementSpec, timeout: Duration) -> Result<Stopped> {
     let deadline = Instant::now() + timeout;
 
     loop {
@@ -675,7 +669,7 @@ fn session_endpoint_missing(error: &synd_client::SyndApiError) -> bool {
     )
 }
 
-fn daemon_stop_suggestion(placement: &RuntimePlacement) -> String {
+fn daemon_stop_suggestion(placement: &PlacementSpec) -> String {
     format!(
         "run `synd --sqlite-db {} daemon shutdown` and retry",
         shell_quote(placement.instance().canonical_database_path())
@@ -708,7 +702,7 @@ mod tests {
         RuntimeConfig, RuntimeDatabase,
         connection::RuntimeEndpointConnectionStatus,
         instance::RuntimeInstance,
-        placement::{RuntimePlacement, RuntimeRoot},
+        placement::{PlacementRoot, PlacementSpec},
     };
 
     use super::{Connected, Endpoint, Held, Incompatible, SessionAttempt, Stale, Stopped};
@@ -861,15 +855,15 @@ mod tests {
         }
     }
 
-    fn placement() -> RuntimePlacement {
+    fn placement() -> PlacementSpec {
         let tmp = tempfile::tempdir().unwrap();
         let instance =
             RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
                 .unwrap();
-        RuntimePlacement::from_instance(RuntimeRoot::from(tmp.path().join("runtime")), instance)
+        PlacementSpec::from_instance(PlacementRoot::from(tmp.path().join("runtime")), instance)
     }
 
-    fn runtime_config_for(placement: &RuntimePlacement) -> RuntimeConfig {
+    fn runtime_config_for(placement: &PlacementSpec) -> RuntimeConfig {
         RuntimeConfig::new(RuntimeDatabase::sqlite(
             placement.instance().canonical_database_path(),
         ))

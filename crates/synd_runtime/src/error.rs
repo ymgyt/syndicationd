@@ -22,6 +22,9 @@ pub enum Error {
     #[error(transparent)]
     RuntimeApi(Box<synd_api::Error>),
 
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+
     #[error("{context} endpoint unavailable: {}", endpoint.display())]
     EndpointUnavailable {
         context: &'static str,
@@ -67,6 +70,15 @@ pub enum Error {
 
     #[error("timed out waiting for daemon endpoint {} to stop", endpoint.display())]
     EndpointStopTimeout { endpoint: PathBuf },
+
+    #[error("daemon claim lock is already held at {}", path.display())]
+    DaemonClaimLockAlreadyHeld { path: PathBuf },
+
+    #[error("refusing force shutdown: {reason}")]
+    ForceShutdownRefused { reason: String },
+
+    #[error("timed out force stopping daemon process {pid}")]
+    ForceShutdownTimeout { pid: u32 },
 
     #[error("runtime daemon is incompatible at {}; {suggestion}", endpoint.display())]
     IncompatibleRuntimeDaemon {

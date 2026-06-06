@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 
 use crate::{
     Result,
-    placement::{RUNTIME_ROOT_ENV, RuntimePlacement},
+    placement::{PlacementSpec, RUNTIME_ROOT_ENV},
 };
 
 /// Configuration for starting a daemon process for a runtime instance.
@@ -213,7 +213,7 @@ struct DaemonLaunchEnvironment {
 }
 
 impl DaemonLaunchEnvironment {
-    fn from_placement(placement: &RuntimePlacement) -> Self {
+    fn from_placement(placement: &PlacementSpec) -> Self {
         Self::runtime_root(placement.root().path())
     }
 
@@ -295,11 +295,11 @@ impl IntoIterator for DaemonSessionServeArguments {
 /// Starts a daemon process for a resolved runtime placement.
 pub(crate) struct DaemonLauncher<'a> {
     config: &'a DaemonLaunchConfig,
-    placement: RuntimePlacement,
+    placement: PlacementSpec,
 }
 
 impl<'a> DaemonLauncher<'a> {
-    pub(crate) fn new(config: &'a DaemonLaunchConfig, placement: RuntimePlacement) -> Self {
+    pub(crate) fn new(config: &'a DaemonLaunchConfig, placement: PlacementSpec) -> Self {
         Self { config, placement }
     }
 
