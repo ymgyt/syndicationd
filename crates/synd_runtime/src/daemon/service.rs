@@ -1,10 +1,10 @@
-use std::time::Duration;
 #[cfg(unix)]
 use std::{
     io::ErrorKind,
     os::unix::{fs::FileTypeExt, net::UnixStream},
-    path::{Path, PathBuf},
+    path::Path,
 };
+use std::{path::PathBuf, time::Duration};
 
 #[cfg(test)]
 use synd_api::session::DaemonSessionLeasePolicy;
@@ -130,6 +130,12 @@ impl DaemonConfig {
     #[must_use]
     pub fn with_session_idle_shutdown_grace(mut self, idle_shutdown_grace: Duration) -> Self {
         self.session = self.session.with_idle_shutdown_grace(idle_shutdown_grace);
+        self
+    }
+
+    #[must_use]
+    pub fn with_runtime_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.placement_environment = RuntimePlacementEnvironment::from_root(root);
         self
     }
 

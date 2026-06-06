@@ -10,7 +10,10 @@ use synd_api::session::DaemonSessionConfig;
 use synd_support::{dirs::SyndicationdDirs, time::humantime::HumanDuration};
 use tracing::{debug, warn};
 
-use crate::{Result, placement::RuntimePlacement};
+use crate::{
+    Result,
+    placement::{RUNTIME_ROOT_ENV, RuntimePlacement},
+};
 
 /// Configuration for starting a daemon process for a runtime instance.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +165,38 @@ impl ResolvedDaemonLaunchCommand {
     }
 }
 
+/// Environment variables passed to a spawned daemon process.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DaemonLaunchEnvironment {
+    values: Vec<(OsString, OsString)>,
+}
+
+impl DaemonLaunchEnvironment {
+    fn from_placement(placement: &RuntimePlacement) -> Self {
+        Self::runtime_root(placement.root().path())
+    }
+
+    fn runtime_root(root: &Path) -> Self {
+        Self {
+            values: vec![(
+                OsString::from(RUNTIME_ROOT_ENV),
+                root.as_os_str().to_os_string(),
+            )],
+        }
+    }
+
+    fn apply_to(&self, command: &mut Command) {
+        for (key, value) in &self.values {
+            command.env(key, value);
+        }
+    }
+
+    #[cfg(test)]
+    fn as_slice(&self) -> &[(OsString, OsString)] {
+        &self.values
+    }
+}
+
 /// Argument vector for invoking `synd daemon serve`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DaemonServeArguments {
@@ -234,16 +269,20 @@ impl<'a> DaemonLauncher<'a> {
             self.placement.instance().canonical_database_path(),
             self.config.session(),
         );
+        let environment = DaemonLaunchEnvironment::from_placement(&self.placement);
         let log = self.config.log().open()?;
         debug!(
             daemon_executable = %command.executable.display(),
             daemon_arguments = ?command.arguments,
+            daemon_environment = ?environment,
             daemon_log = %self.config.log().path().display(),
             "Launching daemon"
         );
 
-        let child = Command::new(&command.executable)
-            .args(command.arguments.as_slice())
+        let mut child_command = Command::new(&command.executable);
+        child_command.args(command.arguments.as_slice());
+        environment.apply_to(&mut child_command);
+        let child = child_command
             .stdin(Stdio::null())
             .stdout(Stdio::from(log.stdout))
             .stderr(Stdio::from(log.stderr))
@@ -281,7 +320,9 @@ mod tests {
 
     use synd_api::session::{DaemonSessionConfig, DaemonSessionLeasePolicy};
 
-    use super::{DaemonExecutable, DaemonLaunchLog, ResolvedDaemonLaunchCommand};
+    use super::{
+        DaemonExecutable, DaemonLaunchEnvironment, DaemonLaunchLog, ResolvedDaemonLaunchCommand,
+    };
 
     mod daemon_serve_command {
         use super::*;
@@ -348,6 +389,23 @@ mod tests {
             let _opened = log.open().unwrap();
 
             assert!(log.path().exists());
+        }
+    }
+
+    mod launch_environment {
+        use super::*;
+
+        #[test]
+        fn includes_runtime_root() {
+            let environment = DaemonLaunchEnvironment::runtime_root(Path::new("/tmp/synd-runtime"));
+
+            assert_eq!(
+                environment.as_slice(),
+                [(
+                    OsString::from(crate::placement::RUNTIME_ROOT_ENV),
+                    OsString::from("/tmp/synd-runtime"),
+                )]
+            );
         }
     }
 }

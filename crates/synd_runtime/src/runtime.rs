@@ -116,6 +116,12 @@ impl Config {
     }
 
     #[must_use]
+    pub fn with_runtime_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.placement_environment = RuntimePlacementEnvironment::from_root(root);
+        self
+    }
+
+    #[must_use]
     pub fn with_requirements(mut self, requirements: SessionRequirements) -> Self {
         self.requirements = requirements;
         self

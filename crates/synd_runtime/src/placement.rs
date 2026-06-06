@@ -7,6 +7,8 @@ use crate::{
     uds::UdsEndpoint,
 };
 
+pub(crate) const RUNTIME_ROOT_ENV: &str = "SYND_RUNTIME_ROOT";
+
 /// Filesystem root used to place runtime implementation artifacts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RuntimeRoot {
@@ -41,8 +43,20 @@ pub(crate) struct RuntimePlacementEnvironment {
 
 impl RuntimePlacementEnvironment {
     pub(crate) fn capture() -> Self {
+        if let Some(root) = std::env::var_os(RUNTIME_ROOT_ENV)
+            && !root.as_os_str().is_empty()
+        {
+            return Self::from_root(root);
+        }
+
         Self {
             default_root: RuntimeRoot::from(SyndicationdDirs::current().runtime_dir_or_temp()),
+        }
+    }
+
+    pub(crate) fn from_root(root: impl Into<PathBuf>) -> Self {
+        Self {
+            default_root: RuntimeRoot::from(root.into()),
         }
     }
 
