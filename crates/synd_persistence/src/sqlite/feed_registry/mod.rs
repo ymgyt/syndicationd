@@ -332,8 +332,8 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use synd_feed::types::FeedUrl;
     use synd_registry::{
-        FeedRegistry, FeedRegistryConfig, RegistryService, SubscribeFeedCommand, Subscription,
-        SubscriptionKey,
+        FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig, RegistryService,
+        SubscribeFeedCommand, Subscription, SubscriptionKey,
         crawl::{
             job::{CrawlJobQueue, CrawlJobTrigger, EnqueueJob, EnqueueJobResult},
             policy::{CrawlPolicy, PollingInterval, PollingPolicy},
@@ -344,7 +344,7 @@ mod tests {
             ApiEvent, ConsumeContext, Consumer, CrawlEvent, CrawlEventKind, EventInterests,
             EventSubmitter, EventWakePublisher, FeedSubscribedEvent, FeedUnsubscribedEvent,
             ProcessorId, RequestEventKind, SubEvent, SubEventKind, SubscriptionChangedEvent,
-            SubscriptionLifecycle,
+            SubscriptionLifecycle, WorkerId,
         },
     };
     use tokio_util::sync::CancellationToken;
@@ -572,11 +572,17 @@ mod tests {
         let db = migrated_db().await?;
         let ct = CancellationToken::new();
         let config = FeedRegistryConfig {
-            event_worker_poll_interval: Duration::from_millis(10),
+            workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
             ..FeedRegistryConfig::default()
         };
         let registry_service = RegistryService::start(db.clone(), config, ct.clone());
         let (registry, event_workers) = registry_service.into_parts();
+        assert!(
+            event_workers
+                .handles()
+                .iter()
+                .any(|worker| worker.id() == WorkerId::CrawlWorkerPool)
+        );
         let subscriber_id = subscriber_id();
         let feed_url = feed_url("runtime-subscribe");
         let mut api_events = registry.subscribe_api_events(subscriber_id.clone());
@@ -624,7 +630,7 @@ mod tests {
         let db = migrated_db().await?;
         let ct = CancellationToken::new();
         let config = FeedRegistryConfig {
-            event_worker_poll_interval: Duration::from_millis(10),
+            workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
             ..FeedRegistryConfig::default()
         };
         let registry_service = RegistryService::start(db.clone(), config, ct.clone());

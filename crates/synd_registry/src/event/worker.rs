@@ -51,6 +51,7 @@ impl Trigger {
 pub enum WorkerId {
     Processor(ProcessorId),
     CrawlScheduler,
+    CrawlWorkerPool,
 }
 
 impl WorkerId {
@@ -58,6 +59,7 @@ impl WorkerId {
         match self {
             Self::Processor(processor) => processor.as_str(),
             Self::CrawlScheduler => "CrawlScheduler",
+            Self::CrawlWorkerPool => "CrawlWorkerPool",
         }
     }
 }

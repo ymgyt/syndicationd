@@ -15,7 +15,8 @@ pub mod subscription;
 pub use command::{
     SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
 };
-pub use config::FeedRegistryConfig;
+pub use config::{FeedRegistryConfig, FeedRegistryWorkerConfig};
+pub use crawl::worker::{CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
 pub use db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::{FeedRegistry, RegistryService};

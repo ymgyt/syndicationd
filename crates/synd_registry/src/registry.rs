@@ -8,7 +8,10 @@ use crate::{
     },
     config::FeedRegistryConfig,
     consumers::{ApiEventProj, SubRequestProj},
-    crawl::{policy::CrawlPolicy, scheduler::CrawlScheduler, target_list::CrawlTargetListProj},
+    crawl::{
+        policy::CrawlPolicy, scheduler::CrawlScheduler, target_list::CrawlTargetListProj,
+        worker::spawn_crawl_worker_pool,
+    },
     db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
     error::FeedRegistryError,
     event::{
@@ -128,42 +131,47 @@ where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx,
 {
-    let poll_interval = config.event_worker_poll_interval;
-
     let subscription_request_projection_worker = spawn_event_worker(
         db.clone(),
         wake_publisher.clone(),
-        poll_interval,
+        config.workers.subscription_request_poll_interval,
         ct.clone(),
         SubRequestProj::new(),
     );
     let crawl_target_projection_worker = spawn_event_worker(
         db.clone(),
         wake_publisher.clone(),
-        poll_interval,
+        config.workers.crawl_target_projection_poll_interval,
         ct.clone(),
         CrawlTargetListProj::new(),
     );
     let api_event_projection_worker = spawn_event_worker(
         db.clone(),
         wake_publisher.clone(),
-        poll_interval,
+        config.workers.api_event_projection_poll_interval,
         ct.clone(),
         ApiEventProj::new(),
     );
     let api_event_publisher_worker = spawn_event_worker(
         db.clone(),
         wake_publisher.clone(),
-        poll_interval,
+        config.workers.api_event_publisher_poll_interval,
         ct.clone(),
         api_events,
     );
     let crawl_scheduler_worker = spawn_reconciler_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        config.workers.crawl_scheduler_poll_interval,
+        ct.clone(),
+        CrawlScheduler::new(),
+    );
+    let crawl_worker_pool = spawn_crawl_worker_pool(
         db,
         wake_publisher.clone(),
-        poll_interval,
+        config.workers.crawl_worker_pool_poll_interval,
+        config.crawl_worker_pool,
         ct,
-        CrawlScheduler::new(),
     );
 
     WorkerSet::new(vec![
@@ -172,6 +180,7 @@ where
         api_event_projection_worker,
         api_event_publisher_worker,
         crawl_scheduler_worker,
+        crawl_worker_pool,
     ])
 }
 
