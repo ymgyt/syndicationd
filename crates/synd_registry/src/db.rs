@@ -4,7 +4,11 @@ use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 
 use crate::{
-    crawl::target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
+    crawl::{
+        job::{CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult},
+        schedule::{CrawlScheduleCandidate, UpsertSchedule},
+        target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
+    },
     error::{RegistryDbError, RegistryDbResult},
     event::JournalTx,
     query::{Subscriptions, SubscriptionsQuery},
@@ -66,6 +70,32 @@ pub trait RegistryTx {
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
+}
+
+/// Transactional scheduler-state operations.
+pub trait CrawlScheduleTx {
+    fn list_candidates(
+        &mut self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> impl Future<Output = RegistryDbResult<Vec<CrawlScheduleCandidate>>> + Send;
+
+    fn upsert_schedule(
+        &mut self,
+        schedule: UpsertSchedule,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+}
+
+/// Transactional crawl-job queue operations.
+pub trait CrawlJobQueueTx {
+    fn queue_snapshot(
+        &mut self,
+    ) -> impl Future<Output = RegistryDbResult<CrawlQueueSnapshot>> + Send;
+
+    fn enqueue_job(
+        &mut self,
+        job: EnqueueJob,
+    ) -> impl Future<Output = RegistryDbResult<EnqueueJobResult>> + Send;
 }
 
 /// Commits a registry database transaction.

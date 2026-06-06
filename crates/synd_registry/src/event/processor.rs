@@ -5,8 +5,12 @@ use synd_feed::types::FeedUrl;
 use thiserror::Error;
 
 use crate::{
-    crawl::target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
-    db::{FeedRegistryDb, RegistryTx},
+    crawl::{
+        job::{CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult},
+        schedule::{CrawlScheduleCandidate, UpsertSchedule},
+        target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
+    },
+    db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
     error::{RegistryDbError, RegistryDbResult},
     event::{Event, EventInterests, EventKind, JournalTx},
     query::{Subscriptions, SubscriptionsQuery},
@@ -220,6 +224,36 @@ where
         self.tx.append_event(event).await?;
         self.recorded.push(kind);
         Ok(())
+    }
+}
+
+impl<Tx> ReconcileContext<'_, Tx>
+where
+    Tx: CrawlScheduleTx + Send,
+{
+    pub async fn list_candidates(
+        &mut self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> RegistryDbResult<Vec<CrawlScheduleCandidate>> {
+        self.tx.list_candidates(now, limit).await
+    }
+
+    pub async fn upsert_schedule(&mut self, schedule: UpsertSchedule) -> RegistryDbResult<()> {
+        self.tx.upsert_schedule(schedule).await
+    }
+}
+
+impl<Tx> ReconcileContext<'_, Tx>
+where
+    Tx: CrawlJobQueueTx + Send,
+{
+    pub async fn queue_snapshot(&mut self) -> RegistryDbResult<CrawlQueueSnapshot> {
+        self.tx.queue_snapshot().await
+    }
+
+    pub async fn enqueue_job(&mut self, job: EnqueueJob) -> RegistryDbResult<EnqueueJobResult> {
+        self.tx.enqueue_job(job).await
     }
 }
 

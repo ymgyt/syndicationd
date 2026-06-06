@@ -4,9 +4,13 @@ use chrono::{DateTime, Utc};
 use sqlx::{QueryBuilder, Row, Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    CommitTx, FeedRegistryDb, FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, RegistryTx,
-    SubscriberId, SubscriptionKey,
-    crawl::target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
+    CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, FeedSubscriptionAttrs,
+    RegistryDbError, RegistryDbResult, RegistryTx, SubscriberId, SubscriptionKey,
+    crawl::{
+        job::{CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult},
+        schedule::{CrawlScheduleCandidate, UpsertSchedule},
+        target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
+    },
     event::{
         Event, EventCursor, EventCursorPos, EventEncoding, EventInterests, EventReadBatch,
         JournalTx, JournaledEvent, ProcessorId,
@@ -15,12 +19,14 @@ use synd_registry::{
 };
 
 use self::{
-    crawl_target::CrawlTargetTable, feed_endpoint::FeedEndpointTable,
-    feed_endpoint_subscription::FeedEndpointSubscriptionTable,
+    crawl_job::CrawlJobTable, crawl_schedule::CrawlScheduleTable, crawl_target::CrawlTargetTable,
+    feed_endpoint::FeedEndpointTable, feed_endpoint_subscription::FeedEndpointSubscriptionTable,
 };
 use super::SqliteDatabase;
 
 mod codec;
+mod crawl_job;
+mod crawl_schedule;
 mod crawl_target;
 mod feed_endpoint;
 mod feed_endpoint_subscription;
@@ -272,6 +278,32 @@ impl RegistryTx for SqliteRegistryTx<'_> {
     }
 }
 
+impl CrawlScheduleTx for SqliteRegistryTx<'_> {
+    async fn list_candidates(
+        &mut self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> RegistryDbResult<Vec<CrawlScheduleCandidate>> {
+        CrawlScheduleTable::new(&mut self.tx)
+            .list_candidates(now, limit)
+            .await
+    }
+
+    async fn upsert_schedule(&mut self, schedule: UpsertSchedule) -> RegistryDbResult<()> {
+        CrawlScheduleTable::new(&mut self.tx).upsert(schedule).await
+    }
+}
+
+impl CrawlJobQueueTx for SqliteRegistryTx<'_> {
+    async fn queue_snapshot(&mut self) -> RegistryDbResult<CrawlQueueSnapshot> {
+        CrawlJobTable::new(&mut self.tx).queue_snapshot().await
+    }
+
+    async fn enqueue_job(&mut self, job: EnqueueJob) -> RegistryDbResult<EnqueueJobResult> {
+        CrawlJobTable::new(&mut self.tx).enqueue(job).await
+    }
+}
+
 impl CommitTx for SqliteRegistryTx<'_> {
     async fn commit(self) -> RegistryDbResult<()> {
         self.tx.commit().await.map_err(RegistryDbError::internal)
@@ -303,7 +335,9 @@ mod tests {
         FeedRegistry, FeedRegistryConfig, RegistryService, SubscribeFeedCommand, Subscription,
         SubscriptionKey,
         crawl::{
+            job::{CrawlJobQueue, CrawlJobTrigger, EnqueueJob, EnqueueJobResult},
             policy::{CrawlPolicy, PollingInterval, PollingPolicy},
+            schedule::UpsertSchedule,
             target_list::{CrawlTargetListInput, CrawlTargetListProj, CrawlTargetState},
         },
         event::{
@@ -766,6 +800,81 @@ mod tests {
         };
         assert_eq!(event.feed_url, subscription.feed_url);
         assert_eq!(event.policy, subscription.crawl_policy);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn crawl_schedule_candidates_and_job_enqueue_are_persisted() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let now = Utc.with_ymd_and_hms(2026, 6, 6, 12, 0, 0).unwrap();
+        let subscription = subscription("crawl-schedule-candidate");
+
+        let mut tx = db.begin().await?;
+        store_subscription(&mut tx, subscription.clone()).await?;
+        tx.commit().await?;
+
+        project_crawl_targets(
+            &db,
+            vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
+                subscription_key(&subscription),
+            ))],
+        )
+        .await?;
+
+        let mut tx = db.begin().await?;
+        let candidates = tx.list_candidates(now, 10).await?;
+        assert_eq!(candidates.len(), 1);
+        let candidate = &candidates[0];
+        assert_eq!(candidate.target.feed_url, subscription.feed_url);
+        assert!(candidate.schedule.is_none());
+        assert!(candidate.active_job.is_none());
+
+        tx.upsert_schedule(UpsertSchedule::new(
+            subscription.feed_url.clone(),
+            candidate.target.target_updated_at,
+            Some(now),
+            now,
+        ))
+        .await?;
+
+        let result = tx
+            .enqueue_job(EnqueueJob::new(
+                subscription.feed_url.clone(),
+                CrawlJobTrigger::TargetChanged,
+                CrawlJobQueue::Default,
+                0,
+                now,
+                now,
+            ))
+            .await?;
+        let EnqueueJobResult::Enqueued(job) = result else {
+            anyhow::bail!("expected job to be enqueued");
+        };
+        assert_eq!(job.feed_url, subscription.feed_url);
+        assert_eq!(job.trigger, CrawlJobTrigger::TargetChanged);
+
+        let result = tx
+            .enqueue_job(EnqueueJob::new(
+                subscription.feed_url.clone(),
+                CrawlJobTrigger::TargetChanged,
+                CrawlJobQueue::Default,
+                0,
+                now,
+                now,
+            ))
+            .await?;
+        assert_eq!(result, EnqueueJobResult::AlreadyActive);
+
+        let snapshot = tx.queue_snapshot().await?;
+        assert_eq!(snapshot.pending_count, 1);
+        assert_eq!(snapshot.running_count, 0);
+        tx.commit().await?;
+
+        let mut tx = db.begin().await?;
+        let candidates = tx.list_candidates(now, 10).await?;
+        assert_eq!(candidates.len(), 1);
+        assert!(candidates[0].schedule.is_some());
+        assert!(candidates[0].active_job.is_some());
         Ok(())
     }
 

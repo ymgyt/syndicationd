@@ -1,7 +1,7 @@
 use super::{EncodedEvent, EventEncodingResult, EventPayload, encode_payload, event_type};
 use crate::event::{
-    CrawlEvent, CrawlEventKind, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
-    CrawlTargetPolicyChangedEvent, Event,
+    CrawlEvent, CrawlEventKind, CrawlJobEnqueuedEvent, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event,
 };
 
 impl CrawlEvent {
@@ -10,6 +10,7 @@ impl CrawlEvent {
             Self::TargetActivated(event) => encode_payload(event),
             Self::TargetPolicyChanged(event) => encode_payload(event),
             Self::TargetDeactivated(event) => encode_payload(event),
+            Self::JobEnqueued(event) => encode_payload(event),
         }
     }
 }
@@ -22,6 +23,7 @@ impl CrawlEventKind {
                 <CrawlTargetPolicyChangedEvent as EventPayload>::EVENT_TYPE
             }
             Self::TargetDeactivated => <CrawlTargetDeactivatedEvent as EventPayload>::EVENT_TYPE,
+            Self::JobEnqueued => <CrawlJobEnqueuedEvent as EventPayload>::EVENT_TYPE,
         }
     }
 }
@@ -47,5 +49,13 @@ impl EventPayload for CrawlTargetDeactivatedEvent {
 
     fn into_event(self) -> Event {
         Event::Crawl(CrawlEvent::TargetDeactivated(self))
+    }
+}
+
+impl EventPayload for CrawlJobEnqueuedEvent {
+    const EVENT_TYPE: &'static str = event_type::CRAWL_JOB_ENQUEUED;
+
+    fn into_event(self) -> Event {
+        Event::Crawl(CrawlEvent::JobEnqueued(self))
     }
 }

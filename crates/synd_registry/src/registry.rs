@@ -9,7 +9,7 @@ use crate::{
     config::FeedRegistryConfig,
     consumers::{ApiEventProj, SubRequestProj},
     crawl::{policy::CrawlPolicy, scheduler::CrawlScheduler, target_list::CrawlTargetListProj},
-    db::{CommitTx, FeedRegistryDb, RegistryTx},
+    db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
     error::FeedRegistryError,
     event::{
         ApiEventPublisher, ApiEventSubscriber, EventSubmitter, EventWakePublisher, Processor,
@@ -28,6 +28,7 @@ pub struct RegistryService<S> {
 impl<S> RegistryService<S>
 where
     S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx,
 {
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> Self {
         let api_events = ApiEventPublisher::default();
@@ -125,6 +126,7 @@ fn spawn_event_workers<S>(
 ) -> WorkerSet
 where
     S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx,
 {
     let poll_interval = config.event_worker_poll_interval;
 

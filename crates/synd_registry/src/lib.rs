@@ -16,7 +16,7 @@ pub use command::{
     SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
 };
 pub use config::FeedRegistryConfig;
-pub use db::{CommitTx, FeedRegistryDb, RegistryTx};
+pub use db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::{FeedRegistry, RegistryService};
 pub use subscription::{
