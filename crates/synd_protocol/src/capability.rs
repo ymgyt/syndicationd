@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 pub const TIMELINE_READ: &str = "timeline.read";
@@ -37,5 +39,15 @@ impl CapabilitySet {
                 .filter(|name| !available.names.contains(name))
                 .cloned(),
         )
+    }
+}
+
+impl fmt::Display for CapabilitySet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.names.is_empty() {
+            return f.write_str("<none>");
+        }
+
+        f.write_str(&self.names.join(", "))
     }
 }

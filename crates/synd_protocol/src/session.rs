@@ -111,6 +111,20 @@ impl OpenSessionErrorResponse {
     }
 }
 
+impl fmt::Display for OpenSessionErrorResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.code {
+            OpenSessionErrorCode::MissingCapabilities => {
+                write!(
+                    f,
+                    "missing required capabilities: {}",
+                    self.missing_capabilities
+                )
+            }
+        }
+    }
+}
+
 /// Request body used by a client to close a daemon session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CloseSessionRequest {
@@ -216,6 +230,16 @@ impl RenewSessionErrorResponse {
     }
 }
 
+impl fmt::Display for RenewSessionErrorResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.code {
+            RenewSessionErrorCode::UnknownSession => {
+                write!(f, "unknown session {}", self.session_id)
+            }
+        }
+    }
+}
+
 /// Response body returned after the daemon closes a session.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CloseSessionResponse {}
@@ -254,6 +278,16 @@ impl CloseSessionErrorResponse {
 
     pub fn session_id(&self) -> &SessionId {
         &self.session_id
+    }
+}
+
+impl fmt::Display for CloseSessionErrorResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.code {
+            CloseSessionErrorCode::UnknownSession => {
+                write!(f, "unknown session {}", self.session_id)
+            }
+        }
     }
 }
 

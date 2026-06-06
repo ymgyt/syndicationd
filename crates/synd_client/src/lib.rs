@@ -57,11 +57,11 @@ pub enum SyndApiError {
     Graphql { errors: Vec<graphql_client::Error> },
     #[error(transparent)]
     SubscribeFeed(SubscribeFeedError),
-    #[error("session open rejected: {0:?}")]
+    #[error("session open rejected: {0}")]
     OpenSession(OpenSessionErrorResponse),
-    #[error("session renew rejected: {0:?}")]
+    #[error("session renew rejected: {0}")]
     RenewSession(RenewSessionErrorResponse),
-    #[error("session close rejected: {0:?}")]
+    #[error("session close rejected: {0}")]
     CloseSession(CloseSessionErrorResponse),
     #[error("credential is not configured")]
     MissingCredential,

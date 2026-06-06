@@ -75,7 +75,7 @@ impl<'a> Control<'a> {
 
     #[expect(clippy::unused_async)]
     pub async fn restart(&self) -> Result<DaemonStatus> {
-        Err(Error::NotImplemented("DaemonControl::restart"))
+        Err(Error::UnsupportedDaemonControlAction { action: "restart" })
     }
 
     async fn resolve_context(&self) -> Result<DaemonControlContext> {
@@ -190,9 +190,9 @@ impl DaemonControlClient {
     fn new(runtime: &Runtime, placement: &RuntimePlacement) -> Result<Self> {
         let _ = (runtime, placement);
 
-        Err(Error::NotImplemented(
-            "daemon control transport unsupported",
-        ))
+        Err(Error::UnsupportedTransport {
+            context: "daemon control transport",
+        })
     }
 
     async fn shutdown(&self) -> Result<()> {

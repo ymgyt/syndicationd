@@ -6,7 +6,7 @@ use std::{
 #[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
 
-use synd_protocol::session::OpenSessionRequest;
+use synd_protocol::session::{OpenSessionErrorCode, OpenSessionErrorResponse, OpenSessionRequest};
 use tokio::time::sleep;
 use tracing::{debug, info};
 
@@ -208,41 +208,55 @@ struct Connected {
 impl Connected {
     async fn open(self, config: &RuntimeConfig) -> Result<SessionAttempt> {
         let client = daemon_client(config, &self.placement)?;
+        let required_capabilities = config.requirements().required_capabilities().clone();
+        debug!(
+            runtime_endpoint = %self.placement.endpoint().path().display(),
+            required_capabilities = %required_capabilities,
+            "Opening daemon session"
+        );
         match client
-            .open_session(OpenSessionRequest::new(
-                config.requirements().required_capabilities().clone(),
-            ))
+            .open_session(OpenSessionRequest::new(required_capabilities))
             .await
         {
-            Ok(session) => Ok(SessionAttempt::Opened(Box::new(Session::new(
-                client.clone(),
-                session.available_capabilities().clone(),
-                {
-                    #[cfg(not(test))]
+            Ok(session) => {
+                debug!(
+                    runtime_endpoint = %self.placement.endpoint().path().display(),
+                    session_id = %session.session_id(),
+                    available_capabilities = %session.available_capabilities(),
+                    lease_duration_ms = session.lease().duration().as_millis(),
+                    "Opened daemon session"
+                );
+                Ok(SessionAttempt::Opened(Box::new(Session::new(
+                    client.clone(),
+                    session.available_capabilities().clone(),
                     {
-                        crate::SessionHandle::daemon(
-                            client,
-                            session.session_id().clone(),
-                            session.lease(),
-                        )
-                    }
-                    #[cfg(test)]
-                    {
-                        crate::SessionHandle::daemon(
-                            client,
-                            session.session_id().clone(),
-                            session.lease(),
-                            config.session().renewal_observer(),
-                        )
-                    }
-                },
-            )))),
-            Err(error) if session_endpoint_missing(&error) => {
-                Ok(SessionAttempt::Incompatible(Incompatible {
-                    placement: self.placement,
-                }))
+                        #[cfg(not(test))]
+                        {
+                            crate::SessionHandle::daemon(
+                                client,
+                                session.session_id().clone(),
+                                session.lease(),
+                            )
+                        }
+                        #[cfg(test)]
+                        {
+                            crate::SessionHandle::daemon(
+                                client,
+                                session.session_id().clone(),
+                                session.lease(),
+                                config.session().renewal_observer(),
+                            )
+                        }
+                    },
+                ))))
             }
-            Err(error) => Err(error.into()),
+            Err(error) => match SessionOpenFailure::from_error(self.placement, error) {
+                SessionOpenFailure::MissingEndpoint(incompatible) => {
+                    Ok(SessionAttempt::Incompatible(incompatible))
+                }
+                SessionOpenFailure::Rejected(rejected) => rejected.fail(),
+                SessionOpenFailure::Client(error) => Err(error.into()),
+            },
         }
     }
 }
@@ -327,6 +341,11 @@ struct Unavailable {
 
 impl Unavailable {
     fn fail<T>(self, context: &'static str) -> Result<T> {
+        debug!(
+            runtime_endpoint = %self.placement.endpoint().path().display(),
+            context,
+            "Runtime endpoint is unavailable"
+        );
         Err(Error::EndpointUnavailable {
             context,
             endpoint: self.placement.endpoint().path().to_path_buf(),
@@ -343,7 +362,11 @@ struct UnsupportedEndpoint {
 #[cfg(not(unix))]
 impl UnsupportedEndpoint {
     fn fail<T>(self, context: &'static str) -> Result<T> {
-        let _ = self;
+        debug!(
+            runtime_endpoint = %self.placement.endpoint().path().display(),
+            context,
+            "Runtime endpoint transport is unsupported"
+        );
 
         Err(Error::UnsupportedTransport { context })
     }
@@ -352,6 +375,60 @@ impl UnsupportedEndpoint {
 enum SessionAttempt {
     Opened(Box<Session>),
     Incompatible(Incompatible),
+}
+
+#[derive(Debug)]
+enum SessionOpenFailure {
+    MissingEndpoint(Incompatible),
+    Rejected(SessionOpenRejection),
+    Client(synd_client::SyndApiError),
+}
+
+impl SessionOpenFailure {
+    fn from_error(placement: RuntimePlacement, error: synd_client::SyndApiError) -> Self {
+        if session_endpoint_missing(&error) {
+            debug!(
+                runtime_endpoint = %placement.endpoint().path().display(),
+                "Daemon does not expose session open endpoint"
+            );
+            return Self::MissingEndpoint(Incompatible { placement });
+        }
+
+        match error {
+            synd_client::SyndApiError::OpenSession(response) => {
+                Self::Rejected(SessionOpenRejection {
+                    placement,
+                    response,
+                })
+            }
+            error => Self::Client(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SessionOpenRejection {
+    placement: RuntimePlacement,
+    response: OpenSessionErrorResponse,
+}
+
+impl SessionOpenRejection {
+    fn fail<T>(self) -> Result<T> {
+        match self.response.code() {
+            OpenSessionErrorCode::MissingCapabilities => {
+                let missing_capabilities = self.response.missing_capabilities().clone();
+                debug!(
+                    runtime_endpoint = %self.placement.endpoint().path().display(),
+                    missing_capabilities = %missing_capabilities,
+                    "Daemon rejected session open because required capabilities are missing"
+                );
+                Err(Error::MissingSessionCapabilities {
+                    endpoint: self.placement.endpoint().path().to_path_buf(),
+                    missing_capabilities,
+                })
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -388,9 +465,15 @@ impl Incompatible {
     }
 
     fn fail<T>(self) -> Result<T> {
+        let suggestion = daemon_stop_suggestion(&self.placement);
+        debug!(
+            runtime_endpoint = %self.placement.endpoint().path().display(),
+            suggestion = %suggestion,
+            "Runtime daemon is incompatible"
+        );
         Err(Error::IncompatibleRuntimeDaemon {
             endpoint: self.placement.endpoint().path().to_path_buf(),
-            suggestion: daemon_stop_suggestion(&self.placement),
+            suggestion,
         })
     }
 }
@@ -445,6 +528,7 @@ struct UnsupportedStartup {}
 impl UnsupportedStartup {
     fn fail<T>(self, context: &'static str) -> Result<T> {
         let _ = self;
+        debug!(context, "Runtime startup lock transport is unsupported");
 
         Err(Error::UnsupportedTransport { context })
     }

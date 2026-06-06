@@ -1,5 +1,7 @@
 use std::{path::PathBuf, process::ExitStatus};
 
+use synd_protocol::CapabilitySet;
+
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -26,6 +28,18 @@ pub enum Error {
 
     #[error("{context} transport unsupported")]
     UnsupportedTransport { context: &'static str },
+
+    #[error("daemon control action `{action}` is unsupported")]
+    UnsupportedDaemonControlAction { action: &'static str },
+
+    #[error(
+        "runtime daemon at {} is missing required session capabilities: {missing_capabilities}",
+        endpoint.display()
+    )]
+    MissingSessionCapabilities {
+        endpoint: PathBuf,
+        missing_capabilities: CapabilitySet,
+    },
 
     #[error("refusing to remove non-socket runtime endpoint {}", path.display())]
     NonSocketEndpoint { path: PathBuf },
@@ -58,9 +72,6 @@ pub enum Error {
         endpoint: PathBuf,
         suggestion: String,
     },
-
-    #[error("{0} is not implemented yet")]
-    NotImplemented(&'static str),
 }
 
 impl From<synd_client::SyndApiError> for Error {

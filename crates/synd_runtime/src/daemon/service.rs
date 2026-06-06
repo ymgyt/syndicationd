@@ -57,7 +57,9 @@ impl Daemon {
 
         #[cfg(not(unix))]
         {
-            Err(crate::Error::NotImplemented("Daemon::serve on non-Unix"))
+            Err(crate::Error::UnsupportedTransport {
+                context: "daemon service endpoint",
+            })
         }
     }
 
