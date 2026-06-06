@@ -19,6 +19,9 @@ pub mod ui;
 #[cfg(feature = "integration")]
 pub mod integration;
 
+#[cfg(any(test, feature = "integration"))]
+pub mod test_support;
+
 #[macro_export]
 macro_rules! key {
     (backspace) => {

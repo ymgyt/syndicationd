@@ -1,8 +1,9 @@
-use synd_client::Client;
-
 use crate::{
-    application::{Application, Authenticator, Cache, Clock, Config, FeedApiSession, FeedBackend},
-    client::github::GithubClient,
+    application::outbound::github::GithubClient,
+    application::{
+        Application, Authenticator, Cache, Clock, Config, FeedApiRef, FeedApiSession, FeedBackend,
+        SessPending, TermInit,
+    },
     config::Categories,
     interact::Interact,
     terminal::Terminal,
@@ -11,7 +12,7 @@ use crate::{
 
 pub struct ApplicationBuilder<
     Terminal = (),
-    Client = (),
+    FeedApi = (),
     Categories = (),
     Cache = (),
     Config = (),
@@ -19,7 +20,7 @@ pub struct ApplicationBuilder<
     Interactor = (),
 > {
     pub(super) terminal: Terminal,
-    pub(super) client: Client,
+    pub(super) feed_api: FeedApi,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) categories: Categories,
     pub(super) cache: Cache,
@@ -37,7 +38,7 @@ impl Default for ApplicationBuilder {
     fn default() -> Self {
         Self {
             terminal: (),
-            client: (),
+            feed_api: (),
             feed_api_session: FeedApiSession::UserCredentialRequired,
             categories: (),
             cache: (),
@@ -60,7 +61,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
     ) -> ApplicationBuilder<Terminal, T1, T2, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal,
-            client: self.client,
+            feed_api: self.feed_api,
             feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
@@ -77,32 +78,23 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
 
 impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
     #[must_use]
-    pub fn client(self, client: Client) -> ApplicationBuilder<T1, Client, T2, T3, T4, T5, T6> {
-        ApplicationBuilder {
-            terminal: self.terminal,
-            client,
-            feed_api_session: self.feed_api_session,
-            categories: self.categories,
-            cache: self.cache,
-            config: self.config,
-            theme: self.theme,
-            interactor: self.interactor,
-            authenticator: self.authenticator,
-            github_client: self.github_client,
-            clock: self.clock,
-            dry_run: self.dry_run,
-        }
+    pub fn client(
+        self,
+        client: synd_client::Client,
+    ) -> ApplicationBuilder<T1, FeedApiRef, T2, T3, T4, T5, T6> {
+        let feed_backend = FeedBackend::from_client(client, self.feed_api_session);
+        self.feed_backend(feed_backend)
     }
 
     #[must_use]
     pub fn feed_backend(
         self,
         feed_backend: FeedBackend,
-    ) -> ApplicationBuilder<T1, Client, T2, T3, T4, T5, T6> {
-        let (client, feed_api_session) = feed_backend.into_parts();
+    ) -> ApplicationBuilder<T1, FeedApiRef, T2, T3, T4, T5, T6> {
+        let (feed_api, feed_api_session) = feed_backend.into_parts();
         ApplicationBuilder {
             terminal: self.terminal,
-            client,
+            feed_api,
             feed_api_session,
             categories: self.categories,
             cache: self.cache,
@@ -125,7 +117,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
     ) -> ApplicationBuilder<T1, T2, Categories, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
-            client: self.client,
+            feed_api: self.feed_api,
             feed_api_session: self.feed_api_session,
             categories,
             cache: self.cache,
@@ -145,7 +137,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
     pub fn cache(self, cache: Cache) -> ApplicationBuilder<T1, T2, T3, Cache, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
-            client: self.client,
+            feed_api: self.feed_api,
             feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache,
@@ -165,7 +157,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
     pub fn config(self, config: Config) -> ApplicationBuilder<T1, T2, T3, T4, Config, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
-            client: self.client,
+            feed_api: self.feed_api,
             feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
@@ -185,7 +177,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
     pub fn theme(self, theme: Theme) -> ApplicationBuilder<T1, T2, T3, T4, T5, Theme, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
-            client: self.client,
+            feed_api: self.feed_api,
             feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
@@ -208,7 +200,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
     ) -> ApplicationBuilder<T1, T2, T3, T4, T5, T6, Box<dyn Interact>> {
         ApplicationBuilder {
             terminal: self.terminal,
-            client: self.client,
+            feed_api: self.feed_api,
             feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
@@ -254,9 +246,9 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
     }
 }
 
-impl ApplicationBuilder<Terminal, Client, Categories, Cache, Config, Theme, Box<dyn Interact>> {
+impl ApplicationBuilder<Terminal, FeedApiRef, Categories, Cache, Config, Theme, Box<dyn Interact>> {
     #[must_use]
-    pub fn build(self) -> Application {
+    pub fn build(self) -> Application<TermInit, SessPending> {
         Application::new(self)
     }
 }

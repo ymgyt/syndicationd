@@ -2,12 +2,13 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use ratatui::Frame;
-use synd_client::Client;
 
 use crate::{
-    application::{Authenticator, Cache, Clock, FeedApiSession, LoadCacheError, PersistCacheError},
+    application::outbound::github::GithubClient,
+    application::{
+        Authenticator, Cache, Clock, FeedApiRef, FeedApiSession, LoadCacheError, PersistCacheError,
+    },
     auth::{Credential, CredentialError, Verified},
-    client::github::GithubClient,
     event::Event,
     interact::Interact,
     operation::Operation,
@@ -40,7 +41,7 @@ pub(super) struct Drivers {
 
 pub(super) struct DriverParts {
     pub(super) terminal: Terminal,
-    pub(super) client: Client,
+    pub(super) feed_api: FeedApiRef,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
     pub(super) cache: Cache,
@@ -61,7 +62,7 @@ impl Drivers {
     pub(super) fn new(parts: DriverParts) -> Self {
         let DriverParts {
             terminal,
-            client,
+            feed_api,
             feed_api_session,
             github_client,
             cache,
@@ -75,7 +76,7 @@ impl Drivers {
         Self {
             adapters: DriverAdapters::new(adapters::DriverAdapterParts {
                 terminal,
-                client,
+                feed_api,
                 feed_api_session,
                 github_client,
                 cache,
@@ -159,12 +160,14 @@ impl Drivers {
     }
 
     pub(super) fn supports_timeline_change_subscription(&self) -> bool {
-        self.adapters.client.supports_timeline_change_subscription()
+        self.adapters
+            .feed_api
+            .supports_timeline_change_subscription()
     }
 
     pub(super) fn restart_timeline_changes_if_running(&mut self) -> bool {
-        let client = self.adapters.client.clone();
-        self.timeline_changes.restart_if_running(client)
+        let feed_api = self.adapters.feed_api.clone();
+        self.timeline_changes.restart_if_running(feed_api)
     }
 
     pub(super) fn load_gh_notification_filter_options(

@@ -12,3 +12,6 @@ pub(crate) mod tabs;
 pub(crate) mod throbber;
 
 mod collections;
+
+#[cfg(test)]
+mod render_tests;

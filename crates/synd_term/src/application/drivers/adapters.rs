@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
-use synd_client::Client;
 
 use crate::{
-    application::{Authenticator, Cache, Clock, FeedApiSession, SystemClock},
-    client::github::GithubClient,
+    application::outbound::github::GithubClient,
+    application::{Authenticator, Cache, Clock, FeedApiRef, FeedApiSession, SystemClock},
     interact::Interact,
     terminal::Terminal,
     ui::widgets::gh_notifications::GhNotificationFilterOptions,
@@ -12,7 +11,7 @@ use crate::{
 pub(super) struct DriverAdapters {
     pub(super) clock: Box<dyn Clock>,
     pub(super) terminal: Terminal,
-    pub(super) client: Client,
+    pub(super) feed_api: FeedApiRef,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
     pub(super) cache: Cache,
@@ -22,7 +21,7 @@ pub(super) struct DriverAdapters {
 
 pub(super) struct DriverAdapterParts {
     pub(super) terminal: Terminal,
-    pub(super) client: Client,
+    pub(super) feed_api: FeedApiRef,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
     pub(super) cache: Cache,
@@ -35,7 +34,7 @@ impl DriverAdapters {
     pub(super) fn new(parts: DriverAdapterParts) -> Self {
         let DriverAdapterParts {
             terminal,
-            client,
+            feed_api,
             feed_api_session,
             github_client,
             cache,
@@ -47,7 +46,7 @@ impl DriverAdapters {
         Self {
             clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
             terminal,
-            client,
+            feed_api,
             feed_api_session,
             github_client,
             cache,

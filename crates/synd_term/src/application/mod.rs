@@ -3,7 +3,7 @@ use std::{ops::ControlFlow, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
-use synd_client::{Client, payload};
+use synd_client::payload;
 use synd_feed::types::FeedUrl;
 use tracing::{debug, info, warn};
 
@@ -41,8 +41,8 @@ pub use cache::{Cache, LoadCacheError, PersistCacheError};
 mod builder;
 pub use builder::ApplicationBuilder;
 
-mod backend;
-pub use backend::{FeedApiSession, FeedBackend};
+pub mod outbound;
+pub use outbound::feed::{FeedApi, FeedApiRef, FeedApiSession, FeedBackend};
 
 mod app_config;
 pub use app_config::{Config, Features};
@@ -58,10 +58,13 @@ mod events;
 mod feeds;
 mod idle;
 mod integration;
+mod lifecycle;
 mod operations;
 mod release;
 use component::AppComponent;
 use drivers::{DriverParts, Drivers};
+use lifecycle::Lifecycle;
+pub use lifecycle::{SessPending, SessReady, TermInit, TermReady, TermRestored};
 
 const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
 const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -75,11 +78,12 @@ pub enum Populate {
 }
 
 /// Composition root that owns the event loop and connects components to drivers.
-pub struct Application {
+pub struct Application<Term = TermInit, Sess = SessPending> {
     drivers: Drivers,
     components: AppComponent,
     keymap: crate::keymap::Keymap,
     config: Config,
+    _lifecycle: Lifecycle<Term, Sess>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -102,7 +106,7 @@ impl FeedRefreshPollKey {
     }
 }
 
-impl Application {
+impl Application<TermInit, SessPending> {
     /// Construct `ApplicationBuilder`
     pub fn builder() -> ApplicationBuilder {
         ApplicationBuilder::default()
@@ -113,7 +117,7 @@ impl Application {
     fn new(
         builder: ApplicationBuilder<
             Terminal,
-            Client,
+            FeedApiRef,
             Categories,
             Cache,
             Config,
@@ -123,7 +127,7 @@ impl Application {
     ) -> Self {
         let ApplicationBuilder {
             terminal,
-            client,
+            feed_api,
             feed_api_session,
             github_client,
             categories,
@@ -139,7 +143,7 @@ impl Application {
         let components = AppComponent::new(&config.features, theme, categories, dry_run);
         let drivers = Drivers::new(DriverParts {
             terminal,
-            client,
+            feed_api,
             feed_api_session,
             github_client,
             cache,
@@ -155,6 +159,7 @@ impl Application {
             components,
             keymap: crate::keymap::Keymap::new(config.keymaps.clone()),
             config,
+            _lifecycle: Lifecycle::new(),
         }
     }
 

@@ -22,10 +22,10 @@ impl FeedDriver {
         cx: &mut DriverContext<'_>,
         input: payload::SubscribeFeedInput,
     ) -> Vec<Event> {
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::SubscribeFeed);
         let fut = async move {
-            match client.subscribe_feed(input).await {
+            match feed_api.subscribe_feed(input).await {
                 Ok(payload) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::FeedSubscribed {
@@ -42,14 +42,14 @@ impl FeedDriver {
     }
 
     pub(super) fn refresh_feed(cx: &mut DriverContext<'_>, url: FeedUrl) -> Vec<Event> {
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::RefreshFeed);
         let event = Event::FeedRefreshRequested {
             request_seq,
             url: url.clone(),
         };
         let fut = async move {
-            match client.refresh_feed(url.clone()).await {
+            match feed_api.refresh_feed(url.clone()).await {
                 Ok(payload) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::FeedRefreshAccepted { url, payload }),
@@ -87,10 +87,10 @@ impl FeedDriver {
         request_id: String,
         remaining: u16,
     ) -> Vec<Event> {
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchFeedStatus);
         let fut = async move {
-            match client.fetch_feed_status(url.clone()).await {
+            match feed_api.fetch_feed_status(url.clone()).await {
                 Ok(status) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::FeedRefreshStatusFetched {
@@ -114,10 +114,10 @@ impl FeedDriver {
     }
 
     pub(super) fn unsubscribe_feed(cx: &mut DriverContext<'_>, url: FeedUrl) -> Vec<Event> {
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::UnsubscribeFeed);
         let fut = async move {
-            match client.unsubscribe_feed(url.clone()).await {
+            match feed_api.unsubscribe_feed(url.clone()).await {
                 Ok(()) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::FeedUnsubscribed { url }),
@@ -135,10 +135,10 @@ impl FeedDriver {
         subscriptions_first: i64,
         timeline_first: i64,
     ) -> Vec<Event> {
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchSubscription);
         let fut = async move {
-            match client
+            match feed_api
                 .fetch_initial_feed_view(subscriptions_first, timeline_first)
                 .await
             {
@@ -166,10 +166,10 @@ impl FeedDriver {
         if first <= 0 {
             return Vec::new();
         }
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchSubscription);
         let fut = async move {
-            match client.fetch_subscription(after, Some(first)).await {
+            match feed_api.fetch_subscription(after, Some(first)).await {
                 Ok(subscription) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::SubscriptionFetched {
@@ -202,7 +202,7 @@ impl FeedDriver {
             timeline_refetch,
             "fetch entries"
         );
-        let client = cx.adapters.client.clone();
+        let feed_api = cx.adapters.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchEntries);
         let mut events = vec![Event::EntryFetchStarted {
             request_seq,
@@ -212,7 +212,7 @@ impl FeedDriver {
             events.push(Event::TimelineRefetchStarted { request_seq });
         }
         let fut = async move {
-            match client.fetch_entries(after, first).await {
+            match feed_api.fetch_entries(after, first).await {
                 Ok(payload) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::EntriesFetched { populate, payload }),

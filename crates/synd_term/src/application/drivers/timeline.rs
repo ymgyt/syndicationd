@@ -1,7 +1,9 @@
 use std::time::Duration;
 
-use synd_client::{Client, payload};
+use synd_client::payload;
 use tokio::{sync::mpsc, task::JoinHandle};
+
+use crate::application::FeedApiRef;
 
 use super::DriverContext;
 use tracing::{debug, warn};
@@ -20,7 +22,7 @@ impl TimelineChangeSubscription {
         Self { rx, task: None }
     }
 
-    pub(super) fn start(&mut self, client: Client) {
+    pub(super) fn start(&mut self, feed_api: FeedApiRef) {
         if self.task.is_some() {
             return;
         }
@@ -33,7 +35,7 @@ impl TimelineChangeSubscription {
                     break;
                 }
 
-                match client.run_timeline_changes(tx.clone()).await {
+                match feed_api.run_timeline_changes(tx.clone()).await {
                     Ok(()) => debug!("timeline change subscription stopped"),
                     Err(error) => warn!("timeline change subscription failed: {error}"),
                 }
@@ -54,12 +56,12 @@ impl TimelineChangeSubscription {
         self.rx = rx;
     }
 
-    pub(super) fn restart_if_running(&mut self, client: Client) -> bool {
+    pub(super) fn restart_if_running(&mut self, feed_api: FeedApiRef) -> bool {
         if self.task.is_none() {
             return false;
         }
         self.stop();
-        self.start(client);
+        self.start(feed_api);
         true
     }
 
@@ -74,8 +76,8 @@ impl TimelineDriver {
     pub(super) fn start_change_subscription(
         cx: &mut DriverContext<'_>,
     ) -> Vec<crate::event::Event> {
-        let client = cx.adapters.client.clone();
-        cx.timeline_changes.start(client);
+        let feed_api = cx.adapters.feed_api.clone();
+        cx.timeline_changes.start(feed_api);
         Vec::new()
     }
 }

@@ -19,7 +19,7 @@ impl AuthDriver {
     pub(super) fn set_credential(cx: &mut DriverContext<'_>, cred: Verified<Credential>) {
         Self::schedule_credential_refreshing(cx, &cred);
         cx.adapters
-            .client
+            .feed_api
             .set_credential(cred.into())
             .expect("credential value must be a valid HTTP header");
     }
