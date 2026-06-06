@@ -170,23 +170,24 @@ impl FeedService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::assert_matches;
 
     #[test]
     fn from_feed_rs_parse_feed_error() {
-        assert!(matches!(
+        assert_matches!(
             FetchFeedError::from(ParseFeedError::ParseError(ParseErrorKind::NoFeedRoot)),
             FetchFeedError::InvalidFeed(_)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             FetchFeedError::from(ParseFeedError::IoError(std::io::Error::from(
                 std::io::ErrorKind::UnexpectedEof
             ))),
             FetchFeedError::Io(_)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             FetchFeedError::from(ParseFeedError::JsonUnsupportedVersion("dummy".into())),
             FetchFeedError::JsonUnsupportedVersion(_)
-        ));
+        );
     }
 
     #[test]

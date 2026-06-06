@@ -378,6 +378,18 @@ enum SessionAttempt {
     Incompatible(Incompatible),
 }
 
+impl std::fmt::Debug for SessionAttempt {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Opened(_) => formatter.debug_tuple("Opened").field(&"<session>").finish(),
+            Self::Incompatible(incompatible) => formatter
+                .debug_tuple("Incompatible")
+                .field(incompatible)
+                .finish(),
+        }
+    }
+}
+
 #[derive(Debug)]
 enum SessionOpenFailure {
     MissingEndpoint(Incompatible),
@@ -479,6 +491,7 @@ impl Incompatible {
     }
 }
 
+#[derive(Debug)]
 enum Stopped {
     Missing(Missing),
     Stale(Stale),
@@ -779,6 +792,7 @@ mod tests {
     #[cfg(unix)]
     mod connected_open {
         use super::*;
+        use core::assert_matches;
 
         #[tokio::test]
         async fn reports_incompatible() {
@@ -793,7 +807,7 @@ mod tests {
             .await
             .unwrap();
 
-            assert!(matches!(attempt, SessionAttempt::Incompatible(_)));
+            assert_matches!(attempt, SessionAttempt::Incompatible(_));
             server.join().unwrap();
         }
     }
@@ -801,6 +815,7 @@ mod tests {
     #[cfg(unix)]
     mod incompatible_stop {
         use super::*;
+        use core::assert_matches;
 
         #[tokio::test]
         async fn returns_stale() {
@@ -816,7 +831,7 @@ mod tests {
             .await
             .unwrap();
 
-            assert!(matches!(stopped, Stopped::Stale(_)));
+            assert_matches!(stopped, Stopped::Stale(_));
             server.join().unwrap();
         }
     }

@@ -1,3 +1,5 @@
+use core::assert_matches;
+
 use crate::{
     application::Direction,
     command::{Command, FeedsCommand, ShellCommand},
@@ -36,10 +38,10 @@ fn default_keymap_matches_single_key_binding() {
         matched_action(&result),
         Some(&KeymapAction::Command(CommandId::MoveEntryNext))
     );
-    assert!(matches!(
+    assert_matches!(
         result_to_command(&result),
         Some(Command::Feeds(FeedsCommand::MoveEntry(Direction::Down)))
-    ));
+    );
 }
 
 #[test]
@@ -47,10 +49,10 @@ fn resolver_keeps_sequence_on_highest_priority_first_key_layer() {
     let mut keymap = Keymap::default_keymaps();
     let layers = LayerStack::from([Layer::Feeds, Layer::Entries]);
 
-    assert!(matches!(
+    assert_matches!(
         keymap.resolve(&layers, key("g")),
         KeymapResult::Pending { .. }
-    ));
+    );
     let result = keymap.resolve(&layers, key("e"));
 
     assert_eq!(
@@ -72,7 +74,7 @@ fn user_override_can_disable_default_binding_with_no_op() {
 
     let result = keymap.resolve(&layers, key("j"));
 
-    assert!(matches!(result_to_command(&result), Some(Command::Nop)));
+    assert_matches!(result_to_command(&result), Some(Command::Nop));
 }
 
 #[test]
@@ -93,10 +95,10 @@ keymap = [
 
     let result = keymap.resolve(&layers, key("up"));
 
-    assert!(matches!(result_to_command(&result), Some(Command::Nop)));
+    assert_matches!(result_to_command(&result), Some(Command::Nop));
 
     let result = keymap.resolve(&layers, key("g"));
-    assert!(matches!(result, KeymapResult::Pending { .. }));
+    assert_matches!(result, KeymapResult::Pending { .. });
 
     let result = keymap.resolve(&layers, key("g"));
     assert_eq!(
@@ -117,13 +119,13 @@ keymap = [
     )
     .unwrap();
 
-    assert!(matches!(
+    assert_matches!(
         CompiledKeymaps::default_with_user_config(user),
         Err(KeymapError::CommandNotAllowed {
             layer: Layer::Feeds,
             command: CommandId::MoveEntryNext,
         })
-    ));
+    );
 }
 
 #[test]
@@ -133,10 +135,10 @@ fn app_layer_can_override_global_layer() {
 
     let result = keymap.resolve(&layers, key("C-c"));
 
-    assert!(matches!(
+    assert_matches!(
         result_to_command(&result),
         Some(Command::Shell(ShellCommand::Quit))
-    ));
+    );
 }
 
 #[test]

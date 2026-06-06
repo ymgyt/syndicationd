@@ -543,6 +543,7 @@ impl FeedsComponent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::assert_matches;
 
     fn feed_url() -> FeedUrl {
         FeedUrl::parse("https://example.com/feed.xml").unwrap()
@@ -582,7 +583,7 @@ mod tests {
     }
 
     fn assert_schedule_timeline_reload(operation: Option<&Operation>) {
-        assert!(matches!(operation, Some(Operation::ScheduleTimelineReload)));
+        assert_matches!(operation, Some(Operation::ScheduleTimelineReload));
     }
 
     #[test]
@@ -676,13 +677,13 @@ mod tests {
             )
             .expect("active poll should accept status response");
 
-        assert!(matches!(
+        assert_matches!(
             operations.as_slice(),
             [
                 Operation::FetchSubscription { first: 10, .. },
                 Operation::FetchEntries { first: 20, .. }
             ]
-        ));
+        );
         assert!(
             feeds
                 .refresh_poll_elapsed(url, "refresh-1".to_owned(), 2)

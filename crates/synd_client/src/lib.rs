@@ -832,6 +832,8 @@ where
 #[cfg(test)]
 #[expect(clippy::items_after_test_module)]
 mod tests {
+    use core::assert_matches;
+
     use super::{
         ApiCredential, Client, ClientOptions, NullableEntriesResponseData, SyndApiError,
         fetch_entries_payload_from_response, header,
@@ -864,7 +866,7 @@ mod tests {
             .apply_authorization_header(&mut headers)
             .unwrap_err();
 
-        assert!(matches!(err, SyndApiError::MissingCredential));
+        assert_matches!(err, SyndApiError::MissingCredential);
         assert!(!headers.contains_key(header::AUTHORIZATION));
     }
 
@@ -916,7 +918,7 @@ mod tests {
 
         let err = fetch_entries_payload_from_response(response).unwrap_err();
 
-        assert!(matches!(err, SyndApiError::Graphql { .. }));
+        assert_matches!(err, SyndApiError::Graphql { .. });
     }
 
     fn options() -> ClientOptions {

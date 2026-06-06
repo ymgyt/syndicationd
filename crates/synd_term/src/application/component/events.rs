@@ -537,6 +537,7 @@ fn next_entries_first(
 
 #[cfg(test)]
 mod tests {
+    use core::assert_matches;
     use synd_feed::types::FeedUrl;
 
     use crate::{
@@ -635,10 +636,7 @@ mod tests {
 
         assert!(!component.feeds.is_active_timeline_refetch(1));
         assert!(component.feeds.should_refetch_timeline());
-        assert!(matches!(
-            operations.as_slice(),
-            [Operation::ScheduleTimelineReload]
-        ));
+        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
     }
 
     #[test]
@@ -659,10 +657,10 @@ mod tests {
             4,
             3,
         );
-        assert!(matches!(
+        assert_matches!(
             operations.as_slice(),
             [Operation::RefetchTimelineEntries { .. }]
-        ));
+        );
 
         component.apply_entry_fetch_started(2, Populate::Append);
         component.apply_timeline_refetch_started(2);
@@ -678,10 +676,7 @@ mod tests {
             3,
         );
 
-        assert!(matches!(
-            operations.as_slice(),
-            [Operation::ScheduleTimelineReload]
-        ));
+        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
         assert!(component.feeds.should_refetch_timeline());
     }
 
@@ -689,15 +684,15 @@ mod tests {
     fn stale_entries_response_is_ignored_after_newer_replace_starts() {
         let mut component = app_component();
         component.apply_entry_fetch_started(1, Populate::Append);
-        assert!(matches!(
+        assert_matches!(
             component.mark_timeline_dirty().as_slice(),
             [Operation::ScheduleTimelineReload]
-        ));
+        );
         let operations = component.apply_timeline_reload_debounced(2);
-        assert!(matches!(
+        assert_matches!(
             operations.as_slice(),
             [Operation::RefetchTimelineEntries { .. }]
-        ));
+        );
         component.apply_entry_fetch_started(2, Populate::Replace);
         component.apply_timeline_refetch_started(2);
 
@@ -738,10 +733,7 @@ mod tests {
 
         assert!(!component.feeds.is_active_timeline_refetch(1));
         assert!(component.feeds.should_refetch_timeline());
-        assert!(matches!(
-            operations.as_slice(),
-            [Operation::ScheduleTimelineReload]
-        ));
+        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
         assert_eq!(component.feeds.entries.count(), 0);
     }
 }

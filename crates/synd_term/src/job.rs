@@ -62,6 +62,7 @@ impl Jobs {
 
 #[cfg(test)]
 mod tests {
+    use core::assert_matches;
     use futures_util::FutureExt as _;
 
     use super::*;
@@ -81,7 +82,7 @@ mod tests {
         let mut count = 0;
         loop {
             if let Some(result) = job.next().await {
-                assert!(matches!(result, Ok(Event::Idle)));
+                assert_matches!(result, Ok(Event::Idle));
                 count += 1;
             }
             if count == 3 {

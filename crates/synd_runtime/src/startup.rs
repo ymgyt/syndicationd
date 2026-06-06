@@ -143,6 +143,7 @@ mod tests {
 
     mod lock {
         use super::*;
+        use core::assert_matches;
 
         #[test]
         fn holds_path() {
@@ -172,7 +173,7 @@ mod tests {
 
             let acquisition = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
 
-            assert!(matches!(acquisition, StartupLockAcquisition::Acquired(_)));
+            assert_matches!(acquisition, StartupLockAcquisition::Acquired(_));
             assert!(lock_path.path().exists());
         }
 
@@ -186,8 +187,8 @@ mod tests {
             let first = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
             let second = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
 
-            assert!(matches!(first, StartupLockAcquisition::Acquired(_)));
-            assert!(matches!(second, StartupLockAcquisition::AlreadyHeld));
+            assert_matches!(first, StartupLockAcquisition::Acquired(_));
+            assert_matches!(second, StartupLockAcquisition::AlreadyHeld);
         }
 
         #[cfg(unix)]
@@ -202,7 +203,7 @@ mod tests {
             drop(first);
             let second = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
 
-            assert!(matches!(second, StartupLockAcquisition::Acquired(_)));
+            assert_matches!(second, StartupLockAcquisition::Acquired(_));
         }
     }
 }

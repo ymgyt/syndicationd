@@ -503,6 +503,7 @@ mod tests {
 
     mod claim_lock {
         use super::*;
+        use core::assert_matches;
 
         #[test]
         fn reports_contention() {
@@ -515,13 +516,14 @@ mod tests {
                 .try_acquire()
                 .unwrap();
 
-            assert!(matches!(first, DaemonClaimLockAcquisition::Acquired(_)));
-            assert!(matches!(second, DaemonClaimLockAcquisition::AlreadyHeld));
+            assert_matches!(first, DaemonClaimLockAcquisition::Acquired(_));
+            assert_matches!(second, DaemonClaimLockAcquisition::AlreadyHeld);
         }
     }
 
     mod owner {
         use super::*;
+        use core::assert_matches;
 
         #[test]
         fn writes_claim_and_holds_lock_until_drop() {
@@ -538,7 +540,7 @@ mod tests {
                 let lock = DaemonClaimLockAcquirer::new(placement.daemon_claim_lock_path())
                     .try_acquire()
                     .unwrap();
-                assert!(matches!(lock, DaemonClaimLockAcquisition::AlreadyHeld));
+                assert_matches!(lock, DaemonClaimLockAcquisition::AlreadyHeld);
             }
 
             assert!(
@@ -549,7 +551,7 @@ mod tests {
             let lock = DaemonClaimLockAcquirer::new(placement.daemon_claim_lock_path())
                 .try_acquire()
                 .unwrap();
-            assert!(matches!(lock, DaemonClaimLockAcquisition::Acquired(_)));
+            assert_matches!(lock, DaemonClaimLockAcquisition::Acquired(_));
         }
     }
 
