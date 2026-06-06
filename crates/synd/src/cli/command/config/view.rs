@@ -85,6 +85,7 @@ struct ApiOutput {
 
 #[derive(Debug, Serialize)]
 struct DaemonOutput {
+    runtime_root: Option<PathBuf>,
     session_lease_duration: String,
     session_idle_shutdown_grace: String,
 }
@@ -138,6 +139,7 @@ impl ConfigViewOutput {
                 timeout: String::from(HumanDuration::from(config.api_timeout())),
             },
             daemon: DaemonOutput {
+                runtime_root: config.daemon_runtime_root(),
                 session_lease_duration: String::from(HumanDuration::from(
                     config.daemon_session_lease_duration(),
                 )),
@@ -168,6 +170,11 @@ impl ConfigViewOutput {
         writeln!(writer, "        Log: {}", self.log.path.display())?;
         writeln!(writer, "  SQLite DB: {}", self.backend.sqlite_db.display())?;
         writeln!(writer, "    Timeout: {}", self.api.timeout)?;
+        writeln!(
+            writer,
+            "Daemon Root: {}",
+            path_or_not_set(self.daemon.runtime_root.as_deref())
+        )?;
         writeln!(
             writer,
             "Daemon Lease: {}",

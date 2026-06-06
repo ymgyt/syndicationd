@@ -74,6 +74,9 @@ pub struct ApiOptions {
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Daemon options")]
 pub struct DaemonOptions {
+    /// Runtime artifact root for daemon socket and startup lock
+    #[arg(long = "runtime-root", env = config::env::RUNTIME_ROOT)]
+    pub runtime_root: Option<PathBuf>,
     /// Session lease duration granted by the local daemon
     #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_LEASE_DURATION)]
     pub daemon_session_lease_duration: Option<Duration>,

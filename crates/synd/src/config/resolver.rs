@@ -36,6 +36,7 @@ pub struct ConfigResolver {
     cache_dir: Entry<PathBuf>,
     sqlite_db: Entry<PathBuf>,
     api_timeout: Entry<Duration>,
+    daemon_runtime_root: Entry<Option<PathBuf>>,
     daemon_session_lease_duration: Entry<Duration>,
     daemon_session_idle_shutdown_grace: Entry<Duration>,
     feed_entries_limit: Entry<usize>,
@@ -71,6 +72,10 @@ impl ConfigResolver {
 
     pub fn api_timeout(&self) -> Duration {
         self.api_timeout.resolve()
+    }
+
+    pub fn daemon_runtime_root(&self) -> Option<PathBuf> {
+        self.daemon_runtime_root.resolve_ref().clone()
     }
 
     pub fn daemon_session_lease_duration(&self) -> Duration {
@@ -242,11 +247,7 @@ impl ConfigResolverBuilder {
 
         let ConfigResolverBuilder {
             api_flags: Some(ApiOptions { client_timeout }),
-            daemon_flags:
-                Some(DaemonOptions {
-                    daemon_session_lease_duration,
-                    daemon_session_idle_shutdown_grace,
-                }),
+            daemon_flags: Some(daemon_flags),
             backend_flags: Some(BackendOptions { sqlite_db }),
             feed_flags:
                 Some(FeedOptions {
@@ -268,6 +269,7 @@ impl ConfigResolverBuilder {
             panic!()
         };
 
+        let daemon_entries = DaemonConfigEntries::from_sources(&mut config_file, daemon_flags);
         let resolver = ConfigResolver {
             config_file: config_path,
             log_file: Entry::with_default(config::log_path())
@@ -302,26 +304,9 @@ impl ConfigResolverBuilder {
                         .and_then(|api| api.timeout.take()),
                 )
                 .with_flag(client_timeout),
-            daemon_session_lease_duration: Entry::with_default(
-                config::daemon::default_session_lease_duration(),
-            )
-            .with_file(
-                config_file
-                    .as_mut()
-                    .and_then(|c| c.daemon.as_mut())
-                    .and_then(|daemon| daemon.session_lease_duration.take()),
-            )
-            .with_flag(daemon_session_lease_duration),
-            daemon_session_idle_shutdown_grace: Entry::with_default(
-                config::daemon::default_session_idle_shutdown_grace(),
-            )
-            .with_file(
-                config_file
-                    .as_mut()
-                    .and_then(|c| c.daemon.as_mut())
-                    .and_then(|daemon| daemon.session_idle_shutdown_grace.take()),
-            )
-            .with_flag(daemon_session_idle_shutdown_grace),
+            daemon_runtime_root: daemon_entries.runtime_root,
+            daemon_session_lease_duration: daemon_entries.session_lease_duration,
+            daemon_session_idle_shutdown_grace: daemon_entries.session_idle_shutdown_grace,
 
             feed_entries_limit: Entry::with_default(config::feed::DEFAULT_ENTRIES_LIMIT)
                 .with_file(
@@ -411,6 +396,49 @@ impl ConfigResolverBuilder {
                     err,
                 }),
             },
+        }
+    }
+}
+
+#[derive(Debug)]
+struct DaemonConfigEntries {
+    runtime_root: Entry<Option<PathBuf>>,
+    session_lease_duration: Entry<Duration>,
+    session_idle_shutdown_grace: Entry<Duration>,
+}
+
+impl DaemonConfigEntries {
+    fn from_sources(config_file: &mut Option<ConfigFile>, flags: DaemonOptions) -> Self {
+        let DaemonOptions {
+            runtime_root,
+            daemon_session_lease_duration,
+            daemon_session_idle_shutdown_grace,
+        } = flags;
+        let file_entry = config_file.as_mut().and_then(|c| c.daemon.as_mut());
+        let (runtime_root_file, session_lease_duration_file, session_idle_shutdown_grace_file) =
+            match file_entry {
+                Some(daemon) => (
+                    daemon.runtime_root.take(),
+                    daemon.session_lease_duration.take(),
+                    daemon.session_idle_shutdown_grace.take(),
+                ),
+                None => (None, None, None),
+            };
+
+        Self {
+            runtime_root: Entry::with_default(None)
+                .with_file(runtime_root_file.map(Some))
+                .with_flag(runtime_root.map(Some)),
+            session_lease_duration: Entry::with_default(
+                config::daemon::default_session_lease_duration(),
+            )
+            .with_file(session_lease_duration_file)
+            .with_flag(daemon_session_lease_duration),
+            session_idle_shutdown_grace: Entry::with_default(
+                config::daemon::default_session_idle_shutdown_grace(),
+            )
+            .with_file(session_idle_shutdown_grace_file)
+            .with_flag(daemon_session_idle_shutdown_grace),
         }
     }
 }

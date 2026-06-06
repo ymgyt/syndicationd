@@ -45,6 +45,7 @@ pub struct ApiEntry {
 
 #[derive(Debug, Deserialize)]
 pub struct DaemonEntry {
+    pub(super) runtime_root: Option<PathBuf>,
     #[serde(
         default,
         deserialize_with = "synd_support::time::humantime::de::parse_duration_opt"
@@ -117,6 +118,9 @@ pub static INIT_CONFIG: &str = r#"
 # timeout = "30s"
 
 [daemon]
+# Runtime artifact root for daemon socket and startup lock
+# runtime_root = "path/to/runtime"
+
 # Session lease duration granted by the local daemon
 # session_lease_duration = "30s"
 
@@ -169,6 +173,7 @@ name = "ferra"
 timeout = "30s"
 
 [daemon]
+runtime_root = "/tmp/synd/runtime"
 session_lease_duration = "60s"
 session_idle_shutdown_grace = "120s"
 

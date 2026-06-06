@@ -28,6 +28,7 @@ pub mod env {
     pub const FEED_BROWSER_ARGS: &str = env_key!("BROWSER_ARGS");
     pub const ENABLE_GITHUB: &str = env_key!("ENABLE_GH");
     pub const GITHUB_PAT: &str = env_key!("GH_PAT");
+    pub const RUNTIME_ROOT: &str = env_key!("RUNTIME_ROOT");
     pub const DAEMON_SESSION_LEASE_DURATION: &str = env_key!("DAEMON_SESSION_LEASE_DURATION");
     pub const DAEMON_SESSION_IDLE_SHUTDOWN_GRACE: &str =
         env_key!("DAEMON_SESSION_IDLE_SHUTDOWN_GRACE");

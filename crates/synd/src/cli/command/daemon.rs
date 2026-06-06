@@ -53,6 +53,9 @@ impl DaemonServeCommand {
         let mut daemon_config = DaemonConfig::new(RuntimeDatabase::sqlite(sqlite_db))
             .with_session_lease_duration(config.daemon_session_lease_duration())
             .with_session_idle_shutdown_grace(config.daemon_session_idle_shutdown_grace());
+        if let Some(root) = config.daemon_runtime_root() {
+            daemon_config = daemon_config.with_runtime_root(root);
+        }
         if let Some(duration) = self.session_lease_duration {
             daemon_config = daemon_config.with_session_lease_duration(duration);
         }

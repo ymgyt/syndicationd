@@ -41,6 +41,9 @@ ConfigFile {
     ),
     daemon: Some(
         DaemonEntry {
+            runtime_root: Some(
+                "/tmp/synd/runtime",
+            ),
             session_lease_duration: Some(
                 60s,
             ),
