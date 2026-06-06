@@ -262,75 +262,83 @@ mod tests {
 
     use super::{DaemonControlContext, DaemonShutdownDecision};
 
-    #[test]
-    fn resolves_daemon_status_from_endpoint_connection() {
-        let cases = [
-            (
-                RuntimeEndpointConnectionStatus::Connected,
-                crate::DaemonState::Running,
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Missing,
-                crate::DaemonState::NotRunning,
-            ),
-            (
-                RuntimeEndpointConnectionStatus::Stale,
-                crate::DaemonState::NotRunning,
-            ),
-        ];
+    mod status {
+        use super::*;
 
-        for (endpoint_connection, expected_state) in cases {
-            let context = context_with(endpoint_connection);
-            let expected_runtime_instance_id = context.placement.instance().id().to_string();
-            let expected_database = context
-                .placement
-                .instance()
-                .canonical_database_path()
-                .to_path_buf();
-            let expected_endpoint = context.placement.endpoint().path().to_path_buf();
-            let status = context.status().unwrap();
+        #[test]
+        fn from_endpoint_connection() {
+            let cases = [
+                (
+                    RuntimeEndpointConnectionStatus::Connected,
+                    crate::DaemonState::Running,
+                ),
+                (
+                    RuntimeEndpointConnectionStatus::Missing,
+                    crate::DaemonState::NotRunning,
+                ),
+                (
+                    RuntimeEndpointConnectionStatus::Stale,
+                    crate::DaemonState::NotRunning,
+                ),
+            ];
 
-            assert_eq!(status.state(), expected_state);
-            assert_eq!(
-                status.placement().runtime_instance_id(),
-                expected_runtime_instance_id
-            );
-            assert_eq!(status.placement().database(), expected_database.as_path());
-            assert_eq!(status.placement().endpoint(), expected_endpoint.as_path());
+            for (endpoint_connection, expected_state) in cases {
+                let context = context_with(endpoint_connection);
+                let expected_runtime_instance_id = context.placement.instance().id().to_string();
+                let expected_database = context
+                    .placement
+                    .instance()
+                    .canonical_database_path()
+                    .to_path_buf();
+                let expected_endpoint = context.placement.endpoint().path().to_path_buf();
+                let status = context.status().unwrap();
+
+                assert_eq!(status.state(), expected_state);
+                assert_eq!(
+                    status.placement().runtime_instance_id(),
+                    expected_runtime_instance_id
+                );
+                assert_eq!(status.placement().database(), expected_database.as_path());
+                assert_eq!(status.placement().endpoint(), expected_endpoint.as_path());
+            }
         }
     }
 
-    #[test]
-    fn selects_shutdown_decision_from_endpoint_connection() {
-        let cases = [
-            (
-                RuntimeEndpointConnectionStatus::Connected,
-                "request_shutdown",
-            ),
-            (RuntimeEndpointConnectionStatus::Missing, "already_stopped"),
-            (RuntimeEndpointConnectionStatus::Stale, "already_stopped"),
-            (
-                RuntimeEndpointConnectionStatus::Unavailable,
-                "fail_unavailable_endpoint",
-            ),
-        ];
+    mod shutdown_decision {
+        use super::*;
 
-        for (endpoint_connection, expected_path) in cases {
-            let decision = DaemonShutdownDecision::from(context_with(endpoint_connection));
+        #[test]
+        fn from_endpoint_connection() {
+            let cases = [
+                (
+                    RuntimeEndpointConnectionStatus::Connected,
+                    "request_shutdown",
+                ),
+                (RuntimeEndpointConnectionStatus::Missing, "already_stopped"),
+                (RuntimeEndpointConnectionStatus::Stale, "already_stopped"),
+                (
+                    RuntimeEndpointConnectionStatus::Unavailable,
+                    "fail_unavailable_endpoint",
+                ),
+            ];
 
-            assert_eq!(shutdown_decision_path(&decision), expected_path);
-        }
+            for (endpoint_connection, expected_path) in cases {
+                let decision = DaemonShutdownDecision::from(context_with(endpoint_connection));
 
-        #[cfg(not(unix))]
-        {
-            let decision = DaemonShutdownDecision::from(context_with(
-                RuntimeEndpointConnectionStatus::UnsupportedTransport,
-            ));
+                assert_eq!(shutdown_decision_path(&decision), expected_path);
+            }
 
-            assert_eq!(
-                shutdown_decision_path(&decision),
-                "fail_unsupported_transport"
-            );
+            #[cfg(not(unix))]
+            {
+                let decision = DaemonShutdownDecision::from(context_with(
+                    RuntimeEndpointConnectionStatus::UnsupportedTransport,
+                ));
+
+                assert_eq!(
+                    shutdown_decision_path(&decision),
+                    "fail_unsupported_transport"
+                );
+            }
         }
     }
 

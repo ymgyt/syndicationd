@@ -197,38 +197,48 @@ mod tests {
         RuntimeDatabase,
     };
 
-    #[test]
-    fn runtime_keeps_daemon_launch_config() -> crate::Result<()> {
-        let tempdir = tempfile::tempdir()?;
-        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
-            .with_api_timeout(Duration::from_secs(5), "synd-runtime-test")
-            .with_session_timeout(Duration::from_secs(5))
-            .with_daemon_launch(DaemonLaunchConfig::default());
+    mod daemon_launch {
+        use super::*;
 
-        let runtime = Runtime::try_new(config.clone())?;
+        #[test]
+        fn keeps_config() -> crate::Result<()> {
+            let tempdir = tempfile::tempdir()?;
+            let config =
+                RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
+                    .with_api_timeout(Duration::from_secs(5), "synd-runtime-test")
+                    .with_session_timeout(Duration::from_secs(5))
+                    .with_daemon_launch(DaemonLaunchConfig::default());
 
-        assert_eq!(runtime.config().daemon(), config.daemon());
-        Ok(())
+            let runtime = Runtime::try_new(config.clone())?;
+
+            assert_eq!(runtime.config().daemon(), config.daemon());
+            Ok(())
+        }
     }
 
-    #[test]
-    fn runtime_config_sets_daemon_log_without_replacing_executable() -> crate::Result<()> {
-        let tempdir = tempfile::tempdir()?;
-        let log = tempdir.path().join("daemon.log");
-        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
-            .with_daemon_launch(DaemonLaunchConfig::new(
-                DaemonExecutable::path("/usr/bin/custom-synd"),
-                DaemonLaunchLog::file(tempdir.path().join("old.log")),
-            ))
-            .with_daemon_log(log.clone());
+    mod daemon_log {
+        use super::*;
 
-        assert_eq!(
-            config.daemon(),
-            &DaemonLaunchConfig::new(
-                DaemonExecutable::path("/usr/bin/custom-synd"),
-                DaemonLaunchLog::file(log),
-            )
-        );
-        Ok(())
+        #[test]
+        fn keeps_executable() -> crate::Result<()> {
+            let tempdir = tempfile::tempdir()?;
+            let log = tempdir.path().join("daemon.log");
+            let config =
+                RuntimeConfig::new(RuntimeDatabase::sqlite(tempdir.path().join("synd.db")))
+                    .with_daemon_launch(DaemonLaunchConfig::new(
+                        DaemonExecutable::path("/usr/bin/custom-synd"),
+                        DaemonLaunchLog::file(tempdir.path().join("old.log")),
+                    ))
+                    .with_daemon_log(log.clone());
+
+            assert_eq!(
+                config.daemon(),
+                &DaemonLaunchConfig::new(
+                    DaemonExecutable::path("/usr/bin/custom-synd"),
+                    DaemonLaunchLog::file(log),
+                )
+            );
+            Ok(())
+        }
     }
 }

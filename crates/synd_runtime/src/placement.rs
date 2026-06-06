@@ -130,54 +130,62 @@ mod tests {
         },
     };
 
-    #[test]
-    fn derives_endpoint_and_startup_lock_path_from_instance() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
-        let root = RuntimeRoot::from(tmp.path().join("runtime"));
-        let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
+    mod from_instance {
+        use super::*;
 
-        let placement = RuntimePlacement::from_instance(root.clone(), instance.clone());
+        #[test]
+        fn derives_paths() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
+            let root = RuntimeRoot::from(tmp.path().join("runtime"));
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
 
-        assert_eq!(placement.root(), &root);
-        assert_eq!(placement.instance(), &instance);
-        assert_eq!(
-            placement.endpoint().path(),
-            root.path().join(format!("api-{}.sock", instance.id()))
-        );
-        assert_eq!(
-            placement.startup_lock_path().path(),
-            root.path().join(format!("api-{}.lock", instance.id()))
-        );
+            let placement = RuntimePlacement::from_instance(root.clone(), instance.clone());
+
+            assert_eq!(placement.root(), &root);
+            assert_eq!(placement.instance(), &instance);
+            assert_eq!(
+                placement.endpoint().path(),
+                root.path().join(format!("api-{}.sock", instance.id()))
+            );
+            assert_eq!(
+                placement.startup_lock_path().path(),
+                root.path().join(format!("api-{}.lock", instance.id()))
+            );
+        }
     }
 
-    #[test]
-    fn resolves_runtime_placement_from_environment() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
-        let default_root = RuntimeRoot::from(tmp.path().join("runtime"));
-        let environment = RuntimePlacementEnvironment::new(default_root.clone());
-        let resolver = RuntimePlacementResolver::with_environment(environment);
-        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(&db));
+    mod resolver {
+        use super::*;
 
-        let placement = resolver.resolve(&config).unwrap();
+        #[test]
+        fn uses_environment() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
+            let default_root = RuntimeRoot::from(tmp.path().join("runtime"));
+            let environment = RuntimePlacementEnvironment::new(default_root.clone());
+            let resolver = RuntimePlacementResolver::with_environment(environment);
+            let config = RuntimeConfig::new(RuntimeDatabase::sqlite(&db));
 
-        assert_eq!(placement.root(), &default_root);
-        assert_eq!(
-            placement.instance().canonical_database_path(),
-            tmp.path().canonicalize().unwrap().join("synd.db")
-        );
-        assert_eq!(
-            placement.endpoint().path(),
-            default_root
-                .path()
-                .join(format!("api-{}.sock", placement.instance().id()))
-        );
-        assert_eq!(
-            placement.startup_lock_path().path(),
-            default_root
-                .path()
-                .join(format!("api-{}.lock", placement.instance().id()))
-        );
+            let placement = resolver.resolve(&config).unwrap();
+
+            assert_eq!(placement.root(), &default_root);
+            assert_eq!(
+                placement.instance().canonical_database_path(),
+                tmp.path().canonicalize().unwrap().join("synd.db")
+            );
+            assert_eq!(
+                placement.endpoint().path(),
+                default_root
+                    .path()
+                    .join(format!("api-{}.sock", placement.instance().id()))
+            );
+            assert_eq!(
+                placement.startup_lock_path().path(),
+                default_root
+                    .path()
+                    .join(format!("api-{}.lock", placement.instance().id()))
+            );
+        }
     }
 }

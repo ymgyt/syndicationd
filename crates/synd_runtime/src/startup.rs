@@ -122,77 +122,87 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn derives_startup_lock_path_from_root_and_instance_id() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
-        let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
-        let root = tmp.path().join("runtime");
+    mod lock_path {
+        use super::*;
 
-        let lock_path = StartupLockPath::from_instance_id(&root, instance.id());
+        #[test]
+        fn from_instance_id() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
+            let root = tmp.path().join("runtime");
 
-        assert_eq!(
-            lock_path.path(),
-            root.join(format!("api-{}.lock", instance.id()))
-        );
+            let lock_path = StartupLockPath::from_instance_id(&root, instance.id());
+
+            assert_eq!(
+                lock_path.path(),
+                root.join(format!("api-{}.lock", instance.id()))
+            );
+        }
     }
 
-    #[test]
-    fn startup_lock_holds_lock_path() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
-        let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
-        let lock_path = StartupLockPath::from_instance_id(tmp.path(), instance.id());
+    mod lock {
+        use super::*;
 
-        let lock = match StartupLockAcquirer::new(&lock_path).try_acquire().unwrap() {
-            StartupLockAcquisition::Acquired(lock) => lock,
-            StartupLockAcquisition::AlreadyHeld => panic!("startup lock should be available"),
-            #[cfg(not(unix))]
-            StartupLockAcquisition::UnsupportedTransport => panic!("startup lock is unsupported"),
-        };
+        #[test]
+        fn holds_path() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
+            let lock_path = StartupLockPath::from_instance_id(tmp.path(), instance.id());
 
-        assert_eq!(lock.path(), &lock_path);
-    }
+            let lock = match StartupLockAcquirer::new(&lock_path).try_acquire().unwrap() {
+                StartupLockAcquisition::Acquired(lock) => lock,
+                StartupLockAcquisition::AlreadyHeld => panic!("startup lock should be available"),
+                #[cfg(not(unix))]
+                StartupLockAcquisition::UnsupportedTransport => {
+                    panic!("startup lock is unsupported")
+                }
+            };
 
-    #[test]
-    fn acquiring_startup_lock_creates_parent_dir() {
-        let tmp = tempfile::tempdir().unwrap();
-        let lock_path = StartupLockPath {
-            path: tmp.path().join("runtime").join("api-test.lock"),
-        };
+            assert_eq!(lock.path(), &lock_path);
+        }
 
-        let acquisition = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
+        #[test]
+        fn creates_parent_dir() {
+            let tmp = tempfile::tempdir().unwrap();
+            let lock_path = StartupLockPath {
+                path: tmp.path().join("runtime").join("api-test.lock"),
+            };
 
-        assert!(matches!(acquisition, StartupLockAcquisition::Acquired(_)));
-        assert!(lock_path.path().exists());
-    }
+            let acquisition = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
 
-    #[cfg(unix)]
-    #[test]
-    fn reports_already_held_when_lock_is_contended() {
-        let tmp = tempfile::tempdir().unwrap();
-        let lock_path = StartupLockPath {
-            path: tmp.path().join("api-test.lock"),
-        };
-        let first = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
-        let second = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
+            assert!(matches!(acquisition, StartupLockAcquisition::Acquired(_)));
+            assert!(lock_path.path().exists());
+        }
 
-        assert!(matches!(first, StartupLockAcquisition::Acquired(_)));
-        assert!(matches!(second, StartupLockAcquisition::AlreadyHeld));
-    }
+        #[cfg(unix)]
+        #[test]
+        fn reports_contention() {
+            let tmp = tempfile::tempdir().unwrap();
+            let lock_path = StartupLockPath {
+                path: tmp.path().join("api-test.lock"),
+            };
+            let first = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
+            let second = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
 
-    #[cfg(unix)]
-    #[test]
-    fn releasing_startup_lock_allows_reacquisition() {
-        let tmp = tempfile::tempdir().unwrap();
-        let lock_path = StartupLockPath {
-            path: tmp.path().join("api-test.lock"),
-        };
-        let first = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
+            assert!(matches!(first, StartupLockAcquisition::Acquired(_)));
+            assert!(matches!(second, StartupLockAcquisition::AlreadyHeld));
+        }
 
-        drop(first);
-        let second = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
+        #[cfg(unix)]
+        #[test]
+        fn allows_reacquisition() {
+            let tmp = tempfile::tempdir().unwrap();
+            let lock_path = StartupLockPath {
+                path: tmp.path().join("api-test.lock"),
+            };
+            let first = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
 
-        assert!(matches!(second, StartupLockAcquisition::Acquired(_)));
+            drop(first);
+            let second = StartupLockAcquirer::new(&lock_path).try_acquire().unwrap();
+
+            assert!(matches!(second, StartupLockAcquisition::Acquired(_)));
+        }
     }
 }

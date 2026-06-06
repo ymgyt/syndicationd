@@ -25,18 +25,22 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn derives_socket_path_from_root_and_instance_id() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
-        let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
-        let root = tmp.path().join("runtime");
+    mod socket_path {
+        use super::*;
 
-        let endpoint = UdsEndpoint::from_instance_id(&root, instance.id());
+        #[test]
+        fn from_instance_id() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(db)).unwrap();
+            let root = tmp.path().join("runtime");
 
-        assert_eq!(
-            endpoint.path(),
-            root.join(format!("api-{}.sock", instance.id()))
-        );
+            let endpoint = UdsEndpoint::from_instance_id(&root, instance.id());
+
+            assert_eq!(
+                endpoint.path(),
+                root.join(format!("api-{}.sock", instance.id()))
+            );
+        }
     }
 }

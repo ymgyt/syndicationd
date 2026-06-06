@@ -96,32 +96,40 @@ fn hex_prefix(bytes: &[u8], chars: usize) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn derives_instance_from_existing_database_path() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
-        std::fs::write(&db, "").unwrap();
+    mod existing_database {
+        use super::*;
 
-        let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(&db)).unwrap();
+        #[test]
+        fn canonicalizes_path() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
+            std::fs::write(&db, "").unwrap();
 
-        assert_eq!(
-            instance.canonical_database_path(),
-            db.canonicalize().unwrap()
-        );
-        assert_eq!(instance.id().as_str().len(), 32);
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(&db)).unwrap();
+
+            assert_eq!(
+                instance.canonical_database_path(),
+                db.canonicalize().unwrap()
+            );
+            assert_eq!(instance.id().as_str().len(), 32);
+        }
     }
 
-    #[test]
-    fn derives_instance_from_database_path_that_does_not_exist_yet() {
-        let tmp = tempfile::tempdir().unwrap();
-        let db = tmp.path().join("synd.db");
+    mod missing_database {
+        use super::*;
 
-        let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(&db)).unwrap();
+        #[test]
+        fn canonicalizes_parent() {
+            let tmp = tempfile::tempdir().unwrap();
+            let db = tmp.path().join("synd.db");
 
-        assert_eq!(
-            instance.canonical_database_path(),
-            tmp.path().canonicalize().unwrap().join("synd.db")
-        );
-        assert_eq!(instance.id().as_str().len(), 32);
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(&db)).unwrap();
+
+            assert_eq!(
+                instance.canonical_database_path(),
+                tmp.path().canonicalize().unwrap().join("synd.db")
+            );
+            assert_eq!(instance.id().as_str().len(), 32);
+        }
     }
 }

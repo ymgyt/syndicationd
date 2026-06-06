@@ -63,37 +63,49 @@ mod tests {
         uds::UdsEndpoint,
     };
 
-    #[tokio::test]
-    async fn reports_missing_when_endpoint_path_does_not_exist() {
-        let tmp = tempfile::tempdir().unwrap();
-        let endpoint = endpoint_at(tmp.path());
+    mod missing_path {
+        use super::*;
 
-        let status = RuntimeEndpointConnector::new(&endpoint).try_connect().await;
+        #[tokio::test]
+        async fn reports_missing() {
+            let tmp = tempfile::tempdir().unwrap();
+            let endpoint = endpoint_at(tmp.path());
 
-        assert_eq!(status, RuntimeEndpointConnectionStatus::Missing);
+            let status = RuntimeEndpointConnector::new(&endpoint).try_connect().await;
+
+            assert_eq!(status, RuntimeEndpointConnectionStatus::Missing);
+        }
     }
 
-    #[tokio::test]
-    async fn reports_connected_when_endpoint_accepts_connections() {
-        let tmp = tempfile::tempdir().unwrap();
-        let endpoint = endpoint_at(tmp.path());
-        let _listener = UnixListener::bind(endpoint.path()).unwrap();
+    mod active_listener {
+        use super::*;
 
-        let status = RuntimeEndpointConnector::new(&endpoint).try_connect().await;
+        #[tokio::test]
+        async fn reports_connected() {
+            let tmp = tempfile::tempdir().unwrap();
+            let endpoint = endpoint_at(tmp.path());
+            let _listener = UnixListener::bind(endpoint.path()).unwrap();
 
-        assert_eq!(status, RuntimeEndpointConnectionStatus::Connected);
+            let status = RuntimeEndpointConnector::new(&endpoint).try_connect().await;
+
+            assert_eq!(status, RuntimeEndpointConnectionStatus::Connected);
+        }
     }
 
-    #[tokio::test]
-    async fn reports_stale_when_socket_file_has_no_listener() {
-        let tmp = tempfile::tempdir().unwrap();
-        let endpoint = endpoint_at(tmp.path());
-        let listener = UnixListener::bind(endpoint.path()).unwrap();
-        drop(listener);
+    mod orphan_socket {
+        use super::*;
 
-        let status = RuntimeEndpointConnector::new(&endpoint).try_connect().await;
+        #[tokio::test]
+        async fn reports_stale() {
+            let tmp = tempfile::tempdir().unwrap();
+            let endpoint = endpoint_at(tmp.path());
+            let listener = UnixListener::bind(endpoint.path()).unwrap();
+            drop(listener);
 
-        assert_eq!(status, RuntimeEndpointConnectionStatus::Stale);
+            let status = RuntimeEndpointConnector::new(&endpoint).try_connect().await;
+
+            assert_eq!(status, RuntimeEndpointConnectionStatus::Stale);
+        }
     }
 
     fn endpoint_at(root: &std::path::Path) -> UdsEndpoint {

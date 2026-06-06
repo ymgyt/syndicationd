@@ -178,18 +178,22 @@ mod tests {
 
     use super::{MIN_RENEWAL_INTERVAL, SessionRenewalSchedule};
 
-    #[test]
-    fn derives_renewal_schedule_from_lease() {
-        let schedule =
-            SessionRenewalSchedule::from_lease(SessionLease::new(Duration::from_secs(30)));
+    mod schedule {
+        use super::*;
 
-        assert_eq!(schedule.renew_after(), Duration::from_secs(10));
-    }
+        #[test]
+        fn derives_from_lease() {
+            let schedule =
+                SessionRenewalSchedule::from_lease(SessionLease::new(Duration::from_secs(30)));
 
-    #[test]
-    fn renewal_schedule_has_minimum_interval() {
-        let schedule = SessionRenewalSchedule::from_lease(SessionLease::new(Duration::ZERO));
+            assert_eq!(schedule.renew_after(), Duration::from_secs(10));
+        }
 
-        assert_eq!(schedule.renew_after(), MIN_RENEWAL_INTERVAL);
+        #[test]
+        fn has_minimum_interval() {
+            let schedule = SessionRenewalSchedule::from_lease(SessionLease::new(Duration::ZERO));
+
+            assert_eq!(schedule.renew_after(), MIN_RENEWAL_INTERVAL);
+        }
     }
 }

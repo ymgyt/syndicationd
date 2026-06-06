@@ -321,7 +321,7 @@ mod tests {
 
     use crate::{
         DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog, DaemonState, Runtime, RuntimeConfig,
-        RuntimeDatabase, SessionConfig,
+        RuntimeDatabase, SessionConfig, SessionRequirements,
         instance::RuntimeInstance,
         placement::{RuntimePlacementEnvironment, RuntimePlacementResolver, RuntimeRoot},
         session::SessionRenewalObserver,
@@ -335,6 +335,7 @@ mod tests {
     struct StartedDaemonConfig {
         session_lease_policy: Option<DaemonSessionLeasePolicy>,
         renewal_observer: Option<SessionRenewalObserver>,
+        session_requirements: Option<SessionRequirements>,
     }
 
     #[cfg(unix)]
@@ -346,6 +347,11 @@ mod tests {
 
         fn with_renewal_observer(mut self, observer: SessionRenewalObserver) -> Self {
             self.renewal_observer = Some(observer);
+            self
+        }
+
+        fn with_session_requirements(mut self, requirements: SessionRequirements) -> Self {
+            self.session_requirements = Some(requirements);
             self
         }
     }
@@ -416,16 +422,21 @@ mod tests {
                     None => session_config,
                 }
             };
-            let runtime = Runtime::try_new(
-                RuntimeConfig::new(database.clone())
+            let runtime_config = {
+                let runtime_config = RuntimeConfig::new(database.clone())
                     .with_api_timeout(Duration::from_secs(2), "synd-runtime-test")
                     .with_session(session_config)
                     .with_daemon_launch(DaemonLaunchConfig::new(
                         DaemonExecutable::path("unused"),
                         DaemonLaunchLog::file(root.join("daemon.log")),
                     ))
-                    .with_placement_environment(placement_environment.clone()),
-            )?;
+                    .with_placement_environment(placement_environment.clone());
+                match config.session_requirements {
+                    Some(requirements) => runtime_config.with_requirements(requirements),
+                    None => runtime_config,
+                }
+            };
+            let runtime = Runtime::try_new(runtime_config)?;
             let mut daemon_config =
                 DaemonConfig::new(database).with_placement_environment(placement_environment);
             if let Some(lease_policy) = config.session_lease_policy {
@@ -494,149 +505,224 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_shutdown_stops_serving_endpoint() -> crate::Result<()> {
-        let tmp = tempfile::tempdir()?;
-        let daemon = StartedDaemon::spawn(tmp.path())?;
+    mod shutdown {
+        use super::*;
 
-        daemon.wait_until_running().await;
-        daemon.shutdown().await;
-        Ok(())
+        #[tokio::test]
+        async fn stops_endpoint() -> crate::Result<()> {
+            let tmp = tempfile::tempdir()?;
+            let daemon = StartedDaemon::spawn(tmp.path())?;
+
+            daemon.wait_until_running().await;
+            daemon.shutdown().await;
+            Ok(())
+        }
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_accepts_and_closes_runtime_session() -> crate::Result<()> {
-        let tmp = tempfile::tempdir()?;
-        let daemon = StartedDaemon::spawn(tmp.path())?;
+    mod session {
+        use super::*;
 
-        daemon.wait_until_running().await;
-        let session = daemon.probe.runtime.acquire_session().await?;
-        assert_eq!(
-            session.available_capabilities(),
-            &synd_protocol::capability::local_api_capabilities()
-        );
-        session.close().await?;
+        mod lifecycle {
+            use super::*;
 
-        daemon.shutdown().await;
-        Ok(())
+            #[tokio::test]
+            async fn accepts_and_closes() -> crate::Result<()> {
+                let tmp = tempfile::tempdir()?;
+                let daemon = StartedDaemon::spawn(tmp.path())?;
+
+                daemon.wait_until_running().await;
+                let session = daemon.probe.runtime.acquire_session().await?;
+                assert_eq!(
+                    session.available_capabilities(),
+                    &synd_protocol::capability::local_api_capabilities()
+                );
+                session.close().await?;
+
+                daemon.shutdown().await;
+                Ok(())
+            }
+        }
+
+        mod required_capabilities {
+            use super::*;
+
+            #[tokio::test]
+            async fn rejects_missing() -> crate::Result<()> {
+                let tmp = tempfile::tempdir()?;
+                let missing_capabilities = synd_protocol::CapabilitySet::new(["test.missing"]);
+                let daemon = StartedDaemon::spawn_with_config(
+                    tmp.path(),
+                    StartedDaemonConfig::default().with_session_requirements(
+                        SessionRequirements::new(missing_capabilities.clone()),
+                    ),
+                )?;
+
+                daemon.wait_until_running().await;
+                let unexpected = match daemon.probe.runtime.acquire_session().await {
+                    Err(crate::Error::MissingSessionCapabilities {
+                        missing_capabilities: actual,
+                        ..
+                    }) => {
+                        assert_eq!(actual, missing_capabilities);
+                        None
+                    }
+                    Err(error) => Some(format!("unexpected acquire_session error: {error:?}")),
+                    Ok(session) => {
+                        session.close().await?;
+                        Some("session unexpectedly opened".to_owned())
+                    }
+                };
+
+                daemon.shutdown().await;
+                if let Some(message) = unexpected {
+                    panic!("{message}");
+                }
+
+                Ok(())
+            }
+        }
+
+        mod lease {
+            use super::*;
+
+            #[tokio::test]
+            async fn renews() -> crate::Result<()> {
+                let tmp = tempfile::tempdir()?;
+                let lease_policy = DaemonSessionLeasePolicy::new(
+                    Duration::from_secs(2),
+                    Duration::from_millis(200),
+                );
+                let (observer, mut renewal_probe) = SessionRenewalProbe::new();
+                let daemon = StartedDaemon::spawn_with_config(
+                    tmp.path(),
+                    StartedDaemonConfig::default()
+                        .with_session_lease_policy(lease_policy)
+                        .with_renewal_observer(observer),
+                )?;
+
+                daemon.wait_until_running().await;
+                let session = daemon.probe.runtime.acquire_session().await?;
+                let renewed_session_ids = renewal_probe
+                    .wait_for_renewals(4, Duration::from_secs(8))
+                    .await;
+                let first_session_id = &renewed_session_ids[0];
+
+                assert!(
+                    renewed_session_ids
+                        .iter()
+                        .all(|session_id| session_id == first_session_id)
+                );
+                session.close().await?;
+
+                daemon.shutdown().await;
+                Ok(())
+            }
+        }
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_keeps_runtime_session_alive_with_client_renewals() -> crate::Result<()> {
-        let tmp = tempfile::tempdir()?;
-        let lease_policy =
-            DaemonSessionLeasePolicy::new(Duration::from_secs(2), Duration::from_millis(200));
-        let (observer, mut renewal_probe) = SessionRenewalProbe::new();
-        let daemon = StartedDaemon::spawn_with_config(
-            tmp.path(),
-            StartedDaemonConfig::default()
-                .with_session_lease_policy(lease_policy)
-                .with_renewal_observer(observer),
-        )?;
+    mod endpoint_binding {
+        use super::*;
 
-        daemon.wait_until_running().await;
-        let session = daemon.probe.runtime.acquire_session().await?;
-        let renewed_session_ids = renewal_probe
-            .wait_for_renewals(4, Duration::from_secs(8))
-            .await;
-        let first_session_id = &renewed_session_ids[0];
+        #[tokio::test]
+        async fn creates_parent_dir() {
+            let tmp = tempfile::tempdir().unwrap();
+            let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(
+                tmp.path().join("synd.db"),
+            ))
+            .unwrap();
+            let endpoint =
+                UdsEndpoint::from_instance_id(&tmp.path().join("runtime"), instance.id());
 
-        assert!(
-            renewed_session_ids
-                .iter()
-                .all(|session_id| session_id == first_session_id)
-        );
-        session.close().await?;
+            let _bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
 
-        daemon.shutdown().await;
-        Ok(())
+            assert!(endpoint.path().exists());
+        }
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_endpoint_binder_creates_parent_dir() {
-        let tmp = tempfile::tempdir().unwrap();
-        let instance =
-            RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
+    mod endpoint_cleanup {
+        use super::*;
+
+        mod stale_socket {
+            use super::*;
+
+            #[tokio::test]
+            async fn removes_socket() {
+                let tmp = tempfile::tempdir().unwrap();
+                let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(
+                    tmp.path().join("synd.db"),
+                ))
                 .unwrap();
-        let endpoint = UdsEndpoint::from_instance_id(&tmp.path().join("runtime"), instance.id());
+                let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
+                let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
+                let (listener, cleanup) = bound_endpoint.into_parts();
 
-        let _bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
+                drop(listener);
+                cleanup.cleanup_stale_socket().unwrap();
 
-        assert!(endpoint.path().exists());
-    }
+                assert!(!endpoint.path().exists());
+            }
 
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_endpoint_cleanup_removes_stale_socket() {
-        let tmp = tempfile::tempdir().unwrap();
-        let instance =
-            RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
+            #[tokio::test]
+            async fn keeps_connected_socket() {
+                let tmp = tempfile::tempdir().unwrap();
+                let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(
+                    tmp.path().join("synd.db"),
+                ))
                 .unwrap();
-        let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
-        let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
-        let (listener, cleanup) = bound_endpoint.into_parts();
+                let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
+                let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
+                let (listener, cleanup) = bound_endpoint.into_parts();
 
-        drop(listener);
-        cleanup.cleanup_stale_socket().unwrap();
+                drop(listener);
+                std::fs::remove_file(endpoint.path()).unwrap();
+                let _replacement = std::os::unix::net::UnixListener::bind(endpoint.path()).unwrap();
+                cleanup.cleanup_stale_socket().unwrap();
 
-        assert!(!endpoint.path().exists());
-    }
+                assert!(endpoint.path().exists());
+            }
 
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_endpoint_cleanup_keeps_connected_socket() {
-        let tmp = tempfile::tempdir().unwrap();
-        let instance =
-            RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
+            #[tokio::test]
+            async fn refuses_non_socket_file() {
+                let tmp = tempfile::tempdir().unwrap();
+                let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(
+                    tmp.path().join("synd.db"),
+                ))
                 .unwrap();
-        let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
-        let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
-        let (listener, cleanup) = bound_endpoint.into_parts();
+                let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
+                let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
+                let (listener, cleanup) = bound_endpoint.into_parts();
 
-        drop(listener);
-        std::fs::remove_file(endpoint.path()).unwrap();
-        let _replacement = std::os::unix::net::UnixListener::bind(endpoint.path()).unwrap();
-        cleanup.cleanup_stale_socket().unwrap();
+                drop(listener);
+                std::fs::remove_file(endpoint.path()).unwrap();
+                std::fs::write(endpoint.path(), "").unwrap();
+                let error = cleanup.cleanup_stale_socket().unwrap_err();
 
-        assert!(endpoint.path().exists());
-    }
+                assert!(error.to_string().contains("non-socket runtime endpoint"));
+                assert!(endpoint.path().exists());
+            }
+        }
 
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_endpoint_cleanup_refuses_non_socket_file() {
-        let tmp = tempfile::tempdir().unwrap();
-        let instance =
-            RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
+        mod shutdown {
+            use super::*;
+
+            #[tokio::test]
+            async fn removes_socket() {
+                let tmp = tempfile::tempdir().unwrap();
+                let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(
+                    tmp.path().join("synd.db"),
+                ))
                 .unwrap();
-        let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
-        let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
-        let (listener, cleanup) = bound_endpoint.into_parts();
+                let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
+                let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
+                let (_listener, cleanup) = bound_endpoint.into_parts();
 
-        drop(listener);
-        std::fs::remove_file(endpoint.path()).unwrap();
-        std::fs::write(endpoint.path(), "").unwrap();
-        let error = cleanup.cleanup_stale_socket().unwrap_err();
+                cleanup.unlink_socket().unwrap();
 
-        assert!(error.to_string().contains("non-socket runtime endpoint"));
-        assert!(endpoint.path().exists());
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn daemon_endpoint_shutdown_cleanup_removes_connected_socket() {
-        let tmp = tempfile::tempdir().unwrap();
-        let instance =
-            RuntimeInstance::from_database(&RuntimeDatabase::sqlite(tmp.path().join("synd.db")))
-                .unwrap();
-        let endpoint = UdsEndpoint::from_instance_id(tmp.path(), instance.id());
-        let bound_endpoint = DaemonEndpointBinder::new(&endpoint).bind().unwrap();
-        let (_listener, cleanup) = bound_endpoint.into_parts();
-
-        cleanup.unlink_socket().unwrap();
-
-        assert!(!endpoint.path().exists());
+                assert!(!endpoint.path().exists());
+            }
+        }
     }
 }

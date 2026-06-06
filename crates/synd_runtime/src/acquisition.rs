@@ -665,132 +665,154 @@ mod tests {
         placement::{RuntimePlacement, RuntimeRoot},
     };
 
-    use super::{
-        Connected, Endpoint, Held, Incompatible, SessionAttempt, Stale, Stopped,
-        daemon_stop_suggestion, shell_quote,
-    };
+    use super::{Connected, Endpoint, Held, Incompatible, SessionAttempt, Stale, Stopped};
 
-    #[test]
-    fn resolves_endpoint_state_from_connection() {
-        let cases = [
-            (RuntimeEndpointConnectionStatus::Connected, "connected"),
-            (RuntimeEndpointConnectionStatus::Missing, "missing"),
-            (RuntimeEndpointConnectionStatus::Stale, "stale"),
-            (RuntimeEndpointConnectionStatus::Unavailable, "unavailable"),
-        ];
+    mod endpoint_state {
+        use super::*;
 
-        for (connection, expected) in cases {
-            let endpoint = Endpoint::from_connection(placement(), connection);
+        #[test]
+        fn from_connection() {
+            let cases = [
+                (RuntimeEndpointConnectionStatus::Connected, "connected"),
+                (RuntimeEndpointConnectionStatus::Missing, "missing"),
+                (RuntimeEndpointConnectionStatus::Stale, "stale"),
+                (RuntimeEndpointConnectionStatus::Unavailable, "unavailable"),
+            ];
 
-            assert_eq!(endpoint.name(), expected);
+            for (connection, expected) in cases {
+                let endpoint = Endpoint::from_connection(placement(), connection);
+
+                assert_eq!(endpoint.name(), expected);
+            }
+
+            #[cfg(not(unix))]
+            {
+                let endpoint = Endpoint::from_connection(
+                    placement(),
+                    RuntimeEndpointConnectionStatus::UnsupportedTransport,
+                );
+
+                assert_eq!(endpoint.name(), "unsupported");
+            }
         }
+    }
 
-        #[cfg(not(unix))]
-        {
-            let endpoint = Endpoint::from_connection(
-                placement(),
-                RuntimeEndpointConnectionStatus::UnsupportedTransport,
+    mod daemon_stop_suggestion {
+        use super::*;
+
+        #[test]
+        fn uses_runtime_database() {
+            let placement = placement();
+            let expected_db = placement.instance().canonical_database_path().display();
+
+            assert_eq!(
+                super::super::daemon_stop_suggestion(&placement),
+                format!("run `synd --sqlite-db {expected_db} daemon shutdown` and retry")
             );
-
-            assert_eq!(endpoint.name(), "unsupported");
         }
     }
 
-    #[test]
-    fn daemon_stop_suggestion_uses_runtime_database() {
-        let placement = placement();
-        let expected_db = placement.instance().canonical_database_path().display();
+    mod shell_quote {
+        use super::*;
 
-        assert_eq!(
-            daemon_stop_suggestion(&placement),
-            format!("run `synd --sqlite-db {expected_db} daemon shutdown` and retry")
-        );
-    }
-
-    #[test]
-    fn shell_quote_quotes_spaces() {
-        assert_eq!(
-            shell_quote(Path::new("/tmp/synd db/synd's.db")),
-            "'/tmp/synd db/synd'\\''s.db'"
-        );
-    }
-
-    #[test]
-    fn session_endpoint_missing_detects_session_open_404() {
-        let error = synd_client::SyndApiError::HttpStatus {
-            status: 404.try_into().unwrap(),
-            url: Some(url::Url::parse("http://localhost/session/open").unwrap()),
-        };
-
-        assert!(super::session_endpoint_missing(&error));
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn connected_open_reports_incompatible_when_session_endpoint_is_missing() {
-        let placement = placement();
-        let server = spawn_old_daemon(placement.endpoint().path().to_path_buf());
-        let config = runtime_config_for(&placement);
-
-        let attempt = Connected {
-            placement: placement.clone(),
+        #[test]
+        fn quotes_spaces() {
+            assert_eq!(
+                super::super::shell_quote(Path::new("/tmp/synd db/synd's.db")),
+                "'/tmp/synd db/synd'\\''s.db'"
+            );
         }
-        .open(&config)
-        .await
-        .unwrap();
-
-        assert!(matches!(attempt, SessionAttempt::Incompatible(_)));
-        server.join().unwrap();
     }
 
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn incompatible_stop_returns_stopped_endpoint_state() {
-        let held = held();
-        let placement = placement();
-        let server = spawn_old_daemon(placement.endpoint().path().to_path_buf());
-        let config = runtime_config_for(&placement);
+    mod session_endpoint_missing {
+        #[test]
+        fn detects_open_404() {
+            let error = synd_client::SyndApiError::HttpStatus {
+                status: 404.try_into().unwrap(),
+                url: Some(url::Url::parse("http://localhost/session/open").unwrap()),
+            };
 
-        let stopped = Incompatible {
-            placement: placement.clone(),
+            assert!(super::super::session_endpoint_missing(&error));
         }
-        .stop(&config, &held)
-        .await
-        .unwrap();
-
-        assert!(matches!(stopped, Stopped::Stale(_)));
-        server.join().unwrap();
     }
 
     #[cfg(unix)]
-    #[test]
-    fn stale_endpoint_recovery_removes_socket_file() {
-        let held = held();
-        let placement = placement();
-        let endpoint = placement.endpoint().path().to_path_buf();
-        std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
-        let listener = UnixListener::bind(&endpoint).unwrap();
-        drop(listener);
+    mod connected_open {
+        use super::*;
 
-        let recovered = Stale { placement }.cleanup(&held).unwrap();
+        #[tokio::test]
+        async fn reports_incompatible() {
+            let placement = placement();
+            let server = spawn_old_daemon(placement.endpoint().path().to_path_buf());
+            let config = runtime_config_for(&placement);
 
-        assert_eq!(recovered.placement.endpoint().path(), endpoint.as_path());
-        assert!(!endpoint.exists());
+            let attempt = Connected {
+                placement: placement.clone(),
+            }
+            .open(&config)
+            .await
+            .unwrap();
+
+            assert!(matches!(attempt, SessionAttempt::Incompatible(_)));
+            server.join().unwrap();
+        }
     }
 
     #[cfg(unix)]
-    #[test]
-    fn stale_endpoint_recovery_refuses_non_socket_file() {
-        let held = held();
-        let placement = placement();
-        let endpoint = placement.endpoint().path().to_path_buf();
-        std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
-        std::fs::write(&endpoint, "").unwrap();
+    mod incompatible_stop {
+        use super::*;
 
-        let error = Stale { placement }.cleanup(&held).unwrap_err();
+        #[tokio::test]
+        async fn returns_stale() {
+            let held = held();
+            let placement = placement();
+            let server = spawn_old_daemon(placement.endpoint().path().to_path_buf());
+            let config = runtime_config_for(&placement);
 
-        assert!(error.to_string().contains("non-socket runtime endpoint"));
-        assert!(endpoint.exists());
+            let stopped = Incompatible {
+                placement: placement.clone(),
+            }
+            .stop(&config, &held)
+            .await
+            .unwrap();
+
+            assert!(matches!(stopped, Stopped::Stale(_)));
+            server.join().unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    mod stale_endpoint_recovery {
+        use super::*;
+
+        #[test]
+        fn removes_socket_file() {
+            let held = held();
+            let placement = placement();
+            let endpoint = placement.endpoint().path().to_path_buf();
+            std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
+            let listener = UnixListener::bind(&endpoint).unwrap();
+            drop(listener);
+
+            let recovered = Stale { placement }.cleanup(&held).unwrap();
+
+            assert_eq!(recovered.placement.endpoint().path(), endpoint.as_path());
+            assert!(!endpoint.exists());
+        }
+
+        #[test]
+        fn refuses_non_socket_file() {
+            let held = held();
+            let placement = placement();
+            let endpoint = placement.endpoint().path().to_path_buf();
+            std::fs::create_dir_all(endpoint.parent().unwrap()).unwrap();
+            std::fs::write(&endpoint, "").unwrap();
+
+            let error = Stale { placement }.cleanup(&held).unwrap_err();
+
+            assert!(error.to_string().contains("non-socket runtime endpoint"));
+            assert!(endpoint.exists());
+        }
     }
 
     fn placement() -> RuntimePlacement {

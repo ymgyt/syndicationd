@@ -281,65 +281,73 @@ mod tests {
 
     use synd_api::session::{DaemonSessionConfig, DaemonSessionLeasePolicy};
 
-    use super::{DaemonExecutable, DaemonLaunchLog};
+    use super::{DaemonExecutable, DaemonLaunchLog, ResolvedDaemonLaunchCommand};
 
-    #[test]
-    fn builds_daemon_serve_command_from_runtime_database_path() {
-        let command = super::ResolvedDaemonLaunchCommand::daemon_serve(
-            DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
-            Path::new("/tmp/synd.db"),
-            DaemonSessionConfig::default(),
-        );
+    mod daemon_serve_command {
+        use super::*;
 
-        assert_eq!(command.executable, Path::new("/usr/bin/synd"));
-        assert_eq!(
-            command.arguments.as_slice(),
-            [
-                OsString::from("daemon"),
-                OsString::from("serve"),
-                OsString::from("--sqlite-db"),
-                OsString::from("/tmp/synd.db"),
-                OsString::from("--session-lease-duration"),
-                OsString::from("30s"),
-                OsString::from("--session-idle-shutdown-grace"),
-                OsString::from("30s"),
-            ]
-        );
+        #[test]
+        fn uses_database_path() {
+            let command = ResolvedDaemonLaunchCommand::daemon_serve(
+                DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
+                Path::new("/tmp/synd.db"),
+                DaemonSessionConfig::default(),
+            );
+
+            assert_eq!(command.executable, Path::new("/usr/bin/synd"));
+            assert_eq!(
+                command.arguments.as_slice(),
+                [
+                    OsString::from("daemon"),
+                    OsString::from("serve"),
+                    OsString::from("--sqlite-db"),
+                    OsString::from("/tmp/synd.db"),
+                    OsString::from("--session-lease-duration"),
+                    OsString::from("30s"),
+                    OsString::from("--session-idle-shutdown-grace"),
+                    OsString::from("30s"),
+                ]
+            );
+        }
+
+        #[test]
+        fn includes_session_config() {
+            let command = ResolvedDaemonLaunchCommand::daemon_serve(
+                DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
+                Path::new("/tmp/synd.db"),
+                DaemonSessionConfig::new(
+                    DaemonSessionLeasePolicy::new(Duration::from_mins(1), Duration::from_secs(5)),
+                    Duration::from_mins(2),
+                ),
+            );
+
+            assert_eq!(
+                command.arguments.as_slice(),
+                [
+                    OsString::from("daemon"),
+                    OsString::from("serve"),
+                    OsString::from("--sqlite-db"),
+                    OsString::from("/tmp/synd.db"),
+                    OsString::from("--session-lease-duration"),
+                    OsString::from("1m"),
+                    OsString::from("--session-idle-shutdown-grace"),
+                    OsString::from("2m"),
+                ]
+            );
+        }
     }
 
-    #[test]
-    fn builds_daemon_serve_command_with_session_config() {
-        let command = super::ResolvedDaemonLaunchCommand::daemon_serve(
-            DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
-            Path::new("/tmp/synd.db"),
-            DaemonSessionConfig::new(
-                DaemonSessionLeasePolicy::new(Duration::from_mins(1), Duration::from_secs(5)),
-                Duration::from_mins(2),
-            ),
-        );
+    mod launch_log {
+        use super::*;
 
-        assert_eq!(
-            command.arguments.as_slice(),
-            [
-                OsString::from("daemon"),
-                OsString::from("serve"),
-                OsString::from("--sqlite-db"),
-                OsString::from("/tmp/synd.db"),
-                OsString::from("--session-lease-duration"),
-                OsString::from("1m"),
-                OsString::from("--session-idle-shutdown-grace"),
-                OsString::from("2m"),
-            ]
-        );
-    }
+        #[test]
+        fn creates_parent_dir() {
+            let tmp = tempfile::tempdir().unwrap();
+            let log = DaemonLaunchLog::file(tmp.path().join("nested").join("daemon.log"));
 
-    #[test]
-    fn launch_log_creates_parent_directory() {
-        let tmp = tempfile::tempdir().unwrap();
-        let log = DaemonLaunchLog::file(tmp.path().join("nested").join("daemon.log"));
+            let _opened = log.open().unwrap();
 
-        let _opened = log.open().unwrap();
-
-        assert!(log.path().exists());
+            assert!(log.path().exists());
+        }
     }
 }
