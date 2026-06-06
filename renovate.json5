@@ -10,7 +10,9 @@
   "reviewersSampleSize": 1,
   "prConcurrentLimit": 10,
   "prHourlyLimit": 4,
-  "schedule": ["* 7 * * 1"],
+  // This is an allowed update window, not a trigger schedule. Keep it wide so
+  // the hosted Renovate app can create update branches when it runs.
+  "schedule": ["* * * * 5,6,0"],
   "packageRules": [
     {
       "matchManagers": ["cargo"],
