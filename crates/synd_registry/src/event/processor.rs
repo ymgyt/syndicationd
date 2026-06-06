@@ -147,6 +147,12 @@ pub struct ConsumeContext<'a, Tx> {
     recorded: RecordedEvents,
 }
 
+/// Transactional context passed to reconcilers.
+pub struct ReconcileContext<'a, Tx> {
+    tx: &'a mut Tx,
+    recorded: RecordedEvents,
+}
+
 impl<'a, Tx> ConsumeContext<'a, Tx> {
     pub fn new(tx: &'a mut Tx) -> Self {
         Self::with_capacity(tx, 0)
@@ -168,11 +174,44 @@ impl<'a, Tx> ConsumeContext<'a, Tx> {
     }
 }
 
+impl<'a, Tx> ReconcileContext<'a, Tx> {
+    pub fn new(tx: &'a mut Tx) -> Self {
+        Self::with_capacity(tx, 0)
+    }
+
+    pub fn with_capacity(tx: &'a mut Tx, capacity: usize) -> Self {
+        Self {
+            tx,
+            recorded: RecordedEvents::with_capacity(capacity),
+        }
+    }
+
+    pub fn into_recorded(self) -> RecordedEvents {
+        self.recorded
+    }
+}
+
 impl<Tx> ConsumeContext<'_, Tx>
 where
     Tx: JournalTx + Send,
 {
     pub async fn record_event<E>(&mut self, event: E) -> ProcessorResult<()>
+    where
+        E: Into<Event>,
+    {
+        let event = event.into();
+        let kind = event.kind();
+        self.tx.append_event(event).await?;
+        self.recorded.push(kind);
+        Ok(())
+    }
+}
+
+impl<Tx> ReconcileContext<'_, Tx>
+where
+    Tx: JournalTx + Send,
+{
+    pub async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>
     where
         E: Into<Event>,
     {

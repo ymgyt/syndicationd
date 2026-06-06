@@ -11,6 +11,7 @@ use crate::{crawl::policy::CrawlPolicy, subscription::SubscriptionKey};
 pub enum Event {
     Request(RequestEvent),
     Sub(SubEvent),
+    Crawl(CrawlEvent),
     Api(ApiEvent),
 }
 
@@ -19,6 +20,7 @@ impl Event {
         match self {
             Self::Request(event) => event.kind().into(),
             Self::Sub(event) => event.kind().into(),
+            Self::Crawl(event) => event.kind().into(),
             Self::Api(event) => event.kind().into(),
         }
     }
@@ -36,6 +38,12 @@ impl From<SubEvent> for Event {
     }
 }
 
+impl From<CrawlEvent> for Event {
+    fn from(event: CrawlEvent) -> Self {
+        Self::Crawl(event)
+    }
+}
+
 impl From<ApiEvent> for Event {
     fn from(event: ApiEvent) -> Self {
         Self::Api(event)
@@ -47,6 +55,7 @@ impl From<ApiEvent> for Event {
 pub enum EventKind {
     Request(RequestEventKind),
     Sub(SubEventKind),
+    Crawl(CrawlEventKind),
     Api(ApiEventKind),
 }
 
@@ -59,6 +68,12 @@ impl From<RequestEventKind> for EventKind {
 impl From<SubEventKind> for EventKind {
     fn from(kind: SubEventKind) -> Self {
         Self::Sub(kind)
+    }
+}
+
+impl From<CrawlEventKind> for EventKind {
+    fn from(kind: CrawlEventKind) -> Self {
+        Self::Crawl(kind)
     }
 }
 
@@ -83,6 +98,14 @@ pub enum SubEventKind {
     FeedSubscribed,
     SubscriptionChanged,
     FeedUnsubscribed,
+}
+
+/// A stable crawl-domain event category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CrawlEventKind {
+    TargetActivated,
+    TargetPolicyChanged,
+    TargetDeactivated,
 }
 
 /// A stable API contract event category.
@@ -295,6 +318,24 @@ impl SubEvent {
             Self::FeedSubscribed(_) => SubEventKind::FeedSubscribed,
             Self::SubscriptionChanged(_) => SubEventKind::SubscriptionChanged,
             Self::FeedUnsubscribed(_) => SubEventKind::FeedUnsubscribed,
+        }
+    }
+}
+
+/// A fact about crawl-domain state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrawlEvent {
+    TargetActivated(CrawlTargetActivatedEvent),
+    TargetPolicyChanged(CrawlTargetPolicyChangedEvent),
+    TargetDeactivated(CrawlTargetDeactivatedEvent),
+}
+
+impl CrawlEvent {
+    pub fn kind(&self) -> CrawlEventKind {
+        match self {
+            Self::TargetActivated(_) => CrawlEventKind::TargetActivated,
+            Self::TargetPolicyChanged(_) => CrawlEventKind::TargetPolicyChanged,
+            Self::TargetDeactivated(_) => CrawlEventKind::TargetDeactivated,
         }
     }
 }
@@ -562,5 +603,79 @@ impl From<FeedUnsubscribedEvent> for SubEvent {
 impl From<FeedUnsubscribedEvent> for Event {
     fn from(event: FeedUnsubscribedEvent) -> Self {
         Self::Sub(event.into())
+    }
+}
+
+/// A crawl target became active and should be considered by the scheduler.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlTargetActivatedEvent {
+    pub feed_url: FeedUrl,
+    pub policy: CrawlPolicy,
+}
+
+impl CrawlTargetActivatedEvent {
+    pub fn new(feed_url: FeedUrl, policy: CrawlPolicy) -> Self {
+        Self { feed_url, policy }
+    }
+}
+
+impl From<CrawlTargetActivatedEvent> for CrawlEvent {
+    fn from(event: CrawlTargetActivatedEvent) -> Self {
+        Self::TargetActivated(event)
+    }
+}
+
+impl From<CrawlTargetActivatedEvent> for Event {
+    fn from(event: CrawlTargetActivatedEvent) -> Self {
+        Self::Crawl(event.into())
+    }
+}
+
+/// An active crawl target's effective policy changed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlTargetPolicyChangedEvent {
+    pub feed_url: FeedUrl,
+    pub policy: CrawlPolicy,
+}
+
+impl CrawlTargetPolicyChangedEvent {
+    pub fn new(feed_url: FeedUrl, policy: CrawlPolicy) -> Self {
+        Self { feed_url, policy }
+    }
+}
+
+impl From<CrawlTargetPolicyChangedEvent> for CrawlEvent {
+    fn from(event: CrawlTargetPolicyChangedEvent) -> Self {
+        Self::TargetPolicyChanged(event)
+    }
+}
+
+impl From<CrawlTargetPolicyChangedEvent> for Event {
+    fn from(event: CrawlTargetPolicyChangedEvent) -> Self {
+        Self::Crawl(event.into())
+    }
+}
+
+/// A crawl target became inactive.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlTargetDeactivatedEvent {
+    pub feed_url: FeedUrl,
+}
+
+impl CrawlTargetDeactivatedEvent {
+    pub fn new(feed_url: FeedUrl) -> Self {
+        Self { feed_url }
+    }
+}
+
+impl From<CrawlTargetDeactivatedEvent> for CrawlEvent {
+    fn from(event: CrawlTargetDeactivatedEvent) -> Self {
+        Self::TargetDeactivated(event)
+    }
+}
+
+impl From<CrawlTargetDeactivatedEvent> for Event {
+    fn from(event: CrawlTargetDeactivatedEvent) -> Self {
+        Self::Crawl(event.into())
     }
 }

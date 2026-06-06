@@ -7,6 +7,10 @@ pub(super) const SUB_FEED_SUBSCRIBED: &str = "sub.feed.subscribed";
 pub(super) const SUB_SUBSCRIPTION_CHANGED: &str = "sub.subscription.changed";
 pub(super) const SUB_FEED_UNSUBSCRIBED: &str = "sub.feed.unsubscribed";
 
+pub(super) const CRAWL_TARGET_ACTIVATED: &str = "crawl.target.activated";
+pub(super) const CRAWL_TARGET_POLICY_CHANGED: &str = "crawl.target.policy_changed";
+pub(super) const CRAWL_TARGET_DEACTIVATED: &str = "crawl.target.deactivated";
+
 pub(super) const API_FEED_SUBSCRIBED: &str = "api.feed.subscribed";
 pub(super) const API_FEED_SUBSCRIBE_REJECTED: &str = "api.feed.subscribe_rejected";
 pub(super) const API_FEED_SUBSCRIPTION_CHANGED: &str = "api.feed.subscription.changed";

@@ -46,6 +46,28 @@ impl Trigger {
     }
 }
 
+/// Stable identity for a background worker task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WorkerId {
+    Processor(ProcessorId),
+    CrawlScheduler,
+}
+
+impl WorkerId {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Processor(processor) => processor.as_str(),
+            Self::CrawlScheduler => "CrawlScheduler",
+        }
+    }
+}
+
+impl From<ProcessorId> for WorkerId {
+    fn from(processor: ProcessorId) -> Self {
+        Self::Processor(processor)
+    }
+}
+
 /// Error returned while receiving a journal wake notification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventWakeRecvError {
@@ -70,10 +92,16 @@ pub struct EventWakeSubscriber {
     receiver: broadcast::Receiver<RecordedEvents>,
 }
 
+/// Worker-local connection to the registry event wake channel.
+pub struct EventWake {
+    publisher: EventWakePublisher,
+    subscriber: EventWakeSubscriber,
+}
+
 /// Owns the task running one event processor.
 #[derive(Debug)]
 pub struct WorkerHandle {
-    processor: ProcessorId,
+    id: WorkerId,
     task: JoinHandle<()>,
 }
 
@@ -112,13 +140,34 @@ impl EventWakeSubscriber {
     }
 }
 
-impl WorkerHandle {
-    pub fn new(processor: ProcessorId, task: JoinHandle<()>) -> Self {
-        Self { processor, task }
+impl EventWake {
+    pub fn new(publisher: EventWakePublisher) -> Self {
+        let subscriber = publisher.subscribe();
+        Self {
+            publisher,
+            subscriber,
+        }
     }
 
-    pub fn processor(&self) -> ProcessorId {
-        self.processor
+    pub async fn recv(&mut self) -> Result<RecordedEvents, EventWakeRecvError> {
+        self.subscriber.recv().await
+    }
+
+    pub fn publish(&self, recorded: RecordedEvents) -> usize {
+        self.publisher.publish(recorded)
+    }
+}
+
+impl WorkerHandle {
+    pub fn new(id: impl Into<WorkerId>, task: JoinHandle<()>) -> Self {
+        Self {
+            id: id.into(),
+            task,
+        }
+    }
+
+    pub fn id(&self) -> WorkerId {
+        self.id
     }
 
     pub fn is_finished(&self) -> bool {
@@ -161,12 +210,12 @@ impl WorkerSet {
         }
     }
 
-    pub async fn join(mut self) -> Vec<(ProcessorId, Result<(), tokio::task::JoinError>)> {
+    pub async fn join(mut self) -> Vec<(WorkerId, Result<(), tokio::task::JoinError>)> {
         let handles = std::mem::take(&mut self.handles);
         let mut results = Vec::with_capacity(handles.len());
         for handle in handles {
-            let processor = handle.processor();
-            results.push((processor, handle.join().await));
+            let id = handle.id();
+            results.push((id, handle.join().await));
         }
         results
     }
@@ -189,24 +238,16 @@ pub(crate) struct ProcessReport {
 pub(crate) struct Worker<S, P> {
     db: S,
     processor: P,
-    wake_publisher: EventWakePublisher,
-    wake_subscriber: EventWakeSubscriber,
+    wake: EventWake,
     poll_interval: Duration,
 }
 
 impl<S, P> Worker<S, P> {
-    pub fn new(
-        db: S,
-        processor: P,
-        wake_publisher: EventWakePublisher,
-        wake_subscriber: EventWakeSubscriber,
-        poll_interval: Duration,
-    ) -> Self {
+    pub fn new(db: S, processor: P, wake: EventWake, poll_interval: Duration) -> Self {
         Self {
             db,
             processor,
-            wake_publisher,
-            wake_subscriber,
+            wake,
             poll_interval,
         }
     }
@@ -238,7 +279,7 @@ where
         loop {
             tokio::select! {
                 () = ct.cancelled() => break,
-                wake = self.wake_subscriber.recv() => {
+                wake = self.wake.recv() => {
                     match wake {
                         Ok(recorded) if self.processor.interests().matches_any(recorded.kinds()) => {
                             self.process(Trigger::Wake).await;
@@ -308,7 +349,7 @@ where
 
     fn publish_recorded(&self, trigger: Trigger, recorded: RecordedEvents) {
         let recorded_count = recorded.len();
-        let receivers = self.wake_publisher.publish(recorded);
+        let receivers = self.wake.publish(recorded);
         if recorded_count > 0 {
             let processor = self.processor.id();
             debug!(
@@ -334,16 +375,7 @@ where
     P: Processor,
     P::Phase: WorkerPhase<S, P>,
 {
-    let wake_subscriber = wake_publisher.subscribe();
-
-    Worker::new(
-        db,
-        processor,
-        wake_publisher,
-        wake_subscriber,
-        poll_interval,
-    )
-    .spawn(ct)
+    Worker::new(db, processor, EventWake::new(wake_publisher), poll_interval).spawn(ct)
 }
 
 pub(crate) trait WorkerPhase<S, P>: Sized

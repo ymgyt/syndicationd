@@ -8,12 +8,12 @@ use crate::{
     },
     config::FeedRegistryConfig,
     consumers::{ApiEventProj, SubRequestProj},
-    crawl::{policy::CrawlPolicy, target_list::CrawlTargetListProj},
+    crawl::{policy::CrawlPolicy, scheduler::CrawlScheduler, target_list::CrawlTargetListProj},
     db::{CommitTx, FeedRegistryDb, RegistryTx},
     error::FeedRegistryError,
     event::{
         ApiEventPublisher, ApiEventSubscriber, EventSubmitter, EventWakePublisher, Processor,
-        WorkerHandle, WorkerPhase, WorkerSet, spawn_worker,
+        WorkerHandle, WorkerPhase, WorkerSet, spawn_reconciler_worker, spawn_worker,
     },
     query::{Subscriptions, SubscriptionsQuery},
     subscription::SubscriberId,
@@ -149,14 +149,27 @@ where
         ct.clone(),
         ApiEventProj::new(),
     );
-    let api_event_publisher_worker =
-        spawn_event_worker(db, wake_publisher.clone(), poll_interval, ct, api_events);
+    let api_event_publisher_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        poll_interval,
+        ct.clone(),
+        api_events,
+    );
+    let crawl_scheduler_worker = spawn_reconciler_worker(
+        db,
+        wake_publisher.clone(),
+        poll_interval,
+        ct,
+        CrawlScheduler::new(),
+    );
 
     WorkerSet::new(vec![
         subscription_request_projection_worker,
         crawl_target_projection_worker,
         api_event_projection_worker,
         api_event_publisher_worker,
+        crawl_scheduler_worker,
     ])
 }
 

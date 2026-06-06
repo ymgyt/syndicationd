@@ -8,8 +8,10 @@ use crate::{
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
     db::{FeedRegistryDb, RegistryTx},
     event::{
-        ConsumeContext, Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId,
-        ProcessorResult, SubEvent, SubEventKind, SubscriptionLifecycle, Transactional,
+        ConsumeContext, Consumer, CrawlEvent, CrawlTargetActivatedEvent,
+        CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event, EventInterests,
+        Processor, ProcessorError, ProcessorId, ProcessorResult, SubEvent, SubEventKind,
+        SubscriptionLifecycle, Transactional,
     },
     subscription::SubscriptionKey,
 };
@@ -192,10 +194,14 @@ where
         let Self::Input { event } = input;
 
         let feed_url = event.affected_feed_url().clone();
+        let previous = cx.load_crawl_target_for_endpoint(&feed_url).await?;
         let subscriptions = cx.load_feed_endpoint_subscriptions(&feed_url).await?;
         let now = Utc::now();
         let target = subscriptions.crawl_target_decision().into_target(now);
         cx.upsert_crawl_target(&target).await?;
+        if let Some(event) = crawl_target_event(previous.as_ref(), &target) {
+            cx.record_event(event).await?;
+        }
 
         debug!(
             feed_url = target.feed_url.as_str(),
@@ -203,6 +209,34 @@ where
             "crawl target reconciled"
         );
         Ok(())
+    }
+}
+
+fn crawl_target_event(previous: Option<&CrawlTarget>, target: &CrawlTarget) -> Option<CrawlEvent> {
+    match (previous.map(|target| &target.state), &target.state) {
+        (
+            None | Some(CrawlTargetState::Inactive),
+            CrawlTargetState::Active {
+                effective_policy, ..
+            },
+        ) => {
+            Some(CrawlTargetActivatedEvent::new(target.feed_url.clone(), *effective_policy).into())
+        }
+        (
+            Some(CrawlTargetState::Active {
+                effective_policy: previous_policy,
+                ..
+            }),
+            CrawlTargetState::Active {
+                effective_policy, ..
+            },
+        ) if previous_policy != effective_policy => Some(
+            CrawlTargetPolicyChangedEvent::new(target.feed_url.clone(), *effective_policy).into(),
+        ),
+        (Some(CrawlTargetState::Active { .. }), CrawlTargetState::Inactive) => {
+            Some(CrawlTargetDeactivatedEvent::new(target.feed_url.clone()).into())
+        }
+        _ => None,
     }
 }
 

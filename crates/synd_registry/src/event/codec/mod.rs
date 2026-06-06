@@ -3,12 +3,14 @@ use thiserror::Error;
 
 use super::domain::{
     ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event, EventKind, FeedSubscribedEvent,
-    FeedUnsubscribedEvent, SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChangedEvent,
-    UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event, EventKind,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, SubscribeFeedRejected, SubscribeFeedRequested,
+    SubscriptionChangedEvent, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 
 mod api;
+mod crawl;
 mod event_type;
 mod request;
 mod sub;
@@ -46,6 +48,7 @@ impl EventEncoding for Event {
         match self {
             Self::Request(event) => event.encode(),
             Self::Sub(event) => event.encode(),
+            Self::Crawl(event) => event.encode(),
             Self::Api(event) => event.encode(),
         }
     }
@@ -76,6 +79,18 @@ impl EventEncoding for Event {
             <FeedUnsubscribedEvent as EventPayload>::EVENT_TYPE => {
                 decode_payload::<FeedUnsubscribedEvent>(payload_json).map(EventPayload::into_event)
             }
+            <CrawlTargetActivatedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<CrawlTargetActivatedEvent>(payload_json)
+                    .map(EventPayload::into_event)
+            }
+            <CrawlTargetPolicyChangedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<CrawlTargetPolicyChangedEvent>(payload_json)
+                    .map(EventPayload::into_event)
+            }
+            <CrawlTargetDeactivatedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<CrawlTargetDeactivatedEvent>(payload_json)
+                    .map(EventPayload::into_event)
+            }
             <ApiFeedSubscribed as EventPayload>::EVENT_TYPE => {
                 decode_payload::<ApiFeedSubscribed>(payload_json).map(EventPayload::into_event)
             }
@@ -104,6 +119,7 @@ impl EventKind {
         match self {
             Self::Request(kind) => kind.event_type(),
             Self::Sub(kind) => kind.event_type(),
+            Self::Crawl(kind) => kind.event_type(),
             Self::Api(kind) => kind.event_type(),
         }
     }
