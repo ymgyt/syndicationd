@@ -31,9 +31,6 @@ pub enum Error {
     #[error("{context} transport unsupported")]
     UnsupportedTransport { context: &'static str },
 
-    #[error("daemon control action `{action}` is unsupported")]
-    UnsupportedDaemonControlAction { action: &'static str },
-
     #[error(
         "runtime daemon at {} is missing required session capabilities: {missing_capabilities}",
         endpoint.display()

@@ -105,11 +105,6 @@ impl<'a> Control<'a> {
         }
     }
 
-    #[expect(clippy::unused_async)]
-    pub async fn restart(&self) -> Result<DaemonStatus> {
-        Err(Error::UnsupportedDaemonControlAction { action: "restart" })
-    }
-
     async fn resolve_context(&self) -> Result<DaemonControlContext> {
         let placement = self.runtime.placement().clone();
         let endpoint_connection = RuntimeEndpointConnector::new(placement.endpoint())

@@ -167,8 +167,18 @@ impl DaemonStatusOutput {
     fn write_human(&self, writer: &mut impl io::Write) -> io::Result<()> {
         writeln!(writer, "state: {}", self.state)?;
         writeln!(writer, "instance: {}", self.placement.runtime_instance_id)?;
+        writeln!(
+            writer,
+            "runtime root: {}",
+            self.placement.runtime_root.display()
+        )?;
         writeln!(writer, "database: {}", self.placement.database.display())?;
         writeln!(writer, "endpoint: {}", self.placement.endpoint.display())?;
+        writeln!(
+            writer,
+            "startup lock: {}",
+            self.placement.startup_lock.display()
+        )?;
 
         if let Some(sessions) = &self.sessions {
             sessions.write_human(writer)?;
@@ -185,9 +195,11 @@ impl From<&DaemonStatus> for DaemonStatusOutput {
         Self {
             state: daemon_state_label(status.state()),
             placement: DaemonPlacementOutput {
+                runtime_root: placement.runtime_root().to_path_buf(),
                 runtime_instance_id: placement.runtime_instance_id().to_owned(),
                 database: placement.database().to_path_buf(),
                 endpoint: placement.endpoint().to_path_buf(),
+                startup_lock: placement.startup_lock().to_path_buf(),
             },
             sessions: status.sessions().map(DaemonSessionsOutput::from),
         }
@@ -196,9 +208,11 @@ impl From<&DaemonStatus> for DaemonStatusOutput {
 
 #[derive(Debug, Serialize)]
 struct DaemonPlacementOutput {
+    runtime_root: PathBuf,
     runtime_instance_id: String,
     database: PathBuf,
     endpoint: PathBuf,
+    startup_lock: PathBuf,
 }
 
 #[derive(Debug, Serialize)]
@@ -266,5 +280,42 @@ impl From<&DaemonIdleShutdownStatus> for DaemonIdleShutdownOutput {
             grace: status.grace(),
             pending: status.is_pending(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn writes_runtime_placement_in_human_status() {
+        let output = DaemonStatusOutput {
+            state: "not-running",
+            placement: DaemonPlacementOutput {
+                runtime_root: PathBuf::from("/runtime"),
+                runtime_instance_id: "runtime-1".to_owned(),
+                database: PathBuf::from("/data/synd.db"),
+                endpoint: PathBuf::from("/runtime/api.sock"),
+                startup_lock: PathBuf::from("/runtime/api.lock"),
+            },
+            sessions: None,
+        };
+        let mut buffer = Vec::new();
+
+        output.write_human(&mut buffer).unwrap();
+
+        assert_eq!(
+            String::from_utf8(buffer).unwrap(),
+            "\
+state: not-running
+instance: runtime-1
+runtime root: /runtime
+database: /data/synd.db
+endpoint: /runtime/api.sock
+startup lock: /runtime/api.lock
+"
+        );
     }
 }
