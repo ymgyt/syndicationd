@@ -319,6 +319,8 @@ mod tests {
                 database: PathBuf::from("/data/synd.db"),
                 endpoint: PathBuf::from("/runtime/api.sock"),
                 startup_lock: PathBuf::from("/runtime/api.lock"),
+                daemon_claim: PathBuf::from("/runtime/daemon.json"),
+                daemon_claim_lock: PathBuf::from("/runtime/daemon.lock"),
             },
             sessions: None,
         };
@@ -335,6 +337,8 @@ runtime root: /runtime
 database: /data/synd.db
 endpoint: /runtime/api.sock
 startup lock: /runtime/api.lock
+daemon claim: /runtime/daemon.json
+daemon claim lock: /runtime/daemon.lock
 "
         );
     }

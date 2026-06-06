@@ -413,7 +413,7 @@ pub(crate) fn remove_stale_claim(path: &DaemonClaimPath) -> Result<()> {
 }
 
 fn pid_to_u32(pid: Pid) -> u32 {
-    pid.as_raw_pid() as u32
+    pid.as_raw_pid().cast_unsigned()
 }
 
 #[cfg(target_os = "linux")]
@@ -482,7 +482,9 @@ mod tests {
         placement::{PlacementRoot, PlacementSpec},
     };
 
-    use super::{DaemonClaim, DaemonClaimLockAcquirer, DaemonClaimLockAcquisition};
+    use super::{
+        DaemonClaim, DaemonClaimLockAcquirer, DaemonClaimLockAcquisition, DaemonClaimOwner,
+    };
 
     #[cfg(target_os = "linux")]
     mod linux_stat {
@@ -495,7 +497,7 @@ mod tests {
             let tmp = tempfile::NamedTempFile::new().unwrap();
             std::fs::write(tmp.path(), stat).unwrap();
 
-            assert_eq!(process_start_time_from_stat(tmp.path()), Some(123456));
+            assert_eq!(process_start_time_from_stat(tmp.path()), Some(123_456));
         }
     }
 
@@ -515,6 +517,39 @@ mod tests {
 
             assert!(matches!(first, DaemonClaimLockAcquisition::Acquired(_)));
             assert!(matches!(second, DaemonClaimLockAcquisition::AlreadyHeld));
+        }
+    }
+
+    mod owner {
+        use super::*;
+
+        #[test]
+        fn writes_claim_and_holds_lock_until_drop() {
+            let tmp = tempfile::tempdir().unwrap();
+            let placement = placement(tmp.path());
+
+            {
+                let _owner = DaemonClaimOwner::create(&placement).unwrap();
+                let claim = DaemonClaim::read(placement.daemon_claim_path())
+                    .unwrap()
+                    .expect("daemon claim should exist while owner is live");
+                claim.validate_placement(&placement).unwrap();
+
+                let lock = DaemonClaimLockAcquirer::new(placement.daemon_claim_lock_path())
+                    .try_acquire()
+                    .unwrap();
+                assert!(matches!(lock, DaemonClaimLockAcquisition::AlreadyHeld));
+            }
+
+            assert!(
+                DaemonClaim::read(placement.daemon_claim_path())
+                    .unwrap()
+                    .is_none()
+            );
+            let lock = DaemonClaimLockAcquirer::new(placement.daemon_claim_lock_path())
+                .try_acquire()
+                .unwrap();
+            assert!(matches!(lock, DaemonClaimLockAcquisition::Acquired(_)));
         }
     }
 
