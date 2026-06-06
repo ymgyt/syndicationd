@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Widget},
+    widgets::{Block, Borders, Padding, Shadow, Widget},
 };
 
 use crate::{
@@ -162,6 +162,7 @@ impl FilterPopup {
                     bottom: 1,
                 })
                 .borders(Borders::ALL)
+                .shadow(Shadow::dark_shade().style(cx.theme.base.add_modifier(Modifier::DIM)))
                 .style(cx.theme.base);
             let inner_area = block.inner(area);
             block.render(area, buf);

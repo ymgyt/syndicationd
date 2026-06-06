@@ -6,7 +6,7 @@ use ratatui::{
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table as RatatuiTable,
+        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Shadow, Table as RatatuiTable,
         Tabs as RatatuiTabs, Widget,
     },
 };
@@ -434,6 +434,7 @@ impl SubscriptionWidget {
                 bottom: 1,
             })
             .borders(Borders::ALL)
+            .shadow(Shadow::dark_shade().style(cx.theme.base.add_modifier(Modifier::DIM)))
             .style(cx.theme.base);
 
         let inner_area = block.inner(area);
