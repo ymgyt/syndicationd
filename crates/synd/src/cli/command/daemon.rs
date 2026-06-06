@@ -7,10 +7,9 @@ use synd_runtime::{
     RuntimeDatabase,
 };
 use synd_support::time::humantime::HumanDuration;
-use tracing::error;
 
 use crate::{
-    cli::OutputFormat,
+    cli::{OutputFormat, command::CommandFailure},
     config::{self, ConfigResolver},
     runtime::FeedRuntime,
 };
@@ -72,10 +71,7 @@ impl DaemonServeCommand {
 
         match daemon.serve().await {
             Ok(()) => ExitCode::SUCCESS,
-            Err(err) => {
-                error!("{err:?}");
-                ExitCode::from(1)
-            }
+            Err(err) => CommandFailure::report(err),
         }
     }
 }
@@ -93,16 +89,12 @@ impl DaemonStatusCommand {
         match inspect_daemon(config).await {
             Ok(status) => {
                 if let Err(err) = write_daemon_status(self.output, &status) {
-                    error!("{err:?}");
-                    ExitCode::from(1)
+                    CommandFailure::report(err)
                 } else {
                     ExitCode::SUCCESS
                 }
             }
-            Err(err) => {
-                error!("{err:?}");
-                ExitCode::from(1)
-            }
+            Err(err) => CommandFailure::report(err),
         }
     }
 }
@@ -120,16 +112,12 @@ impl DaemonShutdownCommand {
         match shutdown_daemon(config).await {
             Ok(result) => {
                 if let Err(err) = write_daemon_status(self.output, result.status()) {
-                    error!("{err:?}");
-                    ExitCode::from(1)
+                    CommandFailure::report(err)
                 } else {
                     ExitCode::SUCCESS
                 }
             }
-            Err(err) => {
-                error!("{err:?}");
-                ExitCode::from(1)
-            }
+            Err(err) => CommandFailure::report(err),
         }
     }
 }

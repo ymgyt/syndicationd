@@ -13,9 +13,11 @@ use clap::Args;
 use serde::Serialize;
 use synd_persistence::sqlite::SqliteDatabase;
 use synd_runtime::{DaemonState, Runtime, RuntimeConfig, RuntimeDatabase, RuntimePlacementSummary};
-use tracing::error;
 
-use crate::{cli::OutputFormat, config::ConfigResolver};
+use crate::{
+    cli::{OutputFormat, command::CommandFailure},
+    config::ConfigResolver,
+};
 
 const DOCTOR_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
@@ -32,10 +34,7 @@ impl DoctorCommand {
         match self.diagnose(config).await {
             Ok(has_failures) if has_failures => ExitCode::from(1),
             Ok(_) => ExitCode::SUCCESS,
-            Err(err) => {
-                error!("{err:?}");
-                ExitCode::from(1)
-            }
+            Err(err) => CommandFailure::report(err),
         }
     }
 

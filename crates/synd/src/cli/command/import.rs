@@ -14,9 +14,11 @@ use synd_client::{
     payload::{SubscribeFeedInput, SubscribeFeedPayload},
 };
 use synd_term::{types::ExportedFeed, ui};
-use tracing::error;
 
-use crate::{cli::port::PortContext, config::ConfigResolver};
+use crate::{
+    cli::{command::CommandFailure, port::PortContext},
+    config::ConfigResolver,
+};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 struct Input {
@@ -47,8 +49,7 @@ impl ImportCommand {
             self.import(config).await
         };
         if let Err(err) = err {
-            error!("{err:?}");
-            ExitCode::from(1)
+            CommandFailure::report(err)
         } else {
             ExitCode::SUCCESS
         }

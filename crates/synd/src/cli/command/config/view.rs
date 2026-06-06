@@ -7,9 +7,11 @@ use std::{
 use clap::Args;
 use serde::Serialize;
 use synd_support::time::humantime::HumanDuration;
-use tracing::error;
 
-use crate::{cli::OutputFormat, config::ConfigResolver};
+use crate::{
+    cli::{OutputFormat, command::CommandFailure},
+    config::ConfigResolver,
+};
 
 /// View resolved configuration
 #[derive(Args, Debug)]
@@ -22,8 +24,7 @@ pub struct ConfigViewCommand {
 impl ConfigViewCommand {
     pub fn run(self, config: &ConfigResolver) -> ExitCode {
         if let Err(err) = self.view(config) {
-            error!("{err:?}");
-            ExitCode::from(1)
+            CommandFailure::report(err)
         } else {
             ExitCode::SUCCESS
         }
