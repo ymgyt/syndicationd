@@ -1,10 +1,12 @@
-use std::{path::PathBuf, process::ExitCode, time::Duration};
+use std::{io, path::PathBuf, process::ExitCode, time::Duration};
 
 use clap::{Args, Subcommand};
+use serde::Serialize;
 use synd_runtime::{Daemon, DaemonConfig, DaemonState, DaemonStatus, RuntimeDatabase};
 use tracing::error;
 
 use crate::{
+    cli::OutputFormat,
     config::{self, ConfigResolver},
     runtime::FeedRuntime,
 };
@@ -76,14 +78,22 @@ impl DaemonServeCommand {
 
 /// Show daemon status for the configured runtime instance
 #[derive(Args, Debug)]
-struct DaemonStatusCommand {}
+struct DaemonStatusCommand {
+    /// Output format
+    #[arg(short = 'o', long = "output", value_enum, default_value_t = OutputFormat::Human)]
+    output: OutputFormat,
+}
 
 impl DaemonStatusCommand {
     async fn run(self, config: &ConfigResolver) -> ExitCode {
         match inspect_daemon(config).await {
             Ok(status) => {
-                print_daemon_status(&status);
-                ExitCode::SUCCESS
+                if let Err(err) = write_daemon_status(self.output, &status) {
+                    error!("{err:?}");
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::SUCCESS
+                }
             }
             Err(err) => {
                 error!("{err:?}");
@@ -95,14 +105,22 @@ impl DaemonStatusCommand {
 
 /// Request daemon shutdown for the configured runtime instance
 #[derive(Args, Debug)]
-struct DaemonShutdownCommand {}
+struct DaemonShutdownCommand {
+    /// Output format
+    #[arg(short = 'o', long = "output", value_enum, default_value_t = OutputFormat::Human)]
+    output: OutputFormat,
+}
 
 impl DaemonShutdownCommand {
     async fn run(self, config: &ConfigResolver) -> ExitCode {
         match shutdown_daemon(config).await {
             Ok(result) => {
-                print_daemon_status(result.status());
-                ExitCode::SUCCESS
+                if let Err(err) = write_daemon_status(self.output, result.status()) {
+                    error!("{err:?}");
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::SUCCESS
+                }
             }
             Err(err) => {
                 error!("{err:?}");
@@ -120,13 +138,11 @@ async fn shutdown_daemon(config: &ConfigResolver) -> anyhow::Result<synd_runtime
     FeedRuntime::new(config)?.shutdown_daemon().await
 }
 
-fn print_daemon_status(status: &DaemonStatus) {
-    let placement = status.placement();
+fn write_daemon_status(format: OutputFormat, status: &DaemonStatus) -> anyhow::Result<()> {
+    let status_output = DaemonStatusOutput::from(status);
+    let mut stdout = io::stdout();
 
-    println!("state: {}", daemon_state_label(status.state()));
-    println!("instance: {}", placement.runtime_instance_id());
-    println!("database: {}", placement.database().display());
-    println!("endpoint: {}", placement.endpoint().display());
+    status_output.write_as(format, &mut stdout)
 }
 
 fn daemon_state_label(state: DaemonState) -> &'static str {
@@ -134,4 +150,53 @@ fn daemon_state_label(state: DaemonState) -> &'static str {
         DaemonState::Running => "running",
         DaemonState::NotRunning => "not-running",
     }
+}
+
+#[derive(Debug, Serialize)]
+struct DaemonStatusOutput {
+    state: &'static str,
+    placement: DaemonPlacementOutput,
+}
+
+impl DaemonStatusOutput {
+    fn write_as(&self, format: OutputFormat, writer: &mut impl io::Write) -> anyhow::Result<()> {
+        match format {
+            OutputFormat::Human => self.write_human(writer)?,
+            OutputFormat::Json => {
+                serde_json::to_writer_pretty(&mut *writer, self)?;
+                writeln!(writer)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_human(&self, writer: &mut impl io::Write) -> io::Result<()> {
+        writeln!(writer, "state: {}", self.state)?;
+        writeln!(writer, "instance: {}", self.placement.runtime_instance_id)?;
+        writeln!(writer, "database: {}", self.placement.database.display())?;
+        writeln!(writer, "endpoint: {}", self.placement.endpoint.display())
+    }
+}
+
+impl From<&DaemonStatus> for DaemonStatusOutput {
+    fn from(status: &DaemonStatus) -> Self {
+        let placement = status.placement();
+
+        Self {
+            state: daemon_state_label(status.state()),
+            placement: DaemonPlacementOutput {
+                runtime_instance_id: placement.runtime_instance_id().to_owned(),
+                database: placement.database().to_path_buf(),
+                endpoint: placement.endpoint().to_path_buf(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct DaemonPlacementOutput {
+    runtime_instance_id: String,
+    database: PathBuf,
+    endpoint: PathBuf,
 }
