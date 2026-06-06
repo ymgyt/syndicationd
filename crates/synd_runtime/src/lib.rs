@@ -30,3 +30,4 @@ pub use session::{
 };
 pub use synd_api::session::{DaemonSessionConfig, DaemonSessionLeasePolicy};
 pub use synd_protocol::CapabilitySet;
+pub use synd_protocol::daemon::{DaemonIdleShutdownStatus, DaemonSessionStatus};

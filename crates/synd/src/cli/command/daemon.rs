@@ -2,7 +2,11 @@ use std::{io, path::PathBuf, process::ExitCode, time::Duration};
 
 use clap::{Args, Subcommand};
 use serde::Serialize;
-use synd_runtime::{Daemon, DaemonConfig, DaemonState, DaemonStatus, RuntimeDatabase};
+use synd_runtime::{
+    Daemon, DaemonConfig, DaemonIdleShutdownStatus, DaemonSessionStatus, DaemonState, DaemonStatus,
+    RuntimeDatabase,
+};
+use synd_support::time::humantime::HumanDuration;
 use tracing::error;
 
 use crate::{
@@ -156,6 +160,7 @@ fn daemon_state_label(state: DaemonState) -> &'static str {
 struct DaemonStatusOutput {
     state: &'static str,
     placement: DaemonPlacementOutput,
+    sessions: Option<DaemonSessionsOutput>,
 }
 
 impl DaemonStatusOutput {
@@ -175,7 +180,13 @@ impl DaemonStatusOutput {
         writeln!(writer, "state: {}", self.state)?;
         writeln!(writer, "instance: {}", self.placement.runtime_instance_id)?;
         writeln!(writer, "database: {}", self.placement.database.display())?;
-        writeln!(writer, "endpoint: {}", self.placement.endpoint.display())
+        writeln!(writer, "endpoint: {}", self.placement.endpoint.display())?;
+
+        if let Some(sessions) = &self.sessions {
+            sessions.write_human(writer)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -190,6 +201,7 @@ impl From<&DaemonStatus> for DaemonStatusOutput {
                 database: placement.database().to_path_buf(),
                 endpoint: placement.endpoint().to_path_buf(),
             },
+            sessions: status.sessions().map(DaemonSessionsOutput::from),
         }
     }
 }
@@ -199,4 +211,72 @@ struct DaemonPlacementOutput {
     runtime_instance_id: String,
     database: PathBuf,
     endpoint: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+struct DaemonSessionsOutput {
+    active_sessions: usize,
+    lease_duration: Duration,
+    sweep_interval: Duration,
+    idle_shutdown: DaemonIdleShutdownOutput,
+}
+
+impl DaemonSessionsOutput {
+    fn write_human(&self, writer: &mut impl io::Write) -> io::Result<()> {
+        writeln!(writer, "active sessions: {}", self.active_sessions)?;
+        writeln!(
+            writer,
+            "session lease: {}",
+            HumanDuration::from(self.lease_duration)
+        )?;
+        writeln!(
+            writer,
+            "session sweep interval: {}",
+            HumanDuration::from(self.sweep_interval)
+        )?;
+        self.idle_shutdown.write_human(writer)
+    }
+}
+
+impl From<&DaemonSessionStatus> for DaemonSessionsOutput {
+    fn from(status: &DaemonSessionStatus) -> Self {
+        Self {
+            active_sessions: status.active_sessions(),
+            lease_duration: status.lease_duration(),
+            sweep_interval: status.sweep_interval(),
+            idle_shutdown: DaemonIdleShutdownOutput::from(status.idle_shutdown()),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct DaemonIdleShutdownOutput {
+    enabled: bool,
+    grace: Option<Duration>,
+    pending: bool,
+}
+
+impl DaemonIdleShutdownOutput {
+    fn write_human(&self, writer: &mut impl io::Write) -> io::Result<()> {
+        let state = if self.enabled { "enabled" } else { "disabled" };
+        writeln!(writer, "idle shutdown: {state}")?;
+        if let Some(grace) = self.grace {
+            writeln!(
+                writer,
+                "idle shutdown grace: {}",
+                HumanDuration::from(grace)
+            )?;
+        }
+        writeln!(writer, "idle shutdown pending: {}", self.pending)
+    }
+}
+
+impl From<&DaemonIdleShutdownStatus> for DaemonIdleShutdownOutput {
+    fn from(status: &DaemonIdleShutdownStatus) -> Self {
+        Self {
+            enabled: status.is_enabled(),
+            grace: status.grace(),
+            pending: status.is_pending(),
+        }
+    }
 }

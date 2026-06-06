@@ -31,6 +31,7 @@ mod daemon_session {
                 second.available_capabilities(),
                 &capability::local_api_capabilities()
             );
+            harness.assert_active_sessions(2).await?;
 
             let probe = second
                 .client()
@@ -44,6 +45,7 @@ mod daemon_session {
                 probe.lease().duration(),
                 DaemonSessionHarness::LEASE_DURATION
             );
+            harness.assert_active_sessions(3).await?;
 
             let renewed = second
                 .client()
@@ -59,7 +61,9 @@ mod daemon_session {
                 .client()
                 .close_session(CloseSessionRequest::new(probe.session_id().clone()))
                 .await?;
+            harness.assert_active_sessions(2).await?;
             first.close().await?;
+            harness.assert_active_sessions(1).await?;
             harness.assert_running_after_idle_grace().await?;
 
             second.close().await?;
@@ -159,6 +163,22 @@ impl DaemonSessionHarness {
 
         let status = self.first_runtime.daemon().inspect().await?;
         assert_eq!(status.state(), DaemonState::Running);
+        Ok(())
+    }
+
+    async fn assert_active_sessions(&self, expected: usize) -> synd_runtime::Result<()> {
+        let status = self.first_runtime.daemon().inspect().await?;
+        let sessions = status
+            .sessions()
+            .expect("running daemon should report session status");
+        let idle_shutdown = sessions.idle_shutdown();
+
+        assert_eq!(status.state(), DaemonState::Running);
+        assert_eq!(sessions.active_sessions(), expected);
+        assert_eq!(sessions.lease_duration(), Self::LEASE_DURATION);
+        assert!(idle_shutdown.is_enabled());
+        assert_eq!(idle_shutdown.grace(), Some(Self::IDLE_SHUTDOWN_GRACE));
+        assert!(!idle_shutdown.is_pending());
         Ok(())
     }
 

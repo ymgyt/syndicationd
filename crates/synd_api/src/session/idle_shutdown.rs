@@ -17,6 +17,10 @@ impl SessionIdleShutdown {
         Self { grace, shutdown }
     }
 
+    pub fn grace(&self) -> Duration {
+        self.grace
+    }
+
     fn schedule(&self, timer: IdleShutdownTimer) {
         let grace = self.grace;
         let shutdown = self.shutdown.clone();

@@ -5,6 +5,7 @@ use std::{
 
 use synd_protocol::{
     CapabilitySet, capability,
+    daemon::{DaemonIdleShutdownStatus, DaemonSessionStatus},
     session::{
         CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse,
         OpenSessionErrorResponse, OpenSessionRequest, OpenSessionResponse,
@@ -318,6 +319,24 @@ impl DaemonSessions {
         }
     }
 
+    pub fn status(&self) -> DaemonSessionStatus {
+        let state = self.lock_state();
+        let idle_shutdown = match &self.inner.idle_shutdown {
+            Some(idle_shutdown) => DaemonIdleShutdownStatus::enabled(
+                idle_shutdown.grace(),
+                state.idle_shutdown_pending(),
+            ),
+            None => DaemonIdleShutdownStatus::disabled(),
+        };
+
+        DaemonSessionStatus::new(
+            state.active_session_count(),
+            self.inner.lease_policy.lease_duration(),
+            self.inner.lease_policy.sweep_interval(),
+            idle_shutdown,
+        )
+    }
+
     fn supported_capabilities(&self) -> &CapabilitySet {
         &self.inner.supported_capabilities
     }
@@ -487,11 +506,14 @@ mod tests {
 
         let error = sessions
             .open(&OpenSessionRequest::new(CapabilitySet::new([
-                "timeline.read",
+                "unsupported.capability",
             ])))
             .unwrap_err();
 
-        assert_eq!(error.missing_capabilities().names(), ["timeline.read"]);
+        assert_eq!(
+            error.missing_capabilities().names(),
+            ["unsupported.capability"]
+        );
         assert_eq!(sessions.active_session_count(), 0);
     }
 

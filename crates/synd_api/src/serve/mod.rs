@@ -117,6 +117,7 @@ pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutd
         .route("/session/open", post(session::open))
         .route("/session/renew", post(session::renew))
         .route("/session/close", post(session::close))
+        .route(synd_protocol::daemon::STATUS_PATH, get(control::status))
         .route("/daemon/shutdown", post(control::shutdown))
         .layer(Extension(sessions))
         .layer(Extension(shutdown));
@@ -191,9 +192,17 @@ fn build_service(dep: Dependency, shutdown: &Shutdown) -> ApiService {
 }
 
 mod control {
-    use axum::{Extension, http::StatusCode};
+    use axum::{Extension, Json, http::StatusCode};
+    use synd_protocol::daemon::DaemonStatusResponse;
 
+    use crate::session::DaemonSessions;
     use crate::shutdown::Shutdown;
+
+    pub(super) async fn status(
+        Extension(sessions): Extension<DaemonSessions>,
+    ) -> Json<DaemonStatusResponse> {
+        Json(DaemonStatusResponse::new(sessions.status()))
+    }
 
     pub(super) async fn shutdown(Extension(shutdown): Extension<Shutdown>) -> StatusCode {
         shutdown.shutdown();

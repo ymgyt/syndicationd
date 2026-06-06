@@ -100,6 +100,10 @@ impl DaemonSessionsState {
         self.sessions.len()
     }
 
+    pub(super) fn idle_shutdown_pending(&self) -> bool {
+        self.idle_shutdown_timer.is_some()
+    }
+
     fn schedule_idle_shutdown(&mut self) -> DaemonSessionsEffect {
         let timer = IdleShutdownTimer::new();
         self.idle_shutdown_timer = Some(timer.clone());

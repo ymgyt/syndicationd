@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use synd_protocol::daemon::DaemonSessionStatus;
+
 use crate::placement::RuntimePlacement;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,11 +14,27 @@ pub enum State {
 pub struct Status {
     state: State,
     placement: RuntimePlacementSummary,
+    sessions: Option<DaemonSessionStatus>,
 }
 
 impl Status {
     pub(crate) fn new(state: State, placement: RuntimePlacementSummary) -> Self {
-        Self { state, placement }
+        Self {
+            state,
+            placement,
+            sessions: None,
+        }
+    }
+
+    pub(crate) fn running(
+        placement: RuntimePlacementSummary,
+        sessions: DaemonSessionStatus,
+    ) -> Self {
+        Self {
+            state: State::Running,
+            placement,
+            sessions: Some(sessions),
+        }
     }
 
     pub fn state(&self) -> State {
@@ -25,6 +43,10 @@ impl Status {
 
     pub fn placement(&self) -> &RuntimePlacementSummary {
         &self.placement
+    }
+
+    pub fn sessions(&self) -> Option<&DaemonSessionStatus> {
+        self.sessions.as_ref()
     }
 }
 

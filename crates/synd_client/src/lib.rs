@@ -9,10 +9,13 @@ use reqwest::{
     header::{self, HeaderValue},
 };
 use serde::{Serialize, de::DeserializeOwned};
-use synd_protocol::session::{
-    CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse, OpenSessionErrorResponse,
-    OpenSessionRequest, OpenSessionResponse, RenewSessionErrorResponse, RenewSessionRequest,
-    RenewSessionResponse,
+use synd_protocol::{
+    daemon::DaemonStatusResponse,
+    session::{
+        CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse,
+        OpenSessionErrorResponse, OpenSessionRequest, OpenSessionResponse,
+        RenewSessionErrorResponse, RenewSessionRequest, RenewSessionResponse,
+    },
 };
 use synd_support::o11y::{health_check::Health, opentelemetry::extension::*};
 use thiserror::Error;
@@ -206,6 +209,7 @@ impl Client {
     const SESSION_OPEN: &'static str = "/session/open";
     const SESSION_RENEW: &'static str = "/session/renew";
     const SESSION_CLOSE: &'static str = "/session/close";
+    const DAEMON_STATUS: &'static str = synd_protocol::daemon::STATUS_PATH;
     const DAEMON_SHUTDOWN: &'static str = "/daemon/shutdown";
 
     pub fn new(endpoint: Url, options: ClientOptions) -> Result<Self, SyndApiError> {
@@ -527,6 +531,18 @@ impl Client {
             .map_err(SyndApiError::from_status_error)?;
 
         Ok(())
+    }
+
+    pub async fn daemon_status(&self) -> Result<DaemonStatusResponse, SyndApiError> {
+        self.client
+            .get(self.endpoint.join(Self::DAEMON_STATUS).unwrap())
+            .send()
+            .await?
+            .error_for_status()
+            .map_err(SyndApiError::from_status_error)?
+            .json()
+            .await
+            .map_err(SyndApiError::BuildRequest)
     }
 
     pub async fn open_session(

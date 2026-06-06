@@ -2,6 +2,7 @@
 #![warn(rustdoc::broken_intra_doc_links)]
 
 pub mod capability;
+pub mod daemon;
 pub mod session;
 
 pub use capability::CapabilitySet;
