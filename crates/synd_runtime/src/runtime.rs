@@ -1,8 +1,8 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    DaemonControl, DaemonLaunchConfig, DaemonLaunchLog, Result, RuntimeDatabase, Session,
-    SessionConfig, SessionRequirements,
+    DaemonControl, DaemonLaunchConfig, DaemonLaunchLog, Result, RuntimeDatabase,
+    RuntimePlacementSummary, Session, SessionConfig, SessionRequirements,
     acquisition::SessionAcquisition,
     placement::{RuntimePlacement, RuntimePlacementEnvironment, RuntimePlacementResolver},
 };
@@ -27,6 +27,10 @@ impl Runtime {
 
     pub(crate) fn placement(&self) -> &RuntimePlacement {
         &self.placement
+    }
+
+    pub fn placement_summary(&self) -> RuntimePlacementSummary {
+        RuntimePlacementSummary::from_placement(&self.placement)
     }
 
     pub async fn acquire_session(&self) -> Result<Session> {

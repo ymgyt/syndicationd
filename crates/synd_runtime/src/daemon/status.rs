@@ -52,18 +52,26 @@ impl Status {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimePlacementSummary {
+    runtime_root: PathBuf,
     runtime_instance_id: String,
     database: PathBuf,
     endpoint: PathBuf,
+    startup_lock: PathBuf,
 }
 
 impl RuntimePlacementSummary {
     pub(crate) fn from_placement(placement: &RuntimePlacement) -> Self {
         Self {
+            runtime_root: placement.root().path().to_path_buf(),
             runtime_instance_id: placement.instance().id().to_string(),
             database: placement.instance().canonical_database_path().to_path_buf(),
             endpoint: placement.endpoint().path().to_path_buf(),
+            startup_lock: placement.startup_lock_path().path().to_path_buf(),
         }
+    }
+
+    pub fn runtime_root(&self) -> &Path {
+        &self.runtime_root
     }
 
     pub fn runtime_instance_id(&self) -> &str {
@@ -76,6 +84,10 @@ impl RuntimePlacementSummary {
 
     pub fn endpoint(&self) -> &Path {
         &self.endpoint
+    }
+
+    pub fn startup_lock(&self) -> &Path {
+        &self.startup_lock
     }
 }
 
