@@ -20,7 +20,11 @@ impl FeedRuntime {
             RuntimeConfig::new(RuntimeDatabase::sqlite(config.sqlite_db()))
                 .with_api_timeout(config.api_timeout(), API_USER_AGENT)
                 .with_session_timeout(SESSION_ACQUIRE_TIMEOUT)
-                .with_daemon_log(config.log_file()),
+                .with_daemon_log(config.log_file())
+                .with_daemon_session_lease_duration(config.daemon_session_lease_duration())
+                .with_daemon_session_idle_shutdown_grace(
+                    config.daemon_session_idle_shutdown_grace(),
+                ),
         )
         .context("Failed to resolve runtime placement")?;
 

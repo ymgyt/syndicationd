@@ -1,10 +1,13 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{path::PathBuf, process::ExitCode, time::Duration};
 
 use clap::{Args, Subcommand};
 use synd_runtime::{Daemon, DaemonConfig, DaemonState, DaemonStatus, RuntimeDatabase};
 use tracing::error;
 
-use crate::{config::ConfigResolver, runtime::FeedRuntime};
+use crate::{
+    config::{self, ConfigResolver},
+    runtime::FeedRuntime,
+};
 
 /// Manage the runtime daemon
 #[derive(Args, Debug)]
@@ -36,12 +39,27 @@ struct DaemonServeCommand {
     /// `SQLite` database path served by this daemon
     #[arg(long = "sqlite-db")]
     sqlite_db: Option<PathBuf>,
+    /// Session lease duration granted by this daemon
+    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_LEASE_DURATION)]
+    session_lease_duration: Option<Duration>,
+    /// Grace period before this daemon shuts down after all sessions are gone
+    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_IDLE_SHUTDOWN_GRACE)]
+    session_idle_shutdown_grace: Option<Duration>,
 }
 
 impl DaemonServeCommand {
     async fn run(self, config: ConfigResolver) -> ExitCode {
         let sqlite_db = self.sqlite_db.unwrap_or_else(|| config.sqlite_db());
-        let daemon = Daemon::new(DaemonConfig::new(RuntimeDatabase::sqlite(sqlite_db)));
+        let mut daemon_config = DaemonConfig::new(RuntimeDatabase::sqlite(sqlite_db))
+            .with_session_lease_duration(config.daemon_session_lease_duration())
+            .with_session_idle_shutdown_grace(config.daemon_session_idle_shutdown_grace());
+        if let Some(duration) = self.session_lease_duration {
+            daemon_config = daemon_config.with_session_lease_duration(duration);
+        }
+        if let Some(grace) = self.session_idle_shutdown_grace {
+            daemon_config = daemon_config.with_session_idle_shutdown_grace(grace);
+        }
+        let daemon = Daemon::new(daemon_config);
 
         match daemon.serve().await {
             Ok(()) => ExitCode::SUCCESS,

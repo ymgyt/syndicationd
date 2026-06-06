@@ -5,10 +5,9 @@ use futures_util::future;
 use octocrab::Octocrab;
 use ratatui::backend::TestBackend;
 use synd_api::{
-    cli::{FeedCrawlOptions, ServeOptions, TlsOptions},
     client::github::GithubClient,
     dependency::Dependency,
-    serve::auth::Authenticator as ApiAuthenticator,
+    serve::{self, ServeOptions, auth::Authenticator as ApiAuthenticator},
     shutdown::Shutdown,
 };
 use synd_auth::{
@@ -346,29 +345,30 @@ pub async fn serve_api(
 
         db
     };
-    let tls_options = TlsOptions {
-        certificate: Some(synd_test::certificate()),
-        private_key: Some(synd_test::private_key()),
-    };
     let serve_options = ServeOptions {
         timeout: Duration::from_secs(10),
         body_limit_bytes: 1024 * 2,
         concurrency_limit: 100,
-    };
-    let feed_crawl_options = FeedCrawlOptions {
-        default_feed_crawl_interval: polling_interval(Duration::from_hours(1)),
+        ..ServeOptions::default()
     };
 
     let shutdown = Shutdown::watch_signal(future::pending(), || {});
-    let registry_config = feed_crawl_options.registry_config();
+    let registry_config = synd_registry::FeedRegistryConfig {
+        default_crawl_policy: CrawlPolicy::interval(polling_interval(Duration::from_hours(1))),
+        ..synd_registry::FeedRegistryConfig::default()
+    };
     let registry_service =
         RegistryService::start(db.clone(), registry_config, shutdown.cancellation_token());
     let (registry, event_workers) = registry_service.into_parts();
+    let tls_config =
+        serve::rustls_config_from_pem_files(synd_test::certificate(), synd_test::private_key())
+            .await
+            .unwrap();
 
     let mut dep = Dependency::new(
         ApiAuthenticator::new().unwrap(),
         registry,
-        tls_options.rustls_config(false).await.unwrap(),
+        Some(tls_config),
         serve_options,
     );
 

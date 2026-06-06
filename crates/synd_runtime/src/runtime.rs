@@ -94,8 +94,24 @@ impl Config {
 
     #[must_use]
     pub fn with_daemon_log(mut self, log: impl Into<PathBuf>) -> Self {
-        self.daemon =
-            DaemonLaunchConfig::new(self.daemon.executable().clone(), DaemonLaunchLog::file(log));
+        self.daemon = self.daemon.with_log(DaemonLaunchLog::file(log));
+        self
+    }
+
+    #[must_use]
+    pub fn with_daemon_session_lease_duration(mut self, lease_duration: Duration) -> Self {
+        self.daemon = self.daemon.with_session_lease_duration(lease_duration);
+        self
+    }
+
+    #[must_use]
+    pub fn with_daemon_session_idle_shutdown_grace(
+        mut self,
+        idle_shutdown_grace: Duration,
+    ) -> Self {
+        self.daemon = self
+            .daemon
+            .with_session_idle_shutdown_grace(idle_shutdown_grace);
         self
     }
 

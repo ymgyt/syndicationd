@@ -4,7 +4,7 @@ use std::{
 };
 
 use synd_protocol::{
-    CapabilitySet,
+    CapabilitySet, capability,
     session::{
         CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse,
         OpenSessionErrorResponse, OpenSessionRequest, OpenSessionResponse,
@@ -31,8 +31,62 @@ use state::{
 
 pub const DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
 pub const DEFAULT_DAEMON_SESSION_LEASE_DURATION: Duration = Duration::from_secs(30);
-pub const DEFAULT_DAEMON_SESSION_RENEWAL_INTERVAL: Duration = Duration::from_secs(10);
 pub const DEFAULT_DAEMON_SESSION_SWEEP_INTERVAL: Duration = Duration::from_secs(5);
+
+/// Session lifecycle settings used by a daemon API service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DaemonSessionConfig {
+    lease_policy: DaemonSessionLeasePolicy,
+    idle_shutdown_grace: Duration,
+}
+
+impl DaemonSessionConfig {
+    #[must_use]
+    pub fn new(lease_policy: DaemonSessionLeasePolicy, idle_shutdown_grace: Duration) -> Self {
+        Self {
+            lease_policy,
+            idle_shutdown_grace,
+        }
+    }
+
+    #[must_use]
+    pub fn with_lease_duration(self, lease_duration: Duration) -> Self {
+        Self {
+            lease_policy: DaemonSessionLeasePolicy::new(
+                lease_duration,
+                self.lease_policy.sweep_interval(),
+            ),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn with_idle_shutdown_grace(self, idle_shutdown_grace: Duration) -> Self {
+        Self {
+            idle_shutdown_grace,
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn lease_policy(self) -> DaemonSessionLeasePolicy {
+        self.lease_policy
+    }
+
+    #[must_use]
+    pub fn idle_shutdown_grace(self) -> Duration {
+        self.idle_shutdown_grace
+    }
+}
+
+impl Default for DaemonSessionConfig {
+    fn default() -> Self {
+        Self::new(
+            DaemonSessionLeasePolicy::default(),
+            DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE,
+        )
+    }
+}
 
 /// Owns daemon sessions accepted by this API process.
 #[derive(Debug, Clone)]
@@ -42,7 +96,7 @@ pub struct DaemonSessions {
 
 impl Default for DaemonSessions {
     fn default() -> Self {
-        Self::new(CapabilitySet::default())
+        Self::new(capability::local_api_capabilities())
     }
 }
 
@@ -107,7 +161,9 @@ impl DaemonSessions {
         );
 
         match SessionOpenDecision::from(context) {
-            SessionOpenDecision::Accept { capabilities } => {
+            SessionOpenDecision::Accept {
+                available_capabilities,
+            } => {
                 let session_id = self.inner.id_issuer.issue();
                 let lease = self.inner.lease_policy.lease();
                 let lease_deadline = self.inner.lease_policy.deadline_from(now);
@@ -131,7 +187,7 @@ impl DaemonSessions {
 
                 Ok(OpenSessionResponse::with_lease(
                     session_id,
-                    capabilities,
+                    available_capabilities,
                     lease,
                 ))
             }
@@ -288,43 +344,38 @@ struct DaemonSessionsInner {
     state: Mutex<DaemonSessionsState>,
 }
 
-/// Lease timing policy for daemon sessions.
+/// Policy used to grant leases and expire sessions that stop renewing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DaemonSessionLeasePolicy {
     lease_duration: Duration,
-    renewal_interval: Duration,
     sweep_interval: Duration,
 }
 
 impl DaemonSessionLeasePolicy {
-    pub fn new(
-        lease_duration: Duration,
-        renewal_interval: Duration,
-        sweep_interval: Duration,
-    ) -> Self {
+    #[must_use]
+    pub fn new(lease_duration: Duration, sweep_interval: Duration) -> Self {
         Self {
             lease_duration,
-            renewal_interval,
             sweep_interval,
         }
     }
 
+    #[must_use]
     fn lease(self) -> SessionLease {
         SessionLease::new(self.lease_duration)
     }
 
+    #[must_use]
     fn deadline_from(self, now: Instant) -> SessionLeaseDeadline {
         SessionLeaseDeadline::new(now + self.lease_duration)
     }
 
+    #[must_use]
     pub fn lease_duration(self) -> Duration {
         self.lease_duration
     }
 
-    pub fn renewal_interval(self) -> Duration {
-        self.renewal_interval
-    }
-
+    #[must_use]
     pub fn sweep_interval(self) -> Duration {
         self.sweep_interval
     }
@@ -334,7 +385,6 @@ impl Default for DaemonSessionLeasePolicy {
     fn default() -> Self {
         Self::new(
             DEFAULT_DAEMON_SESSION_LEASE_DURATION,
-            DEFAULT_DAEMON_SESSION_RENEWAL_INTERVAL,
             DEFAULT_DAEMON_SESSION_SWEEP_INTERVAL,
         )
     }
@@ -376,7 +426,10 @@ mod tests {
                     CapabilitySet::new(["timeline.read", "subscription.write"]),
                 ),
                 SessionOpenDecision::Accept {
-                    capabilities: CapabilitySet::new(["timeline.read", "subscription.write"]),
+                    available_capabilities: CapabilitySet::new([
+                        "timeline.read",
+                        "subscription.write",
+                    ]),
                 },
             ),
             (
@@ -417,11 +470,7 @@ mod tests {
     #[test]
     fn opens_session_with_lease_policy() {
         let now = Instant::now();
-        let policy = DaemonSessionLeasePolicy::new(
-            Duration::from_secs(12),
-            Duration::from_secs(4),
-            Duration::from_secs(2),
-        );
+        let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(12), Duration::from_secs(2));
         let sessions = DaemonSessions::default().with_lease_policy(policy);
 
         let opened = sessions
@@ -449,11 +498,7 @@ mod tests {
     #[test]
     fn renews_session_before_lease_deadline() {
         let now = Instant::now();
-        let policy = DaemonSessionLeasePolicy::new(
-            Duration::from_secs(30),
-            Duration::from_secs(10),
-            Duration::from_secs(5),
-        );
+        let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(30), Duration::from_secs(5));
         let sessions = DaemonSessions::default().with_lease_policy(policy);
         let opened = sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
@@ -474,11 +519,7 @@ mod tests {
     #[test]
     fn rejects_and_removes_expired_session_during_renew() {
         let now = Instant::now();
-        let policy = DaemonSessionLeasePolicy::new(
-            Duration::from_secs(30),
-            Duration::from_secs(10),
-            Duration::from_secs(5),
-        );
+        let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(30), Duration::from_secs(5));
         let sessions = DaemonSessions::default().with_lease_policy(policy);
         let opened = sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
@@ -589,11 +630,7 @@ mod tests {
     #[test]
     fn sweeps_expired_sessions() {
         let now = Instant::now();
-        let policy = DaemonSessionLeasePolicy::new(
-            Duration::from_secs(30),
-            Duration::from_secs(10),
-            Duration::from_secs(5),
-        );
+        let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(30), Duration::from_secs(5));
         let sessions = DaemonSessions::default().with_lease_policy(policy);
         sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
@@ -704,11 +741,8 @@ mod tests {
         let shutdown = Shutdown::manual(move || {
             shutdown_called_for_hook.store(true, Ordering::Relaxed);
         });
-        let policy = DaemonSessionLeasePolicy::new(
-            Duration::from_millis(10),
-            Duration::from_millis(5),
-            Duration::from_millis(5),
-        );
+        let policy =
+            DaemonSessionLeasePolicy::new(Duration::from_millis(10), Duration::from_millis(5));
         let sessions = DaemonSessions::default()
             .with_lease_policy(policy)
             .with_idle_shutdown(SessionIdleShutdown::new(

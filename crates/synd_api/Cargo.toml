@@ -12,34 +12,27 @@ name        = "synd-api"
 readme      = "README.md"
 version     = "0.2.6"
 
-[[bin]]
-name = "synd-api"
-path = "src/main.rs"
-
 [dependencies]
 synd-auth = { path = "../synd_auth", version = "0.2.5" }
 synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["graphql"] }
 synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
 synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
 synd-registry = { path = "../synd_registry", version = "0.1.0" }
-synd-support = { path = "../synd_support", version = "0.1.0", features = ["color", "humantime", "o11y"] }
+synd-support = { path = "../synd_support", version = "0.1.0", features = ["o11y"] }
 
 async-graphql      = { workspace = true, features = ["tracing"] }
 async-graphql-axum = { version = "7.2.1" }
 axum               = { workspace = true, features = ["json"] }
 axum-server        = { workspace = true }
 chrono             = { workspace = true }
-clap               = { workspace = true, features = ["derive", "env", "help", "std"] }
-fdlimit            = { workspace = true }
 feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
 pin-project        = "1.1.11"
 reqwest            = { workspace = true }
-rustls             = { workspace = true }
 serde              = { workspace = true }
-tokio              = { workspace = true, features = ["io-std", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync"] }
+tokio              = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-metrics      = { version = "0.5.0", default-features = false, features = ["rt"] }
 tokio-util         = { workspace = true }
 tower              = { version = "0.5.3", default-features = false, features = ["limit", "timeout"] }
@@ -55,9 +48,6 @@ introspection        = []
 opentelemetry-stdout = ["synd-support/opentelemetry-stdout"]
 
 [dev-dependencies]
-synd-test = { path = "../synd_test" }
-
-assert_cmd         = { workspace = true }
 insta              = { workspace = true, features = ["yaml", "redactions"] }
 tracing-subscriber = { workspace = true }
 

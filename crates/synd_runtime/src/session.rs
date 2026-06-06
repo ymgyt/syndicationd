@@ -4,21 +4,28 @@ use crate::{CapabilitySet, Result};
 #[cfg(test)]
 pub(crate) use renewal::SessionRenewalObserver;
 use renewal::{SessionLeaseRenewal, SessionLeaseRenewalHandle, SessionRenewalSchedule};
-use synd_protocol::session::{CloseSessionRequest, SessionId, SessionLease};
+use synd_protocol::{
+    capability,
+    session::{CloseSessionRequest, SessionId, SessionLease},
+};
 
 mod renewal;
 
 pub struct Session {
     client: synd_client::Client,
-    capabilities: CapabilitySet,
+    available_capabilities: CapabilitySet,
     handle: Handle,
 }
 
 impl Session {
-    pub fn new(client: synd_client::Client, capabilities: CapabilitySet, handle: Handle) -> Self {
+    pub fn new(
+        client: synd_client::Client,
+        available_capabilities: CapabilitySet,
+        handle: Handle,
+    ) -> Self {
         Self {
             client,
-            capabilities,
+            available_capabilities,
             handle,
         }
     }
@@ -27,8 +34,8 @@ impl Session {
         &self.client
     }
 
-    pub fn capabilities(&self) -> &CapabilitySet {
-        &self.capabilities
+    pub fn available_capabilities(&self) -> &CapabilitySet {
+        &self.available_capabilities
     }
 
     pub async fn close(self) -> Result<()> {
@@ -191,17 +198,25 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Requirements {
-    capabilities: CapabilitySet,
+    required_capabilities: CapabilitySet,
 }
 
 impl Requirements {
-    pub fn new(capabilities: CapabilitySet) -> Self {
-        Self { capabilities }
+    pub fn new(required_capabilities: CapabilitySet) -> Self {
+        Self {
+            required_capabilities,
+        }
     }
 
-    pub fn capabilities(&self) -> &CapabilitySet {
-        &self.capabilities
+    pub fn required_capabilities(&self) -> &CapabilitySet {
+        &self.required_capabilities
+    }
+}
+
+impl Default for Requirements {
+    fn default() -> Self {
+        Self::new(capability::local_api_capabilities())
     }
 }

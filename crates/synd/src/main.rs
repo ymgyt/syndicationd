@@ -98,11 +98,17 @@ async fn build_app(
     config: ConfigResolver,
     dry_run: bool,
 ) -> anyhow::Result<(Application, Session)> {
+    let terminal = Terminal::new().context("Failed to construct terminal")?;
+    let github_client = if config.is_github_enable() {
+        Some(GithubClient::new(config.github_pat()).context("Failed to construct github client")?)
+    } else {
+        None
+    };
     let session = FeedRuntime::new(&config)?.acquire_session().await?;
     let feed_backend = FeedBackend::established(session.client().clone());
 
     let mut builder = Application::builder()
-        .terminal(Terminal::new().context("Failed to construct terminal")?)
+        .terminal(terminal)
         .feed_backend(feed_backend)
         .categories(config.categories())
         .config(Config {
@@ -120,10 +126,8 @@ async fn build_app(
         )))
         .dry_run(dry_run);
 
-    if config.is_github_enable() {
-        builder = builder.github_client(
-            GithubClient::new(config.github_pat()).context("Failed to construct github client")?,
-        );
+    if let Some(github_client) = github_client {
+        builder = builder.github_client(github_client);
     }
 
     Ok((builder.build(), session))
@@ -139,6 +143,7 @@ async fn main() -> ExitCode {
             log,
             cache_dir,
             api,
+            daemon,
             backend,
             feed,
             github,
@@ -152,6 +157,7 @@ async fn main() -> ExitCode {
             .log_file(log)
             .cache_dir(cache_dir)
             .api_options(api)
+            .daemon_options(daemon)
             .backend_options(backend)
             .feed_options(feed)
             .github_options(github)

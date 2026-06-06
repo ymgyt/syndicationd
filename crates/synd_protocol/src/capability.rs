@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+pub const TIMELINE_READ: &str = "timeline.read";
+pub const SUBSCRIPTION_WRITE: &str = "subscription.write";
+pub const FEED_REFRESH: &str = "feed.refresh";
+
+pub fn local_api_capabilities() -> CapabilitySet {
+    CapabilitySet::new([TIMELINE_READ, SUBSCRIPTION_WRITE, FEED_REFRESH])
+}
+
 /// Capability names negotiated across the client/server protocol.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilitySet {

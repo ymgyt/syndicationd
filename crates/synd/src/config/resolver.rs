@@ -12,7 +12,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    cli::{self, ApiOptions, BackendOptions, FeedOptions, GithubOptions},
+    cli::{self, ApiOptions, BackendOptions, DaemonOptions, FeedOptions, GithubOptions},
     config::{
         self,
         file::{ConfigFile, ConfigFileError},
@@ -36,6 +36,8 @@ pub struct ConfigResolver {
     cache_dir: Entry<PathBuf>,
     sqlite_db: Entry<PathBuf>,
     api_timeout: Entry<Duration>,
+    daemon_session_lease_duration: Entry<Duration>,
+    daemon_session_idle_shutdown_grace: Entry<Duration>,
     feed_entries_limit: Entry<usize>,
     feed_browser_command: Entry<PathBuf>,
     feed_browser_args: Entry<Vec<String>>,
@@ -69,6 +71,14 @@ impl ConfigResolver {
 
     pub fn api_timeout(&self) -> Duration {
         self.api_timeout.resolve()
+    }
+
+    pub fn daemon_session_lease_duration(&self) -> Duration {
+        self.daemon_session_lease_duration.resolve()
+    }
+
+    pub fn daemon_session_idle_shutdown_grace(&self) -> Duration {
+        self.daemon_session_idle_shutdown_grace.resolve()
     }
 
     pub fn feed_entries_limit(&self) -> usize {
@@ -134,6 +144,7 @@ pub struct ConfigResolverBuilder<FS = fsimpl::FileSystem> {
     log_file_flag: Option<PathBuf>,
     cache_dir_flag: Option<PathBuf>,
     api_flags: Option<ApiOptions>,
+    daemon_flags: Option<DaemonOptions>,
     backend_flags: Option<BackendOptions>,
     feed_flags: Option<FeedOptions>,
     github_flags: Option<GithubOptions>,
@@ -170,6 +181,14 @@ impl ConfigResolverBuilder {
     pub fn api_options(self, api_options: ApiOptions) -> Self {
         Self {
             api_flags: Some(api_options),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn daemon_options(self, daemon_options: DaemonOptions) -> Self {
+        Self {
+            daemon_flags: Some(daemon_options),
             ..self
         }
     }
@@ -223,6 +242,11 @@ impl ConfigResolverBuilder {
 
         let ConfigResolverBuilder {
             api_flags: Some(ApiOptions { client_timeout }),
+            daemon_flags:
+                Some(DaemonOptions {
+                    daemon_session_lease_duration,
+                    daemon_session_idle_shutdown_grace,
+                }),
             backend_flags: Some(BackendOptions { sqlite_db }),
             feed_flags:
                 Some(FeedOptions {
@@ -278,6 +302,26 @@ impl ConfigResolverBuilder {
                         .and_then(|api| api.timeout.take()),
                 )
                 .with_flag(client_timeout),
+            daemon_session_lease_duration: Entry::with_default(
+                config::daemon::default_session_lease_duration(),
+            )
+            .with_file(
+                config_file
+                    .as_mut()
+                    .and_then(|c| c.daemon.as_mut())
+                    .and_then(|daemon| daemon.session_lease_duration.take()),
+            )
+            .with_flag(daemon_session_lease_duration),
+            daemon_session_idle_shutdown_grace: Entry::with_default(
+                config::daemon::default_session_idle_shutdown_grace(),
+            )
+            .with_file(
+                config_file
+                    .as_mut()
+                    .and_then(|c| c.daemon.as_mut())
+                    .and_then(|daemon| daemon.session_idle_shutdown_grace.take()),
+            )
+            .with_flag(daemon_session_idle_shutdown_grace),
 
             feed_entries_limit: Entry::with_default(config::feed::DEFAULT_ENTRIES_LIMIT)
                 .with_file(

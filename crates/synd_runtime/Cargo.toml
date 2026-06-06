@@ -19,7 +19,7 @@ synd-feed = { path = "../synd_feed", version = "0.3.5" }
 synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
 synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
 synd-registry = { path = "../synd_registry", version = "0.1.0" }
-synd-support = { path = "../synd_support", version = "0.1.0" }
+synd-support = { path = "../synd_support", version = "0.1.0", features = ["humantime"] }
 
 rustix    = { version = "1.1.4", features = ["fs"] }
 sha2      = { workspace = true }

@@ -30,8 +30,12 @@ impl SessionOpenContext {
 /// Branch selected for a session open request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum SessionOpenDecision {
-    Accept { capabilities: CapabilitySet },
-    RejectMissingCapabilities { missing_capabilities: CapabilitySet },
+    Accept {
+        available_capabilities: CapabilitySet,
+    },
+    RejectMissingCapabilities {
+        missing_capabilities: CapabilitySet,
+    },
 }
 
 impl From<SessionOpenContext> for SessionOpenDecision {
@@ -42,7 +46,7 @@ impl From<SessionOpenContext> for SessionOpenDecision {
 
         if missing_capabilities.is_empty() {
             Self::Accept {
-                capabilities: context.supported_capabilities,
+                available_capabilities: context.supported_capabilities,
             }
         } else {
             Self::RejectMissingCapabilities {

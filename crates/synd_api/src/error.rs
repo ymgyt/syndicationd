@@ -19,17 +19,11 @@ pub enum Error {
     #[error(transparent)]
     Github(#[from] crate::client::github::GithubClientError),
 
-    #[error("{field} is required unless local mode is enabled")]
-    TlsOptionRequired { field: &'static str },
-
-    #[error("tls options are invalid: {source}")]
-    TlsOptions {
+    #[error("tls config is invalid: {source}")]
+    TlsConfig {
         #[source]
         source: std::io::Error,
     },
-
-    #[error("local mode requires SYND_LOCAL_TOKEN")]
-    LocalTokenRequired,
 
     #[error("local token must not be empty")]
     EmptyLocalToken,

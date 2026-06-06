@@ -52,6 +52,8 @@ pub struct Args {
     #[command(flatten)]
     pub api: ApiOptions,
     #[command(flatten)]
+    pub daemon: DaemonOptions,
+    #[command(flatten)]
     pub backend: BackendOptions,
     #[command(flatten)]
     pub feed: FeedOptions,
@@ -67,6 +69,17 @@ pub struct ApiOptions {
     /// Client timeout(ex. 30s)
     #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::CLIENT_TIMEOUT)]
     pub client_timeout: Option<Duration>,
+}
+
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Daemon options")]
+pub struct DaemonOptions {
+    /// Session lease duration granted by the local daemon
+    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_LEASE_DURATION)]
+    pub daemon_session_lease_duration: Option<Duration>,
+    /// Grace period before the local daemon shuts down after all sessions are gone
+    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_IDLE_SHUTDOWN_GRACE)]
+    pub daemon_session_idle_shutdown_grace: Option<Duration>,
 }
 
 #[derive(clap::Args, Debug)]

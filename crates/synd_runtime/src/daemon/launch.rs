@@ -3,9 +3,11 @@ use std::{
     fs::{File, OpenOptions},
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
+    time::Duration,
 };
 
-use synd_support::dirs::SyndicationdDirs;
+use synd_api::session::DaemonSessionConfig;
+use synd_support::{dirs::SyndicationdDirs, time::humantime::HumanDuration};
 use tracing::{debug, warn};
 
 use crate::{Result, placement::RuntimePlacement};
@@ -15,11 +17,16 @@ use crate::{Result, placement::RuntimePlacement};
 pub struct DaemonLaunchConfig {
     executable: DaemonExecutable,
     log: DaemonLaunchLog,
+    session: DaemonSessionConfig,
 }
 
 impl DaemonLaunchConfig {
     pub fn new(executable: DaemonExecutable, log: DaemonLaunchLog) -> Self {
-        Self { executable, log }
+        Self {
+            executable,
+            log,
+            session: DaemonSessionConfig::default(),
+        }
     }
 
     pub fn executable(&self) -> &DaemonExecutable {
@@ -28,6 +35,34 @@ impl DaemonLaunchConfig {
 
     pub fn log(&self) -> &DaemonLaunchLog {
         &self.log
+    }
+
+    pub fn session(&self) -> DaemonSessionConfig {
+        self.session
+    }
+
+    #[must_use]
+    pub fn with_log(mut self, log: DaemonLaunchLog) -> Self {
+        self.log = log;
+        self
+    }
+
+    #[must_use]
+    pub fn with_session(mut self, session: DaemonSessionConfig) -> Self {
+        self.session = session;
+        self
+    }
+
+    #[must_use]
+    pub fn with_session_lease_duration(mut self, lease_duration: Duration) -> Self {
+        self.session = self.session.with_lease_duration(lease_duration);
+        self
+    }
+
+    #[must_use]
+    pub fn with_session_idle_shutdown_grace(mut self, idle_shutdown_grace: Duration) -> Self {
+        self.session = self.session.with_idle_shutdown_grace(idle_shutdown_grace);
+        self
     }
 }
 
@@ -111,20 +146,74 @@ struct OpenedDaemonLaunchLog {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ResolvedDaemonLaunchCommand {
     executable: PathBuf,
-    arguments: Vec<OsString>,
+    arguments: DaemonServeArguments,
 }
 
 impl ResolvedDaemonLaunchCommand {
-    fn daemon_serve(executable: PathBuf, database_path: &Path) -> Self {
+    fn daemon_serve(
+        executable: PathBuf,
+        database_path: &Path,
+        session: DaemonSessionConfig,
+    ) -> Self {
         Self {
             executable,
-            arguments: vec![
-                OsString::from("daemon"),
-                OsString::from("serve"),
-                OsString::from("--sqlite-db"),
-                database_path.as_os_str().to_os_string(),
-            ],
+            arguments: DaemonServeArguments::new(database_path, session),
         }
+    }
+}
+
+/// Argument vector for invoking `synd daemon serve`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DaemonServeArguments {
+    values: Vec<OsString>,
+}
+
+impl DaemonServeArguments {
+    fn new(database_path: &Path, session: DaemonSessionConfig) -> Self {
+        let mut values = vec![
+            OsString::from("daemon"),
+            OsString::from("serve"),
+            OsString::from("--sqlite-db"),
+            database_path.as_os_str().to_os_string(),
+        ];
+        values.extend(DaemonSessionServeArguments::from(session));
+
+        Self { values }
+    }
+
+    fn as_slice(&self) -> &[OsString] {
+        &self.values
+    }
+}
+
+/// Session-related argument vector fragment for `synd daemon serve`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DaemonSessionServeArguments {
+    lease_duration: Duration,
+    idle_shutdown_grace: Duration,
+}
+
+impl From<DaemonSessionConfig> for DaemonSessionServeArguments {
+    fn from(config: DaemonSessionConfig) -> Self {
+        Self {
+            lease_duration: config.lease_policy().lease_duration(),
+            idle_shutdown_grace: config.idle_shutdown_grace(),
+        }
+    }
+}
+
+impl IntoIterator for DaemonSessionServeArguments {
+    type Item = OsString;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        vec![
+            OsString::from("--session-lease-duration"),
+            OsString::from(String::from(HumanDuration::from(self.lease_duration))),
+            OsString::from("--session-idle-shutdown-grace"),
+            OsString::from(String::from(HumanDuration::from(self.idle_shutdown_grace))),
+        ]
+        .into_iter()
     }
 }
 
@@ -143,6 +232,7 @@ impl<'a> DaemonLauncher<'a> {
         let command = ResolvedDaemonLaunchCommand::daemon_serve(
             self.config.executable().resolve()?,
             self.placement.instance().canonical_database_path(),
+            self.config.session(),
         );
         let log = self.config.log().open()?;
         debug!(
@@ -153,7 +243,7 @@ impl<'a> DaemonLauncher<'a> {
         );
 
         let child = Command::new(&command.executable)
-            .args(&command.arguments)
+            .args(command.arguments.as_slice())
             .stdin(Stdio::null())
             .stdout(Stdio::from(log.stdout))
             .stderr(Stdio::from(log.stderr))
@@ -187,7 +277,9 @@ impl DaemonHandle {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::OsString, path::Path};
+    use std::{ffi::OsString, path::Path, time::Duration};
+
+    use synd_api::session::{DaemonSessionConfig, DaemonSessionLeasePolicy};
 
     use super::{DaemonExecutable, DaemonLaunchLog};
 
@@ -196,16 +288,47 @@ mod tests {
         let command = super::ResolvedDaemonLaunchCommand::daemon_serve(
             DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
             Path::new("/tmp/synd.db"),
+            DaemonSessionConfig::default(),
         );
 
         assert_eq!(command.executable, Path::new("/usr/bin/synd"));
         assert_eq!(
-            command.arguments,
+            command.arguments.as_slice(),
             [
                 OsString::from("daemon"),
                 OsString::from("serve"),
                 OsString::from("--sqlite-db"),
                 OsString::from("/tmp/synd.db"),
+                OsString::from("--session-lease-duration"),
+                OsString::from("30s"),
+                OsString::from("--session-idle-shutdown-grace"),
+                OsString::from("30s"),
+            ]
+        );
+    }
+
+    #[test]
+    fn builds_daemon_serve_command_with_session_config() {
+        let command = super::ResolvedDaemonLaunchCommand::daemon_serve(
+            DaemonExecutable::path("/usr/bin/synd").resolve().unwrap(),
+            Path::new("/tmp/synd.db"),
+            DaemonSessionConfig::new(
+                DaemonSessionLeasePolicy::new(Duration::from_mins(1), Duration::from_secs(5)),
+                Duration::from_mins(2),
+            ),
+        );
+
+        assert_eq!(
+            command.arguments.as_slice(),
+            [
+                OsString::from("daemon"),
+                OsString::from("serve"),
+                OsString::from("--sqlite-db"),
+                OsString::from("/tmp/synd.db"),
+                OsString::from("--session-lease-duration"),
+                OsString::from("1m"),
+                OsString::from("--session-idle-shutdown-grace"),
+                OsString::from("2m"),
             ]
         );
     }

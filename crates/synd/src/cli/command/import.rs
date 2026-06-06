@@ -79,7 +79,9 @@ impl ImportCommand {
             interval: Duration::from_millis(500),
         };
 
-        import.import().await
+        let result = import.import().await;
+
+        cx.finish(result).await
     }
 
     fn read_input(path: &Path) -> anyhow::Result<Input> {

@@ -28,12 +28,29 @@ pub mod env {
     pub const FEED_BROWSER_ARGS: &str = env_key!("BROWSER_ARGS");
     pub const ENABLE_GITHUB: &str = env_key!("ENABLE_GH");
     pub const GITHUB_PAT: &str = env_key!("GH_PAT");
+    pub const DAEMON_SESSION_LEASE_DURATION: &str = env_key!("DAEMON_SESSION_LEASE_DURATION");
+    pub const DAEMON_SESSION_IDLE_SHUTDOWN_GRACE: &str =
+        env_key!("DAEMON_SESSION_IDLE_SHUTDOWN_GRACE");
 }
 
 pub mod client {
     use std::time::Duration;
 
     pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+}
+
+pub mod daemon {
+    use std::time::Duration;
+
+    pub fn default_session_lease_duration() -> Duration {
+        synd_runtime::DaemonSessionConfig::default()
+            .lease_policy()
+            .lease_duration()
+    }
+
+    pub fn default_session_idle_shutdown_grace() -> Duration {
+        synd_runtime::DaemonSessionConfig::default().idle_shutdown_grace()
+    }
 }
 
 pub mod feed {

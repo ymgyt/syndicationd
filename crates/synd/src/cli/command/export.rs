@@ -48,27 +48,31 @@ impl ExportCommand {
 
     async fn export(self, config: ConfigResolver) -> anyhow::Result<()> {
         let cx = PortContext::new(&config).await?;
+        let result = async {
+            let mut after = None;
+            let mut exported_feeds = Vec::new();
 
-        let mut after = None;
-        let mut exported_feeds = Vec::new();
+            loop {
+                let response = cx.client.fetch_subscription(after.take(), Some(50)).await?;
+                let page_info = response.feeds.page_info;
+                exported_feeds.extend(response.feeds.nodes.into_iter().map(ExportedFeed::from));
 
-        loop {
-            let response = cx.client.fetch_subscription(after.take(), Some(50)).await?;
-            let page_info = response.feeds.page_info;
-            exported_feeds.extend(response.feeds.nodes.into_iter().map(ExportedFeed::from));
-
-            if !page_info.has_next_page {
-                break;
+                if !page_info.has_next_page {
+                    break;
+                }
+                after = page_info.end_cursor;
             }
-            after = page_info.end_cursor;
+
+            let output = Export {
+                feeds: exported_feeds,
+            };
+
+            serde_json::to_writer_pretty(std::io::stdout(), &output)?;
+
+            Ok(())
         }
+        .await;
 
-        let output = Export {
-            feeds: exported_feeds,
-        };
-
-        serde_json::to_writer_pretty(std::io::stdout(), &output)?;
-
-        Ok(())
+        cx.finish(result).await
     }
 }

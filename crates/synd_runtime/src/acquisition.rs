@@ -210,13 +210,13 @@ impl Connected {
         let client = daemon_client(config, &self.placement)?;
         match client
             .open_session(OpenSessionRequest::new(
-                config.requirements().capabilities().clone(),
+                config.requirements().required_capabilities().clone(),
             ))
             .await
         {
             Ok(session) => Ok(SessionAttempt::Opened(Box::new(Session::new(
                 client.clone(),
-                session.capabilities().clone(),
+                session.available_capabilities().clone(),
                 {
                     #[cfg(not(test))]
                     {

@@ -1,6 +1,6 @@
 ---
 source: crates/synd/src/config/file.rs
-assertion_line: 174
+assertion_line: 200
 expression: config
 ---
 ConfigFile {
@@ -36,6 +36,16 @@ ConfigFile {
         ApiEntry {
             timeout: Some(
                 30s,
+            ),
+        },
+    ),
+    daemon: Some(
+        DaemonEntry {
+            session_lease_duration: Some(
+                60s,
+            ),
+            session_idle_shutdown_grace: Some(
+                120s,
             ),
         },
     ),

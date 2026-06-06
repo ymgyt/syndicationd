@@ -1,4 +1,4 @@
-use std::{net::IpAddr, time::Duration};
+use std::{path::Path, time::Duration};
 
 use axum::{
     BoxError, Extension, Router,
@@ -22,42 +22,55 @@ use crate::{
     dependency::Dependency,
     gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
-    session::{DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE, DaemonSessionSweeper, SessionIdleShutdown},
+    session::{DaemonSessionConfig, DaemonSessionSweeper, SessionIdleShutdown},
     shutdown::Shutdown,
 };
 
 pub mod auth;
 mod probe;
+mod session;
 
 pub mod layer;
 
-pub struct BindOptions {
-    pub port: u16,
-    pub addr: IpAddr,
+pub async fn rustls_config_from_pem_files(
+    certificate: impl AsRef<Path>,
+    private_key: impl AsRef<Path>,
+) -> Result<axum_server::tls_rustls::RustlsConfig> {
+    axum_server::tls_rustls::RustlsConfig::from_pem_file(certificate, private_key)
+        .await
+        .map_err(|source| crate::Error::TlsConfig { source })
 }
 
 pub struct ServeOptions {
     pub timeout: Duration,
     pub body_limit_bytes: usize,
     pub concurrency_limit: usize,
+    pub daemon_sessions: DaemonSessionConfig,
+}
+
+impl ServeOptions {
+    #[must_use]
+    pub fn with_daemon_sessions(mut self, daemon_sessions: DaemonSessionConfig) -> Self {
+        self.daemon_sessions = daemon_sessions;
+        self
+    }
+}
+
+impl Default for ServeOptions {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_secs(30),
+            body_limit_bytes: config::serve::DEFAULT_REQUEST_BODY_LIMIT_BYTES,
+            concurrency_limit: config::serve::DEFAULT_REQUEST_CONCURRENCY_LIMIT,
+            daemon_sessions: DaemonSessionConfig::default(),
+        }
+    }
 }
 
 #[derive(Clone)]
 pub(crate) struct Context {
     pub gql_monitor: TaskMonitor,
     pub schema: SyndSchema,
-}
-
-/// Bind tcp listener and serve.
-pub async fn listen_and_serve(
-    dep: Dependency,
-    bind: BindOptions,
-    shutdown: Shutdown,
-) -> Result<()> {
-    info!(addr = %bind.addr, port = bind.port, "Listening...");
-    let listener = TcpListener::bind((bind.addr, bind.port)).await?;
-
-    serve(listener, dep, shutdown).await
 }
 
 /// Start api server
@@ -88,18 +101,22 @@ pub async fn serve(listener: TcpListener, dep: Dependency, shutdown: Shutdown) -
 
 #[cfg(unix)]
 pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutdown) -> Result<()> {
-    let sessions = dep.sessions.with_idle_shutdown(SessionIdleShutdown::new(
-        DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE,
-        shutdown.clone(),
-    ));
+    let daemon_sessions = dep.serve_options.daemon_sessions;
+    let sessions = dep
+        .sessions
+        .with_lease_policy(daemon_sessions.lease_policy())
+        .with_idle_shutdown(SessionIdleShutdown::new(
+            daemon_sessions.idle_shutdown_grace(),
+            shutdown.clone(),
+        ));
     let ApiService { router, .. } = build_service(dep, &shutdown);
     let shutdown_requested = shutdown.cancellation_token();
     let _session_sweeper =
         DaemonSessionSweeper::new(sessions.clone(), shutdown_requested.clone()).spawn();
     let router = router
-        .route("/session/open", post(session_routes::open))
-        .route("/session/renew", post(session_routes::renew))
-        .route("/session/close", post(session_routes::close))
+        .route("/session/open", post(session::open))
+        .route("/session/renew", post(session::renew))
+        .route("/session/close", post(session::close))
         .route("/daemon/shutdown", post(control::shutdown))
         .layer(Extension(sessions))
         .layer(Extension(shutdown));
@@ -132,6 +149,7 @@ fn build_service(dep: Dependency, shutdown: &Shutdown) -> ApiService {
                 timeout: request_timeout,
                 body_limit_bytes: request_body_limit_bytes,
                 concurrency_limit,
+                daemon_sessions: _,
             },
         monitors,
         sessions: _,
@@ -180,47 +198,6 @@ mod control {
     pub(super) async fn shutdown(Extension(shutdown): Extension<Shutdown>) -> StatusCode {
         shutdown.shutdown();
         StatusCode::ACCEPTED
-    }
-}
-
-mod session_routes {
-    use axum::{
-        Extension, Json,
-        http::StatusCode,
-        response::{IntoResponse, Response},
-    };
-    use synd_protocol::session::{CloseSessionRequest, OpenSessionRequest, RenewSessionRequest};
-
-    use crate::session::DaemonSessions;
-
-    pub(super) async fn open(
-        Extension(sessions): Extension<DaemonSessions>,
-        Json(request): Json<OpenSessionRequest>,
-    ) -> Response {
-        match sessions.open(&request) {
-            Ok(response) => (StatusCode::CREATED, Json(response)).into_response(),
-            Err(error) => (StatusCode::CONFLICT, Json(error)).into_response(),
-        }
-    }
-
-    pub(super) async fn close(
-        Extension(sessions): Extension<DaemonSessions>,
-        Json(request): Json<CloseSessionRequest>,
-    ) -> Response {
-        match sessions.close(&request) {
-            Ok(response) => (StatusCode::OK, Json(response)).into_response(),
-            Err(error) => (StatusCode::NOT_FOUND, Json(error)).into_response(),
-        }
-    }
-
-    pub(super) async fn renew(
-        Extension(sessions): Extension<DaemonSessions>,
-        Json(request): Json<RenewSessionRequest>,
-    ) -> Response {
-        match sessions.renew(&request) {
-            Ok(response) => (StatusCode::OK, Json(response)).into_response(),
-            Err(error) => (StatusCode::NOT_FOUND, Json(error)).into_response(),
-        }
     }
 }
 

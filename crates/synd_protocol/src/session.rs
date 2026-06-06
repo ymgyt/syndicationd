@@ -46,23 +46,23 @@ impl OpenSessionRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenSessionResponse {
     session_id: SessionId,
-    capabilities: CapabilitySet,
+    available_capabilities: CapabilitySet,
     lease: SessionLease,
 }
 
 impl OpenSessionResponse {
-    pub fn new(session_id: SessionId, capabilities: CapabilitySet) -> Self {
-        Self::with_lease(session_id, capabilities, SessionLease::default())
+    pub fn new(session_id: SessionId, available_capabilities: CapabilitySet) -> Self {
+        Self::with_lease(session_id, available_capabilities, SessionLease::default())
     }
 
     pub fn with_lease(
         session_id: SessionId,
-        capabilities: CapabilitySet,
+        available_capabilities: CapabilitySet,
         lease: SessionLease,
     ) -> Self {
         Self {
             session_id,
-            capabilities,
+            available_capabilities,
             lease,
         }
     }
@@ -71,8 +71,8 @@ impl OpenSessionResponse {
         &self.session_id
     }
 
-    pub fn capabilities(&self) -> &CapabilitySet {
-        &self.capabilities
+    pub fn available_capabilities(&self) -> &CapabilitySet {
+        &self.available_capabilities
     }
 
     pub fn lease(&self) -> SessionLease {
@@ -293,7 +293,7 @@ mod tests {
                 .unwrap(),
                 json!({
                     "session_id": "session-1",
-                    "capabilities": {
+                    "available_capabilities": {
                         "names": ["timeline.read"]
                     },
                     "lease": {

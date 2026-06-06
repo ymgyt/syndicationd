@@ -28,4 +28,5 @@ pub use runtime::{ApiClientConfig, Config as RuntimeConfig, Runtime};
 pub use session::{
     Config as SessionConfig, Handle as SessionHandle, Requirements as SessionRequirements, Session,
 };
+pub use synd_api::session::{DaemonSessionConfig, DaemonSessionLeasePolicy};
 pub use synd_protocol::CapabilitySet;

@@ -44,6 +44,20 @@ pub struct ApiEntry {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DaemonEntry {
+    #[serde(
+        default,
+        deserialize_with = "synd_support::time::humantime::de::parse_duration_opt"
+    )]
+    pub(super) session_lease_duration: Option<Duration>,
+    #[serde(
+        default,
+        deserialize_with = "synd_support::time::humantime::de::parse_duration_opt"
+    )]
+    pub(super) session_idle_shutdown_grace: Option<Duration>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct BackendEntry {
     pub(super) sqlite_db: Option<PathBuf>,
 }
@@ -69,6 +83,7 @@ pub struct ConfigFile {
     pub(super) theme: Option<ThemeEntry>,
     pub(super) backend: Option<BackendEntry>,
     pub(super) api: Option<ApiEntry>,
+    pub(super) daemon: Option<DaemonEntry>,
     pub(super) feed: Option<FeedEntry>,
     pub(super) github: Option<GithubEntry>,
     pub(super) categories: Option<HashMap<String, CategoryConfig>>,
@@ -100,6 +115,13 @@ pub static INIT_CONFIG: &str = r#"
 [api]
 # Client timeout duration 
 # timeout = "30s"
+
+[daemon]
+# Session lease duration granted by the local daemon
+# session_lease_duration = "30s"
+
+# Grace period before the local daemon shuts down after all sessions are gone
+# session_idle_shutdown_grace = "30s"
 
 [backend]
 # Local SQLite database path
@@ -145,6 +167,10 @@ name = "ferra"
 
 [api]
 timeout = "30s"
+
+[daemon]
+session_lease_duration = "60s"
+session_idle_shutdown_grace = "120s"
 
 [backend]
 sqlite_db = "/tmp/synd/synd.db"

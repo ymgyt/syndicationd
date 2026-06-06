@@ -2,11 +2,11 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     process::ExitCode,
-    time::Duration,
 };
 
 use clap::Args;
 use serde::Serialize;
+use synd_support::time::humantime::HumanDuration;
 use tracing::error;
 
 use crate::{cli::OutputFormat, config::ConfigResolver};
@@ -52,6 +52,7 @@ struct ConfigViewOutput {
     log: LogOutput,
     backend: BackendOutput,
     api: ApiOutput,
+    daemon: DaemonOutput,
     feed: FeedOutput,
     github: GithubOutput,
     theme: ThemeOutput,
@@ -80,6 +81,12 @@ struct BackendOutput {
 #[derive(Debug, Serialize)]
 struct ApiOutput {
     timeout: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DaemonOutput {
+    session_lease_duration: String,
+    session_idle_shutdown_grace: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -128,7 +135,15 @@ impl ConfigViewOutput {
                 sqlite_db: config.sqlite_db(),
             },
             api: ApiOutput {
-                timeout: format_duration(config.api_timeout()),
+                timeout: String::from(HumanDuration::from(config.api_timeout())),
+            },
+            daemon: DaemonOutput {
+                session_lease_duration: String::from(HumanDuration::from(
+                    config.daemon_session_lease_duration(),
+                )),
+                session_idle_shutdown_grace: String::from(HumanDuration::from(
+                    config.daemon_session_idle_shutdown_grace(),
+                )),
             },
             feed: FeedOutput {
                 entries_limit: config.feed_entries_limit(),
@@ -153,6 +168,16 @@ impl ConfigViewOutput {
         writeln!(writer, "        Log: {}", self.log.path.display())?;
         writeln!(writer, "  SQLite DB: {}", self.backend.sqlite_db.display())?;
         writeln!(writer, "    Timeout: {}", self.api.timeout)?;
+        writeln!(
+            writer,
+            "Daemon Lease: {}",
+            self.daemon.session_lease_duration
+        )?;
+        writeln!(
+            writer,
+            "Daemon Grace: {}",
+            self.daemon.session_idle_shutdown_grace
+        )?;
         writeln!(writer, " Feed Limit: {}", self.feed.entries_limit)?;
         writeln!(
             writer,
@@ -187,8 +212,4 @@ impl ConfigViewOutput {
 
 fn path_or_not_set(path: Option<&Path>) -> String {
     path.map_or_else(|| "not set".to_owned(), |path| path.display().to_string())
-}
-
-fn format_duration(duration: Duration) -> String {
-    format!("{duration:?}")
 }

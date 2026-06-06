@@ -1,3 +1,4 @@
+use std::time::Duration;
 #[cfg(unix)]
 use std::{
     io::ErrorKind,
@@ -8,8 +9,8 @@ use std::{
 #[cfg(test)]
 use synd_api::session::DaemonSessionLeasePolicy;
 use synd_api::{
-    cli::ServeOptions,
     serve::{self, auth::Authenticator},
+    session::DaemonSessionConfig,
     shutdown::Shutdown,
 };
 
@@ -77,19 +78,11 @@ impl Daemon {
         let api_service = ApiService::from_database(
             self.config.database(),
             Authenticator::trusted_local(),
-            ServeOptions::default(),
+            self.config.serve_options(),
             &shutdown,
         )
         .await?;
         let (dependency, _event_workers) = api_service.into_parts();
-        #[cfg(test)]
-        let dependency = {
-            let mut dependency = dependency;
-            if let Some(lease_policy) = self.config.session_lease_policy() {
-                dependency.sessions = dependency.sessions.with_lease_policy(lease_policy);
-            }
-            dependency
-        };
 
         // Keep event workers alive for the entire serve future.
         serve::serve_unix(listener, dependency, shutdown).await?;
@@ -101,6 +94,7 @@ impl Daemon {
 #[derive(Debug, Clone)]
 pub struct DaemonConfig {
     database: RuntimeDatabase,
+    session: DaemonSessionConfig,
     placement_environment: RuntimePlacementEnvironment,
     #[cfg(test)]
     session_lease_policy: Option<DaemonSessionLeasePolicy>,
@@ -110,6 +104,7 @@ impl DaemonConfig {
     pub fn new(database: RuntimeDatabase) -> Self {
         Self {
             database,
+            session: DaemonSessionConfig::default(),
             placement_environment: RuntimePlacementEnvironment::capture(),
             #[cfg(test)]
             session_lease_policy: None,
@@ -122,6 +117,33 @@ impl DaemonConfig {
 
     pub(crate) fn placement_environment(&self) -> RuntimePlacementEnvironment {
         self.placement_environment.clone()
+    }
+
+    #[must_use]
+    pub fn with_session_lease_duration(mut self, lease_duration: Duration) -> Self {
+        self.session = self.session.with_lease_duration(lease_duration);
+        self
+    }
+
+    #[must_use]
+    pub fn with_session_idle_shutdown_grace(mut self, idle_shutdown_grace: Duration) -> Self {
+        self.session = self.session.with_idle_shutdown_grace(idle_shutdown_grace);
+        self
+    }
+
+    fn serve_options(&self) -> serve::ServeOptions {
+        #[cfg(test)]
+        let session = match self.session_lease_policy {
+            Some(lease_policy) => {
+                DaemonSessionConfig::new(lease_policy, self.session.idle_shutdown_grace())
+            }
+            None => self.session,
+        };
+
+        #[cfg(not(test))]
+        let session = self.session;
+
+        serve::ServeOptions::default().with_daemon_sessions(session)
     }
 
     #[cfg(test)]
@@ -137,11 +159,6 @@ impl DaemonConfig {
     fn with_session_lease_policy(mut self, lease_policy: DaemonSessionLeasePolicy) -> Self {
         self.session_lease_policy = Some(lease_policy);
         self
-    }
-
-    #[cfg(test)]
-    fn session_lease_policy(&self) -> Option<DaemonSessionLeasePolicy> {
-        self.session_lease_policy
     }
 }
 
@@ -493,7 +510,10 @@ mod tests {
 
         daemon.wait_until_running().await;
         let session = daemon.probe.runtime.acquire_session().await?;
-        assert!(session.capabilities().is_empty());
+        assert_eq!(
+            session.available_capabilities(),
+            &synd_protocol::capability::local_api_capabilities()
+        );
         session.close().await?;
 
         daemon.shutdown().await;
@@ -504,11 +524,8 @@ mod tests {
     #[tokio::test]
     async fn daemon_keeps_runtime_session_alive_with_client_renewals() -> crate::Result<()> {
         let tmp = tempfile::tempdir()?;
-        let lease_policy = DaemonSessionLeasePolicy::new(
-            Duration::from_secs(2),
-            Duration::from_millis(500),
-            Duration::from_millis(200),
-        );
+        let lease_policy =
+            DaemonSessionLeasePolicy::new(Duration::from_secs(2), Duration::from_millis(200));
         let (observer, mut renewal_probe) = SessionRenewalProbe::new();
         let daemon = StartedDaemon::spawn_with_config(
             tmp.path(),

@@ -1,7 +1,9 @@
 use std::path::Path;
 
 use synd_api::{
-    cli::ServeOptions, dependency::Dependency, serve::auth::Authenticator, shutdown::Shutdown,
+    dependency::Dependency,
+    serve::{ServeOptions, auth::Authenticator},
+    shutdown::Shutdown,
 };
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{FeedRegistryConfig, RegistryService, event::WorkerSet};

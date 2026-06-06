@@ -58,13 +58,18 @@ impl<'a> Control<'a> {
                     RuntimePlacementSummary::from_placement(&placement),
                 )))
             }
-            DaemonShutdownDecision::FailUnavailableEndpoint { .. } => {
-                Err(Error::NotImplemented("daemon endpoint unavailable"))
+            DaemonShutdownDecision::FailUnavailableEndpoint { placement } => {
+                Err(Error::EndpointUnavailable {
+                    context: "daemon endpoint",
+                    endpoint: placement.endpoint().path().to_path_buf(),
+                })
             }
             #[cfg(not(unix))]
-            DaemonShutdownDecision::FailUnsupportedTransport { .. } => Err(Error::NotImplemented(
-                "daemon control transport unsupported",
-            )),
+            DaemonShutdownDecision::FailUnsupportedTransport { .. } => {
+                Err(Error::UnsupportedTransport {
+                    context: "daemon control transport",
+                })
+            }
         }
     }
 
@@ -106,13 +111,16 @@ impl DaemonControlContext {
                     RuntimePlacementSummary::from_placement(&self.placement),
                 ))
             }
-            RuntimeEndpointConnectionStatus::Unavailable => {
-                Err(Error::NotImplemented("daemon endpoint unavailable"))
-            }
+            RuntimeEndpointConnectionStatus::Unavailable => Err(Error::EndpointUnavailable {
+                context: "daemon endpoint",
+                endpoint: self.placement.endpoint().path().to_path_buf(),
+            }),
             #[cfg(not(unix))]
-            RuntimeEndpointConnectionStatus::UnsupportedTransport => Err(Error::NotImplemented(
-                "daemon control transport unsupported",
-            )),
+            RuntimeEndpointConnectionStatus::UnsupportedTransport => {
+                Err(Error::UnsupportedTransport {
+                    context: "daemon control transport",
+                })
+            }
         }
     }
 }
@@ -218,13 +226,16 @@ impl DaemonShutdownWaiter {
                 }
                 RuntimeEndpointConnectionStatus::Connected => {}
                 RuntimeEndpointConnectionStatus::Unavailable => {
-                    return Err(Error::NotImplemented("daemon endpoint unavailable"));
+                    return Err(Error::EndpointUnavailable {
+                        context: "daemon endpoint",
+                        endpoint: self.placement.endpoint().path().to_path_buf(),
+                    });
                 }
                 #[cfg(not(unix))]
                 RuntimeEndpointConnectionStatus::UnsupportedTransport => {
-                    return Err(Error::NotImplemented(
-                        "daemon control transport unsupported",
-                    ));
+                    return Err(Error::UnsupportedTransport {
+                        context: "daemon control transport",
+                    });
                 }
             }
 
