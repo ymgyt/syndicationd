@@ -85,5 +85,4 @@ pub(crate) enum Operation {
         url: Url,
     },
     ForceRedrawTerminal,
-    CheckLatestRelease,
 }

@@ -109,7 +109,6 @@ impl Display for ApiEvent {
 /// Fact that already happened and can update application state.
 #[derive(Debug, Clone)]
 pub(crate) enum Event {
-    Nop,
     TerminalResized {
         _columns: u16,
         _rows: u16,
@@ -140,7 +139,6 @@ pub(crate) enum Event {
     TimelineRefetchStarted {
         request_seq: RequestSequence,
     },
-    LatestReleaseFound(update_informer::Version),
     TimelineChanged {
         event: payload::TimelineChangeEvent,
     },

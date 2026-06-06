@@ -5451,6 +5451,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "update-informer",
  "url",
 ]
 
@@ -5683,7 +5684,6 @@ dependencies = [
  "tracing",
  "tui-widgets",
  "unicode-segmentation",
- "update-informer",
  "url",
 ]
 

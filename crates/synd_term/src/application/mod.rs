@@ -60,7 +60,6 @@ mod idle;
 mod integration;
 mod lifecycle;
 mod operations;
-mod release;
 use component::AppComponent;
 use drivers::{DriverParts, Drivers};
 use lifecycle::Lifecycle;
@@ -84,6 +83,11 @@ pub struct Application<Term = TermInit, Sess = SessPending> {
     keymap: crate::keymap::Keymap,
     config: Config,
     _lifecycle: Lifecycle<Term, Sess>,
+}
+
+pub enum StartSession {
+    Ready(Application<TermReady, SessReady>),
+    Pending(Application<TermReady, SessPending>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -178,9 +182,101 @@ impl Application<TermInit, SessPending> {
         Ok(())
     }
 
+    pub fn init_terminal(mut self) -> anyhow::Result<Application<TermReady, SessPending>> {
+        self.init_terminal_driver()?;
+        Ok(self.into_terminal_ready())
+    }
+
+    #[cfg(feature = "integration")]
+    #[must_use]
+    pub fn assume_terminal_ready(self) -> Application<TermReady, SessPending> {
+        self.into_terminal_ready()
+    }
+
     /// Initialize application.
     /// Setup terminal and handle cache.
     async fn init(&mut self) -> anyhow::Result<()> {
+        self.init_terminal_driver()?;
+        self.restore_github_notification_filter_options();
+        let _ = self.start_feed_session_in_place().await;
+
+        Ok(())
+    }
+}
+
+impl Application<TermInit, SessPending> {
+    fn into_terminal_ready(self) -> Application<TermReady, SessPending> {
+        let Self {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: _,
+        } = self;
+
+        Application {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: Lifecycle::new(),
+        }
+    }
+}
+
+impl Application<TermReady, SessPending> {
+    pub async fn start_session(mut self) -> StartSession {
+        if self.start_feed_session_in_place().await {
+            StartSession::Ready(self.into_session_ready())
+        } else {
+            StartSession::Pending(self)
+        }
+    }
+
+    fn into_session_ready(self) -> Application<TermReady, SessReady> {
+        let Self {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: _,
+        } = self;
+
+        Application {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: Lifecycle::new(),
+        }
+    }
+}
+
+impl<Sess> Application<TermReady, Sess> {
+    pub fn stop(mut self) -> anyhow::Result<Application<TermRestored, Sess>> {
+        self.shutdown_drivers();
+        self.cleanup()?;
+
+        let Self {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: _,
+        } = self;
+
+        Ok(Application {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: Lifecycle::new(),
+        })
+    }
+}
+
+impl<Term, Sess> Application<Term, Sess> {
+    fn init_terminal_driver(&mut self) -> anyhow::Result<()> {
         match self.drivers.init_terminal() {
             Ok(()) => Ok(()),
             Err(err) => {
@@ -188,34 +284,44 @@ impl Application<TermInit, SessPending> {
                     warn!("Failed to init terminal: {err}");
                     Ok(())
                 } else {
-                    Err(err)
-                }
-            }
-        }?;
-
-        if self.config.features.enable_github_notification {
-            // Restore previous filter options
-            match self.drivers.load_gh_notification_filter_options() {
-                Ok(options) => {
-                    self.components.github.notifications =
-                        GitHubNotificationsWidget::with_filter_options(options);
-                }
-                Err(err) => {
-                    warn!("Load github notification filter options: {err}");
+                    Err(err.into())
                 }
             }
         }
+    }
 
+    fn restore_github_notification_filter_options(&mut self) {
+        if !self.config.features.enable_github_notification {
+            return;
+        }
+
+        match self.drivers.load_gh_notification_filter_options() {
+            Ok(options) => {
+                self.components.github.notifications =
+                    GitHubNotificationsWidget::with_filter_options(options);
+            }
+            Err(err) => {
+                warn!("Load github notification filter options: {err}");
+            }
+        }
+    }
+
+    async fn start_feed_session_in_place(&mut self) -> bool {
         if self.drivers.feed_api_session_requires_user_credential() {
             match self.restore_credential().await {
-                Ok(cred) => self.handle_restored_credential(cred),
-                Err(err) => warn!("Restore credential: {err}"),
+                Ok(cred) => {
+                    self.handle_restored_credential(cred);
+                    true
+                }
+                Err(err) => {
+                    warn!("Restore credential: {err}");
+                    false
+                }
             }
         } else {
             self.enter_feed_api_session();
+            true
         }
-
-        Ok(())
     }
 
     async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
@@ -229,7 +335,6 @@ impl Application<TermInit, SessPending> {
 
     fn enter_feed_api_session(&mut self) {
         self.initial_fetch();
-        self.perform_operation(Operation::CheckLatestRelease);
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
         self.should_render();
@@ -271,8 +376,6 @@ impl Application<TermInit, SessPending> {
 
         self.drivers.restore_terminal()?;
 
-        // Make sure inform after terminal restored
-        self.inform_latest_release();
         Ok(())
     }
 

@@ -2,7 +2,7 @@ use crate::{event::Event, operation::Operation};
 
 use super::{
     DriverContext, auth::AuthDriver, feed::FeedDriver, github::GitHubDriver,
-    interaction::InteractionDriver, release::ReleaseDriver, timeline::TimelineDriver,
+    interaction::InteractionDriver, timeline::TimelineDriver,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -80,7 +80,6 @@ impl OperationDispatcher {
             Operation::OpenBrowser { url } => InteractionDriver::open_browser(cx, url),
             Operation::OpenTextBrowser { url } => InteractionDriver::open_text_browser(cx, url),
             Operation::ForceRedrawTerminal => InteractionDriver::force_redraw_terminal(cx),
-            Operation::CheckLatestRelease => ReleaseDriver::check_latest_release(cx),
         }
     }
 }

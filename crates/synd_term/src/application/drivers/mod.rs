@@ -22,7 +22,6 @@ mod dispatcher;
 mod feed;
 mod github;
 mod interaction;
-mod release;
 mod runtime;
 mod timeline;
 

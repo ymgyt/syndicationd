@@ -1,6 +1,6 @@
 use super::Application;
 
-impl Application {
+impl<Term, Sess> Application<Term, Sess> {
     pub(super) fn next_entries_first(&self, loaded_after_response: usize) -> i64 {
         let remaining = self
             .config

@@ -47,7 +47,6 @@ toml                 = { workspace = true }
 tracing              = { workspace = true }
 tui-widgets          = { version = "0.7.2", default-features = false, features = ["big-text"] }
 unicode-segmentation = "1.12.0"
-update-informer      = { version = "1.3.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 url                  = { workspace = true }
 
 [features]

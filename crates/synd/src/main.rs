@@ -18,6 +18,7 @@ use crate::{cli::Args, config::ConfigResolver, runtime::FeedRuntime};
 
 mod cli;
 mod config;
+mod release;
 mod runtime;
 
 fn init_tracing(
@@ -217,6 +218,7 @@ async fn main() -> ExitCode {
     };
 
     let mut event_stream = terminal::event_stream();
+    let release_check = release::ReleaseCheck::spawn();
     let result = {
         info!("Running...");
         app.run(&mut event_stream)
@@ -226,6 +228,8 @@ async fn main() -> ExitCode {
     if let Err(err) = session.close().await {
         warn!("Failed to close runtime session: {err}");
     }
+
+    release_check.print_notice_if_ready();
 
     if let Err(err) = result {
         error!("{err:?}");

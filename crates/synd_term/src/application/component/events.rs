@@ -70,13 +70,6 @@ impl AppComponent {
         }
     }
 
-    pub(in crate::application) fn apply_latest_release_found(
-        &mut self,
-        version: update_informer::Version,
-    ) {
-        self.shell.latest_release = Some(version);
-    }
-
     pub(in crate::application) fn apply_timeline_changed(
         &mut self,
         event: &payload::TimelineChangeEvent,

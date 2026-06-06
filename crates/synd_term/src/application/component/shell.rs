@@ -1,5 +1,3 @@
-use update_informer::Version;
-
 use crate::{
     application::{
         Direction, Features, TerminalFocus,
@@ -23,7 +21,6 @@ use crate::{
 pub(crate) struct ShellComponent {
     pub(in crate::application) theme: Theme,
     pub(in crate::application) categories: Categories,
-    pub(in crate::application) latest_release: Option<Version>,
     state: State,
     pub(crate) tabs: TabsWidget,
     pub(crate) filter: FilterWidget,
@@ -41,7 +38,6 @@ impl ShellComponent {
         Self {
             theme,
             categories,
-            latest_release: None,
             state,
             tabs: TabsWidget::new(features),
             filter: FilterWidget::new(),

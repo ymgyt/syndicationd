@@ -33,6 +33,7 @@ toml               = { workspace = true }
 tracing            = { workspace = true }
 tracing-appender   = "0.2.3"
 tracing-subscriber = { workspace = true }
+update-informer    = { version = "1.3.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 
 [features]
 integration = ["synd-term/integration"]

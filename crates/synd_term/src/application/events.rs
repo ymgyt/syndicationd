@@ -6,13 +6,12 @@ use crate::event::{ApiEvent, AuthApiEvent, Event};
 
 use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, RequestSequence};
 
-impl Application {
+impl<Term, Sess> Application<Term, Sess> {
     #[instrument(skip_all)]
     pub(super) fn apply_event(&mut self, event: Event) {
         let _guard = info_span!("apply_event", %event).entered();
 
         match event {
-            Event::Nop => {}
             Event::TerminalResized { .. } => {
                 self.should_render();
             }
@@ -58,9 +57,6 @@ impl Application {
             }
             Event::TimelineRefetchStarted { request_seq } => {
                 self.components.apply_timeline_refetch_started(request_seq);
-            }
-            Event::LatestReleaseFound(version) => {
-                self.components.apply_latest_release_found(version);
             }
             Event::TimelineChanged { event } => {
                 let operations = self.components.apply_timeline_changed(&event);

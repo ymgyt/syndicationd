@@ -72,7 +72,7 @@ mod tests {
         let mut job = Jobs::new(NonZero::new(2).unwrap());
 
         for _ in 0..3 {
-            job.push(future::ready(Ok(Event::Nop)).boxed());
+            job.push(future::ready(Ok(Event::Idle)).boxed());
         }
 
         assert_eq!(job.futures.len(), 2);
@@ -81,7 +81,7 @@ mod tests {
         let mut count = 0;
         loop {
             if let Some(result) = job.next().await {
-                assert!(matches!(result, Ok(Event::Nop)));
+                assert!(matches!(result, Ok(Event::Idle)));
                 count += 1;
             }
             if count == 3 {
