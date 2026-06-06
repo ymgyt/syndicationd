@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 
 use crate::crawl::{
-    job::{ActiveCrawlJob, CrawlJobQueue, CrawlJobTrigger, CrawlQueueSnapshot, EnqueueJob},
+    job::{ActiveCrawlJob, CrawlJobQueueLane, CrawlJobTrigger, EnqueueCrawlJobCommand},
     policy::{CrawlPolicy, PollingPolicy},
     target_list::{CrawlTarget, CrawlTargetState},
 };
@@ -11,15 +11,11 @@ use crate::crawl::{
 #[derive(Debug, Clone)]
 pub struct CrawlSchedulingEngine {
     now: DateTime<Utc>,
-    queue_snapshot: CrawlQueueSnapshot,
 }
 
 impl CrawlSchedulingEngine {
-    pub fn new(now: DateTime<Utc>, queue_snapshot: CrawlQueueSnapshot) -> Self {
-        Self {
-            now,
-            queue_snapshot,
-        }
+    pub fn new(now: DateTime<Utc>) -> Self {
+        Self { now }
     }
 
     pub fn reconcile(&mut self, candidate: &CrawlScheduleCandidate) -> CrawlScheduleReconciliation {
@@ -70,14 +66,14 @@ impl CrawlSchedulingEngine {
         &self,
         candidate: &CrawlScheduleCandidate,
         next_crawl_after: Option<DateTime<Utc>>,
-    ) -> Option<UpsertSchedule> {
+    ) -> Option<UpsertCrawlScheduleCommand> {
         let needs_upsert = candidate.schedule.as_ref().is_none_or(|schedule| {
             schedule.target_updated_at != candidate.target.target_updated_at
                 || schedule.next_crawl_after != next_crawl_after
         });
 
         needs_upsert.then(|| {
-            UpsertSchedule::new(
+            UpsertCrawlScheduleCommand::new(
                 candidate.target.feed_url.clone(),
                 candidate.target.target_updated_at,
                 next_crawl_after,
@@ -91,25 +87,22 @@ impl CrawlSchedulingEngine {
         candidate: &CrawlScheduleCandidate,
         next_crawl_after: Option<DateTime<Utc>>,
         target_changed: bool,
-    ) -> Option<EnqueueJob> {
+    ) -> Option<EnqueueCrawlJobCommand> {
         let due_at = next_crawl_after?;
         let run_after = candidate.readiness.run_after(due_at);
 
-        if run_after > self.now
-            || candidate.active_job.is_some()
-            || !self.queue_snapshot.accepts_enqueue()
-        {
+        if run_after > self.now || candidate.active_job.is_some() {
             return None;
         }
 
-        Some(EnqueueJob::new(
+        Some(EnqueueCrawlJobCommand::new(
             candidate.target.feed_url.clone(),
             if target_changed {
                 CrawlJobTrigger::TargetChanged
             } else {
                 CrawlJobTrigger::PeriodicDue
             },
-            CrawlJobQueue::Default,
+            CrawlJobQueueLane::Default,
             0,
             run_after,
             self.now,
@@ -242,20 +235,20 @@ impl CrawlReadiness {
 /// Result of reconciling one scheduling candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlScheduleReconciliation {
-    pub schedule: Option<UpsertSchedule>,
-    pub job: Option<EnqueueJob>,
+    pub schedule: Option<UpsertCrawlScheduleCommand>,
+    pub job: Option<EnqueueCrawlJobCommand>,
 }
 
 /// Command to create or update one schedule row.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpsertSchedule {
+pub struct UpsertCrawlScheduleCommand {
     pub feed_url: FeedUrl,
     pub target_updated_at: DateTime<Utc>,
     pub next_crawl_after: Option<DateTime<Utc>>,
     pub reconciled_at: DateTime<Utc>,
 }
 
-impl UpsertSchedule {
+impl UpsertCrawlScheduleCommand {
     pub fn new(
         feed_url: FeedUrl,
         target_updated_at: DateTime<Utc>,
@@ -326,7 +319,7 @@ mod tests {
     }
 
     fn engine() -> CrawlSchedulingEngine {
-        CrawlSchedulingEngine::new(now(), CrawlQueueSnapshot::empty())
+        CrawlSchedulingEngine::new(now())
     }
 
     #[test]
@@ -343,7 +336,12 @@ mod tests {
 
         assert_eq!(
             reconciliation.schedule,
-            Some(UpsertSchedule::new(feed_url(), now(), Some(now()), now()))
+            Some(UpsertCrawlScheduleCommand::new(
+                feed_url(),
+                now(),
+                Some(now()),
+                now()
+            ))
         );
         assert_eq!(
             reconciliation.job.map(|job| job.trigger),
@@ -365,7 +363,12 @@ mod tests {
 
         assert_eq!(
             reconciliation.schedule,
-            Some(UpsertSchedule::new(feed_url(), now(), None, now()))
+            Some(UpsertCrawlScheduleCommand::new(
+                feed_url(),
+                now(),
+                None,
+                now()
+            ))
         );
         assert_eq!(reconciliation.job, None);
     }
@@ -431,7 +434,7 @@ mod tests {
 
         assert_eq!(
             reconciliation.schedule,
-            Some(UpsertSchedule::new(
+            Some(UpsertCrawlScheduleCommand::new(
                 feed_url(),
                 new_target_updated_at,
                 Some(now() + chrono::Duration::days(1)),
@@ -457,7 +460,7 @@ mod tests {
 
         assert_eq!(
             reconciliation.schedule,
-            Some(UpsertSchedule::new(
+            Some(UpsertCrawlScheduleCommand::new(
                 feed_url(),
                 new_target_updated_at,
                 Some(now()),

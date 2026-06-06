@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use super::domain::{
     ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlJobEnqueuedEvent,
+    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlJobEnqueuedEvent, CrawlJobStartedEvent,
     CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event,
     EventKind, FeedSubscribedEvent, FeedUnsubscribedEvent, SubscribeFeedRejected,
     SubscribeFeedRequested, SubscriptionChangedEvent, UnsubscribeFeedRejected,
@@ -94,6 +94,9 @@ impl EventEncoding for Event {
             }
             <CrawlJobEnqueuedEvent as EventPayload>::EVENT_TYPE => {
                 decode_payload::<CrawlJobEnqueuedEvent>(payload_json).map(EventPayload::into_event)
+            }
+            <CrawlJobStartedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<CrawlJobStartedEvent>(payload_json).map(EventPayload::into_event)
             }
             <ApiFeedSubscribed as EventPayload>::EVENT_TYPE => {
                 decode_payload::<ApiFeedSubscribed>(payload_json).map(EventPayload::into_event)

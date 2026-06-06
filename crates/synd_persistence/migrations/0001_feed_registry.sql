@@ -71,6 +71,6 @@ CREATE UNIQUE INDEX crawl_job_active_feed_endpoint_idx
     ON crawl_job(feed_endpoint_pk)
     WHERE state IN ('pending', 'running');
 
-CREATE INDEX crawl_job_pending_ready_idx
-    ON crawl_job(run_after, priority DESC, pk)
+CREATE INDEX crawl_job_pending_queue_ready_idx
+    ON crawl_job(queue, run_after, priority DESC, pk)
     WHERE state = 'pending';

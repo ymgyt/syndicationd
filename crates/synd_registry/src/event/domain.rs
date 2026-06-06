@@ -7,7 +7,7 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::{
     crawl::{
-        job::{CrawlJob, CrawlJobId, CrawlJobQueue, CrawlJobTrigger},
+        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
         policy::CrawlPolicy,
     },
     subscription::SubscriptionKey,
@@ -114,6 +114,7 @@ pub enum CrawlEventKind {
     TargetPolicyChanged,
     TargetDeactivated,
     JobEnqueued,
+    JobStarted,
 }
 
 /// A stable API contract event category.
@@ -337,6 +338,7 @@ pub enum CrawlEvent {
     TargetPolicyChanged(CrawlTargetPolicyChangedEvent),
     TargetDeactivated(CrawlTargetDeactivatedEvent),
     JobEnqueued(CrawlJobEnqueuedEvent),
+    JobStarted(CrawlJobStartedEvent),
 }
 
 impl CrawlEvent {
@@ -346,6 +348,7 @@ impl CrawlEvent {
             Self::TargetPolicyChanged(_) => CrawlEventKind::TargetPolicyChanged,
             Self::TargetDeactivated(_) => CrawlEventKind::TargetDeactivated,
             Self::JobEnqueued(_) => CrawlEventKind::JobEnqueued,
+            Self::JobStarted(_) => CrawlEventKind::JobStarted,
         }
     }
 }
@@ -696,7 +699,7 @@ pub struct CrawlJobEnqueuedEvent {
     pub job_id: CrawlJobId,
     pub feed_url: FeedUrl,
     pub trigger: CrawlJobTrigger,
-    pub queue: CrawlJobQueue,
+    pub queue: CrawlJobQueueLane,
     pub priority: i64,
     pub run_after: DateTime<Utc>,
 }
@@ -706,7 +709,7 @@ impl CrawlJobEnqueuedEvent {
         job_id: CrawlJobId,
         feed_url: FeedUrl,
         trigger: CrawlJobTrigger,
-        queue: CrawlJobQueue,
+        queue: CrawlJobQueueLane,
         priority: i64,
         run_after: DateTime<Utc>,
     ) -> Self {
@@ -742,6 +745,37 @@ impl From<CrawlJobEnqueuedEvent> for CrawlEvent {
 
 impl From<CrawlJobEnqueuedEvent> for Event {
     fn from(event: CrawlJobEnqueuedEvent) -> Self {
+        Self::Crawl(event.into())
+    }
+}
+
+/// A crawl job moved from pending to running.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlJobStartedEvent {
+    pub job_id: CrawlJobId,
+    pub feed_url: FeedUrl,
+}
+
+impl CrawlJobStartedEvent {
+    pub fn new(job_id: CrawlJobId, feed_url: FeedUrl) -> Self {
+        Self { job_id, feed_url }
+    }
+}
+
+impl From<CrawlJob> for CrawlJobStartedEvent {
+    fn from(job: CrawlJob) -> Self {
+        Self::new(job.job_id, job.feed_url)
+    }
+}
+
+impl From<CrawlJobStartedEvent> for CrawlEvent {
+    fn from(event: CrawlJobStartedEvent) -> Self {
+        Self::JobStarted(event)
+    }
+}
+
+impl From<CrawlJobStartedEvent> for Event {
+    fn from(event: CrawlJobStartedEvent) -> Self {
         Self::Crawl(event.into())
     }
 }

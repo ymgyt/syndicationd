@@ -2,13 +2,13 @@ use chrono::Utc;
 
 use crate::{
     crawl::{
-        job::EnqueueJobResult,
+        job::EnqueueCrawlJobOutcome,
         schedule::{CrawlScheduleCandidate, CrawlSchedulingEngine},
     },
     db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb},
     event::{
-        CrawlEventKind, CrawlJobEnqueuedEvent, EventInterests, ReconcileContext, Reconciler,
-        Trigger, WorkerId, WorkerResult,
+        CrawlEventKind, EventInterests, ReconcileContext, Reconciler, Trigger, WorkerId,
+        WorkerResult,
     },
 };
 
@@ -61,8 +61,7 @@ where
         _trigger: Trigger,
     ) -> WorkerResult<()> {
         let now = Utc::now();
-        let queue_snapshot = cx.queue_snapshot().await?;
-        let mut engine = CrawlSchedulingEngine::new(now, queue_snapshot);
+        let mut engine = CrawlSchedulingEngine::new(now);
         let candidates = cx.list_candidates(now, self.batch_size).await?;
 
         for candidate in candidates {
@@ -91,11 +90,9 @@ impl CrawlScheduler {
         }
 
         if let Some(job) = reconciliation.job {
-            match cx.enqueue_job(job).await? {
-                EnqueueJobResult::Enqueued(job) => {
-                    cx.record_event(CrawlJobEnqueuedEvent::from(job)).await?;
-                }
-                EnqueueJobResult::AlreadyActive => {}
+            let mut queue = cx.crawl_job_queue();
+            match queue.enqueue(job).await? {
+                EnqueueCrawlJobOutcome::Enqueued(_) | EnqueueCrawlJobOutcome::AlreadyActive => {}
             }
         }
 

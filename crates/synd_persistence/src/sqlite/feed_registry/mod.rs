@@ -7,8 +7,11 @@ use synd_registry::{
     CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, FeedSubscriptionAttrs,
     RegistryDbError, RegistryDbResult, RegistryTx, SubscriberId, SubscriptionKey,
     crawl::{
-        job::{CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult},
-        schedule::{CrawlScheduleCandidate, UpsertSchedule},
+        job::{
+            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, EnqueueCrawlJobCommand,
+            EnqueueCrawlJobOutcome,
+        },
+        schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
     event::{
@@ -289,18 +292,27 @@ impl CrawlScheduleTx for SqliteRegistryTx<'_> {
             .await
     }
 
-    async fn upsert_schedule(&mut self, schedule: UpsertSchedule) -> RegistryDbResult<()> {
+    async fn upsert_schedule(
+        &mut self,
+        schedule: UpsertCrawlScheduleCommand,
+    ) -> RegistryDbResult<()> {
         CrawlScheduleTable::new(&mut self.tx).upsert(schedule).await
     }
 }
 
 impl CrawlJobQueueTx for SqliteRegistryTx<'_> {
-    async fn queue_snapshot(&mut self) -> RegistryDbResult<CrawlQueueSnapshot> {
-        CrawlJobTable::new(&mut self.tx).queue_snapshot().await
+    async fn enqueue_job(
+        &mut self,
+        job: EnqueueCrawlJobCommand,
+    ) -> RegistryDbResult<EnqueueCrawlJobOutcome> {
+        CrawlJobTable::new(&mut self.tx).enqueue(job).await
     }
 
-    async fn enqueue_job(&mut self, job: EnqueueJob) -> RegistryDbResult<EnqueueJobResult> {
-        CrawlJobTable::new(&mut self.tx).enqueue(job).await
+    async fn claim_job(
+        &mut self,
+        command: ClaimCrawlJobCommand,
+    ) -> RegistryDbResult<ClaimCrawlJobOutcome> {
+        CrawlJobTable::new(&mut self.tx).claim(command).await
     }
 }
 
@@ -335,9 +347,12 @@ mod tests {
         FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig, RegistryService,
         SubscribeFeedCommand, Subscription, SubscriptionKey,
         crawl::{
-            job::{CrawlJobQueue, CrawlJobTrigger, EnqueueJob, EnqueueJobResult},
+            job::{
+                ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJobQueueLane, CrawlJobState,
+                CrawlJobTrigger, EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome,
+            },
             policy::{CrawlPolicy, PollingInterval, PollingPolicy},
-            schedule::UpsertSchedule,
+            schedule::UpsertCrawlScheduleCommand,
             target_list::{CrawlTargetListInput, CrawlTargetListProj, CrawlTargetState},
         },
         event::{
@@ -835,7 +850,7 @@ mod tests {
         assert!(candidate.schedule.is_none());
         assert!(candidate.active_job.is_none());
 
-        tx.upsert_schedule(UpsertSchedule::new(
+        tx.upsert_schedule(UpsertCrawlScheduleCommand::new(
             subscription.feed_url.clone(),
             candidate.target.target_updated_at,
             Some(now),
@@ -844,36 +859,42 @@ mod tests {
         .await?;
 
         let result = tx
-            .enqueue_job(EnqueueJob::new(
+            .enqueue_job(EnqueueCrawlJobCommand::new(
                 subscription.feed_url.clone(),
                 CrawlJobTrigger::TargetChanged,
-                CrawlJobQueue::Default,
+                CrawlJobQueueLane::Default,
                 0,
                 now,
                 now,
             ))
             .await?;
-        let EnqueueJobResult::Enqueued(job) = result else {
+        let EnqueueCrawlJobOutcome::Enqueued(job) = result else {
             anyhow::bail!("expected job to be enqueued");
         };
         assert_eq!(job.feed_url, subscription.feed_url);
         assert_eq!(job.trigger, CrawlJobTrigger::TargetChanged);
 
         let result = tx
-            .enqueue_job(EnqueueJob::new(
+            .enqueue_job(EnqueueCrawlJobCommand::new(
                 subscription.feed_url.clone(),
                 CrawlJobTrigger::TargetChanged,
-                CrawlJobQueue::Default,
+                CrawlJobQueueLane::Default,
                 0,
                 now,
                 now,
             ))
             .await?;
-        assert_eq!(result, EnqueueJobResult::AlreadyActive);
+        assert_eq!(result, EnqueueCrawlJobOutcome::AlreadyActive);
 
-        let snapshot = tx.queue_snapshot().await?;
-        assert_eq!(snapshot.pending_count, 1);
-        assert_eq!(snapshot.running_count, 0);
+        let result = tx
+            .claim_job(ClaimCrawlJobCommand::new(CrawlJobQueueLane::Default, now))
+            .await?;
+        let ClaimCrawlJobOutcome::Claimed(claimed) = result else {
+            anyhow::bail!("expected job to be claimed");
+        };
+        assert_eq!(claimed.feed_url, subscription.feed_url);
+        assert_eq!(claimed.state, CrawlJobState::Running);
+        assert_eq!(claimed.queue, CrawlJobQueueLane::Default);
         tx.commit().await?;
 
         let mut tx = db.begin().await?;

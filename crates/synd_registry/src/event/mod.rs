@@ -14,11 +14,12 @@ pub use codec::{
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
     ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlEvent,
-    CrawlEventKind, CrawlJobEnqueuedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
-    CrawlTargetPolicyChangedEvent, Event, EventInterests, EventKind, FeedSubscribedEvent,
-    FeedUnsubscribedEvent, RequestEvent, RequestEventKind, RequestId, SubEvent, SubEventKind,
-    SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChangedEvent, SubscriptionLifecycle,
-    UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    CrawlEventKind, CrawlJobEnqueuedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event, EventInterests, EventKind,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent, RequestEventKind, RequestId,
+    SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested,
+    SubscriptionChangedEvent, SubscriptionLifecycle, UnsubscribeFeedRejected,
+    UnsubscribeFeedRequested,
 };
 pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
 pub use processor::{

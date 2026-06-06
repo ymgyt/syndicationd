@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
-use sqlx::{Row, Sqlite, Transaction};
+use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
     RegistryDbError, RegistryDbResult,
     crawl::job::{
-        CrawlJob, CrawlJobId, CrawlJobState, CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult,
+        ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobId, CrawlJobState,
+        EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome,
     },
 };
 
@@ -19,39 +20,17 @@ impl<'tx, 'db> CrawlJobTable<'tx, 'db> {
         Self { tx }
     }
 
-    pub(super) async fn queue_snapshot(&mut self) -> RegistryDbResult<CrawlQueueSnapshot> {
-        let row = sqlx::query(
-            r#"
-            SELECT
-                COUNT(*) FILTER (WHERE state = 'pending') AS pending_count,
-                COUNT(*) FILTER (WHERE state = 'running') AS running_count
-            FROM crawl_job
-            "#,
-        )
-        .fetch_one(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-
-        Ok(CrawlQueueSnapshot::new(
-            row.try_get::<i64, _>("pending_count")
-                .map_err(RegistryDbError::internal)?
-                .try_into()
-                .map_err(RegistryDbError::internal)?,
-            row.try_get::<i64, _>("running_count")
-                .map_err(RegistryDbError::internal)?
-                .try_into()
-                .map_err(RegistryDbError::internal)?,
-        ))
-    }
-
-    pub(super) async fn enqueue(&mut self, job: EnqueueJob) -> RegistryDbResult<EnqueueJobResult> {
+    pub(super) async fn enqueue(
+        &mut self,
+        job: EnqueueCrawlJobCommand,
+    ) -> RegistryDbResult<EnqueueCrawlJobOutcome> {
         let feed_endpoint_pk = {
             let mut feed_endpoint = FeedEndpointTable::new(&mut *self.tx);
             feed_endpoint.resolve_pk(&job.feed_url).await?
         };
 
         if self.active_job_exists(feed_endpoint_pk).await? {
-            return Ok(EnqueueJobResult::AlreadyActive);
+            return Ok(EnqueueCrawlJobOutcome::AlreadyActive);
         }
 
         let job_id = CrawlJobId::generate();
@@ -95,7 +74,59 @@ impl<'tx, 'db> CrawlJobTable<'tx, 'db> {
         .await
         .map_err(RegistryDbError::internal)?;
 
-        Ok(EnqueueJobResult::Enqueued(row.try_into()?))
+        Ok(EnqueueCrawlJobOutcome::Enqueued(row.try_into()?))
+    }
+
+    pub(super) async fn claim(
+        &mut self,
+        command: ClaimCrawlJobCommand,
+    ) -> RegistryDbResult<ClaimCrawlJobOutcome> {
+        let row = sqlx::query_as::<_, ClaimedCrawlJobRow>(
+            r#"
+            UPDATE crawl_job
+            SET
+                state = ?,
+                updated_at = ?
+            WHERE pk = (
+                SELECT pk
+                FROM crawl_job
+                WHERE state = ?
+                  AND queue = ?
+                  AND run_after <= ?
+                ORDER BY priority DESC, run_after ASC, pk ASC
+                LIMIT 1
+            )
+            RETURNING
+                job_id,
+                feed_endpoint_pk,
+                state,
+                trigger,
+                queue,
+                priority,
+                run_after,
+                created_at,
+                updated_at
+            "#,
+        )
+        .bind(CrawlJobState::Running.as_str())
+        .bind(command.claimed_at)
+        .bind(CrawlJobState::Pending.as_str())
+        .bind(command.queue.as_str())
+        .bind(command.claimed_at)
+        .fetch_optional(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        let Some(row) = row else {
+            return Ok(ClaimCrawlJobOutcome::NoClaimableJob);
+        };
+
+        let feed_url = {
+            let mut feed_endpoint = FeedEndpointTable::new(&mut *self.tx);
+            feed_endpoint.resolve_url(row.feed_endpoint_pk).await?
+        };
+
+        Ok(ClaimCrawlJobOutcome::Claimed(row.into_job(feed_url)?))
     }
 
     async fn active_job_exists(&mut self, feed_endpoint_pk: i64) -> RegistryDbResult<bool> {
@@ -128,6 +159,35 @@ struct CrawlJobRow {
     run_after: DateTime<Utc>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ClaimedCrawlJobRow {
+    job_id: String,
+    feed_endpoint_pk: i64,
+    state: String,
+    trigger: String,
+    queue: String,
+    priority: i64,
+    run_after: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl ClaimedCrawlJobRow {
+    fn into_job(self, feed_url: FeedUrl) -> RegistryDbResult<CrawlJob> {
+        Ok(CrawlJob::new(
+            CrawlJobId::new(self.job_id),
+            feed_url,
+            self.state.parse().map_err(RegistryDbError::internal)?,
+            self.trigger.parse().map_err(RegistryDbError::internal)?,
+            self.queue.parse().map_err(RegistryDbError::internal)?,
+            self.priority,
+            self.run_after,
+            self.created_at,
+            self.updated_at,
+        ))
+    }
 }
 
 impl TryFrom<CrawlJobRow> for CrawlJob {

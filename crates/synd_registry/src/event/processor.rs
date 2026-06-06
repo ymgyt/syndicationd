@@ -6,8 +6,8 @@ use thiserror::Error;
 
 use crate::{
     crawl::{
-        job::{CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult},
-        schedule::{CrawlScheduleCandidate, UpsertSchedule},
+        queue::CrawlJobQueue,
+        schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
     db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
@@ -239,7 +239,10 @@ where
         self.tx.list_candidates(now, limit).await
     }
 
-    pub async fn upsert_schedule(&mut self, schedule: UpsertSchedule) -> RegistryDbResult<()> {
+    pub async fn upsert_schedule(
+        &mut self,
+        schedule: UpsertCrawlScheduleCommand,
+    ) -> RegistryDbResult<()> {
         self.tx.upsert_schedule(schedule).await
     }
 }
@@ -248,12 +251,11 @@ impl<Tx> ReconcileContext<'_, Tx>
 where
     Tx: CrawlJobQueueTx + Send,
 {
-    pub async fn queue_snapshot(&mut self) -> RegistryDbResult<CrawlQueueSnapshot> {
-        self.tx.queue_snapshot().await
-    }
-
-    pub async fn enqueue_job(&mut self, job: EnqueueJob) -> RegistryDbResult<EnqueueJobResult> {
-        self.tx.enqueue_job(job).await
+    pub fn crawl_job_queue(&mut self) -> CrawlJobQueue<'_, Tx>
+    where
+        Tx: JournalTx,
+    {
+        CrawlJobQueue::new(&mut *self.tx, &mut self.recorded)
     }
 }
 

@@ -9,7 +9,7 @@ use synd_registry::{
         job::{ActiveCrawlJob, CrawlJobId},
         schedule::{
             CrawlReadiness, CrawlSchedule, CrawlScheduleCandidate, ScheduledCrawlTarget,
-            ScheduledCrawlTargetState, UpsertSchedule,
+            ScheduledCrawlTargetState, UpsertCrawlScheduleCommand,
         },
     },
 };
@@ -74,7 +74,10 @@ impl<'tx, 'db> CrawlScheduleTable<'tx, 'db> {
             .collect()
     }
 
-    pub(super) async fn upsert(&mut self, schedule: UpsertSchedule) -> RegistryDbResult<()> {
+    pub(super) async fn upsert(
+        &mut self,
+        schedule: UpsertCrawlScheduleCommand,
+    ) -> RegistryDbResult<()> {
         let feed_endpoint_pk = {
             let mut feed_endpoint = FeedEndpointTable::new(&mut *self.tx);
             feed_endpoint.resolve_pk(&schedule.feed_url).await?

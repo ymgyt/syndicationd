@@ -63,4 +63,28 @@ impl<'tx, 'db> FeedEndpointTable<'tx, 'db> {
 
         row.try_get("pk").map_err(RegistryDbError::internal)
     }
+
+    pub(super) async fn resolve_url(&mut self, pk: i64) -> RegistryDbResult<FeedUrl> {
+        let row = sqlx::query(
+            r#"
+            SELECT url
+            FROM feed_endpoint
+            WHERE pk = ?
+            "#,
+        )
+        .bind(pk)
+        .fetch_optional(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        let Some(row) = row else {
+            return Err(RegistryDbError::internal(anyhow::anyhow!(
+                "feed endpoint not found: {pk}"
+            )));
+        };
+        let url = row
+            .try_get::<String, _>("url")
+            .map_err(RegistryDbError::internal)?;
+        FeedUrl::parse(&url).map_err(RegistryDbError::internal)
+    }
 }

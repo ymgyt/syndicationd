@@ -5,8 +5,11 @@ use synd_feed::types::FeedUrl;
 
 use crate::{
     crawl::{
-        job::{CrawlQueueSnapshot, EnqueueJob, EnqueueJobResult},
-        schedule::{CrawlScheduleCandidate, UpsertSchedule},
+        job::{
+            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, EnqueueCrawlJobCommand,
+            EnqueueCrawlJobOutcome,
+        },
+        schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
     error::{RegistryDbError, RegistryDbResult},
@@ -82,20 +85,21 @@ pub trait CrawlScheduleTx {
 
     fn upsert_schedule(
         &mut self,
-        schedule: UpsertSchedule,
+        command: UpsertCrawlScheduleCommand,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }
 
 /// Transactional crawl-job queue operations.
 pub trait CrawlJobQueueTx {
-    fn queue_snapshot(
-        &mut self,
-    ) -> impl Future<Output = RegistryDbResult<CrawlQueueSnapshot>> + Send;
-
     fn enqueue_job(
         &mut self,
-        job: EnqueueJob,
-    ) -> impl Future<Output = RegistryDbResult<EnqueueJobResult>> + Send;
+        command: EnqueueCrawlJobCommand,
+    ) -> impl Future<Output = RegistryDbResult<EnqueueCrawlJobOutcome>> + Send;
+
+    fn claim_job(
+        &mut self,
+        command: ClaimCrawlJobCommand,
+    ) -> impl Future<Output = RegistryDbResult<ClaimCrawlJobOutcome>> + Send;
 }
 
 /// Commits a registry database transaction.

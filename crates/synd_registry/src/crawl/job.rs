@@ -5,46 +5,22 @@ use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::FeedUrl;
 
-/// Current queue-wide facts visible to one scheduler run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CrawlQueueSnapshot {
-    pub pending_count: u64,
-    pub running_count: u64,
-}
-
-impl CrawlQueueSnapshot {
-    pub fn new(pending_count: u64, running_count: u64) -> Self {
-        Self {
-            pending_count,
-            running_count,
-        }
-    }
-
-    pub fn empty() -> Self {
-        Self::new(0, 0)
-    }
-
-    pub fn accepts_enqueue(&self) -> bool {
-        true
-    }
-}
-
 /// Command to create one crawl job if no active job exists for the same target.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EnqueueJob {
+pub struct EnqueueCrawlJobCommand {
     pub feed_url: FeedUrl,
     pub trigger: CrawlJobTrigger,
-    pub queue: CrawlJobQueue,
+    pub queue: CrawlJobQueueLane,
     pub priority: i64,
     pub run_after: DateTime<Utc>,
     pub enqueued_at: DateTime<Utc>,
 }
 
-impl EnqueueJob {
+impl EnqueueCrawlJobCommand {
     pub fn new(
         feed_url: FeedUrl,
         trigger: CrawlJobTrigger,
-        queue: CrawlJobQueue,
+        queue: CrawlJobQueueLane,
         priority: i64,
         run_after: DateTime<Utc>,
         enqueued_at: DateTime<Utc>,
@@ -62,9 +38,29 @@ impl EnqueueJob {
 
 /// Result of trying to enqueue one crawl job.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EnqueueJobResult {
+pub enum EnqueueCrawlJobOutcome {
     Enqueued(CrawlJob),
     AlreadyActive,
+}
+
+/// Command to claim one crawl job from a queue lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClaimCrawlJobCommand {
+    pub queue: CrawlJobQueueLane,
+    pub claimed_at: DateTime<Utc>,
+}
+
+impl ClaimCrawlJobCommand {
+    pub fn new(queue: CrawlJobQueueLane, claimed_at: DateTime<Utc>) -> Self {
+        Self { queue, claimed_at }
+    }
+}
+
+/// Result of trying to claim one crawl job.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClaimCrawlJobOutcome {
+    Claimed(CrawlJob),
+    NoClaimableJob,
 }
 
 /// Active job facts attached to one scheduling candidate.
@@ -87,7 +83,7 @@ pub struct CrawlJob {
     pub feed_url: FeedUrl,
     pub state: CrawlJobState,
     pub trigger: CrawlJobTrigger,
-    pub queue: CrawlJobQueue,
+    pub queue: CrawlJobQueueLane,
     pub priority: i64,
     pub run_after: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
@@ -101,7 +97,7 @@ impl CrawlJob {
         feed_url: FeedUrl,
         state: CrawlJobState,
         trigger: CrawlJobTrigger,
-        queue: CrawlJobQueue,
+        queue: CrawlJobQueueLane,
         priority: i64,
         run_after: DateTime<Utc>,
         created_at: DateTime<Utc>,
@@ -244,13 +240,13 @@ impl FromStr for CrawlJobTrigger {
 /// Worker queue lane for one crawl job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CrawlJobQueue {
+pub enum CrawlJobQueueLane {
     Default,
     Manual,
     Retry,
 }
 
-impl CrawlJobQueue {
+impl CrawlJobQueueLane {
     pub const DEFAULT: &'static str = "default";
     pub const MANUAL: &'static str = "manual";
     pub const RETRY: &'static str = "retry";
@@ -264,13 +260,13 @@ impl CrawlJobQueue {
     }
 }
 
-impl fmt::Display for CrawlJobQueue {
+impl fmt::Display for CrawlJobQueueLane {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl FromStr for CrawlJobQueue {
+impl FromStr for CrawlJobQueueLane {
     type Err = UnknownCrawlJobValue;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
