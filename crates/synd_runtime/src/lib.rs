@@ -19,8 +19,8 @@ mod uds;
 
 pub use daemon::{
     Control as DaemonControl, Daemon, DaemonConfig, DaemonExecutable, DaemonLaunchConfig,
-    DaemonLaunchLog, RuntimePlacementSummary, ShutdownResult, State as DaemonState,
-    Status as DaemonStatus,
+    DaemonLaunchInfo, DaemonLaunchLog, RuntimePlacementSummary, ShutdownResult,
+    State as DaemonState, Status as DaemonStatus,
 };
 pub use database::RuntimeDatabase;
 pub use error::{Error, Result};

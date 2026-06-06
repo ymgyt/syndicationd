@@ -4,6 +4,8 @@ use synd_protocol::CapabilitySet;
 
 use thiserror::Error;
 
+use crate::DaemonLaunchInfo;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error)]
@@ -44,8 +46,24 @@ pub enum Error {
     #[error("refusing to remove non-socket runtime endpoint {}", path.display())]
     NonSocketEndpoint { path: PathBuf },
 
-    #[error("daemon exited before endpoint became ready: {status}")]
-    DaemonExitedBeforeReady { status: ExitStatus },
+    #[error(
+        "daemon exited before endpoint became ready: {status}; daemon log: {}",
+        launch.log().display()
+    )]
+    DaemonExitedBeforeReady {
+        status: ExitStatus,
+        launch: DaemonLaunchInfo,
+    },
+
+    #[error(
+        "timed out waiting for launched daemon endpoint {} to become ready; daemon log: {}",
+        endpoint.display(),
+        launch.log().display()
+    )]
+    DaemonEndpointReadyTimeout {
+        endpoint: PathBuf,
+        launch: DaemonLaunchInfo,
+    },
 
     #[error("timed out waiting for daemon endpoint {} to become ready", endpoint.display())]
     EndpointReadyTimeout { endpoint: PathBuf },

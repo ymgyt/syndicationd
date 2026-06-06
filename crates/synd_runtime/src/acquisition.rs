@@ -1,5 +1,6 @@
 use std::{
     path::Path,
+    process::ExitStatus,
     time::{Duration, Instant},
 };
 
@@ -277,7 +278,7 @@ impl Missing {
         let connected = wait_connected(
             self.placement,
             config.session().acquire_timeout(),
-            Some(&mut daemon_handle),
+            EndpointReadyWaitDaemon::Launched(&mut daemon_handle),
         )
         .await?;
         daemon_handle.reap_in_background();
@@ -517,7 +518,12 @@ struct Busy {
 
 impl Busy {
     async fn wait(self, config: &RuntimeConfig) -> Result<Connected> {
-        wait_connected(self.placement, config.session().acquire_timeout(), None).await
+        wait_connected(
+            self.placement,
+            config.session().acquire_timeout(),
+            EndpointReadyWaitDaemon::External,
+        )
+        .await
     }
 }
 
@@ -563,15 +569,21 @@ fn daemon_client(
 async fn wait_connected(
     placement: RuntimePlacement,
     timeout: Duration,
-    mut daemon_handle: Option<&mut DaemonHandle>,
+    mut daemon: EndpointReadyWaitDaemon<'_>,
 ) -> Result<Connected> {
     let deadline = Instant::now() + timeout;
 
     loop {
-        if let Some(handle) = daemon_handle.as_deref_mut()
-            && let Some(status) = handle.try_wait()?
-        {
-            return Err(Error::DaemonExitedBeforeReady { status });
+        if let Some(exited) = daemon.try_exited()? {
+            debug!(
+                status = %exited.status,
+                daemon_launch = ?exited.launch,
+                "Daemon exited before endpoint became ready"
+            );
+            return Err(Error::DaemonExitedBeforeReady {
+                status: exited.status,
+                launch: exited.launch,
+            });
         }
 
         let endpoint = Endpoint::probe(placement.clone()).await;
@@ -581,9 +593,7 @@ async fn wait_connected(
 
         let now = Instant::now();
         if now >= deadline {
-            return Err(Error::EndpointReadyTimeout {
-                endpoint: placement.endpoint().path().to_path_buf(),
-            });
+            return Err(daemon.timeout_error(&placement));
         }
 
         debug!(
@@ -593,6 +603,42 @@ async fn wait_connected(
         );
         sleep(ENDPOINT_WAIT_INTERVAL.min(deadline - now)).await;
     }
+}
+
+enum EndpointReadyWaitDaemon<'a> {
+    Launched(&'a mut DaemonHandle),
+    External,
+}
+
+impl EndpointReadyWaitDaemon<'_> {
+    fn try_exited(&mut self) -> Result<Option<ExitedDaemon>> {
+        match self {
+            Self::Launched(handle) => {
+                let status = handle.try_wait()?;
+                Ok(status.map(|status| ExitedDaemon {
+                    status,
+                    launch: handle.launch().clone(),
+                }))
+            }
+            Self::External => Ok(None),
+        }
+    }
+
+    fn timeout_error(&self, placement: &RuntimePlacement) -> Error {
+        let endpoint = placement.endpoint().path().to_path_buf();
+        match self {
+            Self::Launched(handle) => Error::DaemonEndpointReadyTimeout {
+                endpoint,
+                launch: handle.launch().clone(),
+            },
+            Self::External => Error::EndpointReadyTimeout { endpoint },
+        }
+    }
+}
+
+struct ExitedDaemon {
+    status: ExitStatus,
+    launch: crate::DaemonLaunchInfo,
 }
 
 async fn wait_stopped(placement: RuntimePlacement, timeout: Duration) -> Result<Stopped> {

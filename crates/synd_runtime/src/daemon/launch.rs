@@ -146,6 +146,47 @@ struct OpenedDaemonLaunchLog {
     stderr: File,
 }
 
+/// Information about a daemon process launch attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DaemonLaunchInfo {
+    executable: PathBuf,
+    arguments: Vec<OsString>,
+    environment: Vec<(OsString, OsString)>,
+    log: PathBuf,
+}
+
+impl DaemonLaunchInfo {
+    fn new(
+        executable: PathBuf,
+        arguments: Vec<OsString>,
+        environment: Vec<(OsString, OsString)>,
+        log: PathBuf,
+    ) -> Self {
+        Self {
+            executable,
+            arguments,
+            environment,
+            log,
+        }
+    }
+
+    pub fn executable(&self) -> &Path {
+        &self.executable
+    }
+
+    pub fn arguments(&self) -> &[OsString] {
+        &self.arguments
+    }
+
+    pub fn environment(&self) -> &[(OsString, OsString)] {
+        &self.environment
+    }
+
+    pub fn log(&self) -> &Path {
+        &self.log
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ResolvedDaemonLaunchCommand {
     executable: PathBuf,
@@ -191,7 +232,6 @@ impl DaemonLaunchEnvironment {
         }
     }
 
-    #[cfg(test)]
     fn as_slice(&self) -> &[(OsString, OsString)] {
         &self.values
     }
@@ -271,11 +311,14 @@ impl<'a> DaemonLauncher<'a> {
         );
         let environment = DaemonLaunchEnvironment::from_placement(&self.placement);
         let log = self.config.log().open()?;
+        let launch = DaemonLaunchInfo::new(
+            command.executable.clone(),
+            command.arguments.as_slice().to_vec(),
+            environment.as_slice().to_vec(),
+            self.config.log().path().to_path_buf(),
+        );
         debug!(
-            daemon_executable = %command.executable.display(),
-            daemon_arguments = ?command.arguments,
-            daemon_environment = ?environment,
-            daemon_log = %self.config.log().path().display(),
+            daemon_launch = ?launch,
             "Launching daemon"
         );
 
@@ -288,16 +331,21 @@ impl<'a> DaemonLauncher<'a> {
             .stderr(Stdio::from(log.stderr))
             .spawn()?;
 
-        Ok(DaemonHandle { child })
+        Ok(DaemonHandle { child, launch })
     }
 }
 
 /// Handle for a daemon process spawned by session acquisition.
 pub(crate) struct DaemonHandle {
     child: Child,
+    launch: DaemonLaunchInfo,
 }
 
 impl DaemonHandle {
+    pub(crate) fn launch(&self) -> &DaemonLaunchInfo {
+        &self.launch
+    }
+
     pub(crate) fn try_wait(&mut self) -> Result<Option<ExitStatus>> {
         Ok(self.child.try_wait()?)
     }
