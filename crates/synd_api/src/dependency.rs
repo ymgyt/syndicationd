@@ -5,7 +5,7 @@ use synd_registry::FeedRegistry;
 use crate::{
     monitor::Monitors,
     serve::{ServeOptions, auth::Authenticator},
-    session::SessionRegistry,
+    session::DaemonSessions,
 };
 
 pub type AppFeedRegistry = FeedRegistry<SqliteFeedRegistryDb>;
@@ -16,7 +16,7 @@ pub struct Dependency {
     pub tls_config: Option<RustlsConfig>,
     pub serve_options: ServeOptions,
     pub monitors: Monitors,
-    pub sessions: SessionRegistry,
+    pub sessions: DaemonSessions,
 }
 
 impl Dependency {
@@ -32,7 +32,7 @@ impl Dependency {
             tls_config,
             serve_options: serve_options.into(),
             monitors: Monitors::new(),
-            sessions: SessionRegistry::default(),
+            sessions: DaemonSessions::default(),
         }
     }
 }

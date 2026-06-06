@@ -215,6 +215,7 @@ impl Application {
             SyndApiError::Graphql { errors } => errors.iter().map(ToString::to_string).join(", "),
             SyndApiError::SubscribeFeed(err) => err.to_string(),
             SyndApiError::OpenSession(err) => format!("session open rejected: {err:?}"),
+            SyndApiError::RenewSession(err) => format!("session renew rejected: {err:?}"),
             SyndApiError::CloseSession(err) => format!("session close rejected: {err:?}"),
             SyndApiError::MissingCredential
             | SyndApiError::InvalidHeader(_)

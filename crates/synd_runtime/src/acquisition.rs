@@ -217,7 +217,25 @@ impl Connected {
             Ok(session) => Ok(SessionAttempt::Opened(Box::new(Session::new(
                 client.clone(),
                 session.capabilities().clone(),
-                crate::SessionHandle::daemon(client, session.session_id().clone()),
+                {
+                    #[cfg(not(test))]
+                    {
+                        crate::SessionHandle::daemon(
+                            client,
+                            session.session_id().clone(),
+                            session.lease(),
+                        )
+                    }
+                    #[cfg(test)]
+                    {
+                        crate::SessionHandle::daemon(
+                            client,
+                            session.session_id().clone(),
+                            session.lease(),
+                            config.session().renewal_observer(),
+                        )
+                    }
+                },
             )))),
             Err(error) if session_endpoint_missing(&error) => {
                 Ok(SessionAttempt::Incompatible(Incompatible {

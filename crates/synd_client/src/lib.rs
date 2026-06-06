@@ -11,7 +11,8 @@ use reqwest::{
 use serde::{Serialize, de::DeserializeOwned};
 use synd_protocol::session::{
     CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse, OpenSessionErrorResponse,
-    OpenSessionRequest, OpenSessionResponse,
+    OpenSessionRequest, OpenSessionResponse, RenewSessionErrorResponse, RenewSessionRequest,
+    RenewSessionResponse,
 };
 use synd_support::o11y::{health_check::Health, opentelemetry::extension::*};
 use thiserror::Error;
@@ -58,6 +59,8 @@ pub enum SyndApiError {
     SubscribeFeed(SubscribeFeedError),
     #[error("session open rejected: {0:?}")]
     OpenSession(OpenSessionErrorResponse),
+    #[error("session renew rejected: {0:?}")]
+    RenewSession(RenewSessionErrorResponse),
     #[error("session close rejected: {0:?}")]
     CloseSession(CloseSessionErrorResponse),
     #[error("credential is not configured")]
@@ -201,6 +204,7 @@ impl Client {
     const GRAPHQL: &'static str = "/graphql";
     const HEALTH_CHECK: &'static str = "/health";
     const SESSION_OPEN: &'static str = "/session/open";
+    const SESSION_RENEW: &'static str = "/session/renew";
     const SESSION_CLOSE: &'static str = "/session/close";
     const DAEMON_SHUTDOWN: &'static str = "/daemon/shutdown";
 
@@ -574,6 +578,33 @@ impl Client {
 
         Err(SyndApiError::UnexpectedResponse {
             context: "session close",
+        })
+    }
+
+    pub async fn renew_session(
+        &self,
+        request: RenewSessionRequest,
+    ) -> Result<RenewSessionResponse, SyndApiError> {
+        let response = self
+            .execute_json_post(Self::SESSION_RENEW, &request)
+            .await?;
+
+        if response.status().is_success() {
+            return response.json().await.map_err(SyndApiError::BuildRequest);
+        }
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(SyndApiError::RenewSession(
+                response.json().await.map_err(SyndApiError::BuildRequest)?,
+            ));
+        }
+
+        response
+            .error_for_status()
+            .map_err(SyndApiError::from_status_error)?;
+
+        Err(SyndApiError::UnexpectedResponse {
+            context: "session renew",
         })
     }
 

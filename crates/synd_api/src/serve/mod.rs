@@ -22,7 +22,7 @@ use crate::{
     dependency::Dependency,
     gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
-    session::{DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE, SessionIdleShutdown},
+    session::{DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE, DaemonSessionSweeper, SessionIdleShutdown},
     shutdown::Shutdown,
 };
 
@@ -94,8 +94,11 @@ pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutd
     ));
     let ApiService { router, .. } = build_service(dep, &shutdown);
     let shutdown_requested = shutdown.cancellation_token();
+    let _session_sweeper =
+        DaemonSessionSweeper::new(sessions.clone(), shutdown_requested.clone()).spawn();
     let router = router
         .route("/session/open", post(session_routes::open))
+        .route("/session/renew", post(session_routes::renew))
         .route("/session/close", post(session_routes::close))
         .route("/daemon/shutdown", post(control::shutdown))
         .layer(Extension(sessions))
@@ -186,25 +189,35 @@ mod session_routes {
         http::StatusCode,
         response::{IntoResponse, Response},
     };
-    use synd_protocol::session::{CloseSessionRequest, OpenSessionRequest};
+    use synd_protocol::session::{CloseSessionRequest, OpenSessionRequest, RenewSessionRequest};
 
-    use crate::session::SessionRegistry;
+    use crate::session::DaemonSessions;
 
     pub(super) async fn open(
-        Extension(registry): Extension<SessionRegistry>,
+        Extension(sessions): Extension<DaemonSessions>,
         Json(request): Json<OpenSessionRequest>,
     ) -> Response {
-        match registry.open(&request) {
+        match sessions.open(&request) {
             Ok(response) => (StatusCode::CREATED, Json(response)).into_response(),
             Err(error) => (StatusCode::CONFLICT, Json(error)).into_response(),
         }
     }
 
     pub(super) async fn close(
-        Extension(registry): Extension<SessionRegistry>,
+        Extension(sessions): Extension<DaemonSessions>,
         Json(request): Json<CloseSessionRequest>,
     ) -> Response {
-        match registry.close(&request) {
+        match sessions.close(&request) {
+            Ok(response) => (StatusCode::OK, Json(response)).into_response(),
+            Err(error) => (StatusCode::NOT_FOUND, Json(error)).into_response(),
+        }
+    }
+
+    pub(super) async fn renew(
+        Extension(sessions): Extension<DaemonSessions>,
+        Json(request): Json<RenewSessionRequest>,
+    ) -> Response {
+        match sessions.renew(&request) {
             Ok(response) => (StatusCode::OK, Json(response)).into_response(),
             Err(error) => (StatusCode::NOT_FOUND, Json(error)).into_response(),
         }

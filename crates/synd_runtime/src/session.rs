@@ -1,7 +1,12 @@
 use std::time::Duration;
 
 use crate::{CapabilitySet, Result};
-use synd_protocol::session::{CloseSessionRequest, SessionId};
+#[cfg(test)]
+pub(crate) use renewal::SessionRenewalObserver;
+use renewal::{SessionLeaseRenewal, SessionLeaseRenewalHandle, SessionRenewalSchedule};
+use synd_protocol::session::{CloseSessionRequest, SessionId, SessionLease};
+
+mod renewal;
 
 pub struct Session {
     client: synd_client::Client,
@@ -47,9 +52,31 @@ impl Handle {
         }
     }
 
-    pub(crate) fn daemon(client: synd_client::Client, session_id: SessionId) -> Self {
+    #[cfg(not(test))]
+    pub(crate) fn daemon(
+        client: synd_client::Client,
+        session_id: SessionId,
+        lease: SessionLease,
+    ) -> Self {
         Self {
-            kind: HandleKind::Daemon(DaemonSessionHandle::new(client, session_id)),
+            kind: HandleKind::Daemon(DaemonSessionHandle::new(client, session_id, lease)),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn daemon(
+        client: synd_client::Client,
+        session_id: SessionId,
+        lease: SessionLease,
+        renewal_observer: Option<SessionRenewalObserver>,
+    ) -> Self {
+        Self {
+            kind: HandleKind::Daemon(DaemonSessionHandle::new(
+                client,
+                session_id,
+                lease,
+                renewal_observer,
+            )),
         }
     }
 
@@ -65,14 +92,51 @@ impl Handle {
 struct DaemonSessionHandle {
     client: synd_client::Client,
     session_id: SessionId,
+    renewal: SessionLeaseRenewalHandle,
 }
 
 impl DaemonSessionHandle {
-    fn new(client: synd_client::Client, session_id: SessionId) -> Self {
-        Self { client, session_id }
+    #[cfg(not(test))]
+    fn new(client: synd_client::Client, session_id: SessionId, lease: SessionLease) -> Self {
+        let renewal = {
+            let schedule = SessionRenewalSchedule::from_lease(lease);
+            SessionLeaseRenewal::new(client.clone(), session_id.clone(), schedule).spawn()
+        };
+
+        Self {
+            client,
+            session_id,
+            renewal,
+        }
+    }
+
+    #[cfg(test)]
+    fn new(
+        client: synd_client::Client,
+        session_id: SessionId,
+        lease: SessionLease,
+        renewal_observer: Option<SessionRenewalObserver>,
+    ) -> Self {
+        let renewal = {
+            let schedule = SessionRenewalSchedule::from_lease(lease);
+            SessionLeaseRenewal::new(
+                client.clone(),
+                session_id.clone(),
+                schedule,
+                renewal_observer,
+            )
+            .spawn()
+        };
+
+        Self {
+            client,
+            session_id,
+            renewal,
+        }
     }
 
     async fn close(self) -> Result<()> {
+        self.renewal.stop().await;
         self.client
             .close_session(CloseSessionRequest::new(self.session_id))
             .await?;
@@ -81,20 +145,45 @@ impl DaemonSessionHandle {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Config {
     acquire_timeout: Duration,
+    #[cfg(test)]
+    renewal_observer: Option<SessionRenewalObserver>,
 }
 
 impl Config {
     pub fn new(acquire_timeout: Duration) -> Self {
-        Self { acquire_timeout }
+        Self {
+            acquire_timeout,
+            #[cfg(test)]
+            renewal_observer: None,
+        }
     }
 
     pub fn acquire_timeout(&self) -> Duration {
         self.acquire_timeout
     }
+
+    #[cfg(test)]
+    pub(crate) fn with_renewal_observer(mut self, observer: SessionRenewalObserver) -> Self {
+        self.renewal_observer = Some(observer);
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn renewal_observer(&self) -> Option<SessionRenewalObserver> {
+        self.renewal_observer.clone()
+    }
 }
+
+impl PartialEq for Config {
+    fn eq(&self, other: &Self) -> bool {
+        self.acquire_timeout == other.acquire_timeout
+    }
+}
+
+impl Eq for Config {}
 
 impl Default for Config {
     fn default() -> Self {

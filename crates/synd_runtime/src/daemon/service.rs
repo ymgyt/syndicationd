@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(test)]
+use synd_api::session::DaemonSessionLeasePolicy;
 use synd_api::{
     cli::ServeOptions,
     serve::{self, auth::Authenticator},
@@ -80,6 +82,14 @@ impl Daemon {
         )
         .await?;
         let (dependency, _event_workers) = api_service.into_parts();
+        #[cfg(test)]
+        let dependency = {
+            let mut dependency = dependency;
+            if let Some(lease_policy) = self.config.session_lease_policy() {
+                dependency.sessions = dependency.sessions.with_lease_policy(lease_policy);
+            }
+            dependency
+        };
 
         // Keep event workers alive for the entire serve future.
         serve::serve_unix(listener, dependency, shutdown).await?;
@@ -92,6 +102,8 @@ impl Daemon {
 pub struct DaemonConfig {
     database: RuntimeDatabase,
     placement_environment: RuntimePlacementEnvironment,
+    #[cfg(test)]
+    session_lease_policy: Option<DaemonSessionLeasePolicy>,
 }
 
 impl DaemonConfig {
@@ -99,6 +111,8 @@ impl DaemonConfig {
         Self {
             database,
             placement_environment: RuntimePlacementEnvironment::capture(),
+            #[cfg(test)]
+            session_lease_policy: None,
         }
     }
 
@@ -117,6 +131,17 @@ impl DaemonConfig {
     ) -> Self {
         self.placement_environment = placement_environment;
         self
+    }
+
+    #[cfg(test)]
+    fn with_session_lease_policy(mut self, lease_policy: DaemonSessionLeasePolicy) -> Self {
+        self.session_lease_policy = Some(lease_policy);
+        self
+    }
+
+    #[cfg(test)]
+    fn session_lease_policy(&self) -> Option<DaemonSessionLeasePolicy> {
+        self.session_lease_policy
     }
 }
 
@@ -271,15 +296,80 @@ mod tests {
         time::Duration,
     };
 
+    use synd_api::session::DaemonSessionLeasePolicy;
+    use synd_protocol::session::SessionId;
+    use tokio::sync::mpsc;
+
     use crate::{
         DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog, DaemonState, Runtime, RuntimeConfig,
-        RuntimeDatabase,
+        RuntimeDatabase, SessionConfig,
         instance::RuntimeInstance,
         placement::{RuntimePlacementEnvironment, RuntimePlacementResolver, RuntimeRoot},
+        session::SessionRenewalObserver,
         uds::UdsEndpoint,
     };
 
     use super::{Daemon, DaemonConfig, DaemonEndpointBinder};
+
+    #[cfg(unix)]
+    #[derive(Debug, Default)]
+    struct StartedDaemonConfig {
+        session_lease_policy: Option<DaemonSessionLeasePolicy>,
+        renewal_observer: Option<SessionRenewalObserver>,
+    }
+
+    #[cfg(unix)]
+    impl StartedDaemonConfig {
+        fn with_session_lease_policy(mut self, lease_policy: DaemonSessionLeasePolicy) -> Self {
+            self.session_lease_policy = Some(lease_policy);
+            self
+        }
+
+        fn with_renewal_observer(mut self, observer: SessionRenewalObserver) -> Self {
+            self.renewal_observer = Some(observer);
+            self
+        }
+    }
+
+    #[cfg(unix)]
+    struct SessionRenewalProbe {
+        renewed: mpsc::UnboundedReceiver<SessionId>,
+    }
+
+    #[cfg(unix)]
+    impl SessionRenewalProbe {
+        fn new() -> (SessionRenewalObserver, Self) {
+            let (renewed_tx, renewed_rx) = mpsc::unbounded_channel();
+
+            (
+                SessionRenewalObserver::new(renewed_tx),
+                Self {
+                    renewed: renewed_rx,
+                },
+            )
+        }
+
+        async fn wait_for_renewals(
+            &mut self,
+            expected_renewals: usize,
+            timeout: Duration,
+        ) -> Vec<SessionId> {
+            tokio::time::timeout(timeout, async {
+                let mut renewals = Vec::with_capacity(expected_renewals);
+                while renewals.len() < expected_renewals {
+                    let session_id = self
+                        .renewed
+                        .recv()
+                        .await
+                        .expect("session renewal observer closed before expected renewal");
+                    renewals.push(session_id);
+                }
+                renewals
+            })
+            .await
+            .expect("timed out waiting for session renewals")
+        }
+    }
 
     #[cfg(unix)]
     struct StartedDaemon {
@@ -290,25 +380,39 @@ mod tests {
     #[cfg(unix)]
     impl StartedDaemon {
         fn spawn(root: &Path) -> crate::Result<Self> {
+            Self::spawn_with_config(root, StartedDaemonConfig::default())
+        }
+
+        fn spawn_with_config(root: &Path, config: StartedDaemonConfig) -> crate::Result<Self> {
             let database = RuntimeDatabase::sqlite(root.join("synd.db"));
             let placement_environment =
                 RuntimePlacementEnvironment::new(RuntimeRoot::from(root.join("runtime")));
             let placement =
                 RuntimePlacementResolver::with_environment(placement_environment.clone())
                     .resolve_database(&database)?;
+            let session_config = {
+                let session_config = SessionConfig::new(Duration::from_secs(2));
+                match config.renewal_observer {
+                    Some(observer) => session_config.with_renewal_observer(observer),
+                    None => session_config,
+                }
+            };
             let runtime = Runtime::try_new(
                 RuntimeConfig::new(database.clone())
                     .with_api_timeout(Duration::from_secs(2), "synd-runtime-test")
-                    .with_session_timeout(Duration::from_secs(2))
+                    .with_session(session_config)
                     .with_daemon_launch(DaemonLaunchConfig::new(
                         DaemonExecutable::path("unused"),
                         DaemonLaunchLog::file(root.join("daemon.log")),
                     ))
                     .with_placement_environment(placement_environment.clone()),
             )?;
-            let daemon = Daemon::new(
-                DaemonConfig::new(database).with_placement_environment(placement_environment),
-            );
+            let mut daemon_config =
+                DaemonConfig::new(database).with_placement_environment(placement_environment);
+            if let Some(lease_policy) = config.session_lease_policy {
+                daemon_config = daemon_config.with_session_lease_policy(lease_policy);
+            }
+            let daemon = Daemon::new(daemon_config);
             let probe =
                 DaemonLifecycleProbe::new(runtime, placement.endpoint().path().to_path_buf());
             let daemon_task = tokio::spawn(daemon.serve());
@@ -390,6 +494,41 @@ mod tests {
         daemon.wait_until_running().await;
         let session = daemon.probe.runtime.acquire_session().await?;
         assert!(session.capabilities().is_empty());
+        session.close().await?;
+
+        daemon.shutdown().await;
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn daemon_keeps_runtime_session_alive_with_client_renewals() -> crate::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let lease_policy = DaemonSessionLeasePolicy::new(
+            Duration::from_secs(2),
+            Duration::from_millis(500),
+            Duration::from_millis(200),
+        );
+        let (observer, mut renewal_probe) = SessionRenewalProbe::new();
+        let daemon = StartedDaemon::spawn_with_config(
+            tmp.path(),
+            StartedDaemonConfig::default()
+                .with_session_lease_policy(lease_policy)
+                .with_renewal_observer(observer),
+        )?;
+
+        daemon.wait_until_running().await;
+        let session = daemon.probe.runtime.acquire_session().await?;
+        let renewed_session_ids = renewal_probe
+            .wait_for_renewals(4, Duration::from_secs(8))
+            .await;
+        let first_session_id = &renewed_session_ids[0];
+
+        assert!(
+            renewed_session_ids
+                .iter()
+                .all(|session_id| session_id == first_session_id)
+        );
         session.close().await?;
 
         daemon.shutdown().await;

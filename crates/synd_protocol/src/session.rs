@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
@@ -47,13 +47,23 @@ impl OpenSessionRequest {
 pub struct OpenSessionResponse {
     session_id: SessionId,
     capabilities: CapabilitySet,
+    lease: SessionLease,
 }
 
 impl OpenSessionResponse {
     pub fn new(session_id: SessionId, capabilities: CapabilitySet) -> Self {
+        Self::with_lease(session_id, capabilities, SessionLease::default())
+    }
+
+    pub fn with_lease(
+        session_id: SessionId,
+        capabilities: CapabilitySet,
+        lease: SessionLease,
+    ) -> Self {
         Self {
             session_id,
             capabilities,
+            lease,
         }
     }
 
@@ -63,6 +73,10 @@ impl OpenSessionResponse {
 
     pub fn capabilities(&self) -> &CapabilitySet {
         &self.capabilities
+    }
+
+    pub fn lease(&self) -> SessionLease {
+        self.lease
     }
 }
 
@@ -106,6 +120,95 @@ pub struct CloseSessionRequest {
 impl CloseSessionRequest {
     pub fn new(session_id: SessionId) -> Self {
         Self { session_id }
+    }
+
+    pub fn session_id(&self) -> &SessionId {
+        &self.session_id
+    }
+}
+
+/// Lease granted by the daemon for one accepted session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SessionLease(Duration);
+
+impl SessionLease {
+    pub fn new(duration: Duration) -> Self {
+        Self(duration)
+    }
+
+    pub fn duration(self) -> Duration {
+        self.0
+    }
+}
+
+impl Default for SessionLease {
+    fn default() -> Self {
+        Self(Duration::from_secs(30))
+    }
+}
+
+/// Request body used by a client to renew a daemon session lease.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenewSessionRequest {
+    session_id: SessionId,
+}
+
+impl RenewSessionRequest {
+    pub fn new(session_id: SessionId) -> Self {
+        Self { session_id }
+    }
+
+    pub fn session_id(&self) -> &SessionId {
+        &self.session_id
+    }
+}
+
+/// Response body returned after the daemon renews a session lease.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenewSessionResponse {
+    session_id: SessionId,
+    lease: SessionLease,
+}
+
+impl RenewSessionResponse {
+    pub fn new(session_id: SessionId, lease: SessionLease) -> Self {
+        Self { session_id, lease }
+    }
+
+    pub fn session_id(&self) -> &SessionId {
+        &self.session_id
+    }
+
+    pub fn lease(&self) -> SessionLease {
+        self.lease
+    }
+}
+
+/// Machine-readable reason for rejecting a session renew request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RenewSessionErrorCode {
+    UnknownSession,
+}
+
+/// Error body returned when the daemon rejects a session renew request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RenewSessionErrorResponse {
+    code: RenewSessionErrorCode,
+    session_id: SessionId,
+}
+
+impl RenewSessionErrorResponse {
+    pub fn unknown_session(session_id: SessionId) -> Self {
+        Self {
+            code: RenewSessionErrorCode::UnknownSession,
+            session_id,
+        }
+    }
+
+    pub fn code(&self) -> RenewSessionErrorCode {
+        self.code
     }
 
     pub fn session_id(&self) -> &SessionId {
@@ -162,7 +265,9 @@ mod tests {
         CapabilitySet,
         session::{
             CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse,
-            OpenSessionErrorResponse, OpenSessionRequest, OpenSessionResponse, SessionId,
+            OpenSessionErrorResponse, OpenSessionRequest, OpenSessionResponse,
+            RenewSessionErrorResponse, RenewSessionRequest, RenewSessionResponse, SessionId,
+            SessionLease,
         },
     };
 
@@ -190,6 +295,31 @@ mod tests {
                     "session_id": "session-1",
                     "capabilities": {
                         "names": ["timeline.read"]
+                    },
+                    "lease": {
+                        "secs": 30,
+                        "nanos": 0
+                    }
+                }),
+            ),
+            (
+                serde_json::to_value(RenewSessionRequest::new(SessionId::new("session-1")))
+                    .unwrap(),
+                json!({
+                    "session_id": "session-1"
+                }),
+            ),
+            (
+                serde_json::to_value(RenewSessionResponse::new(
+                    SessionId::new("session-1"),
+                    SessionLease::new(std::time::Duration::from_secs(30)),
+                ))
+                .unwrap(),
+                json!({
+                    "session_id": "session-1",
+                    "lease": {
+                        "secs": 30,
+                        "nanos": 0
                     }
                 }),
             ),
@@ -218,6 +348,16 @@ mod tests {
             ),
             (
                 serde_json::to_value(CloseSessionErrorResponse::unknown_session(SessionId::new(
+                    "session-1",
+                )))
+                .unwrap(),
+                json!({
+                    "code": "unknown_session",
+                    "session_id": "session-1"
+                }),
+            ),
+            (
+                serde_json::to_value(RenewSessionErrorResponse::unknown_session(SessionId::new(
                     "session-1",
                 )))
                 .unwrap(),
