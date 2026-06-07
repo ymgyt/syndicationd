@@ -22,7 +22,3 @@ mod license 'etc/just/license.just'
 # List recipe
 default:
     just --list --list-submodules
-
-# Run term with in-process local api
-run-local *flags:
-    just run term {{ flags }}
