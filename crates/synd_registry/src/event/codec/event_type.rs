@@ -12,6 +12,7 @@ pub(super) const CRAWL_TARGET_POLICY_CHANGED: &str = "crawl.target.policy_change
 pub(super) const CRAWL_TARGET_DEACTIVATED: &str = "crawl.target.deactivated";
 pub(super) const CRAWL_JOB_ENQUEUED: &str = "crawl.job.enqueued";
 pub(super) const CRAWL_JOB_STARTED: &str = "crawl.job.started";
+pub(super) const CRAWL_JOB_FINISHED: &str = "crawl.job.finished";
 
 pub(super) const API_FEED_SUBSCRIBED: &str = "api.feed.subscribed";
 pub(super) const API_FEED_SUBSCRIBE_REJECTED: &str = "api.feed.subscribe_rejected";

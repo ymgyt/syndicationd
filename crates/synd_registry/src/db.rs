@@ -5,10 +5,12 @@ use synd_feed::types::FeedUrl;
 
 use crate::{
     crawl::{
+        blob::{BlobRef, PutBlobCommand},
         job::{
             ClaimCrawlJobCommand, ClaimCrawlJobOutcome, EnqueueCrawlJobCommand,
-            EnqueueCrawlJobOutcome,
+            EnqueueCrawlJobOutcome, FinishCrawlJobCommand, FinishCrawlJobOutcome,
         },
+        result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
         schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
@@ -100,6 +102,37 @@ pub trait CrawlJobQueueTx {
         &mut self,
         command: ClaimCrawlJobCommand,
     ) -> impl Future<Output = RegistryDbResult<ClaimCrawlJobOutcome>> + Send;
+
+    fn finish_job(
+        &mut self,
+        command: FinishCrawlJobCommand,
+    ) -> impl Future<Output = RegistryDbResult<FinishCrawlJobOutcome>> + Send;
+}
+
+/// Transactional generic blob-store operations.
+pub trait BlobStoreTx {
+    fn put_blob(
+        &mut self,
+        command: PutBlobCommand,
+    ) -> impl Future<Output = RegistryDbResult<BlobRef>> + Send;
+}
+
+/// Transactional operations for persisting one crawl job completion.
+pub trait CrawlCompletionTx {
+    fn load_crawl_state(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Option<CrawlState>>> + Send;
+
+    fn record_crawl_result(
+        &mut self,
+        command: RecordCrawlResultCommand,
+    ) -> impl Future<Output = RegistryDbResult<CrawlResultRef>> + Send;
+
+    fn upsert_crawl_state(
+        &mut self,
+        command: UpsertCrawlStateCommand,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }
 
 /// Commits a registry database transaction.

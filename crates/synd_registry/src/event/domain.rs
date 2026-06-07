@@ -115,6 +115,7 @@ pub enum CrawlEventKind {
     TargetDeactivated,
     JobEnqueued,
     JobStarted,
+    JobFinished,
 }
 
 /// A stable API contract event category.
@@ -339,6 +340,7 @@ pub enum CrawlEvent {
     TargetDeactivated(CrawlTargetDeactivatedEvent),
     JobEnqueued(CrawlJobEnqueuedEvent),
     JobStarted(CrawlJobStartedEvent),
+    JobFinished(CrawlJobFinishedEvent),
 }
 
 impl CrawlEvent {
@@ -349,6 +351,7 @@ impl CrawlEvent {
             Self::TargetDeactivated(_) => CrawlEventKind::TargetDeactivated,
             Self::JobEnqueued(_) => CrawlEventKind::JobEnqueued,
             Self::JobStarted(_) => CrawlEventKind::JobStarted,
+            Self::JobFinished(_) => CrawlEventKind::JobFinished,
         }
     }
 }
@@ -776,6 +779,37 @@ impl From<CrawlJobStartedEvent> for CrawlEvent {
 
 impl From<CrawlJobStartedEvent> for Event {
     fn from(event: CrawlJobStartedEvent) -> Self {
+        Self::Crawl(event.into())
+    }
+}
+
+/// A crawl job completed and moved out of the running set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlJobFinishedEvent {
+    pub job_id: CrawlJobId,
+    pub feed_url: FeedUrl,
+}
+
+impl CrawlJobFinishedEvent {
+    pub fn new(job_id: CrawlJobId, feed_url: FeedUrl) -> Self {
+        Self { job_id, feed_url }
+    }
+}
+
+impl From<CrawlJob> for CrawlJobFinishedEvent {
+    fn from(job: CrawlJob) -> Self {
+        Self::new(job.job_id, job.feed_url)
+    }
+}
+
+impl From<CrawlJobFinishedEvent> for CrawlEvent {
+    fn from(event: CrawlJobFinishedEvent) -> Self {
+        Self::JobFinished(event)
+    }
+}
+
+impl From<CrawlJobFinishedEvent> for Event {
+    fn from(event: CrawlJobFinishedEvent) -> Self {
         Self::Crawl(event.into())
     }
 }

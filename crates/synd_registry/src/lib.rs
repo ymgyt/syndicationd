@@ -16,8 +16,11 @@ pub use command::{
     SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
 };
 pub use config::{FeedRegistryConfig, FeedRegistryWorkerConfig};
-pub use crawl::worker::{CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
-pub use db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx};
+pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
+pub use db::{
+    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb,
+    RegistryTx,
+};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::{FeedRegistry, RegistryService};
 pub use subscription::{

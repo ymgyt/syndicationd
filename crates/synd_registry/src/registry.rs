@@ -1,5 +1,6 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
+use synd_feed::feed::service::FeedService;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
@@ -12,7 +13,10 @@ use crate::{
         policy::CrawlPolicy, scheduler::CrawlScheduler, target_list::CrawlTargetListProj,
         worker::spawn_crawl_worker_pool,
     },
-    db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
+    db::{
+        BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb,
+        RegistryTx,
+    },
     error::FeedRegistryError,
     event::{
         ApiEventPublisher, ApiEventSubscriber, EventSubmitter, EventWakePublisher, Processor,
@@ -31,7 +35,7 @@ pub struct RegistryService<S> {
 impl<S> RegistryService<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx,
+    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx,
 {
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> Self {
         let api_events = ApiEventPublisher::default();
@@ -129,7 +133,7 @@ fn spawn_event_workers<S>(
 ) -> WorkerSet
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx,
+    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx,
 {
     let subscription_request_projection_worker = spawn_event_worker(
         db.clone(),
@@ -166,8 +170,13 @@ where
         ct.clone(),
         CrawlScheduler::new(),
     );
+    let crawl_fetcher = Arc::new(FeedService::new(
+        config.crawl_worker_pool.fetch.user_agent,
+        config.crawl_worker_pool.fetch.max_body_bytes,
+    ));
     let crawl_worker_pool = spawn_crawl_worker_pool(
         db,
+        crawl_fetcher,
         wake_publisher.clone(),
         config.workers.crawl_worker_pool_poll_interval,
         config.crawl_worker_pool,

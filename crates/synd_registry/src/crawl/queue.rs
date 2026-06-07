@@ -1,6 +1,7 @@
 use crate::{
     crawl::job::{
         ClaimCrawlJobCommand, ClaimCrawlJobOutcome, EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome,
+        FinishCrawlJobCommand, FinishCrawlJobOutcome,
     },
     db::CrawlJobQueueTx,
     error::RegistryDbResult,
@@ -45,6 +46,13 @@ where
                 .await?;
         }
         Ok(outcome)
+    }
+
+    pub async fn finish(
+        &mut self,
+        command: FinishCrawlJobCommand,
+    ) -> RegistryDbResult<FinishCrawlJobOutcome> {
+        self.tx.finish_job(command).await
     }
 
     async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>

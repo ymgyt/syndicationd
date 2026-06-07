@@ -16,13 +16,15 @@ version     = "0.1.0"
 synd-feed     = { path = "../synd_feed", version = "0.3.5", features = ["sqlx"] }
 synd-registry = { path = "../synd_registry", version = "0.1.0" }
 
-anyhow = { workspace = true }
-chrono = { workspace = true }
-serde = { workspace = true }
+anyhow     = { workspace = true }
+chrono     = { workspace = true }
+serde      = { workspace = true }
 serde_json = { workspace = true }
-sqlx   = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
-thiserror = { workspace = true }
-tracing = { workspace = true }
+sha2       = { workspace = true }
+sqlx       = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
+thiserror  = { workspace = true }
+tracing    = { workspace = true }
+zstd       = { workspace = true }
 
 [dev-dependencies]
 tempfile   = { workspace = true }

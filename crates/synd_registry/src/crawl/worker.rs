@@ -1,19 +1,22 @@
 use std::{sync::Arc, time::Duration};
 
 use chrono::Utc;
+use synd_feed::feed::service::{FeedFetchRequest, FetchFeed};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, warn};
 
 use crate::{
     crawl::{
+        completion::CrawlCompletionRecorder,
         job::{ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobQueueLane},
         queue::CrawlJobQueue,
+        result::CrawlState,
     },
-    db::{CommitTx, CrawlJobQueueTx, FeedRegistryDb},
+    db::{BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, FeedRegistryDb},
     event::{
         CrawlEventKind, EventInterests, EventWake, EventWakePublisher, EventWakeRecvError,
-        RecordedEvents, Trigger, WorkerHandle, WorkerId, WorkerResult,
+        JournalTx, RecordedEvents, Trigger, WorkerHandle, WorkerId, WorkerResult,
     },
 };
 
@@ -30,6 +33,7 @@ pub struct CrawlWorkerPoolConfig {
     pub manual_queue: CrawlWorkerQueueConfig,
     pub default_queue: CrawlWorkerQueueConfig,
     pub retry_queue: CrawlWorkerQueueConfig,
+    pub fetch: CrawlWorkerFetchConfig,
 }
 
 impl Default for CrawlWorkerPoolConfig {
@@ -45,6 +49,7 @@ impl Default for CrawlWorkerPoolConfig {
             retry_queue: CrawlWorkerQueueConfig {
                 max_running_jobs: 1,
             },
+            fetch: CrawlWorkerFetchConfig::default(),
         }
     }
 }
@@ -55,26 +60,48 @@ pub struct CrawlWorkerQueueConfig {
     pub max_running_jobs: usize,
 }
 
+/// HTTP fetch configuration used by crawl workers.
+#[derive(Debug, Clone, Copy)]
+pub struct CrawlWorkerFetchConfig {
+    pub user_agent: &'static str,
+    pub max_body_bytes: usize,
+}
+
+impl Default for CrawlWorkerFetchConfig {
+    fn default() -> Self {
+        Self {
+            user_agent: "syndicationd",
+            max_body_bytes: 10 * 1024 * 1024,
+        }
+    }
+}
+
 /// Claims and runs durable crawl jobs.
-pub(crate) struct CrawlWorkerPool<S> {
+pub(crate) struct CrawlWorkerPool<S, F> {
     db: S,
+    fetcher: F,
     wake: EventWake,
+    wake_publisher: EventWakePublisher,
     poll_interval: Duration,
     ct: CancellationToken,
     capacity: CrawlWorkerCapacity,
 }
 
-impl<S> CrawlWorkerPool<S> {
+impl<S, F> CrawlWorkerPool<S, F> {
     pub fn new(
         db: S,
-        wake: EventWake,
+        fetcher: F,
+        wake_publisher: EventWakePublisher,
         poll_interval: Duration,
         config: CrawlWorkerPoolConfig,
         ct: CancellationToken,
     ) -> Self {
+        let wake = EventWake::new(wake_publisher.clone());
         Self {
             db,
+            fetcher,
             wake,
+            wake_publisher,
             poll_interval,
             ct,
             capacity: CrawlWorkerCapacity::new(config),
@@ -82,10 +109,11 @@ impl<S> CrawlWorkerPool<S> {
     }
 }
 
-impl<S> CrawlWorkerPool<S>
+impl<S, F> CrawlWorkerPool<S, F>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlJobQueueTx,
+    F: FetchFeed + Clone + Send + Sync + 'static,
+    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
 {
     pub fn spawn(self) -> WorkerHandle {
         WorkerHandle::new(WorkerId::CrawlWorkerPool, tokio::spawn(self.run()))
@@ -236,6 +264,9 @@ where
     }
 
     fn start_worker(&self, job: CrawlJob, slot: CrawlWorkerSlot) {
+        let db = self.db.clone();
+        let fetcher = self.fetcher.clone();
+        let wake_publisher = self.wake_publisher.clone();
         let worker_ct = self.ct.child_token();
         tokio::spawn(async move {
             debug!(
@@ -244,10 +275,112 @@ where
                 queue = slot.lane().as_str(),
                 "crawl worker started job"
             );
-            worker_ct.cancelled().await;
+
+            let lane = slot.lane();
+            let worker = CrawlWorker::new(db, fetcher, wake_publisher, worker_ct);
+            if let Err(err) = worker.run(job, lane).await {
+                error!(
+                    worker = WorkerId::CrawlWorkerPool.as_str(),
+                    queue = lane.as_str(),
+                    error = %err,
+                    "crawl worker failed job"
+                );
+            }
             drop(slot);
         });
     }
+}
+
+struct CrawlWorker<S, F> {
+    db: S,
+    fetcher: F,
+    wake_publisher: EventWakePublisher,
+    ct: CancellationToken,
+}
+
+impl<S, F> CrawlWorker<S, F> {
+    fn new(db: S, fetcher: F, wake_publisher: EventWakePublisher, ct: CancellationToken) -> Self {
+        Self {
+            db,
+            fetcher,
+            wake_publisher,
+            ct,
+        }
+    }
+}
+
+impl<S, F> CrawlWorker<S, F>
+where
+    S: FeedRegistryDb,
+    F: FetchFeed + Send + Sync,
+    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
+{
+    #[tracing::instrument(
+        name = "registry.crawl.worker.run",
+        skip_all,
+        fields(
+            worker = WorkerId::CrawlWorkerPool.as_str(),
+            job_id = %job.job_id,
+            queue = lane.as_str()
+        )
+    )]
+    async fn run(self, job: CrawlJob, lane: CrawlJobQueueLane) -> WorkerResult<()> {
+        let previous_state = self.load_previous_state(&job).await?;
+        let request = feed_fetch_request(&job, previous_state.as_ref());
+
+        let outcome = tokio::select! {
+            () = self.ct.cancelled() => {
+                debug!(
+                    worker = WorkerId::CrawlWorkerPool.as_str(),
+                    job_id = %job.job_id,
+                    queue = lane.as_str(),
+                    "crawl worker cancelled before fetch completed"
+                );
+                return Ok(());
+            }
+            outcome = self.fetcher.fetch_feed(request) => outcome,
+        };
+
+        let finished_at = Utc::now();
+        let recorded = self
+            .record_completion(job, outcome, previous_state, finished_at)
+            .await?;
+        self.wake_publisher.publish(recorded);
+        Ok(())
+    }
+
+    async fn load_previous_state(&self, job: &CrawlJob) -> WorkerResult<Option<CrawlState>> {
+        let mut tx = self.db.begin().await?;
+        let state = tx.load_crawl_state(&job.feed_url).await?;
+        tx.commit().await?;
+        Ok(state)
+    }
+
+    async fn record_completion(
+        &self,
+        job: CrawlJob,
+        outcome: synd_feed::feed::service::FeedFetchOutcome,
+        previous_state: Option<CrawlState>,
+        finished_at: chrono::DateTime<Utc>,
+    ) -> WorkerResult<RecordedEvents> {
+        let mut tx = self.db.begin().await?;
+        let mut completion_events = RecordedEvents::empty();
+        {
+            let mut recorder = CrawlCompletionRecorder::new(&mut tx, &mut completion_events);
+            recorder
+                .record(job, outcome, previous_state, finished_at)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(completion_events)
+    }
+}
+
+fn feed_fetch_request(job: &CrawlJob, previous_state: Option<&CrawlState>) -> FeedFetchRequest {
+    let conditional = previous_state
+        .map(|state| state.conditional.clone())
+        .unwrap_or_default();
+    FeedFetchRequest::new(job.feed_url.clone()).with_conditional(conditional)
 }
 
 struct CrawlWorkerCapacity {
@@ -304,8 +437,9 @@ impl CrawlWorkerSlot {
     }
 }
 
-pub(crate) fn spawn_crawl_worker_pool<S>(
+pub(crate) fn spawn_crawl_worker_pool<S, F>(
     db: S,
+    fetcher: F,
     wake_publisher: EventWakePublisher,
     poll_interval: Duration,
     config: CrawlWorkerPoolConfig,
@@ -313,16 +447,10 @@ pub(crate) fn spawn_crawl_worker_pool<S>(
 ) -> WorkerHandle
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlJobQueueTx,
+    F: FetchFeed + Clone + Send + Sync + 'static,
+    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
 {
-    CrawlWorkerPool::new(
-        db,
-        EventWake::new(wake_publisher),
-        poll_interval,
-        config,
-        ct,
-    )
-    .spawn()
+    CrawlWorkerPool::new(db, fetcher, wake_publisher, poll_interval, config, ct).spawn()
 }
 
 #[cfg(test)]
@@ -385,6 +513,7 @@ mod tests {
             retry_queue: CrawlWorkerQueueConfig {
                 max_running_jobs: retry_max_running_jobs,
             },
+            fetch: CrawlWorkerFetchConfig::default(),
         }
     }
 }

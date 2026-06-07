@@ -63,6 +63,29 @@ pub enum ClaimCrawlJobOutcome {
     NoClaimableJob,
 }
 
+/// Command to mark one running crawl job as finished.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinishCrawlJobCommand {
+    pub job_id: CrawlJobId,
+    pub finished_at: DateTime<Utc>,
+}
+
+impl FinishCrawlJobCommand {
+    pub fn new(job_id: CrawlJobId, finished_at: DateTime<Utc>) -> Self {
+        Self {
+            job_id,
+            finished_at,
+        }
+    }
+}
+
+/// Result of trying to finish one crawl job.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FinishCrawlJobOutcome {
+    Finished(CrawlJob),
+    NotRunning,
+}
+
 /// Active job facts attached to one scheduling candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveCrawlJob {
@@ -147,24 +170,21 @@ impl fmt::Display for CrawlJobId {
 pub enum CrawlJobState {
     Pending,
     Running,
-    Succeeded,
-    Failed,
+    Finished,
     Cancelled,
 }
 
 impl CrawlJobState {
     pub const PENDING: &'static str = "pending";
     pub const RUNNING: &'static str = "running";
-    pub const SUCCEEDED: &'static str = "succeeded";
-    pub const FAILED: &'static str = "failed";
+    pub const FINISHED: &'static str = "finished";
     pub const CANCELLED: &'static str = "cancelled";
 
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Pending => Self::PENDING,
             Self::Running => Self::RUNNING,
-            Self::Succeeded => Self::SUCCEEDED,
-            Self::Failed => Self::FAILED,
+            Self::Finished => Self::FINISHED,
             Self::Cancelled => Self::CANCELLED,
         }
     }
@@ -183,8 +203,7 @@ impl FromStr for CrawlJobState {
         match value {
             Self::PENDING => Ok(Self::Pending),
             Self::RUNNING => Ok(Self::Running),
-            Self::SUCCEEDED => Ok(Self::Succeeded),
-            Self::FAILED => Ok(Self::Failed),
+            Self::FINISHED => Ok(Self::Finished),
             Self::CANCELLED => Ok(Self::Cancelled),
             value => Err(UnknownCrawlJobValue::new("state", value)),
         }
