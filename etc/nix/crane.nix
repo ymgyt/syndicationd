@@ -100,8 +100,8 @@ in
       commonArgs
       // {
         inherit cargoArtifacts;
-        cargoExtraArgs = "--features integration";
-        cargoClippyExtraArgs = "--workspace -- --deny warnings";
+        cargoExtraArgs = "--locked --features integration";
+        cargoClippyExtraArgs = "--workspace --all-targets -- --deny warnings";
       }
     );
 
@@ -109,6 +109,7 @@ in
       commonArgs
       // {
         inherit cargoArtifacts;
+        cargoExtraArgs = "--locked";
         cargoNextestExtraArgs = "--features integration";
         CARGO_PROFILE = "";
         RUST_LOG = "synd,integration=debug";

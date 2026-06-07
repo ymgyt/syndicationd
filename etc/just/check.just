@@ -4,7 +4,6 @@ import '.base.just'
 [no-cd]
 default *flags:
 	nix flake check \
-		--all-systems \
 		--accept-flake-config \
 		--print-build-logs \
 		--verbose {{ flags }}
@@ -13,4 +12,3 @@ default *flags:
 [no-cd]
 cargo:
     cargo check --all-features --tests --benches
-

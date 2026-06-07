@@ -83,7 +83,7 @@
             audit
             fmt
             ;
-          typo = pkgs.callPackage ./etc/nix/typo.nix { };
+          typo = pkgs.callPackage ./etc/nix/typo.nix { src = ./.; };
         };
 
         packages = {

@@ -1,9 +1,13 @@
-{ stdenvNoCC, typos }:
+{
+  src,
+  stdenvNoCC,
+  typos,
+}:
 let
   # pkgs.runCommand does not pass src to typos
   typo = stdenvNoCC.mkDerivation {
     name = "typo";
-    src = ../.;
+    inherit src;
     doCheck = true;
     nativeBuildInputs = [ typos ];
     dontBuild = true;
