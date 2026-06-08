@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
-use feed_rs::model::{self as feedrs, Generator, Link, Person, Text};
+use feed_rs::model as feedrs;
+use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 pub type Time = DateTime<Utc>;
@@ -27,10 +28,176 @@ pub use entry::Entry;
 
 mod macros;
 
-#[derive(Debug, Clone)]
+/// Text content with its media type and optional source URI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Text {
+    content: String,
+    content_type: String,
+    src: Option<String>,
+}
+
+impl Text {
+    /// Returns the textual payload.
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    /// Returns the declared media type, such as `text/plain` or `text/html`.
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    /// Returns the source URI when the text references external content.
+    pub fn src(&self) -> Option<&str> {
+        self.src.as_deref()
+    }
+}
+
+impl From<feedrs::Text> for Text {
+    fn from(value: feedrs::Text) -> Self {
+        Self {
+            content: value.content,
+            content_type: value.content_type.to_string(),
+            src: value.src,
+        }
+    }
+}
+
+/// Person credited by a feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Person {
+    name: String,
+    uri: Option<String>,
+    email: Option<String>,
+}
+
+impl Person {
+    /// Returns the human-readable person name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the associated profile or homepage URI.
+    pub fn uri(&self) -> Option<&str> {
+        self.uri.as_deref()
+    }
+
+    /// Returns the email address when supplied by the feed.
+    pub fn email(&self) -> Option<&str> {
+        self.email.as_deref()
+    }
+}
+
+impl From<feedrs::Person> for Person {
+    fn from(value: feedrs::Person) -> Self {
+        Self {
+            name: value.name,
+            uri: value.uri,
+            email: value.email,
+        }
+    }
+}
+
+/// Link relation declared by a feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Link {
+    href: String,
+    rel: Option<String>,
+    media_type: Option<String>,
+    href_lang: Option<String>,
+    title: Option<String>,
+    length: Option<u64>,
+}
+
+impl Link {
+    /// Returns the target URI.
+    pub fn href(&self) -> &str {
+        &self.href
+    }
+
+    /// Returns the link relation, such as `self` or `alternate`.
+    pub fn rel(&self) -> Option<&str> {
+        self.rel.as_deref()
+    }
+
+    /// Returns the media type of the target resource.
+    pub fn media_type(&self) -> Option<&str> {
+        self.media_type.as_deref()
+    }
+
+    /// Returns the language tag for the target resource.
+    pub fn href_lang(&self) -> Option<&str> {
+        self.href_lang.as_deref()
+    }
+
+    /// Returns the human-readable link title.
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Returns the target resource length in bytes.
+    pub fn length(&self) -> Option<u64> {
+        self.length
+    }
+}
+
+impl From<feedrs::Link> for Link {
+    fn from(value: feedrs::Link) -> Self {
+        Self {
+            href: value.href,
+            rel: value.rel,
+            media_type: value.media_type,
+            href_lang: value.href_lang,
+            title: value.title,
+            length: value.length,
+        }
+    }
+}
+
+/// Software metadata declared by a feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Generator {
+    content: String,
+    uri: Option<String>,
+    version: Option<String>,
+}
+
+impl Generator {
+    /// Returns the generator name or description.
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    /// Returns the generator URI.
+    pub fn uri(&self) -> Option<&str> {
+        self.uri.as_deref()
+    }
+
+    /// Returns the generator version.
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
+    }
+}
+
+impl From<feedrs::Generator> for Generator {
+    fn from(value: feedrs::Generator) -> Self {
+        Self {
+            content: value.content,
+            uri: value.uri,
+            version: value.version,
+        }
+    }
+}
+
+/// Metadata declared at the feed level.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct FeedMeta {
     url: FeedUrl,
-    // feed_rs models
     feed_type: FeedType,
     title: Option<Text>,
     updated: Option<Time>,
@@ -69,41 +236,68 @@ impl<T> Annotated<T> {
 }
 
 impl FeedMeta {
+    /// Returns the feed format.
     pub fn r#type(&self) -> FeedType {
         self.feed_type
     }
 
+    /// Returns the URL from which this feed was read.
     pub fn url(&self) -> &FeedUrl {
         &self.url
     }
 
-    pub fn title(&self) -> Option<&str> {
-        self.title.as_ref().map(|text| text.content.as_str())
+    /// Returns the feed title.
+    pub fn title(&self) -> Option<&Text> {
+        self.title.as_ref()
     }
 
+    /// Returns the feed update time, falling back to published time.
     pub fn updated(&self) -> Option<Time> {
         self.updated.or(self.published)
     }
 
-    pub fn authors(&self) -> impl Iterator<Item = &str> {
-        self.authors.iter().map(|person| person.name.as_str())
+    /// Returns people credited as feed authors.
+    pub fn authors(&self) -> &[Person] {
+        &self.authors
     }
 
-    pub fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|text| text.content.as_str())
+    /// Returns the feed description.
+    pub fn description(&self) -> Option<&Text> {
+        self.description.as_ref()
     }
 
-    pub fn links(&self) -> impl Iterator<Item = &feedrs::Link> {
-        self.links.iter()
+    /// Returns link relations declared by the feed.
+    pub fn links(&self) -> &[Link] {
+        &self.links
     }
 
-    /// Return website link to which feed syndicate
+    /// Returns the website URL represented by the feed links.
     pub fn website_url(&self) -> Option<&str> {
-        link::find_website_url(self.r#type(), &self.links)
+        let mut links = self.links.iter();
+        match self.r#type() {
+            FeedType::Atom => links
+                .find(|link| link.rel() == Some("alternate"))
+                .map(Link::href),
+            FeedType::JSON => links
+                .find(|link| {
+                    !std::path::Path::new(link.href())
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+                })
+                .map(Link::href),
+            FeedType::RSS0 => {
+                warn!("RSS0 is used! {:?}", self.links);
+                None
+            }
+            FeedType::RSS1 | FeedType::RSS2 => links
+                .find(|link| link.rel() != Some("self"))
+                .map(Link::href),
+        }
     }
 
-    pub fn generator(&self) -> Option<&str> {
-        self.generator.as_ref().map(|g| g.content.as_str())
+    /// Returns software metadata declared by the feed.
+    pub fn generator(&self) -> Option<&Generator> {
+        self.generator.as_ref()
     }
 }
 
@@ -157,12 +351,12 @@ impl Feed {
         let meta = FeedMeta {
             url,
             feed_type,
-            title,
+            title: title.map(Into::into),
             updated,
-            authors,
-            description,
-            links,
-            generator,
+            authors: authors.into_iter().map(Into::into).collect(),
+            description: description.map(Into::into),
+            links: links.into_iter().map(Into::into).collect(),
+            generator: generator.map(Into::into),
             published,
         };
         Feed { meta, entries }

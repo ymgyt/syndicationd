@@ -19,6 +19,7 @@ pub enum Event {
     Request(RequestEvent),
     Sub(SubEvent),
     Crawl(CrawlEvent),
+    Feed(FeedEvent),
     Api(ApiEvent),
 }
 
@@ -28,6 +29,7 @@ impl Event {
             Self::Request(event) => event.kind().into(),
             Self::Sub(event) => event.kind().into(),
             Self::Crawl(event) => event.kind().into(),
+            Self::Feed(event) => event.kind().into(),
             Self::Api(event) => event.kind().into(),
         }
     }
@@ -51,6 +53,12 @@ impl From<CrawlEvent> for Event {
     }
 }
 
+impl From<FeedEvent> for Event {
+    fn from(event: FeedEvent) -> Self {
+        Self::Feed(event)
+    }
+}
+
 impl From<ApiEvent> for Event {
     fn from(event: ApiEvent) -> Self {
         Self::Api(event)
@@ -63,6 +71,7 @@ pub enum EventKind {
     Request(RequestEventKind),
     Sub(SubEventKind),
     Crawl(CrawlEventKind),
+    Feed(FeedEventKind),
     Api(ApiEventKind),
 }
 
@@ -81,6 +90,12 @@ impl From<SubEventKind> for EventKind {
 impl From<CrawlEventKind> for EventKind {
     fn from(kind: CrawlEventKind) -> Self {
         Self::Crawl(kind)
+    }
+}
+
+impl From<FeedEventKind> for EventKind {
+    fn from(kind: FeedEventKind) -> Self {
+        Self::Feed(kind)
     }
 }
 
@@ -116,6 +131,13 @@ pub enum CrawlEventKind {
     JobEnqueued,
     JobStarted,
     JobFinished,
+}
+
+/// A stable feed-domain event category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FeedEventKind {
+    Discovered,
+    Changed,
 }
 
 /// A stable API contract event category.
@@ -352,6 +374,23 @@ impl CrawlEvent {
             Self::JobEnqueued(_) => CrawlEventKind::JobEnqueued,
             Self::JobStarted(_) => CrawlEventKind::JobStarted,
             Self::JobFinished(_) => CrawlEventKind::JobFinished,
+        }
+    }
+}
+
+/// A fact about current feed state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FeedEvent {
+    Discovered(FeedDiscoveredEvent),
+    Changed(FeedChangedEvent),
+}
+
+impl FeedEvent {
+    /// Returns the stable feed event category.
+    pub fn kind(&self) -> FeedEventKind {
+        match self {
+            Self::Discovered(_) => FeedEventKind::Discovered,
+            Self::Changed(_) => FeedEventKind::Changed,
         }
     }
 }
@@ -811,5 +850,63 @@ impl From<CrawlJobFinishedEvent> for CrawlEvent {
 impl From<CrawlJobFinishedEvent> for Event {
     fn from(event: CrawlJobFinishedEvent) -> Self {
         Self::Crawl(event.into())
+    }
+}
+
+/// A feed became known to the registry for the first time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FeedDiscoveredEvent {
+    pub feed_url: FeedUrl,
+    pub crawl_job_id: CrawlJobId,
+}
+
+impl FeedDiscoveredEvent {
+    /// Creates an event for a feed first observed by the registry.
+    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId) -> Self {
+        Self {
+            feed_url,
+            crawl_job_id,
+        }
+    }
+}
+
+impl From<FeedDiscoveredEvent> for FeedEvent {
+    fn from(event: FeedDiscoveredEvent) -> Self {
+        Self::Discovered(event)
+    }
+}
+
+impl From<FeedDiscoveredEvent> for Event {
+    fn from(event: FeedDiscoveredEvent) -> Self {
+        Self::Feed(event.into())
+    }
+}
+
+/// The current state of a known feed changed after a crawl.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FeedChangedEvent {
+    pub feed_url: FeedUrl,
+    pub crawl_job_id: CrawlJobId,
+}
+
+impl FeedChangedEvent {
+    /// Creates an event for a changed feed observed by a crawl job.
+    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId) -> Self {
+        Self {
+            feed_url,
+            crawl_job_id,
+        }
+    }
+}
+
+impl From<FeedChangedEvent> for FeedEvent {
+    fn from(event: FeedChangedEvent) -> Self {
+        Self::Changed(event)
+    }
+}
+
+impl From<FeedChangedEvent> for Event {
+    fn from(event: FeedChangedEvent) -> Self {
+        Self::Feed(event.into())
     }
 }

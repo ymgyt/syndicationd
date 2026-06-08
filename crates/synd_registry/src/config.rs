@@ -17,6 +17,7 @@ pub struct FeedRegistryConfig {
 pub struct FeedRegistryWorkerConfig {
     pub subscription_request_poll_interval: Duration,
     pub crawl_target_projection_poll_interval: Duration,
+    pub feed_projection_poll_interval: Duration,
     pub api_event_projection_poll_interval: Duration,
     pub api_event_publisher_poll_interval: Duration,
     pub crawl_scheduler_poll_interval: Duration,
@@ -28,6 +29,7 @@ impl FeedRegistryWorkerConfig {
         Self {
             subscription_request_poll_interval: poll_interval,
             crawl_target_projection_poll_interval: poll_interval,
+            feed_projection_poll_interval: poll_interval,
             api_event_projection_poll_interval: poll_interval,
             api_event_publisher_poll_interval: poll_interval,
             crawl_scheduler_poll_interval: poll_interval,

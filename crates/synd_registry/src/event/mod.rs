@@ -16,10 +16,11 @@ pub use domain::{
     ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlEvent,
     CrawlEventKind, CrawlJobEnqueuedEvent, CrawlJobFinishedEvent, CrawlJobStartedEvent,
     CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event,
-    EventInterests, EventKind, FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent,
-    RequestEventKind, RequestId, SubEvent, SubEventKind, SubscribeFeedRejected,
-    SubscribeFeedRequested, SubscriptionChangedEvent, SubscriptionLifecycle,
-    UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    EventInterests, EventKind, FeedChangedEvent, FeedDiscoveredEvent, FeedEvent, FeedEventKind,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent, RequestEventKind, RequestId,
+    SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested,
+    SubscriptionChangedEvent, SubscriptionLifecycle, UnsubscribeFeedRejected,
+    UnsubscribeFeedRequested,
 };
 pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
 pub use processor::{

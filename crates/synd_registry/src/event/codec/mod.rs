@@ -5,14 +5,15 @@ use super::domain::{
     ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
     ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlJobEnqueuedEvent, CrawlJobFinishedEvent,
     CrawlJobStartedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
-    CrawlTargetPolicyChangedEvent, Event, EventKind, FeedSubscribedEvent, FeedUnsubscribedEvent,
-    SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChangedEvent,
-    UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    CrawlTargetPolicyChangedEvent, Event, EventKind, FeedChangedEvent, FeedDiscoveredEvent,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, SubscribeFeedRejected, SubscribeFeedRequested,
+    SubscriptionChangedEvent, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 
 mod api;
 mod crawl;
 mod event_type;
+mod feed;
 mod request;
 mod sub;
 
@@ -50,6 +51,7 @@ impl EventEncoding for Event {
             Self::Request(event) => event.encode(),
             Self::Sub(event) => event.encode(),
             Self::Crawl(event) => event.encode(),
+            Self::Feed(event) => event.encode(),
             Self::Api(event) => event.encode(),
         }
     }
@@ -101,6 +103,12 @@ impl EventEncoding for Event {
             <CrawlJobFinishedEvent as EventPayload>::EVENT_TYPE => {
                 decode_payload::<CrawlJobFinishedEvent>(payload_json).map(EventPayload::into_event)
             }
+            <FeedDiscoveredEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<FeedDiscoveredEvent>(payload_json).map(EventPayload::into_event)
+            }
+            <FeedChangedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<FeedChangedEvent>(payload_json).map(EventPayload::into_event)
+            }
             <ApiFeedSubscribed as EventPayload>::EVENT_TYPE => {
                 decode_payload::<ApiFeedSubscribed>(payload_json).map(EventPayload::into_event)
             }
@@ -130,6 +138,7 @@ impl EventKind {
             Self::Request(kind) => kind.event_type(),
             Self::Sub(kind) => kind.event_type(),
             Self::Crawl(kind) => kind.event_type(),
+            Self::Feed(kind) => kind.event_type(),
             Self::Api(kind) => kind.event_type(),
         }
     }

@@ -519,6 +519,14 @@ impl FeedService {
     where
         S: std::io::Read,
     {
+        Self::parse_feed(url, source)
+    }
+
+    /// Parses a feed document without performing an HTTP fetch.
+    pub fn parse_feed<S>(url: FeedUrl, source: S) -> FeedParseResult<Feed>
+    where
+        S: std::io::Read,
+    {
         let parser = Self::build_parser(&url);
 
         parser

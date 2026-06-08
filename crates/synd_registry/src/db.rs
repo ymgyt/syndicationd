@@ -7,7 +7,7 @@ use crate::{
     crawl::{
         blob::{BlobRef, PutBlobCommand},
         job::{
-            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, EnqueueCrawlJobCommand,
+            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJobId, EnqueueCrawlJobCommand,
             EnqueueCrawlJobOutcome, FinishCrawlJobCommand, FinishCrawlJobOutcome,
         },
         result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
@@ -16,6 +16,7 @@ use crate::{
     },
     error::{RegistryDbError, RegistryDbResult},
     event::JournalTx,
+    feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
     query::{Subscriptions, SubscriptionsQuery},
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
 };
@@ -115,6 +116,11 @@ pub trait BlobStoreTx {
         &mut self,
         command: PutBlobCommand,
     ) -> impl Future<Output = RegistryDbResult<BlobRef>> + Send;
+
+    fn load_blob(
+        &mut self,
+        blob: BlobRef,
+    ) -> impl Future<Output = RegistryDbResult<Vec<u8>>> + Send;
 }
 
 /// Transactional operations for persisting one crawl job completion.
@@ -133,6 +139,19 @@ pub trait CrawlCompletionTx {
         &mut self,
         command: UpsertCrawlStateCommand,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+}
+
+/// Transactional operations for applying parsed feed state to the registry.
+pub trait FeedProjectionTx {
+    fn load_feed_source(
+        &mut self,
+        job_id: &CrawlJobId,
+    ) -> impl Future<Output = RegistryDbResult<Option<FeedSource>>> + Send;
+
+    fn upsert_feed(
+        &mut self,
+        command: UpsertFeedCommand,
+    ) -> impl Future<Output = RegistryDbResult<UpsertFeedOutcome>> + Send;
 }
 
 /// Commits a registry database transaction.

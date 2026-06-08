@@ -4,7 +4,6 @@ use async_graphql::{
     ID, Object, SimpleObject,
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
-use feed_rs::model as feedrs;
 use synd_feed::types::{self, Annotated, Category, FeedType, FeedUrl, Requirement};
 
 use crate::gql::scalar;
@@ -22,14 +21,14 @@ pub(crate) struct Link {
     pub title: Option<String>,
 }
 
-impl From<feedrs::Link> for Link {
-    fn from(value: feedrs::Link) -> Self {
+impl From<&types::Link> for Link {
+    fn from(value: &types::Link) -> Self {
         Self {
-            href: value.href,
-            rel: value.rel,
-            media_type: value.media_type,
-            href_lang: value.href_lang,
-            title: value.title,
+            href: value.href().to_owned(),
+            rel: value.rel().map(ToOwned::to_owned),
+            media_type: value.media_type().map(ToOwned::to_owned),
+            href_lang: value.href_lang().map(ToOwned::to_owned),
+            title: value.title().map(ToOwned::to_owned),
         }
     }
 }
@@ -93,7 +92,11 @@ impl Feed {
 
     /// Feed title
     async fn title(&self) -> Option<&str> {
-        self.0.feed.meta().title()
+        self.0
+            .feed
+            .meta()
+            .title()
+            .map(synd_feed::types::Text::content)
     }
 
     /// Feed URL
@@ -149,8 +152,9 @@ impl Feed {
                 .feed
                 .meta()
                 .authors()
+                .iter()
                 .enumerate()
-                .map(|(idx, author)| Edge::new(idx, author.to_owned())),
+                .map(|(idx, author)| Edge::new(idx, author.name().to_owned())),
         );
 
         c
@@ -158,7 +162,11 @@ impl Feed {
 
     /// Description of feed
     async fn description(&self) -> Option<&str> {
-        self.0.feed.meta().description()
+        self.0
+            .feed
+            .meta()
+            .description()
+            .map(synd_feed::types::Text::content)
     }
 
     async fn links(&self) -> Connection<usize, Link> {
@@ -168,7 +176,8 @@ impl Feed {
                 .feed
                 .meta()
                 .links()
-                .map(|link| Link::from(link.clone()))
+                .iter()
+                .map(Link::from)
                 .enumerate()
                 .map(|(idx, link)| Edge::new(idx, link)),
         );
@@ -181,7 +190,11 @@ impl Feed {
     }
 
     async fn generator(&self) -> Option<&str> {
-        self.0.feed.meta().generator()
+        self.0
+            .feed
+            .meta()
+            .generator()
+            .map(synd_feed::types::Generator::content)
     }
 
     /// Requirement level for feed
@@ -223,7 +236,7 @@ pub(super) struct FeedMeta<'a>(Cow<'a, Annotated<types::FeedMeta>>);
 impl FeedMeta<'_> {
     /// Title of the feed
     async fn title(&self) -> Option<&str> {
-        self.0.feed.title()
+        self.0.feed.title().map(synd_feed::types::Text::content)
     }
 
     /// Url of the feed

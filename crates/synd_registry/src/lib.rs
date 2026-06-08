@@ -8,6 +8,7 @@ pub mod crawl;
 pub mod db;
 pub mod error;
 pub mod event;
+pub mod feed;
 pub mod query;
 pub mod registry;
 pub mod subscription;
@@ -18,8 +19,8 @@ pub use command::{
 pub use config::{FeedRegistryConfig, FeedRegistryWorkerConfig};
 pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
 pub use db::{
-    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb,
-    RegistryTx,
+    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, FeedProjectionTx,
+    FeedRegistryDb, RegistryTx,
 };
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 pub use registry::{FeedRegistry, RegistryService};

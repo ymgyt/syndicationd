@@ -33,6 +33,7 @@ mod crawl_job;
 mod crawl_result;
 mod crawl_schedule;
 mod crawl_target;
+mod feed;
 mod feed_endpoint;
 mod feed_endpoint_subscription;
 
@@ -350,8 +351,11 @@ fn decode_event_cursor_position(position: &EventCursorPos) -> RegistryDbResult<i
 mod tests {
     use std::time::Duration;
 
-    use chrono::{TimeZone, Utc};
-    use synd_feed::feed::service::{FeedFetchFailure, FeedFetchFailureKind, FeedFetchOutcome};
+    use chrono::{DateTime, TimeZone, Utc};
+    use synd_feed::feed::service::{
+        FeedFetchFailure, FeedFetchFailureKind, FeedFetchOutcome, FeedHttpResponse, FeedHttpStatus,
+        FeedResponseBody, FeedResponseHeaders, FeedService, FetchedFeed,
+    };
     use synd_feed::types::FeedUrl;
     use synd_registry::{
         BlobStoreTx, CrawlCompletionTx, FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig,
@@ -369,11 +373,12 @@ mod tests {
             target_list::{CrawlTargetListInput, CrawlTargetListProj, CrawlTargetState},
         },
         event::{
-            ApiEvent, ConsumeContext, Consumer, CrawlEvent, CrawlEventKind, EventInterests,
-            EventSubmitter, EventWakePublisher, FeedSubscribedEvent, FeedUnsubscribedEvent,
-            ProcessorId, RecordedEvents, RequestEventKind, SubEvent, SubEventKind,
-            SubscriptionChangedEvent, SubscriptionLifecycle, WorkerId,
+            ApiEvent, ConsumeContext, Consumer, CrawlEvent, CrawlEventKind, CrawlJobFinishedEvent,
+            EventInterests, EventSubmitter, EventWakePublisher, FeedEventKind, FeedSubscribedEvent,
+            FeedUnsubscribedEvent, ProcessorId, RecordedEvents, RequestEventKind, SubEvent,
+            SubEventKind, SubscriptionChangedEvent, SubscriptionLifecycle, WorkerId,
         },
+        feed::{FeedProj, FeedProjectionInput},
     };
     use tokio_util::sync::CancellationToken;
 
@@ -416,6 +421,7 @@ mod tests {
         assert_eq!(row.try_get::<String, _>("digest_algo")?, "sha256");
         assert_eq!(row.try_get::<String, _>("compression_algo")?, "zstd");
         assert_eq!(row.try_get::<i64, _>("uncompressed_len")?, 12);
+        assert_eq!(tx.load_blob(first).await?, b"same payload");
         tx.commit().await?;
         Ok(())
     }
@@ -499,6 +505,39 @@ mod tests {
             ClaimCrawlJobOutcome::NoClaimableJob
         );
         tx.commit().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn feed_projection_records_discovered_unchanged_and_changed() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let feed_url = feed_url("feed-projection");
+        let first_body = rss_body("first title");
+
+        let first = record_fetched_crawl(&db, &feed_url, first_body.clone(), 0).await?;
+        let recorded = project_feed(&db, first).await?;
+        assert_eq!(recorded.kinds(), &[FeedEventKind::Discovered.into()]);
+
+        let second = record_fetched_crawl(&db, &feed_url, first_body, 1).await?;
+        let recorded = project_feed(&db, second).await?;
+        assert!(recorded.is_empty());
+
+        let third = record_fetched_crawl(&db, &feed_url, rss_body("changed title"), 2).await?;
+        let recorded = project_feed(&db, third).await?;
+        assert_eq!(recorded.kinds(), &[FeedEventKind::Changed.into()]);
+
+        let mut tx = db.begin().await?;
+        let row = sqlx::query(
+            r#"
+            SELECT current_meta_json
+            FROM feed
+            "#,
+        )
+        .fetch_one(&mut *tx.tx)
+        .await?;
+        let meta_json = row.try_get::<String, _>("current_meta_json")?;
+        tx.commit().await?;
+        assert!(meta_json.contains("changed title"));
         Ok(())
     }
 
@@ -625,6 +664,111 @@ mod tests {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(events)
+    }
+
+    async fn record_fetched_crawl(
+        db: &SqliteFeedRegistryDb,
+        feed_url: &FeedUrl,
+        body: Vec<u8>,
+        seq: i64,
+    ) -> anyhow::Result<CrawlJobFinishedEvent> {
+        let enqueued_at = Utc.with_ymd_and_hms(2026, 6, 8, 12, 0, 0).unwrap()
+            + chrono::Duration::minutes(seq * 3);
+        let claimed_at = enqueued_at + chrono::Duration::minutes(1);
+        let finished_at = enqueued_at + chrono::Duration::minutes(2);
+        let mut tx = db.begin().await?;
+        tx.upsert_feed_endpoint(feed_url, enqueued_at).await?;
+        let enqueue = tx
+            .enqueue_job(EnqueueCrawlJobCommand::new(
+                feed_url.clone(),
+                CrawlJobTrigger::TargetChanged,
+                CrawlJobQueueLane::Default,
+                0,
+                enqueued_at,
+                enqueued_at,
+            ))
+            .await?;
+        assert!(matches!(enqueue, EnqueueCrawlJobOutcome::Enqueued(_)));
+
+        let job = match tx
+            .claim_job(ClaimCrawlJobCommand::new(
+                CrawlJobQueueLane::Default,
+                claimed_at,
+            ))
+            .await?
+        {
+            ClaimCrawlJobOutcome::Claimed(job) => job,
+            ClaimCrawlJobOutcome::NoClaimableJob => anyhow::bail!("job should be claimable"),
+        };
+        let event = CrawlJobFinishedEvent::new(job.job_id.clone(), job.feed_url.clone());
+        let outcome = fetched_outcome(feed_url.clone(), body, finished_at)?;
+        let mut completion_events = RecordedEvents::empty();
+        {
+            let mut completion = CrawlCompletionRecorder::new(&mut tx, &mut completion_events);
+            completion.record(job, outcome, None, finished_at).await?;
+        }
+        tx.commit().await?;
+        Ok(event)
+    }
+
+    async fn project_feed(
+        db: &SqliteFeedRegistryDb,
+        event: CrawlJobFinishedEvent,
+    ) -> anyhow::Result<RecordedEvents> {
+        let mut tx = db.begin().await?;
+        let mut proj = FeedProj::new();
+        let recorded = {
+            let mut cx = ConsumeContext::new(&mut tx);
+            <FeedProj as Consumer<SqliteFeedRegistryDb>>::consume(
+                &mut proj,
+                &mut cx,
+                FeedProjectionInput::new(event),
+            )
+            .await?;
+            cx.into_recorded()
+        };
+        tx.commit().await?;
+        Ok(recorded)
+    }
+
+    fn fetched_outcome(
+        feed_url: FeedUrl,
+        body: Vec<u8>,
+        fetched_at: DateTime<Utc>,
+    ) -> anyhow::Result<FeedFetchOutcome> {
+        let feed = FeedService::parse_feed(feed_url.clone(), body.as_slice())?;
+        Ok(FeedFetchOutcome::Fetched(Box::new(FetchedFeed {
+            body: FeedResponseBody {
+                response: FeedHttpResponse {
+                    requested_url: feed_url.clone(),
+                    response_url: feed_url,
+                    status: FeedHttpStatus::new(200),
+                    headers: FeedResponseHeaders::default(),
+                    fetched_at,
+                },
+                bytes: body,
+            },
+            feed,
+        })))
+    }
+
+    fn rss_body(title: &str) -> Vec<u8> {
+        format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>{title}</title>
+    <link>https://example.com/</link>
+    <description>example feed</description>
+    <item>
+      <title>first entry</title>
+      <link>https://example.com/entry/1</link>
+      <guid>entry-1</guid>
+    </item>
+  </channel>
+</rss>"#
+        )
+        .into_bytes()
     }
 
     #[tokio::test]

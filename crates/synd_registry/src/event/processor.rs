@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use chrono::{DateTime, Utc};
+use synd_feed::feed::service::FeedParseError;
 use synd_feed::types::FeedUrl;
 use thiserror::Error;
 
@@ -13,6 +14,7 @@ use crate::{
     db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
     error::{RegistryDbError, RegistryDbResult},
     event::{Event, EventInterests, EventKind, JournalTx},
+    feed::FeedProjectionScope,
     query::{Subscriptions, SubscriptionsQuery},
     subscription::{
         FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
@@ -32,6 +34,8 @@ pub enum ProcessorError {
         expected: &'static str,
         actual: EventKind,
     },
+    #[error(transparent)]
+    FeedParse(#[from] FeedParseError),
 }
 
 /// Stable identity for an event processor.
@@ -39,6 +43,7 @@ pub enum ProcessorError {
 pub enum ProcessorId {
     SubscriptionRequest,
     CrawlTargetProjection,
+    FeedProjection,
     ApiEventProjection,
     ApiEventPublisher,
 }
@@ -48,6 +53,7 @@ impl ProcessorId {
         match self {
             Self::SubscriptionRequest => "SubscriptionRequest",
             Self::CrawlTargetProjection => "CrawlTargetProjection",
+            Self::FeedProjection => "FeedProjection",
             Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
         }
@@ -175,6 +181,11 @@ impl<'a, Tx> ConsumeContext<'a, Tx> {
 
     pub fn subscriber_scope(&mut self, subscriber_id: SubscriberId) -> SubscriberScope<'_, Tx> {
         SubscriberScope::new(&mut *self.tx, subscriber_id)
+    }
+
+    /// Returns feed projection operations within this transaction.
+    pub fn feed_projection(&mut self) -> FeedProjectionScope<'_, Tx> {
+        FeedProjectionScope::new(&mut *self.tx, &mut self.recorded)
     }
 }
 

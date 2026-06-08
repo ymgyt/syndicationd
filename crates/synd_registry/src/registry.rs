@@ -14,14 +14,15 @@ use crate::{
         worker::spawn_crawl_worker_pool,
     },
     db::{
-        BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb,
-        RegistryTx,
+        BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx,
+        FeedProjectionTx, FeedRegistryDb, RegistryTx,
     },
     error::FeedRegistryError,
     event::{
         ApiEventPublisher, ApiEventSubscriber, EventSubmitter, EventWakePublisher, Processor,
         WorkerHandle, WorkerPhase, WorkerSet, spawn_reconciler_worker, spawn_worker,
     },
+    feed::FeedProj,
     query::{Subscriptions, SubscriptionsQuery},
     subscription::SubscriberId,
 };
@@ -35,7 +36,8 @@ pub struct RegistryService<S> {
 impl<S> RegistryService<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx,
+    for<'tx> S::Tx<'tx>:
+        BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx + FeedProjectionTx,
 {
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> Self {
         let api_events = ApiEventPublisher::default();
@@ -133,7 +135,8 @@ fn spawn_event_workers<S>(
 ) -> WorkerSet
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx,
+    for<'tx> S::Tx<'tx>:
+        BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx + FeedProjectionTx,
 {
     let subscription_request_projection_worker = spawn_event_worker(
         db.clone(),
@@ -155,6 +158,13 @@ where
         config.workers.api_event_projection_poll_interval,
         ct.clone(),
         ApiEventProj::new(),
+    );
+    let feed_projection_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        config.workers.feed_projection_poll_interval,
+        ct.clone(),
+        FeedProj::new(),
     );
     let api_event_publisher_worker = spawn_event_worker(
         db.clone(),
@@ -186,6 +196,7 @@ where
     WorkerSet::new(vec![
         subscription_request_projection_worker,
         crawl_target_projection_worker,
+        feed_projection_worker,
         api_event_projection_worker,
         api_event_publisher_worker,
         crawl_scheduler_worker,
