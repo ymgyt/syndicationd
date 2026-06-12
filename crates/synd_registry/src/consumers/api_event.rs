@@ -3,9 +3,10 @@ use crate::{
     db::FeedRegistryDb,
     event::{
         ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ConsumeContext, Consumer, Event,
-        EventInterests, Processor, ProcessorError, ProcessorId, ProcessorResult, RequestEvent,
-        RequestEventKind, SubEvent, SubEventKind, Transactional,
+        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged, ConsumeContext,
+        Consumer, Event, EventInterests, Processor, ProcessorError, ProcessorId, ProcessorResult,
+        RequestEvent, RequestEventKind, SubEvent, SubEventKind, TimelineEvent, TimelineEventKind,
+        Transactional,
     },
 };
 
@@ -37,7 +38,8 @@ impl TryFrom<Event> for ApiEventProjectionInput {
                 SubEvent::FeedSubscribed(_)
                 | SubEvent::SubscriptionChanged(_)
                 | SubEvent::FeedUnsubscribed(_),
-            )) => Ok(Self::new(event)),
+            )
+            | Event::Timeline(TimelineEvent::Changed(_))) => Ok(Self::new(event)),
             event => Err(unexpected_event("api projection event", &event)),
         }
     }
@@ -74,6 +76,7 @@ impl Processor for ApiEventProj {
             SubEventKind::FeedSubscribed.into(),
             SubEventKind::SubscriptionChanged.into(),
             SubEventKind::FeedUnsubscribed.into(),
+            TimelineEventKind::Changed.into(),
         ])
     }
 }
@@ -126,6 +129,9 @@ fn project_api_event(event: Event) -> Option<ApiEvent> {
                 event.subscription,
             )))
         }
+        Event::Timeline(TimelineEvent::Changed(event)) => Some(ApiEvent::TimelineChanged(
+            ApiTimelineChanged::new(event.timeline, event.changed_at, event.affected_feeds),
+        )),
         _ => None,
     }
 }

@@ -6,7 +6,7 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     Subscription as RegistrySubscription,
     crawl::policy::{CrawlPolicy as RegistryCrawlPolicy, PollingPolicy as RegistryPollingPolicy},
-    query::SubscriptionsQuery,
+    query::{SubscriptionsQuery, TimelineItemCursor, TimelineItemsQuery},
 };
 
 use crate::gql::{
@@ -129,12 +129,12 @@ impl Subscription {
         subscriptions_connection(cx, after, first).await
     }
 
-    async fn entries<'cx>(
-        &'_ self,
-        cx: &'cx Context<'cx>,
+    async fn entries(
+        &self,
+        cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, Entry<'cx>>> {
+    ) -> Result<Connection<String, Entry>> {
         timeline_entries_connection(cx, after, first).await
     }
 
@@ -169,12 +169,12 @@ struct Timeline;
 
 #[Object]
 impl Timeline {
-    async fn entries<'cx>(
-        &'_ self,
-        cx: &'cx Context<'cx>,
+    async fn entries(
+        &self,
+        cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, Entry<'cx>>> {
+    ) -> Result<Connection<String, Entry>> {
         timeline_entries_connection(cx, after, first).await
     }
 }
@@ -218,14 +218,30 @@ async fn subscriptions_connection(
     Ok(connection)
 }
 
-#[expect(clippy::unused_async)]
-async fn timeline_entries_connection<'cx>(
-    cx: &Context<'cx>,
+async fn timeline_entries_connection(
+    cx: &Context<'_>,
     after: Option<String>,
     first: Option<i32>,
-) -> Result<Connection<String, Entry<'cx>>> {
-    let _ = (cx, after, first);
-    Err(async_graphql::Error::new(
-        "timeline entries are not implemented while timeline projection is redesigned",
-    ))
+) -> Result<Connection<String, Entry>> {
+    let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
+    let after = after
+        .as_deref()
+        .map(TimelineItemCursor::decode)
+        .transpose()
+        .map_err(|err| async_graphql::Error::new(err.to_string()))?;
+    let page = registry(cx)
+        .list_timeline_items(TimelineItemsQuery {
+            subscriber_id: subscriber_id(cx),
+            after,
+            first,
+        })
+        .await?;
+
+    let mut connection = Connection::new(false, page.has_next_page);
+    connection.edges.extend(page.nodes.into_iter().map(|node| {
+        let cursor = node.cursor.encode();
+        Edge::new(cursor, Entry::from_timeline_item_node(node))
+    }));
+
+    Ok(connection)
 }

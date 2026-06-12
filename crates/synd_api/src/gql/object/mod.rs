@@ -5,6 +5,7 @@ use async_graphql::{
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
 use synd_feed::types::{self, Annotated, Category, FeedType, FeedUrl, Requirement};
+use synd_registry::{entry::EntryAttrs as RegistryEntryAttrs, query::TimelineItemNode};
 
 use crate::gql::scalar;
 
@@ -33,46 +34,78 @@ impl From<&types::Link> for Link {
     }
 }
 
-pub(crate) struct Entry<'a> {
-    meta: Cow<'a, Annotated<types::FeedMeta>>,
-    entry: types::Entry,
+pub(crate) struct Entry {
+    meta: Annotated<types::FeedMeta>,
+    body: EntryBody,
+}
+
+pub(crate) enum EntryBody {
+    Feed(Box<types::Entry>),
+    Timeline(RegistryEntryAttrs),
 }
 
 #[Object]
-impl Entry<'_> {
+impl Entry {
     /// Feed of this entry
     async fn feed(&self) -> FeedMeta<'_> {
-        self.meta.clone().into()
+        Cow::Borrowed(&self.meta).into()
     }
     /// Entry title
     async fn title(&self) -> Option<&str> {
-        self.entry.title()
+        match &self.body {
+            EntryBody::Feed(entry) => entry.title(),
+            EntryBody::Timeline(attrs) => attrs.title.as_deref(),
+        }
     }
 
     /// Time at which the entry was last modified
     async fn updated(&self) -> Option<scalar::Rfc3339Time> {
-        self.entry.updated().map(Into::into)
+        match &self.body {
+            EntryBody::Feed(entry) => entry.updated(),
+            EntryBody::Timeline(attrs) => attrs.updated_at,
+        }
+        .map(Into::into)
     }
 
     /// The time at which the entry published
     async fn published(&self) -> Option<scalar::Rfc3339Time> {
-        self.entry.published().map(Into::into)
+        match &self.body {
+            EntryBody::Feed(entry) => entry.published(),
+            EntryBody::Timeline(attrs) => attrs.published_at,
+        }
+        .map(Into::into)
     }
 
     /// Entry summary. If there is no summary of the entry, return the content(is this bad api?)
     async fn summary(&self) -> Option<&str> {
-        self.entry.summary().or(self.entry.content())
+        match &self.body {
+            EntryBody::Feed(entry) => entry.summary().or(entry.content()),
+            EntryBody::Timeline(attrs) => attrs.summary.as_deref().or(attrs.content.as_deref()),
+        }
     }
 
     /// Link to websiteurl at which this entry is published
     async fn website_url(&self) -> Option<&str> {
-        self.entry.website_url(self.meta.feed.r#type())
+        match &self.body {
+            EntryBody::Feed(entry) => entry.website_url(self.meta.feed.r#type()),
+            EntryBody::Timeline(attrs) => attrs.website_url.as_deref(),
+        }
     }
 }
 
-impl<'a> Entry<'a> {
-    pub fn new(meta: Cow<'a, Annotated<types::FeedMeta>>, entry: types::Entry) -> Self {
-        Self { meta, entry }
+impl Entry {
+    pub fn new(meta: Annotated<types::FeedMeta>, entry: types::Entry) -> Self {
+        Self {
+            meta,
+            body: EntryBody::Feed(Box::new(entry)),
+        }
+    }
+
+    pub fn from_timeline_item_node(node: TimelineItemNode) -> Self {
+        Self {
+            meta: node.feed_meta,
+            body: EntryBody::Timeline(node.attrs),
+        }
     }
 }
 
@@ -116,7 +149,7 @@ impl Feed {
         #[graphql(default = 5)] first: Option<i32>,
     ) -> Connection<
         usize,
-        Entry<'_>,
+        Entry,
         EmptyFields,
         EmptyFields,
         FeedEntryConnectionName,
@@ -129,7 +162,7 @@ impl Feed {
             .0
             .feed
             .entries()
-            .map(move |entry| Entry::new(Cow::Owned(meta.clone()), entry.clone()))
+            .map(move |entry| Entry::new(meta.clone(), entry.clone()))
             .take(first)
             .collect::<Vec<_>>();
 

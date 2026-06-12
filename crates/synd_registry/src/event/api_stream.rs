@@ -69,6 +69,7 @@ impl Processor for ApiEventPublisher {
             ApiEventKind::FeedSubscriptionChanged.into(),
             ApiEventKind::FeedUnsubscribed.into(),
             ApiEventKind::FeedUnsubscribeRejected.into(),
+            ApiEventKind::TimelineChanged.into(),
         ])
     }
 }
@@ -122,5 +123,6 @@ fn event_subscriber_id(event: &ApiEvent) -> &SubscriberId {
         ApiEvent::FeedSubscriptionChanged(event) => &event.subscription.subscriber_id,
         ApiEvent::FeedUnsubscribed(event) => &event.subscription.subscriber_id,
         ApiEvent::FeedUnsubscribeRejected(event) => &event.subscription.subscriber_id,
+        ApiEvent::TimelineChanged(event) => &event.timeline.subscriber_id,
     }
 }

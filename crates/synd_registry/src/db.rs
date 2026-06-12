@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use chrono::{DateTime, Utc};
-use synd_feed::types::FeedUrl;
+use synd_feed::types::{EntryId, FeedUrl};
 
 use crate::{
     crawl::{
@@ -14,11 +14,13 @@ use crate::{
         schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
+    entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
     event::JournalTx,
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
-    query::{Subscriptions, SubscriptionsQuery},
+    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
+    timeline::{TimelineCatchup, TimelineKey},
 };
 
 /// Opens registry database transactions.
@@ -61,6 +63,11 @@ pub trait RegistryTx {
         &mut self,
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
+
+    fn list_timeline_items(
+        &mut self,
+        query: TimelineItemsQuery,
+    ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send;
 
     fn load_feed_endpoint_subscriptions(
         &mut self,
@@ -152,6 +159,41 @@ pub trait FeedProjectionTx {
         &mut self,
         command: UpsertFeedCommand,
     ) -> impl Future<Output = RegistryDbResult<UpsertFeedOutcome>> + Send;
+}
+
+/// Transactional operations for applying reconciled entry state.
+pub trait EntryProjectionTx {
+    fn load_entry_source(
+        &mut self,
+        job_id: &CrawlJobId,
+    ) -> impl Future<Output = RegistryDbResult<Option<FeedSource>>> + Send;
+
+    fn load_entries(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_ids: &[EntryId],
+    ) -> impl Future<Output = RegistryDbResult<EntrySet>> + Send;
+
+    fn apply_entry_changes(
+        &mut self,
+        changes: EntryChanges,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+}
+
+/// Transactional operations for applying timeline membership.
+pub trait TimelineProjectionTx {
+    fn ensure_default_timeline(
+        &mut self,
+        timeline: &TimelineKey,
+        now: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    fn catchup_timeline_feed(
+        &mut self,
+        timeline: &TimelineKey,
+        feed_url: &FeedUrl,
+        now: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<TimelineCatchup>> + Send;
 }
 
 /// Commits a registry database transaction.

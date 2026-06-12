@@ -5,6 +5,7 @@ use synd_registry::{
         policy::CrawlPolicy,
         result::{CrawlHttpErrorKind, CrawlStateErrorKind},
     },
+    entry::EntryAttrs,
 };
 
 pub(super) fn encode_crawl_policy_json(policy: CrawlPolicy) -> RegistryDbResult<String> {
@@ -13,6 +14,14 @@ pub(super) fn encode_crawl_policy_json(policy: CrawlPolicy) -> RegistryDbResult<
 
 pub(super) fn decode_crawl_policy_json(policy_json: &str) -> RegistryDbResult<CrawlPolicy> {
     serde_json::from_str(policy_json).map_err(RegistryDbError::internal)
+}
+
+pub(super) fn encode_entry_attrs_json(attrs: &EntryAttrs) -> RegistryDbResult<String> {
+    serde_json::to_string(attrs).map_err(RegistryDbError::internal)
+}
+
+pub(super) fn decode_entry_attrs_json(attrs_json: &str) -> RegistryDbResult<EntryAttrs> {
+    serde_json::from_str(attrs_json).map_err(RegistryDbError::internal)
 }
 
 pub(super) fn encode_crawl_state_error_kind(kind: CrawlStateErrorKind) -> String {

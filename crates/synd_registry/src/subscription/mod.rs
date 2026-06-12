@@ -8,6 +8,8 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::crawl::policy::CrawlPolicy;
 
+pub mod query;
+
 /// Opaque registry identity that owns subscriptions.
 ///
 /// API and UI layers decide how authenticated principals map to this value.

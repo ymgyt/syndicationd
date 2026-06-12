@@ -9,8 +9,8 @@ use crate::{
     db::{CommitTx, FeedRegistryDb},
     error::RegistryDbError,
     event::{
-        ConsumeContext, Consumer, EventCursor, JournalTx, PostCommit, Processor, ProcessorError,
-        ProcessorId, ProcessorResult, RecordedEvents, Sink, Transactional,
+        ConsumeContext, Consumer, EventCursor, InputBatch, JournalTx, PostCommit, Processor,
+        ProcessorError, ProcessorId, ProcessorResult, RecordedEvents, Sink, Transactional,
     },
 };
 
@@ -405,10 +405,14 @@ where
         let scanned_cursor = batch.scanned_cursor().clone();
         let mut cx = ConsumeContext::with_capacity(&mut tx, event_count);
 
-        for journaled in batch.into_events() {
-            let input = P::Input::try_from(journaled.into_event())?;
-            processor.consume(&mut cx, input).await?;
-        }
+        let inputs = batch
+            .into_events()
+            .into_iter()
+            .map(|journaled| P::Input::try_from(journaled.into_event()))
+            .collect::<ProcessorResult<Vec<_>>>()?;
+        processor
+            .consume_batch(&mut cx, InputBatch::new(inputs))
+            .await?;
         let recorded = cx.into_recorded();
 
         tx.advance_cursor(&scanned_cursor).await?;

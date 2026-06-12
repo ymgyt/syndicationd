@@ -1,7 +1,8 @@
 use super::{EncodedEvent, EventEncodingResult, EventPayload, encode_payload, event_type};
 use crate::event::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
-    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, Event,
+    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
+    ApiTimelineChanged, Event,
 };
 
 impl ApiEvent {
@@ -12,6 +13,7 @@ impl ApiEvent {
             Self::FeedSubscriptionChanged(event) => encode_payload(event),
             Self::FeedUnsubscribed(event) => encode_payload(event),
             Self::FeedUnsubscribeRejected(event) => encode_payload(event),
+            Self::TimelineChanged(event) => encode_payload(event),
         }
     }
 }
@@ -28,6 +30,7 @@ impl ApiEventKind {
             Self::FeedUnsubscribeRejected => {
                 <ApiFeedUnsubscribeRejected as EventPayload>::EVENT_TYPE
             }
+            Self::TimelineChanged => <ApiTimelineChanged as EventPayload>::EVENT_TYPE,
         }
     }
 }
@@ -69,5 +72,13 @@ impl EventPayload for ApiFeedUnsubscribeRejected {
 
     fn into_event(self) -> Event {
         Event::Api(ApiEvent::FeedUnsubscribeRejected(self))
+    }
+}
+
+impl EventPayload for ApiTimelineChanged {
+    const EVENT_TYPE: &'static str = event_type::API_TIMELINE_CHANGED;
+
+    fn into_event(self) -> Event {
+        Event::Api(ApiEvent::TimelineChanged(self))
     }
 }

@@ -13,20 +13,21 @@ pub use codec::{
 };
 pub use domain::{
     ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
-    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlEvent,
-    CrawlEventKind, CrawlJobEnqueuedEvent, CrawlJobFinishedEvent, CrawlJobStartedEvent,
-    CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event,
-    EventInterests, EventKind, FeedChangedEvent, FeedDiscoveredEvent, FeedEvent, FeedEventKind,
-    FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent, RequestEventKind, RequestId,
-    SubEvent, SubEventKind, SubscribeFeedRejected, SubscribeFeedRequested,
-    SubscriptionChangedEvent, SubscriptionLifecycle, UnsubscribeFeedRejected,
-    UnsubscribeFeedRequested,
+    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
+    ApiTimelineChanged, CrawlEvent, CrawlEventKind, CrawlJobEnqueuedEvent, CrawlJobFinishedEvent,
+    CrawlJobStartedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
+    CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, EntryEvent,
+    EntryEventKind, Event, EventInterests, EventKind, FeedChangedEvent, FeedDiscoveredEvent,
+    FeedEvent, FeedEventKind, FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent,
+    RequestEventKind, RequestId, SubEvent, SubEventKind, SubscribeFeedRejected,
+    SubscribeFeedRequested, SubscriptionChangedEvent, SubscriptionLifecycle, TimelineChangedEvent,
+    TimelineEvent, TimelineEventKind, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
 pub use processor::{
-    ConsumeContext, Consumer, PostCommit, Processor, ProcessorError, ProcessorId, ProcessorInput,
-    ProcessorPhase, ProcessorResult, ReconcileContext, RecordedEvents, Sink, SubscriberScope,
-    Transactional,
+    ConsumeContext, Consumer, InputBatch, PostCommit, Processor, ProcessorError, ProcessorId,
+    ProcessorInput, ProcessorPhase, ProcessorResult, ReconcileContext, RecordedEvents, Sink,
+    SubscriberScope, Transactional,
 };
 pub(crate) use reconciler::{Reconciler, spawn_reconciler_worker};
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};

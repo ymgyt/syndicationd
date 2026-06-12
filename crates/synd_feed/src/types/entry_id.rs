@@ -1,6 +1,7 @@
 use std::{fmt, str::FromStr};
 
 use feed_rs::model as feedrs;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -202,6 +203,25 @@ impl TryFrom<&str> for EntryId {
 impl fmt::Display for EntryId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl Serialize for EntryId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for EntryId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::parse(value).map_err(de::Error::custom)
     }
 }
 

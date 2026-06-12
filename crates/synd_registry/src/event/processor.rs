@@ -12,13 +12,15 @@ use crate::{
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
     db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
+    entry::EntryProjectionScope,
     error::{RegistryDbError, RegistryDbResult},
     event::{Event, EventInterests, EventKind, JournalTx},
     feed::FeedProjectionScope,
-    query::{Subscriptions, SubscriptionsQuery},
+    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
     subscription::{
         FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
     },
+    timeline::TimelineProjectionScope,
 };
 
 /// Result type returned by event processors.
@@ -44,6 +46,8 @@ pub enum ProcessorId {
     SubscriptionRequest,
     CrawlTargetProjection,
     FeedProjection,
+    EntryProjection,
+    TimelineProjection,
     ApiEventProjection,
     ApiEventPublisher,
 }
@@ -54,6 +58,8 @@ impl ProcessorId {
             Self::SubscriptionRequest => "SubscriptionRequest",
             Self::CrawlTargetProjection => "CrawlTargetProjection",
             Self::FeedProjection => "FeedProjection",
+            Self::EntryProjection => "EntryProjection",
+            Self::TimelineProjection => "TimelineProjection",
             Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
         }
@@ -90,6 +96,34 @@ pub trait Processor: Send + 'static {
     fn interests(&self) -> EventInterests;
 }
 
+/// Inputs selected from one journal read for a processor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputBatch<I> {
+    inputs: Vec<I>,
+}
+
+impl<I> InputBatch<I> {
+    pub fn new(inputs: Vec<I>) -> Self {
+        Self { inputs }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inputs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inputs.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &I> {
+        self.inputs.iter()
+    }
+
+    pub fn into_inputs(self) -> Vec<I> {
+        self.inputs
+    }
+}
+
 /// A component that consumes registry events inside a registry transaction.
 pub trait Consumer<S>: Processor<Phase = Transactional>
 where
@@ -100,6 +134,19 @@ where
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
     ) -> impl Future<Output = ProcessorResult<()>> + Send;
+
+    fn consume_batch(
+        &mut self,
+        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        batch: InputBatch<Self::Input>,
+    ) -> impl Future<Output = ProcessorResult<()>> + Send {
+        async move {
+            for input in batch.into_inputs() {
+                self.consume(cx, input).await?;
+            }
+            Ok(())
+        }
+    }
 }
 
 /// A terminal event processor that consumes committed events without recording new events.
@@ -186,6 +233,16 @@ impl<'a, Tx> ConsumeContext<'a, Tx> {
     /// Returns feed projection operations within this transaction.
     pub fn feed_projection(&mut self) -> FeedProjectionScope<'_, Tx> {
         FeedProjectionScope::new(&mut *self.tx, &mut self.recorded)
+    }
+
+    /// Returns entry projection operations within this transaction.
+    pub fn entry_projection(&mut self) -> EntryProjectionScope<'_, Tx> {
+        EntryProjectionScope::new(&mut *self.tx, &mut self.recorded)
+    }
+
+    /// Returns timeline projection operations within this transaction.
+    pub fn timeline_projection(&mut self) -> TimelineProjectionScope<'_, Tx> {
+        TimelineProjectionScope::new(&mut *self.tx, &mut self.recorded)
     }
 }
 
@@ -376,6 +433,13 @@ where
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send {
         self.tx.list_subscriptions(query)
+    }
+
+    fn list_timeline_items(
+        &mut self,
+        query: TimelineItemsQuery,
+    ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send {
+        self.tx.list_timeline_items(query)
     }
 
     fn load_feed_endpoint_subscriptions(

@@ -15,16 +15,18 @@ use crate::{
     },
     db::{
         BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx,
-        FeedProjectionTx, FeedRegistryDb, RegistryTx,
+        EntryProjectionTx, FeedProjectionTx, FeedRegistryDb, RegistryTx, TimelineProjectionTx,
     },
+    entry::EntryProj,
     error::FeedRegistryError,
     event::{
         ApiEventPublisher, ApiEventSubscriber, EventSubmitter, EventWakePublisher, Processor,
         WorkerHandle, WorkerPhase, WorkerSet, spawn_reconciler_worker, spawn_worker,
     },
     feed::FeedProj,
-    query::{Subscriptions, SubscriptionsQuery},
+    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
     subscription::SubscriberId,
+    timeline::TimelineProj,
 };
 
 /// Owns a registry facade together with the workers required to process its events.
@@ -36,8 +38,13 @@ pub struct RegistryService<S> {
 impl<S> RegistryService<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>:
-        BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx + FeedProjectionTx,
+    for<'tx> S::Tx<'tx>: BlobStoreTx
+        + CrawlCompletionTx
+        + CrawlScheduleTx
+        + CrawlJobQueueTx
+        + FeedProjectionTx
+        + EntryProjectionTx
+        + TimelineProjectionTx,
 {
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> Self {
         let api_events = ApiEventPublisher::default();
@@ -124,6 +131,16 @@ where
         tx.commit().await?;
         Ok(page)
     }
+
+    pub async fn list_timeline_items(
+        &self,
+        query: TimelineItemsQuery,
+    ) -> Result<TimelineItemsPage, FeedRegistryError> {
+        let mut tx = self.db.begin().await?;
+        let page = tx.list_timeline_items(query).await?;
+        tx.commit().await?;
+        Ok(page)
+    }
 }
 
 fn spawn_event_workers<S>(
@@ -135,8 +152,13 @@ fn spawn_event_workers<S>(
 ) -> WorkerSet
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>:
-        BlobStoreTx + CrawlCompletionTx + CrawlScheduleTx + CrawlJobQueueTx + FeedProjectionTx,
+    for<'tx> S::Tx<'tx>: BlobStoreTx
+        + CrawlCompletionTx
+        + CrawlScheduleTx
+        + CrawlJobQueueTx
+        + FeedProjectionTx
+        + EntryProjectionTx
+        + TimelineProjectionTx,
 {
     let subscription_request_projection_worker = spawn_event_worker(
         db.clone(),
@@ -165,6 +187,20 @@ where
         config.workers.feed_projection_poll_interval,
         ct.clone(),
         FeedProj::new(),
+    );
+    let entry_projection_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        config.workers.entry_projection_poll_interval,
+        ct.clone(),
+        EntryProj::new(),
+    );
+    let timeline_projection_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        config.workers.timeline_projection_poll_interval,
+        ct.clone(),
+        TimelineProj::new(),
     );
     let api_event_publisher_worker = spawn_event_worker(
         db.clone(),
@@ -197,6 +233,8 @@ where
         subscription_request_projection_worker,
         crawl_target_projection_worker,
         feed_projection_worker,
+        entry_projection_worker,
+        timeline_projection_worker,
         api_event_projection_worker,
         api_event_publisher_worker,
         crawl_scheduler_worker,

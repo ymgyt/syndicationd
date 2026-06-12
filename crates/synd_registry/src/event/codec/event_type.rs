@@ -17,8 +17,14 @@ pub(super) const CRAWL_JOB_FINISHED: &str = "crawl.job.finished";
 pub(super) const FEED_DISCOVERED: &str = "feed.discovered";
 pub(super) const FEED_CHANGED: &str = "feed.changed";
 
+pub(super) const ENTRY_DISCOVERED: &str = "entry.discovered";
+pub(super) const ENTRY_CHANGED: &str = "entry.changed";
+
+pub(super) const TIMELINE_CHANGED: &str = "timeline.changed";
+
 pub(super) const API_FEED_SUBSCRIBED: &str = "api.feed.subscribed";
 pub(super) const API_FEED_SUBSCRIBE_REJECTED: &str = "api.feed.subscribe_rejected";
 pub(super) const API_FEED_SUBSCRIPTION_CHANGED: &str = "api.feed.subscription.changed";
 pub(super) const API_FEED_UNSUBSCRIBED: &str = "api.feed.unsubscribed";
 pub(super) const API_FEED_UNSUBSCRIBE_REJECTED: &str = "api.feed.unsubscribe_rejected";
+pub(super) const API_TIMELINE_CHANGED: &str = "api.timeline.changed";

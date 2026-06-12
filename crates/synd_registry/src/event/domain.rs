@@ -3,7 +3,7 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::{Category, EntryId, FeedUrl, Requirement};
 
 use crate::{
     crawl::{
@@ -11,6 +11,7 @@ use crate::{
         policy::CrawlPolicy,
     },
     subscription::SubscriptionKey,
+    timeline::TimelineKey,
 };
 
 /// A typed fact recorded in the registry event journal.
@@ -20,6 +21,8 @@ pub enum Event {
     Sub(SubEvent),
     Crawl(CrawlEvent),
     Feed(FeedEvent),
+    Entry(EntryEvent),
+    Timeline(TimelineEvent),
     Api(ApiEvent),
 }
 
@@ -30,6 +33,8 @@ impl Event {
             Self::Sub(event) => event.kind().into(),
             Self::Crawl(event) => event.kind().into(),
             Self::Feed(event) => event.kind().into(),
+            Self::Entry(event) => event.kind().into(),
+            Self::Timeline(event) => event.kind().into(),
             Self::Api(event) => event.kind().into(),
         }
     }
@@ -59,6 +64,18 @@ impl From<FeedEvent> for Event {
     }
 }
 
+impl From<EntryEvent> for Event {
+    fn from(event: EntryEvent) -> Self {
+        Self::Entry(event)
+    }
+}
+
+impl From<TimelineEvent> for Event {
+    fn from(event: TimelineEvent) -> Self {
+        Self::Timeline(event)
+    }
+}
+
 impl From<ApiEvent> for Event {
     fn from(event: ApiEvent) -> Self {
         Self::Api(event)
@@ -72,6 +89,8 @@ pub enum EventKind {
     Sub(SubEventKind),
     Crawl(CrawlEventKind),
     Feed(FeedEventKind),
+    Entry(EntryEventKind),
+    Timeline(TimelineEventKind),
     Api(ApiEventKind),
 }
 
@@ -96,6 +115,18 @@ impl From<CrawlEventKind> for EventKind {
 impl From<FeedEventKind> for EventKind {
     fn from(kind: FeedEventKind) -> Self {
         Self::Feed(kind)
+    }
+}
+
+impl From<EntryEventKind> for EventKind {
+    fn from(kind: EntryEventKind) -> Self {
+        Self::Entry(kind)
+    }
+}
+
+impl From<TimelineEventKind> for EventKind {
+    fn from(kind: TimelineEventKind) -> Self {
+        Self::Timeline(kind)
     }
 }
 
@@ -140,6 +171,19 @@ pub enum FeedEventKind {
     Changed,
 }
 
+/// A stable entry-domain event category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EntryEventKind {
+    Discovered,
+    Changed,
+}
+
+/// A stable timeline-domain event category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TimelineEventKind {
+    Changed,
+}
+
 /// A stable API contract event category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApiEventKind {
@@ -148,6 +192,7 @@ pub enum ApiEventKind {
     FeedSubscriptionChanged,
     FeedUnsubscribed,
     FeedUnsubscribeRejected,
+    TimelineChanged,
 }
 
 /// Event categories a worker is interested in consuming.
@@ -395,6 +440,38 @@ impl FeedEvent {
     }
 }
 
+/// A fact about current entry state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntryEvent {
+    Discovered(EntryDiscoveredEvent),
+    Changed(EntryChangedEvent),
+}
+
+impl EntryEvent {
+    /// Returns the stable entry event category.
+    pub fn kind(&self) -> EntryEventKind {
+        match self {
+            Self::Discovered(_) => EntryEventKind::Discovered,
+            Self::Changed(_) => EntryEventKind::Changed,
+        }
+    }
+}
+
+/// A fact about timeline membership.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TimelineEvent {
+    Changed(TimelineChangedEvent),
+}
+
+impl TimelineEvent {
+    /// Returns the stable timeline event category.
+    pub fn kind(&self) -> TimelineEventKind {
+        match self {
+            Self::Changed(_) => TimelineEventKind::Changed,
+        }
+    }
+}
+
 /// Public event contract exposed through the API stream.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ApiEvent {
@@ -403,6 +480,7 @@ pub enum ApiEvent {
     FeedSubscriptionChanged(ApiFeedSubscriptionChanged),
     FeedUnsubscribed(ApiFeedUnsubscribed),
     FeedUnsubscribeRejected(ApiFeedUnsubscribeRejected),
+    TimelineChanged(ApiTimelineChanged),
 }
 
 impl ApiEvent {
@@ -413,6 +491,7 @@ impl ApiEvent {
             Self::FeedSubscriptionChanged(_) => ApiEventKind::FeedSubscriptionChanged,
             Self::FeedUnsubscribed(_) => ApiEventKind::FeedUnsubscribed,
             Self::FeedUnsubscribeRejected(_) => ApiEventKind::FeedUnsubscribeRejected,
+            Self::TimelineChanged(_) => ApiEventKind::TimelineChanged,
         }
     }
 }
@@ -500,6 +579,27 @@ impl ApiFeedUnsubscribeRejected {
             request_id,
             subscription,
             reason: reason.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiTimelineChanged {
+    pub timeline: TimelineKey,
+    pub changed_at: DateTime<Utc>,
+    pub affected_feeds: Vec<FeedUrl>,
+}
+
+impl ApiTimelineChanged {
+    pub fn new(
+        timeline: TimelineKey,
+        changed_at: DateTime<Utc>,
+        affected_feeds: Vec<FeedUrl>,
+    ) -> Self {
+        Self {
+            timeline,
+            changed_at,
+            affected_feeds,
         }
     }
 }
@@ -908,5 +1008,101 @@ impl From<FeedChangedEvent> for FeedEvent {
 impl From<FeedChangedEvent> for Event {
     fn from(event: FeedChangedEvent) -> Self {
         Self::Feed(event.into())
+    }
+}
+
+/// An entry became known to the registry for the first time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EntryDiscoveredEvent {
+    pub feed_url: FeedUrl,
+    pub entry_id: EntryId,
+    pub crawl_job_id: CrawlJobId,
+}
+
+impl EntryDiscoveredEvent {
+    /// Creates an event for an entry first observed by the registry.
+    pub fn new(feed_url: FeedUrl, entry_id: EntryId, crawl_job_id: CrawlJobId) -> Self {
+        Self {
+            feed_url,
+            entry_id,
+            crawl_job_id,
+        }
+    }
+}
+
+impl From<EntryDiscoveredEvent> for EntryEvent {
+    fn from(event: EntryDiscoveredEvent) -> Self {
+        Self::Discovered(event)
+    }
+}
+
+impl From<EntryDiscoveredEvent> for Event {
+    fn from(event: EntryDiscoveredEvent) -> Self {
+        Self::Entry(event.into())
+    }
+}
+
+/// The current state of a known entry changed after a feed source was applied.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EntryChangedEvent {
+    pub feed_url: FeedUrl,
+    pub entry_id: EntryId,
+    pub crawl_job_id: CrawlJobId,
+}
+
+impl EntryChangedEvent {
+    /// Creates an event for a changed entry observed by a feed source.
+    pub fn new(feed_url: FeedUrl, entry_id: EntryId, crawl_job_id: CrawlJobId) -> Self {
+        Self {
+            feed_url,
+            entry_id,
+            crawl_job_id,
+        }
+    }
+}
+
+impl From<EntryChangedEvent> for EntryEvent {
+    fn from(event: EntryChangedEvent) -> Self {
+        Self::Changed(event)
+    }
+}
+
+impl From<EntryChangedEvent> for Event {
+    fn from(event: EntryChangedEvent) -> Self {
+        Self::Entry(event.into())
+    }
+}
+
+/// Timeline membership changed for a subscriber-visible timeline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimelineChangedEvent {
+    pub timeline: TimelineKey,
+    pub changed_at: DateTime<Utc>,
+    pub affected_feeds: Vec<FeedUrl>,
+}
+
+impl TimelineChangedEvent {
+    pub fn new(
+        timeline: TimelineKey,
+        changed_at: DateTime<Utc>,
+        affected_feeds: Vec<FeedUrl>,
+    ) -> Self {
+        Self {
+            timeline,
+            changed_at,
+            affected_feeds,
+        }
+    }
+}
+
+impl From<TimelineChangedEvent> for TimelineEvent {
+    fn from(event: TimelineChangedEvent) -> Self {
+        Self::Changed(event)
+    }
+}
+
+impl From<TimelineChangedEvent> for Event {
+    fn from(event: TimelineChangedEvent) -> Self {
+        Self::Timeline(event.into())
     }
 }

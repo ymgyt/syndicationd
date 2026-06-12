@@ -3,19 +3,23 @@ use thiserror::Error;
 
 use super::domain::{
     ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, CrawlJobEnqueuedEvent, CrawlJobFinishedEvent,
-    CrawlJobStartedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
-    CrawlTargetPolicyChangedEvent, Event, EventKind, FeedChangedEvent, FeedDiscoveredEvent,
+    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged, CrawlJobEnqueuedEvent,
+    CrawlJobFinishedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
+    EntryDiscoveredEvent, Event, EventKind, FeedChangedEvent, FeedDiscoveredEvent,
     FeedSubscribedEvent, FeedUnsubscribedEvent, SubscribeFeedRejected, SubscribeFeedRequested,
-    SubscriptionChangedEvent, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    SubscriptionChangedEvent, TimelineChangedEvent, UnsubscribeFeedRejected,
+    UnsubscribeFeedRequested,
 };
 
 mod api;
 mod crawl;
+mod entry;
 mod event_type;
 mod feed;
 mod request;
 mod sub;
+mod timeline;
 
 pub type EventEncodingResult<T> = Result<T, EventEncodingError>;
 
@@ -52,6 +56,8 @@ impl EventEncoding for Event {
             Self::Sub(event) => event.encode(),
             Self::Crawl(event) => event.encode(),
             Self::Feed(event) => event.encode(),
+            Self::Entry(event) => event.encode(),
+            Self::Timeline(event) => event.encode(),
             Self::Api(event) => event.encode(),
         }
     }
@@ -109,6 +115,15 @@ impl EventEncoding for Event {
             <FeedChangedEvent as EventPayload>::EVENT_TYPE => {
                 decode_payload::<FeedChangedEvent>(payload_json).map(EventPayload::into_event)
             }
+            <EntryDiscoveredEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<EntryDiscoveredEvent>(payload_json).map(EventPayload::into_event)
+            }
+            <EntryChangedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<EntryChangedEvent>(payload_json).map(EventPayload::into_event)
+            }
+            <TimelineChangedEvent as EventPayload>::EVENT_TYPE => {
+                decode_payload::<TimelineChangedEvent>(payload_json).map(EventPayload::into_event)
+            }
             <ApiFeedSubscribed as EventPayload>::EVENT_TYPE => {
                 decode_payload::<ApiFeedSubscribed>(payload_json).map(EventPayload::into_event)
             }
@@ -127,6 +142,9 @@ impl EventEncoding for Event {
                 decode_payload::<ApiFeedUnsubscribeRejected>(payload_json)
                     .map(EventPayload::into_event)
             }
+            <ApiTimelineChanged as EventPayload>::EVENT_TYPE => {
+                decode_payload::<ApiTimelineChanged>(payload_json).map(EventPayload::into_event)
+            }
             event_type => Err(EventEncodingError::UnknownEventType(event_type.to_owned())),
         }
     }
@@ -139,6 +157,8 @@ impl EventKind {
             Self::Sub(kind) => kind.event_type(),
             Self::Crawl(kind) => kind.event_type(),
             Self::Feed(kind) => kind.event_type(),
+            Self::Entry(kind) => kind.event_type(),
+            Self::Timeline(kind) => kind.event_type(),
             Self::Api(kind) => kind.event_type(),
         }
     }

@@ -21,7 +21,7 @@ CREATE TABLE entry (
     feed_pk                  INTEGER NOT NULL,
     entry_id                 TEXT NOT NULL UNIQUE,
     current_content_json     TEXT NOT NULL CHECK (json_valid(current_content_json)),
-    current_order_time       DATETIME,
+    current_order_time       DATETIME NOT NULL,
     current_source_result_pk INTEGER NOT NULL,
     first_seen_at            DATETIME NOT NULL,
     last_seen_at             DATETIME NOT NULL,
@@ -61,7 +61,7 @@ CREATE INDEX timeline_subscriber_idx
 CREATE TABLE timeline_item (
     timeline_pk INTEGER NOT NULL,
     entry_pk    INTEGER NOT NULL,
-    order_time  DATETIME,
+    order_time  DATETIME NOT NULL,
     created_at  DATETIME NOT NULL,
     updated_at  DATETIME NOT NULL,
 
