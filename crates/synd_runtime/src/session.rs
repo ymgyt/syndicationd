@@ -49,7 +49,7 @@ pub struct Handle {
 
 enum HandleKind {
     Inert,
-    Daemon(DaemonSessionHandle),
+    Daemon(Box<DaemonSessionHandle>),
 }
 
 impl Handle {
@@ -66,7 +66,9 @@ impl Handle {
         lease: SessionLease,
     ) -> Self {
         Self {
-            kind: HandleKind::Daemon(DaemonSessionHandle::new(client, session_id, lease)),
+            kind: HandleKind::Daemon(Box::new(DaemonSessionHandle::new(
+                client, session_id, lease,
+            ))),
         }
     }
 
@@ -78,12 +80,12 @@ impl Handle {
         renewal_observer: Option<SessionRenewalObserver>,
     ) -> Self {
         Self {
-            kind: HandleKind::Daemon(DaemonSessionHandle::new(
+            kind: HandleKind::Daemon(Box::new(DaemonSessionHandle::new(
                 client,
                 session_id,
                 lease,
                 renewal_observer,
-            )),
+            ))),
         }
     }
 
