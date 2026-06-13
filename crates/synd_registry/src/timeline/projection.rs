@@ -1,14 +1,16 @@
 use chrono::{DateTime, Utc};
-use synd_feed::types::FeedUrl;
+use synd_feed::types::{EntryId, FeedUrl};
 
 use crate::{
     db::{FeedRegistryDb, TimelineProjectionTx},
     error::RegistryDbResult,
     event::{
-        ConsumeContext, Consumer, Event, EventInterests, FeedSubscribedEvent, InputBatch,
-        JournalTx, Processor, ProcessorError, ProcessorId, ProcessorResult, RecordedEvents,
-        SubEvent, SubEventKind, TimelineChangedEvent, Transactional,
+        ConsumeContext, Consumer, EntryChangedEvent, EntryDiscoveredEvent, EntryEvent,
+        EntryEventKind, Event, EventInterests, FeedSubscribedEvent, FeedUnsubscribedEvent,
+        InputBatch, JournalTx, Processor, ProcessorError, ProcessorId, ProcessorResult,
+        RecordedEvents, SubEvent, SubEventKind, TimelineChangedEvent, Transactional,
     },
+    subscription::SubscriptionKey,
     timeline::{TimelineCatchup, TimelineKey},
 };
 
@@ -16,6 +18,9 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimelineProjectionInput {
     FeedSubscribed(FeedSubscribedEvent),
+    FeedUnsubscribed(FeedUnsubscribedEvent),
+    EntryDiscovered(EntryDiscoveredEvent),
+    EntryChanged(EntryChangedEvent),
 }
 
 impl TryFrom<Event> for TimelineProjectionInput {
@@ -24,6 +29,9 @@ impl TryFrom<Event> for TimelineProjectionInput {
     fn try_from(event: Event) -> Result<Self, Self::Error> {
         match event {
             Event::Sub(SubEvent::FeedSubscribed(event)) => Ok(Self::FeedSubscribed(event)),
+            Event::Sub(SubEvent::FeedUnsubscribed(event)) => Ok(Self::FeedUnsubscribed(event)),
+            Event::Entry(EntryEvent::Discovered(event)) => Ok(Self::EntryDiscovered(event)),
+            Event::Entry(EntryEvent::Changed(event)) => Ok(Self::EntryChanged(event)),
             event => Err(ProcessorError::UnexpectedEvent {
                 expected: "timeline projection event",
                 actual: event.kind(),
@@ -57,7 +65,12 @@ impl Processor for TimelineProj {
     }
 
     fn interests(&self) -> EventInterests {
-        EventInterests::new([SubEventKind::FeedSubscribed.into()])
+        EventInterests::new([
+            SubEventKind::FeedSubscribed.into(),
+            SubEventKind::FeedUnsubscribed.into(),
+            EntryEventKind::Discovered.into(),
+            EntryEventKind::Changed.into(),
+        ])
     }
 }
 
@@ -95,6 +108,28 @@ where
                         invalidations.mark(catchup.timeline().clone(), catchup.feed_url().clone());
                     }
                 }
+                TimelineProjectionInput::FeedUnsubscribed(event) => {
+                    let subscription = event.subscription;
+                    if let Some(timeline) = scope.apply_feed_unsubscribed(&subscription).await? {
+                        invalidations.mark(timeline, subscription.feed_url);
+                    }
+                }
+                TimelineProjectionInput::EntryDiscovered(event) => {
+                    for timeline in scope
+                        .apply_entry_discovered(&event.feed_url, &event.entry_id, now)
+                        .await?
+                    {
+                        invalidations.mark(timeline, event.feed_url.clone());
+                    }
+                }
+                TimelineProjectionInput::EntryChanged(event) => {
+                    for timeline in scope
+                        .apply_entry_changed(&event.feed_url, &event.entry_id, now)
+                        .await?
+                    {
+                        invalidations.mark(timeline, event.feed_url.clone());
+                    }
+                }
             }
         }
 
@@ -129,6 +164,33 @@ where
     ) -> RegistryDbResult<TimelineCatchup> {
         self.tx.ensure_default_timeline(timeline, now).await?;
         self.tx.catchup_timeline_feed(timeline, feed_url, now).await
+    }
+
+    pub async fn apply_entry_discovered(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Vec<TimelineKey>> {
+        self.tx
+            .apply_entry_discovered(feed_url, entry_id, now)
+            .await
+    }
+
+    pub async fn apply_entry_changed(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Vec<TimelineKey>> {
+        self.tx.apply_entry_changed(feed_url, entry_id, now).await
+    }
+
+    pub async fn apply_feed_unsubscribed(
+        &mut self,
+        subscription: &SubscriptionKey,
+    ) -> RegistryDbResult<Option<TimelineKey>> {
+        self.tx.apply_feed_unsubscribed(subscription).await
     }
 
     async fn record_timeline_invalidations(
@@ -171,6 +233,18 @@ fn same_input(a: &TimelineProjectionInput, b: &TimelineProjectionInput) -> bool 
             TimelineProjectionInput::FeedSubscribed(a),
             TimelineProjectionInput::FeedSubscribed(b),
         ) => a.subscription == b.subscription,
+        (
+            TimelineProjectionInput::FeedUnsubscribed(a),
+            TimelineProjectionInput::FeedUnsubscribed(b),
+        ) => a.subscription == b.subscription,
+        (
+            TimelineProjectionInput::EntryDiscovered(a),
+            TimelineProjectionInput::EntryDiscovered(b),
+        ) => a == b,
+        (TimelineProjectionInput::EntryChanged(a), TimelineProjectionInput::EntryChanged(b)) => {
+            a == b
+        }
+        _ => false,
     }
 }
 

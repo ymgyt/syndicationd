@@ -7,7 +7,7 @@ use synd_registry::{
     RegistryDbError, RegistryDbResult, TimelineProjectionTx,
     entry::EntryAttrs,
     query::{TimelineItemCursor, TimelineItemNode, TimelineItemsPage, TimelineItemsQuery},
-    subscription::{SubscriberId, Subscription},
+    subscription::{SubscriberId, Subscription, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey, TimelineKind},
 };
 
@@ -129,6 +129,84 @@ impl<'tx, 'db> TimelineTable<'tx, 'db> {
         ))
     }
 
+    pub(super) async fn apply_entry_discovered(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Vec<TimelineKey>> {
+        self.ensure_default_timelines_for_feed(feed_url, now)
+            .await?;
+
+        let mut affected = Vec::new();
+        for target in self.load_entry_timeline_targets(feed_url, entry_id).await? {
+            if target.item_order_time.is_some() {
+                continue;
+            }
+            self.insert_entry_item(&target, now).await?;
+            affected.push(target.timeline);
+        }
+        Ok(affected)
+    }
+
+    pub(super) async fn apply_entry_changed(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Vec<TimelineKey>> {
+        let mut affected = Vec::new();
+        for target in self.load_entry_timeline_targets(feed_url, entry_id).await? {
+            let Some(item_order_time) = target.item_order_time else {
+                continue;
+            };
+            if item_order_time != target.entry_order_time {
+                self.update_entry_item_order(&target, now).await?;
+            }
+            affected.push(target.timeline);
+        }
+        Ok(affected)
+    }
+
+    pub(super) async fn apply_feed_unsubscribed(
+        &mut self,
+        subscription: &SubscriptionKey,
+    ) -> RegistryDbResult<Option<TimelineKey>> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM timeline_item
+            WHERE timeline_pk = (
+                SELECT t.pk
+                FROM timeline AS t
+                WHERE t.subscriber_id = ?
+                  AND t.kind = ?
+            )
+              AND entry_pk IN (
+                SELECT e.pk
+                FROM entry AS e
+                INNER JOIN feed AS f
+                    ON f.pk = e.feed_pk
+                INNER JOIN feed_endpoint AS fe
+                    ON fe.pk = f.feed_endpoint_pk
+                WHERE fe.url = ?
+              )
+            "#,
+        )
+        .bind(subscription.subscriber_id.as_str())
+        .bind(TimelineKind::Default.as_str())
+        .bind(subscription.feed_url.as_str())
+        .execute(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        if result.rows_affected() == 0 {
+            return Ok(None);
+        }
+        Ok(Some(TimelineKey::default_for(
+            subscription.subscriber_id.clone(),
+        )))
+    }
+
     pub(super) async fn list_items(
         &mut self,
         query: TimelineItemsQuery,
@@ -200,6 +278,149 @@ impl<'tx, 'db> TimelineTable<'tx, 'db> {
         row.try_get::<i64, _>("pk")
             .map_err(RegistryDbError::internal)
     }
+
+    async fn ensure_default_timelines_for_feed(
+        &mut self,
+        feed_url: &FeedUrl,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO timeline (
+                subscriber_id,
+                kind,
+                name,
+                definition_json,
+                created_at,
+                updated_at
+            )
+            SELECT
+                s.subscriber_id,
+                ?,
+                NULL,
+                NULL,
+                ?,
+                ?
+            FROM feed_endpoint_subscription AS s
+            INNER JOIN feed_endpoint AS fe
+                ON fe.pk = s.feed_endpoint_pk
+            WHERE fe.url = ?
+            "#,
+        )
+        .bind(TimelineKind::Default.as_str())
+        .bind(now)
+        .bind(now)
+        .bind(feed_url.as_str())
+        .execute(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+        Ok(())
+    }
+
+    async fn load_entry_timeline_targets(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+    ) -> RegistryDbResult<Vec<TimelineEntryTarget>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                t.pk AS timeline_pk,
+                t.subscriber_id,
+                e.pk AS entry_pk,
+                e.current_order_time AS entry_order_time,
+                ti.order_time AS item_order_time
+            FROM feed_endpoint_subscription AS s
+            INNER JOIN feed_endpoint AS fe
+                ON fe.pk = s.feed_endpoint_pk
+            INNER JOIN timeline AS t
+                ON t.subscriber_id = s.subscriber_id
+               AND t.kind = ?
+            INNER JOIN feed AS f
+                ON f.feed_endpoint_pk = fe.pk
+            INNER JOIN entry AS e
+                ON e.feed_pk = f.pk
+            LEFT JOIN timeline_item AS ti
+                ON ti.timeline_pk = t.pk
+               AND ti.entry_pk = e.pk
+            WHERE fe.url = ?
+              AND e.entry_id = ?
+            ORDER BY t.subscriber_id
+            "#,
+        )
+        .bind(TimelineKind::Default.as_str())
+        .bind(feed_url.as_str())
+        .bind(entry_id.as_str())
+        .fetch_all(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        rows.into_iter()
+            .map(TimelineEntryTarget::try_from)
+            .collect()
+    }
+
+    async fn insert_entry_item(
+        &mut self,
+        target: &TimelineEntryTarget,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO timeline_item (
+                timeline_pk,
+                entry_pk,
+                order_time,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(target.timeline_pk)
+        .bind(target.entry_pk)
+        .bind(target.entry_order_time)
+        .bind(now)
+        .bind(now)
+        .execute(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+        Ok(())
+    }
+
+    async fn update_entry_item_order(
+        &mut self,
+        target: &TimelineEntryTarget,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        let result = sqlx::query(
+            r#"
+            UPDATE timeline_item
+            SET
+                order_time = ?,
+                updated_at = ?
+            WHERE timeline_pk = ?
+              AND entry_pk = ?
+            "#,
+        )
+        .bind(target.entry_order_time)
+        .bind(now)
+        .bind(target.timeline_pk)
+        .bind(target.entry_pk)
+        .execute(&mut **self.tx)
+        .await
+        .map_err(RegistryDbError::internal)?;
+
+        if result.rows_affected() != 1 {
+            return Err(RegistryDbError::internal(anyhow::anyhow!(
+                "timeline item order update affected {} rows for timeline_pk={}, entry_pk={}",
+                result.rows_affected(),
+                target.timeline_pk,
+                target.entry_pk
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl TimelineProjectionTx for super::SqliteRegistryTx<'_> {
@@ -222,6 +443,70 @@ impl TimelineProjectionTx for super::SqliteRegistryTx<'_> {
         TimelineTable::new(&mut self.tx)
             .catchup_feed(timeline, feed_url, now)
             .await
+    }
+
+    async fn apply_entry_discovered(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Vec<TimelineKey>> {
+        TimelineTable::new(&mut self.tx)
+            .apply_entry_discovered(feed_url, entry_id, now)
+            .await
+    }
+
+    async fn apply_entry_changed(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Vec<TimelineKey>> {
+        TimelineTable::new(&mut self.tx)
+            .apply_entry_changed(feed_url, entry_id, now)
+            .await
+    }
+
+    async fn apply_feed_unsubscribed(
+        &mut self,
+        subscription: &SubscriptionKey,
+    ) -> RegistryDbResult<Option<TimelineKey>> {
+        TimelineTable::new(&mut self.tx)
+            .apply_feed_unsubscribed(subscription)
+            .await
+    }
+}
+
+struct TimelineEntryTarget {
+    timeline_pk: i64,
+    timeline: TimelineKey,
+    entry_pk: i64,
+    entry_order_time: DateTime<Utc>,
+    item_order_time: Option<DateTime<Utc>>,
+}
+
+impl TryFrom<sqlx::sqlite::SqliteRow> for TimelineEntryTarget {
+    type Error = RegistryDbError;
+
+    fn try_from(row: sqlx::sqlite::SqliteRow) -> RegistryDbResult<Self> {
+        let subscriber_id = row
+            .try_get::<String, _>("subscriber_id")
+            .map_err(RegistryDbError::internal)?;
+        Ok(Self {
+            timeline_pk: row
+                .try_get::<i64, _>("timeline_pk")
+                .map_err(RegistryDbError::internal)?,
+            timeline: TimelineKey::default_for(SubscriberId::new(subscriber_id)),
+            entry_pk: row
+                .try_get::<i64, _>("entry_pk")
+                .map_err(RegistryDbError::internal)?,
+            entry_order_time: row
+                .try_get::<DateTime<Utc>, _>("entry_order_time")
+                .map_err(RegistryDbError::internal)?,
+            item_order_time: row
+                .try_get::<Option<DateTime<Utc>>, _>("item_order_time")
+                .map_err(RegistryDbError::internal)?,
+        })
     }
 }
 

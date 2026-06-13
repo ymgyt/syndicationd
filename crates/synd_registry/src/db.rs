@@ -194,6 +194,25 @@ pub trait TimelineProjectionTx {
         feed_url: &FeedUrl,
         now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<TimelineCatchup>> + Send;
+
+    fn apply_entry_discovered(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<Vec<TimelineKey>>> + Send;
+
+    fn apply_entry_changed(
+        &mut self,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        now: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<Vec<TimelineKey>>> + Send;
+
+    fn apply_feed_unsubscribed(
+        &mut self,
+        subscription: &SubscriptionKey,
+    ) -> impl Future<Output = RegistryDbResult<Option<TimelineKey>>> + Send;
 }
 
 /// Commits a registry database transaction.

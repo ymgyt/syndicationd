@@ -366,7 +366,7 @@ mod tests {
         FeedFetchFailure, FeedFetchFailureKind, FeedFetchOutcome, FeedHttpResponse, FeedHttpStatus,
         FeedResponseBody, FeedResponseHeaders, FeedService, FetchedFeed,
     };
-    use synd_feed::types::FeedUrl;
+    use synd_feed::types::{EntryId, FeedUrl};
     use synd_registry::{
         BlobStoreTx, CrawlCompletionTx, FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig,
         RegistryService, SubscribeFeedCommand, Subscription, SubscriptionKey,
@@ -385,10 +385,11 @@ mod tests {
         entry::{EntryProj, EntryProjectionInput},
         event::{
             ApiEvent, ConsumeContext, Consumer, CrawlEvent, CrawlEventKind, CrawlJobFinishedEvent,
-            EntryEventKind, EventInterests, EventSubmitter, EventWakePublisher, FeedChangedEvent,
-            FeedDiscoveredEvent, FeedEventKind, FeedSubscribedEvent, FeedUnsubscribedEvent,
-            ProcessorId, RecordedEvents, RequestEventKind, SubEvent, SubEventKind,
-            SubscriptionChangedEvent, SubscriptionLifecycle, TimelineEventKind, WorkerId,
+            EntryChangedEvent, EntryDiscoveredEvent, EntryEventKind, Event, EventInterests,
+            EventSubmitter, EventWakePublisher, FeedChangedEvent, FeedDiscoveredEvent,
+            FeedEventKind, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
+            RecordedEvents, RequestEventKind, SubEvent, SubEventKind, SubscriptionChangedEvent,
+            SubscriptionLifecycle, TimelineEvent, TimelineEventKind, WorkerId,
         },
         feed::{FeedProj, FeedProjectionInput},
         timeline::{TimelineProj, TimelineProjectionInput},
@@ -628,11 +629,7 @@ mod tests {
         let recorded = project_entries(&db, EntryProjectionInput::from(feed_event)).await?;
         assert_eq!(recorded.kinds(), &[EntryEventKind::Discovered.into()]);
 
-        {
-            let mut tx = db.begin().await?;
-            store_subscription(&mut tx, subscription.clone()).await?;
-            tx.commit().await?;
-        }
+        store_subscription_in_db(&db, subscription.clone()).await?;
 
         let subscribed = FeedSubscribedEvent::new(subscription_key(&subscription));
         let recorded =
@@ -675,11 +672,7 @@ mod tests {
         let _ = project_feed(&db, crawl).await?;
         let _ = project_entries(&db, EntryProjectionInput::from(feed_event)).await?;
 
-        {
-            let mut tx = db.begin().await?;
-            store_subscription(&mut tx, subscription.clone()).await?;
-            tx.commit().await?;
-        }
+        store_subscription_in_db(&db, subscription.clone()).await?;
 
         let subscribed = FeedSubscribedEvent::new(subscription_key(&subscription));
         let _ = project_timeline(
@@ -691,6 +684,230 @@ mod tests {
             project_timeline(&db, TimelineProjectionInput::FeedSubscribed(subscribed)).await?;
 
         assert!(recorded.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timeline_projection_adds_discovered_entry_for_active_subscription()
+    -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let subscription = subscription("timeline-entry-discovered");
+
+        let crawl = record_fetched_crawl(
+            &db,
+            &subscription.feed_url,
+            rss_body_with_entry("timeline feed", "timeline entry", "entry-1"),
+            0,
+        )
+        .await?;
+        let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+        let _ = project_feed(&db, crawl.clone()).await?;
+        let _ = project_entries(&db, EntryProjectionInput::from(feed_event)).await?;
+        let entry_id = current_entry_id(&db).await?;
+
+        store_subscription_in_db(&db, subscription.clone()).await?;
+
+        let recorded = project_timeline(
+            &db,
+            TimelineProjectionInput::EntryDiscovered(EntryDiscoveredEvent::new(
+                subscription.feed_url.clone(),
+                entry_id,
+                crawl.job_id,
+            )),
+        )
+        .await?;
+        assert_eq!(recorded.kinds(), &[TimelineEventKind::Changed.into()]);
+
+        let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+        assert_eq!(page.nodes.len(), 1);
+        assert_eq!(page.nodes[0].attrs.title.as_deref(), Some("timeline entry"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timeline_projection_ignores_discovered_entry_without_subscription()
+    -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let feed_url = feed_url("timeline-entry-without-subscription");
+
+        let crawl = record_fetched_crawl(
+            &db,
+            &feed_url,
+            rss_body_with_entry("timeline feed", "timeline entry", "entry-1"),
+            0,
+        )
+        .await?;
+        let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+        let _ = project_feed(&db, crawl.clone()).await?;
+        let _ = project_entries(&db, EntryProjectionInput::from(feed_event)).await?;
+        let entry_id = current_entry_id(&db).await?;
+
+        let recorded = project_timeline(
+            &db,
+            TimelineProjectionInput::EntryDiscovered(EntryDiscoveredEvent::new(
+                feed_url,
+                entry_id,
+                crawl.job_id,
+            )),
+        )
+        .await?;
+
+        assert!(recorded.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timeline_projection_invalidates_changed_entry_payload() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let subscription = subscription("timeline-entry-payload");
+
+        let first = record_fetched_crawl(
+            &db,
+            &subscription.feed_url,
+            rss_body_with_entry("timeline feed", "old title", "entry-1"),
+            0,
+        )
+        .await?;
+        let first_feed_event =
+            FeedDiscoveredEvent::new(first.feed_url.clone(), first.job_id.clone());
+        let _ = project_feed(&db, first.clone()).await?;
+        let _ = project_entries(&db, EntryProjectionInput::from(first_feed_event)).await?;
+        let entry_id = current_entry_id(&db).await?;
+
+        store_subscription_in_db(&db, subscription.clone()).await?;
+        let _ = project_timeline(
+            &db,
+            TimelineProjectionInput::EntryDiscovered(EntryDiscoveredEvent::new(
+                subscription.feed_url.clone(),
+                entry_id.clone(),
+                first.job_id,
+            )),
+        )
+        .await?;
+
+        let second = record_fetched_crawl(
+            &db,
+            &subscription.feed_url,
+            rss_body_with_entry("timeline feed", "new title", "entry-1"),
+            1,
+        )
+        .await?;
+        let second_feed_event =
+            FeedChangedEvent::new(second.feed_url.clone(), second.job_id.clone());
+        let _ = project_feed(&db, second.clone()).await?;
+        let recorded = project_entries(&db, EntryProjectionInput::from(second_feed_event)).await?;
+        assert_eq!(recorded.kinds(), &[EntryEventKind::Changed.into()]);
+
+        let recorded = project_timeline(
+            &db,
+            TimelineProjectionInput::EntryChanged(EntryChangedEvent::new(
+                subscription.feed_url.clone(),
+                entry_id,
+                second.job_id,
+            )),
+        )
+        .await?;
+        assert_eq!(recorded.kinds(), &[TimelineEventKind::Changed.into()]);
+
+        let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+        assert_eq!(page.nodes.len(), 1);
+        assert_eq!(page.nodes[0].attrs.title.as_deref(), Some("new title"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timeline_projection_updates_changed_entry_order() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let subscription = subscription("timeline-entry-order");
+        let older = Utc.with_ymd_and_hms(2026, 6, 1, 12, 0, 0).unwrap();
+        let newer = Utc.with_ymd_and_hms(2026, 6, 2, 12, 0, 0).unwrap();
+
+        let first = record_fetched_crawl(
+            &db,
+            &subscription.feed_url,
+            rss_body_with_entry_published_at("timeline feed", "old title", "entry-1", older),
+            0,
+        )
+        .await?;
+        let first_feed_event =
+            FeedDiscoveredEvent::new(first.feed_url.clone(), first.job_id.clone());
+        let _ = project_feed(&db, first.clone()).await?;
+        let _ = project_entries(&db, EntryProjectionInput::from(first_feed_event)).await?;
+        let entry_id = current_entry_id(&db).await?;
+
+        store_subscription_in_db(&db, subscription.clone()).await?;
+        let _ = project_timeline(
+            &db,
+            TimelineProjectionInput::EntryDiscovered(EntryDiscoveredEvent::new(
+                subscription.feed_url.clone(),
+                entry_id.clone(),
+                first.job_id,
+            )),
+        )
+        .await?;
+        let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+        assert_eq!(page.nodes[0].cursor.order_time(), older);
+
+        let second = record_fetched_crawl(
+            &db,
+            &subscription.feed_url,
+            rss_body_with_entry_published_at("timeline feed", "new title", "entry-1", newer),
+            1,
+        )
+        .await?;
+        let second_feed_event =
+            FeedChangedEvent::new(second.feed_url.clone(), second.job_id.clone());
+        let _ = project_feed(&db, second.clone()).await?;
+        let _ = project_entries(&db, EntryProjectionInput::from(second_feed_event)).await?;
+
+        let recorded = project_timeline(
+            &db,
+            TimelineProjectionInput::EntryChanged(EntryChangedEvent::new(
+                subscription.feed_url.clone(),
+                entry_id,
+                second.job_id,
+            )),
+        )
+        .await?;
+        assert_eq!(recorded.kinds(), &[TimelineEventKind::Changed.into()]);
+
+        let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+        assert_eq!(page.nodes[0].cursor.order_time(), newer);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timeline_projection_coalesces_entry_invalidations_by_feed() -> anyhow::Result<()> {
+        let db = migrated_db().await?;
+        let subscription = subscription("timeline-entry-coalesce");
+
+        let crawl = record_fetched_crawl(
+            &db,
+            &subscription.feed_url,
+            rss_body_with_entry("timeline feed", "timeline entry", "entry-1"),
+            0,
+        )
+        .await?;
+        let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+        let _ = project_feed(&db, crawl.clone()).await?;
+        let _ = project_entries(&db, EntryProjectionInput::from(feed_event)).await?;
+        let entry_id = current_entry_id(&db).await?;
+
+        store_subscription_in_db(&db, subscription.clone()).await?;
+
+        let input = TimelineProjectionInput::EntryDiscovered(EntryDiscoveredEvent::new(
+            subscription.feed_url.clone(),
+            entry_id,
+            crawl.job_id,
+        ));
+        let recorded = project_timeline_batch(&db, vec![input.clone(), input]).await?;
+        assert_eq!(recorded.kinds(), &[TimelineEventKind::Changed.into()]);
+
+        let events = read_timeline_events(&db).await?;
+        let Some(TimelineEvent::Changed(event)) = events.last() else {
+            anyhow::bail!("expected timeline changed event");
+        };
+        assert_eq!(event.affected_feeds, vec![subscription.feed_url]);
         Ok(())
     }
 
@@ -751,6 +968,16 @@ mod tests {
             .await
     }
 
+    async fn store_subscription_in_db(
+        db: &SqliteFeedRegistryDb,
+        subscription: Subscription,
+    ) -> anyhow::Result<()> {
+        let mut tx = db.begin().await?;
+        store_subscription(&mut tx, subscription).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     fn subscribed_event(path: &str) -> Event {
         Event::Sub(SubEvent::FeedSubscribed(FeedSubscribedEvent::new(
             subscription_key(&subscription(path)),
@@ -777,6 +1004,10 @@ mod tests {
             CrawlEventKind::TargetPolicyChanged.into(),
             CrawlEventKind::TargetDeactivated.into(),
         ])
+    }
+
+    fn timeline_interests() -> EventInterests {
+        EventInterests::new([TimelineEventKind::Changed.into()])
     }
 
     async fn project_crawl_targets(
@@ -813,6 +1044,23 @@ mod tests {
             .into_iter()
             .map(|journaled| match journaled.into_event() {
                 Event::Crawl(event) => Ok(event),
+                event => anyhow::bail!("unexpected event: {event:?}"),
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok(events)
+    }
+
+    async fn read_timeline_events(db: &SqliteFeedRegistryDb) -> anyhow::Result<Vec<TimelineEvent>> {
+        let mut tx = db.begin().await?;
+        let cursor = tx.load_cursor(ProcessorId::ApiEventProjection).await?;
+        let batch = tx.read_after(&cursor, timeline_interests()).await?;
+        tx.commit().await?;
+
+        let events = batch
+            .into_events()
+            .into_iter()
+            .map(|journaled| match journaled.into_event() {
+                Event::Timeline(event) => Ok(event),
                 event => anyhow::bail!("unexpected event: {event:?}"),
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -904,12 +1152,23 @@ mod tests {
         db: &SqliteFeedRegistryDb,
         input: TimelineProjectionInput,
     ) -> anyhow::Result<RecordedEvents> {
+        project_timeline_batch(db, vec![input]).await
+    }
+
+    async fn project_timeline_batch(
+        db: &SqliteFeedRegistryDb,
+        inputs: Vec<TimelineProjectionInput>,
+    ) -> anyhow::Result<RecordedEvents> {
         let mut tx = db.begin().await?;
         let mut proj = TimelineProj::new();
         let recorded = {
             let mut cx = ConsumeContext::new(&mut tx);
-            <TimelineProj as Consumer<SqliteFeedRegistryDb>>::consume(&mut proj, &mut cx, input)
-                .await?;
+            <TimelineProj as Consumer<SqliteFeedRegistryDb>>::consume_batch(
+                &mut proj,
+                &mut cx,
+                InputBatch::new(inputs),
+            )
+            .await?;
             cx.into_recorded()
         };
         tx.commit().await?;
@@ -930,6 +1189,37 @@ mod tests {
         let source_result_pk = row.try_get::<i64, _>("current_source_result_pk")?;
         tx.commit().await?;
         Ok((content_json, source_result_pk))
+    }
+
+    async fn current_entry_id(db: &SqliteFeedRegistryDb) -> anyhow::Result<EntryId> {
+        let mut tx = db.begin().await?;
+        let row = sqlx::query(
+            r#"
+            SELECT entry_id
+            FROM entry
+            "#,
+        )
+        .fetch_one(&mut *tx.tx)
+        .await?;
+        let entry_id = row.try_get::<String, _>("entry_id")?;
+        tx.commit().await?;
+        EntryId::parse(entry_id).map_err(Into::into)
+    }
+
+    async fn list_timeline_items(
+        db: &SqliteFeedRegistryDb,
+        subscriber_id: SubscriberId,
+    ) -> anyhow::Result<TimelineItemsPage> {
+        let mut tx = db.begin().await?;
+        let page = tx
+            .list_timeline_items(TimelineItemsQuery {
+                subscriber_id,
+                after: None,
+                first: 10,
+            })
+            .await?;
+        tx.commit().await?;
+        Ok(page)
     }
 
     fn fetched_outcome(
@@ -972,6 +1262,32 @@ mod tests {
     </item>
   </channel>
 </rss>"#
+        )
+        .into_bytes()
+    }
+
+    fn rss_body_with_entry_published_at(
+        feed_title: &str,
+        entry_title: &str,
+        entry_guid: &str,
+        published_at: DateTime<Utc>,
+    ) -> Vec<u8> {
+        format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>{feed_title}</title>
+    <link>https://example.com/</link>
+    <description>example feed</description>
+    <item>
+      <title>{entry_title}</title>
+      <link>https://example.com/entry/1</link>
+      <guid>{entry_guid}</guid>
+      <pubDate>{}</pubDate>
+    </item>
+  </channel>
+</rss>"#,
+            published_at.to_rfc2822()
         )
         .into_bytes()
     }
