@@ -9,6 +9,7 @@ use crate::{
         EntryEventKind, Event, EventInterests, FeedSubscribedEvent, FeedUnsubscribedEvent,
         InputBatch, JournalTx, Processor, ProcessorError, ProcessorId, ProcessorResult,
         RecordedEvents, SubEvent, SubEventKind, TimelineChangedEvent, Transactional,
+        skip_permanent_error,
     },
     subscription::SubscriptionKey,
     timeline::{TimelineCatchup, TimelineKey},
@@ -92,50 +93,83 @@ where
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         batch: InputBatch<Self::Input>,
     ) -> ProcessorResult<()> {
+        let processor = self.id();
         let now = Utc::now();
         let mut invalidations = TimelineInvalidations::empty();
         let mut scope = cx.timeline_projection();
 
         for input in unique_inputs(batch.into_inputs()) {
-            match input {
+            let consumed = match input {
                 TimelineProjectionInput::FeedSubscribed(event) => {
                     let subscription = event.subscription;
                     let timeline = TimelineKey::default_for(subscription.subscriber_id);
-                    let catchup = scope
+                    match scope
                         .catchup_default_timeline_feed(&timeline, &subscription.feed_url, now)
-                        .await?;
-                    if catchup.inserted_items() > 0 {
-                        invalidations.mark(catchup.timeline().clone(), catchup.feed_url().clone());
+                        .await
+                    {
+                        Ok(catchup) => {
+                            if catchup.inserted_items() > 0 {
+                                invalidations
+                                    .mark(catchup.timeline().clone(), catchup.feed_url().clone());
+                            }
+                            Ok(())
+                        }
+                        Err(err) => Err(err.into()),
                     }
                 }
                 TimelineProjectionInput::FeedUnsubscribed(event) => {
                     let subscription = event.subscription;
-                    if let Some(timeline) = scope.apply_feed_unsubscribed(&subscription).await? {
-                        invalidations.mark(timeline, subscription.feed_url);
+                    match scope.apply_feed_unsubscribed(&subscription).await {
+                        Ok(timeline) => {
+                            if let Some(timeline) = timeline {
+                                invalidations.mark(timeline, subscription.feed_url);
+                            }
+                            Ok(())
+                        }
+                        Err(err) => Err(err.into()),
                     }
                 }
                 TimelineProjectionInput::EntryDiscovered(event) => {
-                    for timeline in scope
+                    match scope
                         .apply_entry_discovered(&event.feed_url, &event.entry_id, now)
-                        .await?
+                        .await
                     {
-                        invalidations.mark(timeline, event.feed_url.clone());
+                        Ok(timelines) => {
+                            for timeline in timelines {
+                                invalidations.mark(timeline, event.feed_url.clone());
+                            }
+                            Ok(())
+                        }
+                        Err(err) => Err(err.into()),
                     }
                 }
                 TimelineProjectionInput::EntryChanged(event) => {
-                    for timeline in scope
+                    match scope
                         .apply_entry_changed(&event.feed_url, &event.entry_id, now)
-                        .await?
+                        .await
                     {
-                        invalidations.mark(timeline, event.feed_url.clone());
+                        Ok(timelines) => {
+                            for timeline in timelines {
+                                invalidations.mark(timeline, event.feed_url.clone());
+                            }
+                            Ok(())
+                        }
+                        Err(err) => Err(err.into()),
                     }
                 }
+            };
+
+            if let Err(err) = consumed {
+                skip_permanent_error(processor, err, "input")?;
             }
         }
 
-        scope
+        if let Err(err) = scope
             .record_timeline_invalidations(invalidations, now)
-            .await?;
+            .await
+        {
+            skip_permanent_error(processor, err.into(), "timeline invalidation")?;
+        }
         Ok(())
     }
 }

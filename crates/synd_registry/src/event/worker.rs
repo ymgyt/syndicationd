@@ -9,8 +9,9 @@ use crate::{
     db::{CommitTx, FeedRegistryDb},
     error::RegistryDbError,
     event::{
-        ConsumeContext, Consumer, EventCursor, InputBatch, JournalTx, PostCommit, Processor,
-        ProcessorError, ProcessorId, ProcessorResult, RecordedEvents, Sink, Transactional,
+        ConsumeContext, Consumer, EventCursor, EventReadBatch, InputBatch, JournalTx, PostCommit,
+        Processor, ProcessorError, ProcessorId, RecordedEvents, Sink, Transactional,
+        skip_permanent_error,
     },
 };
 
@@ -380,6 +381,24 @@ where
     Worker::new(db, processor, EventWake::new(wake_publisher), poll_interval).spawn(ct)
 }
 
+fn collect_inputs<P>(
+    processor: ProcessorId,
+    batch: EventReadBatch,
+    capacity: usize,
+) -> WorkerResult<Vec<P::Input>>
+where
+    P: Processor,
+{
+    let mut inputs = Vec::with_capacity(capacity);
+    for journaled in batch.into_events() {
+        match P::Input::try_from(journaled.into_event()) {
+            Ok(input) => inputs.push(input),
+            Err(err) => skip_permanent_error(processor, err, "event input")?,
+        }
+    }
+    Ok(inputs)
+}
+
 pub(crate) trait WorkerPhase<S, P>: Sized
 where
     S: FeedRegistryDb,
@@ -405,11 +424,7 @@ where
         let scanned_cursor = batch.scanned_cursor().clone();
         let mut cx = ConsumeContext::with_capacity(&mut tx, event_count);
 
-        let inputs = batch
-            .into_events()
-            .into_iter()
-            .map(|journaled| P::Input::try_from(journaled.into_event()))
-            .collect::<ProcessorResult<Vec<_>>>()?;
+        let inputs = collect_inputs::<P>(processor_id, batch, event_count)?;
         processor
             .consume_batch(&mut cx, InputBatch::new(inputs))
             .await?;
@@ -438,11 +453,7 @@ where
         let batch = tx.read_after(&cursor, processor.interests()).await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();
-        let inputs = batch
-            .into_events()
-            .into_iter()
-            .map(|journaled| P::Input::try_from(journaled.into_event()))
-            .collect::<ProcessorResult<Vec<_>>>()?;
+        let inputs = collect_inputs::<P>(processor_id, batch, event_count)?;
 
         tx.advance_cursor(&scanned_cursor).await?;
         tx.commit().await?;

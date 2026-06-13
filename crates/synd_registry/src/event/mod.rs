@@ -24,10 +24,11 @@ pub use domain::{
     TimelineEvent, TimelineEventKind, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
 pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
+pub(crate) use processor::skip_permanent_error;
 pub use processor::{
-    ConsumeContext, Consumer, InputBatch, PostCommit, Processor, ProcessorError, ProcessorId,
-    ProcessorInput, ProcessorPhase, ProcessorResult, ReconcileContext, RecordedEvents, Sink,
-    SubscriberScope, Transactional,
+    ClassifyError, ConsumeContext, Consumer, FailureClass, InputBatch, PostCommit, Processor,
+    ProcessorError, ProcessorId, ProcessorInput, ProcessorPhase, ProcessorResult, ReconcileContext,
+    RecordedEvents, Sink, SubscriberScope, Transactional,
 };
 pub(crate) use reconciler::{Reconciler, spawn_reconciler_worker};
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};

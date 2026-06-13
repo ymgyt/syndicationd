@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use synd_feed::feed::service::FeedParseError;
 use synd_feed::types::FeedUrl;
 use thiserror::Error;
+use tracing::warn;
 
 use crate::{
     crawl::{
@@ -40,6 +41,28 @@ pub enum ProcessorError {
     FeedParse(#[from] FeedParseError),
 }
 
+/// Retry behavior for a processor failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FailureClass {
+    Retryable,
+    Permanent,
+}
+
+/// Classifies whether a processor failure should be retried from the same cursor.
+pub trait ClassifyError {
+    fn classify(&self) -> FailureClass;
+}
+
+impl ClassifyError for ProcessorError {
+    fn classify(&self) -> FailureClass {
+        match self {
+            Self::RegistryDb(_) | Self::UnexpectedEvent { .. } | Self::FeedParse(_) => {
+                FailureClass::Permanent
+            }
+        }
+    }
+}
+
 /// Stable identity for an event processor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProcessorId {
@@ -63,6 +86,25 @@ impl ProcessorId {
             Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
         }
+    }
+}
+
+pub(crate) fn skip_permanent_error(
+    processor: ProcessorId,
+    err: ProcessorError,
+    context: &'static str,
+) -> ProcessorResult<()> {
+    match err.classify() {
+        FailureClass::Permanent => {
+            warn!(
+                processor = processor.as_str(),
+                context,
+                error = %err,
+                "registry event processor skipped permanent failure"
+            );
+            Ok(())
+        }
+        FailureClass::Retryable => Err(err),
     }
 }
 
@@ -141,8 +183,11 @@ where
         batch: InputBatch<Self::Input>,
     ) -> impl Future<Output = ProcessorResult<()>> + Send {
         async move {
+            let processor = self.id();
             for input in batch.into_inputs() {
-                self.consume(cx, input).await?;
+                if let Err(err) = self.consume(cx, input).await {
+                    skip_permanent_error(processor, err, "input")?;
+                }
             }
             Ok(())
         }
