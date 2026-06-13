@@ -347,8 +347,8 @@ impl<Term, Sess> Application<Term, Sess> {
 
     fn initial_fetch(&mut self) {
         info!("Initial fetch");
-        if self.drivers.supports_timeline_change_subscription() {
-            self.perform_operation(Operation::StartTimelineChangeSubscription);
+        if self.drivers.supports_feed_event_subscription() {
+            self.perform_operation(Operation::StartFeedEventSubscription);
         }
         self.perform_operation(Operation::FetchInitialFeedView {
             subscriptions_first: self.config.feeds_per_pagination,
@@ -404,7 +404,7 @@ impl<Term, Sess> Application<Term, Sess> {
             Terminal(std::io::Result<CrosstermEvent>),
             Job(anyhow::Result<Event>),
             BackgroundJob(anyhow::Result<Event>),
-            Timeline(payload::TimelineChangeEvent),
+            FeedEvent(payload::FeedEvent),
             Throbber,
             Idle,
         }
@@ -418,7 +418,7 @@ impl<Term, Sess> Application<Term, Sess> {
                     Some(event) = input.next() => PollResult::Terminal(event),
                     Some(event) = pollers.jobs.next() => PollResult::Job(event),
                     Some(event) = pollers.background_jobs.next() => PollResult::BackgroundJob(event),
-                    Some(event) = pollers.timeline_changes.recv() => PollResult::Timeline(event),
+                    Some(event) = pollers.feed_events.recv() => PollResult::FeedEvent(event),
                     ()  = pollers.in_flight.throbber_timer() => PollResult::Throbber,
                     () = &mut *pollers.idle_timer => PollResult::Idle,
                 }
@@ -429,9 +429,14 @@ impl<Term, Sess> Application<Term, Sess> {
                 PollResult::Job(event) | PollResult::BackgroundJob(event) => {
                     self.apply_job_result(event);
                 }
-                PollResult::Timeline(event) => {
-                    self.apply_event(Event::TimelineChanged { event });
-                }
+                PollResult::FeedEvent(event) => match event {
+                    payload::FeedEvent::TimelineChanged(event) => {
+                        self.apply_event(Event::TimelineChanged { event });
+                    }
+                    event => {
+                        debug!(?event, "feed event received");
+                    }
+                },
                 PollResult::Throbber => {
                     self.apply_event(Event::RenderThrobber);
                 }

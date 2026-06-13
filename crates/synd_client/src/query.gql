@@ -55,10 +55,35 @@ query FeedStatus($url: FeedUrl!) {
   }
 }
 
-subscription TimelineChanged {
-  timelineChanged {
-    changedAt
-    affectedFeeds
+subscription FeedEvents {
+  feedEvents {
+    __typename
+    ... on FeedSubscribed {
+      requestId
+      url
+    }
+    ... on FeedSubscribeRejected {
+      requestId
+      url
+      reason
+    }
+    ... on SubscriptionChanged {
+      requestId
+      url
+    }
+    ... on FeedUnsubscribed {
+      requestId
+      url
+    }
+    ... on FeedUnsubscribeRejected {
+      requestId
+      url
+      reason
+    }
+    ... on TimelineChanged {
+      changedAt
+      affectedFeeds
+    }
   }
 }
 

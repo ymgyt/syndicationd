@@ -7,7 +7,7 @@ use crate::{
     job::{JobFuture, Jobs},
 };
 
-use super::timeline::TimelineChangeSubscription;
+use super::feed_events::FeedEventSubscription;
 
 const FOREGROUND_JOB_CONCURRENCY: usize = 90;
 const BACKGROUND_JOB_CONCURRENCY: usize = 10;
@@ -22,7 +22,7 @@ pub(super) struct DriverRuntime {
 pub(in crate::application) struct DriverPollers<'a> {
     pub(in crate::application) jobs: &'a mut Jobs,
     pub(in crate::application) background_jobs: &'a mut Jobs,
-    pub(in crate::application) timeline_changes: &'a mut TimelineChangeSubscription,
+    pub(in crate::application) feed_events: &'a mut FeedEventSubscription,
     pub(in crate::application) in_flight: &'a mut InFlight,
     pub(in crate::application) idle_timer: &'a mut Pin<Box<Sleep>>,
 }

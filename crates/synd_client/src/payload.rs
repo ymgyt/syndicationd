@@ -281,6 +281,54 @@ pub struct FeedStatusResponseData {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "__typename")]
+pub enum FeedEvent {
+    FeedSubscribed(FeedSubscribedEvent),
+    FeedSubscribeRejected(FeedSubscribeRejectedEvent),
+    SubscriptionChanged(SubscriptionChangedEvent),
+    FeedUnsubscribed(FeedUnsubscribedEvent),
+    FeedUnsubscribeRejected(FeedUnsubscribeRejectedEvent),
+    TimelineChanged(TimelineChangeEvent),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedSubscribedEvent {
+    pub request_id: String,
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedSubscribeRejectedEvent {
+    pub request_id: String,
+    pub url: FeedUrl,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionChangedEvent {
+    pub request_id: String,
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedUnsubscribedEvent {
+    pub request_id: String,
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedUnsubscribeRejectedEvent {
+    pub request_id: String,
+    pub url: FeedUrl,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineChangeEvent {
     pub changed_at: String,
@@ -517,5 +565,44 @@ mod requirement_graphql {
             "MAY" => Ok(Some(Requirement::May)),
             value => Err(de::Error::unknown_variant(value, VARIANTS)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::assert_matches;
+
+    use super::FeedEvent;
+
+    #[test]
+    fn decodes_subscription_changed_feed_event() {
+        let event: FeedEvent = serde_json::from_value(serde_json::json!({
+            "__typename": "SubscriptionChanged",
+            "requestId": "request-1",
+            "url": "https://example.com/feed.xml"
+        }))
+        .unwrap();
+
+        let FeedEvent::SubscriptionChanged(event) = event else {
+            panic!("expected subscription changed event");
+        };
+        assert_eq!(event.request_id, "request-1");
+        assert_eq!(event.url.as_ref(), "https://example.com/feed.xml");
+    }
+
+    #[test]
+    fn decodes_timeline_changed_feed_event() {
+        let event: FeedEvent = serde_json::from_value(serde_json::json!({
+            "__typename": "TimelineChanged",
+            "changedAt": "2026-06-13T00:00:00Z",
+            "affectedFeeds": ["https://example.com/feed.xml"]
+        }))
+        .unwrap();
+
+        let FeedEvent::TimelineChanged(event) = event else {
+            panic!("expected timeline changed event");
+        };
+        assert_eq!(event.changed_at, "2026-06-13T00:00:00Z");
+        assert_matches!(event.affected_feeds, Some(feeds) if feeds.len() == 1);
     }
 }

@@ -59,7 +59,7 @@ pub(crate) enum Operation {
         after: Option<String>,
         first: i64,
     },
-    StartTimelineChangeSubscription,
+    StartFeedEventSubscription,
     UnsubscribeFeed {
         url: FeedUrl,
     },

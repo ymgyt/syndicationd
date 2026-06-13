@@ -35,8 +35,8 @@ impl FeedApi for ClientFeedApi {
             .set_credential(credential)
     }
 
-    fn supports_timeline_change_subscription(&self) -> bool {
-        self.client().supports_timeline_change_subscription()
+    fn supports_feed_event_subscription(&self) -> bool {
+        self.client().supports_feed_event_subscription()
     }
 
     fn fetch_initial_feed_view(
@@ -100,11 +100,11 @@ impl FeedApi for ClientFeedApi {
         async move { client.fetch_entries(after, first).await }.boxed()
     }
 
-    fn run_timeline_changes(
+    fn run_feed_events(
         &self,
-        events: mpsc::UnboundedSender<payload::TimelineChangeEvent>,
+        events: mpsc::UnboundedSender<payload::FeedEvent>,
     ) -> BoxFuture<'static, Result<(), SyndApiError>> {
         let client = self.client();
-        async move { client.run_timeline_changes(events).await }.boxed()
+        async move { client.run_feed_events(events).await }.boxed()
     }
 }

@@ -18,6 +18,7 @@ enum FeedEvent {
     SubscriptionChanged(SubscriptionChanged),
     Unsubscribed(FeedUnsubscribed),
     UnsubscribeRejected(FeedUnsubscribeRejected),
+    TimelineChanged(TimelineChanged),
 }
 
 #[derive(SimpleObject)]
@@ -123,68 +124,27 @@ impl RegistrySubscription {
         let subscriber = registry(cx).subscribe_api_events(subscriber_id(cx));
 
         Ok(stream::unfold(subscriber, |mut subscriber| async move {
-            loop {
-                match subscriber.recv().await {
-                    Ok(event) => {
-                        if let Some(event) = feed_event_from_api_event(event) {
-                            return Some((Ok(event), subscriber));
-                        }
-                    }
-                    Err(ApiEventRecvError::Lagged(skipped)) => {
-                        return Some((
-                            Err(async_graphql::Error::new(format!(
-                                "feed event stream lagged by {skipped} messages"
-                            ))),
-                            subscriber,
-                        ));
-                    }
-                    Err(ApiEventRecvError::Closed) => return None,
-                }
-            }
-        }))
-    }
-
-    // async-graphql requires subscription stream resolvers to be async.
-    #[allow(clippy::unused_async)]
-    async fn timeline_changed(
-        &self,
-        cx: &Context<'_>,
-    ) -> Result<impl Stream<Item = Result<TimelineChanged>>> {
-        let subscriber = registry(cx).subscribe_api_events(subscriber_id(cx));
-
-        Ok(stream::unfold(subscriber, |mut subscriber| async move {
-            loop {
-                match subscriber.recv().await {
-                    Ok(ApiEvent::TimelineChanged(event)) => {
-                        return Some((Ok(event.into()), subscriber));
-                    }
-                    Ok(_) => {}
-                    Err(ApiEventRecvError::Lagged(skipped)) => {
-                        return Some((
-                            Err(async_graphql::Error::new(format!(
-                                "timeline change stream lagged by {skipped} messages"
-                            ))),
-                            subscriber,
-                        ));
-                    }
-                    Err(ApiEventRecvError::Closed) => return None,
-                }
+            match subscriber.recv().await {
+                Ok(event) => Some((Ok(feed_event_from_api_event(event)), subscriber)),
+                Err(ApiEventRecvError::Lagged(skipped)) => Some((
+                    Err(async_graphql::Error::new(format!(
+                        "feed event stream lagged by {skipped} messages"
+                    ))),
+                    subscriber,
+                )),
+                Err(ApiEventRecvError::Closed) => None,
             }
         }))
     }
 }
 
-fn feed_event_from_api_event(event: ApiEvent) -> Option<FeedEvent> {
+fn feed_event_from_api_event(event: ApiEvent) -> FeedEvent {
     match event {
-        ApiEvent::FeedSubscribed(event) => Some(FeedEvent::Subscribed(event.into())),
-        ApiEvent::FeedSubscribeRejected(event) => Some(FeedEvent::SubscribeRejected(event.into())),
-        ApiEvent::FeedSubscriptionChanged(event) => {
-            Some(FeedEvent::SubscriptionChanged(event.into()))
-        }
-        ApiEvent::FeedUnsubscribed(event) => Some(FeedEvent::Unsubscribed(event.into())),
-        ApiEvent::FeedUnsubscribeRejected(event) => {
-            Some(FeedEvent::UnsubscribeRejected(event.into()))
-        }
-        ApiEvent::TimelineChanged(_) => None,
+        ApiEvent::FeedSubscribed(event) => FeedEvent::Subscribed(event.into()),
+        ApiEvent::FeedSubscribeRejected(event) => FeedEvent::SubscribeRejected(event.into()),
+        ApiEvent::FeedSubscriptionChanged(event) => FeedEvent::SubscriptionChanged(event.into()),
+        ApiEvent::FeedUnsubscribed(event) => FeedEvent::Unsubscribed(event.into()),
+        ApiEvent::FeedUnsubscribeRejected(event) => FeedEvent::UnsubscribeRejected(event.into()),
+        ApiEvent::TimelineChanged(event) => FeedEvent::TimelineChanged(event.into()),
     }
 }

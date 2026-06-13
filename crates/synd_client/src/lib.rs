@@ -1,8 +1,8 @@
 #![warn(rustdoc::broken_intra_doc_links)]
 
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, path::PathBuf, time::Duration};
 
-use futures_util::{SinkExt, Stream, StreamExt};
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use graphql_client::Response;
 use reqwest::{
     StatusCode,
@@ -19,18 +19,24 @@ use synd_protocol::{
 };
 use synd_support::o11y::{health_check::Health, opentelemetry::extension::*};
 use thiserror::Error;
-use tokio::{net::TcpStream, sync::mpsc};
+#[cfg(unix)]
+use tokio::net::UnixStream;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+    sync::mpsc,
+};
 use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream, connect_async,
-    tungstenite::{Message, client::IntoClientRequest},
+    MaybeTlsStream, WebSocketStream, client_async, connect_async,
+    tungstenite::{Message, client::IntoClientRequest, handshake::client::Request},
 };
 use tracing::Span;
 use tracing::{debug, instrument, warn};
 use url::Url;
 
 use crate::payload::{
-    InitialFeedViewPayload, RefreshFeedPayload, RefreshStatus, SubscribeFeedInput,
-    SubscribeFeedPayload, SubscriptionPayload, TimelineChangeEvent,
+    FeedEvent, InitialFeedViewPayload, RefreshFeedPayload, RefreshStatus, SubscribeFeedInput,
+    SubscribeFeedPayload, SubscriptionPayload,
 };
 
 mod scalar;
@@ -170,11 +176,13 @@ impl ClientAuthentication {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum ClientTransport {
     Tcp,
     #[cfg(unix)]
-    Unix,
+    Unix {
+        socket_path: PathBuf,
+    },
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -228,15 +236,16 @@ impl Client {
         socket_path: impl AsRef<std::path::Path>,
         options: ClientOptions,
     ) -> Result<Self, SyndApiError> {
+        let socket_path = socket_path.as_ref().to_path_buf();
         let client = Self::builder(options)
-            .unix_socket(socket_path.as_ref())
+            .unix_socket(socket_path.clone())
             .build()?;
 
         Ok(Self {
             client,
             endpoint: Url::parse("http://localhost")?,
             authentication: ClientAuthentication::TransportTrusted,
-            transport: ClientTransport::Unix,
+            transport: ClientTransport::Unix { socket_path },
         })
     }
 
@@ -260,8 +269,12 @@ impl Client {
         })
     }
 
-    pub fn supports_timeline_change_subscription(&self) -> bool {
-        self.transport == ClientTransport::Tcp && self.endpoint.scheme() == "http"
+    pub fn supports_feed_event_subscription(&self) -> bool {
+        match &self.transport {
+            ClientTransport::Tcp => self.endpoint.scheme() == "http",
+            #[cfg(unix)]
+            ClientTransport::Unix { .. } => true,
+        }
     }
 
     #[instrument(skip(self))]
@@ -648,29 +661,67 @@ impl Client {
     }
 
     #[instrument(skip(self))]
-    pub async fn next_timeline_change(&self) -> Result<TimelineChangeEvent, SyndApiError> {
-        let mut socket = self.connect_timeline_change_socket().await?;
-        wait_for_timeline_change(&mut socket).await
-    }
-
-    #[instrument(skip(self, events))]
-    pub async fn run_timeline_changes(
-        &self,
-        events: mpsc::UnboundedSender<TimelineChangeEvent>,
-    ) -> Result<(), SyndApiError> {
-        let mut socket = self.connect_timeline_change_socket().await?;
-
-        loop {
-            let event = wait_for_timeline_change(&mut socket).await?;
-            if events.send(event).is_err() {
-                return Ok(());
+    pub async fn next_feed_event(&self) -> Result<FeedEvent, SyndApiError> {
+        match &self.transport {
+            ClientTransport::Tcp => {
+                let mut socket = self.connect_tcp_feed_event_socket().await?;
+                wait_for_feed_event(&mut socket).await
+            }
+            #[cfg(unix)]
+            ClientTransport::Unix { socket_path } => {
+                let mut socket = self.connect_unix_feed_event_socket(socket_path).await?;
+                wait_for_feed_event(&mut socket).await
             }
         }
     }
 
-    async fn connect_timeline_change_socket(
+    #[instrument(skip(self, events))]
+    pub async fn run_feed_events(
+        &self,
+        events: mpsc::UnboundedSender<FeedEvent>,
+    ) -> Result<(), SyndApiError> {
+        match &self.transport {
+            ClientTransport::Tcp => {
+                let socket = self.connect_tcp_feed_event_socket().await?;
+                run_feed_event_socket(socket, events).await
+            }
+            #[cfg(unix)]
+            ClientTransport::Unix { socket_path } => {
+                let socket = self.connect_unix_feed_event_socket(socket_path).await?;
+                run_feed_event_socket(socket, events).await
+            }
+        }
+    }
+
+    async fn connect_tcp_feed_event_socket(
         &self,
     ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, SyndApiError> {
+        let request = self.feed_event_ws_request()?;
+        let (mut socket, _) = connect_async(request)
+            .await
+            .map_err(SyndApiError::WebSocket)?;
+        initialize_feed_event_socket(&mut socket).await?;
+
+        Ok(socket)
+    }
+
+    #[cfg(unix)]
+    async fn connect_unix_feed_event_socket(
+        &self,
+        socket_path: &std::path::Path,
+    ) -> Result<WebSocketStream<UnixStream>, SyndApiError> {
+        let request = self.feed_event_ws_request()?;
+        let stream = UnixStream::connect(socket_path).await.map_err(|err| {
+            SyndApiError::WebSocket(tokio_tungstenite::tungstenite::Error::Io(err))
+        })?;
+        let (mut socket, _) = client_async(request, stream)
+            .await
+            .map_err(SyndApiError::WebSocket)?;
+        initialize_feed_event_socket(&mut socket).await?;
+        Ok(socket)
+    }
+
+    fn feed_event_ws_request(&self) -> Result<Request, SyndApiError> {
         let ws_url = self.graphql_ws_endpoint()?;
         let mut request = ws_url
             .as_str()
@@ -682,30 +733,7 @@ impl Client {
         );
         self.authentication
             .apply_authorization_header(request.headers_mut())?;
-
-        let (mut socket, _) = connect_async(request)
-            .await
-            .map_err(SyndApiError::WebSocket)?;
-
-        socket
-            .send(Message::text(r#"{"type":"connection_init"}"#))
-            .await
-            .map_err(SyndApiError::WebSocket)?;
-        wait_for_connection_ack(&mut socket).await?;
-
-        let subscribe = serde_json::json!({
-            "id": "timelineChanged",
-            "type": "subscribe",
-            "payload": {
-                "query": TIMELINE_CHANGED_SUBSCRIPTION,
-            },
-        });
-        socket
-            .send(Message::text(subscribe.to_string()))
-            .await
-            .map_err(SyndApiError::WebSocket)?;
-
-        Ok(socket)
+        Ok(request)
     }
 
     fn graphql_ws_endpoint(&self) -> Result<Url, SyndApiError> {
@@ -756,7 +784,47 @@ where
     }
 }
 
-async fn wait_for_timeline_change<S>(socket: &mut S) -> Result<TimelineChangeEvent, SyndApiError>
+async fn initialize_feed_event_socket<S>(socket: &mut S) -> Result<(), SyndApiError>
+where
+    S: Sink<Message, Error = tokio_tungstenite::tungstenite::Error>
+        + Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>>
+        + Unpin,
+{
+    socket
+        .send(Message::text(r#"{"type":"connection_init"}"#))
+        .await
+        .map_err(SyndApiError::WebSocket)?;
+    wait_for_connection_ack(socket).await?;
+
+    let subscribe = serde_json::json!({
+        "id": "feedEvents",
+        "type": "subscribe",
+        "payload": {
+            "query": FEED_EVENTS_SUBSCRIPTION,
+        },
+    });
+    socket
+        .send(Message::text(subscribe.to_string()))
+        .await
+        .map_err(SyndApiError::WebSocket)
+}
+
+async fn run_feed_event_socket<S>(
+    mut socket: WebSocketStream<S>,
+    events: mpsc::UnboundedSender<FeedEvent>,
+) -> Result<(), SyndApiError>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    loop {
+        let event = wait_for_feed_event(&mut socket).await?;
+        if events.send(event).is_err() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wait_for_feed_event<S>(socket: &mut S) -> Result<FeedEvent, SyndApiError>
 where
     S: Stream<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
 {
@@ -777,10 +845,10 @@ where
                 }
                 let event = payload
                     .get("data")
-                    .and_then(|data| data.get("timelineChanged"))
+                    .and_then(|data| data.get("feedEvents"))
                     .cloned()
                     .ok_or_else(|| SyndApiError::SubscriptionProtocol {
-                        message: "missing timelineChanged payload".to_owned(),
+                        message: "missing feedEvents payload".to_owned(),
                     })?;
                 let event = serde_json::from_value(event).map_err(SyndApiError::Json)?;
                 return Ok(event);
@@ -840,19 +908,19 @@ mod tests {
     };
 
     #[test]
-    fn tcp_client_supports_timeline_change_subscription_for_plain_http() {
+    fn tcp_client_supports_feed_event_subscription_for_plain_http() {
         let client =
             Client::new(url::Url::parse("http://127.0.0.1:8080").unwrap(), options()).unwrap();
 
-        assert!(client.supports_timeline_change_subscription());
+        assert!(client.supports_feed_event_subscription());
     }
 
     #[cfg(unix)]
     #[test]
-    fn unix_client_does_not_support_timeline_change_subscription_yet() {
+    fn unix_client_supports_feed_event_subscription() {
         let client = Client::new_unix("/tmp/synd-client-test.sock", options()).unwrap();
 
-        assert!(!client.supports_timeline_change_subscription());
+        assert!(client.supports_feed_event_subscription());
     }
 
     #[test]
@@ -1134,11 +1202,36 @@ mutation RefreshFeed($input: RefreshFeedInput!) {
 }
 ";
 
-const TIMELINE_CHANGED_SUBSCRIPTION: &str = r"
-subscription TimelineChanged {
-  timelineChanged {
-    changedAt
-    affectedFeeds
+const FEED_EVENTS_SUBSCRIPTION: &str = r"
+subscription FeedEvents {
+  feedEvents {
+    __typename
+    ... on FeedSubscribed {
+      requestId
+      url
+    }
+    ... on FeedSubscribeRejected {
+      requestId
+      url
+      reason
+    }
+    ... on SubscriptionChanged {
+      requestId
+      url
+    }
+    ... on FeedUnsubscribed {
+      requestId
+      url
+    }
+    ... on FeedUnsubscribeRejected {
+      requestId
+      url
+      reason
+    }
+    ... on TimelineChanged {
+      changedAt
+      affectedFeeds
+    }
   }
 }
 ";

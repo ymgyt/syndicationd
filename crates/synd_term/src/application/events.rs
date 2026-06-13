@@ -27,7 +27,7 @@ impl<Term, Sess> Application<Term, Sess> {
             }
             Event::CredentialRefreshed { credential } => {
                 self.set_credential(credential);
-                if self.drivers.restart_timeline_changes_if_running() {
+                if self.drivers.restart_feed_events_if_running() {
                     let operations = self.components.mark_timeline_dirty();
                     self.perform_operations(operations);
                 }

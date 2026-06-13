@@ -20,21 +20,21 @@ mod adapters;
 mod auth;
 mod dispatcher;
 mod feed;
+mod feed_events;
 mod github;
 mod interaction;
 mod runtime;
-mod timeline;
 
 use adapters::DriverAdapters;
 use dispatcher::OperationDispatcher;
+use feed_events::FeedEventSubscription;
 use runtime::{DriverPollers, DriverRuntime};
-use timeline::TimelineChangeSubscription;
 
 /// Facade over outside-world adapters, execution machinery, and operation routing.
 pub(super) struct Drivers {
     adapters: DriverAdapters,
     runtime: DriverRuntime,
-    timeline_changes: TimelineChangeSubscription,
+    feed_events: FeedEventSubscription,
     operation_dispatcher: OperationDispatcher,
 }
 
@@ -54,7 +54,7 @@ pub(super) struct DriverParts {
 pub(super) struct DriverContext<'a> {
     adapters: &'a mut DriverAdapters,
     runtime: &'a mut DriverRuntime,
-    timeline_changes: &'a mut TimelineChangeSubscription,
+    feed_events: &'a mut FeedEventSubscription,
 }
 
 impl Drivers {
@@ -84,7 +84,7 @@ impl Drivers {
                 clock,
             }),
             runtime: DriverRuntime::new(throbber_timer_interval, idle_timer_interval),
-            timeline_changes: TimelineChangeSubscription::new(),
+            feed_events: FeedEventSubscription::new(),
             operation_dispatcher: OperationDispatcher::new(),
         }
     }
@@ -99,7 +99,7 @@ impl Drivers {
         DriverPollers {
             jobs: &mut self.runtime.jobs,
             background_jobs: &mut self.runtime.background_jobs,
-            timeline_changes: &mut self.timeline_changes,
+            feed_events: &mut self.feed_events,
             in_flight: &mut self.runtime.in_flight,
             idle_timer: &mut self.runtime.idle_timer,
         }
@@ -158,15 +158,13 @@ impl Drivers {
         self.adapters.feed_api_session.requires_user_credential()
     }
 
-    pub(super) fn supports_timeline_change_subscription(&self) -> bool {
-        self.adapters
-            .feed_api
-            .supports_timeline_change_subscription()
+    pub(super) fn supports_feed_event_subscription(&self) -> bool {
+        self.adapters.feed_api.supports_feed_event_subscription()
     }
 
-    pub(super) fn restart_timeline_changes_if_running(&mut self) -> bool {
+    pub(super) fn restart_feed_events_if_running(&mut self) -> bool {
         let feed_api = self.adapters.feed_api.clone();
-        self.timeline_changes.restart_if_running(feed_api)
+        self.feed_events.restart_if_running(feed_api)
     }
 
     pub(super) fn load_gh_notification_filter_options(
@@ -196,7 +194,7 @@ impl Drivers {
     }
 
     pub(super) fn shutdown(&mut self) {
-        self.timeline_changes.stop();
+        self.feed_events.stop();
     }
 
     #[cfg(feature = "integration")]
@@ -213,7 +211,7 @@ impl Drivers {
         DriverContext {
             adapters: &mut self.adapters,
             runtime: &mut self.runtime,
-            timeline_changes: &mut self.timeline_changes,
+            feed_events: &mut self.feed_events,
         }
     }
 }

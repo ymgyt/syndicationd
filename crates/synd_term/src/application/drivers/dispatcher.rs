@@ -1,8 +1,8 @@
 use crate::{event::Event, operation::Operation};
 
 use super::{
-    DriverContext, auth::AuthDriver, feed::FeedDriver, github::GitHubDriver,
-    interaction::InteractionDriver, timeline::TimelineDriver,
+    DriverContext, auth::AuthDriver, feed::FeedDriver, feed_events::FeedEventDriver,
+    github::GitHubDriver, interaction::InteractionDriver,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -61,9 +61,7 @@ impl OperationDispatcher {
                 after,
                 first,
             } => FeedDriver::fetch_entries(cx, populate, after, first, true),
-            Operation::StartTimelineChangeSubscription => {
-                TimelineDriver::start_change_subscription(cx)
-            }
+            Operation::StartFeedEventSubscription => FeedEventDriver::start_subscription(cx),
             Operation::UnsubscribeFeed { url } => FeedDriver::unsubscribe_feed(cx, url),
             Operation::ScheduleFeedViewSync => FeedDriver::schedule_feed_view_sync(cx),
             Operation::ScheduleTimelineReload => FeedDriver::schedule_timeline_reload(cx),

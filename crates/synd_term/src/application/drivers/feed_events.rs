@@ -8,15 +8,15 @@ use crate::application::FeedApiRef;
 use super::DriverContext;
 use tracing::{debug, warn};
 
-const TIMELINE_CHANGE_RECONNECT_DELAY: Duration = Duration::from_secs(2);
+const FEED_EVENT_RECONNECT_DELAY: Duration = Duration::from_secs(2);
 
-/// Running GraphQL timeline change subscription and its event receiver.
-pub(in crate::application) struct TimelineChangeSubscription {
-    rx: mpsc::UnboundedReceiver<payload::TimelineChangeEvent>,
+/// Running GraphQL feed event subscription and its event receiver.
+pub(in crate::application) struct FeedEventSubscription {
+    rx: mpsc::UnboundedReceiver<payload::FeedEvent>,
     task: Option<JoinHandle<()>>,
 }
 
-impl TimelineChangeSubscription {
+impl FeedEventSubscription {
     pub(super) fn new() -> Self {
         let (_tx, rx) = mpsc::unbounded_channel();
         Self { rx, task: None }
@@ -35,15 +35,15 @@ impl TimelineChangeSubscription {
                     break;
                 }
 
-                match feed_api.run_timeline_changes(tx.clone()).await {
-                    Ok(()) => debug!("timeline change subscription stopped"),
-                    Err(error) => warn!("timeline change subscription failed: {error}"),
+                match feed_api.run_feed_events(tx.clone()).await {
+                    Ok(()) => debug!("feed event subscription stopped"),
+                    Err(error) => warn!("feed event subscription failed: {error}"),
                 }
 
                 if tx.is_closed() {
                     break;
                 }
-                tokio::time::sleep(TIMELINE_CHANGE_RECONNECT_DELAY).await;
+                tokio::time::sleep(FEED_EVENT_RECONNECT_DELAY).await;
             }
         }));
     }
@@ -65,19 +65,17 @@ impl TimelineChangeSubscription {
         true
     }
 
-    pub(in crate::application) async fn recv(&mut self) -> Option<payload::TimelineChangeEvent> {
+    pub(in crate::application) async fn recv(&mut self) -> Option<payload::FeedEvent> {
         self.rx.recv().await
     }
 }
 
-pub(super) struct TimelineDriver;
+pub(super) struct FeedEventDriver;
 
-impl TimelineDriver {
-    pub(super) fn start_change_subscription(
-        cx: &mut DriverContext<'_>,
-    ) -> Vec<crate::event::Event> {
+impl FeedEventDriver {
+    pub(super) fn start_subscription(cx: &mut DriverContext<'_>) -> Vec<crate::event::Event> {
         let feed_api = cx.adapters.feed_api.clone();
-        cx.timeline_changes.start(feed_api);
+        cx.feed_events.start(feed_api);
         Vec::new()
     }
 }

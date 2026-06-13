@@ -11,7 +11,7 @@ pub type FeedApiRef = Arc<dyn FeedApi>;
 pub trait FeedApi: Send + Sync + 'static {
     fn set_credential(&self, credential: ApiCredential) -> Result<(), SyndApiError>;
 
-    fn supports_timeline_change_subscription(&self) -> bool;
+    fn supports_feed_event_subscription(&self) -> bool;
 
     fn fetch_initial_feed_view(
         &self,
@@ -48,8 +48,8 @@ pub trait FeedApi: Send + Sync + 'static {
         first: i64,
     ) -> BoxFuture<'static, Result<payload::FetchEntriesPayload, SyndApiError>>;
 
-    fn run_timeline_changes(
+    fn run_feed_events(
         &self,
-        events: mpsc::UnboundedSender<payload::TimelineChangeEvent>,
+        events: mpsc::UnboundedSender<payload::FeedEvent>,
     ) -> BoxFuture<'static, Result<(), SyndApiError>>;
 }

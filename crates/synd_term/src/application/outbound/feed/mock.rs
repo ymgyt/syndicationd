@@ -15,26 +15,26 @@ pub enum MockFeedApiResponse {
     RefreshFeed(Result<payload::RefreshFeedPayload, SyndApiError>),
     FeedStatus(Result<payload::RefreshStatus, SyndApiError>),
     Entries(Result<payload::FetchEntriesPayload, SyndApiError>),
-    TimelineChanges(Result<Vec<payload::TimelineChangeEvent>, SyndApiError>),
+    FeedEvents(Result<Vec<payload::FeedEvent>, SyndApiError>),
 }
 
 /// In-memory `FeedApi` implementation for terminal workflow tests.
 pub struct MockFeedApi {
     responses: Mutex<VecDeque<MockFeedApiResponse>>,
-    supports_timeline_change_subscription: bool,
+    supports_feed_event_subscription: bool,
 }
 
 impl MockFeedApi {
     pub fn new(responses: impl IntoIterator<Item = MockFeedApiResponse>) -> Self {
         Self {
             responses: Mutex::new(responses.into_iter().collect()),
-            supports_timeline_change_subscription: false,
+            supports_feed_event_subscription: false,
         }
     }
 
     #[must_use]
-    pub fn with_timeline_change_subscription(mut self) -> Self {
-        self.supports_timeline_change_subscription = true;
+    pub fn with_feed_event_subscription(mut self) -> Self {
+        self.supports_feed_event_subscription = true;
         self
     }
 
@@ -60,8 +60,8 @@ impl FeedApi for MockFeedApi {
         Ok(())
     }
 
-    fn supports_timeline_change_subscription(&self) -> bool {
-        self.supports_timeline_change_subscription
+    fn supports_feed_event_subscription(&self) -> bool {
+        self.supports_feed_event_subscription
     }
 
     fn fetch_initial_feed_view(
@@ -148,20 +148,20 @@ impl FeedApi for MockFeedApi {
         future::ready(result).boxed()
     }
 
-    fn run_timeline_changes(
+    fn run_feed_events(
         &self,
-        events: mpsc::UnboundedSender<payload::TimelineChangeEvent>,
+        events: mpsc::UnboundedSender<payload::FeedEvent>,
     ) -> BoxFuture<'static, Result<(), SyndApiError>> {
         let result = match self.pop_response() {
-            Ok(MockFeedApiResponse::TimelineChanges(Ok(changes))) => {
-                for event in changes {
+            Ok(MockFeedApiResponse::FeedEvents(Ok(feed_events))) => {
+                for event in feed_events {
                     if events.send(event).is_err() {
                         break;
                     }
                 }
                 Ok(())
             }
-            Ok(MockFeedApiResponse::TimelineChanges(Err(err))) | Err(err) => Err(err),
+            Ok(MockFeedApiResponse::FeedEvents(Err(err))) | Err(err) => Err(err),
             Ok(_) => Err(Self::mismatch()),
         };
         future::ready(result).boxed()
