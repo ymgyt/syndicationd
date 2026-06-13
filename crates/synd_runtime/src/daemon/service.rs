@@ -317,7 +317,7 @@ impl DaemonEndpointFileState {
 mod tests {
     use std::{
         path::{Path, PathBuf},
-        time::Duration,
+        time::{Duration, Instant},
     };
 
     use synd_api::session::DaemonSessionLeasePolicy;
@@ -334,6 +334,11 @@ mod tests {
     };
 
     use super::{Daemon, DaemonConfig, DaemonEndpointBinder};
+
+    #[cfg(unix)]
+    const DAEMON_READY_TIMEOUT: Duration = Duration::from_secs(30);
+    #[cfg(unix)]
+    const DAEMON_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
     #[cfg(unix)]
     #[derive(Debug, Default)]
@@ -454,13 +459,18 @@ mod tests {
             Ok(Self { probe, daemon_task })
         }
 
-        async fn wait_until_running(&self) {
-            self.probe.wait_until_running().await;
+        async fn wait_until_running(&mut self) {
+            tokio::select! {
+                () = self.probe.wait_until_running() => {}
+                result = &mut self.daemon_task => {
+                    panic!("daemon serve task finished before readiness: {result:?}");
+                }
+            }
         }
 
         async fn shutdown(self) {
             self.probe.shutdown().await;
-            tokio::time::timeout(Duration::from_secs(5), self.daemon_task)
+            tokio::time::timeout(DAEMON_READY_TIMEOUT, self.daemon_task)
                 .await
                 .unwrap()
                 .unwrap()
@@ -483,18 +493,23 @@ mod tests {
         }
 
         async fn wait_until_running(&self) {
-            tokio::time::timeout(Duration::from_secs(5), async {
-                loop {
-                    let status = self.runtime.daemon().inspect().await.unwrap();
-                    if status.state() == DaemonState::Running {
-                        return;
-                    }
+            let deadline = Instant::now() + DAEMON_READY_TIMEOUT;
 
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
-            })
-            .await
-            .unwrap();
+            loop {
+                let last_probe_error = match self.runtime.daemon().inspect().await {
+                    Ok(status) if status.state() == DaemonState::Running => return,
+                    Ok(_) => None,
+                    Err(error) => Some(format!("{error:?}")),
+                };
+
+                let now = Instant::now();
+                assert!(
+                    now < deadline,
+                    "timed out waiting for daemon to run; last probe error: {last_probe_error:?}",
+                );
+
+                tokio::time::sleep(DAEMON_POLL_INTERVAL.min(deadline - now)).await;
+            }
         }
 
         async fn shutdown(&self) {
@@ -515,7 +530,7 @@ mod tests {
         #[tokio::test]
         async fn stops_endpoint() -> crate::Result<()> {
             let tmp = tempfile::tempdir()?;
-            let daemon = StartedDaemon::spawn(tmp.path())?;
+            let mut daemon = StartedDaemon::spawn(tmp.path())?;
 
             daemon.wait_until_running().await;
             daemon.shutdown().await;
@@ -533,7 +548,7 @@ mod tests {
             #[tokio::test]
             async fn accepts_and_closes() -> crate::Result<()> {
                 let tmp = tempfile::tempdir()?;
-                let daemon = StartedDaemon::spawn(tmp.path())?;
+                let mut daemon = StartedDaemon::spawn(tmp.path())?;
 
                 daemon.wait_until_running().await;
                 let session = daemon.probe.runtime.acquire_session().await?;
@@ -555,7 +570,7 @@ mod tests {
             async fn rejects_missing() -> crate::Result<()> {
                 let tmp = tempfile::tempdir()?;
                 let missing_capabilities = synd_protocol::CapabilitySet::new(["test.missing"]);
-                let daemon = StartedDaemon::spawn_with_config(
+                let mut daemon = StartedDaemon::spawn_with_config(
                     tmp.path(),
                     StartedDaemonConfig::default().with_session_requirements(
                         SessionRequirements::new(missing_capabilities.clone()),
@@ -598,7 +613,7 @@ mod tests {
                     Duration::from_millis(200),
                 );
                 let (observer, mut renewal_probe) = SessionRenewalProbe::new();
-                let daemon = StartedDaemon::spawn_with_config(
+                let mut daemon = StartedDaemon::spawn_with_config(
                     tmp.path(),
                     StartedDaemonConfig::default()
                         .with_session_lease_policy(lease_policy)

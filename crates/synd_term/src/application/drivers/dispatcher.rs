@@ -62,6 +62,10 @@ impl OperationDispatcher {
                 first,
             } => FeedDriver::fetch_entries(cx, populate, after, first, true),
             Operation::StartFeedEventSubscription => FeedEventDriver::start_subscription(cx),
+            Operation::ScheduleFeedViewReload {
+                feeds_first,
+                entries_first,
+            } => FeedDriver::schedule_feed_view_reload(cx, feeds_first, entries_first),
             Operation::UnsubscribeFeed { url } => FeedDriver::unsubscribe_feed(cx, url),
             Operation::ScheduleFeedViewSync => FeedDriver::schedule_feed_view_sync(cx),
             Operation::ScheduleTimelineReload => FeedDriver::schedule_timeline_reload(cx),

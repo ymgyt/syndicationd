@@ -16,7 +16,7 @@ use crate::{
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
-    event::JournalTx,
+    event::{JournalAppendTx, JournalTx},
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
     query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
@@ -25,15 +25,15 @@ use crate::{
 
 /// Opens registry database transactions.
 pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
-    type Tx<'a>: RegistryTx + JournalTx + CommitTx + Send
+    type Tx<'a>: JournalTx + JournalAppendTx + CommitTx + Send
     where
         Self: 'a;
 
     fn begin(&self) -> impl Future<Output = Result<Self::Tx<'_>, RegistryDbError>> + Send;
 }
 
-/// Transactional registry-domain operations.
-pub trait RegistryTx {
+/// Transactional operations over feed subscription state.
+pub trait SubscriptionTx {
     fn upsert_feed_endpoint(
         &mut self,
         feed_url: &FeedUrl,
@@ -64,16 +64,14 @@ pub trait RegistryTx {
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    fn list_timeline_items(
-        &mut self,
-        query: TimelineItemsQuery,
-    ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send;
-
     fn load_feed_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send;
+}
 
+/// Transactional operations over crawl target state.
+pub trait CrawlTargetTx {
     fn upsert_crawl_target(
         &mut self,
         target: &CrawlTarget,
@@ -180,8 +178,13 @@ pub trait EntryProjectionTx {
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }
 
-/// Transactional operations for applying timeline membership.
-pub trait TimelineProjectionTx {
+/// Transactional operations for reading and applying timeline membership.
+pub trait TimelineTx {
+    fn list_timeline_items(
+        &mut self,
+        query: TimelineItemsQuery,
+    ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send;
+
     fn ensure_default_timeline(
         &mut self,
         timeline: &TimelineKey,

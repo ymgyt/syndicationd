@@ -1,47 +1,56 @@
-use chrono::Utc;
+use std::sync::Arc;
+
+use synd_support::time::{Clock, SystemClock};
 
 use crate::{
     crawl::{
         job::EnqueueCrawlJobOutcome,
         schedule::{CrawlScheduleCandidate, CrawlSchedulingEngine},
     },
-    db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb},
+    db::{CommitTx, CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb},
     event::{
-        CrawlEventKind, EventInterests, ReconcileContext, Reconciler, Trigger, WorkerId,
-        WorkerResult,
+        CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
+        Event, EventInterests, EventRecorder, EventWorker, JournalAppendTx, JournalTx,
+        ReconcileContext, RecordedEvents, RegistryEvent, Trigger, WorkerId, WorkerResult,
     },
 };
 
 const DEFAULT_BATCH_SIZE: usize = 100;
 
 /// Reconciles crawl scheduling state from durable registry state.
-#[derive(Debug, Clone)]
-pub struct CrawlScheduler {
+#[derive(Clone)]
+pub struct CrawlScheduler<S> {
+    db: S,
     batch_size: usize,
+    clock: Arc<dyn Clock>,
 }
 
-impl CrawlScheduler {
-    pub fn new() -> Self {
+impl<S> CrawlScheduler<S> {
+    pub fn new(db: S) -> Self {
+        Self::with_clock(db, Arc::new(SystemClock))
+    }
+
+    pub fn with_clock(db: S, clock: Arc<dyn Clock>) -> Self {
         Self {
+            db,
             batch_size: DEFAULT_BATCH_SIZE,
+            clock,
         }
     }
 
-    pub fn with_batch_size(batch_size: usize) -> Self {
-        Self { batch_size }
+    pub fn with_batch_size(db: S, clock: Arc<dyn Clock>, batch_size: usize) -> Self {
+        Self {
+            db,
+            batch_size,
+            clock,
+        }
     }
 }
 
-impl Default for CrawlScheduler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<S> Reconciler<S> for CrawlScheduler
+impl<S> EventWorker for CrawlScheduler<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx,
+    for<'tx> S::Tx<'tx>: CrawlScheduleTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
 {
     fn id(&self) -> WorkerId {
         WorkerId::CrawlScheduler
@@ -49,41 +58,48 @@ where
 
     fn interests(&self) -> EventInterests {
         EventInterests::new([
-            CrawlEventKind::TargetActivated.into(),
-            CrawlEventKind::TargetPolicyChanged.into(),
-            CrawlEventKind::TargetDeactivated.into(),
+            CrawlTargetActivatedEvent::TYPE,
+            CrawlTargetPolicyChangedEvent::TYPE,
+            CrawlTargetDeactivatedEvent::TYPE,
         ])
     }
 
-    async fn reconcile(
-        &mut self,
-        cx: &mut ReconcileContext<'_, S::Tx<'_>>,
-        _trigger: Trigger,
-    ) -> WorkerResult<()> {
-        let now = Utc::now();
+    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
+        let now = self.clock.now();
+        let mut tx = self.db.begin().await?;
+        let mut cx = ReconcileContext::new(&mut tx);
         let mut engine = CrawlSchedulingEngine::new(now);
         let candidates = cx.list_candidates(now, self.batch_size).await?;
+        let mut produced = Vec::new();
 
         for candidate in candidates {
-            self.apply_reconciliation(cx, &mut engine, candidate)
-                .await?;
+            produced.extend(
+                self.apply_reconciliation(&mut cx, &mut engine, candidate)
+                    .await?,
+            );
         }
 
-        Ok(())
+        let mut recorded = RecordedEvents::with_capacity(produced.len());
+        EventRecorder::new(&mut tx, &mut recorded, self.clock.as_ref())
+            .record_all(produced)
+            .await?;
+        tx.commit().await?;
+        Ok(recorded)
     }
 }
 
-impl CrawlScheduler {
+impl<S> CrawlScheduler<S> {
     async fn apply_reconciliation<Tx>(
         &self,
         cx: &mut ReconcileContext<'_, Tx>,
         engine: &mut CrawlSchedulingEngine,
         candidate: CrawlScheduleCandidate,
-    ) -> WorkerResult<()>
+    ) -> WorkerResult<Vec<Event>>
     where
-        Tx: CrawlScheduleTx + CrawlJobQueueTx + crate::event::JournalTx + Send,
+        Tx: CrawlScheduleTx + CrawlJobQueueTx + Send,
     {
         let reconciliation = engine.reconcile(&candidate);
+        let mut events = Vec::new();
 
         if let Some(schedule) = reconciliation.schedule {
             cx.upsert_schedule(schedule).await?;
@@ -91,11 +107,13 @@ impl CrawlScheduler {
 
         if let Some(job) = reconciliation.job {
             let mut queue = cx.crawl_job_queue();
-            match queue.enqueue(job).await? {
+            let (outcome, mut produced) = queue.enqueue(job).await?;
+            events.append(&mut produced);
+            match outcome {
                 EnqueueCrawlJobOutcome::Enqueued(_) | EnqueueCrawlJobOutcome::AlreadyActive => {}
             }
         }
 
-        Ok(())
+        Ok(events)
     }
 }

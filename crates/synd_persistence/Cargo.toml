@@ -16,7 +16,6 @@ version     = "0.1.0"
 synd-feed     = { path = "../synd_feed", version = "0.3.5", features = ["sqlx"] }
 synd-registry = { path = "../synd_registry", version = "0.1.0" }
 
-anyhow     = { workspace = true }
 chrono     = { workspace = true }
 serde      = { workspace = true }
 serde_json = { workspace = true }
@@ -27,6 +26,8 @@ tracing    = { workspace = true }
 zstd       = { workspace = true }
 
 [dev-dependencies]
+anyhow       = { workspace = true }
+synd-support = { path = "../synd_support", version = "0.1.0" }
 tempfile   = { workspace = true }
 tokio      = { workspace = true, features = ["macros", "rt"] }
 tokio-util = { workspace = true }

@@ -156,6 +156,10 @@ impl FeedsComponent {
         vec![
             Self::reload_subscription(feeds_first),
             Self::reload_entries(entries_first),
+            Operation::ScheduleFeedViewReload {
+                feeds_first,
+                entries_first,
+            },
         ]
     }
 

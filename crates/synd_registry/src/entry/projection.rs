@@ -1,5 +1,5 @@
-use anyhow::anyhow;
 use bon::Builder;
+use chrono::{DateTime, Utc};
 use synd_feed::feed::service::FeedService;
 use synd_feed::types::FeedUrl;
 
@@ -9,9 +9,9 @@ use crate::{
     entry::{EntryAppearances, EntryChange, EntryChanges, EntryReconciliation, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
     event::{
-        ConsumeContext, Consumer, EntryChangedEvent, EntryDiscoveredEvent, Event, EventInterests,
-        FeedChangedEvent, FeedDiscoveredEvent, FeedEvent, FeedEventKind, JournalTx, Processor,
-        ProcessorError, ProcessorId, ProcessorResult, RecordedEvents, Transactional,
+        ConsumeContext, Consumer, ConsumerInput, EntryChangedEvent, EntryDiscoveredEvent, Event,
+        EventType, FeedChangedEvent, FeedDiscoveredEvent, Processor, ProcessorError, ProcessorId,
+        ProcessorResult, RegistryEvent,
     },
     feed::FeedSource,
 };
@@ -41,17 +41,17 @@ impl From<FeedChangedEvent> for EntryProjectionInput {
     }
 }
 
-impl TryFrom<Event> for EntryProjectionInput {
-    type Error = ProcessorError;
+impl ConsumerInput for EntryProjectionInput {
+    const INTERESTS: &'static [EventType] = &[FeedDiscoveredEvent::TYPE, FeedChangedEvent::TYPE];
 
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
+    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
-            Event::Feed(FeedEvent::Discovered(event)) => Ok(event.into()),
-            Event::Feed(FeedEvent::Changed(event)) => Ok(event.into()),
-            event => Err(ProcessorError::UnexpectedEvent {
-                expected: "entry projection event",
-                actual: event.kind(),
-            }),
+            Event::FeedDiscovered(event) => Ok(event.into()),
+            Event::FeedChanged(event) => Ok(event.into()),
+            event => Err(ProcessorError::unexpected_input(
+                "entry projection event",
+                &event,
+            )),
         }
     }
 }
@@ -75,30 +75,22 @@ impl Default for EntryProj {
 
 impl Processor for EntryProj {
     type Input = EntryProjectionInput;
-    type Phase = Transactional;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::EntryProjection
-    }
-
-    fn interests(&self) -> EventInterests {
-        EventInterests::new([
-            FeedEventKind::Discovered.into(),
-            FeedEventKind::Changed.into(),
-        ])
     }
 }
 
 impl<S> Consumer<S> for EntryProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + EntryProjectionTx + JournalTx + Send,
+    for<'tx> S::Tx<'tx>: BlobStoreTx + EntryProjectionTx + Send,
 {
     async fn consume(
         &mut self,
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> ProcessorResult<()> {
+    ) -> ProcessorResult<Vec<Event>> {
         let mut pj = cx.entry_projection();
         let source = pj.load_source(&input).await?;
         let body = pj.load_body(&source).await?;
@@ -106,27 +98,25 @@ where
         let appearances = EntryAppearances::from_feed(&feed);
         let existing = pj.load_entries(&source, &appearances).await?;
         let changes = EntryReconciliation::new(source, appearances, existing).reconcile();
-        pj.apply_entry_changes(changes).await?;
-        Ok(())
+        pj.apply_entry_changes(changes).await.map_err(Into::into)
     }
 }
 
 /// Transaction-scoped operations for projecting feed entries.
 pub struct EntryProjectionScope<'a, Tx> {
     tx: &'a mut Tx,
-    recorded: &'a mut RecordedEvents,
 }
 
 impl<'a, Tx> EntryProjectionScope<'a, Tx> {
     /// Creates a projection scope inside one open registry transaction.
-    pub fn new(tx: &'a mut Tx, recorded: &'a mut RecordedEvents) -> Self {
-        Self { tx, recorded }
+    pub fn new(tx: &'a mut Tx) -> Self {
+        Self { tx }
     }
 }
 
 impl<Tx> EntryProjectionScope<'_, Tx>
 where
-    Tx: BlobStoreTx + EntryProjectionTx + JournalTx + Send,
+    Tx: BlobStoreTx + EntryProjectionTx + Send,
 {
     /// Returns the accepted feed source behind a feed lifecycle event.
     pub async fn load_source(
@@ -134,16 +124,15 @@ where
         input: &EntryProjectionInput,
     ) -> RegistryDbResult<FeedSource> {
         let Some(source) = self.tx.load_entry_source(&input.crawl_job_id).await? else {
-            return Err(RegistryDbError::internal(anyhow!(
+            return Err(RegistryDbError::internal_message(format!(
                 "entry projection source not found for crawl job {}",
                 input.crawl_job_id
             )));
         };
         if source.feed_url != input.feed_url {
-            return Err(RegistryDbError::internal(anyhow!(
+            return Err(RegistryDbError::internal_message(format!(
                 "entry projection source feed URL mismatch: event={}, source={}",
-                input.feed_url,
-                source.feed_url
+                input.feed_url, source.feed_url
             )));
         }
         Ok(source)
@@ -164,25 +153,14 @@ where
         self.tx.load_entries(&source.feed_url, &entry_ids).await
     }
 
-    /// Applies reconciled entry changes and records entry lifecycle events.
-    pub async fn apply_entry_changes(&mut self, changes: EntryChanges) -> RegistryDbResult<()> {
+    /// Applies reconciled entry changes and returns entry lifecycle events.
+    pub async fn apply_entry_changes(
+        &mut self,
+        changes: EntryChanges,
+    ) -> RegistryDbResult<Vec<Event>> {
         let events = entry_events(&changes);
         self.tx.apply_entry_changes(changes).await?;
-        for event in events {
-            self.record_event(event).await?;
-        }
-        Ok(())
-    }
-
-    async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        let kind = event.kind();
-        self.tx.append_event(event).await?;
-        self.recorded.push(kind);
-        Ok(())
+        Ok(events)
     }
 }
 

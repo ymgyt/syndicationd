@@ -1,13 +1,18 @@
 use std::fmt;
 
+use chrono::{DateTime, Utc};
 use tokio::sync::broadcast;
 use tracing::debug;
 
 use crate::{
     SubscriberId,
+    api::{
+        ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
+        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
+    },
     event::{
-        ApiEvent, ApiEventKind, Event, EventInterests, PostCommit, Processor, ProcessorError,
-        ProcessorId, ProcessorResult, Sink,
+        ConsumerInput, Event, EventType, Processor, ProcessorError, ProcessorId, ProcessorResult,
+        RegistryEvent, Sink,
     },
 };
 
@@ -56,21 +61,9 @@ impl Default for ApiEventPublisher {
 
 impl Processor for ApiEventPublisher {
     type Input = ApiEvent;
-    type Phase = PostCommit;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::ApiEventPublisher
-    }
-
-    fn interests(&self) -> EventInterests {
-        EventInterests::new([
-            ApiEventKind::FeedSubscribed.into(),
-            ApiEventKind::FeedSubscribeRejected.into(),
-            ApiEventKind::FeedSubscriptionChanged.into(),
-            ApiEventKind::FeedUnsubscribed.into(),
-            ApiEventKind::FeedUnsubscribeRejected.into(),
-            ApiEventKind::TimelineChanged.into(),
-        ])
     }
 }
 
@@ -82,16 +75,25 @@ impl Sink for ApiEventPublisher {
     }
 }
 
-impl TryFrom<Event> for ApiEvent {
-    type Error = ProcessorError;
+impl ConsumerInput for ApiEvent {
+    const INTERESTS: &'static [EventType] = &[
+        ApiFeedSubscribed::TYPE,
+        ApiFeedSubscribeRejected::TYPE,
+        ApiFeedSubscriptionChanged::TYPE,
+        ApiFeedUnsubscribed::TYPE,
+        ApiFeedUnsubscribeRejected::TYPE,
+        ApiTimelineChanged::TYPE,
+    ];
 
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
+    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
-            Event::Api(event) => Ok(event),
-            event => Err(ProcessorError::UnexpectedEvent {
-                expected: "api event",
-                actual: event.kind(),
-            }),
+            Event::ApiFeedSubscribed(event) => Ok(Self::FeedSubscribed(event)),
+            Event::ApiFeedSubscribeRejected(event) => Ok(Self::FeedSubscribeRejected(event)),
+            Event::ApiFeedSubscriptionChanged(event) => Ok(Self::FeedSubscriptionChanged(event)),
+            Event::ApiFeedUnsubscribed(event) => Ok(Self::FeedUnsubscribed(event)),
+            Event::ApiFeedUnsubscribeRejected(event) => Ok(Self::FeedUnsubscribeRejected(event)),
+            Event::ApiTimelineChanged(event) => Ok(Self::TimelineChanged(event)),
+            event => Err(ProcessorError::unexpected_input("api event", &event)),
         }
     }
 }

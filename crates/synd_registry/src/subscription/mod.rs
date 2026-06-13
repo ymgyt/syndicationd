@@ -8,7 +8,10 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::crawl::policy::CrawlPolicy;
 
+pub mod projection;
 pub mod query;
+
+pub use projection::{SubRequestInput, SubRequestProj};
 
 /// Opaque registry identity that owns subscriptions.
 ///

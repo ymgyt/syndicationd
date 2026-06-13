@@ -12,12 +12,12 @@ use crate::{
         schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
-    db::{CrawlJobQueueTx, CrawlScheduleTx, FeedRegistryDb, RegistryTx},
+    db::{CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx, FeedRegistryDb, SubscriptionTx},
     entry::EntryProjectionScope,
     error::{RegistryDbError, RegistryDbResult},
-    event::{Event, EventInterests, EventKind, JournalTx},
+    event::{Event, EventInterests, EventPayloadError, EventType, RegistryEvent},
     feed::FeedProjectionScope,
-    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
+    query::{Subscriptions, SubscriptionsQuery},
     subscription::{
         FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
     },
@@ -35,10 +35,26 @@ pub enum ProcessorError {
     #[error("unexpected event for {expected}: {actual:?}")]
     UnexpectedEvent {
         expected: &'static str,
-        actual: EventKind,
+        actual: EventType,
     },
     #[error(transparent)]
     FeedParse(#[from] FeedParseError),
+}
+
+impl From<EventPayloadError> for ProcessorError {
+    fn from(err: EventPayloadError) -> Self {
+        Self::unexpected_event(err.expected.as_str(), err.actual)
+    }
+}
+
+impl ProcessorError {
+    pub fn unexpected_event(expected: &'static str, actual: EventType) -> Self {
+        Self::UnexpectedEvent { expected, actual }
+    }
+
+    pub fn unexpected_input(expected: &'static str, event: &Event) -> Self {
+        Self::unexpected_event(expected, event.event_type())
+    }
 }
 
 /// Retry behavior for a processor failure.
@@ -108,34 +124,34 @@ pub(crate) fn skip_permanent_error(
     }
 }
 
-/// Typed input built from one event a processor is interested in.
-pub trait ProcessorInput: TryFrom<Event, Error = ProcessorError> + Send {}
+/// Typed processor input built from one journaled event.
+pub trait ConsumerInput: Sized + Send {
+    const INTERESTS: &'static [EventType];
 
-impl<T> ProcessorInput for T where T: TryFrom<Event, Error = ProcessorError> + Send {}
+    fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self>;
+}
 
-/// Marker for how an event processor participates in transaction boundaries.
-pub trait ProcessorPhase: Send + Sync + 'static {}
+impl<T> ConsumerInput for T
+where
+    T: RegistryEvent + TryFrom<Event> + Send,
+    ProcessorError: From<<T as TryFrom<Event>>::Error>,
+{
+    const INTERESTS: &'static [EventType] = &[T::TYPE];
 
-/// Processor phase that runs inside the registry database transaction.
-#[derive(Debug, Clone, Copy)]
-pub struct Transactional;
-
-/// Processor phase that runs only after cursor progress is committed.
-#[derive(Debug, Clone, Copy)]
-pub struct PostCommit;
-
-impl ProcessorPhase for Transactional {}
-
-impl ProcessorPhase for PostCommit {}
+    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
+        event.try_into().map_err(ProcessorError::from)
+    }
+}
 
 /// Common declaration for event processors that advance through the journal.
 pub trait Processor: Send + 'static {
-    type Input: ProcessorInput;
-    type Phase: ProcessorPhase;
+    type Input: ConsumerInput;
 
     fn id(&self) -> ProcessorId;
 
-    fn interests(&self) -> EventInterests;
+    fn interests(&self) -> EventInterests {
+        EventInterests::new(Self::Input::INTERESTS.to_vec())
+    }
 }
 
 /// Inputs selected from one journal read for a processor.
@@ -167,7 +183,7 @@ impl<I> InputBatch<I> {
 }
 
 /// A component that consumes registry events inside a registry transaction.
-pub trait Consumer<S>: Processor<Phase = Transactional>
+pub trait Consumer<S>: Processor
 where
     S: FeedRegistryDb,
 {
@@ -175,39 +191,41 @@ where
         &mut self,
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> impl Future<Output = ProcessorResult<()>> + Send;
+    ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
 
     fn consume_batch(
         &mut self,
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         batch: InputBatch<Self::Input>,
-    ) -> impl Future<Output = ProcessorResult<()>> + Send {
+    ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send {
         async move {
             let processor = self.id();
+            let mut events = Vec::new();
             for input in batch.into_inputs() {
-                if let Err(err) = self.consume(cx, input).await {
-                    skip_permanent_error(processor, err, "input")?;
+                match self.consume(cx, input).await {
+                    Ok(mut produced) => events.append(&mut produced),
+                    Err(err) => skip_permanent_error(processor, err, "input")?,
                 }
             }
-            Ok(())
+            Ok(events)
         }
     }
 }
 
 /// A terminal event processor that consumes committed events without recording new events.
-pub trait Sink: Processor<Phase = PostCommit> {
+pub trait Sink: Processor {
     fn consume(&mut self, input: Self::Input) -> impl Future<Output = ProcessorResult<()>> + Send;
 }
 
 /// Summary of events recorded into the journal by one submit operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordedEvents {
-    kinds: Vec<EventKind>,
+    types: Vec<EventType>,
 }
 
 impl RecordedEvents {
-    pub fn new(kinds: Vec<EventKind>) -> Self {
-        Self { kinds }
+    pub fn new(types: Vec<EventType>) -> Self {
+        Self { types }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
@@ -219,56 +237,44 @@ impl RecordedEvents {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.kinds.is_empty()
+        self.types.is_empty()
     }
 
     pub fn len(&self) -> usize {
-        self.kinds.len()
+        self.types.len()
     }
 
-    pub fn kinds(&self) -> &[EventKind] {
-        &self.kinds
+    pub fn types(&self) -> &[EventType] {
+        &self.types
     }
 
-    pub fn push(&mut self, kind: EventKind) {
-        self.kinds.push(kind);
+    pub fn push(&mut self, event_type: EventType) {
+        self.types.push(event_type);
     }
 
     pub fn extend(&mut self, mut other: Self) {
-        self.kinds.append(&mut other.kinds);
+        self.types.append(&mut other.types);
     }
+}
+
+/// Transactional registry context used by event-driven processors.
+///
+/// Domain database operations are delegated to the underlying transaction.
+/// Processors return produced events to their worker, which records them after
+/// domain database writes succeed.
+pub struct RegistryContext<'a, Tx> {
+    tx: &'a mut Tx,
 }
 
 /// Transactional context passed to event consumers.
-///
-/// Domain database operations are delegated to the underlying transaction.
-/// New journal events must be recorded through `record_event` so journal writes
-/// and wake summaries stay in sync.
-pub struct ConsumeContext<'a, Tx> {
-    tx: &'a mut Tx,
-    recorded: RecordedEvents,
-}
+pub type ConsumeContext<'a, Tx> = RegistryContext<'a, Tx>;
 
 /// Transactional context passed to reconcilers.
-pub struct ReconcileContext<'a, Tx> {
-    tx: &'a mut Tx,
-    recorded: RecordedEvents,
-}
+pub type ReconcileContext<'a, Tx> = RegistryContext<'a, Tx>;
 
-impl<'a, Tx> ConsumeContext<'a, Tx> {
+impl<'a, Tx> RegistryContext<'a, Tx> {
     pub fn new(tx: &'a mut Tx) -> Self {
-        Self::with_capacity(tx, 0)
-    }
-
-    pub fn with_capacity(tx: &'a mut Tx, capacity: usize) -> Self {
-        Self {
-            tx,
-            recorded: RecordedEvents::with_capacity(capacity),
-        }
-    }
-
-    pub fn into_recorded(self) -> RecordedEvents {
-        self.recorded
+        Self { tx }
     }
 
     pub fn subscriber_scope(&mut self, subscriber_id: SubscriberId) -> SubscriberScope<'_, Tx> {
@@ -277,70 +283,21 @@ impl<'a, Tx> ConsumeContext<'a, Tx> {
 
     /// Returns feed projection operations within this transaction.
     pub fn feed_projection(&mut self) -> FeedProjectionScope<'_, Tx> {
-        FeedProjectionScope::new(&mut *self.tx, &mut self.recorded)
+        FeedProjectionScope::new(&mut *self.tx)
     }
 
     /// Returns entry projection operations within this transaction.
     pub fn entry_projection(&mut self) -> EntryProjectionScope<'_, Tx> {
-        EntryProjectionScope::new(&mut *self.tx, &mut self.recorded)
+        EntryProjectionScope::new(&mut *self.tx)
     }
 
     /// Returns timeline projection operations within this transaction.
     pub fn timeline_projection(&mut self) -> TimelineProjectionScope<'_, Tx> {
-        TimelineProjectionScope::new(&mut *self.tx, &mut self.recorded)
+        TimelineProjectionScope::new(&mut *self.tx)
     }
 }
 
-impl<'a, Tx> ReconcileContext<'a, Tx> {
-    pub fn new(tx: &'a mut Tx) -> Self {
-        Self::with_capacity(tx, 0)
-    }
-
-    pub fn with_capacity(tx: &'a mut Tx, capacity: usize) -> Self {
-        Self {
-            tx,
-            recorded: RecordedEvents::with_capacity(capacity),
-        }
-    }
-
-    pub fn into_recorded(self) -> RecordedEvents {
-        self.recorded
-    }
-}
-
-impl<Tx> ConsumeContext<'_, Tx>
-where
-    Tx: JournalTx + Send,
-{
-    pub async fn record_event<E>(&mut self, event: E) -> ProcessorResult<()>
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        let kind = event.kind();
-        self.tx.append_event(event).await?;
-        self.recorded.push(kind);
-        Ok(())
-    }
-}
-
-impl<Tx> ReconcileContext<'_, Tx>
-where
-    Tx: JournalTx + Send,
-{
-    pub async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        let kind = event.kind();
-        self.tx.append_event(event).await?;
-        self.recorded.push(kind);
-        Ok(())
-    }
-}
-
-impl<Tx> ReconcileContext<'_, Tx>
+impl<Tx> RegistryContext<'_, Tx>
 where
     Tx: CrawlScheduleTx + Send,
 {
@@ -360,15 +317,12 @@ where
     }
 }
 
-impl<Tx> ReconcileContext<'_, Tx>
+impl<Tx> RegistryContext<'_, Tx>
 where
     Tx: CrawlJobQueueTx + Send,
 {
-    pub fn crawl_job_queue(&mut self) -> CrawlJobQueue<'_, Tx>
-    where
-        Tx: JournalTx,
-    {
-        CrawlJobQueue::new(&mut *self.tx, &mut self.recorded)
+    pub fn crawl_job_queue(&mut self) -> CrawlJobQueue<'_, Tx> {
+        CrawlJobQueue::new(&mut *self.tx)
     }
 }
 
@@ -386,7 +340,7 @@ impl<'a, Tx> SubscriberScope<'a, Tx> {
 
 impl<Tx> SubscriberScope<'_, Tx>
 where
-    Tx: RegistryTx + Send,
+    Tx: SubscriptionTx + Send,
 {
     pub async fn subscribe_feed(
         &mut self,
@@ -436,9 +390,9 @@ where
     }
 }
 
-impl<Tx> RegistryTx for ConsumeContext<'_, Tx>
+impl<Tx> SubscriptionTx for ConsumeContext<'_, Tx>
 where
-    Tx: RegistryTx + Send,
+    Tx: SubscriptionTx + Send,
 {
     fn upsert_feed_endpoint(
         &mut self,
@@ -480,20 +434,18 @@ where
         self.tx.list_subscriptions(query)
     }
 
-    fn list_timeline_items(
-        &mut self,
-        query: TimelineItemsQuery,
-    ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send {
-        self.tx.list_timeline_items(query)
-    }
-
     fn load_feed_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send {
         self.tx.load_feed_endpoint_subscriptions(feed_url)
     }
+}
 
+impl<Tx> CrawlTargetTx for ConsumeContext<'_, Tx>
+where
+    Tx: CrawlTargetTx + Send,
+{
     fn upsert_crawl_target(
         &mut self,
         target: &CrawlTarget,

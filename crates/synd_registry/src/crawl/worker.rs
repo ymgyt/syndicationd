@@ -1,10 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use synd_feed::feed::service::{FeedFetchRequest, FetchFeed};
+use synd_support::time::Clock;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use crate::{
     crawl::{
@@ -15,8 +16,9 @@ use crate::{
     },
     db::{BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, FeedRegistryDb},
     event::{
-        CrawlEventKind, EventInterests, EventWake, EventWakePublisher, EventWakeRecvError,
-        JournalTx, RecordedEvents, Trigger, WorkerHandle, WorkerId, WorkerResult,
+        CrawlJobEnqueuedEvent, EventInterests, EventRecorder, EventWakePublisher, EventWorker,
+        JournalAppendTx, JournalTx, RecordedEvents, RegistryEvent, Trigger, WorkerHandle, WorkerId,
+        WorkerResult, spawn_event_loop,
     },
 };
 
@@ -80,11 +82,10 @@ impl Default for CrawlWorkerFetchConfig {
 pub(crate) struct CrawlWorkerPool<S, F> {
     db: S,
     fetcher: F,
-    wake: EventWake,
     wake_publisher: EventWakePublisher,
-    poll_interval: Duration,
     ct: CancellationToken,
     capacity: CrawlWorkerCapacity,
+    clock: Arc<dyn Clock>,
 }
 
 impl<S, F> CrawlWorkerPool<S, F> {
@@ -92,19 +93,17 @@ impl<S, F> CrawlWorkerPool<S, F> {
         db: S,
         fetcher: F,
         wake_publisher: EventWakePublisher,
-        poll_interval: Duration,
         config: CrawlWorkerPoolConfig,
         ct: CancellationToken,
+        clock: Arc<dyn Clock>,
     ) -> Self {
-        let wake = EventWake::new(wake_publisher.clone());
         Self {
             db,
             fetcher,
-            wake,
             wake_publisher,
-            poll_interval,
             ct,
             capacity: CrawlWorkerCapacity::new(config),
+            clock,
         }
     }
 }
@@ -113,105 +112,19 @@ impl<S, F> CrawlWorkerPool<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
+    for<'tx> S::Tx<'tx>:
+        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
 {
-    pub fn spawn(self) -> WorkerHandle {
-        WorkerHandle::new(WorkerId::CrawlWorkerPool, tokio::spawn(self.run()))
-    }
-
-    async fn run(mut self) {
-        debug!(
-            worker = WorkerId::CrawlWorkerPool.as_str(),
-            "crawl worker pool started"
-        );
-        self.process(Trigger::Startup).await;
-
-        let mut interval = tokio::time::interval(self.poll_interval);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        interval.tick().await;
-
-        loop {
-            tokio::select! {
-                () = self.ct.cancelled() => break,
-                wake = self.wake.recv() => {
-                    match wake {
-                        Ok(recorded) if Self::interests().matches_any(recorded.kinds()) => {
-                            self.process(Trigger::Wake).await;
-                        }
-                        Ok(_) => {}
-                        Err(EventWakeRecvError::Lagged(skipped)) => {
-                            warn!(
-                                worker = WorkerId::CrawlWorkerPool.as_str(),
-                                skipped,
-                                "crawl worker pool wake lagged"
-                            );
-                            self.process(Trigger::WakeLagged).await;
-                        }
-                        Err(EventWakeRecvError::Closed) => {
-                            warn!(
-                                worker = WorkerId::CrawlWorkerPool.as_str(),
-                                "crawl worker pool wake channel closed"
-                            );
-                            break;
-                        }
-                    }
-                }
-                _ = interval.tick() => {
-                    self.process(Trigger::Poll).await;
-                }
-            }
-        }
-
-        debug!(
-            worker = WorkerId::CrawlWorkerPool.as_str(),
-            "crawl worker pool stopped"
-        );
-    }
-
-    fn interests() -> EventInterests {
-        EventInterests::new([CrawlEventKind::JobEnqueued.into()])
-    }
-
-    #[tracing::instrument(
-        name = "registry.crawl.worker_pool.process",
-        skip_all,
-        fields(
-            worker = WorkerId::CrawlWorkerPool.as_str(),
-            trigger = trigger.as_str()
-        )
-    )]
-    async fn process(&mut self, trigger: Trigger) {
+    async fn poll_and_dispatch(&mut self) -> WorkerResult<RecordedEvents> {
         let mut recorded = RecordedEvents::empty();
-
-        match self.poll_and_dispatch(&mut recorded).await {
-            Ok(()) => {
-                self.wake.publish(recorded);
-                debug!(
-                    worker = WorkerId::CrawlWorkerPool.as_str(),
-                    trigger = trigger.as_str(),
-                    "crawl worker pool poll completed"
-                );
-            }
-            Err(err) => {
-                error!(
-                    worker = WorkerId::CrawlWorkerPool.as_str(),
-                    trigger = trigger.as_str(),
-                    error = %err,
-                    "crawl worker pool failed"
-                );
-            }
-        }
-    }
-
-    async fn poll_and_dispatch(&mut self, recorded: &mut RecordedEvents) -> WorkerResult<()> {
         let mut no_claimable_lanes = Vec::new();
 
         while self
-            .try_start_next_job(&mut no_claimable_lanes, recorded)
+            .try_start_next_job(&mut no_claimable_lanes, &mut recorded)
             .await?
         {}
 
-        Ok(())
+        Ok(recorded)
     }
 
     async fn try_start_next_job(
@@ -252,12 +165,15 @@ where
     ) -> WorkerResult<(ClaimCrawlJobOutcome, RecordedEvents)> {
         let mut tx = self.db.begin().await?;
         let mut recorded = RecordedEvents::empty();
-        let outcome = {
-            let mut queue = CrawlJobQueue::new(&mut tx, &mut recorded);
+        let (outcome, produced) = {
+            let mut queue = CrawlJobQueue::new(&mut tx);
             queue
-                .claim(ClaimCrawlJobCommand::new(lane, Utc::now()))
+                .claim(ClaimCrawlJobCommand::new(lane, self.clock.now()))
                 .await?
         };
+        EventRecorder::new(&mut tx, &mut recorded, self.clock.as_ref())
+            .record_all(produced)
+            .await?;
         tx.commit().await?;
 
         Ok((outcome, recorded))
@@ -268,6 +184,7 @@ where
         let fetcher = self.fetcher.clone();
         let wake_publisher = self.wake_publisher.clone();
         let worker_ct = self.ct.child_token();
+        let clock = Arc::clone(&self.clock);
         tokio::spawn(async move {
             debug!(
                 worker = WorkerId::CrawlWorkerPool.as_str(),
@@ -277,7 +194,7 @@ where
             );
 
             let lane = slot.lane();
-            let worker = CrawlWorker::new(db, fetcher, wake_publisher, worker_ct);
+            let worker = CrawlWorker::new(db, fetcher, wake_publisher, worker_ct, clock);
             if let Err(err) = worker.run(job, lane).await {
                 error!(
                     worker = WorkerId::CrawlWorkerPool.as_str(),
@@ -291,20 +208,48 @@ where
     }
 }
 
+impl<S, F> EventWorker for CrawlWorkerPool<S, F>
+where
+    S: FeedRegistryDb,
+    F: FetchFeed + Clone + Send + Sync + 'static,
+    for<'tx> S::Tx<'tx>:
+        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
+{
+    fn id(&self) -> WorkerId {
+        WorkerId::CrawlWorkerPool
+    }
+
+    fn interests(&self) -> EventInterests {
+        EventInterests::new([CrawlJobEnqueuedEvent::TYPE])
+    }
+
+    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
+        self.poll_and_dispatch().await
+    }
+}
+
 struct CrawlWorker<S, F> {
     db: S,
     fetcher: F,
     wake_publisher: EventWakePublisher,
     ct: CancellationToken,
+    clock: Arc<dyn Clock>,
 }
 
 impl<S, F> CrawlWorker<S, F> {
-    fn new(db: S, fetcher: F, wake_publisher: EventWakePublisher, ct: CancellationToken) -> Self {
+    fn new(
+        db: S,
+        fetcher: F,
+        wake_publisher: EventWakePublisher,
+        ct: CancellationToken,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         Self {
             db,
             fetcher,
             wake_publisher,
             ct,
+            clock,
         }
     }
 }
@@ -313,7 +258,8 @@ impl<S, F> CrawlWorker<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Send + Sync,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
+    for<'tx> S::Tx<'tx>:
+        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
 {
     #[tracing::instrument(
         name = "registry.crawl.worker.run",
@@ -341,7 +287,7 @@ where
             outcome = self.fetcher.fetch_feed(request) => outcome,
         };
 
-        let finished_at = Utc::now();
+        let finished_at = self.clock.now();
         let recorded = self
             .record_completion(job, outcome, previous_state, finished_at)
             .await?;
@@ -361,16 +307,16 @@ where
         job: CrawlJob,
         outcome: synd_feed::feed::service::FeedFetchOutcome,
         previous_state: Option<CrawlState>,
-        finished_at: chrono::DateTime<Utc>,
+        finished_at: DateTime<Utc>,
     ) -> WorkerResult<RecordedEvents> {
         let mut tx = self.db.begin().await?;
         let mut completion_events = RecordedEvents::empty();
-        {
-            let mut recorder = CrawlCompletionRecorder::new(&mut tx, &mut completion_events);
-            recorder
-                .record(job, outcome, previous_state, finished_at)
-                .await?;
-        }
+        let (_record, produced) = CrawlCompletionRecorder::new(&mut tx)
+            .record(job, outcome, previous_state, finished_at)
+            .await?;
+        EventRecorder::new(&mut tx, &mut completion_events, self.clock.as_ref())
+            .record_all(produced)
+            .await?;
         tx.commit().await?;
         Ok(completion_events)
     }
@@ -444,21 +390,35 @@ pub(crate) fn spawn_crawl_worker_pool<S, F>(
     poll_interval: Duration,
     config: CrawlWorkerPoolConfig,
     ct: CancellationToken,
+    clock: Arc<dyn Clock>,
 ) -> WorkerHandle
 where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
+    for<'tx> S::Tx<'tx>:
+        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
 {
-    CrawlWorkerPool::new(db, fetcher, wake_publisher, poll_interval, config, ct).spawn()
+    let pool = CrawlWorkerPool::new(
+        db,
+        fetcher,
+        wake_publisher.clone(),
+        config,
+        ct.clone(),
+        clock,
+    );
+    spawn_event_loop(pool, wake_publisher, poll_interval, ct)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        CLAIM_LANES, CrawlWorkerCapacity, CrawlWorkerFetchConfig, CrawlWorkerPoolConfig,
+        CrawlWorkerQueueConfig,
+    };
+    use crate::crawl::job::CrawlJobQueueLane;
 
     mod capacity {
-        use super::*;
+        use super::{CLAIM_LANES, CrawlJobQueueLane, CrawlWorkerCapacity, config};
 
         #[test]
         fn enforces_global_and_lane_capacity() {

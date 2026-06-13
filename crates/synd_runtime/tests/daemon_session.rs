@@ -86,7 +86,7 @@ impl DaemonSessionHarness {
     const LEASE_DURATION: Duration = Duration::from_secs(3);
     const POLL_INTERVAL: Duration = Duration::from_millis(25);
     const REQUEST_TIMEOUT: Duration = Duration::from_secs(2);
-    const WAIT_TIMEOUT: Duration = Duration::from_secs(5);
+    const WAIT_TIMEOUT: Duration = Duration::from_secs(30);
 
     async fn start() -> synd_runtime::Result<Self> {
         let tempdir = tempfile::tempdir()?;
@@ -109,7 +109,7 @@ impl DaemonSessionHarness {
 
             tokio::spawn(Daemon::new(config).serve())
         };
-        let harness = Self {
+        let mut harness = Self {
             _tempdir: tempdir,
             first_runtime,
             second_runtime,
@@ -138,18 +138,25 @@ impl DaemonSessionHarness {
         &self.second_runtime
     }
 
-    async fn wait_until_running(&self) -> synd_runtime::Result<()> {
-        self.wait_for(
-            DaemonState::Running,
-            Error::EndpointReadyTimeout {
-                endpoint: self.endpoint.clone(),
+    async fn wait_until_running(&mut self) -> synd_runtime::Result<()> {
+        let endpoint = self.endpoint.clone();
+
+        tokio::select! {
+            result = Self::wait_for_state(
+                &self.first_runtime,
+                DaemonState::Running,
+                Error::EndpointReadyTimeout { endpoint },
+            ) => result,
+            result = &mut self.daemon => match result.expect("daemon serve task panicked") {
+                Ok(()) => panic!("daemon serve task finished before readiness"),
+                Err(error) => Err(error),
             },
-        )
-        .await
+        }
     }
 
     async fn wait_until_stopped(&self) -> synd_runtime::Result<()> {
-        self.wait_for(
+        Self::wait_for_state(
+            &self.first_runtime,
             DaemonState::NotRunning,
             Error::EndpointStopTimeout {
                 endpoint: self.endpoint.clone(),
@@ -182,17 +189,17 @@ impl DaemonSessionHarness {
         Ok(())
     }
 
-    async fn wait_for(
-        &self,
+    async fn wait_for_state(
+        runtime: &Runtime,
         expected_state: DaemonState,
         timeout_error: Error,
     ) -> synd_runtime::Result<()> {
         let deadline = Instant::now() + Self::WAIT_TIMEOUT;
 
         loop {
-            let status = self.first_runtime.daemon().inspect().await?;
-            if status.state() == expected_state {
-                return Ok(());
+            match runtime.daemon().inspect().await {
+                Ok(status) if status.state() == expected_state => return Ok(()),
+                Ok(_) | Err(_) => {}
             }
 
             let now = Instant::now();

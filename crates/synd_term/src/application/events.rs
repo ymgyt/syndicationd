@@ -58,8 +58,28 @@ impl<Term, Sess> Application<Term, Sess> {
             Event::TimelineRefetchStarted { request_seq } => {
                 self.components.apply_timeline_refetch_started(request_seq);
             }
-            Event::TimelineChanged { event } => {
-                let operations = self.components.apply_timeline_changed(&event);
+            Event::RegistryFeed { event } => {
+                let operations = self.components.apply_feed_event(
+                    event,
+                    self.config.feeds_per_pagination,
+                    self.next_entries_first(0),
+                );
+                self.perform_operations(operations);
+            }
+            Event::FeedEventSubscriptionInterrupted => {
+                let operations = self.components.apply_feed_event_subscription_interrupted(
+                    self.config.feeds_per_pagination,
+                    self.next_entries_first(0),
+                );
+                self.perform_operations(operations);
+            }
+            Event::FeedViewReloadDebounced {
+                feeds_first,
+                entries_first,
+            } => {
+                let operations = self
+                    .components
+                    .apply_feed_view_reload_debounced(feeds_first, entries_first);
                 self.perform_operations(operations);
             }
             Event::FeedRefreshPollElapsed {

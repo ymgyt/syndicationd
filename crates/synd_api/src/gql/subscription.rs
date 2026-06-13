@@ -1,7 +1,7 @@
 use async_graphql::{Context, Result, SimpleObject, Subscription, Union};
 use futures_util::{Stream, stream};
 use synd_feed::types::FeedUrl;
-use synd_registry::event::{
+use synd_registry::api::{
     ApiEvent, ApiEventRecvError, ApiFeedSubscribeRejected, ApiFeedSubscribed,
     ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
     ApiTimelineChanged,

@@ -1,25 +1,19 @@
-use serde::{Serialize, de::DeserializeOwned};
+use serde_json;
 use thiserror::Error;
 
-use super::domain::{
+use crate::api::{
     ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged, CrawlJobEnqueuedEvent,
-    CrawlJobFinishedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
-    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
-    EntryDiscoveredEvent, Event, EventKind, FeedChangedEvent, FeedDiscoveredEvent,
-    FeedSubscribedEvent, FeedUnsubscribedEvent, SubscribeFeedRejected, SubscribeFeedRequested,
-    SubscriptionChangedEvent, TimelineChangedEvent, UnsubscribeFeedRejected,
-    UnsubscribeFeedRequested,
+    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
 };
 
-mod api;
-mod crawl;
-mod entry;
-mod event_type;
-mod feed;
-mod request;
-mod sub;
-mod timeline;
+use super::domain::{
+    CrawlJobEnqueuedEvent, CrawlJobFinishedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
+    EntryDiscoveredEvent, Event, EventType, FeedChangedEvent, FeedDiscoveredEvent,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubscribeFeedRejected,
+    SubscribeFeedRequested, SubscriptionChangedEvent, TimelineChangedEvent,
+    UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+};
 
 pub type EventEncodingResult<T> = Result<T, EventEncodingError>;
 
@@ -33,14 +27,8 @@ pub enum EventEncodingError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncodedEvent {
-    pub event_type: &'static str,
+    pub event_type: EventType,
     pub payload_json: String,
-}
-
-pub trait EventPayload: Serialize + DeserializeOwned + Sized {
-    const EVENT_TYPE: &'static str;
-
-    fn into_event(self) -> Event;
 }
 
 pub trait EventEncoding: Sized {
@@ -52,131 +40,128 @@ pub trait EventEncoding: Sized {
 impl EventEncoding for Event {
     fn encode(&self) -> EventEncodingResult<EncodedEvent> {
         match self {
-            Self::Request(event) => event.encode(),
-            Self::Sub(event) => event.encode(),
-            Self::Crawl(event) => event.encode(),
-            Self::Feed(event) => event.encode(),
-            Self::Entry(event) => event.encode(),
-            Self::Timeline(event) => event.encode(),
-            Self::Api(event) => event.encode(),
+            Self::SubscribeFeedRequested(event) => encode_payload(event),
+            Self::SubscribeFeedRejected(event) => encode_payload(event),
+            Self::UnsubscribeFeedRequested(event) => encode_payload(event),
+            Self::UnsubscribeFeedRejected(event) => encode_payload(event),
+            Self::FeedSubscribed(event) => encode_payload(event),
+            Self::SubscriptionChanged(event) => encode_payload(event),
+            Self::FeedUnsubscribed(event) => encode_payload(event),
+            Self::CrawlTargetActivated(event) => encode_payload(event),
+            Self::CrawlTargetPolicyChanged(event) => encode_payload(event),
+            Self::CrawlTargetDeactivated(event) => encode_payload(event),
+            Self::CrawlJobEnqueued(event) => encode_payload(event),
+            Self::CrawlJobStarted(event) => encode_payload(event),
+            Self::CrawlJobFinished(event) => encode_payload(event),
+            Self::FeedDiscovered(event) => encode_payload(event),
+            Self::FeedChanged(event) => encode_payload(event),
+            Self::EntryDiscovered(event) => encode_payload(event),
+            Self::EntryChanged(event) => encode_payload(event),
+            Self::TimelineChanged(event) => encode_payload(event),
+            Self::ApiFeedSubscribed(event) => encode_payload(event),
+            Self::ApiFeedSubscribeRejected(event) => encode_payload(event),
+            Self::ApiFeedSubscriptionChanged(event) => encode_payload(event),
+            Self::ApiFeedUnsubscribed(event) => encode_payload(event),
+            Self::ApiFeedUnsubscribeRejected(event) => encode_payload(event),
+            Self::ApiTimelineChanged(event) => encode_payload(event),
         }
     }
 
     fn decode(event_type: &str, payload_json: &str) -> EventEncodingResult<Self> {
-        match event_type {
-            <SubscribeFeedRequested as EventPayload>::EVENT_TYPE => {
-                decode_payload::<SubscribeFeedRequested>(payload_json).map(EventPayload::into_event)
-            }
-            <SubscribeFeedRejected as EventPayload>::EVENT_TYPE => {
-                decode_payload::<SubscribeFeedRejected>(payload_json).map(EventPayload::into_event)
-            }
-            <UnsubscribeFeedRequested as EventPayload>::EVENT_TYPE => {
-                decode_payload::<UnsubscribeFeedRequested>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <UnsubscribeFeedRejected as EventPayload>::EVENT_TYPE => {
-                decode_payload::<UnsubscribeFeedRejected>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <FeedSubscribedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<FeedSubscribedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <SubscriptionChangedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<SubscriptionChangedEvent>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <FeedUnsubscribedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<FeedUnsubscribedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <CrawlTargetActivatedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<CrawlTargetActivatedEvent>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <CrawlTargetPolicyChangedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<CrawlTargetPolicyChangedEvent>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <CrawlTargetDeactivatedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<CrawlTargetDeactivatedEvent>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <CrawlJobEnqueuedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<CrawlJobEnqueuedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <CrawlJobStartedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<CrawlJobStartedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <CrawlJobFinishedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<CrawlJobFinishedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <FeedDiscoveredEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<FeedDiscoveredEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <FeedChangedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<FeedChangedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <EntryDiscoveredEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<EntryDiscoveredEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <EntryChangedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<EntryChangedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <TimelineChangedEvent as EventPayload>::EVENT_TYPE => {
-                decode_payload::<TimelineChangedEvent>(payload_json).map(EventPayload::into_event)
-            }
-            <ApiFeedSubscribed as EventPayload>::EVENT_TYPE => {
-                decode_payload::<ApiFeedSubscribed>(payload_json).map(EventPayload::into_event)
-            }
-            <ApiFeedSubscribeRejected as EventPayload>::EVENT_TYPE => {
-                decode_payload::<ApiFeedSubscribeRejected>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <ApiFeedSubscriptionChanged as EventPayload>::EVENT_TYPE => {
-                decode_payload::<ApiFeedSubscriptionChanged>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <ApiFeedUnsubscribed as EventPayload>::EVENT_TYPE => {
-                decode_payload::<ApiFeedUnsubscribed>(payload_json).map(EventPayload::into_event)
-            }
-            <ApiFeedUnsubscribeRejected as EventPayload>::EVENT_TYPE => {
-                decode_payload::<ApiFeedUnsubscribeRejected>(payload_json)
-                    .map(EventPayload::into_event)
-            }
-            <ApiTimelineChanged as EventPayload>::EVENT_TYPE => {
-                decode_payload::<ApiTimelineChanged>(payload_json).map(EventPayload::into_event)
-            }
-            event_type => Err(EventEncodingError::UnknownEventType(event_type.to_owned())),
-        }
-    }
-}
+        let Some(event_type) = EventType::from_wire(event_type) else {
+            return Err(EventEncodingError::UnknownEventType(event_type.to_owned()));
+        };
 
-impl EventKind {
-    pub const fn event_type(self) -> &'static str {
-        match self {
-            Self::Request(kind) => kind.event_type(),
-            Self::Sub(kind) => kind.event_type(),
-            Self::Crawl(kind) => kind.event_type(),
-            Self::Feed(kind) => kind.event_type(),
-            Self::Entry(kind) => kind.event_type(),
-            Self::Timeline(kind) => kind.event_type(),
-            Self::Api(kind) => kind.event_type(),
+        match event_type {
+            EventType::SubscribeFeedRequested => {
+                decode_payload::<SubscribeFeedRequested>(payload_json).map(Event::from)
+            }
+            EventType::SubscribeFeedRejected => {
+                decode_payload::<SubscribeFeedRejected>(payload_json).map(Event::from)
+            }
+            EventType::UnsubscribeFeedRequested => {
+                decode_payload::<UnsubscribeFeedRequested>(payload_json).map(Event::from)
+            }
+            EventType::UnsubscribeFeedRejected => {
+                decode_payload::<UnsubscribeFeedRejected>(payload_json).map(Event::from)
+            }
+            EventType::FeedSubscribed => {
+                decode_payload::<FeedSubscribedEvent>(payload_json).map(Event::from)
+            }
+            EventType::SubscriptionChanged => {
+                decode_payload::<SubscriptionChangedEvent>(payload_json).map(Event::from)
+            }
+            EventType::FeedUnsubscribed => {
+                decode_payload::<FeedUnsubscribedEvent>(payload_json).map(Event::from)
+            }
+            EventType::CrawlTargetActivated => {
+                decode_payload::<CrawlTargetActivatedEvent>(payload_json).map(Event::from)
+            }
+            EventType::CrawlTargetPolicyChanged => {
+                decode_payload::<CrawlTargetPolicyChangedEvent>(payload_json).map(Event::from)
+            }
+            EventType::CrawlTargetDeactivated => {
+                decode_payload::<CrawlTargetDeactivatedEvent>(payload_json).map(Event::from)
+            }
+            EventType::CrawlJobEnqueued => {
+                decode_payload::<CrawlJobEnqueuedEvent>(payload_json).map(Event::from)
+            }
+            EventType::CrawlJobStarted => {
+                decode_payload::<CrawlJobStartedEvent>(payload_json).map(Event::from)
+            }
+            EventType::CrawlJobFinished => {
+                decode_payload::<CrawlJobFinishedEvent>(payload_json).map(Event::from)
+            }
+            EventType::FeedDiscovered => {
+                decode_payload::<FeedDiscoveredEvent>(payload_json).map(Event::from)
+            }
+            EventType::FeedChanged => {
+                decode_payload::<FeedChangedEvent>(payload_json).map(Event::from)
+            }
+            EventType::EntryDiscovered => {
+                decode_payload::<EntryDiscoveredEvent>(payload_json).map(Event::from)
+            }
+            EventType::EntryChanged => {
+                decode_payload::<EntryChangedEvent>(payload_json).map(Event::from)
+            }
+            EventType::TimelineChanged => {
+                decode_payload::<TimelineChangedEvent>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedSubscribed => {
+                decode_payload::<ApiFeedSubscribed>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedSubscribeRejected => {
+                decode_payload::<ApiFeedSubscribeRejected>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedSubscriptionChanged => {
+                decode_payload::<ApiFeedSubscriptionChanged>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedUnsubscribed => {
+                decode_payload::<ApiFeedUnsubscribed>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedUnsubscribeRejected => {
+                decode_payload::<ApiFeedUnsubscribeRejected>(payload_json).map(Event::from)
+            }
+            EventType::ApiTimelineChanged => {
+                decode_payload::<ApiTimelineChanged>(payload_json).map(Event::from)
+            }
         }
     }
 }
 
 fn encode_payload<T>(payload: &T) -> EventEncodingResult<EncodedEvent>
 where
-    T: EventPayload,
+    T: RegistryEvent,
 {
     Ok(EncodedEvent {
-        event_type: T::EVENT_TYPE,
+        event_type: T::TYPE,
         payload_json: serde_json::to_string(payload)?,
     })
 }
 
 fn decode_payload<T>(payload_json: &str) -> EventEncodingResult<T>
 where
-    T: EventPayload,
+    T: RegistryEvent,
 {
     serde_json::from_str(payload_json).map_err(EventEncodingError::from)
 }

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    RegistryDbError, RegistryDbResult,
+    CrawlScheduleTx, RegistryDbResult,
     crawl::{
         job::{ActiveCrawlJob, CrawlJobId},
         schedule::{
@@ -14,25 +14,21 @@ use synd_registry::{
     },
 };
 
-use super::{codec, feed_endpoint::FeedEndpointTable};
+use super::super::{
+    SqliteRegistryTx, codec,
+    error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
+    feed_endpoint,
+};
 
-pub(super) struct CrawlScheduleTable<'tx, 'db> {
-    tx: &'tx mut Transaction<'db, Sqlite>,
-}
-
-impl<'tx, 'db> CrawlScheduleTable<'tx, 'db> {
-    pub(super) fn new(tx: &'tx mut Transaction<'db, Sqlite>) -> Self {
-        Self { tx }
-    }
-
-    pub(super) async fn list_candidates(
-        &mut self,
-        now: DateTime<Utc>,
-        limit: usize,
-    ) -> RegistryDbResult<Vec<CrawlScheduleCandidate>> {
-        let limit = i64::try_from(limit).map_err(RegistryDbError::internal)?;
-        let rows = sqlx::query_as::<_, CrawlScheduleCandidateRow>(
-            r#"
+async fn list_candidates(
+    tx: &mut Transaction<'_, Sqlite>,
+    now: DateTime<Utc>,
+    limit: usize,
+) -> SqliteResult<Vec<CrawlScheduleCandidate>> {
+    let limit = i64::try_from(limit)
+        .map_err(|_| SqliteError::decode_message("candidate limit exceeds SQLite INTEGER range"))?;
+    let rows = sqlx::query_as::<_, CrawlScheduleCandidateRow>(
+        r#"
             SELECT
                 e.url AS feed_url,
                 ct.state AS target_state,
@@ -62,29 +58,25 @@ impl<'tx, 'db> CrawlScheduleTable<'tx, 'db> {
                 ct.feed_endpoint_pk
             LIMIT ?
             "#,
-        )
-        .bind(now)
-        .bind(limit)
-        .fetch_all(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(now)
+    .bind(limit)
+    .fetch_all(&mut **tx)
+    .await?;
 
-        rows.into_iter()
-            .map(CrawlScheduleCandidate::try_from)
-            .collect()
-    }
+    rows.into_iter()
+        .map(CrawlScheduleCandidateRow::into_candidate)
+        .collect()
+}
 
-    pub(super) async fn upsert(
-        &mut self,
-        schedule: UpsertCrawlScheduleCommand,
-    ) -> RegistryDbResult<()> {
-        let feed_endpoint_pk = {
-            let mut feed_endpoint = FeedEndpointTable::new(&mut *self.tx);
-            feed_endpoint.resolve_pk(&schedule.feed_url).await?
-        };
+async fn upsert(
+    tx: &mut Transaction<'_, Sqlite>,
+    schedule: UpsertCrawlScheduleCommand,
+) -> SqliteResult<()> {
+    let feed_endpoint_pk = feed_endpoint::resolve_pk(tx, &schedule.feed_url).await?;
 
-        sqlx::query(
-            r#"
+    sqlx::query(
+        r#"
             INSERT INTO crawl_schedule (
                 feed_endpoint_pk,
                 target_updated_at,
@@ -98,18 +90,16 @@ impl<'tx, 'db> CrawlScheduleTable<'tx, 'db> {
                 next_crawl_after = excluded.next_crawl_after,
                 updated_at = excluded.updated_at
             "#,
-        )
-        .bind(feed_endpoint_pk)
-        .bind(schedule.target_updated_at)
-        .bind(schedule.next_crawl_after)
-        .bind(schedule.reconciled_at)
-        .bind(schedule.reconciled_at)
-        .execute(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(feed_endpoint_pk)
+    .bind(schedule.target_updated_at)
+    .bind(schedule.next_crawl_after)
+    .bind(schedule.reconciled_at)
+    .bind(schedule.reconciled_at)
+    .execute(&mut **tx)
+    .await?;
 
-        Ok(())
-    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -124,13 +114,13 @@ impl ScheduledTargetStateDb {
 }
 
 impl FromStr for ScheduledTargetStateDb {
-    type Err = RegistryDbError;
+    type Err = SqliteError;
 
     fn from_str(state: &str) -> Result<Self, Self::Err> {
         match state {
             Self::ACTIVE => Ok(Self::Active),
             Self::INACTIVE => Ok(Self::Inactive),
-            state => Err(RegistryDbError::internal(anyhow::anyhow!(
+            state => Err(SqliteError::decode_message(format!(
                 "unknown crawl target state: {state}"
             ))),
         }
@@ -160,17 +150,13 @@ struct CrawlScheduleCandidateRow {
     active_job_state: Option<String>,
 }
 
-impl TryFrom<CrawlScheduleCandidateRow> for CrawlScheduleCandidate {
-    type Error = RegistryDbError;
-
-    fn try_from(row: CrawlScheduleCandidateRow) -> Result<Self, Self::Error> {
-        let feed_url = FeedUrl::parse(&row.feed_url).map_err(RegistryDbError::internal)?;
-        let state = match row.target_state.parse()? {
+impl CrawlScheduleCandidateRow {
+    fn into_candidate(self) -> SqliteResult<CrawlScheduleCandidate> {
+        let feed_url = FeedUrl::parse(&self.feed_url).decode()?;
+        let state = match self.target_state.parse()? {
             ScheduledTargetStateDb::Active => {
-                let policy_json = row.target_policy_json.ok_or_else(|| {
-                    RegistryDbError::internal(anyhow::anyhow!(
-                        "active crawl target requires an effective policy"
-                    ))
+                let policy_json = self.target_policy_json.ok_or_else(|| {
+                    SqliteError::decode_message("active crawl target requires an effective policy")
                 })?;
                 ScheduledCrawlTargetState::Active {
                     policy: codec::decode_crawl_policy_json(&policy_json)?,
@@ -178,44 +164,44 @@ impl TryFrom<CrawlScheduleCandidateRow> for CrawlScheduleCandidate {
             }
             ScheduledTargetStateDb::Inactive => ScheduledCrawlTargetState::Inactive,
         };
-        let target = ScheduledCrawlTarget::new(feed_url.clone(), row.target_updated_at, state);
+        let target = ScheduledCrawlTarget::new(feed_url.clone(), self.target_updated_at, state);
         let schedule = match (
-            row.schedule_target_updated_at,
-            row.schedule_created_at,
-            row.schedule_updated_at,
+            self.schedule_target_updated_at,
+            self.schedule_created_at,
+            self.schedule_updated_at,
         ) {
             (Some(target_updated_at), Some(created_at), Some(updated_at)) => {
                 Some(CrawlSchedule::new(
                     feed_url.clone(),
                     target_updated_at,
-                    row.schedule_next_crawl_after,
+                    self.schedule_next_crawl_after,
                     created_at,
                     updated_at,
                 ))
             }
             (None, None, None) => None,
             _ => {
-                return Err(RegistryDbError::internal(anyhow::anyhow!(
+                return Err(SqliteError::decode_message(format!(
                     "incomplete crawl schedule row for {}",
                     feed_url.as_str()
                 )));
             }
         };
-        let active_job = match (row.active_job_id, row.active_job_state) {
+        let active_job = match (self.active_job_id, self.active_job_state) {
             (Some(job_id), Some(state)) => Some(ActiveCrawlJob::new(
                 CrawlJobId::new(job_id),
-                state.parse().map_err(RegistryDbError::internal)?,
+                state.parse().decode()?,
             )),
             (None, None) => None,
             _ => {
-                return Err(RegistryDbError::internal(anyhow::anyhow!(
+                return Err(SqliteError::decode_message(format!(
                     "incomplete active crawl job row for {}",
                     feed_url.as_str()
                 )));
             }
         };
 
-        Ok(Self::new(
+        Ok(CrawlScheduleCandidate::new(
             target,
             schedule,
             active_job,
@@ -223,3 +209,23 @@ impl TryFrom<CrawlScheduleCandidateRow> for CrawlScheduleCandidate {
         ))
     }
 }
+
+impl CrawlScheduleTx for SqliteRegistryTx<'_> {
+    async fn list_candidates(
+        &mut self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> RegistryDbResult<Vec<CrawlScheduleCandidate>> {
+        list_candidates(&mut self.tx, now, limit).await.db()
+    }
+
+    async fn upsert_schedule(
+        &mut self,
+        schedule: UpsertCrawlScheduleCommand,
+    ) -> RegistryDbResult<()> {
+        upsert(&mut self.tx, schedule).await.db()
+    }
+}
+
+#[cfg(test)]
+mod tests;

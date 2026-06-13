@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
+use synd_support::time::{Clock, SystemClock};
 use thiserror::Error;
 
 use crate::{
     db::{CommitTx, FeedRegistryDb},
     error::RegistryDbError,
-    event::{Event, EventWakePublisher, JournalTx, RecordedEvents},
+    event::{Event, EventRecorder, EventWakePublisher, JournalAppendTx, RecordedEvents},
 };
 
 pub type EventSubmitterResult<T> = Result<T, EventSubmitterError>;
@@ -15,18 +18,28 @@ pub enum EventSubmitterError {
 }
 
 /// Records submitted events and wakes registry event workers.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EventSubmitter<S> {
     db: S,
     wake_publisher: EventWakePublisher,
+    clock: Arc<dyn Clock>,
 }
 
 impl<S> EventSubmitter<S>
 where
     S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: JournalAppendTx,
 {
     pub fn new(db: S, wake_publisher: EventWakePublisher) -> Self {
-        Self { db, wake_publisher }
+        Self::with_clock(db, wake_publisher, Arc::new(SystemClock))
+    }
+
+    pub fn with_clock(db: S, wake_publisher: EventWakePublisher, clock: Arc<dyn Clock>) -> Self {
+        Self {
+            db,
+            wake_publisher,
+            clock,
+        }
     }
 
     pub async fn submit<I, E>(&self, events: I) -> EventSubmitterResult<RecordedEvents>
@@ -35,16 +48,15 @@ where
         E: Into<Event>,
     {
         let events = events.into_iter();
-        let mut kinds = Vec::with_capacity(events.size_hint().0);
         let mut tx = self.db.begin().await?;
-        for event in events {
-            let event = event.into();
-            kinds.push(event.kind());
-            tx.append_event(event).await?;
+        let mut recorded_events = RecordedEvents::with_capacity(events.size_hint().0);
+        {
+            let mut event_recorder =
+                EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref());
+            event_recorder.record_all(events).await?;
         }
         tx.commit().await?;
-        let recorded = RecordedEvents::new(kinds);
-        self.wake_publisher.publish(recorded.clone());
-        Ok(recorded)
+        self.wake_publisher.publish(recorded_events.clone());
+        Ok(recorded_events)
     }
 }

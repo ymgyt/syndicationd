@@ -27,6 +27,7 @@ mod runtime;
 
 use adapters::DriverAdapters;
 use dispatcher::OperationDispatcher;
+pub(in crate::application) use feed_events::FeedEventMessage;
 use feed_events::FeedEventSubscription;
 use runtime::{DriverPollers, DriverRuntime};
 

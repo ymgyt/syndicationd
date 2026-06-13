@@ -238,6 +238,23 @@ impl FeedDriver {
         Vec::new()
     }
 
+    pub(super) fn schedule_feed_view_reload(
+        cx: &mut DriverContext<'_>,
+        feeds_first: i64,
+        entries_first: i64,
+    ) -> Vec<Event> {
+        let fut = async move {
+            tokio::time::sleep(TIMELINE_INVALIDATION_DEBOUNCE).await;
+            Ok(Event::FeedViewReloadDebounced {
+                feeds_first,
+                entries_first,
+            })
+        }
+        .boxed();
+        cx.runtime.push_background_job(fut);
+        Vec::new()
+    }
+
     pub(super) fn schedule_timeline_reload(cx: &mut DriverContext<'_>) -> Vec<Event> {
         let fut = async move {
             tokio::time::sleep(TIMELINE_INVALIDATION_DEBOUNCE).await;

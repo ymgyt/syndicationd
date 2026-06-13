@@ -82,6 +82,82 @@ impl AppComponent {
         self.mark_timeline_dirty()
     }
 
+    pub(in crate::application) fn apply_feed_event(
+        &mut self,
+        event: payload::FeedEvent,
+        feeds_first: i64,
+        entries_first: i64,
+    ) -> Vec<Operation> {
+        match event {
+            payload::FeedEvent::FeedSubscribed(event) => {
+                debug!(url = %event.url, request_id = %event.request_id, "feed subscribed");
+                self.shell.request_render();
+                vec![
+                    FeedsComponent::reload_subscription(feeds_first),
+                    FeedsComponent::reload_entries(entries_first),
+                ]
+            }
+            payload::FeedEvent::SubscriptionChanged(event) => {
+                debug!(url = %event.url, request_id = %event.request_id, "feed subscription changed");
+                self.shell.request_render();
+                vec![
+                    FeedsComponent::reload_subscription(feeds_first),
+                    FeedsComponent::reload_entries(entries_first),
+                ]
+            }
+            payload::FeedEvent::FeedUnsubscribed(event) => {
+                debug!(url = %event.url, request_id = %event.request_id, "feed unsubscribed");
+                self.feeds.feed_unsubscribed(&event.url);
+                self.shell.filter.update_categories(
+                    &self.shell.categories,
+                    Populate::Replace,
+                    self.feeds.entries.entries(),
+                );
+                self.shell.request_render();
+                vec![FeedsComponent::reload_subscription(feeds_first)]
+            }
+            payload::FeedEvent::TimelineChanged(event) => self.apply_timeline_changed(&event),
+            payload::FeedEvent::FeedSubscribeRejected(event) => {
+                self.shell.prompt.set_error_message(event.reason);
+                self.shell.request_render();
+                Vec::new()
+            }
+            payload::FeedEvent::FeedUnsubscribeRejected(event) => {
+                self.shell.prompt.set_error_message(event.reason);
+                self.shell.request_render();
+                Vec::new()
+            }
+        }
+    }
+
+    pub(in crate::application) fn apply_feed_event_subscription_interrupted(
+        &mut self,
+        feeds_first: i64,
+        entries_first: i64,
+    ) -> Vec<Operation> {
+        self.shell.request_render();
+        vec![Operation::ScheduleFeedViewReload {
+            feeds_first,
+            entries_first,
+        }]
+    }
+
+    pub(in crate::application) fn apply_feed_view_reload_debounced(
+        &mut self,
+        feeds_first: i64,
+        entries_first: i64,
+    ) -> Vec<Operation> {
+        self.shell.request_render();
+        vec![
+            Operation::FetchSubscription {
+                populate: Populate::Replace,
+                after: None,
+                first: feeds_first,
+            },
+            FeedsComponent::reload_entries(entries_first),
+        ]
+    }
+
     pub(in crate::application) fn mark_timeline_dirty(&mut self) -> Vec<Operation> {
         self.feeds.mark_timeline_dirty().into_iter().collect()
     }
@@ -538,6 +614,7 @@ fn next_entries_first(
 #[cfg(test)]
 mod tests {
     use core::assert_matches;
+    use synd_client::payload::{ResponseCode, ResponseStatus};
     use synd_feed::types::FeedUrl;
 
     use crate::{
@@ -580,6 +657,154 @@ mod tests {
                 end_cursor: Some("cursor".to_owned()),
             },
         }
+    }
+
+    #[test]
+    fn feed_subscription_editor_emits_subscribe_operation() {
+        let mut component = app_component();
+
+        let operations = component.apply_feed_subscription_editor_closed(
+            "MUST rust https://example.ymgyt.io/atom.xml interval:30m",
+        );
+
+        let [Operation::SubscribeFeed { input }] = operations.as_slice() else {
+            panic!("expected SubscribeFeed operation");
+        };
+        assert_eq!(input.url.as_ref(), "https://example.ymgyt.io/atom.xml");
+        assert_eq!(
+            input
+                .crawl_policy
+                .as_ref()
+                .and_then(|policy| policy.polling.interval_seconds),
+            Some(1800)
+        );
+    }
+
+    #[test]
+    fn feed_subscribed_response_reloads_subscription_and_entries() {
+        let mut component = app_component();
+        let url = FeedUrl::parse("https://example.com/feed.xml").unwrap();
+        let payload = payload::SubscribeFeedPayload {
+            status: ResponseStatus {
+                code: ResponseCode::Ok,
+            },
+            url: url.clone(),
+            request_id: "request-1".to_owned(),
+        };
+
+        let operations = component.apply_feeds_api_event(
+            1,
+            FeedsApiEvent::FeedSubscribed { url, payload },
+            10,
+            20,
+            100,
+            3,
+        );
+
+        assert_matches!(
+            operations.as_slice(),
+            [
+                Operation::FetchSubscription {
+                    populate: Populate::Replace,
+                    after: None,
+                    first: 10,
+                },
+                Operation::FetchEntries {
+                    populate: Populate::Replace,
+                    after: None,
+                    first: 20,
+                },
+                Operation::ScheduleFeedViewReload {
+                    feeds_first: 10,
+                    entries_first: 20,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn feed_event_subscription_interruption_schedules_delayed_feed_view_reload() {
+        let mut component = app_component();
+
+        let operations = component.apply_feed_event_subscription_interrupted(10, 20);
+
+        assert_matches!(
+            operations.as_slice(),
+            [Operation::ScheduleFeedViewReload {
+                feeds_first: 10,
+                entries_first: 20,
+            }]
+        );
+
+        let operations = component.apply_feed_view_reload_debounced(10, 20);
+        assert_matches!(
+            operations.as_slice(),
+            [
+                Operation::FetchSubscription {
+                    populate: Populate::Replace,
+                    after: None,
+                    first: 10,
+                },
+                Operation::FetchEntries {
+                    populate: Populate::Replace,
+                    after: None,
+                    first: 20,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn feed_event_subscription_confirmation_reloads_subscription_and_entries() {
+        let mut component = app_component();
+        let event = payload::FeedEvent::SubscriptionChanged(payload::SubscriptionChangedEvent {
+            request_id: "request-1".to_owned(),
+            url: FeedUrl::parse("https://example.com/feed.xml").unwrap(),
+        });
+
+        let operations = component.apply_feed_event(event, 10, 20);
+
+        assert_matches!(
+            operations.as_slice(),
+            [
+                Operation::FetchSubscription {
+                    populate: Populate::Replace,
+                    after: None,
+                    first: 10,
+                },
+                Operation::FetchEntries {
+                    populate: Populate::Replace,
+                    after: None,
+                    first: 20,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn timeline_changed_event_schedules_debounced_refetch() {
+        let mut component = app_component();
+        let event = payload::TimelineChangeEvent {
+            changed_at: "2026-06-13T00:00:00Z".to_owned(),
+            affected_feeds: Some(vec![
+                FeedUrl::parse("https://example.com/feed.xml").unwrap(),
+            ]),
+        };
+
+        let operations = component.apply_timeline_changed(&event);
+
+        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
+
+        let operations = component.apply_timeline_reload_debounced(20);
+
+        assert_matches!(
+            operations.as_slice(),
+            [Operation::RefetchTimelineEntries {
+                populate: Populate::Replace,
+                after: None,
+                first: 20,
+            }]
+        );
     }
 
     #[test]

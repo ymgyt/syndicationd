@@ -5,47 +5,50 @@ use crate::{
     },
     db::CrawlJobQueueTx,
     error::RegistryDbResult,
-    event::{CrawlJobEnqueuedEvent, CrawlJobStartedEvent, Event, JournalTx, RecordedEvents},
+    event::{CrawlJobEnqueuedEvent, CrawlJobStartedEvent, Event},
 };
 
 /// Transactional service for durable crawl-job queue operations.
 pub struct CrawlJobQueue<'a, Tx> {
     tx: &'a mut Tx,
-    recorded: &'a mut RecordedEvents,
 }
 
 impl<'a, Tx> CrawlJobQueue<'a, Tx> {
-    pub fn new(tx: &'a mut Tx, recorded: &'a mut RecordedEvents) -> Self {
-        Self { tx, recorded }
+    pub fn new(tx: &'a mut Tx) -> Self {
+        Self { tx }
     }
 }
 
 impl<Tx> CrawlJobQueue<'_, Tx>
 where
-    Tx: CrawlJobQueueTx + JournalTx + Send,
+    Tx: CrawlJobQueueTx + Send,
 {
     pub async fn enqueue(
         &mut self,
         command: EnqueueCrawlJobCommand,
-    ) -> RegistryDbResult<EnqueueCrawlJobOutcome> {
+    ) -> RegistryDbResult<(EnqueueCrawlJobOutcome, Vec<Event>)> {
         let outcome = self.tx.enqueue_job(command).await?;
-        if let EnqueueCrawlJobOutcome::Enqueued(job) = &outcome {
-            self.record_event(CrawlJobEnqueuedEvent::from(job.clone()))
-                .await?;
-        }
-        Ok(outcome)
+        let events = match &outcome {
+            EnqueueCrawlJobOutcome::Enqueued(job) => {
+                vec![CrawlJobEnqueuedEvent::from(job.clone()).into()]
+            }
+            EnqueueCrawlJobOutcome::AlreadyActive => Vec::new(),
+        };
+        Ok((outcome, events))
     }
 
     pub async fn claim(
         &mut self,
         command: ClaimCrawlJobCommand,
-    ) -> RegistryDbResult<ClaimCrawlJobOutcome> {
+    ) -> RegistryDbResult<(ClaimCrawlJobOutcome, Vec<Event>)> {
         let outcome = self.tx.claim_job(command).await?;
-        if let ClaimCrawlJobOutcome::Claimed(job) = &outcome {
-            self.record_event(CrawlJobStartedEvent::from(job.clone()))
-                .await?;
-        }
-        Ok(outcome)
+        let events = match &outcome {
+            ClaimCrawlJobOutcome::Claimed(job) => {
+                vec![CrawlJobStartedEvent::from(job.clone()).into()]
+            }
+            ClaimCrawlJobOutcome::NoClaimableJob => Vec::new(),
+        };
+        Ok((outcome, events))
     }
 
     pub async fn finish(
@@ -53,16 +56,5 @@ where
         command: FinishCrawlJobCommand,
     ) -> RegistryDbResult<FinishCrawlJobOutcome> {
         self.tx.finish_job(command).await
-    }
-
-    async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        let kind = event.kind();
-        self.tx.append_event(event).await?;
-        self.recorded.push(kind);
-        Ok(())
     }
 }

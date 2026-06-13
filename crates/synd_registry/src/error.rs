@@ -1,3 +1,5 @@
+use std::error::Error as StdError;
+
 use thiserror::Error;
 
 pub type RegistryDbResult<T> = Result<T, RegistryDbError>;
@@ -5,12 +7,21 @@ pub type RegistryDbResult<T> = Result<T, RegistryDbError>;
 #[derive(Debug, Error)]
 pub enum RegistryDbError {
     #[error(transparent)]
-    Internal(#[from] anyhow::Error),
+    Internal(#[from] Box<dyn StdError + Send + Sync>),
+    #[error("internal registry error: {0}")]
+    InternalMessage(String),
 }
 
 impl RegistryDbError {
-    pub fn internal(err: impl Into<anyhow::Error>) -> Self {
-        Self::Internal(err.into())
+    pub fn internal<E>(err: E) -> Self
+    where
+        E: StdError + Send + Sync + 'static,
+    {
+        Self::Internal(Box::new(err))
+    }
+
+    pub fn internal_message(message: impl Into<String>) -> Self {
+        Self::InternalMessage(message.into())
     }
 }
 

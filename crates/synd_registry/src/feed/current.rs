@@ -6,7 +6,7 @@ use crate::{
     crawl::{blob::BlobRef, job::CrawlJobId, result::CrawlResultRef},
     db::{BlobStoreTx, FeedProjectionTx},
     error::RegistryDbResult,
-    event::{Event, FeedChangedEvent, FeedDiscoveredEvent, FeedEvent, JournalTx, RecordedEvents},
+    event::{Event, FeedChangedEvent, FeedDiscoveredEvent},
 };
 
 /// Source crawl result used to derive the current feed state.
@@ -36,7 +36,7 @@ pub enum UpsertFeedOutcome {
 
 impl UpsertFeedOutcome {
     /// Returns the feed lifecycle event represented by this write outcome.
-    pub fn into_event(self, source: &FeedSource) -> Option<FeedEvent> {
+    pub fn into_event(self, source: &FeedSource) -> Option<Event> {
         match self {
             Self::Discovered => Some(
                 FeedDiscoveredEvent::new(source.feed_url.clone(), source.crawl_job_id.clone())
@@ -53,19 +53,18 @@ impl UpsertFeedOutcome {
 /// Transaction-scoped operations for projecting crawled feed state.
 pub struct FeedProjectionScope<'a, Tx> {
     tx: &'a mut Tx,
-    recorded: &'a mut RecordedEvents,
 }
 
 impl<'a, Tx> FeedProjectionScope<'a, Tx> {
     /// Creates a projection scope inside one open registry transaction.
-    pub fn new(tx: &'a mut Tx, recorded: &'a mut RecordedEvents) -> Self {
-        Self { tx, recorded }
+    pub fn new(tx: &'a mut Tx) -> Self {
+        Self { tx }
     }
 }
 
 impl<Tx> FeedProjectionScope<'_, Tx>
 where
-    Tx: BlobStoreTx + FeedProjectionTx + JournalTx + Send,
+    Tx: BlobStoreTx + FeedProjectionTx + Send,
 {
     /// Returns the crawl result source that can update feed state.
     pub async fn load_feed_source(
@@ -80,27 +79,14 @@ where
         self.tx.load_blob(source.body_blob).await
     }
 
-    /// Applies the latest parsed feed state and records feed lifecycle events.
+    /// Applies the latest parsed feed state and returns feed lifecycle events.
     pub async fn upsert_feed(
         &mut self,
         command: UpsertFeedCommand,
-    ) -> RegistryDbResult<UpsertFeedOutcome> {
+    ) -> RegistryDbResult<(UpsertFeedOutcome, Vec<Event>)> {
         let source = command.source.clone();
         let outcome = self.tx.upsert_feed(command).await?;
-        if let Some(event) = outcome.into_event(&source) {
-            self.record_event(event).await?;
-        }
-        Ok(outcome)
-    }
-
-    async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        let kind = event.kind();
-        self.tx.append_event(event).await?;
-        self.recorded.push(kind);
-        Ok(())
+        let events = outcome.into_event(&source).into_iter().collect();
+        Ok((outcome, events))
     }
 }

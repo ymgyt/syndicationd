@@ -2,10 +2,15 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use rand::distr::{Alphanumeric, SampleString};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use synd_feed::types::{Category, EntryId, FeedUrl, Requirement};
+use thiserror::Error;
 
 use crate::{
+    api::{
+        ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
+        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
+    },
     crawl::{
         job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
         policy::CrawlPolicy,
@@ -14,197 +19,241 @@ use crate::{
     timeline::TimelineKey,
 };
 
-/// A typed fact recorded in the registry event journal.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Event {
-    Request(RequestEvent),
-    Sub(SubEvent),
-    Crawl(CrawlEvent),
-    Feed(FeedEvent),
-    Entry(EntryEvent),
-    Timeline(TimelineEvent),
-    Api(ApiEvent),
+/// Stable identifier stored in the event journal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EventType {
+    SubscribeFeedRequested,
+    SubscribeFeedRejected,
+    UnsubscribeFeedRequested,
+    UnsubscribeFeedRejected,
+    FeedSubscribed,
+    SubscriptionChanged,
+    FeedUnsubscribed,
+    CrawlTargetActivated,
+    CrawlTargetPolicyChanged,
+    CrawlTargetDeactivated,
+    CrawlJobEnqueued,
+    CrawlJobStarted,
+    CrawlJobFinished,
+    FeedDiscovered,
+    FeedChanged,
+    EntryDiscovered,
+    EntryChanged,
+    TimelineChanged,
+    ApiFeedSubscribed,
+    ApiFeedSubscribeRejected,
+    ApiFeedSubscriptionChanged,
+    ApiFeedUnsubscribed,
+    ApiFeedUnsubscribeRejected,
+    ApiTimelineChanged,
 }
 
-impl Event {
-    pub fn kind(&self) -> EventKind {
+impl EventType {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Request(event) => event.kind().into(),
-            Self::Sub(event) => event.kind().into(),
-            Self::Crawl(event) => event.kind().into(),
-            Self::Feed(event) => event.kind().into(),
-            Self::Entry(event) => event.kind().into(),
-            Self::Timeline(event) => event.kind().into(),
-            Self::Api(event) => event.kind().into(),
+            Self::SubscribeFeedRequested => "request.subscribe_feed.requested",
+            Self::SubscribeFeedRejected => "request.subscribe_feed.rejected",
+            Self::UnsubscribeFeedRequested => "request.unsubscribe_feed.requested",
+            Self::UnsubscribeFeedRejected => "request.unsubscribe_feed.rejected",
+            Self::FeedSubscribed => "sub.feed.subscribed",
+            Self::SubscriptionChanged => "sub.subscription.changed",
+            Self::FeedUnsubscribed => "sub.feed.unsubscribed",
+            Self::CrawlTargetActivated => "crawl.target.activated",
+            Self::CrawlTargetPolicyChanged => "crawl.target.policy_changed",
+            Self::CrawlTargetDeactivated => "crawl.target.deactivated",
+            Self::CrawlJobEnqueued => "crawl.job.enqueued",
+            Self::CrawlJobStarted => "crawl.job.started",
+            Self::CrawlJobFinished => "crawl.job.finished",
+            Self::FeedDiscovered => "feed.discovered",
+            Self::FeedChanged => "feed.changed",
+            Self::EntryDiscovered => "entry.discovered",
+            Self::EntryChanged => "entry.changed",
+            Self::TimelineChanged => "timeline.changed",
+            Self::ApiFeedSubscribed => "api.feed.subscribed",
+            Self::ApiFeedSubscribeRejected => "api.feed.subscribe_rejected",
+            Self::ApiFeedSubscriptionChanged => "api.feed.subscription.changed",
+            Self::ApiFeedUnsubscribed => "api.feed.unsubscribed",
+            Self::ApiFeedUnsubscribeRejected => "api.feed.unsubscribe_rejected",
+            Self::ApiTimelineChanged => "api.timeline.changed",
+        }
+    }
+
+    pub fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "request.subscribe_feed.requested" => Some(Self::SubscribeFeedRequested),
+            "request.subscribe_feed.rejected" => Some(Self::SubscribeFeedRejected),
+            "request.unsubscribe_feed.requested" => Some(Self::UnsubscribeFeedRequested),
+            "request.unsubscribe_feed.rejected" => Some(Self::UnsubscribeFeedRejected),
+            "sub.feed.subscribed" => Some(Self::FeedSubscribed),
+            "sub.subscription.changed" => Some(Self::SubscriptionChanged),
+            "sub.feed.unsubscribed" => Some(Self::FeedUnsubscribed),
+            "crawl.target.activated" => Some(Self::CrawlTargetActivated),
+            "crawl.target.policy_changed" => Some(Self::CrawlTargetPolicyChanged),
+            "crawl.target.deactivated" => Some(Self::CrawlTargetDeactivated),
+            "crawl.job.enqueued" => Some(Self::CrawlJobEnqueued),
+            "crawl.job.started" => Some(Self::CrawlJobStarted),
+            "crawl.job.finished" => Some(Self::CrawlJobFinished),
+            "feed.discovered" => Some(Self::FeedDiscovered),
+            "feed.changed" => Some(Self::FeedChanged),
+            "entry.discovered" => Some(Self::EntryDiscovered),
+            "entry.changed" => Some(Self::EntryChanged),
+            "timeline.changed" => Some(Self::TimelineChanged),
+            "api.feed.subscribed" => Some(Self::ApiFeedSubscribed),
+            "api.feed.subscribe_rejected" => Some(Self::ApiFeedSubscribeRejected),
+            "api.feed.subscription.changed" => Some(Self::ApiFeedSubscriptionChanged),
+            "api.feed.unsubscribed" => Some(Self::ApiFeedUnsubscribed),
+            "api.feed.unsubscribe_rejected" => Some(Self::ApiFeedUnsubscribeRejected),
+            "api.timeline.changed" => Some(Self::ApiTimelineChanged),
+            _ => None,
         }
     }
 }
 
-impl From<RequestEvent> for Event {
-    fn from(event: RequestEvent) -> Self {
-        Self::Request(event)
-    }
+/// Event payload persisted in the registry journal.
+pub trait RegistryEvent: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {
+    const TYPE: EventType;
 }
 
-impl From<SubEvent> for Event {
-    fn from(event: SubEvent) -> Self {
-        Self::Sub(event)
-    }
+/// A typed fact recorded in the registry event journal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event {
+    SubscribeFeedRequested(SubscribeFeedRequested),
+    SubscribeFeedRejected(SubscribeFeedRejected),
+    UnsubscribeFeedRequested(UnsubscribeFeedRequested),
+    UnsubscribeFeedRejected(UnsubscribeFeedRejected),
+    FeedSubscribed(FeedSubscribedEvent),
+    SubscriptionChanged(SubscriptionChangedEvent),
+    FeedUnsubscribed(FeedUnsubscribedEvent),
+    CrawlTargetActivated(CrawlTargetActivatedEvent),
+    CrawlTargetPolicyChanged(CrawlTargetPolicyChangedEvent),
+    CrawlTargetDeactivated(CrawlTargetDeactivatedEvent),
+    CrawlJobEnqueued(CrawlJobEnqueuedEvent),
+    CrawlJobStarted(CrawlJobStartedEvent),
+    CrawlJobFinished(CrawlJobFinishedEvent),
+    FeedDiscovered(FeedDiscoveredEvent),
+    FeedChanged(FeedChangedEvent),
+    EntryDiscovered(EntryDiscoveredEvent),
+    EntryChanged(EntryChangedEvent),
+    TimelineChanged(TimelineChangedEvent),
+    ApiFeedSubscribed(ApiFeedSubscribed),
+    ApiFeedSubscribeRejected(ApiFeedSubscribeRejected),
+    ApiFeedSubscriptionChanged(ApiFeedSubscriptionChanged),
+    ApiFeedUnsubscribed(ApiFeedUnsubscribed),
+    ApiFeedUnsubscribeRejected(ApiFeedUnsubscribeRejected),
+    ApiTimelineChanged(ApiTimelineChanged),
 }
 
-impl From<CrawlEvent> for Event {
-    fn from(event: CrawlEvent) -> Self {
-        Self::Crawl(event)
+impl Event {
+    pub fn event_type(&self) -> EventType {
+        match self {
+            Self::SubscribeFeedRequested(_) => EventType::SubscribeFeedRequested,
+            Self::SubscribeFeedRejected(_) => EventType::SubscribeFeedRejected,
+            Self::UnsubscribeFeedRequested(_) => EventType::UnsubscribeFeedRequested,
+            Self::UnsubscribeFeedRejected(_) => EventType::UnsubscribeFeedRejected,
+            Self::FeedSubscribed(_) => EventType::FeedSubscribed,
+            Self::SubscriptionChanged(_) => EventType::SubscriptionChanged,
+            Self::FeedUnsubscribed(_) => EventType::FeedUnsubscribed,
+            Self::CrawlTargetActivated(_) => EventType::CrawlTargetActivated,
+            Self::CrawlTargetPolicyChanged(_) => EventType::CrawlTargetPolicyChanged,
+            Self::CrawlTargetDeactivated(_) => EventType::CrawlTargetDeactivated,
+            Self::CrawlJobEnqueued(_) => EventType::CrawlJobEnqueued,
+            Self::CrawlJobStarted(_) => EventType::CrawlJobStarted,
+            Self::CrawlJobFinished(_) => EventType::CrawlJobFinished,
+            Self::FeedDiscovered(_) => EventType::FeedDiscovered,
+            Self::FeedChanged(_) => EventType::FeedChanged,
+            Self::EntryDiscovered(_) => EventType::EntryDiscovered,
+            Self::EntryChanged(_) => EventType::EntryChanged,
+            Self::TimelineChanged(_) => EventType::TimelineChanged,
+            Self::ApiFeedSubscribed(_) => EventType::ApiFeedSubscribed,
+            Self::ApiFeedSubscribeRejected(_) => EventType::ApiFeedSubscribeRejected,
+            Self::ApiFeedSubscriptionChanged(_) => EventType::ApiFeedSubscriptionChanged,
+            Self::ApiFeedUnsubscribed(_) => EventType::ApiFeedUnsubscribed,
+            Self::ApiFeedUnsubscribeRejected(_) => EventType::ApiFeedUnsubscribeRejected,
+            Self::ApiTimelineChanged(_) => EventType::ApiTimelineChanged,
+        }
     }
-}
 
-impl From<FeedEvent> for Event {
-    fn from(event: FeedEvent) -> Self {
-        Self::Feed(event)
-    }
-}
-
-impl From<EntryEvent> for Event {
-    fn from(event: EntryEvent) -> Self {
-        Self::Entry(event)
-    }
-}
-
-impl From<TimelineEvent> for Event {
-    fn from(event: TimelineEvent) -> Self {
-        Self::Timeline(event)
+    fn payload_error<T>(&self) -> EventPayloadError
+    where
+        T: RegistryEvent,
+    {
+        EventPayloadError::new(T::TYPE, self.event_type())
     }
 }
 
 impl From<ApiEvent> for Event {
     fn from(event: ApiEvent) -> Self {
-        Self::Api(event)
+        match event {
+            ApiEvent::FeedSubscribed(event) => Self::ApiFeedSubscribed(event),
+            ApiEvent::FeedSubscribeRejected(event) => Self::ApiFeedSubscribeRejected(event),
+            ApiEvent::FeedSubscriptionChanged(event) => Self::ApiFeedSubscriptionChanged(event),
+            ApiEvent::FeedUnsubscribed(event) => Self::ApiFeedUnsubscribed(event),
+            ApiEvent::FeedUnsubscribeRejected(event) => Self::ApiFeedUnsubscribeRejected(event),
+            ApiEvent::TimelineChanged(event) => Self::ApiTimelineChanged(event),
+        }
     }
 }
 
-/// A stable event category used to route committed facts to interested workers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EventKind {
-    Request(RequestEventKind),
-    Sub(SubEventKind),
-    Crawl(CrawlEventKind),
-    Feed(FeedEventKind),
-    Entry(EntryEventKind),
-    Timeline(TimelineEventKind),
-    Api(ApiEventKind),
-}
-
-impl From<RequestEventKind> for EventKind {
-    fn from(kind: RequestEventKind) -> Self {
-        Self::Request(kind)
+impl From<ApiFeedSubscribed> for Event {
+    fn from(event: ApiFeedSubscribed) -> Self {
+        Self::ApiFeedSubscribed(event)
     }
 }
 
-impl From<SubEventKind> for EventKind {
-    fn from(kind: SubEventKind) -> Self {
-        Self::Sub(kind)
+impl From<ApiFeedSubscribeRejected> for Event {
+    fn from(event: ApiFeedSubscribeRejected) -> Self {
+        Self::ApiFeedSubscribeRejected(event)
     }
 }
 
-impl From<CrawlEventKind> for EventKind {
-    fn from(kind: CrawlEventKind) -> Self {
-        Self::Crawl(kind)
+impl From<ApiFeedSubscriptionChanged> for Event {
+    fn from(event: ApiFeedSubscriptionChanged) -> Self {
+        Self::ApiFeedSubscriptionChanged(event)
     }
 }
 
-impl From<FeedEventKind> for EventKind {
-    fn from(kind: FeedEventKind) -> Self {
-        Self::Feed(kind)
+impl From<ApiFeedUnsubscribed> for Event {
+    fn from(event: ApiFeedUnsubscribed) -> Self {
+        Self::ApiFeedUnsubscribed(event)
     }
 }
 
-impl From<EntryEventKind> for EventKind {
-    fn from(kind: EntryEventKind) -> Self {
-        Self::Entry(kind)
+impl From<ApiFeedUnsubscribeRejected> for Event {
+    fn from(event: ApiFeedUnsubscribeRejected) -> Self {
+        Self::ApiFeedUnsubscribeRejected(event)
     }
 }
 
-impl From<TimelineEventKind> for EventKind {
-    fn from(kind: TimelineEventKind) -> Self {
-        Self::Timeline(kind)
+impl From<ApiTimelineChanged> for Event {
+    fn from(event: ApiTimelineChanged) -> Self {
+        Self::ApiTimelineChanged(event)
     }
 }
 
-impl From<ApiEventKind> for EventKind {
-    fn from(kind: ApiEventKind) -> Self {
-        Self::Api(kind)
+/// Error returned when a flat journal event is converted to the wrong payload type.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unexpected event payload: expected {expected:?}, actual {actual:?}")]
+pub struct EventPayloadError {
+    pub expected: EventType,
+    pub actual: EventType,
+}
+
+impl EventPayloadError {
+    pub fn new(expected: EventType, actual: EventType) -> Self {
+        Self { expected, actual }
     }
-}
-
-/// A stable request event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum RequestEventKind {
-    SubscribeFeedRequested,
-    SubscribeFeedRejected,
-    UnsubscribeFeedRequested,
-    UnsubscribeFeedRejected,
-}
-
-/// A stable subscription event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SubEventKind {
-    FeedSubscribed,
-    SubscriptionChanged,
-    FeedUnsubscribed,
-}
-
-/// A stable crawl-domain event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CrawlEventKind {
-    TargetActivated,
-    TargetPolicyChanged,
-    TargetDeactivated,
-    JobEnqueued,
-    JobStarted,
-    JobFinished,
-}
-
-/// A stable feed-domain event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FeedEventKind {
-    Discovered,
-    Changed,
-}
-
-/// A stable entry-domain event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EntryEventKind {
-    Discovered,
-    Changed,
-}
-
-/// A stable timeline-domain event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TimelineEventKind {
-    Changed,
-}
-
-/// A stable API contract event category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ApiEventKind {
-    FeedSubscribed,
-    FeedSubscribeRejected,
-    FeedSubscriptionChanged,
-    FeedUnsubscribed,
-    FeedUnsubscribeRejected,
-    TimelineChanged,
 }
 
 /// Event categories a worker is interested in consuming.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventInterests {
-    kinds: Vec<EventKind>,
+    types: Vec<EventType>,
 }
 
 impl EventInterests {
-    pub fn new(kinds: impl Into<Vec<EventKind>>) -> Self {
+    pub fn new(types: impl Into<Vec<EventType>>) -> Self {
         Self {
-            kinds: kinds.into(),
+            types: types.into(),
         }
     }
 
@@ -212,16 +261,18 @@ impl EventInterests {
         Self::new(Vec::new())
     }
 
-    pub fn kinds(&self) -> &[EventKind] {
-        &self.kinds
+    pub fn types(&self) -> &[EventType] {
+        &self.types
     }
 
-    pub fn contains(&self, kind: EventKind) -> bool {
-        self.kinds.contains(&kind)
+    pub fn contains(&self, event_type: EventType) -> bool {
+        self.types.contains(&event_type)
     }
 
-    pub fn matches_any(&self, kinds: &[EventKind]) -> bool {
-        kinds.iter().any(|kind| self.contains(*kind))
+    pub fn matches_any(&self, event_types: &[EventType]) -> bool {
+        event_types
+            .iter()
+            .any(|event_type| self.contains(*event_type))
     }
 }
 
@@ -246,26 +297,6 @@ impl RequestId {
 impl fmt::Display for RequestId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
-    }
-}
-
-/// A fact about the lifecycle of one accepted registry request.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RequestEvent {
-    SubscribeFeedRequested(SubscribeFeedRequested),
-    SubscribeFeedRejected(SubscribeFeedRejected),
-    UnsubscribeFeedRequested(UnsubscribeFeedRequested),
-    UnsubscribeFeedRejected(UnsubscribeFeedRejected),
-}
-
-impl RequestEvent {
-    pub fn kind(&self) -> RequestEventKind {
-        match self {
-            Self::SubscribeFeedRequested(_) => RequestEventKind::SubscribeFeedRequested,
-            Self::SubscribeFeedRejected(_) => RequestEventKind::SubscribeFeedRejected,
-            Self::UnsubscribeFeedRequested(_) => RequestEventKind::UnsubscribeFeedRequested,
-            Self::UnsubscribeFeedRejected(_) => RequestEventKind::UnsubscribeFeedRejected,
-        }
     }
 }
 
@@ -299,7 +330,7 @@ impl SubscribeFeedRequested {
 
 impl From<SubscribeFeedRequested> for Event {
     fn from(event: SubscribeFeedRequested) -> Self {
-        Self::Request(RequestEvent::SubscribeFeedRequested(event))
+        Self::SubscribeFeedRequested(event)
     }
 }
 
@@ -327,7 +358,7 @@ impl SubscribeFeedRejected {
 
 impl From<SubscribeFeedRejected> for Event {
     fn from(event: SubscribeFeedRejected) -> Self {
-        Self::Request(RequestEvent::SubscribeFeedRejected(event))
+        Self::SubscribeFeedRejected(event)
     }
 }
 
@@ -349,7 +380,7 @@ impl UnsubscribeFeedRequested {
 
 impl From<UnsubscribeFeedRequested> for Event {
     fn from(event: UnsubscribeFeedRequested) -> Self {
-        Self::Request(RequestEvent::UnsubscribeFeedRequested(event))
+        Self::UnsubscribeFeedRequested(event)
     }
 }
 
@@ -377,230 +408,7 @@ impl UnsubscribeFeedRejected {
 
 impl From<UnsubscribeFeedRejected> for Event {
     fn from(event: UnsubscribeFeedRejected) -> Self {
-        Self::Request(RequestEvent::UnsubscribeFeedRejected(event))
-    }
-}
-
-/// A fact about subscription domain state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SubEvent {
-    FeedSubscribed(FeedSubscribedEvent),
-    SubscriptionChanged(SubscriptionChangedEvent),
-    FeedUnsubscribed(FeedUnsubscribedEvent),
-}
-
-impl SubEvent {
-    pub fn kind(&self) -> SubEventKind {
-        match self {
-            Self::FeedSubscribed(_) => SubEventKind::FeedSubscribed,
-            Self::SubscriptionChanged(_) => SubEventKind::SubscriptionChanged,
-            Self::FeedUnsubscribed(_) => SubEventKind::FeedUnsubscribed,
-        }
-    }
-}
-
-/// A fact about crawl-domain state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CrawlEvent {
-    TargetActivated(CrawlTargetActivatedEvent),
-    TargetPolicyChanged(CrawlTargetPolicyChangedEvent),
-    TargetDeactivated(CrawlTargetDeactivatedEvent),
-    JobEnqueued(CrawlJobEnqueuedEvent),
-    JobStarted(CrawlJobStartedEvent),
-    JobFinished(CrawlJobFinishedEvent),
-}
-
-impl CrawlEvent {
-    pub fn kind(&self) -> CrawlEventKind {
-        match self {
-            Self::TargetActivated(_) => CrawlEventKind::TargetActivated,
-            Self::TargetPolicyChanged(_) => CrawlEventKind::TargetPolicyChanged,
-            Self::TargetDeactivated(_) => CrawlEventKind::TargetDeactivated,
-            Self::JobEnqueued(_) => CrawlEventKind::JobEnqueued,
-            Self::JobStarted(_) => CrawlEventKind::JobStarted,
-            Self::JobFinished(_) => CrawlEventKind::JobFinished,
-        }
-    }
-}
-
-/// A fact about current feed state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FeedEvent {
-    Discovered(FeedDiscoveredEvent),
-    Changed(FeedChangedEvent),
-}
-
-impl FeedEvent {
-    /// Returns the stable feed event category.
-    pub fn kind(&self) -> FeedEventKind {
-        match self {
-            Self::Discovered(_) => FeedEventKind::Discovered,
-            Self::Changed(_) => FeedEventKind::Changed,
-        }
-    }
-}
-
-/// A fact about current entry state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EntryEvent {
-    Discovered(EntryDiscoveredEvent),
-    Changed(EntryChangedEvent),
-}
-
-impl EntryEvent {
-    /// Returns the stable entry event category.
-    pub fn kind(&self) -> EntryEventKind {
-        match self {
-            Self::Discovered(_) => EntryEventKind::Discovered,
-            Self::Changed(_) => EntryEventKind::Changed,
-        }
-    }
-}
-
-/// A fact about timeline membership.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TimelineEvent {
-    Changed(TimelineChangedEvent),
-}
-
-impl TimelineEvent {
-    /// Returns the stable timeline event category.
-    pub fn kind(&self) -> TimelineEventKind {
-        match self {
-            Self::Changed(_) => TimelineEventKind::Changed,
-        }
-    }
-}
-
-/// Public event contract exposed through the API stream.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ApiEvent {
-    FeedSubscribed(ApiFeedSubscribed),
-    FeedSubscribeRejected(ApiFeedSubscribeRejected),
-    FeedSubscriptionChanged(ApiFeedSubscriptionChanged),
-    FeedUnsubscribed(ApiFeedUnsubscribed),
-    FeedUnsubscribeRejected(ApiFeedUnsubscribeRejected),
-    TimelineChanged(ApiTimelineChanged),
-}
-
-impl ApiEvent {
-    pub fn kind(&self) -> ApiEventKind {
-        match self {
-            Self::FeedSubscribed(_) => ApiEventKind::FeedSubscribed,
-            Self::FeedSubscribeRejected(_) => ApiEventKind::FeedSubscribeRejected,
-            Self::FeedSubscriptionChanged(_) => ApiEventKind::FeedSubscriptionChanged,
-            Self::FeedUnsubscribed(_) => ApiEventKind::FeedUnsubscribed,
-            Self::FeedUnsubscribeRejected(_) => ApiEventKind::FeedUnsubscribeRejected,
-            Self::TimelineChanged(_) => ApiEventKind::TimelineChanged,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApiFeedSubscribed {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
-}
-
-impl ApiFeedSubscribed {
-    pub fn new(request_id: RequestId, subscription: SubscriptionKey) -> Self {
-        Self {
-            request_id,
-            subscription,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApiFeedSubscribeRejected {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
-    pub reason: String,
-}
-
-impl ApiFeedSubscribeRejected {
-    pub fn new(
-        request_id: RequestId,
-        subscription: SubscriptionKey,
-        reason: impl Into<String>,
-    ) -> Self {
-        Self {
-            request_id,
-            subscription,
-            reason: reason.into(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApiFeedSubscriptionChanged {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
-}
-
-impl ApiFeedSubscriptionChanged {
-    pub fn new(request_id: RequestId, subscription: SubscriptionKey) -> Self {
-        Self {
-            request_id,
-            subscription,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApiFeedUnsubscribed {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
-}
-
-impl ApiFeedUnsubscribed {
-    pub fn new(request_id: RequestId, subscription: SubscriptionKey) -> Self {
-        Self {
-            request_id,
-            subscription,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApiFeedUnsubscribeRejected {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
-    pub reason: String,
-}
-
-impl ApiFeedUnsubscribeRejected {
-    pub fn new(
-        request_id: RequestId,
-        subscription: SubscriptionKey,
-        reason: impl Into<String>,
-    ) -> Self {
-        Self {
-            request_id,
-            subscription,
-            reason: reason.into(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ApiTimelineChanged {
-    pub timeline: TimelineKey,
-    pub changed_at: DateTime<Utc>,
-    pub affected_feeds: Vec<FeedUrl>,
-}
-
-impl ApiTimelineChanged {
-    pub fn new(
-        timeline: TimelineKey,
-        changed_at: DateTime<Utc>,
-        affected_feeds: Vec<FeedUrl>,
-    ) -> Self {
-        Self {
-            timeline,
-            changed_at,
-            affected_feeds,
-        }
+        Self::UnsubscribeFeedRejected(event)
     }
 }
 
@@ -616,39 +424,11 @@ pub enum SubscriptionLifecycle {
 }
 
 impl SubscriptionLifecycle {
-    pub fn kind(&self) -> SubEventKind {
-        match self {
-            Self::Subscribed(_) => SubEventKind::FeedSubscribed,
-            Self::Changed(_) => SubEventKind::SubscriptionChanged,
-            Self::Unsubscribed(_) => SubEventKind::FeedUnsubscribed,
-        }
-    }
-
     pub fn affected_feed_url(&self) -> &FeedUrl {
         match self {
             Self::Subscribed(event) => &event.subscription.feed_url,
             Self::Changed(event) => &event.subscription.feed_url,
             Self::Unsubscribed(event) => &event.subscription.feed_url,
-        }
-    }
-}
-
-impl From<SubscriptionLifecycle> for SubEvent {
-    fn from(event: SubscriptionLifecycle) -> Self {
-        match event {
-            SubscriptionLifecycle::Subscribed(event) => Self::FeedSubscribed(event),
-            SubscriptionLifecycle::Changed(event) => Self::SubscriptionChanged(event),
-            SubscriptionLifecycle::Unsubscribed(event) => Self::FeedUnsubscribed(event),
-        }
-    }
-}
-
-impl SubscriptionLifecycle {
-    pub fn from_sub_event(event: SubEvent) -> Option<Self> {
-        match event {
-            SubEvent::FeedSubscribed(event) => Some(SubscriptionLifecycle::Subscribed(event)),
-            SubEvent::SubscriptionChanged(event) => Some(SubscriptionLifecycle::Changed(event)),
-            SubEvent::FeedUnsubscribed(event) => Some(SubscriptionLifecycle::Unsubscribed(event)),
         }
     }
 }
@@ -677,15 +457,9 @@ impl FeedSubscribedEvent {
     }
 }
 
-impl From<FeedSubscribedEvent> for SubEvent {
-    fn from(event: FeedSubscribedEvent) -> Self {
-        Self::FeedSubscribed(event)
-    }
-}
-
 impl From<FeedSubscribedEvent> for Event {
     fn from(event: FeedSubscribedEvent) -> Self {
-        Self::Sub(event.into())
+        Self::FeedSubscribed(event)
     }
 }
 
@@ -713,15 +487,9 @@ impl SubscriptionChangedEvent {
     }
 }
 
-impl From<SubscriptionChangedEvent> for SubEvent {
-    fn from(event: SubscriptionChangedEvent) -> Self {
-        Self::SubscriptionChanged(event)
-    }
-}
-
 impl From<SubscriptionChangedEvent> for Event {
     fn from(event: SubscriptionChangedEvent) -> Self {
-        Self::Sub(event.into())
+        Self::SubscriptionChanged(event)
     }
 }
 
@@ -749,15 +517,9 @@ impl FeedUnsubscribedEvent {
     }
 }
 
-impl From<FeedUnsubscribedEvent> for SubEvent {
-    fn from(event: FeedUnsubscribedEvent) -> Self {
-        Self::FeedUnsubscribed(event)
-    }
-}
-
 impl From<FeedUnsubscribedEvent> for Event {
     fn from(event: FeedUnsubscribedEvent) -> Self {
-        Self::Sub(event.into())
+        Self::FeedUnsubscribed(event)
     }
 }
 
@@ -774,15 +536,9 @@ impl CrawlTargetActivatedEvent {
     }
 }
 
-impl From<CrawlTargetActivatedEvent> for CrawlEvent {
-    fn from(event: CrawlTargetActivatedEvent) -> Self {
-        Self::TargetActivated(event)
-    }
-}
-
 impl From<CrawlTargetActivatedEvent> for Event {
     fn from(event: CrawlTargetActivatedEvent) -> Self {
-        Self::Crawl(event.into())
+        Self::CrawlTargetActivated(event)
     }
 }
 
@@ -799,15 +555,9 @@ impl CrawlTargetPolicyChangedEvent {
     }
 }
 
-impl From<CrawlTargetPolicyChangedEvent> for CrawlEvent {
-    fn from(event: CrawlTargetPolicyChangedEvent) -> Self {
-        Self::TargetPolicyChanged(event)
-    }
-}
-
 impl From<CrawlTargetPolicyChangedEvent> for Event {
     fn from(event: CrawlTargetPolicyChangedEvent) -> Self {
-        Self::Crawl(event.into())
+        Self::CrawlTargetPolicyChanged(event)
     }
 }
 
@@ -823,15 +573,9 @@ impl CrawlTargetDeactivatedEvent {
     }
 }
 
-impl From<CrawlTargetDeactivatedEvent> for CrawlEvent {
-    fn from(event: CrawlTargetDeactivatedEvent) -> Self {
-        Self::TargetDeactivated(event)
-    }
-}
-
 impl From<CrawlTargetDeactivatedEvent> for Event {
     fn from(event: CrawlTargetDeactivatedEvent) -> Self {
-        Self::Crawl(event.into())
+        Self::CrawlTargetDeactivated(event)
     }
 }
 
@@ -879,15 +623,9 @@ impl From<CrawlJob> for CrawlJobEnqueuedEvent {
     }
 }
 
-impl From<CrawlJobEnqueuedEvent> for CrawlEvent {
-    fn from(event: CrawlJobEnqueuedEvent) -> Self {
-        Self::JobEnqueued(event)
-    }
-}
-
 impl From<CrawlJobEnqueuedEvent> for Event {
     fn from(event: CrawlJobEnqueuedEvent) -> Self {
-        Self::Crawl(event.into())
+        Self::CrawlJobEnqueued(event)
     }
 }
 
@@ -910,15 +648,9 @@ impl From<CrawlJob> for CrawlJobStartedEvent {
     }
 }
 
-impl From<CrawlJobStartedEvent> for CrawlEvent {
-    fn from(event: CrawlJobStartedEvent) -> Self {
-        Self::JobStarted(event)
-    }
-}
-
 impl From<CrawlJobStartedEvent> for Event {
     fn from(event: CrawlJobStartedEvent) -> Self {
-        Self::Crawl(event.into())
+        Self::CrawlJobStarted(event)
     }
 }
 
@@ -941,15 +673,9 @@ impl From<CrawlJob> for CrawlJobFinishedEvent {
     }
 }
 
-impl From<CrawlJobFinishedEvent> for CrawlEvent {
-    fn from(event: CrawlJobFinishedEvent) -> Self {
-        Self::JobFinished(event)
-    }
-}
-
 impl From<CrawlJobFinishedEvent> for Event {
     fn from(event: CrawlJobFinishedEvent) -> Self {
-        Self::Crawl(event.into())
+        Self::CrawlJobFinished(event)
     }
 }
 
@@ -970,15 +696,9 @@ impl FeedDiscoveredEvent {
     }
 }
 
-impl From<FeedDiscoveredEvent> for FeedEvent {
-    fn from(event: FeedDiscoveredEvent) -> Self {
-        Self::Discovered(event)
-    }
-}
-
 impl From<FeedDiscoveredEvent> for Event {
     fn from(event: FeedDiscoveredEvent) -> Self {
-        Self::Feed(event.into())
+        Self::FeedDiscovered(event)
     }
 }
 
@@ -999,15 +719,9 @@ impl FeedChangedEvent {
     }
 }
 
-impl From<FeedChangedEvent> for FeedEvent {
-    fn from(event: FeedChangedEvent) -> Self {
-        Self::Changed(event)
-    }
-}
-
 impl From<FeedChangedEvent> for Event {
     fn from(event: FeedChangedEvent) -> Self {
-        Self::Feed(event.into())
+        Self::FeedChanged(event)
     }
 }
 
@@ -1030,15 +744,9 @@ impl EntryDiscoveredEvent {
     }
 }
 
-impl From<EntryDiscoveredEvent> for EntryEvent {
-    fn from(event: EntryDiscoveredEvent) -> Self {
-        Self::Discovered(event)
-    }
-}
-
 impl From<EntryDiscoveredEvent> for Event {
     fn from(event: EntryDiscoveredEvent) -> Self {
-        Self::Entry(event.into())
+        Self::EntryDiscovered(event)
     }
 }
 
@@ -1061,15 +769,9 @@ impl EntryChangedEvent {
     }
 }
 
-impl From<EntryChangedEvent> for EntryEvent {
-    fn from(event: EntryChangedEvent) -> Self {
-        Self::Changed(event)
-    }
-}
-
 impl From<EntryChangedEvent> for Event {
     fn from(event: EntryChangedEvent) -> Self {
-        Self::Entry(event.into())
+        Self::EntryChanged(event)
     }
 }
 
@@ -1095,14 +797,344 @@ impl TimelineChangedEvent {
     }
 }
 
-impl From<TimelineChangedEvent> for TimelineEvent {
+impl From<TimelineChangedEvent> for Event {
     fn from(event: TimelineChangedEvent) -> Self {
-        Self::Changed(event)
+        Self::TimelineChanged(event)
     }
 }
 
-impl From<TimelineChangedEvent> for Event {
-    fn from(event: TimelineChangedEvent) -> Self {
-        Self::Timeline(event.into())
+impl RegistryEvent for SubscribeFeedRequested {
+    const TYPE: EventType = EventType::SubscribeFeedRequested;
+}
+
+impl RegistryEvent for SubscribeFeedRejected {
+    const TYPE: EventType = EventType::SubscribeFeedRejected;
+}
+
+impl RegistryEvent for UnsubscribeFeedRequested {
+    const TYPE: EventType = EventType::UnsubscribeFeedRequested;
+}
+
+impl RegistryEvent for UnsubscribeFeedRejected {
+    const TYPE: EventType = EventType::UnsubscribeFeedRejected;
+}
+
+impl RegistryEvent for FeedSubscribedEvent {
+    const TYPE: EventType = EventType::FeedSubscribed;
+}
+
+impl RegistryEvent for SubscriptionChangedEvent {
+    const TYPE: EventType = EventType::SubscriptionChanged;
+}
+
+impl RegistryEvent for FeedUnsubscribedEvent {
+    const TYPE: EventType = EventType::FeedUnsubscribed;
+}
+
+impl RegistryEvent for CrawlTargetActivatedEvent {
+    const TYPE: EventType = EventType::CrawlTargetActivated;
+}
+
+impl RegistryEvent for CrawlTargetPolicyChangedEvent {
+    const TYPE: EventType = EventType::CrawlTargetPolicyChanged;
+}
+
+impl RegistryEvent for CrawlTargetDeactivatedEvent {
+    const TYPE: EventType = EventType::CrawlTargetDeactivated;
+}
+
+impl RegistryEvent for CrawlJobEnqueuedEvent {
+    const TYPE: EventType = EventType::CrawlJobEnqueued;
+}
+
+impl RegistryEvent for CrawlJobStartedEvent {
+    const TYPE: EventType = EventType::CrawlJobStarted;
+}
+
+impl RegistryEvent for CrawlJobFinishedEvent {
+    const TYPE: EventType = EventType::CrawlJobFinished;
+}
+
+impl RegistryEvent for FeedDiscoveredEvent {
+    const TYPE: EventType = EventType::FeedDiscovered;
+}
+
+impl RegistryEvent for FeedChangedEvent {
+    const TYPE: EventType = EventType::FeedChanged;
+}
+
+impl RegistryEvent for EntryDiscoveredEvent {
+    const TYPE: EventType = EventType::EntryDiscovered;
+}
+
+impl RegistryEvent for EntryChangedEvent {
+    const TYPE: EventType = EventType::EntryChanged;
+}
+
+impl RegistryEvent for TimelineChangedEvent {
+    const TYPE: EventType = EventType::TimelineChanged;
+}
+
+impl TryFrom<Event> for SubscribeFeedRequested {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::SubscribeFeedRequested(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for SubscribeFeedRejected {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::SubscribeFeedRejected(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for UnsubscribeFeedRequested {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::UnsubscribeFeedRequested(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for UnsubscribeFeedRejected {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::UnsubscribeFeedRejected(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for FeedSubscribedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::FeedSubscribed(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for SubscriptionChangedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::SubscriptionChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for FeedUnsubscribedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::FeedUnsubscribed(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for CrawlTargetActivatedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::CrawlTargetActivated(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for CrawlTargetPolicyChangedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::CrawlTargetPolicyChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for CrawlTargetDeactivatedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::CrawlTargetDeactivated(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for CrawlJobEnqueuedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::CrawlJobEnqueued(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for CrawlJobStartedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::CrawlJobStarted(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for CrawlJobFinishedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::CrawlJobFinished(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for FeedDiscoveredEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::FeedDiscovered(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for FeedChangedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::FeedChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for EntryDiscoveredEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::EntryDiscovered(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for EntryChangedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::EntryChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for TimelineChangedEvent {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::TimelineChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for ApiFeedSubscribed {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::ApiFeedSubscribed(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for ApiFeedSubscribeRejected {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::ApiFeedSubscribeRejected(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for ApiFeedSubscriptionChanged {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::ApiFeedSubscriptionChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for ApiFeedUnsubscribed {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::ApiFeedUnsubscribed(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for ApiFeedUnsubscribeRejected {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::ApiFeedUnsubscribeRejected(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
+    }
+}
+
+impl TryFrom<Event> for ApiTimelineChanged {
+    type Error = EventPayloadError;
+
+    fn try_from(event: Event) -> Result<Self, Self::Error> {
+        match event {
+            Event::ApiTimelineChanged(payload) => Ok(payload),
+            event => Err(event.payload_error::<Self>()),
+        }
     }
 }

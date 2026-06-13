@@ -16,24 +16,23 @@ use crate::{
     },
     db::{BlobStoreTx, CrawlCompletionTx, CrawlJobQueueTx},
     error::{RegistryDbError, RegistryDbResult},
-    event::{CrawlJobFinishedEvent, Event, JournalTx, RecordedEvents},
+    event::{CrawlJobFinishedEvent, Event},
 };
 
 /// Records the durable completion facts for one claimed crawl job.
 pub struct CrawlCompletionRecorder<'a, Tx> {
     tx: &'a mut Tx,
-    recorded: &'a mut RecordedEvents,
 }
 
 impl<'a, Tx> CrawlCompletionRecorder<'a, Tx> {
-    pub fn new(tx: &'a mut Tx, recorded: &'a mut RecordedEvents) -> Self {
-        Self { tx, recorded }
+    pub fn new(tx: &'a mut Tx) -> Self {
+        Self { tx }
     }
 }
 
 impl<Tx> CrawlCompletionRecorder<'_, Tx>
 where
-    Tx: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalTx + Send,
+    Tx: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + Send,
 {
     pub async fn record(
         &mut self,
@@ -41,7 +40,7 @@ where
         outcome: FeedFetchOutcome,
         previous_state: Option<CrawlState>,
         finished_at: DateTime<Utc>,
-    ) -> RegistryDbResult<CrawlCompletionRecord> {
+    ) -> RegistryDbResult<(CrawlCompletionRecord, Vec<Event>)> {
         let started_at = job.updated_at;
         let feed_url = job.feed_url.clone();
         let previous_conditional = previous_state
@@ -85,16 +84,16 @@ where
         {
             FinishCrawlJobOutcome::Finished(job) => job,
             FinishCrawlJobOutcome::NotRunning => {
-                return Err(RegistryDbError::internal(anyhow::anyhow!(
-                    "claimed crawl job was not running when completion was recorded"
-                )));
+                return Err(RegistryDbError::internal_message(
+                    "claimed crawl job was not running when completion was recorded",
+                ));
             }
         };
 
-        self.record_event(CrawlJobFinishedEvent::from(finished_job))
-            .await?;
-
-        Ok(CrawlCompletionRecord { result_ref })
+        Ok((
+            CrawlCompletionRecord { result_ref },
+            vec![CrawlJobFinishedEvent::from(finished_job).into()],
+        ))
     }
 
     async fn persist_outcome(
@@ -252,17 +251,6 @@ where
             last_modified: response.headers.last_modified.clone(),
             retry_after_at: retry_after_at(response),
         })
-    }
-
-    async fn record_event<E>(&mut self, event: E) -> RegistryDbResult<()>
-    where
-        E: Into<Event>,
-    {
-        let event = event.into();
-        let kind = event.kind();
-        self.tx.append_event(event).await?;
-        self.recorded.push(kind);
-        Ok(())
     }
 }
 

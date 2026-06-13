@@ -60,6 +60,10 @@ pub(crate) enum Operation {
         first: i64,
     },
     StartFeedEventSubscription,
+    ScheduleFeedViewReload {
+        feeds_first: i64,
+        entries_first: i64,
+    },
     UnsubscribeFeed {
         url: FeedUrl,
     },

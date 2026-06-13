@@ -1,15 +1,24 @@
 use std::future::Future;
 
+use chrono::{DateTime, Utc};
+
 use crate::{
     error::RegistryDbResult,
-    event::{Event, EventInterests, ProcessorId},
+    event::{Event, EventInterests, EventType, ProcessorId},
 };
 
-/// Transactional event journal operations.
-pub trait JournalTx {
+/// Transactional event journal append operation used by `EventRecorder`.
+pub trait JournalAppendTx {
     /// Records that the event happened in the current transaction.
-    fn append_event(&mut self, event: Event) -> impl Future<Output = RegistryDbResult<()>> + Send;
+    fn append_event(
+        &mut self,
+        event: Event,
+        occurred_at: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<EventType>> + Send;
+}
 
+/// Transactional event journal read and cursor operations.
+pub trait JournalTx {
     /// Reads interested entries after the supplied cursor in the current transaction.
     fn read_after(
         &mut self,
@@ -75,11 +84,16 @@ impl EventReadBatch {
 pub struct JournaledEvent {
     cursor: EventCursor,
     event: Event,
+    occurred_at: DateTime<Utc>,
 }
 
 impl JournaledEvent {
-    pub fn new(cursor: EventCursor, event: Event) -> Self {
-        Self { cursor, event }
+    pub fn new(cursor: EventCursor, event: Event, occurred_at: DateTime<Utc>) -> Self {
+        Self {
+            cursor,
+            event,
+            occurred_at,
+        }
     }
 
     pub fn cursor(&self) -> &EventCursor {
@@ -90,8 +104,16 @@ impl JournaledEvent {
         &self.event
     }
 
+    pub fn occurred_at(&self) -> DateTime<Utc> {
+        self.occurred_at
+    }
+
     pub fn into_event(self) -> Event {
         self.event
+    }
+
+    pub fn into_parts(self) -> (EventCursor, Event, DateTime<Utc>) {
+        (self.cursor, self.event, self.occurred_at)
     }
 }
 

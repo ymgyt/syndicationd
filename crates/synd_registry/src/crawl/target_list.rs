@@ -6,12 +6,12 @@ use tracing::debug;
 
 use crate::{
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
-    db::{FeedRegistryDb, RegistryTx},
+    db::{CrawlTargetTx, FeedRegistryDb, SubscriptionTx},
     event::{
-        ConsumeContext, Consumer, CrawlEvent, CrawlTargetActivatedEvent,
-        CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event, EventInterests,
-        Processor, ProcessorError, ProcessorId, ProcessorResult, SubEvent, SubEventKind,
-        SubscriptionLifecycle, Transactional,
+        ConsumeContext, Consumer, ConsumerInput, CrawlTargetActivatedEvent,
+        CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event, EventType,
+        FeedSubscribedEvent, FeedUnsubscribedEvent, Processor, ProcessorError, ProcessorId,
+        ProcessorResult, RegistryEvent, SubscriptionChangedEvent, SubscriptionLifecycle,
     },
     subscription::SubscriptionKey,
 };
@@ -119,32 +119,40 @@ impl CrawlTargetDecision {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlTargetListInput {
     event: SubscriptionLifecycle,
+    occurred_at: DateTime<Utc>,
 }
 
 impl CrawlTargetListInput {
-    pub fn new(event: SubscriptionLifecycle) -> Self {
-        Self { event }
+    pub fn new(event: SubscriptionLifecycle, occurred_at: DateTime<Utc>) -> Self {
+        Self { event, occurred_at }
     }
 }
 
-impl TryFrom<Event> for CrawlTargetListInput {
-    type Error = ProcessorError;
+impl ConsumerInput for CrawlTargetListInput {
+    const INTERESTS: &'static [EventType] = &[
+        FeedSubscribedEvent::TYPE,
+        SubscriptionChangedEvent::TYPE,
+        FeedUnsubscribedEvent::TYPE,
+    ];
 
-    fn try_from(event: Event) -> Result<Self, Self::Error> {
+    fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
-            Event::Sub(SubEvent::FeedSubscribed(event)) => {
-                Ok(Self::new(SubscriptionLifecycle::Subscribed(event)))
-            }
-            Event::Sub(SubEvent::SubscriptionChanged(event)) => {
-                Ok(Self::new(SubscriptionLifecycle::Changed(event)))
-            }
-            Event::Sub(SubEvent::FeedUnsubscribed(event)) => {
-                Ok(Self::new(SubscriptionLifecycle::Unsubscribed(event)))
-            }
-            event => Err(ProcessorError::UnexpectedEvent {
-                expected: "crawl target list event",
-                actual: event.kind(),
-            }),
+            Event::FeedSubscribed(event) => Ok(Self::new(
+                SubscriptionLifecycle::Subscribed(event),
+                occurred_at,
+            )),
+            Event::SubscriptionChanged(event) => Ok(Self::new(
+                SubscriptionLifecycle::Changed(event),
+                occurred_at,
+            )),
+            Event::FeedUnsubscribed(event) => Ok(Self::new(
+                SubscriptionLifecycle::Unsubscribed(event),
+                occurred_at,
+            )),
+            event => Err(ProcessorError::unexpected_input(
+                "crawl target list event",
+                &event,
+            )),
         }
     }
 }
@@ -167,52 +175,44 @@ impl Default for CrawlTargetListProj {
 
 impl Processor for CrawlTargetListProj {
     type Input = CrawlTargetListInput;
-    type Phase = Transactional;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::CrawlTargetProjection
-    }
-
-    fn interests(&self) -> EventInterests {
-        EventInterests::new([
-            SubEventKind::FeedSubscribed.into(),
-            SubEventKind::SubscriptionChanged.into(),
-            SubEventKind::FeedUnsubscribed.into(),
-        ])
     }
 }
 
 impl<S> Consumer<S> for CrawlTargetListProj
 where
     S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: CrawlTargetTx + SubscriptionTx + Send,
 {
     async fn consume(
         &mut self,
         cx: &mut ConsumeContext<'_, S::Tx<'_>>,
         input: Self::Input,
-    ) -> ProcessorResult<()> {
-        let Self::Input { event } = input;
+    ) -> ProcessorResult<Vec<Event>> {
+        let Self::Input { event, occurred_at } = input;
 
         let feed_url = event.affected_feed_url().clone();
         let previous = cx.load_crawl_target_for_endpoint(&feed_url).await?;
         let subscriptions = cx.load_feed_endpoint_subscriptions(&feed_url).await?;
-        let now = Utc::now();
-        let target = subscriptions.crawl_target_decision().into_target(now);
+        let target = subscriptions
+            .crawl_target_decision()
+            .into_target(occurred_at);
         cx.upsert_crawl_target(&target).await?;
-        if let Some(event) = crawl_target_event(previous.as_ref(), &target) {
-            cx.record_event(event).await?;
-        }
 
         debug!(
             feed_url = target.feed_url.as_str(),
             ?target.state,
             "crawl target reconciled"
         );
-        Ok(())
+        Ok(crawl_target_event(previous.as_ref(), &target)
+            .into_iter()
+            .collect())
     }
 }
 
-fn crawl_target_event(previous: Option<&CrawlTarget>, target: &CrawlTarget) -> Option<CrawlEvent> {
+fn crawl_target_event(previous: Option<&CrawlTarget>, target: &CrawlTarget) -> Option<Event> {
     match (previous.map(|target| &target.state), &target.state) {
         (
             None | Some(CrawlTargetState::Inactive),
@@ -257,12 +257,21 @@ fn effective_policy(subscriptions: &[FeedEndpointSubscription]) -> CrawlPolicy {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
     use std::time::Duration;
 
+    use chrono::Utc;
     use synd_feed::types::FeedUrl;
 
-    use super::*;
-    use crate::subscription::{SubscriberId, SubscriptionKey};
+    use crate::{
+        crawl::{
+            policy::{CrawlPolicy, PollingInterval, PollingPolicy},
+            target_list::{
+                CrawlTargetState, FeedEndpointSubscription, FeedEndpointSubscriptionSet,
+            },
+        },
+        subscription::{SubscriberId, SubscriptionKey},
+    };
 
     fn interval(duration: Duration) -> PollingInterval {
         PollingInterval::try_from(duration).unwrap()

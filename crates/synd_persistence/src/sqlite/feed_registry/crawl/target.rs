@@ -4,30 +4,22 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    RegistryDbError, RegistryDbResult,
+    CrawlTargetTx, RegistryDbResult,
     crawl::target_list::{CrawlTarget, CrawlTargetState},
 };
 
-use super::{codec, feed_endpoint::FeedEndpointTable};
+use super::super::{
+    SqliteRegistryTx, codec,
+    error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
+    feed_endpoint,
+};
 
-pub(super) struct CrawlTargetTable<'tx, 'db> {
-    tx: &'tx mut Transaction<'db, Sqlite>,
-}
+async fn upsert(tx: &mut Transaction<'_, Sqlite>, target: &CrawlTarget) -> SqliteResult<()> {
+    let feed_endpoint_pk = feed_endpoint::resolve_pk(tx, &target.feed_url).await?;
+    let state = CrawlTargetStateRow::try_from(&target.state)?;
 
-impl<'tx, 'db> CrawlTargetTable<'tx, 'db> {
-    pub(super) fn new(tx: &'tx mut Transaction<'db, Sqlite>) -> Self {
-        Self { tx }
-    }
-
-    pub(super) async fn upsert(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
-        let feed_endpoint_pk = {
-            let mut feed_endpoint = FeedEndpointTable::new(&mut *self.tx);
-            feed_endpoint.resolve_pk(&target.feed_url).await?
-        };
-        let state = CrawlTargetStateRow::try_from(&target.state)?;
-
-        sqlx::query(
-            r#"
+    sqlx::query(
+        r#"
             INSERT INTO crawl_target (
                 feed_endpoint_pk,
                 state,
@@ -43,26 +35,25 @@ impl<'tx, 'db> CrawlTargetTable<'tx, 'db> {
                 effective_policy_json = excluded.effective_policy_json,
                 updated_at = excluded.updated_at
             "#,
-        )
-        .bind(feed_endpoint_pk)
-        .bind(state.state.to_string())
-        .bind(state.subscription_count)
-        .bind(state.effective_policy_json.as_deref())
-        .bind(target.created_at)
-        .bind(target.updated_at)
-        .execute(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(feed_endpoint_pk)
+    .bind(state.state.to_string())
+    .bind(state.subscription_count)
+    .bind(state.effective_policy_json.as_deref())
+    .bind(target.created_at)
+    .bind(target.updated_at)
+    .execute(&mut **tx)
+    .await?;
 
-        Ok(())
-    }
+    Ok(())
+}
 
-    pub(super) async fn load_for_endpoint(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> RegistryDbResult<Option<CrawlTarget>> {
-        let row = sqlx::query_as::<_, CrawlTargetRow>(
-            r#"
+async fn load_for_endpoint(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_url: &FeedUrl,
+) -> SqliteResult<Option<CrawlTarget>> {
+    let row = sqlx::query_as::<_, CrawlTargetRow>(
+        r#"
             SELECT
                 e.url AS feed_url,
                 ct.state AS state,
@@ -75,14 +66,12 @@ impl<'tx, 'db> CrawlTargetTable<'tx, 'db> {
                 ON e.pk = ct.feed_endpoint_pk
             WHERE e.url = ?
             "#,
-        )
-        .bind(feed_url.as_str())
-        .fetch_optional(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(feed_url.as_str())
+    .fetch_optional(&mut **tx)
+    .await?;
 
-        row.map(CrawlTarget::try_from).transpose()
-    }
+    row.map(CrawlTargetRow::into_target).transpose()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,13 +95,13 @@ impl fmt::Display for CrawlTargetStateDb {
 }
 
 impl FromStr for CrawlTargetStateDb {
-    type Err = RegistryDbError;
+    type Err = SqliteError;
 
     fn from_str(state: &str) -> Result<Self, Self::Err> {
         match state {
             Self::ACTIVE => Ok(Self::Active),
             Self::INACTIVE => Ok(Self::Inactive),
-            state => Err(RegistryDbError::internal(anyhow::anyhow!(
+            state => Err(SqliteError::decode_message(format!(
                 "unknown crawl target state: {state}"
             ))),
         }
@@ -126,7 +115,7 @@ struct CrawlTargetStateRow {
 }
 
 impl TryFrom<&CrawlTargetState> for CrawlTargetStateRow {
-    type Error = RegistryDbError;
+    type Error = SqliteError;
 
     fn try_from(state: &CrawlTargetState) -> Result<Self, Self::Error> {
         match state {
@@ -135,8 +124,9 @@ impl TryFrom<&CrawlTargetState> for CrawlTargetStateRow {
                 effective_policy,
             } => Ok(Self {
                 state: CrawlTargetStateDb::Active,
-                subscription_count: i64::try_from(subscription_count.get())
-                    .map_err(RegistryDbError::internal)?,
+                subscription_count: i64::try_from(subscription_count.get()).map_err(|_| {
+                    SqliteError::decode_message("subscription count exceeds SQLite INTEGER range")
+                })?,
                 effective_policy_json: Some(codec::encode_crawl_policy_json(*effective_policy)?),
             }),
             CrawlTargetState::Inactive => Ok(Self {
@@ -149,22 +139,23 @@ impl TryFrom<&CrawlTargetState> for CrawlTargetStateRow {
 }
 
 impl TryFrom<CrawlTargetStateRow> for CrawlTargetState {
-    type Error = RegistryDbError;
+    type Error = SqliteError;
 
     fn try_from(row: CrawlTargetStateRow) -> Result<Self, Self::Error> {
         if row.subscription_count < 0 {
-            return Err(RegistryDbError::internal(anyhow::anyhow!(
+            return Err(SqliteError::decode_message(format!(
                 "crawl target subscription count must be non-negative: {}",
                 row.subscription_count
             )));
         }
-        let subscription_count =
-            usize::try_from(row.subscription_count).map_err(RegistryDbError::internal)?;
+        let subscription_count = usize::try_from(row.subscription_count).map_err(|_| {
+            SqliteError::decode_message("crawl target subscription count exceeds usize range")
+        })?;
 
         match (row.state, subscription_count, row.effective_policy_json) {
-            (CrawlTargetStateDb::Active, 0, _) => Err(RegistryDbError::internal(anyhow::anyhow!(
-                "active crawl target subscription count must be positive"
-            ))),
+            (CrawlTargetStateDb::Active, 0, _) => Err(SqliteError::decode_message(
+                "active crawl target subscription count must be positive",
+            )),
             (CrawlTargetStateDb::Active, subscription_count, Some(policy_json)) => {
                 Ok(CrawlTargetState::Active {
                     subscription_count: NonZeroUsize::new(subscription_count)
@@ -172,15 +163,15 @@ impl TryFrom<CrawlTargetStateRow> for CrawlTargetState {
                     effective_policy: codec::decode_crawl_policy_json(&policy_json)?,
                 })
             }
-            (CrawlTargetStateDb::Active, _, None) => Err(RegistryDbError::internal(
-                anyhow::anyhow!("active crawl target requires an effective policy"),
+            (CrawlTargetStateDb::Active, _, None) => Err(SqliteError::decode_message(
+                "active crawl target requires an effective policy",
             )),
             (CrawlTargetStateDb::Inactive, 0, None) => Ok(CrawlTargetState::Inactive),
-            (CrawlTargetStateDb::Inactive, _, Some(_)) => Err(RegistryDbError::internal(
-                anyhow::anyhow!("inactive crawl target must not have an effective policy"),
+            (CrawlTargetStateDb::Inactive, _, Some(_)) => Err(SqliteError::decode_message(
+                "inactive crawl target must not have an effective policy",
             )),
             (CrawlTargetStateDb::Inactive, subscription_count, None) => {
-                Err(RegistryDbError::internal(anyhow::anyhow!(
+                Err(SqliteError::decode_message(format!(
                     "inactive crawl target subscription count must be zero: {subscription_count}"
                 )))
             }
@@ -198,21 +189,35 @@ struct CrawlTargetRow {
     updated_at: DateTime<Utc>,
 }
 
-impl TryFrom<CrawlTargetRow> for CrawlTarget {
-    type Error = RegistryDbError;
-
-    fn try_from(row: CrawlTargetRow) -> Result<Self, Self::Error> {
+impl CrawlTargetRow {
+    fn into_target(self) -> SqliteResult<CrawlTarget> {
         let state = CrawlTargetState::try_from(CrawlTargetStateRow {
-            state: row.state.parse()?,
-            subscription_count: row.subscription_count,
-            effective_policy_json: row.effective_policy_json,
+            state: self.state.parse()?,
+            subscription_count: self.subscription_count,
+            effective_policy_json: self.effective_policy_json,
         })?;
 
-        Ok(Self {
-            feed_url: FeedUrl::parse(&row.feed_url).map_err(RegistryDbError::internal)?,
+        Ok(CrawlTarget {
+            feed_url: FeedUrl::parse(&self.feed_url).decode()?,
             state,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
         })
     }
 }
+
+impl CrawlTargetTx for SqliteRegistryTx<'_> {
+    async fn upsert_crawl_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
+        upsert(&mut self.tx, target).await.db()
+    }
+
+    async fn load_crawl_target_for_endpoint(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> RegistryDbResult<Option<CrawlTarget>> {
+        load_for_endpoint(&mut self.tx, feed_url).await.db()
+    }
+}
+
+#[cfg(test)]
+mod tests;

@@ -1,15 +1,17 @@
 //! Feed lifecycle registry.
 #![allow(async_fn_in_trait)]
 
+pub mod api;
 pub mod command;
 pub mod config;
-pub mod consumers;
 pub mod crawl;
 pub mod db;
 pub mod entry;
 pub mod error;
 pub mod event;
 pub mod feed;
+#[cfg(any(test, feature = "test"))]
+pub mod in_memory;
 pub mod query;
 pub mod registry;
 pub mod subscription;
@@ -21,10 +23,12 @@ pub use command::{
 pub use config::{FeedRegistryConfig, FeedRegistryWorkerConfig};
 pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
 pub use db::{
-    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, EntryProjectionTx,
-    FeedProjectionTx, FeedRegistryDb, RegistryTx, TimelineProjectionTx,
+    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx,
+    EntryProjectionTx, FeedProjectionTx, FeedRegistryDb, SubscriptionTx, TimelineTx,
 };
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
+#[cfg(any(test, feature = "test"))]
+pub use in_memory::{InMemoryFeedRegistryDb, InMemoryRegistryTx};
 pub use registry::{FeedRegistry, RegistryService};
 pub use subscription::{
     FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, Subscription, SubscriptionKey,

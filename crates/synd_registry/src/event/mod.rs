@@ -1,39 +1,33 @@
-mod api_stream;
 mod codec;
 mod domain;
 mod journal;
 mod processor;
-mod reconciler;
+mod recorder;
 mod runtime;
 mod worker;
 
-pub use api_stream::{ApiEventPublisher, ApiEventRecvError, ApiEventSubscriber};
-pub use codec::{
-    EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult, EventPayload,
-};
+pub use codec::{EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult};
 pub use domain::{
-    ApiEvent, ApiEventKind, ApiFeedSubscribeRejected, ApiFeedSubscribed,
-    ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
-    ApiTimelineChanged, CrawlEvent, CrawlEventKind, CrawlJobEnqueuedEvent, CrawlJobFinishedEvent,
-    CrawlJobStartedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
-    CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, EntryEvent,
-    EntryEventKind, Event, EventInterests, EventKind, FeedChangedEvent, FeedDiscoveredEvent,
-    FeedEvent, FeedEventKind, FeedSubscribedEvent, FeedUnsubscribedEvent, RequestEvent,
-    RequestEventKind, RequestId, SubEvent, SubEventKind, SubscribeFeedRejected,
-    SubscribeFeedRequested, SubscriptionChangedEvent, SubscriptionLifecycle, TimelineChangedEvent,
-    TimelineEvent, TimelineEventKind, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
+    CrawlJobEnqueuedEvent, CrawlJobFinishedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
+    EntryDiscoveredEvent, Event, EventInterests, EventPayloadError, EventType, FeedChangedEvent,
+    FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, RequestId,
+    SubscribeFeedRejected, SubscribeFeedRequested, SubscriptionChangedEvent, SubscriptionLifecycle,
+    TimelineChangedEvent, UnsubscribeFeedRejected, UnsubscribeFeedRequested,
 };
-pub use journal::{EventCursor, EventCursorPos, EventReadBatch, JournalTx, JournaledEvent};
+pub use journal::{
+    EventCursor, EventCursorPos, EventReadBatch, JournalAppendTx, JournalTx, JournaledEvent,
+};
 pub(crate) use processor::skip_permanent_error;
 pub use processor::{
-    ClassifyError, ConsumeContext, Consumer, FailureClass, InputBatch, PostCommit, Processor,
-    ProcessorError, ProcessorId, ProcessorInput, ProcessorPhase, ProcessorResult, ReconcileContext,
-    RecordedEvents, Sink, SubscriberScope, Transactional,
+    ClassifyError, ConsumeContext, Consumer, ConsumerInput, FailureClass, InputBatch, Processor,
+    ProcessorError, ProcessorId, ProcessorResult, ReconcileContext, RecordedEvents,
+    RegistryContext, Sink, SubscriberScope,
 };
-pub(crate) use reconciler::{Reconciler, spawn_reconciler_worker};
+pub use recorder::{EventRecorder, JournalEventMeta};
 pub use runtime::{EventSubmitter, EventSubmitterError, EventSubmitterResult};
+pub(crate) use worker::{CursorAdapter, EventWorker, PostCommitAdapter, spawn_event_loop};
 pub use worker::{
     EventWake, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, WorkerError,
     WorkerHandle, WorkerId, WorkerResult, WorkerSet,
 };
-pub(crate) use worker::{WorkerPhase, spawn_worker};

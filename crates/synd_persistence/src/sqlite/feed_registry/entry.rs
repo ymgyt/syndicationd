@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
-use sqlx::{Row, Sqlite, Transaction};
+use sqlx::{Sqlite, Transaction};
 use synd_feed::types::{EntryId, FeedUrl};
 use synd_registry::{
-    EntryProjectionTx, RegistryDbError, RegistryDbResult,
+    EntryProjectionTx, RegistryDbResult,
     crawl::{job::CrawlJobId, result::CrawlResultRef},
     entry::{
         Entry, EntryChange, EntryChanges, EntryLifecycle, EntryOrderKey, EntrySet, EntrySourceRef,
@@ -12,32 +12,23 @@ use synd_registry::{
 
 use super::{
     codec::{decode_entry_attrs_json, encode_entry_attrs_json},
-    feed::FeedTable,
+    error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
+    feed,
 };
 
-pub(super) struct EntryTable<'tx, 'db> {
-    tx: &'tx mut Transaction<'db, Sqlite>,
-}
-
-impl<'tx, 'db> EntryTable<'tx, 'db> {
-    pub(super) fn new(tx: &'tx mut Transaction<'db, Sqlite>) -> Self {
-        Self { tx }
+async fn load_entries(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_url: &FeedUrl,
+    entry_ids: &[EntryId],
+) -> SqliteResult<EntrySet> {
+    if entry_ids.is_empty() {
+        return Ok(EntrySet::empty(feed_url.clone()));
     }
 
-    pub(super) async fn load_entries(
-        &mut self,
-        feed_url: &FeedUrl,
-        entry_ids: &[EntryId],
-    ) -> RegistryDbResult<EntrySet> {
-        if entry_ids.is_empty() {
-            return Ok(EntrySet::empty(feed_url.clone()));
-        }
-
-        let entry_id_values = entry_ids.iter().map(EntryId::as_str).collect::<Vec<_>>();
-        let entry_ids_json =
-            serde_json::to_string(&entry_id_values).map_err(RegistryDbError::internal)?;
-        let rows = sqlx::query(
-            r#"
+    let entry_id_values = entry_ids.iter().map(EntryId::as_str).collect::<Vec<_>>();
+    let entry_ids_json = serde_json::to_string(&entry_id_values)?;
+    let rows = sqlx::query_as::<_, EntryRow>(
+        r#"
             WITH requested(entry_id) AS (
                 SELECT CAST(value AS TEXT)
                 FROM json_each(?)
@@ -63,85 +54,39 @@ impl<'tx, 'db> EntryTable<'tx, 'db> {
             WHERE fe.url = ?
             ORDER BY e.entry_id
             "#,
-        )
-        .bind(entry_ids_json)
-        .bind(feed_url.as_str())
-        .fetch_all(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(entry_ids_json)
+    .bind(feed_url.as_str())
+    .fetch_all(&mut **tx)
+    .await?;
 
-        let mut entries = Vec::with_capacity(rows.len());
-        for row in rows {
-            let entry_id = row
-                .try_get::<String, _>("entry_id")
-                .map_err(RegistryDbError::internal)?;
-            let attrs_json = row
-                .try_get::<String, _>("current_content_json")
-                .map_err(RegistryDbError::internal)?;
-            entries.push(
-                Entry::builder()
-                    .id(EntryId::parse(entry_id).map_err(RegistryDbError::internal)?)
-                    .feed_url(feed_url.clone())
-                    .attrs(decode_entry_attrs_json(&attrs_json)?)
-                    .order_key(EntryOrderKey::from_datetime(
-                        row.try_get::<DateTime<Utc>, _>("current_order_time")
-                            .map_err(RegistryDbError::internal)?,
-                    ))
-                    .lifecycle(
-                        EntryLifecycle::builder()
-                            .first_seen_at(
-                                row.try_get::<DateTime<Utc>, _>("first_seen_at")
-                                    .map_err(RegistryDbError::internal)?,
-                            )
-                            .last_seen_at(
-                                row.try_get::<DateTime<Utc>, _>("last_seen_at")
-                                    .map_err(RegistryDbError::internal)?,
-                            )
-                            .updated_at(
-                                row.try_get::<DateTime<Utc>, _>("updated_at")
-                                    .map_err(RegistryDbError::internal)?,
-                            )
-                            .build(),
-                    )
-                    .source(
-                        EntrySourceRef::builder()
-                            .crawl_job_id(CrawlJobId::new(
-                                row.try_get::<String, _>("source_job_id")
-                                    .map_err(RegistryDbError::internal)?,
-                            ))
-                            .result_ref(CrawlResultRef::new(
-                                row.try_get::<i64, _>("current_source_result_pk")
-                                    .map_err(RegistryDbError::internal)?,
-                            ))
-                            .build(),
-                    )
-                    .build(),
-            );
-        }
+    let entries = rows
+        .into_iter()
+        .map(|row| row.into_entry(feed_url))
+        .collect::<SqliteResult<Vec<_>>>()?;
+    Ok(EntrySet::new(feed_url.clone(), entries))
+}
 
-        Ok(EntrySet::new(feed_url.clone(), entries))
-    }
-
-    pub(super) async fn apply_entry_changes(
-        &mut self,
-        changes: EntryChanges,
-    ) -> RegistryDbResult<()> {
-        for change in changes.into_changes() {
-            match change {
-                EntryChange::Discovered(entry) => self.insert_entry(&entry).await?,
-                EntryChange::Changed(entry) | EntryChange::AlreadySeen(entry) => {
-                    self.update_entry(&entry).await?;
-                }
+async fn apply_entry_changes(
+    tx: &mut Transaction<'_, Sqlite>,
+    changes: EntryChanges,
+) -> SqliteResult<()> {
+    for change in changes.into_changes() {
+        match change {
+            EntryChange::Discovered(entry) => insert_entry(tx, &entry).await?,
+            EntryChange::Changed(entry) | EntryChange::AlreadySeen(entry) => {
+                update_entry(tx, &entry).await?;
             }
         }
-        Ok(())
     }
+    Ok(())
+}
 
-    async fn insert_entry(&mut self, entry: &Entry) -> RegistryDbResult<()> {
-        let feed_pk = self.resolve_feed_pk(&entry.feed_url).await?;
-        let attrs_json = encode_entry_attrs_json(&entry.attrs)?;
-        sqlx::query(
-            r#"
+async fn insert_entry(tx: &mut Transaction<'_, Sqlite>, entry: &Entry) -> SqliteResult<()> {
+    let feed_pk = resolve_feed_pk(tx, &entry.feed_url).await?;
+    let attrs_json = encode_entry_attrs_json(&entry.attrs)?;
+    sqlx::query(
+        r#"
             INSERT INTO entry (
                 feed_pk,
                 entry_id,
@@ -154,25 +99,24 @@ impl<'tx, 'db> EntryTable<'tx, 'db> {
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             "#,
-        )
-        .bind(feed_pk)
-        .bind(entry.id.as_str())
-        .bind(attrs_json)
-        .bind(entry.order_key.as_datetime())
-        .bind(entry.source.result_ref.pk())
-        .bind(entry.lifecycle.first_seen_at)
-        .bind(entry.lifecycle.last_seen_at)
-        .bind(entry.lifecycle.updated_at)
-        .execute(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-        Ok(())
-    }
+    )
+    .bind(feed_pk)
+    .bind(entry.id.as_str())
+    .bind(attrs_json)
+    .bind(entry.order_key.as_datetime())
+    .bind(entry.source.result_ref.pk())
+    .bind(entry.lifecycle.first_seen_at)
+    .bind(entry.lifecycle.last_seen_at)
+    .bind(entry.lifecycle.updated_at)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
 
-    async fn update_entry(&mut self, entry: &Entry) -> RegistryDbResult<()> {
-        let attrs_json = encode_entry_attrs_json(&entry.attrs)?;
-        let result = sqlx::query(
-            r#"
+async fn update_entry(tx: &mut Transaction<'_, Sqlite>, entry: &Entry) -> SqliteResult<()> {
+    let attrs_json = encode_entry_attrs_json(&entry.attrs)?;
+    let result = sqlx::query(
+        r#"
             UPDATE entry
             SET
                 current_content_json = ?,
@@ -189,51 +133,92 @@ impl<'tx, 'db> EntryTable<'tx, 'db> {
                 WHERE fe.url = ?
               )
             "#,
-        )
-        .bind(attrs_json)
-        .bind(entry.order_key.as_datetime())
-        .bind(entry.source.result_ref.pk())
-        .bind(entry.lifecycle.last_seen_at)
-        .bind(entry.lifecycle.updated_at)
-        .bind(entry.id.as_str())
-        .bind(entry.feed_url.as_str())
-        .execute(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(attrs_json)
+    .bind(entry.order_key.as_datetime())
+    .bind(entry.source.result_ref.pk())
+    .bind(entry.lifecycle.last_seen_at)
+    .bind(entry.lifecycle.updated_at)
+    .bind(entry.id.as_str())
+    .bind(entry.feed_url.as_str())
+    .execute(&mut **tx)
+    .await?;
 
-        if result.rows_affected() != 1 {
-            return Err(RegistryDbError::internal(anyhow::anyhow!(
-                "entry update affected {} rows for {}",
-                result.rows_affected(),
-                entry.id
-            )));
-        }
-        Ok(())
+    if result.rows_affected() != 1 {
+        return Err(SqliteError::decode_message(format!(
+            "entry update affected {} rows for {}",
+            result.rows_affected(),
+            entry.id
+        )));
     }
+    Ok(())
+}
 
-    async fn resolve_feed_pk(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<i64> {
-        let row = sqlx::query(
-            r#"
+async fn resolve_feed_pk(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_url: &FeedUrl,
+) -> SqliteResult<i64> {
+    let row = sqlx::query_as::<_, FeedPkRow>(
+        r#"
             SELECT f.pk
             FROM feed AS f
             INNER JOIN feed_endpoint AS fe
                 ON fe.pk = f.feed_endpoint_pk
             WHERE fe.url = ?
             "#,
-        )
-        .bind(feed_url.as_str())
-        .fetch_optional(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(feed_url.as_str())
+    .fetch_optional(&mut **tx)
+    .await?;
 
-        let Some(row) = row else {
-            return Err(RegistryDbError::internal(anyhow::anyhow!(
-                "feed not found for entry projection: {feed_url}"
-            )));
-        };
-        row.try_get::<i64, _>("pk")
-            .map_err(RegistryDbError::internal)
+    let Some(row) = row else {
+        return Err(SqliteError::not_found(
+            "feed for entry projection",
+            feed_url.as_str(),
+        ));
+    };
+    Ok(row.pk)
+}
+
+#[derive(sqlx::FromRow)]
+struct EntryRow {
+    entry_id: String,
+    current_content_json: String,
+    current_order_time: DateTime<Utc>,
+    current_source_result_pk: i64,
+    first_seen_at: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    source_job_id: String,
+}
+
+impl EntryRow {
+    fn into_entry(self, feed_url: &FeedUrl) -> SqliteResult<Entry> {
+        Ok(Entry::builder()
+            .id(EntryId::parse(self.entry_id).decode()?)
+            .feed_url(feed_url.clone())
+            .attrs(decode_entry_attrs_json(&self.current_content_json)?)
+            .order_key(EntryOrderKey::from_datetime(self.current_order_time))
+            .lifecycle(
+                EntryLifecycle::builder()
+                    .first_seen_at(self.first_seen_at)
+                    .last_seen_at(self.last_seen_at)
+                    .updated_at(self.updated_at)
+                    .build(),
+            )
+            .source(
+                EntrySourceRef::builder()
+                    .crawl_job_id(CrawlJobId::new(self.source_job_id))
+                    .result_ref(CrawlResultRef::new(self.current_source_result_pk))
+                    .build(),
+            )
+            .build())
     }
+}
+
+#[derive(sqlx::FromRow)]
+struct FeedPkRow {
+    pk: i64,
 }
 
 impl EntryProjectionTx for super::SqliteRegistryTx<'_> {
@@ -241,7 +226,7 @@ impl EntryProjectionTx for super::SqliteRegistryTx<'_> {
         &mut self,
         job_id: &CrawlJobId,
     ) -> RegistryDbResult<Option<FeedSource>> {
-        FeedTable::new(&mut self.tx).load_source(job_id).await
+        feed::load_source(&mut self.tx, job_id).await.db()
     }
 
     async fn load_entries(
@@ -249,14 +234,13 @@ impl EntryProjectionTx for super::SqliteRegistryTx<'_> {
         feed_url: &FeedUrl,
         entry_ids: &[EntryId],
     ) -> RegistryDbResult<EntrySet> {
-        EntryTable::new(&mut self.tx)
-            .load_entries(feed_url, entry_ids)
-            .await
+        load_entries(&mut self.tx, feed_url, entry_ids).await.db()
     }
 
     async fn apply_entry_changes(&mut self, changes: EntryChanges) -> RegistryDbResult<()> {
-        EntryTable::new(&mut self.tx)
-            .apply_entry_changes(changes)
-            .await
+        apply_entry_changes(&mut self.tx, changes).await.db()
     }
 }
+
+#[cfg(test)]
+mod tests;

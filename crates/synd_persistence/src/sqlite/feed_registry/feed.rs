@@ -1,29 +1,23 @@
 use chrono::{DateTime, Utc};
-use sqlx::{Row, Sqlite, Transaction};
+use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedProjectionTx, RegistryDbError, RegistryDbResult,
+    FeedProjectionTx, RegistryDbResult,
     crawl::{blob::BlobRef, job::CrawlJobId, result::CrawlResultRef},
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
 };
 
-use super::feed_endpoint::FeedEndpointTable;
+use super::{
+    error::{DecodeResultExt, IntoDbResult, SqliteResult},
+    feed_endpoint,
+};
 
-pub(super) struct FeedTable<'tx, 'db> {
-    tx: &'tx mut Transaction<'db, Sqlite>,
-}
-
-impl<'tx, 'db> FeedTable<'tx, 'db> {
-    pub(super) fn new(tx: &'tx mut Transaction<'db, Sqlite>) -> Self {
-        Self { tx }
-    }
-
-    pub(super) async fn load_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        let row = sqlx::query(
-            r#"
+pub(super) async fn load_source(
+    tx: &mut Transaction<'_, Sqlite>,
+    job_id: &CrawlJobId,
+) -> SqliteResult<Option<FeedSource>> {
+    let row = sqlx::query_as::<_, FeedSourceRow>(
+        r#"
             SELECT
                 cr.pk AS result_pk,
                 cr.job_id,
@@ -42,111 +36,67 @@ impl<'tx, 'db> FeedTable<'tx, 'db> {
               AND h.body_blob_pk IS NOT NULL
               AND pe.result_pk IS NULL
             "#,
-        )
-        .bind(job_id.as_str())
-        .fetch_optional(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(job_id.as_str())
+    .fetch_optional(&mut **tx)
+    .await?;
 
-        let Some(row) = row else {
-            return Ok(None);
-        };
-        let feed_url = row
-            .try_get::<String, _>("feed_url")
-            .map_err(RegistryDbError::internal)?;
-        let feed_url = FeedUrl::parse(&feed_url).map_err(RegistryDbError::internal)?;
-        Ok(Some(
-            FeedSource::builder()
-                .feed_url(feed_url)
-                .crawl_job_id(CrawlJobId::new(
-                    row.try_get::<String, _>("job_id")
-                        .map_err(RegistryDbError::internal)?,
-                ))
-                .result_ref(CrawlResultRef::new(
-                    row.try_get::<i64, _>("result_pk")
-                        .map_err(RegistryDbError::internal)?,
-                ))
-                .body_blob(BlobRef::new(
-                    row.try_get::<i64, _>("body_blob_pk")
-                        .map_err(RegistryDbError::internal)?,
-                ))
-                .seen_at(
-                    row.try_get::<DateTime<Utc>, _>("finished_at")
-                        .map_err(RegistryDbError::internal)?,
-                )
-                .build(),
-        ))
-    }
+    row.map(FeedSourceRow::into_source).transpose()
+}
 
-    pub(super) async fn upsert_current(
-        &mut self,
-        command: UpsertFeedCommand,
-    ) -> RegistryDbResult<UpsertFeedOutcome> {
-        let source = command.source;
-        let feed_endpoint_pk = {
-            let mut feed_endpoint = FeedEndpointTable::new(&mut *self.tx);
-            feed_endpoint.resolve_pk(&source.feed_url).await?
-        };
-        let meta_json = serde_json::to_string(&command.meta).map_err(RegistryDbError::internal)?;
-        let previous = self.load_current(feed_endpoint_pk).await?;
-        let outcome = match previous {
-            None => {
-                self.insert_current(feed_endpoint_pk, &source, &meta_json)
-                    .await?;
-                UpsertFeedOutcome::Discovered
+async fn upsert_current(
+    tx: &mut Transaction<'_, Sqlite>,
+    command: UpsertFeedCommand,
+) -> SqliteResult<UpsertFeedOutcome> {
+    let source = command.source;
+    let feed_endpoint_pk = feed_endpoint::resolve_pk(tx, &source.feed_url).await?;
+    let meta_json = serde_json::to_string(&command.meta)?;
+    let previous = load_current(tx, feed_endpoint_pk).await?;
+    let outcome = match previous {
+        None => {
+            insert_current(tx, feed_endpoint_pk, &source, &meta_json).await?;
+            UpsertFeedOutcome::Discovered
+        }
+        Some(previous) => {
+            update_current(tx, feed_endpoint_pk, &source, &meta_json).await?;
+            if previous.current_meta_json != meta_json
+                || previous.current_body_blob_pk != source.body_blob.pk()
+            {
+                UpsertFeedOutcome::Changed
+            } else {
+                UpsertFeedOutcome::Unchanged
             }
-            Some(previous) => {
-                self.update_current(feed_endpoint_pk, &source, &meta_json)
-                    .await?;
-                if previous.current_meta_json != meta_json
-                    || previous.current_body_blob_pk != source.body_blob.pk()
-                {
-                    UpsertFeedOutcome::Changed
-                } else {
-                    UpsertFeedOutcome::Unchanged
-                }
-            }
-        };
-        Ok(outcome)
-    }
+        }
+    };
+    Ok(outcome)
+}
 
-    async fn load_current(
-        &mut self,
-        feed_endpoint_pk: i64,
-    ) -> RegistryDbResult<Option<StoredFeed>> {
-        let row = sqlx::query(
-            r#"
+async fn load_current(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_endpoint_pk: i64,
+) -> SqliteResult<Option<StoredFeed>> {
+    let row = sqlx::query_as::<_, StoredFeed>(
+        r#"
             SELECT current_meta_json, current_body_blob_pk
             FROM feed
             WHERE feed_endpoint_pk = ?
             "#,
-        )
-        .bind(feed_endpoint_pk)
-        .fetch_optional(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
+    )
+    .bind(feed_endpoint_pk)
+    .fetch_optional(&mut **tx)
+    .await?;
 
-        let Some(row) = row else {
-            return Ok(None);
-        };
-        Ok(Some(StoredFeed {
-            current_meta_json: row
-                .try_get("current_meta_json")
-                .map_err(RegistryDbError::internal)?,
-            current_body_blob_pk: row
-                .try_get("current_body_blob_pk")
-                .map_err(RegistryDbError::internal)?,
-        }))
-    }
+    Ok(row)
+}
 
-    async fn insert_current(
-        &mut self,
-        feed_endpoint_pk: i64,
-        source: &FeedSource,
-        meta_json: &str,
-    ) -> RegistryDbResult<()> {
-        sqlx::query(
-            r#"
+async fn insert_current(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_endpoint_pk: i64,
+    source: &FeedSource,
+    meta_json: &str,
+) -> SqliteResult<()> {
+    sqlx::query(
+        r#"
             INSERT INTO feed (
                 feed_endpoint_pk,
                 current_meta_json,
@@ -158,28 +108,27 @@ impl<'tx, 'db> FeedTable<'tx, 'db> {
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
-        )
-        .bind(feed_endpoint_pk)
-        .bind(meta_json)
-        .bind(source.body_blob.pk())
-        .bind(source.result_ref.pk())
-        .bind(source.seen_at)
-        .bind(source.seen_at)
-        .bind(source.seen_at)
-        .execute(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-        Ok(())
-    }
+    )
+    .bind(feed_endpoint_pk)
+    .bind(meta_json)
+    .bind(source.body_blob.pk())
+    .bind(source.result_ref.pk())
+    .bind(source.seen_at)
+    .bind(source.seen_at)
+    .bind(source.seen_at)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
 
-    async fn update_current(
-        &mut self,
-        feed_endpoint_pk: i64,
-        source: &FeedSource,
-        meta_json: &str,
-    ) -> RegistryDbResult<()> {
-        sqlx::query(
-            r#"
+async fn update_current(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_endpoint_pk: i64,
+    source: &FeedSource,
+    meta_json: &str,
+) -> SqliteResult<()> {
+    sqlx::query(
+        r#"
             UPDATE feed
             SET
                 current_meta_json = ?,
@@ -189,18 +138,43 @@ impl<'tx, 'db> FeedTable<'tx, 'db> {
                 updated_at = ?
             WHERE feed_endpoint_pk = ?
             "#,
-        )
-        .bind(meta_json)
-        .bind(source.body_blob.pk())
-        .bind(source.result_ref.pk())
-        .bind(source.seen_at)
-        .bind(source.seen_at)
-        .bind(feed_endpoint_pk)
-        .execute(&mut **self.tx)
-        .await
-        .map_err(RegistryDbError::internal)?;
-        Ok(())
+    )
+    .bind(meta_json)
+    .bind(source.body_blob.pk())
+    .bind(source.result_ref.pk())
+    .bind(source.seen_at)
+    .bind(source.seen_at)
+    .bind(feed_endpoint_pk)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+#[derive(sqlx::FromRow)]
+struct FeedSourceRow {
+    result_pk: i64,
+    job_id: String,
+    feed_url: String,
+    finished_at: DateTime<Utc>,
+    body_blob_pk: i64,
+}
+
+impl FeedSourceRow {
+    fn into_source(self) -> SqliteResult<FeedSource> {
+        Ok(FeedSource::builder()
+            .feed_url(FeedUrl::parse(&self.feed_url).decode()?)
+            .crawl_job_id(CrawlJobId::new(self.job_id))
+            .result_ref(CrawlResultRef::new(self.result_pk))
+            .body_blob(BlobRef::new(self.body_blob_pk))
+            .seen_at(self.finished_at)
+            .build())
     }
+}
+
+#[derive(sqlx::FromRow)]
+struct StoredFeed {
+    current_meta_json: String,
+    current_body_blob_pk: i64,
 }
 
 impl FeedProjectionTx for super::SqliteRegistryTx<'_> {
@@ -208,18 +182,16 @@ impl FeedProjectionTx for super::SqliteRegistryTx<'_> {
         &mut self,
         job_id: &CrawlJobId,
     ) -> RegistryDbResult<Option<FeedSource>> {
-        FeedTable::new(&mut self.tx).load_source(job_id).await
+        load_source(&mut self.tx, job_id).await.db()
     }
 
     async fn upsert_feed(
         &mut self,
         command: UpsertFeedCommand,
     ) -> RegistryDbResult<UpsertFeedOutcome> {
-        FeedTable::new(&mut self.tx).upsert_current(command).await
+        upsert_current(&mut self.tx, command).await.db()
     }
 }
 
-struct StoredFeed {
-    current_meta_json: String,
-    current_body_blob_pk: i64,
-}
+#[cfg(test)]
+mod tests;

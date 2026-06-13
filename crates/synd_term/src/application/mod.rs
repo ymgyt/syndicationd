@@ -3,7 +3,6 @@ use std::{ops::ControlFlow, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
-use synd_client::payload;
 use synd_feed::types::FeedUrl;
 use tracing::{debug, info, warn};
 
@@ -404,7 +403,7 @@ impl<Term, Sess> Application<Term, Sess> {
             Terminal(std::io::Result<CrosstermEvent>),
             Job(anyhow::Result<Event>),
             BackgroundJob(anyhow::Result<Event>),
-            FeedEvent(payload::FeedEvent),
+            FeedEvent(drivers::FeedEventMessage),
             Throbber,
             Idle,
         }
@@ -429,12 +428,12 @@ impl<Term, Sess> Application<Term, Sess> {
                 PollResult::Job(event) | PollResult::BackgroundJob(event) => {
                     self.apply_job_result(event);
                 }
-                PollResult::FeedEvent(event) => match event {
-                    payload::FeedEvent::TimelineChanged(event) => {
-                        self.apply_event(Event::TimelineChanged { event });
+                PollResult::FeedEvent(message) => match message {
+                    drivers::FeedEventMessage::Event(event) => {
+                        self.apply_event(Event::RegistryFeed { event });
                     }
-                    event => {
-                        debug!(?event, "feed event received");
+                    drivers::FeedEventMessage::Interrupted => {
+                        self.apply_event(Event::FeedEventSubscriptionInterrupted);
                     }
                 },
                 PollResult::Throbber => {

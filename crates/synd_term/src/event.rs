@@ -139,8 +139,13 @@ pub(crate) enum Event {
     TimelineRefetchStarted {
         request_seq: RequestSequence,
     },
-    TimelineChanged {
-        event: payload::TimelineChangeEvent,
+    RegistryFeed {
+        event: payload::FeedEvent,
+    },
+    FeedEventSubscriptionInterrupted,
+    FeedViewReloadDebounced {
+        feeds_first: i64,
+        entries_first: i64,
     },
     FeedRefreshPollElapsed {
         url: FeedUrl,

@@ -5586,6 +5586,7 @@ dependencies = [
  "sqlx",
  "synd-feed",
  "synd-registry",
+ "synd-support",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -5613,6 +5614,7 @@ dependencies = [
  "serde",
  "serde_json",
  "synd-feed",
+ "synd-support",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
@@ -5647,6 +5649,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "byte-unit",
+ "chrono",
  "directories",
  "http",
  "humantime",
