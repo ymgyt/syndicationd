@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{io::IsTerminal as _, path::PathBuf, process::ExitCode};
 
 use anyhow::Context as _;
 use synd_runtime::Session;
@@ -37,7 +37,7 @@ fn init_tracing(
         util::SubscriberInitExt as _,
     };
 
-    let (writer, guard) = if let Some(log_path) = log_path {
+    let (writer, guard, enable_ansi) = if let Some(log_path) = log_path {
         if let Some(parent) = log_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -46,17 +46,25 @@ fn init_tracing(
             .create(true)
             .open(log_path)?;
         let (non_blocking, guard) = tracing_appender::non_blocking(log);
-        (BoxMakeWriter::new(non_blocking), Some(guard))
+        (BoxMakeWriter::new(non_blocking), Some(guard), false)
     } else if stderr {
-        (BoxMakeWriter::new(std::io::stderr), None)
+        (
+            BoxMakeWriter::new(std::io::stderr),
+            None,
+            std::io::stderr().is_terminal(),
+        )
     } else {
-        (BoxMakeWriter::new(std::io::stdout), None)
+        (
+            BoxMakeWriter::new(std::io::stdout),
+            None,
+            std::io::stdout().is_terminal(),
+        )
     };
 
     Registry::default()
         .with(
             fmt::Layer::new()
-                .with_ansi(true)
+                .with_ansi(enable_ansi)
                 .with_timer(fmt::time::UtcTime::rfc_3339())
                 .with_file(false)
                 .with_line_number(false)
