@@ -132,10 +132,11 @@ impl Subscription {
     async fn entries(
         &self,
         cx: &Context<'_>,
+        url: Option<FeedUrl>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, Entry>> {
-        timeline_entries_connection(cx, after, first).await
+        timeline_entries_connection(cx, url, after, first).await
     }
 
     #[expect(clippy::unused_async)]
@@ -172,10 +173,11 @@ impl Timeline {
     async fn entries(
         &self,
         cx: &Context<'_>,
+        url: Option<FeedUrl>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, Entry>> {
-        timeline_entries_connection(cx, after, first).await
+        timeline_entries_connection(cx, url, after, first).await
     }
 }
 
@@ -220,6 +222,7 @@ async fn subscriptions_connection(
 
 async fn timeline_entries_connection(
     cx: &Context<'_>,
+    feed_url: Option<FeedUrl>,
     after: Option<String>,
     first: Option<i32>,
 ) -> Result<Connection<String, Entry>> {
@@ -232,6 +235,7 @@ async fn timeline_entries_connection(
     let page = registry(cx)
         .list_timeline_items(TimelineItemsQuery {
             subscriber_id: subscriber_id(cx),
+            feed_url,
             after,
             first,
         })

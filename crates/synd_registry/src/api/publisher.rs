@@ -7,8 +7,10 @@ use tracing::debug;
 use crate::{
     SubscriberId,
     api::{
-        ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
+        ApiCrawlJobEnqueued, ApiCrawlJobFinished, ApiCrawlJobStarted, ApiEntryChanged,
+        ApiEntryDiscovered, ApiEvent, ApiFeedChanged, ApiFeedDiscovered, ApiFeedSubscribeRejected,
+        ApiFeedSubscribed, ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected,
+        ApiFeedUnsubscribed, ApiTimelineChanged,
     },
     event::{
         ConsumerInput, Event, EventType, Processor, ProcessorError, ProcessorId, ProcessorResult,
@@ -82,6 +84,13 @@ impl ConsumerInput for ApiEvent {
         ApiFeedSubscriptionChanged::TYPE,
         ApiFeedUnsubscribed::TYPE,
         ApiFeedUnsubscribeRejected::TYPE,
+        ApiCrawlJobEnqueued::TYPE,
+        ApiCrawlJobStarted::TYPE,
+        ApiCrawlJobFinished::TYPE,
+        ApiFeedDiscovered::TYPE,
+        ApiFeedChanged::TYPE,
+        ApiEntryDiscovered::TYPE,
+        ApiEntryChanged::TYPE,
         ApiTimelineChanged::TYPE,
     ];
 
@@ -92,6 +101,13 @@ impl ConsumerInput for ApiEvent {
             Event::ApiFeedSubscriptionChanged(event) => Ok(Self::FeedSubscriptionChanged(event)),
             Event::ApiFeedUnsubscribed(event) => Ok(Self::FeedUnsubscribed(event)),
             Event::ApiFeedUnsubscribeRejected(event) => Ok(Self::FeedUnsubscribeRejected(event)),
+            Event::ApiCrawlJobEnqueued(event) => Ok(Self::CrawlJobEnqueued(event)),
+            Event::ApiCrawlJobStarted(event) => Ok(Self::CrawlJobStarted(event)),
+            Event::ApiCrawlJobFinished(event) => Ok(Self::CrawlJobFinished(event)),
+            Event::ApiFeedDiscovered(event) => Ok(Self::FeedDiscovered(event)),
+            Event::ApiFeedChanged(event) => Ok(Self::FeedChanged(event)),
+            Event::ApiEntryDiscovered(event) => Ok(Self::EntryDiscovered(event)),
+            Event::ApiEntryChanged(event) => Ok(Self::EntryChanged(event)),
             Event::ApiTimelineChanged(event) => Ok(Self::TimelineChanged(event)),
             event => Err(ProcessorError::unexpected_input("api event", &event)),
         }
@@ -125,6 +141,13 @@ fn event_subscriber_id(event: &ApiEvent) -> &SubscriberId {
         ApiEvent::FeedSubscriptionChanged(event) => &event.subscription.subscriber_id,
         ApiEvent::FeedUnsubscribed(event) => &event.subscription.subscriber_id,
         ApiEvent::FeedUnsubscribeRejected(event) => &event.subscription.subscriber_id,
+        ApiEvent::CrawlJobEnqueued(event) => &event.subscriber_id,
+        ApiEvent::CrawlJobStarted(event) => &event.subscriber_id,
+        ApiEvent::CrawlJobFinished(event) => &event.subscriber_id,
+        ApiEvent::FeedDiscovered(event) => &event.subscriber_id,
+        ApiEvent::FeedChanged(event) => &event.subscriber_id,
+        ApiEvent::EntryDiscovered(event) => &event.subscriber_id,
+        ApiEvent::EntryChanged(event) => &event.subscriber_id,
         ApiEvent::TimelineChanged(event) => &event.timeline.subscriber_id,
     }
 }

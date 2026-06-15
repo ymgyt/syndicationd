@@ -5,8 +5,10 @@ mod projection;
 mod publisher;
 
 pub use event::{
-    ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
+    ApiCrawlJobEnqueued, ApiCrawlJobFinished, ApiCrawlJobStarted, ApiEntryChanged,
+    ApiEntryDiscovered, ApiEvent, ApiFeedChanged, ApiFeedDiscovered, ApiFeedSubscribeRejected,
+    ApiFeedSubscribed, ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
+    ApiTimelineChanged,
 };
 pub use projection::{ApiEventProj, ApiEventProjectionInput};
 pub use publisher::{ApiEventPublisher, ApiEventRecvError, ApiEventSubscriber};

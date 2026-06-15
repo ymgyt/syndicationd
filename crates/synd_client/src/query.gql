@@ -47,6 +47,19 @@ query Entries($after: String, $first: Int!) {
   }
 }
 
+query FeedEntries($url: FeedUrl!, $after: String, $first: Int!) {
+  output: subscription {
+    entries(url: $url, after: $after, first: $first) {
+      nodes {
+        ...Entry
+      }
+      pageInfo {
+        ...PageInfo
+      }
+    }
+  }
+}
+
 query FeedStatus($url: FeedUrl!) {
   output: subscription {
     feedStatus(url: $url) {
@@ -79,6 +92,29 @@ subscription FeedEvents {
       requestId
       url
       reason
+    }
+    ... on CrawlJobEnqueued {
+      url
+    }
+    ... on CrawlJobStarted {
+      url
+    }
+    ... on CrawlJobFinished {
+      url
+      httpStatus
+      error
+    }
+    ... on FeedDiscovered {
+      url
+    }
+    ... on FeedChanged {
+      url
+    }
+    ... on EntryDiscovered {
+      url
+    }
+    ... on EntryChanged {
+      url
     }
     ... on TimelineChanged {
       changedAt

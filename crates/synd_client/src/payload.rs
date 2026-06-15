@@ -288,6 +288,13 @@ pub enum FeedEvent {
     SubscriptionChanged(SubscriptionChangedEvent),
     FeedUnsubscribed(FeedUnsubscribedEvent),
     FeedUnsubscribeRejected(FeedUnsubscribeRejectedEvent),
+    CrawlJobEnqueued(CrawlJobEnqueuedEvent),
+    CrawlJobStarted(CrawlJobStartedEvent),
+    CrawlJobFinished(CrawlJobFinishedEvent),
+    FeedDiscovered(FeedDiscoveredEvent),
+    FeedChanged(FeedChangedEvent),
+    EntryDiscovered(EntryDiscoveredEvent),
+    EntryChanged(EntryChangedEvent),
     TimelineChanged(TimelineChangeEvent),
 }
 
@@ -326,6 +333,50 @@ pub struct FeedUnsubscribeRejectedEvent {
     pub request_id: String,
     pub url: FeedUrl,
     pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrawlJobEnqueuedEvent {
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrawlJobStartedEvent {
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrawlJobFinishedEvent {
+    pub url: FeedUrl,
+    pub http_status: Option<i32>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedDiscoveredEvent {
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedChangedEvent {
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryDiscoveredEvent {
+    pub url: FeedUrl,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryChangedEvent {
+    pub url: FeedUrl,
 }
 
 #[derive(Debug, Clone, Deserialize)]

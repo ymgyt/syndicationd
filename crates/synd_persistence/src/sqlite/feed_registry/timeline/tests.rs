@@ -29,6 +29,7 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
     let page = tx
         .list_timeline_items(TimelineItemsQuery {
             subscriber_id: subscription.subscriber_id.clone(),
+            feed_url: None,
             after: None,
             first: 10,
         })
@@ -41,6 +42,64 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
     assert_eq!(node.subscription, subscription);
     assert_eq!(node.attrs.title.as_deref(), Some("timeline entry"));
     assert_eq!(node.feed_meta.feed.url(), &feed_url("timeline-projection"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn list_timeline_items_can_filter_by_feed_url() -> anyhow::Result<()> {
+    let db = migrated_db().await?;
+    let first = subscription("timeline-filter-one");
+    let second = subscription("timeline-filter-two");
+
+    let first_crawl = record_fetched_crawl(
+        &db,
+        &first.feed_url,
+        rss_body_with_entry("first feed", "first entry", "entry-1"),
+        0,
+    )
+    .await?;
+    let second_crawl = record_fetched_crawl(
+        &db,
+        &second.feed_url,
+        rss_body_with_entry("second feed", "second entry", "entry-2"),
+        1,
+    )
+    .await?;
+
+    let first_feed_event =
+        FeedDiscoveredEvent::new(first_crawl.feed_url.clone(), first_crawl.job_id.clone());
+    let second_feed_event =
+        FeedDiscoveredEvent::new(second_crawl.feed_url.clone(), second_crawl.job_id.clone());
+    let _ = project_feed(&db, first_crawl).await?;
+    let _ = project_entries(&db, EntryProjectionInput::from(first_feed_event)).await?;
+    let _ = project_feed(&db, second_crawl).await?;
+    let _ = project_entries(&db, EntryProjectionInput::from(second_feed_event)).await?;
+
+    store_subscription_in_db(&db, first.clone()).await?;
+    store_subscription_in_db(&db, second.clone()).await?;
+    let _ = project_timeline_batch(
+        &db,
+        vec![
+            timeline_feed_subscribed(FeedSubscribedEvent::new(subscription_key(&first))),
+            timeline_feed_subscribed(FeedSubscribedEvent::new(subscription_key(&second))),
+        ],
+    )
+    .await?;
+
+    let mut tx = db.begin().await?;
+    let page = tx
+        .list_timeline_items(TimelineItemsQuery {
+            subscriber_id: first.subscriber_id.clone(),
+            feed_url: Some(first.feed_url.clone()),
+            after: None,
+            first: 10,
+        })
+        .await?;
+    tx.commit().await?;
+
+    assert_eq!(page.nodes.len(), 1);
+    assert_eq!(page.nodes[0].subscription.feed_url, first.feed_url);
+    assert_eq!(page.nodes[0].attrs.title.as_deref(), Some("first entry"));
     Ok(())
 }
 

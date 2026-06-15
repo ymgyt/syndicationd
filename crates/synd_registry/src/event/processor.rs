@@ -9,10 +9,14 @@ use tracing::warn;
 use crate::{
     crawl::{
         queue::CrawlJobQueue,
+        result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
         schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
-    db::{CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx, FeedRegistryDb, SubscriptionTx},
+    db::{
+        CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx, FeedRegistryDb,
+        SubscriptionTx,
+    },
     entry::EntryProjectionScope,
     error::{RegistryDbError, RegistryDbResult},
     event::{Event, EventInterests, EventPayloadError, EventType, RegistryEvent},
@@ -458,5 +462,31 @@ where
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send {
         self.tx.load_crawl_target_for_endpoint(feed_url)
+    }
+}
+
+impl<Tx> CrawlCompletionTx for ConsumeContext<'_, Tx>
+where
+    Tx: CrawlCompletionTx + Send,
+{
+    fn load_crawl_state(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Option<CrawlState>>> + Send {
+        self.tx.load_crawl_state(feed_url)
+    }
+
+    fn record_crawl_result(
+        &mut self,
+        command: RecordCrawlResultCommand,
+    ) -> impl Future<Output = RegistryDbResult<CrawlResultRef>> + Send {
+        self.tx.record_crawl_result(command)
+    }
+
+    fn upsert_crawl_state(
+        &mut self,
+        command: UpsertCrawlStateCommand,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
+        self.tx.upsert_crawl_state(command)
     }
 }

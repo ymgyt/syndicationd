@@ -13,6 +13,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct TimelineItemsQuery {
     pub subscriber_id: SubscriberId,
+    pub feed_url: Option<FeedUrl>,
     pub after: Option<TimelineItemCursor>,
     pub first: usize,
 }

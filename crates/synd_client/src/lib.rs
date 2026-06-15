@@ -468,6 +468,34 @@ impl Client {
         fetch_entries_payload_from_response(response)
     }
 
+    #[instrument(skip(self))]
+    pub async fn fetch_feed_entries(
+        &self,
+        url: FeedUrl,
+        after: Option<String>,
+        first: i64,
+    ) -> Result<payload::FetchEntriesPayload, SyndApiError> {
+        debug!("Fetch feed entries...");
+
+        #[derive(Serialize, Debug)]
+        struct Variables {
+            url: FeedUrl,
+            after: Option<String>,
+            first: i64,
+        }
+
+        let response: Response<NullableEntriesResponseData> = self
+            .execute_graphql(&graphql(
+                FEED_ENTRIES_QUERY,
+                Variables { url, after, first },
+            ))
+            .await?;
+
+        debug!("Got response");
+
+        fetch_entries_payload_from_response(response)
+    }
+
     #[instrument(skip_all, err(Display))]
     async fn request<Body, ResponseData>(&self, body: &Body) -> Result<ResponseData, SyndApiError>
     where
@@ -673,6 +701,35 @@ impl Client {
                 wait_for_feed_event(&mut socket).await
             }
         }
+    }
+
+    #[instrument(skip(self))]
+    pub async fn subscribe_feed_events(
+        &self,
+    ) -> Result<mpsc::UnboundedReceiver<FeedEvent>, SyndApiError> {
+        let (events_tx, events_rx) = mpsc::unbounded_channel();
+
+        match &self.transport {
+            ClientTransport::Tcp => {
+                let socket = self.connect_tcp_feed_event_socket().await?;
+                tokio::spawn(async move {
+                    if let Err(err) = run_feed_event_socket(socket, events_tx).await {
+                        warn!("feed event subscription stopped: {err}");
+                    }
+                });
+            }
+            #[cfg(unix)]
+            ClientTransport::Unix { socket_path } => {
+                let socket = self.connect_unix_feed_event_socket(socket_path).await?;
+                tokio::spawn(async move {
+                    if let Err(err) = run_feed_event_socket(socket, events_tx).await {
+                        warn!("feed event subscription stopped: {err}");
+                    }
+                });
+            }
+        }
+
+        Ok(events_rx)
     }
 
     #[instrument(skip(self, events))]
@@ -1159,6 +1216,32 @@ query Entries($after: String, $first: Int!) {
 }
 ";
 
+const FEED_ENTRIES_QUERY: &str = r"
+query FeedEntries($url: FeedUrl!, $after: String, $first: Int!) {
+  output: subscription {
+    entries(url: $url, after: $after, first: $first) {
+      nodes {
+        title
+        published
+        updated
+        summary
+        websiteUrl
+        feed {
+          title
+          url
+          requirement
+          category
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+";
+
 const FEED_STATUS_QUERY: &str = r"
 query FeedStatus($url: FeedUrl!) {
   output: subscription {
@@ -1227,6 +1310,29 @@ subscription FeedEvents {
       requestId
       url
       reason
+    }
+    ... on CrawlJobEnqueued {
+      url
+    }
+    ... on CrawlJobStarted {
+      url
+    }
+    ... on CrawlJobFinished {
+      url
+      httpStatus
+      error
+    }
+    ... on FeedDiscovered {
+      url
+    }
+    ... on FeedChanged {
+      url
+    }
+    ... on EntryDiscovered {
+      url
+    }
+    ... on EntryChanged {
+      url
     }
     ... on TimelineChanged {
       changedAt

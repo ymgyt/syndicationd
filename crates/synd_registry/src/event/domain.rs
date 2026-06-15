@@ -8,8 +8,10 @@ use thiserror::Error;
 
 use crate::{
     api::{
-        ApiEvent, ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-        ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
+        ApiCrawlJobEnqueued, ApiCrawlJobFinished, ApiCrawlJobStarted, ApiEntryChanged,
+        ApiEntryDiscovered, ApiEvent, ApiFeedChanged, ApiFeedDiscovered, ApiFeedSubscribeRejected,
+        ApiFeedSubscribed, ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected,
+        ApiFeedUnsubscribed, ApiTimelineChanged,
     },
     crawl::{
         job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
@@ -45,6 +47,13 @@ pub enum EventType {
     ApiFeedSubscriptionChanged,
     ApiFeedUnsubscribed,
     ApiFeedUnsubscribeRejected,
+    ApiCrawlJobEnqueued,
+    ApiCrawlJobStarted,
+    ApiCrawlJobFinished,
+    ApiFeedDiscovered,
+    ApiFeedChanged,
+    ApiEntryDiscovered,
+    ApiEntryChanged,
     ApiTimelineChanged,
 }
 
@@ -74,6 +83,13 @@ impl EventType {
             Self::ApiFeedSubscriptionChanged => "api.feed.subscription.changed",
             Self::ApiFeedUnsubscribed => "api.feed.unsubscribed",
             Self::ApiFeedUnsubscribeRejected => "api.feed.unsubscribe_rejected",
+            Self::ApiCrawlJobEnqueued => "api.crawl.job.enqueued",
+            Self::ApiCrawlJobStarted => "api.crawl.job.started",
+            Self::ApiCrawlJobFinished => "api.crawl.job.finished",
+            Self::ApiFeedDiscovered => "api.feed.discovered",
+            Self::ApiFeedChanged => "api.feed.changed",
+            Self::ApiEntryDiscovered => "api.entry.discovered",
+            Self::ApiEntryChanged => "api.entry.changed",
             Self::ApiTimelineChanged => "api.timeline.changed",
         }
     }
@@ -103,6 +119,13 @@ impl EventType {
             "api.feed.subscription.changed" => Some(Self::ApiFeedSubscriptionChanged),
             "api.feed.unsubscribed" => Some(Self::ApiFeedUnsubscribed),
             "api.feed.unsubscribe_rejected" => Some(Self::ApiFeedUnsubscribeRejected),
+            "api.crawl.job.enqueued" => Some(Self::ApiCrawlJobEnqueued),
+            "api.crawl.job.started" => Some(Self::ApiCrawlJobStarted),
+            "api.crawl.job.finished" => Some(Self::ApiCrawlJobFinished),
+            "api.feed.discovered" => Some(Self::ApiFeedDiscovered),
+            "api.feed.changed" => Some(Self::ApiFeedChanged),
+            "api.entry.discovered" => Some(Self::ApiEntryDiscovered),
+            "api.entry.changed" => Some(Self::ApiEntryChanged),
             "api.timeline.changed" => Some(Self::ApiTimelineChanged),
             _ => None,
         }
@@ -140,6 +163,13 @@ pub enum Event {
     ApiFeedSubscriptionChanged(ApiFeedSubscriptionChanged),
     ApiFeedUnsubscribed(ApiFeedUnsubscribed),
     ApiFeedUnsubscribeRejected(ApiFeedUnsubscribeRejected),
+    ApiCrawlJobEnqueued(ApiCrawlJobEnqueued),
+    ApiCrawlJobStarted(ApiCrawlJobStarted),
+    ApiCrawlJobFinished(ApiCrawlJobFinished),
+    ApiFeedDiscovered(ApiFeedDiscovered),
+    ApiFeedChanged(ApiFeedChanged),
+    ApiEntryDiscovered(ApiEntryDiscovered),
+    ApiEntryChanged(ApiEntryChanged),
     ApiTimelineChanged(ApiTimelineChanged),
 }
 
@@ -169,6 +199,13 @@ impl Event {
             Self::ApiFeedSubscriptionChanged(_) => EventType::ApiFeedSubscriptionChanged,
             Self::ApiFeedUnsubscribed(_) => EventType::ApiFeedUnsubscribed,
             Self::ApiFeedUnsubscribeRejected(_) => EventType::ApiFeedUnsubscribeRejected,
+            Self::ApiCrawlJobEnqueued(_) => EventType::ApiCrawlJobEnqueued,
+            Self::ApiCrawlJobStarted(_) => EventType::ApiCrawlJobStarted,
+            Self::ApiCrawlJobFinished(_) => EventType::ApiCrawlJobFinished,
+            Self::ApiFeedDiscovered(_) => EventType::ApiFeedDiscovered,
+            Self::ApiFeedChanged(_) => EventType::ApiFeedChanged,
+            Self::ApiEntryDiscovered(_) => EventType::ApiEntryDiscovered,
+            Self::ApiEntryChanged(_) => EventType::ApiEntryChanged,
             Self::ApiTimelineChanged(_) => EventType::ApiTimelineChanged,
         }
     }
@@ -189,6 +226,13 @@ impl From<ApiEvent> for Event {
             ApiEvent::FeedSubscriptionChanged(event) => Self::ApiFeedSubscriptionChanged(event),
             ApiEvent::FeedUnsubscribed(event) => Self::ApiFeedUnsubscribed(event),
             ApiEvent::FeedUnsubscribeRejected(event) => Self::ApiFeedUnsubscribeRejected(event),
+            ApiEvent::CrawlJobEnqueued(event) => Self::ApiCrawlJobEnqueued(event),
+            ApiEvent::CrawlJobStarted(event) => Self::ApiCrawlJobStarted(event),
+            ApiEvent::CrawlJobFinished(event) => Self::ApiCrawlJobFinished(event),
+            ApiEvent::FeedDiscovered(event) => Self::ApiFeedDiscovered(event),
+            ApiEvent::FeedChanged(event) => Self::ApiFeedChanged(event),
+            ApiEvent::EntryDiscovered(event) => Self::ApiEntryDiscovered(event),
+            ApiEvent::EntryChanged(event) => Self::ApiEntryChanged(event),
             ApiEvent::TimelineChanged(event) => Self::ApiTimelineChanged(event),
         }
     }
@@ -221,6 +265,48 @@ impl From<ApiFeedUnsubscribed> for Event {
 impl From<ApiFeedUnsubscribeRejected> for Event {
     fn from(event: ApiFeedUnsubscribeRejected) -> Self {
         Self::ApiFeedUnsubscribeRejected(event)
+    }
+}
+
+impl From<ApiCrawlJobEnqueued> for Event {
+    fn from(event: ApiCrawlJobEnqueued) -> Self {
+        Self::ApiCrawlJobEnqueued(event)
+    }
+}
+
+impl From<ApiCrawlJobStarted> for Event {
+    fn from(event: ApiCrawlJobStarted) -> Self {
+        Self::ApiCrawlJobStarted(event)
+    }
+}
+
+impl From<ApiCrawlJobFinished> for Event {
+    fn from(event: ApiCrawlJobFinished) -> Self {
+        Self::ApiCrawlJobFinished(event)
+    }
+}
+
+impl From<ApiFeedDiscovered> for Event {
+    fn from(event: ApiFeedDiscovered) -> Self {
+        Self::ApiFeedDiscovered(event)
+    }
+}
+
+impl From<ApiFeedChanged> for Event {
+    fn from(event: ApiFeedChanged) -> Self {
+        Self::ApiFeedChanged(event)
+    }
+}
+
+impl From<ApiEntryDiscovered> for Event {
+    fn from(event: ApiEntryDiscovered) -> Self {
+        Self::ApiEntryDiscovered(event)
+    }
+}
+
+impl From<ApiEntryChanged> for Event {
+    fn from(event: ApiEntryChanged) -> Self {
+        Self::ApiEntryChanged(event)
     }
 }
 

@@ -389,6 +389,7 @@ pub(crate) async fn list_timeline_items(
     let page = tx
         .list_timeline_items(TimelineItemsQuery {
             subscriber_id,
+            feed_url: None,
             after: None,
             first: 10,
         })

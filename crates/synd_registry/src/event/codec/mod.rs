@@ -2,8 +2,10 @@ use serde_json;
 use thiserror::Error;
 
 use crate::api::{
-    ApiFeedSubscribeRejected, ApiFeedSubscribed, ApiFeedSubscriptionChanged,
-    ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed, ApiTimelineChanged,
+    ApiCrawlJobEnqueued, ApiCrawlJobFinished, ApiCrawlJobStarted, ApiEntryChanged,
+    ApiEntryDiscovered, ApiFeedChanged, ApiFeedDiscovered, ApiFeedSubscribeRejected,
+    ApiFeedSubscribed, ApiFeedSubscriptionChanged, ApiFeedUnsubscribeRejected, ApiFeedUnsubscribed,
+    ApiTimelineChanged,
 };
 
 use super::domain::{
@@ -63,6 +65,13 @@ impl EventEncoding for Event {
             Self::ApiFeedSubscriptionChanged(event) => encode_payload(event),
             Self::ApiFeedUnsubscribed(event) => encode_payload(event),
             Self::ApiFeedUnsubscribeRejected(event) => encode_payload(event),
+            Self::ApiCrawlJobEnqueued(event) => encode_payload(event),
+            Self::ApiCrawlJobStarted(event) => encode_payload(event),
+            Self::ApiCrawlJobFinished(event) => encode_payload(event),
+            Self::ApiFeedDiscovered(event) => encode_payload(event),
+            Self::ApiFeedChanged(event) => encode_payload(event),
+            Self::ApiEntryDiscovered(event) => encode_payload(event),
+            Self::ApiEntryChanged(event) => encode_payload(event),
             Self::ApiTimelineChanged(event) => encode_payload(event),
         }
     }
@@ -141,6 +150,27 @@ impl EventEncoding for Event {
             }
             EventType::ApiFeedUnsubscribeRejected => {
                 decode_payload::<ApiFeedUnsubscribeRejected>(payload_json).map(Event::from)
+            }
+            EventType::ApiCrawlJobEnqueued => {
+                decode_payload::<ApiCrawlJobEnqueued>(payload_json).map(Event::from)
+            }
+            EventType::ApiCrawlJobStarted => {
+                decode_payload::<ApiCrawlJobStarted>(payload_json).map(Event::from)
+            }
+            EventType::ApiCrawlJobFinished => {
+                decode_payload::<ApiCrawlJobFinished>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedDiscovered => {
+                decode_payload::<ApiFeedDiscovered>(payload_json).map(Event::from)
+            }
+            EventType::ApiFeedChanged => {
+                decode_payload::<ApiFeedChanged>(payload_json).map(Event::from)
+            }
+            EventType::ApiEntryDiscovered => {
+                decode_payload::<ApiEntryDiscovered>(payload_json).map(Event::from)
+            }
+            EventType::ApiEntryChanged => {
+                decode_payload::<ApiEntryChanged>(payload_json).map(Event::from)
             }
             EventType::ApiTimelineChanged => {
                 decode_payload::<ApiTimelineChanged>(payload_json).map(Event::from)

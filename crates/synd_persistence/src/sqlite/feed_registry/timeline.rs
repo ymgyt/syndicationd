@@ -207,6 +207,10 @@ async fn list_items(
     sql.push_bind(query.subscriber_id.as_str());
     sql.push(" AND t.kind = ");
     sql.push_bind(TimelineKind::Default.as_str());
+    if let Some(feed_url) = query.feed_url.as_ref() {
+        sql.push(" AND fe.url = ");
+        sql.push_bind(feed_url.as_str());
+    }
 
     if let Some(after) = query.after.as_ref() {
         sql.push(" AND (ti.order_time, fe.url, e.entry_id) < (");

@@ -117,6 +117,39 @@ impl AppComponent {
                 vec![FeedsComponent::reload_subscription(feeds_first)]
             }
             payload::FeedEvent::TimelineChanged(event) => self.apply_timeline_changed(&event),
+            payload::FeedEvent::CrawlJobEnqueued(event) => {
+                debug!(url = %event.url, "crawl job enqueued");
+                Vec::new()
+            }
+            payload::FeedEvent::CrawlJobStarted(event) => {
+                debug!(url = %event.url, "crawl job started");
+                Vec::new()
+            }
+            payload::FeedEvent::CrawlJobFinished(event) => {
+                debug!(
+                    url = %event.url,
+                    http_status = ?event.http_status,
+                    error = ?event.error,
+                    "crawl job finished"
+                );
+                Vec::new()
+            }
+            payload::FeedEvent::FeedDiscovered(event) => {
+                debug!(url = %event.url, "feed discovered");
+                Vec::new()
+            }
+            payload::FeedEvent::FeedChanged(event) => {
+                debug!(url = %event.url, "feed changed");
+                Vec::new()
+            }
+            payload::FeedEvent::EntryDiscovered(event) => {
+                debug!(url = %event.url, "entry discovered");
+                Vec::new()
+            }
+            payload::FeedEvent::EntryChanged(event) => {
+                debug!(url = %event.url, "entry changed");
+                Vec::new()
+            }
             payload::FeedEvent::FeedSubscribeRejected(event) => {
                 self.shell.prompt.set_error_message(event.reason);
                 self.shell.request_render();

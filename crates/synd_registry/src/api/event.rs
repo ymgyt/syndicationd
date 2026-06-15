@@ -4,7 +4,7 @@ use synd_feed::types::FeedUrl;
 
 use crate::{
     event::{EventType, RegistryEvent, RequestId},
-    subscription::SubscriptionKey,
+    subscription::{SubscriberId, SubscriptionKey},
     timeline::TimelineKey,
 };
 
@@ -16,6 +16,13 @@ pub enum ApiEvent {
     FeedSubscriptionChanged(ApiFeedSubscriptionChanged),
     FeedUnsubscribed(ApiFeedUnsubscribed),
     FeedUnsubscribeRejected(ApiFeedUnsubscribeRejected),
+    CrawlJobEnqueued(ApiCrawlJobEnqueued),
+    CrawlJobStarted(ApiCrawlJobStarted),
+    CrawlJobFinished(ApiCrawlJobFinished),
+    FeedDiscovered(ApiFeedDiscovered),
+    FeedChanged(ApiFeedChanged),
+    EntryDiscovered(ApiEntryDiscovered),
+    EntryChanged(ApiEntryChanged),
     TimelineChanged(ApiTimelineChanged),
 }
 
@@ -111,6 +118,127 @@ impl ApiFeedUnsubscribeRejected {
     }
 }
 
+/// API stream payload emitted when a crawl job is enqueued for a subscribed feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiCrawlJobEnqueued {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+}
+
+impl ApiCrawlJobEnqueued {
+    pub fn new(subscriber_id: SubscriberId, feed_url: FeedUrl) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+        }
+    }
+}
+
+/// API stream payload emitted when a crawl job starts for a subscribed feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiCrawlJobStarted {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+}
+
+impl ApiCrawlJobStarted {
+    pub fn new(subscriber_id: SubscriberId, feed_url: FeedUrl) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+        }
+    }
+}
+
+/// API stream payload emitted when a crawl job finishes for a subscribed feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiCrawlJobFinished {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+    pub http_status: Option<u16>,
+    pub error: Option<String>,
+}
+
+impl ApiCrawlJobFinished {
+    pub fn new(
+        subscriber_id: SubscriberId,
+        feed_url: FeedUrl,
+        http_status: Option<u16>,
+        error: Option<String>,
+    ) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+            http_status,
+            error,
+        }
+    }
+}
+
+/// API stream payload emitted when a subscribed feed is discovered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiFeedDiscovered {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+}
+
+impl ApiFeedDiscovered {
+    pub fn new(subscriber_id: SubscriberId, feed_url: FeedUrl) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+        }
+    }
+}
+
+/// API stream payload emitted when a subscribed feed changes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiFeedChanged {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+}
+
+impl ApiFeedChanged {
+    pub fn new(subscriber_id: SubscriberId, feed_url: FeedUrl) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+        }
+    }
+}
+
+/// API stream payload emitted when an entry is discovered for a subscribed feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiEntryDiscovered {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+}
+
+impl ApiEntryDiscovered {
+    pub fn new(subscriber_id: SubscriberId, feed_url: FeedUrl) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+        }
+    }
+}
+
+/// API stream payload emitted when an entry changes for a subscribed feed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiEntryChanged {
+    pub subscriber_id: SubscriberId,
+    pub feed_url: FeedUrl,
+}
+
+impl ApiEntryChanged {
+    pub fn new(subscriber_id: SubscriberId, feed_url: FeedUrl) -> Self {
+        Self {
+            subscriber_id,
+            feed_url,
+        }
+    }
+}
+
 /// API stream payload emitted when a timeline's visible contents change.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApiTimelineChanged {
@@ -151,6 +279,34 @@ impl RegistryEvent for ApiFeedUnsubscribed {
 
 impl RegistryEvent for ApiFeedUnsubscribeRejected {
     const TYPE: EventType = EventType::ApiFeedUnsubscribeRejected;
+}
+
+impl RegistryEvent for ApiCrawlJobEnqueued {
+    const TYPE: EventType = EventType::ApiCrawlJobEnqueued;
+}
+
+impl RegistryEvent for ApiCrawlJobStarted {
+    const TYPE: EventType = EventType::ApiCrawlJobStarted;
+}
+
+impl RegistryEvent for ApiCrawlJobFinished {
+    const TYPE: EventType = EventType::ApiCrawlJobFinished;
+}
+
+impl RegistryEvent for ApiFeedDiscovered {
+    const TYPE: EventType = EventType::ApiFeedDiscovered;
+}
+
+impl RegistryEvent for ApiFeedChanged {
+    const TYPE: EventType = EventType::ApiFeedChanged;
+}
+
+impl RegistryEvent for ApiEntryDiscovered {
+    const TYPE: EventType = EventType::ApiEntryDiscovered;
+}
+
+impl RegistryEvent for ApiEntryChanged {
+    const TYPE: EventType = EventType::ApiEntryChanged;
 }
 
 impl RegistryEvent for ApiTimelineChanged {
