@@ -1,6 +1,7 @@
 use synd_feed::feed::service::FeedService;
 
 use chrono::{DateTime, Utc};
+use tracing::debug;
 
 use crate::{
     db::{BlobStore, CrawlResultStore, FeedRegistryDb, FeedStore},
@@ -72,6 +73,20 @@ where
             .build();
         let source = command.source.clone();
         let outcome = tx.upsert_feed(command).await?;
+        debug!(
+            feed_url = source.feed_url.as_str(),
+            job_id = %source.crawl_job_id,
+            outcome = feed_projection_outcome(outcome),
+            "feed state projected"
+        );
         Ok(outcome.into_event(&source).into_iter().collect())
+    }
+}
+
+fn feed_projection_outcome(outcome: crate::feed::UpsertFeedOutcome) -> &'static str {
+    match outcome {
+        crate::feed::UpsertFeedOutcome::Discovered => "discovered",
+        crate::feed::UpsertFeedOutcome::Changed => "changed",
+        crate::feed::UpsertFeedOutcome::Unchanged => "unchanged",
     }
 }

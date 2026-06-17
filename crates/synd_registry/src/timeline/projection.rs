@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
+use tracing::info;
 
 use crate::{
     db::{FeedRegistryDb, TimelineStore},
@@ -177,6 +178,7 @@ where
             }
         }
 
+        invalidations.log_changes();
         Ok(invalidations.into_events())
     }
 }
@@ -215,6 +217,17 @@ impl TimelineInvalidations {
             .into_iter()
             .map(|change| TimelineChangedEvent::new(change.timeline, change.affected_feeds).into())
             .collect()
+    }
+
+    fn log_changes(&self) {
+        for change in &self.changes {
+            info!(
+                subscriber_id = change.timeline.subscriber_id.as_str(),
+                timeline = change.timeline.kind.as_str(),
+                affected_feeds = change.affected_feeds.len(),
+                "timeline changed"
+            );
+        }
     }
 }
 

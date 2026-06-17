@@ -4,6 +4,7 @@ use synd_feed::feed::service::FeedService;
 use synd_support::time::{Clock, SystemClock};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 
 use crate::{
     api::{ApiEventProj, ApiEventPublisher, ApiEventSubscriber},
@@ -148,7 +149,21 @@ where
 
         tx.upsert_subscription(&subscription, attrs, self.clock.now())
             .await?;
+        let event_type = event.event_type();
         self.record_and_commit(tx, event.clone()).await?;
+
+        let outcome_label = match &event {
+            Event::FeedSubscribed(_) => "subscribed",
+            Event::SubscriptionChanged(_) => "changed",
+            event => unreachable!("subscription decider produced unexpected event: {event:?}"),
+        };
+        info!(
+            subscriber_id = subscription.subscriber_id.as_str(),
+            feed_url = subscription.feed_url.as_str(),
+            outcome = outcome_label,
+            event_type = %event_type,
+            "registry subscription committed"
+        );
 
         let outcome = match event {
             Event::FeedSubscribed(event) => SubscribeOutcome::Subscribed(event.subscription),
@@ -174,7 +189,16 @@ where
 
         tx.delete_subscription(&subscription.subscriber_id, &subscription.feed_url)
             .await?;
+        let event_type = event.event_type();
         self.record_and_commit(tx, event.clone()).await?;
+
+        info!(
+            subscriber_id = subscription.subscriber_id.as_str(),
+            feed_url = subscription.feed_url.as_str(),
+            outcome = "unsubscribed",
+            event_type = %event_type,
+            "registry subscription committed"
+        );
 
         let outcome = match event {
             Event::FeedUnsubscribed(event) => UnsubscribeOutcome::Unsubscribed(event.subscription),

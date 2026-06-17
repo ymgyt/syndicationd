@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use tracing::info;
 
 use crate::{
     crawl::{
@@ -101,6 +102,15 @@ where
     if let Some(job) = reconciliation.job {
         match tx.enqueue_job(job).await? {
             EnqueueCrawlJobOutcome::Enqueued(job) => {
+                info!(
+                    job_id = %job.job_id,
+                    feed_url = job.feed_url.as_str(),
+                    trigger = job.trigger.as_str(),
+                    queue = job.queue.as_str(),
+                    priority = job.priority,
+                    run_after = %job.run_after,
+                    "crawl job enqueued"
+                );
                 events.push(CrawlJobEnqueuedEvent::from(job).into());
             }
             EnqueueCrawlJobOutcome::AlreadyActive => {}

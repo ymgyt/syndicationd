@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
@@ -211,9 +211,11 @@ where
                     ?target.state,
                     "crawl target reconciled"
                 );
-                Ok(crawl_target_event(previous.as_ref(), &target)
-                    .into_iter()
-                    .collect::<Vec<_>>())
+                let event = crawl_target_event(previous.as_ref(), &target);
+                if let Some(event) = &event {
+                    log_crawl_target_event(event, &target);
+                }
+                Ok(event.into_iter().collect::<Vec<_>>())
             }
             .await;
 
@@ -223,6 +225,50 @@ where
             }
         }
         Ok(events)
+    }
+}
+
+fn log_crawl_target_event(event: &Event, target: &CrawlTarget) {
+    match event {
+        Event::CrawlTargetActivated(event) => {
+            info!(
+                feed_url = event.feed_url.as_str(),
+                subscriptions = active_subscription_count(target),
+                policy = %crawl_policy_label(event.policy),
+                "crawl target activated"
+            );
+        }
+        Event::CrawlTargetPolicyChanged(event) => {
+            info!(
+                feed_url = event.feed_url.as_str(),
+                subscriptions = active_subscription_count(target),
+                policy = %crawl_policy_label(event.policy),
+                "crawl target policy changed"
+            );
+        }
+        Event::CrawlTargetDeactivated(event) => {
+            info!(
+                feed_url = event.feed_url.as_str(),
+                "crawl target deactivated"
+            );
+        }
+        _ => {}
+    }
+}
+
+fn active_subscription_count(target: &CrawlTarget) -> usize {
+    match &target.state {
+        CrawlTargetState::Active {
+            subscription_count, ..
+        } => subscription_count.get(),
+        CrawlTargetState::Inactive => 0,
+    }
+}
+
+fn crawl_policy_label(policy: CrawlPolicy) -> String {
+    match policy.polling {
+        PollingPolicy::Manual => "manual".to_owned(),
+        PollingPolicy::Interval { interval } => format!("interval:{}s", interval.as_secs()),
     }
 }
 

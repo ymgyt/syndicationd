@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use synd_feed::feed::service::{
-    FeedConditionalFetch, FeedFetchOutcome, FeedHttpResponse, FeedResponseBody,
+    FeedConditionalFetch, FeedFetchOutcome, FeedHttpResponse, FeedHttpStatus, FeedResponseBody,
 };
 
 use crate::{
@@ -51,6 +51,7 @@ where
         let observed = self
             .persist_outcome(outcome, started_at, finished_at, &previous_conditional)
             .await?;
+        let summary = CrawlCompletionSummary::from_detail(&observed.detail);
 
         let result_ref = self
             .tx
@@ -91,7 +92,13 @@ where
         };
 
         Ok((
-            CrawlCompletionRecord { result_ref },
+            CrawlCompletionRecord {
+                result_ref,
+                outcome: summary.outcome,
+                http_status: summary.http_status,
+                error_kind: summary.error_kind,
+                health,
+            },
             vec![CrawlJobFinishedEvent::from(finished_job).into()],
         ))
     }
@@ -258,6 +265,78 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CrawlCompletionRecord {
     pub result_ref: CrawlResultRef,
+    pub outcome: CrawlCompletionOutcome,
+    pub http_status: Option<FeedHttpStatus>,
+    pub error_kind: Option<&'static str>,
+    pub health: CrawlHealth,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CrawlCompletionSummary {
+    outcome: CrawlCompletionOutcome,
+    http_status: Option<FeedHttpStatus>,
+    error_kind: Option<&'static str>,
+}
+
+impl CrawlCompletionSummary {
+    fn from_detail(detail: &CrawlResultDetail) -> Self {
+        match detail {
+            CrawlResultDetail::Fetched { http, .. } => Self {
+                outcome: CrawlCompletionOutcome::Fetched,
+                http_status: Some(http.status),
+                error_kind: None,
+            },
+            CrawlResultDetail::NotModified { http } => Self {
+                outcome: CrawlCompletionOutcome::NotModified,
+                http_status: Some(http.status),
+                error_kind: None,
+            },
+            CrawlResultDetail::UnexpectedStatus { http, .. } => Self {
+                outcome: CrawlCompletionOutcome::UnexpectedStatus,
+                http_status: Some(http.status),
+                error_kind: Some(CrawlHttpErrorKind::from_status(http.status).as_str()),
+            },
+            CrawlResultDetail::BodyReadFailed { http, error } => Self {
+                outcome: CrawlCompletionOutcome::BodyReadFailed,
+                http_status: Some(http.status),
+                error_kind: Some(error.kind.as_str()),
+            },
+            CrawlResultDetail::FetchFailed { error } => Self {
+                outcome: CrawlCompletionOutcome::FetchFailed,
+                http_status: None,
+                error_kind: Some(error.kind.as_str()),
+            },
+            CrawlResultDetail::ParseFailed { http, error, .. } => Self {
+                outcome: CrawlCompletionOutcome::ParseFailed,
+                http_status: Some(http.status),
+                error_kind: Some(error.kind.as_str()),
+            },
+        }
+    }
+}
+
+/// Coarse crawl outcome name used for operational logging.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CrawlCompletionOutcome {
+    Fetched,
+    NotModified,
+    UnexpectedStatus,
+    BodyReadFailed,
+    FetchFailed,
+    ParseFailed,
+}
+
+impl CrawlCompletionOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fetched => "fetched",
+            Self::NotModified => "not_modified",
+            Self::UnexpectedStatus => "unexpected_status",
+            Self::BodyReadFailed => "body_read_failed",
+            Self::FetchFailed => "fetch_failed",
+            Self::ParseFailed => "parse_failed",
+        }
+    }
 }
 
 struct PersistedOutcome {

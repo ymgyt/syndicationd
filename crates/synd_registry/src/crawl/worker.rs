@@ -5,12 +5,15 @@ use synd_feed::feed::service::{FeedFetchRequest, FetchFeed};
 use synd_support::time::Clock;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::{
     crawl::{
-        completion::CrawlCompletionRecorder,
-        job::{ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobQueueLane},
+        completion::{CrawlCompletionRecord, CrawlCompletionRecorder},
+        job::{
+            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobId, CrawlJobQueueLane,
+            CrawlJobTrigger,
+        },
         result::CrawlState,
     },
     db::{BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, FeedRegistryDb},
@@ -188,11 +191,13 @@ where
         let worker_ct = self.ct.child_token();
         let clock = Arc::clone(&self.clock);
         tokio::spawn(async move {
-            debug!(
+            info!(
                 worker = WorkerId::CrawlWorkerPool.as_str(),
                 job_id = %job.job_id,
+                feed_url = job.feed_url.as_str(),
                 queue = slot.lane().as_str(),
-                "crawl worker started job"
+                trigger = job.trigger.as_str(),
+                "crawl job started"
             );
 
             let lane = slot.lane();
@@ -273,6 +278,10 @@ where
         )
     )]
     async fn run(self, job: CrawlJob, lane: CrawlJobQueueLane) -> WorkerResult<()> {
+        let job_id = job.job_id.clone();
+        let feed_url = job.feed_url.clone();
+        let trigger = job.trigger;
+        let started_at = job.updated_at;
         let previous_state = self.load_previous_state(&job).await?;
         let request = feed_fetch_request(&job, previous_state.as_ref());
 
@@ -290,9 +299,17 @@ where
         };
 
         let finished_at = self.clock.now();
-        let recorded = self
+        let (completion, recorded) = self
             .record_completion(job, outcome, previous_state, finished_at)
             .await?;
+        log_crawl_job_completed(
+            &job_id,
+            feed_url.as_str(),
+            lane,
+            trigger,
+            (finished_at - started_at).num_milliseconds(),
+            &completion,
+        );
         self.wake_publisher.publish(recorded);
         Ok(())
     }
@@ -310,17 +327,85 @@ where
         outcome: synd_feed::feed::service::FeedFetchOutcome,
         previous_state: Option<CrawlState>,
         finished_at: DateTime<Utc>,
-    ) -> WorkerResult<RecordedEvents> {
+    ) -> WorkerResult<(CrawlCompletionRecord, RecordedEvents)> {
         let mut tx = self.db.begin().await?;
         let mut completion_events = RecordedEvents::empty();
-        let (_record, produced) = CrawlCompletionRecorder::new(&mut tx)
+        let (record, produced) = CrawlCompletionRecorder::new(&mut tx)
             .record(job, outcome, previous_state, finished_at)
             .await?;
         EventRecorder::new(&mut tx, &mut completion_events, self.clock.as_ref())
             .record_all(produced)
             .await?;
         tx.commit().await?;
-        Ok(completion_events)
+        Ok((record, completion_events))
+    }
+}
+
+fn log_crawl_job_completed(
+    job_id: &CrawlJobId,
+    feed_url: &str,
+    lane: CrawlJobQueueLane,
+    trigger: CrawlJobTrigger,
+    duration_ms: i64,
+    completion: &CrawlCompletionRecord,
+) {
+    match (completion.http_status, completion.error_kind) {
+        (Some(status), Some(error_kind)) => {
+            info!(
+                job_id = %job_id,
+                feed_url,
+                queue = lane.as_str(),
+                trigger = trigger.as_str(),
+                outcome = completion.outcome.as_str(),
+                http_status = status.as_u16(),
+                error_kind,
+                result_ref = completion.result_ref.pk(),
+                failure_streak = completion.health.failure_streak.value(),
+                duration_ms,
+                "crawl job completed"
+            );
+        }
+        (Some(status), None) => {
+            info!(
+                job_id = %job_id,
+                feed_url,
+                queue = lane.as_str(),
+                trigger = trigger.as_str(),
+                outcome = completion.outcome.as_str(),
+                http_status = status.as_u16(),
+                result_ref = completion.result_ref.pk(),
+                failure_streak = completion.health.failure_streak.value(),
+                duration_ms,
+                "crawl job completed"
+            );
+        }
+        (None, Some(error_kind)) => {
+            info!(
+                job_id = %job_id,
+                feed_url,
+                queue = lane.as_str(),
+                trigger = trigger.as_str(),
+                outcome = completion.outcome.as_str(),
+                error_kind,
+                result_ref = completion.result_ref.pk(),
+                failure_streak = completion.health.failure_streak.value(),
+                duration_ms,
+                "crawl job completed"
+            );
+        }
+        (None, None) => {
+            info!(
+                job_id = %job_id,
+                feed_url,
+                queue = lane.as_str(),
+                trigger = trigger.as_str(),
+                outcome = completion.outcome.as_str(),
+                result_ref = completion.result_ref.pk(),
+                failure_streak = completion.health.failure_streak.value(),
+                duration_ms,
+                "crawl job completed"
+            );
+        }
     }
 }
 

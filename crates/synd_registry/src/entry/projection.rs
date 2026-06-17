@@ -2,6 +2,7 @@ use bon::Builder;
 use chrono::{DateTime, Utc};
 use synd_feed::feed::service::FeedService;
 use synd_feed::types::FeedUrl;
+use tracing::debug;
 
 use crate::{
     crawl::job::CrawlJobId,
@@ -99,8 +100,42 @@ where
         let existing = tx.load_entries(&source.feed_url, &entry_ids).await?;
         let changes = EntryReconciliation::new(source, appearances, existing).reconcile();
         let events = entry_events(&changes);
+        let counts = EntryProjectionCounts::from_changes(&changes);
+        debug!(
+            feed_url = input.feed_url.as_str(),
+            job_id = %input.crawl_job_id,
+            discovered = counts.discovered,
+            changed = counts.changed,
+            already_seen = counts.already_seen,
+            "entry state projected"
+        );
         tx.apply_entry_changes(changes).await?;
         Ok(events)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EntryProjectionCounts {
+    discovered: usize,
+    changed: usize,
+    already_seen: usize,
+}
+
+impl EntryProjectionCounts {
+    fn from_changes(changes: &EntryChanges) -> Self {
+        let mut counts = Self {
+            discovered: 0,
+            changed: 0,
+            already_seen: 0,
+        };
+        for change in changes.iter() {
+            match change {
+                EntryChange::Discovered(_) => counts.discovered += 1,
+                EntryChange::Changed(_) => counts.changed += 1,
+                EntryChange::AlreadySeen(_) => counts.already_seen += 1,
+            }
+        }
+        counts
     }
 }
 
