@@ -2,18 +2,16 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::{EntryId, FeedUrl};
 use synd_registry::{
-    EntryProjectionTx, RegistryDbResult,
+    EntryStore, RegistryDbResult,
     crawl::{job::CrawlJobId, result::CrawlResultRef},
     entry::{
         Entry, EntryChange, EntryChanges, EntryLifecycle, EntryOrderKey, EntrySet, EntrySourceRef,
     },
-    feed::FeedSource,
 };
 
 use super::{
     codec::{decode_entry_attrs_json, encode_entry_attrs_json},
     error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
-    feed,
 };
 
 async fn load_entries(
@@ -221,14 +219,7 @@ struct FeedPkRow {
     pk: i64,
 }
 
-impl EntryProjectionTx for super::SqliteRegistryTx<'_> {
-    async fn load_entry_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        feed::load_source(&mut self.tx, job_id).await.db()
-    }
-
+impl EntryStore for super::SqliteRegistryTx<'_> {
     async fn load_entries(
         &mut self,
         feed_url: &FeedUrl,

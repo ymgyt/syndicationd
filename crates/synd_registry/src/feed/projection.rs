@@ -1,13 +1,29 @@
 use synd_feed::feed::service::FeedService;
 
+use chrono::{DateTime, Utc};
+
 use crate::{
-    db::{BlobStoreTx, FeedProjectionTx, FeedRegistryDb},
+    db::{BlobStore, CrawlResultStore, FeedRegistryDb, FeedStore},
     event::{
-        ConsumeContext, Consumer, CrawlJobFinishedEvent, Event, Processor, ProcessorId,
-        ProcessorResult,
+        CrawlJobFinishedEvent, Event, EventInput, EventType, Processor, ProcessorId,
+        ProcessorResult, Projector, RegistryEvent,
     },
     feed::UpsertFeedCommand,
 };
+
+impl EventInput for CrawlJobFinishedEvent {
+    const INTERESTS: &'static [EventType] = &[Self::TYPE];
+
+    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
+        match event {
+            Event::CrawlJobFinished(event) => Ok(event),
+            event => Err(crate::event::ProcessorError::unexpected_input(
+                "crawl job finished event",
+                &event,
+            )),
+        }
+    }
+}
 
 /// Projects successful crawl results into feed state.
 #[derive(Debug, Clone)]
@@ -34,31 +50,28 @@ impl Processor for FeedProj {
     }
 }
 
-impl<S> Consumer<S> for FeedProj
+impl<S> Projector<S> for FeedProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + FeedProjectionTx + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + FeedStore + Send,
 {
-    async fn consume(
+    async fn apply(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
-        let mut pj = cx.feed_projection();
-        let Some(source) = pj.load_feed_source(&input.job_id).await? else {
+        let Some(source) = tx.load_crawl_source(&input.job_id).await? else {
             return Ok(Vec::new());
         };
-        let body = pj.load_body(&source).await?;
+        let body = tx.load_blob(source.body_blob).await?;
         let feed = FeedService::parse_feed(source.feed_url.clone(), body.as_slice())?;
 
-        let (_, events) = pj
-            .upsert_feed(
-                UpsertFeedCommand::builder()
-                    .source(source)
-                    .meta(feed.meta().clone())
-                    .build(),
-            )
-            .await?;
-        Ok(events)
+        let command = UpsertFeedCommand::builder()
+            .source(source)
+            .meta(feed.meta().clone())
+            .build();
+        let source = command.source.clone();
+        let outcome = tx.upsert_feed(command).await?;
+        Ok(outcome.into_event(&source).into_iter().collect())
     }
 }

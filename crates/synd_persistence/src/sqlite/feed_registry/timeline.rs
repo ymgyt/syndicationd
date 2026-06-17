@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{QueryBuilder, Sqlite, Transaction};
 use synd_feed::types::{Annotated, Category, EntryId, FeedMeta, FeedUrl, Requirement};
 use synd_registry::{
-    RegistryDbResult, TimelineTx,
+    RegistryDbResult, TimelineStore,
     entry::EntryAttrs,
     query::{TimelineItemCursor, TimelineItemNode, TimelineItemsPage, TimelineItemsQuery},
     subscription::{SubscriberId, Subscription, SubscriptionKey},
@@ -121,38 +121,25 @@ async fn catchup_feed(
     ))
 }
 
-async fn apply_entry_discovered(
+async fn apply_entry_to_timelines(
     tx: &mut Transaction<'_, Sqlite>,
     feed_url: &FeedUrl,
     entry_id: &EntryId,
     now: DateTime<Utc>,
 ) -> SqliteResult<Vec<TimelineKey>> {
-    ensure_default_timelines_for_feed(tx, feed_url, now).await?;
+    catchup_subscribed_feeds_for_feed(tx, feed_url, now).await?;
 
     let mut affected = Vec::new();
     for target in load_entry_timeline_targets(tx, feed_url, entry_id).await? {
-        if target.item_order_time.is_some() {
-            continue;
-        }
-        insert_entry_item(tx, &target, now).await?;
-        affected.push(target.timeline);
-    }
-    Ok(affected)
-}
-
-async fn apply_entry_changed(
-    tx: &mut Transaction<'_, Sqlite>,
-    feed_url: &FeedUrl,
-    entry_id: &EntryId,
-    now: DateTime<Utc>,
-) -> SqliteResult<Vec<TimelineKey>> {
-    let mut affected = Vec::new();
-    for target in load_entry_timeline_targets(tx, feed_url, entry_id).await? {
-        let Some(item_order_time) = target.item_order_time else {
-            continue;
-        };
-        if item_order_time != target.entry_order_time {
-            update_entry_item_order(tx, &target, now).await?;
+        match target.item_order_time {
+            Some(item_order_time) => {
+                if item_order_time != target.entry_order_time {
+                    update_entry_item_order(tx, &target, now).await?;
+                }
+            }
+            None => {
+                insert_entry_item(tx, &target, now).await?;
+            }
         }
         affected.push(target.timeline);
     }
@@ -275,7 +262,7 @@ async fn resolve_timeline_pk(
     Ok(row.pk)
 }
 
-async fn ensure_default_timelines_for_feed(
+async fn catchup_subscribed_feeds_for_feed(
     tx: &mut Transaction<'_, Sqlite>,
     feed_url: &FeedUrl,
     now: DateTime<Utc>,
@@ -502,7 +489,7 @@ struct PkRow {
     pk: i64,
 }
 
-impl TimelineTx for super::SqliteRegistryTx<'_> {
+impl TimelineStore for super::SqliteRegistryTx<'_> {
     async fn list_timeline_items(
         &mut self,
         query: TimelineItemsQuery,
@@ -510,43 +497,25 @@ impl TimelineTx for super::SqliteRegistryTx<'_> {
         list_items(&mut self.tx, query).await.db()
     }
 
-    async fn ensure_default_timeline(
-        &mut self,
-        timeline: &TimelineKey,
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<()> {
-        ensure_default(&mut self.tx, timeline, now).await.db()
-    }
-
-    async fn catchup_timeline_feed(
+    async fn catchup_subscribed_feed(
         &mut self,
         timeline: &TimelineKey,
         feed_url: &FeedUrl,
         now: DateTime<Utc>,
     ) -> RegistryDbResult<TimelineCatchup> {
+        ensure_default(&mut self.tx, timeline, now).await.db()?;
         catchup_feed(&mut self.tx, timeline, feed_url, now)
             .await
             .db()
     }
 
-    async fn apply_entry_discovered(
+    async fn apply_entry_to_timelines(
         &mut self,
         feed_url: &FeedUrl,
         entry_id: &EntryId,
         now: DateTime<Utc>,
     ) -> RegistryDbResult<Vec<TimelineKey>> {
-        apply_entry_discovered(&mut self.tx, feed_url, entry_id, now)
-            .await
-            .db()
-    }
-
-    async fn apply_entry_changed(
-        &mut self,
-        feed_url: &FeedUrl,
-        entry_id: &EntryId,
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<Vec<TimelineKey>> {
-        apply_entry_changed(&mut self.tx, feed_url, entry_id, now)
+        apply_entry_to_timelines(&mut self.tx, feed_url, entry_id, now)
             .await
             .db()
     }

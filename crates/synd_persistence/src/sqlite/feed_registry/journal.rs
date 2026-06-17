@@ -3,8 +3,8 @@ use sqlx::{QueryBuilder, Sqlite, Transaction};
 use synd_registry::{
     RegistryDbResult,
     event::{
-        Event, EventCursor, EventCursorPos, EventEncoding, EventInterests, EventReadBatch,
-        EventType, JournalAppendTx, JournalTx, JournaledEvent, ProcessorId,
+        Event, EventCursor, EventCursorPos, EventEncoding, EventInterests, EventJournal,
+        EventJournalAppend, EventReadBatch, EventType, JournaledEvent, ProcessorId,
     },
 };
 
@@ -22,11 +22,10 @@ async fn append_event(
     let event_type = encoded.event_type;
     sqlx::query(
         r"
-        INSERT INTO event_journal (event_type, occurred_at, payload_json)
-        VALUES (?, ?, ?)
+        INSERT INTO event_journal (occurred_at, payload_json)
+        VALUES (?, ?)
         ",
     )
-    .bind(event_type.as_str())
     .bind(occurred_at)
     .bind(encoded.payload_json)
     .execute(&mut **tx)
@@ -46,7 +45,7 @@ async fn read_after(
         .types()
         .iter()
         .copied()
-        .map(EventType::as_str)
+        .map(<EventType as Into<&'static str>>::into)
         .collect::<Vec<_>>();
 
     let scanned = sqlx::query_as::<_, ScannedPositionRow>(
@@ -193,7 +192,7 @@ fn decode_event_cursor_position(position: &EventCursorPos) -> SqliteResult<i64> 
     }
 }
 
-impl JournalAppendTx for SqliteRegistryTx<'_> {
+impl EventJournalAppend for SqliteRegistryTx<'_> {
     async fn append_event(
         &mut self,
         event: Event,
@@ -203,7 +202,7 @@ impl JournalAppendTx for SqliteRegistryTx<'_> {
     }
 }
 
-impl JournalTx for SqliteRegistryTx<'_> {
+impl EventJournal for SqliteRegistryTx<'_> {
     async fn read_after(
         &mut self,
         cursor: &EventCursor,

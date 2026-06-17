@@ -85,81 +85,11 @@ impl AppComponent {
     pub(in crate::application) fn apply_feed_event(
         &mut self,
         event: payload::FeedEvent,
-        feeds_first: i64,
-        entries_first: i64,
+        _feeds_first: i64,
+        _entries_first: i64,
     ) -> Vec<Operation> {
         match event {
-            payload::FeedEvent::FeedSubscribed(event) => {
-                debug!(url = %event.url, request_id = %event.request_id, "feed subscribed");
-                self.shell.request_render();
-                vec![
-                    FeedsComponent::reload_subscription(feeds_first),
-                    FeedsComponent::reload_entries(entries_first),
-                ]
-            }
-            payload::FeedEvent::SubscriptionChanged(event) => {
-                debug!(url = %event.url, request_id = %event.request_id, "feed subscription changed");
-                self.shell.request_render();
-                vec![
-                    FeedsComponent::reload_subscription(feeds_first),
-                    FeedsComponent::reload_entries(entries_first),
-                ]
-            }
-            payload::FeedEvent::FeedUnsubscribed(event) => {
-                debug!(url = %event.url, request_id = %event.request_id, "feed unsubscribed");
-                self.feeds.feed_unsubscribed(&event.url);
-                self.shell.filter.update_categories(
-                    &self.shell.categories,
-                    Populate::Replace,
-                    self.feeds.entries.entries(),
-                );
-                self.shell.request_render();
-                vec![FeedsComponent::reload_subscription(feeds_first)]
-            }
             payload::FeedEvent::TimelineChanged(event) => self.apply_timeline_changed(&event),
-            payload::FeedEvent::CrawlJobEnqueued(event) => {
-                debug!(url = %event.url, "crawl job enqueued");
-                Vec::new()
-            }
-            payload::FeedEvent::CrawlJobStarted(event) => {
-                debug!(url = %event.url, "crawl job started");
-                Vec::new()
-            }
-            payload::FeedEvent::CrawlJobFinished(event) => {
-                debug!(
-                    url = %event.url,
-                    http_status = ?event.http_status,
-                    error = ?event.error,
-                    "crawl job finished"
-                );
-                Vec::new()
-            }
-            payload::FeedEvent::FeedDiscovered(event) => {
-                debug!(url = %event.url, "feed discovered");
-                Vec::new()
-            }
-            payload::FeedEvent::FeedChanged(event) => {
-                debug!(url = %event.url, "feed changed");
-                Vec::new()
-            }
-            payload::FeedEvent::EntryDiscovered(event) => {
-                debug!(url = %event.url, "entry discovered");
-                Vec::new()
-            }
-            payload::FeedEvent::EntryChanged(event) => {
-                debug!(url = %event.url, "entry changed");
-                Vec::new()
-            }
-            payload::FeedEvent::FeedSubscribeRejected(event) => {
-                self.shell.prompt.set_error_message(event.reason);
-                self.shell.request_render();
-                Vec::new()
-            }
-            payload::FeedEvent::FeedUnsubscribeRejected(event) => {
-                self.shell.prompt.set_error_message(event.reason);
-                self.shell.request_render();
-                Vec::new()
-            }
         }
     }
 
@@ -722,7 +652,7 @@ mod tests {
                 code: ResponseCode::Ok,
             },
             url: url.clone(),
-            request_id: "request-1".to_owned(),
+            disposition: payload::SubscribeDisposition::Subscribed,
         };
 
         let operations = component.apply_feeds_api_event(
@@ -788,30 +718,18 @@ mod tests {
     }
 
     #[test]
-    fn feed_event_subscription_confirmation_reloads_subscription_and_entries() {
+    fn feed_event_timeline_changed_schedules_timeline_reload() {
         let mut component = app_component();
-        let event = payload::FeedEvent::SubscriptionChanged(payload::SubscriptionChangedEvent {
-            request_id: "request-1".to_owned(),
-            url: FeedUrl::parse("https://example.com/feed.xml").unwrap(),
+        let event = payload::FeedEvent::TimelineChanged(payload::TimelineChangeEvent {
+            changed_at: "2026-06-13T00:00:00Z".to_owned(),
+            affected_feeds: Some(vec![
+                FeedUrl::parse("https://example.com/feed.xml").unwrap(),
+            ]),
         });
 
         let operations = component.apply_feed_event(event, 10, 20);
 
-        assert_matches!(
-            operations.as_slice(),
-            [
-                Operation::FetchSubscription {
-                    populate: Populate::Replace,
-                    after: None,
-                    first: 10,
-                },
-                Operation::FetchEntries {
-                    populate: Populate::Replace,
-                    after: None,
-                    first: 20,
-                },
-            ]
-        );
+        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
     }
 
     #[test]

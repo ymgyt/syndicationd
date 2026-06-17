@@ -6,12 +6,12 @@ use tracing::debug;
 
 use crate::{
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
-    db::{CrawlTargetTx, FeedRegistryDb, SubscriptionTx},
+    db::{CrawlTargetStore, FeedRegistryDb, SubscriptionStore},
     event::{
-        ConsumeContext, Consumer, ConsumerInput, CrawlTargetActivatedEvent,
-        CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, Event, EventType,
-        FeedSubscribedEvent, FeedUnsubscribedEvent, Processor, ProcessorError, ProcessorId,
-        ProcessorResult, RegistryEvent, SubscriptionChangedEvent, SubscriptionLifecycle,
+        CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
+        Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch,
+        Processor, ProcessorError, ProcessorId, ProcessorResult, Reconciler, RegistryEvent,
+        SubscriptionChangedEvent, SubscriptionLifecycle, skip_permanent_error,
     },
     subscription::SubscriptionKey,
 };
@@ -128,7 +128,7 @@ impl CrawlTargetListInput {
     }
 }
 
-impl ConsumerInput for CrawlTargetListInput {
+impl EventInput for CrawlTargetListInput {
     const INTERESTS: &'static [EventType] = &[
         FeedSubscribedEvent::TYPE,
         SubscriptionChangedEvent::TYPE,
@@ -157,7 +157,7 @@ impl ConsumerInput for CrawlTargetListInput {
     }
 }
 
-/// Consumer that reacts to subscription events for the crawl target list.
+/// Reconciler that reacts to subscription events for the crawl target list.
 #[derive(Debug, Clone)]
 pub struct CrawlTargetListProj;
 
@@ -181,34 +181,48 @@ impl Processor for CrawlTargetListProj {
     }
 }
 
-impl<S> Consumer<S> for CrawlTargetListProj
+impl<S> Reconciler<S> for CrawlTargetListProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlTargetTx + SubscriptionTx + Send,
+    for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + Send,
 {
-    async fn consume(
+    async fn reconcile(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
-        input: Self::Input,
+        tx: &mut S::Tx<'_>,
+        _now: DateTime<Utc>,
+        batch: InputBatch<Self::Input>,
     ) -> ProcessorResult<Vec<Event>> {
-        let Self::Input { event, occurred_at } = input;
+        let processor = self.id();
+        let mut events = Vec::new();
+        for input in batch.into_inputs() {
+            let Self::Input { event, occurred_at } = input;
 
-        let feed_url = event.affected_feed_url().clone();
-        let previous = cx.load_crawl_target_for_endpoint(&feed_url).await?;
-        let subscriptions = cx.load_feed_endpoint_subscriptions(&feed_url).await?;
-        let target = subscriptions
-            .crawl_target_decision()
-            .into_target(occurred_at);
-        cx.upsert_crawl_target(&target).await?;
+            let produced = async {
+                let feed_url = event.affected_feed_url().clone();
+                let previous = tx.load_target_for_endpoint(&feed_url).await?;
+                let subscriptions = tx.load_endpoint_subscriptions(&feed_url).await?;
+                let target = subscriptions
+                    .crawl_target_decision()
+                    .into_target(occurred_at);
+                tx.upsert_target(&target).await?;
 
-        debug!(
-            feed_url = target.feed_url.as_str(),
-            ?target.state,
-            "crawl target reconciled"
-        );
-        Ok(crawl_target_event(previous.as_ref(), &target)
-            .into_iter()
-            .collect())
+                debug!(
+                    feed_url = target.feed_url.as_str(),
+                    ?target.state,
+                    "crawl target reconciled"
+                );
+                Ok(crawl_target_event(previous.as_ref(), &target)
+                    .into_iter()
+                    .collect::<Vec<_>>())
+            }
+            .await;
+
+            match produced {
+                Ok(mut produced) => events.append(&mut produced),
+                Err(err) => skip_permanent_error(processor, err, "input")?,
+            }
+        }
+        Ok(events)
     }
 }
 

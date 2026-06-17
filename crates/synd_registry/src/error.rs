@@ -30,5 +30,5 @@ pub enum FeedRegistryError {
     #[error(transparent)]
     Db(#[from] RegistryDbError),
     #[error(transparent)]
-    EventSubmitter(#[from] crate::event::EventSubmitterError),
+    Rejected(#[from] crate::subscription::SubscriptionReject),
 }

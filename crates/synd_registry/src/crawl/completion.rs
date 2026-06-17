@@ -14,7 +14,7 @@ use crate::{
             UpsertCrawlStateCommand,
         },
     },
-    db::{BlobStoreTx, CrawlCompletionTx, CrawlJobQueueTx},
+    db::{BlobStore, CrawlJobQueue, CrawlResultStore},
     error::{RegistryDbError, RegistryDbResult},
     event::{CrawlJobFinishedEvent, Event},
 };
@@ -32,7 +32,7 @@ impl<'a, Tx> CrawlCompletionRecorder<'a, Tx> {
 
 impl<Tx> CrawlCompletionRecorder<'_, Tx>
 where
-    Tx: BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + Send,
+    Tx: BlobStore + CrawlResultStore + CrawlJobQueue + Send,
 {
     pub async fn record(
         &mut self,

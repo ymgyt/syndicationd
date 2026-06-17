@@ -71,51 +71,6 @@ query FeedStatus($url: FeedUrl!) {
 subscription FeedEvents {
   feedEvents {
     __typename
-    ... on FeedSubscribed {
-      requestId
-      url
-    }
-    ... on FeedSubscribeRejected {
-      requestId
-      url
-      reason
-    }
-    ... on SubscriptionChanged {
-      requestId
-      url
-    }
-    ... on FeedUnsubscribed {
-      requestId
-      url
-    }
-    ... on FeedUnsubscribeRejected {
-      requestId
-      url
-      reason
-    }
-    ... on CrawlJobEnqueued {
-      url
-    }
-    ... on CrawlJobStarted {
-      url
-    }
-    ... on CrawlJobFinished {
-      url
-      httpStatus
-      error
-    }
-    ... on FeedDiscovered {
-      url
-    }
-    ... on FeedChanged {
-      url
-    }
-    ... on EntryDiscovered {
-      url
-    }
-    ... on EntryChanged {
-      url
-    }
     ... on TimelineChanged {
       changedAt
       affectedFeeds

@@ -5,13 +5,13 @@ use synd_feed::types::FeedUrl;
 
 use crate::{
     crawl::job::CrawlJobId,
-    db::{BlobStoreTx, EntryProjectionTx, FeedRegistryDb},
-    entry::{EntryAppearances, EntryChange, EntryChanges, EntryReconciliation, EntrySet},
+    db::{BlobStore, CrawlResultStore, EntryStore, FeedRegistryDb},
+    entry::{EntryAppearances, EntryChange, EntryChanges, EntryReconciliation},
     error::{RegistryDbError, RegistryDbResult},
     event::{
-        ConsumeContext, Consumer, ConsumerInput, EntryChangedEvent, EntryDiscoveredEvent, Event,
-        EventType, FeedChangedEvent, FeedDiscoveredEvent, Processor, ProcessorError, ProcessorId,
-        ProcessorResult, RegistryEvent,
+        EntryChangedEvent, EntryDiscoveredEvent, Event, EventInput, EventType, FeedChangedEvent,
+        FeedDiscoveredEvent, Processor, ProcessorError, ProcessorId, ProcessorResult, Projector,
+        RegistryEvent,
     },
     feed::FeedSource,
 };
@@ -41,7 +41,7 @@ impl From<FeedChangedEvent> for EntryProjectionInput {
     }
 }
 
-impl ConsumerInput for EntryProjectionInput {
+impl EventInput for EntryProjectionInput {
     const INTERESTS: &'static [EventType] = &[FeedDiscoveredEvent::TYPE, FeedChangedEvent::TYPE];
 
     fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
@@ -81,87 +81,46 @@ impl Processor for EntryProj {
     }
 }
 
-impl<S> Consumer<S> for EntryProj
+impl<S> Projector<S> for EntryProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStoreTx + EntryProjectionTx + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EntryStore + Send,
 {
-    async fn consume(
+    async fn apply(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
-        let mut pj = cx.entry_projection();
-        let source = pj.load_source(&input).await?;
-        let body = pj.load_body(&source).await?;
+        let source = load_source(tx, &input).await?;
+        let body = tx.load_blob(source.body_blob).await?;
         let feed = FeedService::parse_feed(source.feed_url.clone(), body.as_slice())?;
         let appearances = EntryAppearances::from_feed(&feed);
-        let existing = pj.load_entries(&source, &appearances).await?;
-        let changes = EntryReconciliation::new(source, appearances, existing).reconcile();
-        pj.apply_entry_changes(changes).await.map_err(Into::into)
-    }
-}
-
-/// Transaction-scoped operations for projecting feed entries.
-pub struct EntryProjectionScope<'a, Tx> {
-    tx: &'a mut Tx,
-}
-
-impl<'a, Tx> EntryProjectionScope<'a, Tx> {
-    /// Creates a projection scope inside one open registry transaction.
-    pub fn new(tx: &'a mut Tx) -> Self {
-        Self { tx }
-    }
-}
-
-impl<Tx> EntryProjectionScope<'_, Tx>
-where
-    Tx: BlobStoreTx + EntryProjectionTx + Send,
-{
-    /// Returns the accepted feed source behind a feed lifecycle event.
-    pub async fn load_source(
-        &mut self,
-        input: &EntryProjectionInput,
-    ) -> RegistryDbResult<FeedSource> {
-        let Some(source) = self.tx.load_entry_source(&input.crawl_job_id).await? else {
-            return Err(RegistryDbError::internal_message(format!(
-                "entry projection source not found for crawl job {}",
-                input.crawl_job_id
-            )));
-        };
-        if source.feed_url != input.feed_url {
-            return Err(RegistryDbError::internal_message(format!(
-                "entry projection source feed URL mismatch: event={}, source={}",
-                input.feed_url, source.feed_url
-            )));
-        }
-        Ok(source)
-    }
-
-    /// Returns the fetched response body for the given feed source.
-    pub async fn load_body(&mut self, source: &FeedSource) -> RegistryDbResult<Vec<u8>> {
-        self.tx.load_blob(source.body_blob).await
-    }
-
-    /// Returns existing registry entries addressed by the given appearances.
-    pub async fn load_entries(
-        &mut self,
-        source: &FeedSource,
-        appearances: &EntryAppearances,
-    ) -> RegistryDbResult<EntrySet> {
         let entry_ids = appearances.ids();
-        self.tx.load_entries(&source.feed_url, &entry_ids).await
-    }
-
-    /// Applies reconciled entry changes and returns entry lifecycle events.
-    pub async fn apply_entry_changes(
-        &mut self,
-        changes: EntryChanges,
-    ) -> RegistryDbResult<Vec<Event>> {
+        let existing = tx.load_entries(&source.feed_url, &entry_ids).await?;
+        let changes = EntryReconciliation::new(source, appearances, existing).reconcile();
         let events = entry_events(&changes);
-        self.tx.apply_entry_changes(changes).await?;
+        tx.apply_entry_changes(changes).await?;
         Ok(events)
     }
+}
+
+async fn load_source<Tx>(tx: &mut Tx, input: &EntryProjectionInput) -> RegistryDbResult<FeedSource>
+where
+    Tx: CrawlResultStore + Send,
+{
+    let Some(source) = tx.load_crawl_source(&input.crawl_job_id).await? else {
+        return Err(RegistryDbError::internal_message(format!(
+            "entry projection source not found for crawl job {}",
+            input.crawl_job_id
+        )));
+    };
+    if source.feed_url != input.feed_url {
+        return Err(RegistryDbError::internal_message(format!(
+            "entry projection source feed URL mismatch: event={}, source={}",
+            input.feed_url, source.feed_url
+        )));
+    }
+    Ok(source)
 }
 
 fn entry_events(changes: &EntryChanges) -> Vec<Event> {

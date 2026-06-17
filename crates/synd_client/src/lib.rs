@@ -1262,7 +1262,7 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
   subscribeFeed(input: $input) {
     status { code }
     url
-    requestId
+    disposition
   }
 }
 ";
@@ -1271,6 +1271,8 @@ const UNSUBSCRIBE_FEED_MUTATION: &str = r"
 mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
   unsubscribeFeed(input: $input) {
     status { code }
+    url
+    disposition
   }
 }
 ";
@@ -1289,51 +1291,6 @@ const FEED_EVENTS_SUBSCRIPTION: &str = r"
 subscription FeedEvents {
   feedEvents {
     __typename
-    ... on FeedSubscribed {
-      requestId
-      url
-    }
-    ... on FeedSubscribeRejected {
-      requestId
-      url
-      reason
-    }
-    ... on SubscriptionChanged {
-      requestId
-      url
-    }
-    ... on FeedUnsubscribed {
-      requestId
-      url
-    }
-    ... on FeedUnsubscribeRejected {
-      requestId
-      url
-      reason
-    }
-    ... on CrawlJobEnqueued {
-      url
-    }
-    ... on CrawlJobStarted {
-      url
-    }
-    ... on CrawlJobFinished {
-      url
-      httpStatus
-      error
-    }
-    ... on FeedDiscovered {
-      url
-    }
-    ... on FeedChanged {
-      url
-    }
-    ... on EntryDiscovered {
-      url
-    }
-    ... on EntryChanged {
-      url
-    }
     ... on TimelineChanged {
       changedAt
       affectedFeeds

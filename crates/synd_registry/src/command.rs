@@ -2,8 +2,9 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::{
     crawl::policy::CrawlPolicy,
-    event::{RequestId, SubscribeFeedRequested, UnsubscribeFeedRequested},
-    subscription::{SubscriberId, SubscriptionKey},
+    subscription::{
+        FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -16,34 +17,27 @@ pub struct SubscribeFeedCommand {
 }
 
 impl SubscribeFeedCommand {
-    pub(crate) fn into_request(self) -> SubscribeFeedRequested {
-        SubscribeFeedRequested::new(
-            RequestId::generate(),
-            SubscriptionKey::new(self.subscriber_id, self.feed_url),
-            self.requirement,
-            self.category,
-            self.crawl_policy,
-        )
+    pub(crate) fn into_parts(self) -> (SubscriptionKey, FeedSubscriptionAttrs) {
+        let subscription = SubscriptionKey::new(self.subscriber_id, self.feed_url);
+        let attrs = FeedSubscriptionAttrs {
+            requirement: self.requirement,
+            category: self.category,
+            crawl_policy: self.crawl_policy,
+        };
+        (subscription, attrs)
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscribeFeedOutput {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
+    pub outcome: SubscribeOutcome,
 }
 
-impl From<SubscribeFeedRequested> for SubscribeFeedOutput {
-    fn from(request: SubscribeFeedRequested) -> Self {
-        let SubscribeFeedRequested {
-            request_id,
-            subscription,
-            ..
-        } = request;
-
-        Self {
-            request_id,
-            subscription,
+impl SubscribeFeedOutput {
+    pub fn subscription(&self) -> &SubscriptionKey {
+        match &self.outcome {
+            SubscribeOutcome::Subscribed(subscription)
+            | SubscribeOutcome::Changed(subscription) => subscription,
         }
     }
 }
@@ -55,30 +49,20 @@ pub struct UnsubscribeFeedCommand {
 }
 
 impl UnsubscribeFeedCommand {
-    pub(crate) fn into_request(self) -> UnsubscribeFeedRequested {
-        UnsubscribeFeedRequested::new(
-            RequestId::generate(),
-            SubscriptionKey::new(self.subscriber_id, self.feed_url),
-        )
+    pub(crate) fn into_subscription(self) -> SubscriptionKey {
+        SubscriptionKey::new(self.subscriber_id, self.feed_url)
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsubscribeFeedOutput {
-    pub request_id: RequestId,
-    pub subscription: SubscriptionKey,
+    pub outcome: UnsubscribeOutcome,
 }
 
-impl From<UnsubscribeFeedRequested> for UnsubscribeFeedOutput {
-    fn from(request: UnsubscribeFeedRequested) -> Self {
-        let UnsubscribeFeedRequested {
-            request_id,
-            subscription,
-        } = request;
-
-        Self {
-            request_id,
-            subscription,
+impl UnsubscribeFeedOutput {
+    pub fn subscription(&self) -> &SubscriptionKey {
+        match &self.outcome {
+            UnsubscribeOutcome::Unsubscribed(subscription) => subscription,
         }
     }
 }

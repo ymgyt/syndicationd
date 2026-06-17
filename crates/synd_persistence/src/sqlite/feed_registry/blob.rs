@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 use sqlx::{Sqlite, Transaction};
 use synd_registry::{
-    BlobStoreTx, RegistryDbResult,
+    BlobStore, RegistryDbResult,
     crawl::blob::{BlobRef, PutBlobCommand},
 };
 
@@ -121,7 +121,7 @@ fn to_usize(value: i64, field: &'static str) -> SqliteResult<usize> {
         .map_err(|_| SqliteError::decode_message(format!("{field} must be non-negative")))
 }
 
-impl BlobStoreTx for super::SqliteRegistryTx<'_> {
+impl BlobStore for super::SqliteRegistryTx<'_> {
     async fn put_blob(&mut self, command: PutBlobCommand) -> RegistryDbResult<BlobRef> {
         put(&mut self.tx, DefaultCompressionCodec, command)
             .await

@@ -1,17 +1,14 @@
 use chrono::{DateTime, Utc};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::types::FeedUrl;
 
 use crate::{
-    db::{FeedRegistryDb, TimelineTx},
-    error::RegistryDbResult,
+    db::{FeedRegistryDb, TimelineStore},
     event::{
-        ConsumeContext, Consumer, ConsumerInput, EntryChangedEvent, EntryDiscoveredEvent, Event,
-        EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, Processor,
-        ProcessorError, ProcessorId, ProcessorResult, RegistryEvent, TimelineChangedEvent,
-        skip_permanent_error,
+        EntryChangedEvent, EntryDiscoveredEvent, Event, EventInput, EventType, FeedSubscribedEvent,
+        FeedUnsubscribedEvent, InputBatch, Processor, ProcessorError, ProcessorId, ProcessorResult,
+        Projector, RegistryEvent, TimelineChangedEvent, skip_permanent_error,
     },
-    subscription::SubscriptionKey,
-    timeline::{TimelineCatchup, TimelineKey},
+    timeline::TimelineKey,
 };
 
 /// Event input used to project timeline state.
@@ -46,7 +43,7 @@ impl TimelineProjectionInput {
     }
 }
 
-impl ConsumerInput for TimelineProjectionInput {
+impl EventInput for TimelineProjectionInput {
     const INTERESTS: &'static [EventType] = &[
         FeedSubscribedEvent::TYPE,
         FeedUnsubscribedEvent::TYPE,
@@ -92,27 +89,26 @@ impl Processor for TimelineProj {
     }
 }
 
-impl<S> Consumer<S> for TimelineProj
+impl<S> Projector<S> for TimelineProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: TimelineTx + Send,
+    for<'tx> S::Tx<'tx>: TimelineStore + Send,
 {
-    async fn consume(
+    async fn apply(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
-        <Self as Consumer<S>>::consume_batch(self, cx, InputBatch::new(vec![input])).await
+        <Self as Projector<S>>::apply_batch(self, tx, InputBatch::new(vec![input])).await
     }
 
-    async fn consume_batch(
+    async fn apply_batch(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        tx: &mut S::Tx<'_>,
         batch: InputBatch<Self::Input>,
     ) -> ProcessorResult<Vec<Event>> {
         let processor = self.id();
         let mut invalidations = TimelineInvalidations::empty();
-        let mut scope = cx.timeline_projection();
 
         for input in batch.into_inputs() {
             let occurred_at = input.occurred_at();
@@ -120,21 +116,14 @@ where
                 TimelineProjectionInput::FeedSubscribed { event, .. } => {
                     let subscription = event.subscription;
                     let timeline = TimelineKey::default_for(subscription.subscriber_id);
-                    match scope
-                        .catchup_default_timeline_feed(
-                            &timeline,
-                            &subscription.feed_url,
-                            occurred_at,
-                        )
+                    match tx
+                        .catchup_subscribed_feed(&timeline, &subscription.feed_url, occurred_at)
                         .await
                     {
                         Ok(catchup) => {
                             if catchup.inserted_items() > 0 {
-                                invalidations.mark(
-                                    catchup.timeline().clone(),
-                                    catchup.feed_url().clone(),
-                                    occurred_at,
-                                );
+                                invalidations
+                                    .mark(catchup.timeline().clone(), catchup.feed_url().clone());
                             }
                             Ok(())
                         }
@@ -143,10 +132,10 @@ where
                 }
                 TimelineProjectionInput::FeedUnsubscribed { event, .. } => {
                     let subscription = event.subscription;
-                    match scope.apply_feed_unsubscribed(&subscription).await {
+                    match tx.apply_feed_unsubscribed(&subscription).await {
                         Ok(timeline) => {
                             if let Some(timeline) = timeline {
-                                invalidations.mark(timeline, subscription.feed_url, occurred_at);
+                                invalidations.mark(timeline, subscription.feed_url);
                             }
                             Ok(())
                         }
@@ -154,13 +143,13 @@ where
                     }
                 }
                 TimelineProjectionInput::EntryDiscovered { event, .. } => {
-                    match scope
-                        .apply_entry_discovered(&event.feed_url, &event.entry_id, occurred_at)
+                    match tx
+                        .apply_entry_to_timelines(&event.feed_url, &event.entry_id, occurred_at)
                         .await
                     {
                         Ok(timelines) => {
                             for timeline in timelines {
-                                invalidations.mark(timeline, event.feed_url.clone(), occurred_at);
+                                invalidations.mark(timeline, event.feed_url.clone());
                             }
                             Ok(())
                         }
@@ -168,13 +157,13 @@ where
                     }
                 }
                 TimelineProjectionInput::EntryChanged { event, .. } => {
-                    match scope
-                        .apply_entry_changed(&event.feed_url, &event.entry_id, occurred_at)
+                    match tx
+                        .apply_entry_to_timelines(&event.feed_url, &event.entry_id, occurred_at)
                         .await
                     {
                         Ok(timelines) => {
                             for timeline in timelines {
-                                invalidations.mark(timeline, event.feed_url.clone(), occurred_at);
+                                invalidations.mark(timeline, event.feed_url.clone());
                             }
                             Ok(())
                         }
@@ -192,59 +181,6 @@ where
     }
 }
 
-/// Transaction-scoped operations for projecting timeline membership.
-pub struct TimelineProjectionScope<'a, Tx> {
-    tx: &'a mut Tx,
-}
-
-impl<'a, Tx> TimelineProjectionScope<'a, Tx> {
-    pub fn new(tx: &'a mut Tx) -> Self {
-        Self { tx }
-    }
-}
-
-impl<Tx> TimelineProjectionScope<'_, Tx>
-where
-    Tx: TimelineTx + Send,
-{
-    pub async fn catchup_default_timeline_feed(
-        &mut self,
-        timeline: &TimelineKey,
-        feed_url: &FeedUrl,
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<TimelineCatchup> {
-        self.tx.ensure_default_timeline(timeline, now).await?;
-        self.tx.catchup_timeline_feed(timeline, feed_url, now).await
-    }
-
-    pub async fn apply_entry_discovered(
-        &mut self,
-        feed_url: &FeedUrl,
-        entry_id: &EntryId,
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<Vec<TimelineKey>> {
-        self.tx
-            .apply_entry_discovered(feed_url, entry_id, now)
-            .await
-    }
-
-    pub async fn apply_entry_changed(
-        &mut self,
-        feed_url: &FeedUrl,
-        entry_id: &EntryId,
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<Vec<TimelineKey>> {
-        self.tx.apply_entry_changed(feed_url, entry_id, now).await
-    }
-
-    pub async fn apply_feed_unsubscribed(
-        &mut self,
-        subscription: &SubscriptionKey,
-    ) -> RegistryDbResult<Option<TimelineKey>> {
-        self.tx.apply_feed_unsubscribed(subscription).await
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TimelineInvalidations {
     changes: Vec<TimelineInvalidation>,
@@ -257,13 +193,12 @@ impl TimelineInvalidations {
         }
     }
 
-    fn mark(&mut self, timeline: TimelineKey, feed_url: FeedUrl, changed_at: DateTime<Utc>) {
+    fn mark(&mut self, timeline: TimelineKey, feed_url: FeedUrl) {
         if let Some(change) = self
             .changes
             .iter_mut()
             .find(|change| change.timeline == timeline)
         {
-            change.changed_at = change.changed_at.max(changed_at);
             if !change.affected_feeds.contains(&feed_url) {
                 change.affected_feeds.push(feed_url);
             }
@@ -271,7 +206,6 @@ impl TimelineInvalidations {
         }
         self.changes.push(TimelineInvalidation {
             timeline,
-            changed_at,
             affected_feeds: vec![feed_url],
         });
     }
@@ -279,10 +213,7 @@ impl TimelineInvalidations {
     fn into_events(self) -> Vec<Event> {
         self.changes
             .into_iter()
-            .map(|change| {
-                TimelineChangedEvent::new(change.timeline, change.changed_at, change.affected_feeds)
-                    .into()
-            })
+            .map(|change| TimelineChangedEvent::new(change.timeline, change.affected_feeds).into())
             .collect()
     }
 }
@@ -290,29 +221,24 @@ impl TimelineInvalidations {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TimelineInvalidation {
     timeline: TimelineKey,
-    changed_at: DateTime<Utc>,
     affected_feeds: Vec<FeedUrl>,
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, Utc};
-
     use super::*;
     use crate::subscription::SubscriberId;
 
     #[test]
-    fn timeline_invalidations_keep_changed_at_per_timeline() {
-        let first_time = Utc.with_ymd_and_hms(2026, 6, 8, 12, 0, 0).unwrap();
-        let second_time = Utc.with_ymd_and_hms(2026, 6, 8, 12, 1, 0).unwrap();
+    fn timeline_invalidations_group_feeds_per_timeline() {
         let timeline_a = TimelineKey::default_for(SubscriberId::new("reader-a"));
         let timeline_b = TimelineKey::default_for(SubscriberId::new("reader-b"));
         let feed_a = FeedUrl::parse("https://example.com/a.xml").unwrap();
         let feed_b = FeedUrl::parse("https://example.com/b.xml").unwrap();
 
         let mut invalidations = TimelineInvalidations::empty();
-        invalidations.mark(timeline_a.clone(), feed_a.clone(), first_time);
-        invalidations.mark(timeline_b.clone(), feed_b.clone(), second_time);
+        invalidations.mark(timeline_a.clone(), feed_a.clone());
+        invalidations.mark(timeline_b.clone(), feed_b.clone());
 
         let events = invalidations.into_events();
         assert_eq!(events.len(), 2);
@@ -323,10 +249,8 @@ mod tests {
             panic!("expected timeline changed event");
         };
         assert_eq!(event_a.timeline, timeline_a);
-        assert_eq!(event_a.changed_at, first_time);
         assert_eq!(event_a.affected_feeds, vec![feed_a]);
         assert_eq!(event_b.timeline, timeline_b);
-        assert_eq!(event_b.changed_at, second_time);
         assert_eq!(event_b.affected_feeds, vec![feed_b]);
     }
 }

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    CrawlScheduleTx, RegistryDbResult,
+    CrawlScheduleStore, RegistryDbResult,
     crawl::{
         job::{ActiveCrawlJob, CrawlJobId},
         schedule::{
@@ -210,7 +210,7 @@ impl CrawlScheduleCandidateRow {
     }
 }
 
-impl CrawlScheduleTx for SqliteRegistryTx<'_> {
+impl CrawlScheduleStore for SqliteRegistryTx<'_> {
     async fn list_candidates(
         &mut self,
         now: DateTime<Utc>,

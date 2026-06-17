@@ -4,7 +4,7 @@ mutation SubscribeFeed($input: SubscribeFeedInput!) {
       code
     }
     url
-    requestId
+    disposition
   }
 }
 
@@ -13,6 +13,8 @@ mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
     status {
       code
     }
+    url
+    disposition
   }
 }
 

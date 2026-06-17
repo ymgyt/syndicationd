@@ -8,9 +8,9 @@ pub(crate) use synd_feed::feed::service::{
 };
 pub(crate) use synd_feed::types::{EntryId, FeedUrl};
 pub(crate) use synd_registry::{
-    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx,
+    BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
     FeedRegistryDb, FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId,
-    Subscription, SubscriptionKey, SubscriptionTx, TimelineTx,
+    Subscription, SubscriptionKey, SubscriptionStore, TimelineStore,
     crawl::completion::CrawlCompletionRecorder,
     crawl::{
         blob::PutBlobCommand,
@@ -25,18 +25,20 @@ pub(crate) use synd_registry::{
     },
     entry::{EntryProj, EntryProjectionInput},
     event::{
-        ConsumeContext, Consumer, CrawlJobFinishedEvent, CrawlTargetActivatedEvent,
-        CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
-        EntryDiscoveredEvent, Event, EventCursor, EventCursorPos, EventInterests, EventRecorder,
-        FeedChangedEvent, FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent,
-        InputBatch, JournalTx, ProcessorId, RecordedEvents, RegistryEvent,
-        SubscriptionChangedEvent, SubscriptionLifecycle, TimelineChangedEvent,
+        CrawlJobFinishedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
+        CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, Event, EventCursor,
+        EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
+        FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
+        Projector, Reconciler, RecordedEvents, RegistryEvent, SubscriptionChangedEvent,
+        SubscriptionLifecycle, TimelineChangedEvent,
     },
     feed::FeedProj,
     query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
     timeline::{TimelineProj, TimelineProjectionInput},
 };
 pub(crate) use synd_support::time::Clock;
+
+use super::{error::IntoDbResult, feed_endpoint};
 
 pub(crate) use super::{SqliteFeedRegistryDb, SqliteRegistryTx};
 pub(crate) use crate::sqlite::SqliteDatabase;
@@ -140,21 +142,47 @@ pub(crate) fn subscription_key(subscription: &Subscription) -> SubscriptionKey {
     )
 }
 
+pub(crate) fn subscription_attrs(subscription: &Subscription) -> FeedSubscriptionAttrs {
+    FeedSubscriptionAttrs {
+        requirement: subscription.requirement,
+        category: subscription.category.clone(),
+        crawl_policy: subscription.crawl_policy,
+    }
+}
+
+pub(crate) fn feed_subscribed_event(subscription: &Subscription) -> FeedSubscribedEvent {
+    FeedSubscribedEvent::new(
+        subscription_key(subscription),
+        subscription_attrs(subscription),
+    )
+}
+
+pub(crate) fn subscription_changed_event(subscription: &Subscription) -> SubscriptionChangedEvent {
+    SubscriptionChangedEvent::new(
+        subscription_key(subscription),
+        subscription_attrs(subscription),
+    )
+}
+
 pub(crate) async fn store_subscription(
     tx: &mut SqliteRegistryTx<'_>,
     subscription: Subscription,
 ) -> RegistryDbResult<()> {
-    let feed_url = subscription.feed_url.clone();
     let key = subscription_key(&subscription);
-    let attrs = FeedSubscriptionAttrs {
-        requirement: subscription.requirement,
-        category: subscription.category,
-        crawl_policy: subscription.crawl_policy,
-    };
-    tx.upsert_feed_endpoint(&feed_url, subscription.created_at)
-        .await?;
-    tx.upsert_feed_subscription(&key, attrs, subscription.created_at)
+    let attrs = subscription_attrs(&subscription);
+    tx.upsert_subscription(&key, attrs, subscription.created_at)
         .await
+}
+
+pub(crate) async fn store_feed_endpoint(
+    tx: &mut SqliteRegistryTx<'_>,
+    feed_url: &FeedUrl,
+    now: DateTime<Utc>,
+) -> RegistryDbResult<()> {
+    feed_endpoint::upsert(&mut tx.tx, feed_url, now, now)
+        .await
+        .map(|_| ())
+        .db()
 }
 
 pub(crate) async fn store_subscription_in_db(
@@ -168,11 +196,13 @@ pub(crate) async fn store_subscription_in_db(
 }
 
 pub(crate) fn subscribed_event(path: &str) -> Event {
-    FeedSubscribedEvent::new(subscription_key(&subscription(path))).into()
+    let subscription = subscription(path);
+    feed_subscribed_event(&subscription).into()
 }
 
 pub(crate) fn changed_event(path: &str) -> Event {
-    SubscriptionChangedEvent::new(subscription_key(&subscription(path))).into()
+    let subscription = subscription(path);
+    subscription_changed_event(&subscription).into()
 }
 
 pub(crate) fn subscription_lifecycle_interests() -> EventInterests {
@@ -202,17 +232,15 @@ pub(crate) async fn project_crawl_targets(
     let mut projector = CrawlTargetListProj::new();
     let mut tx = db.begin().await?;
     let mut generated = Vec::new();
-    {
-        let mut cx = ConsumeContext::new(&mut tx);
-        for event in events {
-            let events = <CrawlTargetListProj as Consumer<SqliteFeedRegistryDb>>::consume(
-                &mut projector,
-                &mut cx,
-                CrawlTargetListInput::new(event, test_occurred_at()),
-            )
-            .await?;
-            generated.extend(events);
-        }
+    for event in events {
+        let events = <CrawlTargetListProj as Reconciler<SqliteFeedRegistryDb>>::reconcile(
+            &mut projector,
+            &mut tx,
+            test_occurred_at(),
+            InputBatch::new(vec![CrawlTargetListInput::new(event, test_occurred_at())]),
+        )
+        .await?;
+        generated.extend(events);
     }
     record_generated_events(&mut tx, generated).await?;
     tx.commit().await?;
@@ -260,7 +288,7 @@ pub(crate) async fn record_fetched_crawl(
     let claimed_at = enqueued_at + chrono::Duration::minutes(1);
     let finished_at = enqueued_at + chrono::Duration::minutes(2);
     let mut tx = db.begin().await?;
-    tx.upsert_feed_endpoint(feed_url, enqueued_at).await?;
+    store_feed_endpoint(&mut tx, feed_url, enqueued_at).await?;
     let enqueue = tx
         .enqueue_job(EnqueueCrawlJobCommand::new(
             feed_url.clone(),
@@ -299,10 +327,8 @@ pub(crate) async fn project_feed(
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = FeedProj::new();
-    let events = {
-        let mut cx = ConsumeContext::new(&mut tx);
-        <FeedProj as Consumer<SqliteFeedRegistryDb>>::consume(&mut proj, &mut cx, event).await?
-    };
+    let events =
+        <FeedProj as Projector<SqliteFeedRegistryDb>>::apply(&mut proj, &mut tx, event).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -314,10 +340,8 @@ pub(crate) async fn project_entries(
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = EntryProj::new();
-    let events = {
-        let mut cx = ConsumeContext::new(&mut tx);
-        <EntryProj as Consumer<SqliteFeedRegistryDb>>::consume(&mut proj, &mut cx, input).await?
-    };
+    let events =
+        <EntryProj as Projector<SqliteFeedRegistryDb>>::apply(&mut proj, &mut tx, input).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -336,15 +360,12 @@ pub(crate) async fn project_timeline_batch(
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = TimelineProj::new();
-    let events = {
-        let mut cx = ConsumeContext::new(&mut tx);
-        <TimelineProj as Consumer<SqliteFeedRegistryDb>>::consume_batch(
-            &mut proj,
-            &mut cx,
-            InputBatch::new(inputs),
-        )
-        .await?
-    };
+    let events = <TimelineProj as Projector<SqliteFeedRegistryDb>>::apply_batch(
+        &mut proj,
+        &mut tx,
+        InputBatch::new(inputs),
+    )
+    .await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)

@@ -260,14 +260,14 @@ mod tests {
                         code: synd_client::payload::ResponseCode::Ok,
                     },
                     url: url_ok1.clone(),
-                    request_id: "subscribe-ok1".to_owned(),
+                    disposition: synd_client::payload::SubscribeDisposition::Subscribed,
                 }),
                 "https://ok2.ymgyt.io/feed.xml" => Ok(SubscribeFeedPayload {
                     status: synd_client::payload::ResponseStatus {
                         code: synd_client::payload::ResponseCode::Ok,
                     },
                     url: url_ok2.clone(),
-                    request_id: "subscribe-ok2".to_owned(),
+                    disposition: synd_client::payload::SubscribeDisposition::Subscribed,
                 }),
                 "https://err_unavailable.ymgyt.io/feed.xml" => Err(SyndApiError::SubscribeFeed(
                     SubscribeFeedError::FeedUnavailable {

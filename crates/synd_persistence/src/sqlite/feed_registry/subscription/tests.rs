@@ -39,7 +39,7 @@ async fn feed_subscription_reads_are_backed_by_feed_endpoint() -> anyhow::Result
         })
         .await?;
     let endpoint_subscriptions = tx
-        .load_feed_endpoint_subscriptions(&subscription.feed_url)
+        .load_endpoint_subscriptions(&subscription.feed_url)
         .await?;
 
     assert_eq!(page.subscriptions, vec![subscription.clone()]);

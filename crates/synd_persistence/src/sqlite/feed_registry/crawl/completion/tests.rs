@@ -9,7 +9,7 @@ async fn crawl_completion_records_result_state_and_finished_event() -> anyhow::R
     let finished_at = Utc.with_ymd_and_hms(2026, 6, 7, 12, 2, 0).unwrap();
 
     let mut tx = db.begin().await?;
-    tx.upsert_feed_endpoint(&feed_url, enqueued_at).await?;
+    store_feed_endpoint(&mut tx, &feed_url, enqueued_at).await?;
     let enqueue = tx
         .enqueue_job(EnqueueCrawlJobCommand::new(
             feed_url.clone(),

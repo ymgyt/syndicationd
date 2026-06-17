@@ -1,7 +1,7 @@
 use async_graphql::{Context, Enum, Error, InputObject, Object, SimpleObject};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
-    SubscribeFeedCommand, UnsubscribeFeedCommand,
+    SubscribeFeedCommand, SubscribeOutcome, UnsubscribeFeedCommand, UnsubscribeOutcome,
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
 };
 
@@ -94,7 +94,13 @@ impl PollingPolicyInput {
 struct SubscribeFeedPayload {
     status: ResponseStatus,
     url: FeedUrl,
-    request_id: String,
+    disposition: SubscribeDisposition,
+}
+
+#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+enum SubscribeDisposition {
+    Subscribed,
+    Changed,
 }
 
 #[derive(InputObject)]
@@ -105,6 +111,13 @@ struct UnsubscribeFeedInput {
 #[derive(SimpleObject)]
 struct UnsubscribeFeedPayload {
     status: ResponseStatus,
+    url: FeedUrl,
+    disposition: UnsubscribeDisposition,
+}
+
+#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+enum UnsubscribeDisposition {
+    Unsubscribed,
 }
 
 #[derive(InputObject)]
@@ -152,10 +165,19 @@ impl Mutation {
             })
             .await?;
 
+        let (url, disposition) = match out.outcome {
+            SubscribeOutcome::Subscribed(subscription) => {
+                (subscription.feed_url, SubscribeDisposition::Subscribed)
+            }
+            SubscribeOutcome::Changed(subscription) => {
+                (subscription.feed_url, SubscribeDisposition::Changed)
+            }
+        };
+
         Ok(SubscribeFeedPayload {
             status: ResponseStatus::ok(),
-            url: out.subscription.feed_url,
-            request_id: out.request_id.to_string(),
+            url,
+            disposition,
         })
     }
 
@@ -164,15 +186,22 @@ impl Mutation {
         cx: &Context<'_>,
         input: UnsubscribeFeedInput,
     ) -> async_graphql::Result<UnsubscribeFeedPayload> {
-        registry(cx)
+        let out = registry(cx)
             .unsubscribe(UnsubscribeFeedCommand {
                 subscriber_id: subscriber_id(cx),
                 feed_url: input.url,
             })
             .await?;
+        let (url, disposition) = match out.outcome {
+            UnsubscribeOutcome::Unsubscribed(subscription) => {
+                (subscription.feed_url, UnsubscribeDisposition::Unsubscribed)
+            }
+        };
 
         Ok(UnsubscribeFeedPayload {
             status: ResponseStatus::ok(),
+            url,
+            disposition,
         })
     }
 

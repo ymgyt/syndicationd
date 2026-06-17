@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    CrawlJobQueueTx, RegistryDbResult,
+    CrawlJobQueue, RegistryDbResult,
     crawl::job::{
         ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobId, CrawlJobState,
         EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome, FinishCrawlJobCommand,
@@ -219,7 +219,7 @@ impl ClaimedCrawlJobRow {
     }
 }
 
-impl CrawlJobQueueTx for SqliteRegistryTx<'_> {
+impl CrawlJobQueue for SqliteRegistryTx<'_> {
     async fn enqueue_job(
         &mut self,
         job: EnqueueCrawlJobCommand,

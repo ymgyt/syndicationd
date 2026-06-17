@@ -15,7 +15,6 @@ pub struct FeedRegistryConfig {
 
 #[derive(Debug, Clone, Copy)]
 pub struct FeedRegistryWorkerConfig {
-    pub subscription_request_poll_interval: Duration,
     pub crawl_target_projection_poll_interval: Duration,
     pub feed_projection_poll_interval: Duration,
     pub entry_projection_poll_interval: Duration,
@@ -29,7 +28,6 @@ pub struct FeedRegistryWorkerConfig {
 impl FeedRegistryWorkerConfig {
     pub fn with_poll_interval(poll_interval: Duration) -> Self {
         Self {
-            subscription_request_poll_interval: poll_interval,
             crawl_target_projection_poll_interval: poll_interval,
             feed_projection_poll_interval: poll_interval,
             entry_projection_poll_interval: poll_interval,

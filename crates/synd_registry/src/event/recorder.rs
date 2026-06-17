@@ -1,9 +1,8 @@
-use chrono::{DateTime, Utc};
 use synd_support::time::Clock;
 
 use crate::{
     error::RegistryDbResult,
-    event::{Event, JournalAppendTx, RecordedEvents},
+    event::{Event, EventJournalAppend, RecordedEvents},
 };
 
 /// Records journal events and the wake summary as one operation.
@@ -25,10 +24,10 @@ impl<'a, Tx, C: ?Sized> EventRecorder<'a, Tx, C> {
 
 impl<Tx, C> EventRecorder<'_, Tx, C>
 where
-    Tx: JournalAppendTx + Send,
+    Tx: EventJournalAppend + Send,
     C: Clock + ?Sized,
 {
-    pub async fn record<E>(&mut self, event: E) -> RegistryDbResult<JournalEventMeta>
+    pub async fn record<E>(&mut self, event: E) -> RegistryDbResult<()>
     where
         E: Into<Event>,
     {
@@ -39,7 +38,7 @@ where
         )]
         let event_type = self.tx.append_event(event.into(), occurred_at).await?;
         self.recorded.push(event_type);
-        Ok(JournalEventMeta { occurred_at })
+        Ok(())
     }
 
     pub async fn record_all<I, E>(&mut self, events: I) -> RegistryDbResult<()>
@@ -52,10 +51,4 @@ where
         }
         Ok(())
     }
-}
-
-/// Metadata assigned to an event by the journal recording boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct JournalEventMeta {
-    pub occurred_at: DateTime<Utc>,
 }

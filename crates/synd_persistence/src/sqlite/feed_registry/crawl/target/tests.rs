@@ -11,15 +11,15 @@ async fn crawl_target_projection_activates_target_after_subscription() -> anyhow
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;
 
     let mut tx = db.begin().await?;
     let target = tx
-        .load_crawl_target_for_endpoint(&subscription.feed_url)
+        .load_target_for_endpoint(&subscription.feed_url)
         .await?
         .expect("crawl target should be projected");
 
@@ -51,8 +51,8 @@ async fn crawl_target_projection_emits_target_activated_event() -> anyhow::Resul
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;
@@ -94,15 +94,15 @@ async fn crawl_target_projection_aggregates_multiple_subscriptions() -> anyhow::
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&one_hour),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &one_hour,
         ))],
     )
     .await?;
 
     let mut tx = db.begin().await?;
     let target = tx
-        .load_crawl_target_for_endpoint(&one_hour.feed_url)
+        .load_target_for_endpoint(&one_hour.feed_url)
         .await?
         .expect("crawl target should be projected");
 
@@ -134,8 +134,8 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;
@@ -147,15 +147,15 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Changed(
-            SubscriptionChangedEvent::new(subscription_key(&subscription)),
-        )],
+        vec![SubscriptionLifecycle::Changed(subscription_changed_event(
+            &subscription,
+        ))],
     )
     .await?;
 
     let mut tx = db.begin().await?;
     let target = tx
-        .load_crawl_target_for_endpoint(&subscription.feed_url)
+        .load_target_for_endpoint(&subscription.feed_url)
         .await?
         .expect("crawl target should be projected");
 
@@ -187,8 +187,8 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;
@@ -200,9 +200,9 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Changed(
-            SubscriptionChangedEvent::new(subscription_key(&subscription)),
-        )],
+        vec![SubscriptionLifecycle::Changed(subscription_changed_event(
+            &subscription,
+        ))],
     )
     .await?;
 
@@ -227,14 +227,14 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;
 
     let mut tx = db.begin().await?;
-    tx.delete_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
+    tx.delete_subscription(&subscription.subscriber_id, &subscription.feed_url)
         .await?;
     tx.commit().await?;
 
@@ -248,7 +248,7 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
 
     let mut tx = db.begin().await?;
     let target = tx
-        .load_crawl_target_for_endpoint(&subscription.feed_url)
+        .load_target_for_endpoint(&subscription.feed_url)
         .await?
         .expect("crawl target should be projected");
 
@@ -267,14 +267,14 @@ async fn crawl_target_projection_emits_target_deactivated_event() -> anyhow::Res
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;
 
     let mut tx = db.begin().await?;
-    tx.delete_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
+    tx.delete_subscription(&subscription.subscriber_id, &subscription.feed_url)
         .await?;
     tx.commit().await?;
 

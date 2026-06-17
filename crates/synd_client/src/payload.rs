@@ -283,100 +283,7 @@ pub struct FeedStatusResponseData {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "__typename")]
 pub enum FeedEvent {
-    FeedSubscribed(FeedSubscribedEvent),
-    FeedSubscribeRejected(FeedSubscribeRejectedEvent),
-    SubscriptionChanged(SubscriptionChangedEvent),
-    FeedUnsubscribed(FeedUnsubscribedEvent),
-    FeedUnsubscribeRejected(FeedUnsubscribeRejectedEvent),
-    CrawlJobEnqueued(CrawlJobEnqueuedEvent),
-    CrawlJobStarted(CrawlJobStartedEvent),
-    CrawlJobFinished(CrawlJobFinishedEvent),
-    FeedDiscovered(FeedDiscoveredEvent),
-    FeedChanged(FeedChangedEvent),
-    EntryDiscovered(EntryDiscoveredEvent),
-    EntryChanged(EntryChangedEvent),
     TimelineChanged(TimelineChangeEvent),
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedSubscribedEvent {
-    pub request_id: String,
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedSubscribeRejectedEvent {
-    pub request_id: String,
-    pub url: FeedUrl,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SubscriptionChangedEvent {
-    pub request_id: String,
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedUnsubscribedEvent {
-    pub request_id: String,
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedUnsubscribeRejectedEvent {
-    pub request_id: String,
-    pub url: FeedUrl,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CrawlJobEnqueuedEvent {
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CrawlJobStartedEvent {
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CrawlJobFinishedEvent {
-    pub url: FeedUrl,
-    pub http_status: Option<i32>,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedDiscoveredEvent {
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedChangedEvent {
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EntryDiscoveredEvent {
-    pub url: FeedUrl,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EntryChangedEvent {
-    pub url: FeedUrl,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -512,7 +419,28 @@ pub enum PollingPolicyInputKind {
 pub struct SubscribeFeedPayload {
     pub status: ResponseStatus,
     pub url: FeedUrl,
-    pub request_id: String,
+    pub disposition: SubscribeDisposition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SubscribeDisposition {
+    Subscribed,
+    Changed,
+    Other(String),
+}
+
+impl<'de> Deserialize<'de> for SubscribeDisposition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "SUBSCRIBED" => Self::Subscribed,
+            "CHANGED" => Self::Changed,
+            _ => Self::Other(value),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -626,22 +554,6 @@ mod tests {
     use super::FeedEvent;
 
     #[test]
-    fn decodes_subscription_changed_feed_event() {
-        let event: FeedEvent = serde_json::from_value(serde_json::json!({
-            "__typename": "SubscriptionChanged",
-            "requestId": "request-1",
-            "url": "https://example.com/feed.xml"
-        }))
-        .unwrap();
-
-        let FeedEvent::SubscriptionChanged(event) = event else {
-            panic!("expected subscription changed event");
-        };
-        assert_eq!(event.request_id, "request-1");
-        assert_eq!(event.url.as_ref(), "https://example.com/feed.xml");
-    }
-
-    #[test]
     fn decodes_timeline_changed_feed_event() {
         let event: FeedEvent = serde_json::from_value(serde_json::json!({
             "__typename": "TimelineChanged",
@@ -650,9 +562,7 @@ mod tests {
         }))
         .unwrap();
 
-        let FeedEvent::TimelineChanged(event) = event else {
-            panic!("expected timeline changed event");
-        };
+        let FeedEvent::TimelineChanged(event) = event;
         assert_eq!(event.changed_at, "2026-06-13T00:00:00Z");
         assert_matches!(event.affected_feeds, Some(feeds) if feeds.len() == 1);
     }

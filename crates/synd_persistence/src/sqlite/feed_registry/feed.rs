@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedProjectionTx, RegistryDbResult,
+    FeedStore, RegistryDbResult,
     crawl::{blob::BlobRef, job::CrawlJobId, result::CrawlResultRef},
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
 };
@@ -177,14 +177,7 @@ struct StoredFeed {
     current_body_blob_pk: i64,
 }
 
-impl FeedProjectionTx for super::SqliteRegistryTx<'_> {
-    async fn load_feed_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        load_source(&mut self.tx, job_id).await.db()
-    }
-
+impl FeedStore for super::SqliteRegistryTx<'_> {
     async fn upsert_feed(
         &mut self,
         command: UpsertFeedCommand,

@@ -19,5 +19,5 @@ allowed-duplicate-crates = [
 too-many-lines-threshold = 150
 
 disallowed-methods = [
-  { path = "synd_registry::event::JournalAppendTx::append_event", reason = "use EventRecorder so journal append and wake summary stay inseparable" },
+  { path = "synd_registry::event::EventJournalAppend::append_event", reason = "use EventRecorder so journal append and wake summary stay inseparable" },
 ]

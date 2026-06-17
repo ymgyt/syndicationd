@@ -2,30 +2,13 @@ use std::future::Future;
 
 use chrono::{DateTime, Utc};
 use synd_feed::feed::service::FeedParseError;
-use synd_feed::types::FeedUrl;
 use thiserror::Error;
 use tracing::warn;
 
 use crate::{
-    crawl::{
-        queue::CrawlJobQueue,
-        result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
-        schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
-        target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
-    },
-    db::{
-        CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx, FeedRegistryDb,
-        SubscriptionTx,
-    },
-    entry::EntryProjectionScope,
-    error::{RegistryDbError, RegistryDbResult},
-    event::{Event, EventInterests, EventPayloadError, EventType, RegistryEvent},
-    feed::FeedProjectionScope,
-    query::{Subscriptions, SubscriptionsQuery},
-    subscription::{
-        FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
-    },
-    timeline::TimelineProjectionScope,
+    db::FeedRegistryDb,
+    error::RegistryDbError,
+    event::{Event, EventInterests, EventType},
 };
 
 /// Result type returned by event processors.
@@ -43,12 +26,6 @@ pub enum ProcessorError {
     },
     #[error(transparent)]
     FeedParse(#[from] FeedParseError),
-}
-
-impl From<EventPayloadError> for ProcessorError {
-    fn from(err: EventPayloadError) -> Self {
-        Self::unexpected_event(err.expected.as_str(), err.actual)
-    }
 }
 
 impl ProcessorError {
@@ -86,25 +63,25 @@ impl ClassifyError for ProcessorError {
 /// Stable identity for an event processor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProcessorId {
-    SubscriptionRequest,
     CrawlTargetProjection,
     FeedProjection,
     EntryProjection,
     TimelineProjection,
     ApiEventProjection,
     ApiEventPublisher,
+    CrawlScheduler,
 }
 
 impl ProcessorId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::SubscriptionRequest => "SubscriptionRequest",
             Self::CrawlTargetProjection => "CrawlTargetProjection",
             Self::FeedProjection => "FeedProjection",
             Self::EntryProjection => "EntryProjection",
             Self::TimelineProjection => "TimelineProjection",
             Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
+            Self::CrawlScheduler => "CrawlScheduler",
         }
     }
 }
@@ -129,27 +106,15 @@ pub(crate) fn skip_permanent_error(
 }
 
 /// Typed processor input built from one journaled event.
-pub trait ConsumerInput: Sized + Send {
+pub trait EventInput: Sized + Send {
     const INTERESTS: &'static [EventType];
 
     fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self>;
 }
 
-impl<T> ConsumerInput for T
-where
-    T: RegistryEvent + TryFrom<Event> + Send,
-    ProcessorError: From<<T as TryFrom<Event>>::Error>,
-{
-    const INTERESTS: &'static [EventType] = &[T::TYPE];
-
-    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
-        event.try_into().map_err(ProcessorError::from)
-    }
-}
-
-/// Common declaration for event processors that advance through the journal.
+/// Common declaration for components that react to registry events.
 pub trait Processor: Send + 'static {
-    type Input: ConsumerInput;
+    type Input: EventInput;
 
     fn id(&self) -> ProcessorId;
 
@@ -186,27 +151,27 @@ impl<I> InputBatch<I> {
     }
 }
 
-/// A component that consumes registry events inside a registry transaction.
-pub trait Consumer<S>: Processor
+/// A non-idempotent cursor-driven projection over journaled facts.
+pub trait Projector<S>: Processor
 where
     S: FeedRegistryDb,
 {
-    fn consume(
+    fn apply(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
 
-    fn consume_batch(
+    fn apply_batch(
         &mut self,
-        cx: &mut ConsumeContext<'_, S::Tx<'_>>,
+        tx: &mut S::Tx<'_>,
         batch: InputBatch<Self::Input>,
     ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send {
         async move {
             let processor = self.id();
             let mut events = Vec::new();
             for input in batch.into_inputs() {
-                match self.consume(cx, input).await {
+                match self.apply(tx, input).await {
                     Ok(mut produced) => events.append(&mut produced),
                     Err(err) => skip_permanent_error(processor, err, "input")?,
                 }
@@ -216,9 +181,116 @@ where
     }
 }
 
-/// A terminal event processor that consumes committed events without recording new events.
+/// An idempotent reconciler that may be driven by a cursor or by a scan tick.
+pub trait Reconciler<S>: Processor
+where
+    S: FeedRegistryDb,
+{
+    fn reconcile(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        now: DateTime<Utc>,
+        batch: InputBatch<Self::Input>,
+    ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
+}
+
+pub(crate) trait CursorRole<S>: Processor
+where
+    S: FeedRegistryDb,
+{
+    fn process_cursor_batch(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        now: DateTime<Utc>,
+        batch: InputBatch<Self::Input>,
+    ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
+}
+
+/// Marks a projector as cursor-driven when it reacts to selected journal facts.
+pub(crate) struct CursorProjector<P> {
+    processor: P,
+}
+
+impl<P> CursorProjector<P> {
+    pub(crate) fn new(processor: P) -> Self {
+        Self { processor }
+    }
+}
+
+impl<P> Processor for CursorProjector<P>
+where
+    P: Processor,
+{
+    type Input = P::Input;
+
+    fn id(&self) -> ProcessorId {
+        self.processor.id()
+    }
+
+    fn interests(&self) -> EventInterests {
+        self.processor.interests()
+    }
+}
+
+impl<S, P> CursorRole<S> for CursorProjector<P>
+where
+    S: FeedRegistryDb,
+    P: Projector<S>,
+{
+    async fn process_cursor_batch(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        _now: DateTime<Utc>,
+        batch: InputBatch<Self::Input>,
+    ) -> ProcessorResult<Vec<Event>> {
+        self.processor.apply_batch(tx, batch).await
+    }
+}
+
+/// Marks a reconciler as cursor-driven when it reacts to selected journal facts.
+pub(crate) struct CursorReconciler<P> {
+    processor: P,
+}
+
+impl<P> CursorReconciler<P> {
+    pub(crate) fn new(processor: P) -> Self {
+        Self { processor }
+    }
+}
+
+impl<P> Processor for CursorReconciler<P>
+where
+    P: Processor,
+{
+    type Input = P::Input;
+
+    fn id(&self) -> ProcessorId {
+        self.processor.id()
+    }
+
+    fn interests(&self) -> EventInterests {
+        self.processor.interests()
+    }
+}
+
+impl<S, P> CursorRole<S> for CursorReconciler<P>
+where
+    S: FeedRegistryDb,
+    P: Reconciler<S>,
+{
+    async fn process_cursor_batch(
+        &mut self,
+        tx: &mut S::Tx<'_>,
+        now: DateTime<Utc>,
+        batch: InputBatch<Self::Input>,
+    ) -> ProcessorResult<Vec<Event>> {
+        self.processor.reconcile(tx, now, batch).await
+    }
+}
+
+/// A best-effort terminal event processor that consumes committed events without recording new events.
 pub trait Sink: Processor {
-    fn consume(&mut self, input: Self::Input) -> impl Future<Output = ProcessorResult<()>> + Send;
+    fn deliver(&mut self, input: Self::Input) -> impl Future<Output = ()> + Send;
 }
 
 /// Summary of events recorded into the journal by one submit operation.
@@ -258,235 +330,5 @@ impl RecordedEvents {
 
     pub fn extend(&mut self, mut other: Self) {
         self.types.append(&mut other.types);
-    }
-}
-
-/// Transactional registry context used by event-driven processors.
-///
-/// Domain database operations are delegated to the underlying transaction.
-/// Processors return produced events to their worker, which records them after
-/// domain database writes succeed.
-pub struct RegistryContext<'a, Tx> {
-    tx: &'a mut Tx,
-}
-
-/// Transactional context passed to event consumers.
-pub type ConsumeContext<'a, Tx> = RegistryContext<'a, Tx>;
-
-/// Transactional context passed to reconcilers.
-pub type ReconcileContext<'a, Tx> = RegistryContext<'a, Tx>;
-
-impl<'a, Tx> RegistryContext<'a, Tx> {
-    pub fn new(tx: &'a mut Tx) -> Self {
-        Self { tx }
-    }
-
-    pub fn subscriber_scope(&mut self, subscriber_id: SubscriberId) -> SubscriberScope<'_, Tx> {
-        SubscriberScope::new(&mut *self.tx, subscriber_id)
-    }
-
-    /// Returns feed projection operations within this transaction.
-    pub fn feed_projection(&mut self) -> FeedProjectionScope<'_, Tx> {
-        FeedProjectionScope::new(&mut *self.tx)
-    }
-
-    /// Returns entry projection operations within this transaction.
-    pub fn entry_projection(&mut self) -> EntryProjectionScope<'_, Tx> {
-        EntryProjectionScope::new(&mut *self.tx)
-    }
-
-    /// Returns timeline projection operations within this transaction.
-    pub fn timeline_projection(&mut self) -> TimelineProjectionScope<'_, Tx> {
-        TimelineProjectionScope::new(&mut *self.tx)
-    }
-}
-
-impl<Tx> RegistryContext<'_, Tx>
-where
-    Tx: CrawlScheduleTx + Send,
-{
-    pub async fn list_candidates(
-        &mut self,
-        now: DateTime<Utc>,
-        limit: usize,
-    ) -> RegistryDbResult<Vec<CrawlScheduleCandidate>> {
-        self.tx.list_candidates(now, limit).await
-    }
-
-    pub async fn upsert_schedule(
-        &mut self,
-        schedule: UpsertCrawlScheduleCommand,
-    ) -> RegistryDbResult<()> {
-        self.tx.upsert_schedule(schedule).await
-    }
-}
-
-impl<Tx> RegistryContext<'_, Tx>
-where
-    Tx: CrawlJobQueueTx + Send,
-{
-    pub fn crawl_job_queue(&mut self) -> CrawlJobQueue<'_, Tx> {
-        CrawlJobQueue::new(&mut *self.tx)
-    }
-}
-
-/// Subscriber-scoped operations over feed subscription state.
-pub struct SubscriberScope<'a, Tx> {
-    tx: &'a mut Tx,
-    subscriber_id: SubscriberId,
-}
-
-impl<'a, Tx> SubscriberScope<'a, Tx> {
-    fn new(tx: &'a mut Tx, subscriber_id: SubscriberId) -> Self {
-        Self { tx, subscriber_id }
-    }
-}
-
-impl<Tx> SubscriberScope<'_, Tx>
-where
-    Tx: SubscriptionTx + Send,
-{
-    pub async fn subscribe_feed(
-        &mut self,
-        feed_url: FeedUrl,
-        attrs: FeedSubscriptionAttrs,
-        now: DateTime<Utc>,
-    ) -> ProcessorResult<SubscribeOutcome> {
-        let subscription = SubscriptionKey::new(self.subscriber_id.clone(), feed_url);
-        let already_subscribed = self
-            .tx
-            .has_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
-            .await?;
-
-        self.tx
-            .upsert_feed_endpoint(&subscription.feed_url, now)
-            .await?;
-        self.tx
-            .upsert_feed_subscription(&subscription, attrs, now)
-            .await?;
-
-        let outcome = if already_subscribed {
-            SubscribeOutcome::Changed(subscription)
-        } else {
-            SubscribeOutcome::Subscribed(subscription)
-        };
-        Ok(outcome)
-    }
-
-    pub async fn unsubscribe_feed(
-        &mut self,
-        feed_url: FeedUrl,
-    ) -> ProcessorResult<UnsubscribeOutcome> {
-        let subscription = SubscriptionKey::new(self.subscriber_id.clone(), feed_url);
-        let is_subscribed = self
-            .tx
-            .has_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
-            .await?;
-
-        if is_subscribed {
-            self.tx
-                .delete_feed_subscription(&subscription.subscriber_id, &subscription.feed_url)
-                .await?;
-            Ok(UnsubscribeOutcome::Unsubscribed(subscription))
-        } else {
-            Ok(UnsubscribeOutcome::NotSubscribed(subscription))
-        }
-    }
-}
-
-impl<Tx> SubscriptionTx for ConsumeContext<'_, Tx>
-where
-    Tx: SubscriptionTx + Send,
-{
-    fn upsert_feed_endpoint(
-        &mut self,
-        feed_url: &FeedUrl,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.upsert_feed_endpoint(feed_url, now)
-    }
-
-    fn upsert_feed_subscription(
-        &mut self,
-        subscription: &SubscriptionKey,
-        attrs: FeedSubscriptionAttrs,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.upsert_feed_subscription(subscription, attrs, now)
-    }
-
-    fn delete_feed_subscription(
-        &mut self,
-        subscriber_id: &SubscriberId,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.delete_feed_subscription(subscriber_id, feed_url)
-    }
-
-    fn has_feed_subscription(
-        &mut self,
-        subscriber_id: &SubscriberId,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<bool>> + Send {
-        self.tx.has_feed_subscription(subscriber_id, feed_url)
-    }
-
-    fn list_subscriptions(
-        &mut self,
-        query: SubscriptionsQuery,
-    ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send {
-        self.tx.list_subscriptions(query)
-    }
-
-    fn load_feed_endpoint_subscriptions(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send {
-        self.tx.load_feed_endpoint_subscriptions(feed_url)
-    }
-}
-
-impl<Tx> CrawlTargetTx for ConsumeContext<'_, Tx>
-where
-    Tx: CrawlTargetTx + Send,
-{
-    fn upsert_crawl_target(
-        &mut self,
-        target: &CrawlTarget,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.upsert_crawl_target(target)
-    }
-
-    fn load_crawl_target_for_endpoint(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send {
-        self.tx.load_crawl_target_for_endpoint(feed_url)
-    }
-}
-
-impl<Tx> CrawlCompletionTx for ConsumeContext<'_, Tx>
-where
-    Tx: CrawlCompletionTx + Send,
-{
-    fn load_crawl_state(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<Option<CrawlState>>> + Send {
-        self.tx.load_crawl_state(feed_url)
-    }
-
-    fn record_crawl_result(
-        &mut self,
-        command: RecordCrawlResultCommand,
-    ) -> impl Future<Output = RegistryDbResult<CrawlResultRef>> + Send {
-        self.tx.record_crawl_result(command)
-    }
-
-    fn upsert_crawl_state(
-        &mut self,
-        command: UpsertCrawlStateCommand,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send {
-        self.tx.upsert_crawl_state(command)
     }
 }

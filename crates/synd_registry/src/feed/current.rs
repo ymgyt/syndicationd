@@ -4,8 +4,6 @@ use synd_feed::types::{FeedMeta, FeedUrl};
 
 use crate::{
     crawl::{blob::BlobRef, job::CrawlJobId, result::CrawlResultRef},
-    db::{BlobStoreTx, FeedProjectionTx},
-    error::RegistryDbResult,
     event::{Event, FeedChangedEvent, FeedDiscoveredEvent},
 };
 
@@ -47,46 +45,5 @@ impl UpsertFeedOutcome {
             ),
             Self::Unchanged => None,
         }
-    }
-}
-
-/// Transaction-scoped operations for projecting crawled feed state.
-pub struct FeedProjectionScope<'a, Tx> {
-    tx: &'a mut Tx,
-}
-
-impl<'a, Tx> FeedProjectionScope<'a, Tx> {
-    /// Creates a projection scope inside one open registry transaction.
-    pub fn new(tx: &'a mut Tx) -> Self {
-        Self { tx }
-    }
-}
-
-impl<Tx> FeedProjectionScope<'_, Tx>
-where
-    Tx: BlobStoreTx + FeedProjectionTx + Send,
-{
-    /// Returns the crawl result source that can update feed state.
-    pub async fn load_feed_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        self.tx.load_feed_source(job_id).await
-    }
-
-    /// Returns the fetched response body for the given feed source.
-    pub async fn load_body(&mut self, source: &FeedSource) -> RegistryDbResult<Vec<u8>> {
-        self.tx.load_blob(source.body_blob).await
-    }
-
-    /// Applies the latest parsed feed state and returns feed lifecycle events.
-    pub async fn upsert_feed(
-        &mut self,
-        command: UpsertFeedCommand,
-    ) -> RegistryDbResult<(UpsertFeedOutcome, Vec<Event>)> {
-        let source = command.source.clone();
-        let outcome = self.tx.upsert_feed(command).await?;
-        let events = outcome.into_event(&source).into_iter().collect();
-        Ok((outcome, events))
     }
 }

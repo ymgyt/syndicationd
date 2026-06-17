@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    CrawlTargetTx, RegistryDbResult,
+    CrawlTargetStore, RegistryDbResult,
     crawl::target_list::{CrawlTarget, CrawlTargetState},
 };
 
@@ -206,12 +206,12 @@ impl CrawlTargetRow {
     }
 }
 
-impl CrawlTargetTx for SqliteRegistryTx<'_> {
-    async fn upsert_crawl_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
+impl CrawlTargetStore for SqliteRegistryTx<'_> {
+    async fn upsert_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
         upsert(&mut self.tx, target).await.db()
     }
 
-    async fn load_crawl_target_for_endpoint(
+    async fn load_target_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<Option<CrawlTarget>> {

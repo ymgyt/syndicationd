@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Transactional event journal append operation used by `EventRecorder`.
-pub trait JournalAppendTx {
+pub trait EventJournalAppend {
     /// Records that the event happened in the current transaction.
     fn append_event(
         &mut self,
@@ -18,7 +18,7 @@ pub trait JournalAppendTx {
 }
 
 /// Transactional event journal read and cursor operations.
-pub trait JournalTx {
+pub trait EventJournal {
     /// Reads interested entries after the supplied cursor in the current transaction.
     fn read_after(
         &mut self,

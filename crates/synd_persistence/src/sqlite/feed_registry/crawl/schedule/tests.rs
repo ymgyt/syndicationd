@@ -12,8 +12,8 @@ async fn crawl_schedule_candidates_and_job_enqueue_are_persisted() -> anyhow::Re
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(FeedSubscribedEvent::new(
-            subscription_key(&subscription),
+        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
+            &subscription,
         ))],
     )
     .await?;

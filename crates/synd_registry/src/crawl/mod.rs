@@ -2,7 +2,6 @@ pub mod blob;
 pub mod completion;
 pub mod job;
 pub mod policy;
-pub mod queue;
 pub mod result;
 pub mod schedule;
 pub mod scheduler;

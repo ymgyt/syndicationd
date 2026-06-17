@@ -17,14 +17,14 @@ use crate::{
         target_list::{CrawlTarget, FeedEndpointSubscription, FeedEndpointSubscriptionSet},
     },
     db::{
-        BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx,
-        EntryProjectionTx, FeedProjectionTx, FeedRegistryDb, SubscriptionTx, TimelineTx,
+        BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
+        EntryStore, FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
     event::{
-        Event, EventCursor, EventCursorPos, EventInterests, EventType, JournalAppendTx, JournalTx,
-        JournaledEvent, ProcessorId,
+        Event, EventCursor, EventCursorPos, EventInterests, EventJournal, EventJournalAppend,
+        EventType, JournaledEvent, ProcessorId,
     },
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
     query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
@@ -52,6 +52,7 @@ struct InMemoryState {
     subscriptions: HashMap<SubscriptionKeyParts, Subscription>,
     crawl_targets: HashMap<String, CrawlTarget>,
     crawl_states: HashMap<String, CrawlState>,
+    timeline_catchup_counts: HashMap<String, u64>,
     blobs: HashMap<i64, Vec<u8>>,
     jobs: Vec<CrawlJob>,
     next_blob_pk: i64,
@@ -104,7 +105,7 @@ impl CommitTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl JournalAppendTx for InMemoryRegistryTx<'_> {
+impl EventJournalAppend for InMemoryRegistryTx<'_> {
     async fn append_event(
         &mut self,
         event: Event,
@@ -125,7 +126,7 @@ impl JournalAppendTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl JournalTx for InMemoryRegistryTx<'_> {
+impl EventJournal for InMemoryRegistryTx<'_> {
     async fn read_after(
         &mut self,
         cursor: &EventCursor,
@@ -191,16 +192,8 @@ impl JournalTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl SubscriptionTx for InMemoryRegistryTx<'_> {
-    async fn upsert_feed_endpoint(
-        &mut self,
-        _feed_url: &FeedUrl,
-        _now: DateTime<Utc>,
-    ) -> RegistryDbResult<()> {
-        Ok(())
-    }
-
-    async fn upsert_feed_subscription(
+impl SubscriptionStore for InMemoryRegistryTx<'_> {
+    async fn upsert_subscription(
         &mut self,
         subscription: &SubscriptionKey,
         attrs: FeedSubscriptionAttrs,
@@ -227,7 +220,7 @@ impl SubscriptionTx for InMemoryRegistryTx<'_> {
         Ok(())
     }
 
-    async fn delete_feed_subscription(
+    async fn delete_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -239,7 +232,7 @@ impl SubscriptionTx for InMemoryRegistryTx<'_> {
         Ok(())
     }
 
-    async fn has_feed_subscription(
+    async fn has_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -282,7 +275,7 @@ impl SubscriptionTx for InMemoryRegistryTx<'_> {
         ))
     }
 
-    async fn load_feed_endpoint_subscriptions(
+    async fn load_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<FeedEndpointSubscriptionSet> {
@@ -314,8 +307,8 @@ impl SubscriptionTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl CrawlTargetTx for InMemoryRegistryTx<'_> {
-    async fn upsert_crawl_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
+impl CrawlTargetStore for InMemoryRegistryTx<'_> {
+    async fn upsert_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
         let state = &mut self.state;
         state
             .crawl_targets
@@ -323,7 +316,7 @@ impl CrawlTargetTx for InMemoryRegistryTx<'_> {
         Ok(())
     }
 
-    async fn load_crawl_target_for_endpoint(
+    async fn load_target_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<Option<CrawlTarget>> {
@@ -332,7 +325,7 @@ impl CrawlTargetTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl CrawlScheduleTx for InMemoryRegistryTx<'_> {
+impl CrawlScheduleStore for InMemoryRegistryTx<'_> {
     async fn list_candidates(
         &mut self,
         _now: DateTime<Utc>,
@@ -349,7 +342,7 @@ impl CrawlScheduleTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl CrawlJobQueueTx for InMemoryRegistryTx<'_> {
+impl CrawlJobQueue for InMemoryRegistryTx<'_> {
     async fn enqueue_job(
         &mut self,
         command: EnqueueCrawlJobCommand,
@@ -412,7 +405,7 @@ impl CrawlJobQueueTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl BlobStoreTx for InMemoryRegistryTx<'_> {
+impl BlobStore for InMemoryRegistryTx<'_> {
     async fn put_blob(&mut self, command: PutBlobCommand) -> RegistryDbResult<BlobRef> {
         let state = &mut self.state;
         state.next_blob_pk = state.next_blob_pk.saturating_add(1);
@@ -429,7 +422,14 @@ impl BlobStoreTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl CrawlCompletionTx for InMemoryRegistryTx<'_> {
+impl CrawlResultStore for InMemoryRegistryTx<'_> {
+    async fn load_crawl_source(
+        &mut self,
+        _job_id: &CrawlJobId,
+    ) -> RegistryDbResult<Option<FeedSource>> {
+        Ok(None)
+    }
+
     async fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,
@@ -469,14 +469,7 @@ impl CrawlCompletionTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl FeedProjectionTx for InMemoryRegistryTx<'_> {
-    async fn load_feed_source(
-        &mut self,
-        _job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        Ok(None)
-    }
-
+impl FeedStore for InMemoryRegistryTx<'_> {
     async fn upsert_feed(
         &mut self,
         _command: UpsertFeedCommand,
@@ -485,14 +478,7 @@ impl FeedProjectionTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl EntryProjectionTx for InMemoryRegistryTx<'_> {
-    async fn load_entry_source(
-        &mut self,
-        _job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        Ok(None)
-    }
-
+impl EntryStore for InMemoryRegistryTx<'_> {
     async fn load_entries(
         &mut self,
         feed_url: &FeedUrl,
@@ -506,7 +492,7 @@ impl EntryProjectionTx for InMemoryRegistryTx<'_> {
     }
 }
 
-impl TimelineTx for InMemoryRegistryTx<'_> {
+impl TimelineStore for InMemoryRegistryTx<'_> {
     async fn list_timeline_items(
         &mut self,
         _query: TimelineItemsQuery,
@@ -518,33 +504,26 @@ impl TimelineTx for InMemoryRegistryTx<'_> {
         })
     }
 
-    async fn ensure_default_timeline(
-        &mut self,
-        _timeline: &TimelineKey,
-        _now: DateTime<Utc>,
-    ) -> RegistryDbResult<()> {
-        Ok(())
-    }
-
-    async fn catchup_timeline_feed(
+    async fn catchup_subscribed_feed(
         &mut self,
         timeline: &TimelineKey,
         feed_url: &FeedUrl,
         _now: DateTime<Utc>,
     ) -> RegistryDbResult<TimelineCatchup> {
-        Ok(TimelineCatchup::new(timeline.clone(), feed_url.clone(), 0))
+        let inserted_items = self
+            .state
+            .timeline_catchup_counts
+            .get(feed_url.as_str())
+            .copied()
+            .unwrap_or_default();
+        Ok(TimelineCatchup::new(
+            timeline.clone(),
+            feed_url.clone(),
+            inserted_items,
+        ))
     }
 
-    async fn apply_entry_discovered(
-        &mut self,
-        _feed_url: &FeedUrl,
-        _entry_id: &EntryId,
-        _now: DateTime<Utc>,
-    ) -> RegistryDbResult<Vec<TimelineKey>> {
-        Ok(Vec::new())
-    }
-
-    async fn apply_entry_changed(
+    async fn apply_entry_to_timelines(
         &mut self,
         _feed_url: &FeedUrl,
         _entry_id: &EntryId,
@@ -592,8 +571,9 @@ mod tests {
         command::SubscribeFeedCommand,
         config::{FeedRegistryConfig, FeedRegistryWorkerConfig},
         crawl::policy::{CrawlPolicy, PollingInterval},
-        event::{EventSubmitter, EventWakePublisher, RegistryEvent, SubscribeFeedRequested},
+        event::{EventWakePublisher, FeedSubscribedEvent, RegistryEvent},
         registry::{FeedRegistry, RegistryService},
+        subscription::SubscribeOutcome,
     };
 
     fn test_occurred_at() -> DateTime<Utc> {
@@ -633,36 +613,37 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn subscribe_records_request_event() -> anyhow::Result<()> {
+    async fn subscribe_records_fact_event() -> anyhow::Result<()> {
         let db = InMemoryFeedRegistryDb::new();
         let config = FeedRegistryConfig::default();
-        let event_submitter = EventSubmitter::with_clock(
+        let registry = FeedRegistry::with_api_events(
             db.clone(),
+            config,
+            crate::api::ApiEventPublisher::default(),
             EventWakePublisher::new(config.event_wake_channel_capacity),
             Arc::new(TestClock(test_occurred_at())),
         );
-        let registry = FeedRegistry::new(db.clone(), config, event_submitter);
 
         registry.subscribe(subscribe_command("event", 3600)).await?;
 
         let mut tx = db.begin().await?;
-        let cursor = tx.load_cursor(ProcessorId::SubscriptionRequest).await?;
+        let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
         let batch = tx
-            .read_after(&cursor, EventInterests::new([SubscribeFeedRequested::TYPE]))
+            .read_after(&cursor, EventInterests::new([FeedSubscribedEvent::TYPE]))
             .await?;
         tx.commit().await?;
 
         assert_eq!(batch.events().len(), 1);
         assert_eq!(
             batch.events()[0].event().event_type(),
-            SubscribeFeedRequested::TYPE
+            FeedSubscribedEvent::TYPE
         );
         assert_eq!(batch.events()[0].occurred_at(), test_occurred_at());
         Ok(())
     }
 
     #[tokio::test]
-    async fn runtime_subscribe_projects_subscription_and_api_event() -> anyhow::Result<()> {
+    async fn runtime_subscribe_writes_subscription_immediately() -> anyhow::Result<()> {
         let db = InMemoryFeedRegistryDb::new();
         let ct = CancellationToken::new();
         let config = FeedRegistryConfig {
@@ -671,23 +652,15 @@ mod tests {
         };
         let registry_service = RegistryService::start(db, config, ct.clone());
         let (registry, event_workers) = registry_service.into_parts();
-        let mut api_events = registry.subscribe_api_events(subscriber_id());
 
         let output = registry
             .subscribe(subscribe_command("runtime-subscribe", 3600))
             .await?;
-
-        let api_event = tokio::time::timeout(Duration::from_secs(2), api_events.recv()).await?;
-        let api_event = match api_event {
-            Ok(event) => event,
-            Err(err) => anyhow::bail!("api event receive failed: {err:?}"),
+        let SubscribeOutcome::Subscribed(subscription) = output.outcome else {
+            anyhow::bail!("unexpected subscribe outcome: {:?}", output.outcome);
         };
-        let ApiEvent::FeedSubscribed(event) = api_event else {
-            anyhow::bail!("unexpected api event: {api_event:?}");
-        };
-        assert_eq!(event.request_id, output.request_id);
-        assert_eq!(event.subscription.subscriber_id, subscriber_id());
-        assert_eq!(event.subscription.feed_url, feed_url("runtime-subscribe"));
+        assert_eq!(subscription.subscriber_id, subscriber_id());
+        assert_eq!(subscription.feed_url, feed_url("runtime-subscribe"));
 
         let page = registry
             .list_subscriptions(SubscriptionsQuery {
@@ -709,8 +682,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn runtime_second_subscribe_emits_api_subscription_changed() -> anyhow::Result<()> {
+    async fn runtime_subscribe_publishes_timeline_api_event_after_catchup() -> anyhow::Result<()> {
         let db = InMemoryFeedRegistryDb::new();
+        let feed_url = feed_url("runtime-subscribe-api-event");
+        {
+            let mut state = db.state.lock().await;
+            state
+                .timeline_catchup_counts
+                .insert(feed_url.as_str().to_owned(), 1);
+        }
+
         let ct = CancellationToken::new();
         let config = FeedRegistryConfig {
             workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
@@ -720,36 +701,55 @@ mod tests {
         let (registry, event_workers) = registry_service.into_parts();
         let mut api_events = registry.subscribe_api_events(subscriber_id());
 
+        let output = registry
+            .subscribe(SubscribeFeedCommand {
+                feed_url: feed_url.clone(),
+                ..subscribe_command("unused", 3600)
+            })
+            .await?;
+        let SubscribeOutcome::Subscribed(subscription) = output.outcome else {
+            anyhow::bail!("unexpected subscribe outcome: {:?}", output.outcome);
+        };
+        assert_eq!(subscription.feed_url, feed_url);
+
+        let event = tokio::time::timeout(Duration::from_secs(1), api_events.recv()).await?;
+        let event = event.map_err(|err| anyhow::anyhow!("api event recv failed: {err:?}"))?;
+        let ApiEvent::TimelineChanged(event) = event;
+        assert_eq!(event.timeline.subscriber_id, subscriber_id());
+        assert_eq!(event.affected_feeds, vec![feed_url]);
+
+        ct.cancel();
+        drop(event_workers);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn runtime_second_subscribe_returns_changed() -> anyhow::Result<()> {
+        let db = InMemoryFeedRegistryDb::new();
+        let ct = CancellationToken::new();
+        let config = FeedRegistryConfig {
+            workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
+            ..FeedRegistryConfig::default()
+        };
+        let registry_service = RegistryService::start(db, config, ct.clone());
+        let (registry, event_workers) = registry_service.into_parts();
+
         let first = registry
             .subscribe(subscribe_command("runtime-second-subscribe", 3600))
             .await?;
-        let api_event = tokio::time::timeout(Duration::from_secs(2), api_events.recv()).await?;
-        let api_event = match api_event {
-            Ok(event) => event,
-            Err(err) => anyhow::bail!("api event receive failed: {err:?}"),
+        let SubscribeOutcome::Subscribed(subscription) = first.outcome else {
+            anyhow::bail!("unexpected first subscribe outcome: {:?}", first.outcome);
         };
-        let ApiEvent::FeedSubscribed(event) = api_event else {
-            anyhow::bail!("unexpected api event: {api_event:?}");
-        };
-        assert_eq!(event.request_id, first.request_id);
+        assert_eq!(subscription.feed_url, feed_url("runtime-second-subscribe"));
 
         let second = registry
             .subscribe(subscribe_command("runtime-second-subscribe", 600))
             .await?;
-        let api_event = tokio::time::timeout(Duration::from_secs(2), api_events.recv()).await?;
-        let api_event = match api_event {
-            Ok(event) => event,
-            Err(err) => anyhow::bail!("api event receive failed: {err:?}"),
+        let SubscribeOutcome::Changed(subscription) = second.outcome else {
+            anyhow::bail!("unexpected second subscribe outcome: {:?}", second.outcome);
         };
-        let ApiEvent::FeedSubscriptionChanged(event) = api_event else {
-            anyhow::bail!("unexpected api event: {api_event:?}");
-        };
-        assert_eq!(event.request_id, second.request_id);
-        assert_eq!(event.subscription.subscriber_id, subscriber_id());
-        assert_eq!(
-            event.subscription.feed_url,
-            feed_url("runtime-second-subscribe")
-        );
+        assert_eq!(subscription.subscriber_id, subscriber_id());
+        assert_eq!(subscription.feed_url, feed_url("runtime-second-subscribe"));
 
         ct.cancel();
         drop(event_workers);

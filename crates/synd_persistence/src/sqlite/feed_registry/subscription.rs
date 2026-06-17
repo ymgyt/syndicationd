@@ -5,7 +5,7 @@ use sqlx::{Sqlite, Transaction};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     FeedSubscriptionAttrs, RegistryDbResult, SubscriberId, Subscription, SubscriptionKey,
-    SubscriptionTx,
+    SubscriptionStore,
     crawl::target_list::{FeedEndpointSubscription, FeedEndpointSubscriptionSet},
     query::{Subscriptions, SubscriptionsQuery},
 };
@@ -35,7 +35,7 @@ async fn upsert(
     let requirement = attrs.requirement.map(|r| r.to_string());
     let category = attrs.category.map(|c| c.to_string());
     let policy_json = codec::encode_crawl_policy_json(attrs.crawl_policy)?;
-    let feed_endpoint_pk = feed_endpoint::resolve_pk(tx, &subscription.feed_url).await?;
+    let feed_endpoint_pk = feed_endpoint::upsert(tx, &subscription.feed_url, now, now).await?;
 
     sqlx::query(
         r#"
@@ -258,19 +258,8 @@ impl FeedEndpointSubscriptionRow {
     }
 }
 
-impl SubscriptionTx for SqliteRegistryTx<'_> {
-    async fn upsert_feed_endpoint(
-        &mut self,
-        feed_url: &FeedUrl,
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<()> {
-        feed_endpoint::upsert(&mut self.tx, feed_url, now, now)
-            .await
-            .db()?;
-        Ok(())
-    }
-
-    async fn upsert_feed_subscription(
+impl SubscriptionStore for SqliteRegistryTx<'_> {
+    async fn upsert_subscription(
         &mut self,
         subscription: &SubscriptionKey,
         attrs: FeedSubscriptionAttrs,
@@ -279,7 +268,7 @@ impl SubscriptionTx for SqliteRegistryTx<'_> {
         upsert(&mut self.tx, subscription, attrs, now).await.db()
     }
 
-    async fn delete_feed_subscription(
+    async fn delete_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -287,7 +276,7 @@ impl SubscriptionTx for SqliteRegistryTx<'_> {
         delete(&mut self.tx, subscriber_id, feed_url).await.db()
     }
 
-    async fn has_feed_subscription(
+    async fn has_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -302,7 +291,7 @@ impl SubscriptionTx for SqliteRegistryTx<'_> {
         list(&mut self.tx, query).await.db()
     }
 
-    async fn load_feed_endpoint_subscriptions(
+    async fn load_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<FeedEndpointSubscriptionSet> {

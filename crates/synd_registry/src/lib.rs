@@ -23,8 +23,8 @@ pub use command::{
 pub use config::{FeedRegistryConfig, FeedRegistryWorkerConfig};
 pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
 pub use db::{
-    BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, CrawlScheduleTx, CrawlTargetTx,
-    EntryProjectionTx, FeedProjectionTx, FeedRegistryDb, SubscriptionTx, TimelineTx,
+    BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
+    EntryStore, FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
 };
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 #[cfg(any(test, feature = "test"))]

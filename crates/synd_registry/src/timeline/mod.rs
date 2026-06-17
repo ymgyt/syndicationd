@@ -10,7 +10,7 @@ use crate::{entry::EntryOrderKey, subscription::SubscriberId};
 mod projection;
 pub mod query;
 
-pub use projection::{TimelineProj, TimelineProjectionInput, TimelineProjectionScope};
+pub use projection::{TimelineProj, TimelineProjectionInput};
 
 /// Timeline definition currently supported by the registry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -21,7 +21,7 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
-    let subscribed = FeedSubscribedEvent::new(subscription_key(&subscription));
+    let subscribed = feed_subscribed_event(&subscription);
     let recorded = project_timeline(&db, timeline_feed_subscribed(subscribed)).await?;
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
 
@@ -80,8 +80,8 @@ async fn list_timeline_items_can_filter_by_feed_url() -> anyhow::Result<()> {
     let _ = project_timeline_batch(
         &db,
         vec![
-            timeline_feed_subscribed(FeedSubscribedEvent::new(subscription_key(&first))),
-            timeline_feed_subscribed(FeedSubscribedEvent::new(subscription_key(&second))),
+            timeline_feed_subscribed(feed_subscribed_event(&first)),
+            timeline_feed_subscribed(feed_subscribed_event(&second)),
         ],
     )
     .await?;
@@ -122,7 +122,7 @@ async fn timeline_projection_does_not_emit_changed_when_catchup_inserts_nothing(
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
-    let subscribed = FeedSubscribedEvent::new(subscription_key(&subscription));
+    let subscribed = feed_subscribed_event(&subscription);
     let _ = project_timeline(&db, timeline_feed_subscribed(subscribed.clone())).await?;
     let recorded = project_timeline(&db, timeline_feed_subscribed(subscribed)).await?;
 
@@ -152,9 +152,15 @@ async fn timeline_projection_preserves_feed_lifecycle_order_inside_batch() -> an
     let recorded = project_timeline_batch(
         &db,
         vec![
-            timeline_feed_subscribed(FeedSubscribedEvent::new(key.clone())),
+            timeline_feed_subscribed(FeedSubscribedEvent::new(
+                key.clone(),
+                subscription_attrs(&subscription),
+            )),
             timeline_feed_unsubscribed(FeedUnsubscribedEvent::new(key.clone())),
-            timeline_feed_subscribed(FeedSubscribedEvent::new(key)),
+            timeline_feed_subscribed(FeedSubscribedEvent::new(
+                key,
+                subscription_attrs(&subscription),
+            )),
         ],
     )
     .await?;

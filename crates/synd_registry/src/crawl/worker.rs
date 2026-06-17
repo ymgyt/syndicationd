@@ -11,14 +11,13 @@ use crate::{
     crawl::{
         completion::CrawlCompletionRecorder,
         job::{ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobQueueLane},
-        queue::CrawlJobQueue,
         result::CrawlState,
     },
-    db::{BlobStoreTx, CommitTx, CrawlCompletionTx, CrawlJobQueueTx, FeedRegistryDb},
+    db::{BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, FeedRegistryDb},
     event::{
-        CrawlJobEnqueuedEvent, EventInterests, EventRecorder, EventWakePublisher, EventWorker,
-        JournalAppendTx, JournalTx, RecordedEvents, RegistryEvent, Trigger, WorkerHandle, WorkerId,
-        WorkerResult, spawn_event_loop,
+        CrawlJobEnqueuedEvent, CrawlJobStartedEvent, EventInterests, EventJournal,
+        EventJournalAppend, EventRecorder, EventWakePublisher, EventWorker, RecordedEvents,
+        RegistryEvent, Trigger, WorkerHandle, WorkerId, WorkerResult, spawn_event_loop,
     },
 };
 
@@ -113,7 +112,7 @@ where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
     for<'tx> S::Tx<'tx>:
-        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
+        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
 {
     async fn poll_and_dispatch(&mut self) -> WorkerResult<RecordedEvents> {
         let mut recorded = RecordedEvents::empty();
@@ -165,11 +164,14 @@ where
     ) -> WorkerResult<(ClaimCrawlJobOutcome, RecordedEvents)> {
         let mut tx = self.db.begin().await?;
         let mut recorded = RecordedEvents::empty();
-        let (outcome, produced) = {
-            let mut queue = CrawlJobQueue::new(&mut tx);
-            queue
-                .claim(ClaimCrawlJobCommand::new(lane, self.clock.now()))
-                .await?
+        let outcome = tx
+            .claim_job(ClaimCrawlJobCommand::new(lane, self.clock.now()))
+            .await?;
+        let produced: Vec<crate::event::Event> = match &outcome {
+            ClaimCrawlJobOutcome::Claimed(job) => {
+                vec![CrawlJobStartedEvent::from(job.clone()).into()]
+            }
+            ClaimCrawlJobOutcome::NoClaimableJob => Vec::new(),
         };
         EventRecorder::new(&mut tx, &mut recorded, self.clock.as_ref())
             .record_all(produced)
@@ -213,7 +215,7 @@ where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
     for<'tx> S::Tx<'tx>:
-        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
+        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
 {
     fn id(&self) -> WorkerId {
         WorkerId::CrawlWorkerPool
@@ -259,7 +261,7 @@ where
     S: FeedRegistryDb,
     F: FetchFeed + Send + Sync,
     for<'tx> S::Tx<'tx>:
-        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
+        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
 {
     #[tracing::instrument(
         name = "registry.crawl.worker.run",
@@ -396,7 +398,7 @@ where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
     for<'tx> S::Tx<'tx>:
-        BlobStoreTx + CrawlCompletionTx + CrawlJobQueueTx + JournalAppendTx + JournalTx + Send,
+        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
 {
     let pool = CrawlWorkerPool::new(
         db,

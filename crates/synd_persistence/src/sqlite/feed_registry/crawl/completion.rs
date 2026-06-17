@@ -5,19 +5,23 @@ use synd_feed::{
     types::FeedUrl,
 };
 use synd_registry::{
-    CrawlCompletionTx, RegistryDbResult,
-    crawl::result::{
-        CrawlFeedParseErrorDetail, CrawlFetchErrorDetail, CrawlHealth, CrawlHttpBodyDetail,
-        CrawlHttpResponseDetail, CrawlResultDetail, CrawlResultRef, CrawlState, CrawlStateError,
-        CrawlStateTimestamps, FailureStreak, LastCrawlResult, RecordCrawlResultCommand,
-        UpsertCrawlStateCommand,
+    CrawlResultStore, RegistryDbResult,
+    crawl::{
+        job::CrawlJobId,
+        result::{
+            CrawlFeedParseErrorDetail, CrawlFetchErrorDetail, CrawlHealth, CrawlHttpBodyDetail,
+            CrawlHttpResponseDetail, CrawlResultDetail, CrawlResultRef, CrawlState,
+            CrawlStateError, CrawlStateTimestamps, FailureStreak, LastCrawlResult,
+            RecordCrawlResultCommand, UpsertCrawlStateCommand,
+        },
     },
+    feed::FeedSource,
 };
 
 use super::super::{
     SqliteRegistryTx, codec,
     error::{IntoDbResult, SqliteError, SqliteResult},
-    feed_endpoint,
+    feed, feed_endpoint,
 };
 
 async fn load_state(
@@ -328,7 +332,14 @@ fn encode_u64(value: u64, field: &'static str) -> SqliteResult<i64> {
         .map_err(|_| SqliteError::decode_message(format!("{field} exceeds SQLite INTEGER range")))
 }
 
-impl CrawlCompletionTx for SqliteRegistryTx<'_> {
+impl CrawlResultStore for SqliteRegistryTx<'_> {
+    async fn load_crawl_source(
+        &mut self,
+        job_id: &CrawlJobId,
+    ) -> RegistryDbResult<Option<FeedSource>> {
+        feed::load_source(&mut self.tx, job_id).await.db()
+    }
+
     async fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,

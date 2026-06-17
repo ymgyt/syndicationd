@@ -8,10 +8,13 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::crawl::policy::CrawlPolicy;
 
-pub mod projection;
+pub mod decider;
 pub mod query;
 
-pub use projection::{SubRequestInput, SubRequestProj};
+pub use decider::{
+    Decider, SubscriptionCommand, SubscriptionDecider, SubscriptionReject, SubscriptionState,
+    decide, evolve,
+};
 
 /// Opaque registry identity that owns subscriptions.
 ///
@@ -53,7 +56,7 @@ impl SubscriptionKey {
 }
 
 /// Registry-owned attributes applied to one subscriber/feed relation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FeedSubscriptionAttrs {
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
@@ -71,7 +74,6 @@ pub enum SubscribeOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnsubscribeOutcome {
     Unsubscribed(SubscriptionKey),
-    NotSubscribed(SubscriptionKey),
 }
 
 /// Current subscription attributes for one subscriber/feed relation.

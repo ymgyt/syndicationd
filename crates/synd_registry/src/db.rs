@@ -16,7 +16,7 @@ use crate::{
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
-    event::{JournalAppendTx, JournalTx},
+    event::{EventJournal, EventJournalAppend},
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
     query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
@@ -25,7 +25,7 @@ use crate::{
 
 /// Opens registry database transactions.
 pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
-    type Tx<'a>: JournalTx + JournalAppendTx + CommitTx + Send
+    type Tx<'a>: EventJournal + EventJournalAppend + CommitTx + Send
     where
         Self: 'a;
 
@@ -33,27 +33,21 @@ pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
 }
 
 /// Transactional operations over feed subscription state.
-pub trait SubscriptionTx {
-    fn upsert_feed_endpoint(
-        &mut self,
-        feed_url: &FeedUrl,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
-    fn upsert_feed_subscription(
+pub trait SubscriptionStore {
+    fn upsert_subscription(
         &mut self,
         subscription: &SubscriptionKey,
         attrs: FeedSubscriptionAttrs,
         now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn delete_feed_subscription(
+    fn delete_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn has_feed_subscription(
+    fn has_subscription(
         &mut self,
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
@@ -64,27 +58,27 @@ pub trait SubscriptionTx {
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    fn load_feed_endpoint_subscriptions(
+    fn load_endpoint_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send;
 }
 
 /// Transactional operations over crawl target state.
-pub trait CrawlTargetTx {
-    fn upsert_crawl_target(
+pub trait CrawlTargetStore {
+    fn upsert_target(
         &mut self,
         target: &CrawlTarget,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn load_crawl_target_for_endpoint(
+    fn load_target_for_endpoint(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
 }
 
 /// Transactional scheduler-state operations.
-pub trait CrawlScheduleTx {
+pub trait CrawlScheduleStore {
     fn list_candidates(
         &mut self,
         now: DateTime<Utc>,
@@ -98,7 +92,7 @@ pub trait CrawlScheduleTx {
 }
 
 /// Transactional crawl-job queue operations.
-pub trait CrawlJobQueueTx {
+pub trait CrawlJobQueue {
     fn enqueue_job(
         &mut self,
         command: EnqueueCrawlJobCommand,
@@ -116,7 +110,7 @@ pub trait CrawlJobQueueTx {
 }
 
 /// Transactional generic blob-store operations.
-pub trait BlobStoreTx {
+pub trait BlobStore {
     fn put_blob(
         &mut self,
         command: PutBlobCommand,
@@ -129,7 +123,12 @@ pub trait BlobStoreTx {
 }
 
 /// Transactional operations for persisting one crawl job completion.
-pub trait CrawlCompletionTx {
+pub trait CrawlResultStore {
+    fn load_crawl_source(
+        &mut self,
+        job_id: &CrawlJobId,
+    ) -> impl Future<Output = RegistryDbResult<Option<FeedSource>>> + Send;
+
     fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,
@@ -147,12 +146,7 @@ pub trait CrawlCompletionTx {
 }
 
 /// Transactional operations for applying parsed feed state to the registry.
-pub trait FeedProjectionTx {
-    fn load_feed_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> impl Future<Output = RegistryDbResult<Option<FeedSource>>> + Send;
-
+pub trait FeedStore {
     fn upsert_feed(
         &mut self,
         command: UpsertFeedCommand,
@@ -160,12 +154,7 @@ pub trait FeedProjectionTx {
 }
 
 /// Transactional operations for applying reconciled entry state.
-pub trait EntryProjectionTx {
-    fn load_entry_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> impl Future<Output = RegistryDbResult<Option<FeedSource>>> + Send;
-
+pub trait EntryStore {
     fn load_entries(
         &mut self,
         feed_url: &FeedUrl,
@@ -179,33 +168,20 @@ pub trait EntryProjectionTx {
 }
 
 /// Transactional operations for reading and applying timeline membership.
-pub trait TimelineTx {
+pub trait TimelineStore {
     fn list_timeline_items(
         &mut self,
         query: TimelineItemsQuery,
     ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send;
 
-    fn ensure_default_timeline(
-        &mut self,
-        timeline: &TimelineKey,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
-    fn catchup_timeline_feed(
+    fn catchup_subscribed_feed(
         &mut self,
         timeline: &TimelineKey,
         feed_url: &FeedUrl,
         now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<TimelineCatchup>> + Send;
 
-    fn apply_entry_discovered(
-        &mut self,
-        feed_url: &FeedUrl,
-        entry_id: &EntryId,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<Vec<TimelineKey>>> + Send;
-
-    fn apply_entry_changed(
+    fn apply_entry_to_timelines(
         &mut self,
         feed_url: &FeedUrl,
         entry_id: &EntryId,

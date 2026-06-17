@@ -10,8 +10,8 @@ use crate::{
     db::{CommitTx, FeedRegistryDb},
     error::RegistryDbError,
     event::{
-        ConsumeContext, Consumer, ConsumerInput, EventInterests, EventReadBatch, EventRecorder,
-        InputBatch, JournalAppendTx, JournalTx, Processor, ProcessorError, ProcessorId,
+        CursorRole, EventInput, EventInterests, EventJournal, EventJournalAppend, EventReadBatch,
+        EventRecorder, InputBatch, Processor, ProcessorError, ProcessorId, Reconciler,
         RecordedEvents, Sink, skip_permanent_error,
     },
 };
@@ -368,8 +368,8 @@ impl<S, P> CursorAdapter<S, P> {
 impl<S, P> EventWorker for CursorAdapter<S, P>
 where
     S: FeedRegistryDb,
-    P: Consumer<S>,
-    for<'tx> S::Tx<'tx>: JournalAppendTx,
+    P: CursorRole<S>,
+    for<'tx> S::Tx<'tx>: EventJournalAppend,
 {
     fn id(&self) -> WorkerId {
         self.processor.id().into()
@@ -386,12 +386,11 @@ where
         let batch = tx.read_after(&cursor, self.processor.interests()).await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();
-        let mut cx = ConsumeContext::new(&mut tx);
 
-        let inputs = collect_inputs::<P>(processor_id, batch, event_count)?;
+        let inputs = collect_inputs::<P>(processor_id, batch)?;
         let produced = self
             .processor
-            .consume_batch(&mut cx, InputBatch::new(inputs))
+            .process_cursor_batch(&mut tx, self.clock.now(), InputBatch::new(inputs))
             .await?;
         let mut recorded_events = RecordedEvents::with_capacity(produced.len());
         {
@@ -408,6 +407,61 @@ where
             event_count,
             cursor_position = ?scanned_cursor.position(),
             "registry cursor worker advanced"
+        );
+
+        Ok(recorded_events)
+    }
+}
+
+/// Adapts an idempotent scan reconciler to the shared wake-driven loop.
+pub(crate) struct ScanAdapter<S, P> {
+    db: S,
+    processor: P,
+    clock: Arc<dyn Clock>,
+}
+
+impl<S, P> ScanAdapter<S, P> {
+    pub fn new(db: S, processor: P, clock: Arc<dyn Clock>) -> Self {
+        Self {
+            db,
+            processor,
+            clock,
+        }
+    }
+}
+
+impl<S, P> EventWorker for ScanAdapter<S, P>
+where
+    S: FeedRegistryDb,
+    P: Reconciler<S>,
+    for<'tx> S::Tx<'tx>: EventJournalAppend,
+{
+    fn id(&self) -> WorkerId {
+        self.processor.id().into()
+    }
+
+    fn interests(&self) -> EventInterests {
+        EventInterests::empty()
+    }
+
+    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
+        let mut tx = self.db.begin().await?;
+        let produced = self
+            .processor
+            .reconcile(&mut tx, self.clock.now(), InputBatch::new(Vec::new()))
+            .await?;
+        let mut recorded_events = RecordedEvents::with_capacity(produced.len());
+        {
+            let mut event_recorder =
+                EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref());
+            event_recorder.record_all(produced).await?;
+        }
+        tx.commit().await?;
+
+        debug!(
+            worker = self.id().as_str(),
+            recorded_count = recorded_events.len(),
+            "registry scan worker reconciled"
         );
 
         Ok(recorded_events)
@@ -446,13 +500,13 @@ where
         let batch = tx.read_after(&cursor, self.processor.interests()).await?;
         let event_count = batch.events().len();
         let scanned_cursor = batch.scanned_cursor().clone();
-        let inputs = collect_inputs::<P>(processor_id, batch, event_count)?;
+        let inputs = collect_inputs::<P>(processor_id, batch)?;
 
         tx.advance_cursor(&scanned_cursor).await?;
         tx.commit().await?;
 
         for input in inputs {
-            self.processor.consume(input).await?;
+            self.processor.deliver(input).await;
         }
 
         debug!(
@@ -466,15 +520,11 @@ where
     }
 }
 
-fn collect_inputs<P>(
-    processor: ProcessorId,
-    batch: EventReadBatch,
-    capacity: usize,
-) -> WorkerResult<Vec<P::Input>>
+fn collect_inputs<P>(processor: ProcessorId, batch: EventReadBatch) -> WorkerResult<Vec<P::Input>>
 where
     P: Processor,
 {
-    let mut inputs = Vec::with_capacity(capacity);
+    let mut inputs = Vec::with_capacity(batch.events().len());
     for journaled in batch.into_events() {
         let occurred_at = journaled.occurred_at();
         match P::Input::from_event(journaled.into_event(), occurred_at) {
