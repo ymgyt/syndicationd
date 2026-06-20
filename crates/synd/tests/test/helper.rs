@@ -1,9 +1,7 @@
-use std::{path::PathBuf, sync::Once, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, sync::Once, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures_util::future;
-use octocrab::Octocrab;
-use ratatui::backend::TestBackend;
 use synd_api::{
     client::github::GithubClient,
     dependency::Dependency,
@@ -23,17 +21,12 @@ use synd_registry::{
     SubscriptionStore,
     crawl::policy::{CrawlPolicy, PollingInterval},
 };
-pub use synd_term::integration::event_stream;
+pub use synd_term::integration::{event_stream, new_test_terminal};
 use synd_term::{
-    application::{
-        Application, Authenticator, Cache, Clock, Config, DeviceFlows, JwtService, SystemClock,
-    },
+    application::{Application, Authenticator, Cache, Config, DeviceFlows, JwtService},
     auth::Credential,
-    client::github::GithubClient as TermGithubClient,
     config::Categories,
     interact::mock::MockInteractor,
-    terminal::Terminal,
-    types::Time,
     ui::theme::Theme,
 };
 use synd_test::temp_dir;
@@ -41,51 +34,63 @@ use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 
-struct DummyClock(Time);
-
-impl Clock for DummyClock {
-    fn now(&self) -> DateTime<Utc> {
-        self.0
-    }
-}
-
 #[derive(Clone)]
 pub struct TestCase {
-    pub mock_port: u16,
-    pub synd_api_port: u16,
-    pub sqlite_db_id: u16,
     pub sqlite_root_dir: PathBuf,
     pub terminal_col_row: (u16, u16),
     pub config: Config,
-    pub device_flow_case: &'static str,
     pub cache_dir: PathBuf,
-    pub now: Option<Time>,
 
     pub login_credential: Option<Credential>,
-    pub interactor_buffer_fn: Option<fn(&TestCase) -> Vec<String>>,
+    pub subscriptions: Vec<SubscriptionSeed>,
 }
 
 pub fn test_config() -> Config {
     Config::default().with_idle_timer_interval(Duration::from_secs(1))
 }
 
+#[derive(Clone)]
+pub struct SubscriptionSeed {
+    pub feed_url: FeedUrl,
+    pub requirement: Option<Requirement>,
+    pub category: Option<Category<'static>>,
+    pub crawl_policy: CrawlPolicy,
+}
+
+impl SubscriptionSeed {
+    pub fn interval(
+        feed_url: FeedUrl,
+        requirement: Option<Requirement>,
+        category: Option<Category<'static>>,
+        interval: Duration,
+    ) -> Self {
+        Self {
+            feed_url,
+            requirement,
+            category,
+            crawl_policy: CrawlPolicy::interval(polling_interval(interval)),
+        }
+    }
+}
+
 impl Default for TestCase {
     fn default() -> Self {
         Self {
-            mock_port: 0,
-            synd_api_port: 0,
-            sqlite_db_id: 0,
             sqlite_root_dir: synd_test::temp_dir().keep(),
             terminal_col_row: (120, 30),
             config: test_config(),
-            device_flow_case: "case1",
             cache_dir: temp_dir().keep(),
-            now: None,
 
             login_credential: None,
-            interactor_buffer_fn: None,
+            subscriptions: Vec::new(),
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct ServiceAddrs {
+    mock: SocketAddr,
+    api: SocketAddr,
 }
 
 impl TestCase {
@@ -101,51 +106,38 @@ impl TestCase {
         self
     }
 
-    pub async fn run_api(&self) -> anyhow::Result<()> {
+    async fn run_api(&self) -> anyhow::Result<ServiceAddrs> {
         let TestCase {
-            mock_port,
-            synd_api_port,
-            sqlite_db_id,
             sqlite_root_dir,
+            subscriptions,
             ..
         } = self.clone();
 
-        // Start mock server
-        {
-            let addr = ("127.0.0.1", mock_port);
-            let listener = TcpListener::bind(addr).await?;
-            tokio::spawn(synd_test::mock::serve(listener));
-        }
+        let mock_listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let mock = mock_listener.local_addr()?;
+        let _mock_server = synd_test::mock::spawn(mock_listener);
 
-        // Start synd api server
-        {
-            serve_api(mock_port, synd_api_port, sqlite_db_id, sqlite_root_dir).await?;
-        }
+        let api_listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+        let api = api_listener.local_addr()?;
+        serve_api(mock, api_listener, sqlite_root_dir, subscriptions).await?;
 
-        Ok(())
+        Ok(ServiceAddrs { mock, api })
     }
 
     pub async fn init_app(&self) -> anyhow::Result<Application> {
         let TestCase {
-            mock_port,
-            synd_api_port,
             terminal_col_row: (term_col, term_row),
             config,
-            device_flow_case,
             cache_dir,
             login_credential,
-            interactor_buffer_fn,
-            now,
             ..
         } = self.clone();
 
-        self.run_api().await?;
+        let services = self.run_api().await?;
 
         // Configure application
         let application = {
-            let endpoint = format!("https://localhost:{synd_api_port}/graphql")
-                .parse()
-                .unwrap();
+            let endpoint = format!("https://{}/graphql", services.api).parse().unwrap();
             let terminal = new_test_terminal(term_col, term_row);
             let client = Client::new(
                 endpoint,
@@ -155,15 +147,37 @@ impl TestCase {
             let device_flows = DeviceFlows {
                 github: DeviceFlow::new(
                     provider::Github::new("dummy")
-                        .with_device_authorization_endpoint(Url::parse(&format!(
-                            "http://localhost:{mock_port}/{device_flow_case}/github/login/device/code",
-                        )).unwrap())
+                        .with_device_authorization_endpoint(
+                            Url::parse(&format!(
+                                "http://{}/case1/github/login/device/code",
+                                services.mock
+                            ))
+                            .unwrap(),
+                        )
                         .with_token_endpoint(
-                            Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/github/login/oauth/access_token")).unwrap()),
+                            Url::parse(&format!(
+                                "http://{}/case1/github/login/oauth/access_token",
+                                services.mock
+                            ))
+                            .unwrap(),
+                        ),
                 ),
-                google: DeviceFlow::new(provider::Google::new("dummy", "dummy")
-                    .with_device_authorization_endpoint(Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/google/login/device/code")).unwrap())
-                    .with_token_endpoint(Url::parse(&format!("http://localhost:{mock_port}/{device_flow_case}/google/login/oauth/access_token")).unwrap())
+                google: DeviceFlow::new(
+                    provider::Google::new("dummy", "dummy")
+                        .with_device_authorization_endpoint(
+                            Url::parse(&format!(
+                                "http://{}/case1/google/login/device/code",
+                                services.mock
+                            ))
+                            .unwrap(),
+                        )
+                        .with_token_endpoint(
+                            Url::parse(&format!(
+                                "http://{}/case1/google/login/oauth/access_token",
+                                services.mock
+                            ))
+                            .unwrap(),
+                        ),
                 ),
             };
             let jwt_service = {
@@ -173,8 +187,7 @@ impl TestCase {
                     synd_test::jwt::DUMMY_GOOGLE_CLIENT_ID,
                 )
                 .with_token_endpoint(
-                    Url::parse(&format!("http://localhost:{mock_port}/google/oauth2/token"))
-                        .unwrap(),
+                    Url::parse(&format!("http://{}/google/oauth2/token", services.mock)).unwrap(),
                 );
                 JwtService::new().with_google_jwt_service(google_jwt_service)
             };
@@ -193,30 +206,7 @@ impl TestCase {
                 should_reload = true;
             }
 
-            let interactor = {
-                let buffer = if let Some(f) = interactor_buffer_fn {
-                    f(self)
-                } else {
-                    Vec::new()
-                };
-                Box::new(MockInteractor::new().with_buffer(buffer))
-            };
-
-            let github_client = {
-                let octo = Octocrab::builder()
-                    .base_uri(format!("http://localhost:{mock_port}/github/rest"))?
-                    .personal_token("dummpy_gh_pat".to_owned())
-                    .build()
-                    .unwrap();
-                TermGithubClient::with(octo)
-            };
-
-            let clock: Box<dyn Clock> = {
-                match now {
-                    Some(now) => Box::new(DummyClock(now)),
-                    None => Box::new(SystemClock),
-                }
-            };
+            let interactor = Box::new(MockInteractor::new());
 
             let mut app = Application::builder()
                 .terminal(terminal)
@@ -227,8 +217,6 @@ impl TestCase {
                 .theme(Theme::default())
                 .authenticator(authenticator)
                 .interactor(interactor)
-                .github_client(github_client)
-                .clock(clock)
                 .build();
 
             if should_reload {
@@ -259,12 +247,6 @@ pub fn init_tracing() {
             .without_time()
             .init();
     });
-}
-
-pub fn new_test_terminal(width: u16, height: u16) -> Terminal {
-    let backend = TestBackend::new(width, height);
-    let terminal = ratatui::Terminal::new(backend).unwrap();
-    Terminal::with(terminal)
 }
 
 fn polling_interval(duration: Duration) -> PollingInterval {
@@ -299,46 +281,41 @@ async fn seed_subscription(
 }
 
 pub async fn serve_api(
-    oauth_provider_port: u16,
-    api_port: u16,
-    sqlite_db_id: u16,
+    oauth_provider_addr: SocketAddr,
+    api_listener: TcpListener,
     sqlite_root_dir: PathBuf,
+    subscriptions: Vec<SubscriptionSeed>,
 ) -> anyhow::Result<()> {
     let db = {
-        let db =
-            SqliteDatabase::create_or_open(sqlite_root_dir.join(format!("{sqlite_db_id}_synd.db")))
-                .await?;
+        let db = SqliteDatabase::create_or_open(sqlite_root_dir.join("synd.db")).await?;
         db.migrate().await?;
         let db = SqliteFeedRegistryDb::new(db);
 
-        if api_port == 6031 {
-            // setup fixtures
-            let test_user_id = SubscriberId::new("899cf3fa5afc0aa1");
-            let now = Utc::now();
-            seed_subscription(
-                &db,
-                SubscriptionFixture {
-                    subscriber_id: test_user_id.clone(),
-                    feed_url: "http://localhost:6030/feed/twir_atom".try_into().unwrap(),
-                    requirement: Some(Requirement::Must),
-                    category: Some(Category::new("rust").unwrap()),
-                    crawl_policy: CrawlPolicy::interval(polling_interval(Duration::from_hours(1))),
-                    subscribed_at: now,
-                },
-            )
-            .await?;
-            seed_subscription(
-                &db,
-                SubscriptionFixture {
-                    subscriber_id: test_user_id,
-                    feed_url: "http://localhost:6030/feed/o11y_news".try_into().unwrap(),
-                    requirement: Some(Requirement::Should),
-                    category: Some(Category::new("opentelemetry").unwrap()),
-                    crawl_policy: CrawlPolicy::interval(polling_interval(Duration::from_hours(1))),
-                    subscribed_at: now,
-                },
-            )
-            .await?;
+        if !subscriptions.is_empty() {
+            let subscriber_id = SubscriberId::new(synd_test::TEST_USER_ID);
+            let subscribed_at = Utc::now();
+
+            for subscription in subscriptions {
+                let SubscriptionSeed {
+                    feed_url,
+                    requirement,
+                    category,
+                    crawl_policy,
+                } = subscription;
+
+                seed_subscription(
+                    &db,
+                    SubscriptionFixture {
+                        subscriber_id: subscriber_id.clone(),
+                        feed_url,
+                        requirement,
+                        category,
+                        crawl_policy,
+                        subscribed_at,
+                    },
+                )
+                .await?;
+            }
         }
 
         db
@@ -371,13 +348,13 @@ pub async fn serve_api(
 
     {
         let github_endpoint: &'static str =
-            format!("http://localhost:{oauth_provider_port}/github/graphql").leak();
+            format!("http://{oauth_provider_addr}/github/graphql").leak();
         let github_client = GithubClient::new()?.with_endpoint(github_endpoint);
         let google_jwt =
             jwt::google::JwtService::new("dummy_google_client_id", "dummy_google_client_secret")
                 .with_pem_endpoint(
                     Url::parse(&format!(
-                        "http://localhost:{oauth_provider_port}/google/oauth2/v1/certs"
+                        "http://{oauth_provider_addr}/google/oauth2/v1/certs"
                     ))
                     .unwrap(),
                 );
@@ -388,24 +365,10 @@ pub async fn serve_api(
             .with_google_jwt(google_jwt);
     }
 
-    let listener = TcpListener::bind(("localhost", api_port)).await?;
-
     tokio::spawn(async move {
         let _event_workers = event_workers;
-        synd_api::serve::serve(listener, dep, shutdown).await
+        synd_api::serve::serve(api_listener, dep, shutdown).await
     });
 
     Ok(())
-}
-
-pub fn resize_event(columns: u16, rows: u16) -> crossterm::event::Event {
-    crossterm::event::Event::Resize(columns, rows)
-}
-
-pub fn focus_gained_event() -> crossterm::event::Event {
-    crossterm::event::Event::FocusGained
-}
-
-pub fn focus_lost_event() -> crossterm::event::Event {
-    crossterm::event::Event::FocusLost
 }

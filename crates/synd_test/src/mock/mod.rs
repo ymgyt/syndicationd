@@ -13,7 +13,7 @@ use synd_auth::device_flow::{
     DeviceAuthorizationRequest, DeviceAuthorizationResponse,
     provider::google::DeviceAccessTokenRequest as GoogleDeviceAccessTokenRequest,
 };
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, task::JoinHandle};
 use tracing::{debug, info};
 
 use crate::{GITHUB_INVALID_TOKEN, TEST_EMAIL, certificate_buff, jwt::DUMMY_GOOGLE_JWT_KEY_ID};
@@ -227,6 +227,10 @@ pub async fn serve(listener: TcpListener) -> anyhow::Result<()> {
     axum::serve(listener, router).await?;
 
     Ok(())
+}
+
+pub fn spawn(listener: TcpListener) -> JoinHandle<anyhow::Result<()>> {
+    tokio::spawn(serve(listener))
 }
 
 async fn debug_mw(
