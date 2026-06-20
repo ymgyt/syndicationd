@@ -36,7 +36,7 @@ use url::Url;
 
 use crate::payload::{
     FeedEvent, InitialFeedViewPayload, RefreshFeedPayload, RefreshStatus, SubscribeFeedInput,
-    SubscribeFeedPayload, SubscriptionPayload,
+    SubscribeFeedPayload, SubscriptionPayload, UnsubscribeFeedPayload,
 };
 
 mod scalar;
@@ -376,7 +376,10 @@ impl Client {
     }
 
     #[instrument(skip(self))]
-    pub async fn unsubscribe_feed(&self, url: FeedUrl) -> Result<(), SyndApiError> {
+    pub async fn unsubscribe_feed(
+        &self,
+        url: FeedUrl,
+    ) -> Result<UnsubscribeFeedPayload, SyndApiError> {
         #[derive(Serialize, Debug)]
         struct Variables {
             input: UnsubscribeFeedInput,
@@ -390,10 +393,6 @@ impl Client {
         struct ResponseData {
             unsubscribe_feed: UnsubscribeFeedPayload,
         }
-        #[derive(Debug, serde::Deserialize)]
-        struct UnsubscribeFeedPayload {
-            status: payload::ResponseStatus,
-        }
 
         let response: ResponseData = self
             .request(&graphql(
@@ -403,8 +402,7 @@ impl Client {
                 },
             ))
             .await?;
-        let _ = response.unsubscribe_feed.status.code;
-        Ok(())
+        Ok(response.unsubscribe_feed)
     }
 
     pub async fn refresh_feed(&self, url: FeedUrl) -> Result<RefreshFeedPayload, SyndApiError> {

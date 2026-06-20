@@ -445,6 +445,33 @@ impl<'de> Deserialize<'de> for SubscribeDisposition {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UnsubscribeFeedPayload {
+    pub status: ResponseStatus,
+    pub url: FeedUrl,
+    pub disposition: UnsubscribeDisposition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnsubscribeDisposition {
+    Unsubscribed,
+    Other(String),
+}
+
+impl<'de> Deserialize<'de> for UnsubscribeDisposition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "UNSUBSCRIBED" => Self::Unsubscribed,
+            _ => Self::Other(value),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RefreshFeedPayload {
     pub status: ResponseStatus,
     pub request_id: String,

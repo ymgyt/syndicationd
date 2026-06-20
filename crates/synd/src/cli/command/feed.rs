@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 use clap::{Args, Subcommand};
-use synd_client::payload::{SubscribeDisposition, SubscribeFeedInput};
+use synd_client::payload::{SubscribeDisposition, SubscribeFeedInput, UnsubscribeDisposition};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::{
@@ -125,8 +125,16 @@ impl UnsubscribeCommand {
         let url = FeedUrl::parse(&self.url)?;
         let cx = PortContext::new(&config).await?;
         let result = async {
-            cx.client.unsubscribe_feed(url.clone()).await?;
-            println!("{url} subscription removed.");
+            let response = cx.client.unsubscribe_feed(url).await?;
+            let url = response.url;
+            match response.disposition {
+                UnsubscribeDisposition::Unsubscribed => {
+                    println!("{url} subscription removed.");
+                }
+                UnsubscribeDisposition::Other(disposition) => {
+                    println!("{url} subscription removed ({disposition}).");
+                }
+            }
             Ok(())
         }
         .await;

@@ -72,7 +72,7 @@ impl FeedApi for ClientFeedApi {
 
     fn unsubscribe_feed(&self, url: FeedUrl) -> BoxFuture<'static, Result<(), SyndApiError>> {
         let client = self.client();
-        async move { client.unsubscribe_feed(url).await }.boxed()
+        async move { client.unsubscribe_feed(url).await.map(|_| ()) }.boxed()
     }
 
     fn refresh_feed(
