@@ -11,7 +11,7 @@ use crate::{
         CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
         Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch,
         Processor, ProcessorError, ProcessorId, ProcessorResult, Reconciler, RegistryEvent,
-        SubscriptionChangedEvent, SubscriptionLifecycle, skip_permanent_error,
+        SubEvent, SubscriptionChangedEvent, skip_permanent_error,
     },
     subscription::SubscriptionKey,
 };
@@ -118,12 +118,12 @@ impl CrawlTargetDecision {
 /// Subscription lifecycle events relevant to the crawl target list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlTargetListInput {
-    event: SubscriptionLifecycle,
+    event: SubEvent,
     occurred_at: DateTime<Utc>,
 }
 
 impl CrawlTargetListInput {
-    pub fn new(event: SubscriptionLifecycle, occurred_at: DateTime<Utc>) -> Self {
+    pub fn new(event: SubEvent, occurred_at: DateTime<Utc>) -> Self {
         Self { event, occurred_at }
     }
 }
@@ -137,18 +137,13 @@ impl EventInput for CrawlTargetListInput {
 
     fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
-            Event::FeedSubscribed(event) => Ok(Self::new(
-                SubscriptionLifecycle::Subscribed(event),
-                occurred_at,
-            )),
-            Event::SubscriptionChanged(event) => Ok(Self::new(
-                SubscriptionLifecycle::Changed(event),
-                occurred_at,
-            )),
-            Event::FeedUnsubscribed(event) => Ok(Self::new(
-                SubscriptionLifecycle::Unsubscribed(event),
-                occurred_at,
-            )),
+            Event::FeedSubscribed(event) => Ok(Self::new(SubEvent::Subscribed(event), occurred_at)),
+            Event::SubscriptionChanged(event) => {
+                Ok(Self::new(SubEvent::Changed(event), occurred_at))
+            }
+            Event::FeedUnsubscribed(event) => {
+                Ok(Self::new(SubEvent::Unsubscribed(event), occurred_at))
+            }
             event => Err(ProcessorError::unexpected_input(
                 "crawl target list event",
                 &event,

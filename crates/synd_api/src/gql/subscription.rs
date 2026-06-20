@@ -33,7 +33,7 @@ impl RegistrySubscription {
     // async-graphql requires subscription stream resolvers to be async.
     #[allow(clippy::unused_async)]
     async fn feed_events(&self, cx: &Context<'_>) -> Result<impl Stream<Item = Result<FeedEvent>>> {
-        let subscriber = registry(cx).subscribe_api_events(subscriber_id(cx));
+        let subscriber = registry(cx).subscribe_events(subscriber_id(cx));
 
         Ok(stream::unfold(subscriber, |mut subscriber| async move {
             match subscriber.recv().await {

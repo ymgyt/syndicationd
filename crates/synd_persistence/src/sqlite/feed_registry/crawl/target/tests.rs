@@ -11,9 +11,7 @@ async fn crawl_target_projection_activates_target_after_subscription() -> anyhow
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
     .await?;
 
@@ -51,9 +49,7 @@ async fn crawl_target_projection_emits_target_activated_event() -> anyhow::Resul
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
     .await?;
 
@@ -94,9 +90,7 @@ async fn crawl_target_projection_aggregates_multiple_subscriptions() -> anyhow::
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &one_hour,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&one_hour))],
     )
     .await?;
 
@@ -134,9 +128,7 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
     .await?;
 
@@ -147,9 +139,7 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Changed(subscription_changed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Changed(subscription_changed_event(&subscription))],
     )
     .await?;
 
@@ -187,9 +177,7 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
     .await?;
 
@@ -200,9 +188,7 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Changed(subscription_changed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Changed(subscription_changed_event(&subscription))],
     )
     .await?;
 
@@ -227,9 +213,7 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
     .await?;
 
@@ -240,9 +224,9 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Unsubscribed(
-            FeedUnsubscribedEvent::new(subscription_key(&subscription)),
-        )],
+        vec![SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(
+            subscription_key(&subscription),
+        ))],
     )
     .await?;
 
@@ -267,9 +251,7 @@ async fn crawl_target_projection_emits_target_deactivated_event() -> anyhow::Res
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Subscribed(feed_subscribed_event(
-            &subscription,
-        ))],
+        vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
     .await?;
 
@@ -280,9 +262,9 @@ async fn crawl_target_projection_emits_target_deactivated_event() -> anyhow::Res
 
     project_crawl_targets(
         &db,
-        vec![SubscriptionLifecycle::Unsubscribed(
-            FeedUnsubscribedEvent::new(subscription_key(&subscription)),
-        )],
+        vec![SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(
+            subscription_key(&subscription),
+        ))],
     )
     .await?;
 

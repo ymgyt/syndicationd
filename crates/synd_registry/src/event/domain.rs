@@ -120,7 +120,7 @@ impl EventInterests {
 
 /// A domain fact about the lifecycle of one feed subscription relation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SubscriptionLifecycle {
+pub enum SubEvent {
     /// The subscriber started subscribing to the feed.
     Subscribed(FeedSubscribedEvent),
     /// An active subscription changed its registry-owned attributes.
@@ -129,12 +129,46 @@ pub enum SubscriptionLifecycle {
     Unsubscribed(FeedUnsubscribedEvent),
 }
 
-impl SubscriptionLifecycle {
+impl SubEvent {
+    pub fn subscription(&self) -> &SubscriptionKey {
+        match self {
+            Self::Subscribed(event) => &event.subscription,
+            Self::Changed(event) => &event.subscription,
+            Self::Unsubscribed(event) => &event.subscription,
+        }
+    }
+
     pub fn affected_feed_url(&self) -> &FeedUrl {
         match self {
             Self::Subscribed(event) => &event.subscription.feed_url,
             Self::Changed(event) => &event.subscription.feed_url,
             Self::Unsubscribed(event) => &event.subscription.feed_url,
+        }
+    }
+
+    pub fn event_type(&self) -> EventType {
+        match self {
+            Self::Subscribed(_) => FeedSubscribedEvent::TYPE,
+            Self::Changed(_) => SubscriptionChangedEvent::TYPE,
+            Self::Unsubscribed(_) => FeedUnsubscribedEvent::TYPE,
+        }
+    }
+
+    pub fn outcome_label(&self) -> &'static str {
+        match self {
+            Self::Subscribed(_) => "subscribed",
+            Self::Changed(_) => "changed",
+            Self::Unsubscribed(_) => "unsubscribed",
+        }
+    }
+}
+
+impl From<SubEvent> for Event {
+    fn from(event: SubEvent) -> Self {
+        match event {
+            SubEvent::Subscribed(event) => Self::FeedSubscribed(event),
+            SubEvent::Changed(event) => Self::SubscriptionChanged(event),
+            SubEvent::Unsubscribed(event) => Self::FeedUnsubscribed(event),
         }
     }
 }

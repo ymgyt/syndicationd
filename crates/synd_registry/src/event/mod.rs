@@ -10,8 +10,8 @@ pub use domain::{
     CrawlJobEnqueuedEvent, CrawlJobFinishedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
     CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
     EntryDiscoveredEvent, Event, EventInterests, EventType, FeedChangedEvent, FeedDiscoveredEvent,
-    FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubscriptionChangedEvent,
-    SubscriptionLifecycle, TimelineChangedEvent,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubEvent, SubscriptionChangedEvent,
+    TimelineChangedEvent,
 };
 pub use journal::{
     EventCursor, EventCursorPos, EventJournal, EventJournalAppend, EventReadBatch, JournaledEvent,

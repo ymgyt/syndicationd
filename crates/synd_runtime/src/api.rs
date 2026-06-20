@@ -6,7 +6,7 @@ use synd_api::{
     shutdown::Shutdown,
 };
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
-use synd_registry::{FeedRegistryConfig, RegistryService, event::WorkerSet};
+use synd_registry::{FeedRegistry, FeedRegistryConfig, event::WorkerSet};
 
 use crate::{Result, RuntimeDatabase};
 
@@ -40,8 +40,8 @@ impl ApiService {
     ) -> Result<Self> {
         let db = Repository::open(database_path).await?;
         let config = FeedRegistryConfig::default();
-        let registry_service = RegistryService::start(db, config, shutdown.cancellation_token());
-        let (registry, event_workers) = registry_service.into_parts();
+        let (registry, event_workers) =
+            FeedRegistry::start(db, config, shutdown.cancellation_token());
 
         let dependency = Dependency::new(authenticator, registry, None, serve_options);
 

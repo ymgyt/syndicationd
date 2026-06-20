@@ -10,6 +10,7 @@ pub mod entry;
 pub mod error;
 pub mod event;
 pub mod feed;
+mod handler;
 #[cfg(any(test, feature = "test"))]
 pub mod in_memory;
 pub mod query;
@@ -29,7 +30,7 @@ pub use db::{
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 #[cfg(any(test, feature = "test"))]
 pub use in_memory::{InMemoryFeedRegistryDb, InMemoryRegistryTx};
-pub use registry::{FeedRegistry, RegistryService};
+pub use registry::FeedRegistry;
 pub use subscription::{
     FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, Subscription, SubscriptionKey,
     UnsubscribeOutcome,

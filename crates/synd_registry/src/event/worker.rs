@@ -506,7 +506,7 @@ where
         tx.commit().await?;
 
         for input in inputs {
-            self.processor.deliver(input).await;
+            self.processor.sink(input).await;
         }
 
         debug!(

@@ -29,8 +29,8 @@ pub(crate) use synd_registry::{
         CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, Event, EventCursor,
         EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
         FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
-        Projector, Reconciler, RecordedEvents, RegistryEvent, SubscriptionChangedEvent,
-        SubscriptionLifecycle, TimelineChangedEvent,
+        Projector, Reconciler, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
+        TimelineChangedEvent,
     },
     feed::FeedProj,
     query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
@@ -227,7 +227,7 @@ pub(crate) fn timeline_interests() -> EventInterests {
 
 pub(crate) async fn project_crawl_targets(
     db: &SqliteFeedRegistryDb,
-    events: Vec<SubscriptionLifecycle>,
+    events: Vec<SubEvent>,
 ) -> anyhow::Result<()> {
     let mut projector = CrawlTargetListProj::new();
     let mut tx = db.begin().await?;

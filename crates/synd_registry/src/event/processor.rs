@@ -290,7 +290,7 @@ where
 
 /// A best-effort terminal event processor that consumes committed events without recording new events.
 pub trait Sink: Processor {
-    fn deliver(&mut self, input: Self::Input) -> impl Future<Output = ()> + Send;
+    fn sink(&mut self, input: Self::Input) -> impl Future<Output = ()> + Send;
 }
 
 /// Summary of events recorded into the journal by one submit operation.

@@ -571,8 +571,8 @@ mod tests {
         command::SubscribeFeedCommand,
         config::{FeedRegistryConfig, FeedRegistryWorkerConfig},
         crawl::policy::{CrawlPolicy, PollingInterval},
-        event::{EventWakePublisher, FeedSubscribedEvent, RegistryEvent},
-        registry::{FeedRegistry, RegistryService},
+        event::{FeedSubscribedEvent, RegistryEvent},
+        registry::FeedRegistry,
         subscription::SubscribeOutcome,
     };
 
@@ -608,7 +608,7 @@ mod tests {
             feed_url: feed_url(name),
             requirement: None,
             category: None,
-            crawl_policy: CrawlPolicy::interval(interval(seconds)),
+            crawl_policy: Some(CrawlPolicy::interval(interval(seconds))),
         }
     }
 
@@ -616,13 +616,9 @@ mod tests {
     async fn subscribe_records_fact_event() -> anyhow::Result<()> {
         let db = InMemoryFeedRegistryDb::new();
         let config = FeedRegistryConfig::default();
-        let registry = FeedRegistry::with_api_events(
-            db.clone(),
-            config,
-            crate::api::ApiEventPublisher::default(),
-            EventWakePublisher::new(config.event_wake_channel_capacity),
-            Arc::new(TestClock(test_occurred_at())),
-        );
+        let registry = FeedRegistry::builder(db.clone(), config)
+            .with_clock(Arc::new(TestClock(test_occurred_at())))
+            .build();
 
         registry.subscribe(subscribe_command("event", 3600)).await?;
 
@@ -650,8 +646,7 @@ mod tests {
             workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
             ..FeedRegistryConfig::default()
         };
-        let registry_service = RegistryService::start(db, config, ct.clone());
-        let (registry, event_workers) = registry_service.into_parts();
+        let (registry, event_workers) = FeedRegistry::start(db, config, ct.clone());
 
         let output = registry
             .subscribe(subscribe_command("runtime-subscribe", 3600))
@@ -682,6 +677,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn runtime_subscribe_uses_default_crawl_policy_when_omitted() -> anyhow::Result<()> {
+        let db = InMemoryFeedRegistryDb::new();
+        let ct = CancellationToken::new();
+        let default_crawl_policy = CrawlPolicy::interval(interval(600));
+        let config = FeedRegistryConfig {
+            default_crawl_policy,
+            workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
+            ..FeedRegistryConfig::default()
+        };
+        let (registry, event_workers) = FeedRegistry::start(db, config, ct.clone());
+
+        registry
+            .subscribe(SubscribeFeedCommand {
+                crawl_policy: None,
+                ..subscribe_command("runtime-default-crawl-policy", 3600)
+            })
+            .await?;
+
+        let page = registry
+            .list_subscriptions(SubscriptionsQuery {
+                subscriber_id: subscriber_id(),
+                after: None,
+                first: 10,
+            })
+            .await?;
+
+        assert_eq!(page.subscriptions.len(), 1);
+        assert_eq!(page.subscriptions[0].crawl_policy, default_crawl_policy);
+
+        ct.cancel();
+        drop(event_workers);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn runtime_subscribe_publishes_timeline_api_event_after_catchup() -> anyhow::Result<()> {
         let db = InMemoryFeedRegistryDb::new();
         let feed_url = feed_url("runtime-subscribe-api-event");
@@ -697,9 +727,8 @@ mod tests {
             workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
             ..FeedRegistryConfig::default()
         };
-        let registry_service = RegistryService::start(db, config, ct.clone());
-        let (registry, event_workers) = registry_service.into_parts();
-        let mut api_events = registry.subscribe_api_events(subscriber_id());
+        let (registry, event_workers) = FeedRegistry::start(db, config, ct.clone());
+        let mut api_events = registry.subscribe_events(subscriber_id());
 
         let output = registry
             .subscribe(SubscribeFeedCommand {
@@ -731,8 +760,7 @@ mod tests {
             workers: FeedRegistryWorkerConfig::with_poll_interval(Duration::from_millis(10)),
             ..FeedRegistryConfig::default()
         };
-        let registry_service = RegistryService::start(db, config, ct.clone());
-        let (registry, event_workers) = registry_service.into_parts();
+        let (registry, event_workers) = FeedRegistry::start(db, config, ct.clone());
 
         let first = registry
             .subscribe(subscribe_command("runtime-second-subscribe", 3600))

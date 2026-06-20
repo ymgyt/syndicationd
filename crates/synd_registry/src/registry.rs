@@ -2,9 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use synd_feed::feed::service::FeedService;
 use synd_support::time::{Clock, SystemClock};
-use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
 
 use crate::{
     api::{ApiEventProj, ApiEventPublisher, ApiEventSubscriber},
@@ -13,7 +11,7 @@ use crate::{
     },
     config::FeedRegistryConfig,
     crawl::{
-        policy::CrawlPolicy, scheduler::CrawlScheduler, target_list::CrawlTargetListProj,
+        scheduler::CrawlScheduler, target_list::CrawlTargetListProj,
         worker::spawn_crawl_worker_pool,
     },
     db::{
@@ -23,26 +21,140 @@ use crate::{
     entry::EntryProj,
     error::FeedRegistryError,
     event::{
-        CursorAdapter, CursorProjector, CursorReconciler, CursorRole, Event, EventJournalAppend,
-        EventRecorder, EventWakePublisher, PostCommitAdapter, Processor, Reconciler,
-        RecordedEvents, ScanAdapter, Sink, WorkerHandle, WorkerSet, spawn_event_loop,
+        CursorAdapter, CursorProjector, CursorReconciler, CursorRole, EventJournalAppend,
+        EventWakePublisher, PostCommitAdapter, Processor, Reconciler, ScanAdapter, Sink,
+        WorkerHandle, WorkerSet, spawn_event_loop,
     },
     feed::FeedProj,
+    handler::CommandHandler,
     query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
-    subscription::{
-        self, SubscribeOutcome, SubscriberId, SubscriptionCommand, SubscriptionKey,
-        SubscriptionState, UnsubscribeOutcome,
-    },
+    subscription::{SubHandler, SubscriberId},
     timeline::TimelineProj,
 };
 
-/// Owns a registry facade together with the workers required to process its events.
-pub struct RegistryService<S> {
-    registry: FeedRegistry<S>,
-    workers: WorkerSet,
+/// Channels shared by registry commands and post-commit event workers.
+#[derive(Clone)]
+struct EventDispatch {
+    api_events: ApiEventPublisher,
+    wake_publisher: EventWakePublisher,
 }
 
-impl<S> RegistryService<S>
+impl EventDispatch {
+    fn new(config: FeedRegistryConfig) -> Self {
+        Self {
+            api_events: ApiEventPublisher::default(),
+            wake_publisher: EventWakePublisher::new(config.event_wake_channel_capacity),
+        }
+    }
+}
+
+/// Builds a registry facade with shared dispatch channels and clock wiring.
+pub(crate) struct FeedRegistryBuilder<S> {
+    db: S,
+    config: FeedRegistryConfig,
+    event_dispatch: EventDispatch,
+    clock: Arc<dyn Clock>,
+}
+
+impl<S> FeedRegistryBuilder<S>
+where
+    S: Clone,
+{
+    fn new(db: S, config: FeedRegistryConfig) -> Self {
+        Self {
+            db,
+            config,
+            event_dispatch: EventDispatch::new(config),
+            clock: Arc::new(SystemClock),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    fn event_dispatch(&self) -> &EventDispatch {
+        &self.event_dispatch
+    }
+
+    fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
+    }
+
+    pub(crate) fn build(self) -> FeedRegistry<S> {
+        let handlers = RegistryHandlers {
+            subscriptions: SubHandler::new(
+                self.db.clone(),
+                self.config.default_crawl_policy,
+                Arc::clone(&self.clock),
+            ),
+        };
+
+        FeedRegistry {
+            db: self.db,
+            handlers,
+            event_dispatch: self.event_dispatch,
+        }
+    }
+}
+
+/// Command handlers owned by the registry facade.
+#[derive(Clone)]
+pub(crate) struct RegistryHandlers<S> {
+    subscriptions: SubHandler<S>,
+}
+
+/// Facade for registry commands, queries, and API event subscriptions.
+#[derive(Clone)]
+pub struct FeedRegistry<S> {
+    db: S,
+    handlers: RegistryHandlers<S>,
+    event_dispatch: EventDispatch,
+}
+
+impl<S> FeedRegistry<S>
+where
+    S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: EventJournalAppend + SubscriptionStore,
+{
+    pub fn new(db: S, config: FeedRegistryConfig) -> Self {
+        Self::builder(db, config).build()
+    }
+
+    pub(crate) fn builder(db: S, config: FeedRegistryConfig) -> FeedRegistryBuilder<S> {
+        FeedRegistryBuilder::new(db, config)
+    }
+
+    pub fn subscribe_events(&self, subscriber_id: SubscriberId) -> ApiEventSubscriber {
+        self.event_dispatch.api_events.subscribe(subscriber_id)
+    }
+
+    pub async fn subscribe(
+        &self,
+        command: SubscribeFeedCommand,
+    ) -> Result<SubscribeFeedOutput, FeedRegistryError> {
+        let handled = self.handlers.subscriptions.handle(command).await?;
+        self.event_dispatch
+            .wake_publisher
+            .publish(handled.recorded_events);
+        Ok(handled.output)
+    }
+
+    pub async fn unsubscribe(
+        &self,
+        command: UnsubscribeFeedCommand,
+    ) -> Result<UnsubscribeFeedOutput, FeedRegistryError> {
+        let handled = self.handlers.subscriptions.handle(command).await?;
+        self.event_dispatch
+            .wake_publisher
+            .publish(handled.recorded_events);
+        Ok(handled.output)
+    }
+}
+
+impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: BlobStore
@@ -56,188 +168,20 @@ where
         + TimelineStore
         + EventJournalAppend,
 {
-    pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> Self {
-        let api_events = ApiEventPublisher::default();
-        let wake_publisher = EventWakePublisher::new(config.event_wake_channel_capacity);
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-        let registry = FeedRegistry::with_api_events(
-            db.clone(),
-            config,
-            api_events.clone(),
-            wake_publisher.clone(),
-            Arc::clone(&clock),
-        );
-        let workers = spawn_event_workers(db, &wake_publisher, api_events, config, ct, clock);
-
-        Self { registry, workers }
-    }
-
-    pub fn registry(&self) -> &FeedRegistry<S> {
-        &self.registry
-    }
-
-    pub fn into_parts(self) -> (FeedRegistry<S>, WorkerSet) {
-        (self.registry, self.workers)
-    }
-}
-
-#[derive(Clone)]
-pub struct FeedRegistry<S> {
-    db: S,
-    config: FeedRegistryConfig,
-    api_events: ApiEventPublisher,
-    wake_publisher: EventWakePublisher,
-    clock: Arc<dyn Clock>,
-    subscription_commands: Arc<Mutex<()>>,
-}
-
-impl<S> FeedRegistry<S>
-where
-    S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: EventJournalAppend + SubscriptionStore,
-{
-    pub fn new(db: S, config: FeedRegistryConfig) -> Self {
-        Self::with_api_events(
+    pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> (Self, WorkerSet) {
+        let registry_builder = FeedRegistry::builder(db.clone(), config);
+        let event_dispatch = registry_builder.event_dispatch();
+        let workers = spawn_event_workers(
             db,
+            &event_dispatch.wake_publisher,
+            event_dispatch.api_events.clone(),
             config,
-            ApiEventPublisher::default(),
-            EventWakePublisher::new(config.event_wake_channel_capacity),
-            Arc::new(SystemClock),
-        )
-    }
-
-    pub fn with_api_events(
-        db: S,
-        config: FeedRegistryConfig,
-        api_events: ApiEventPublisher,
-        wake_publisher: EventWakePublisher,
-        clock: Arc<dyn Clock>,
-    ) -> Self {
-        Self {
-            db,
-            config,
-            api_events,
-            wake_publisher,
-            clock,
-            subscription_commands: Arc::new(Mutex::new(())),
-        }
-    }
-
-    pub fn subscribe_api_events(&self, subscriber_id: SubscriberId) -> ApiEventSubscriber {
-        self.api_events.subscribe(subscriber_id)
-    }
-
-    pub fn default_crawl_policy(&self) -> CrawlPolicy {
-        self.config.default_crawl_policy
-    }
-
-    pub async fn subscribe(
-        &self,
-        command: SubscribeFeedCommand,
-    ) -> Result<SubscribeFeedOutput, FeedRegistryError> {
-        let _guard = self.subscription_commands.lock().await;
-        let (subscription, attrs) = command.into_parts();
-        let mut tx = self.db.begin().await?;
-        let state = subscription_state(&mut tx, &subscription).await?;
-        let event = subscription::decide(
-            SubscriptionCommand::Subscribe {
-                attrs: attrs.clone(),
-            },
-            state,
-            subscription.clone(),
-        )?;
-
-        tx.upsert_subscription(&subscription, attrs, self.clock.now())
-            .await?;
-        let event_type = event.event_type();
-        self.record_and_commit(tx, event.clone()).await?;
-
-        let outcome_label = match &event {
-            Event::FeedSubscribed(_) => "subscribed",
-            Event::SubscriptionChanged(_) => "changed",
-            event => unreachable!("subscription decider produced unexpected event: {event:?}"),
-        };
-        info!(
-            subscriber_id = subscription.subscriber_id.as_str(),
-            feed_url = subscription.feed_url.as_str(),
-            outcome = outcome_label,
-            event_type = %event_type,
-            "registry subscription committed"
+            ct,
+            Arc::clone(registry_builder.clock()),
         );
+        let registry = registry_builder.build();
 
-        let outcome = match event {
-            Event::FeedSubscribed(event) => SubscribeOutcome::Subscribed(event.subscription),
-            Event::SubscriptionChanged(event) => SubscribeOutcome::Changed(event.subscription),
-            event => unreachable!("subscription decider produced unexpected event: {event:?}"),
-        };
-        Ok(SubscribeFeedOutput { outcome })
-    }
-
-    pub async fn unsubscribe(
-        &self,
-        command: UnsubscribeFeedCommand,
-    ) -> Result<UnsubscribeFeedOutput, FeedRegistryError> {
-        let _guard = self.subscription_commands.lock().await;
-        let subscription = command.into_subscription();
-        let mut tx = self.db.begin().await?;
-        let state = subscription_state(&mut tx, &subscription).await?;
-        let event = subscription::decide(
-            SubscriptionCommand::Unsubscribe,
-            state,
-            subscription.clone(),
-        )?;
-
-        tx.delete_subscription(&subscription.subscriber_id, &subscription.feed_url)
-            .await?;
-        let event_type = event.event_type();
-        self.record_and_commit(tx, event.clone()).await?;
-
-        info!(
-            subscriber_id = subscription.subscriber_id.as_str(),
-            feed_url = subscription.feed_url.as_str(),
-            outcome = "unsubscribed",
-            event_type = %event_type,
-            "registry subscription committed"
-        );
-
-        let outcome = match event {
-            Event::FeedUnsubscribed(event) => UnsubscribeOutcome::Unsubscribed(event.subscription),
-            event => unreachable!("subscription decider produced unexpected event: {event:?}"),
-        };
-        Ok(UnsubscribeFeedOutput { outcome })
-    }
-
-    async fn record_and_commit(
-        &self,
-        mut tx: S::Tx<'_>,
-        event: Event,
-    ) -> Result<(), FeedRegistryError> {
-        let mut recorded_events = RecordedEvents::with_capacity(1);
-        {
-            let mut recorder =
-                EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref());
-            recorder.record(event).await?;
-        }
-        tx.commit().await?;
-        self.wake_publisher.publish(recorded_events);
-        Ok(())
-    }
-}
-
-async fn subscription_state<Tx>(
-    tx: &mut Tx,
-    subscription: &SubscriptionKey,
-) -> Result<SubscriptionState, FeedRegistryError>
-where
-    Tx: SubscriptionStore + Send,
-{
-    if tx
-        .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
-        .await?
-    {
-        Ok(SubscriptionState::Subscribed)
-    } else {
-        Ok(SubscriptionState::NotSubscribed)
+        (registry, workers)
     }
 }
 

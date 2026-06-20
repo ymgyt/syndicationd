@@ -65,7 +65,7 @@ impl Processor for ApiEventPublisher {
 }
 
 impl Sink for ApiEventPublisher {
-    async fn deliver(&mut self, input: Self::Input) {
+    async fn sink(&mut self, input: Self::Input) {
         let receivers = self.publish(input);
         debug!(receivers, "registry api event publisher delivered event");
     }

@@ -13,16 +13,19 @@ pub struct SubscribeFeedCommand {
     pub feed_url: FeedUrl,
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
-    pub crawl_policy: CrawlPolicy,
+    pub crawl_policy: Option<CrawlPolicy>,
 }
 
 impl SubscribeFeedCommand {
-    pub(crate) fn into_parts(self) -> (SubscriptionKey, FeedSubscriptionAttrs) {
+    pub(crate) fn into_parts(
+        self,
+        default_crawl_policy: CrawlPolicy,
+    ) -> (SubscriptionKey, FeedSubscriptionAttrs) {
         let subscription = SubscriptionKey::new(self.subscriber_id, self.feed_url);
         let attrs = FeedSubscriptionAttrs {
             requirement: self.requirement,
             category: self.category,
-            crawl_policy: self.crawl_policy,
+            crawl_policy: self.crawl_policy.unwrap_or(default_crawl_policy),
         };
         (subscription, attrs)
     }

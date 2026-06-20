@@ -19,8 +19,8 @@ use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    CommitTx, FeedRegistryDb, FeedSubscriptionAttrs, RegistryService, SubscriberId,
-    SubscriptionKey, SubscriptionStore,
+    CommitTx, FeedRegistry, FeedRegistryDb, FeedSubscriptionAttrs, SubscriberId, SubscriptionKey,
+    SubscriptionStore,
     crawl::policy::{CrawlPolicy, PollingInterval},
 };
 pub use synd_term::integration::event_stream;
@@ -355,9 +355,8 @@ pub async fn serve_api(
         default_crawl_policy: CrawlPolicy::interval(polling_interval(Duration::from_hours(1))),
         ..synd_registry::FeedRegistryConfig::default()
     };
-    let registry_service =
-        RegistryService::start(db.clone(), registry_config, shutdown.cancellation_token());
-    let (registry, event_workers) = registry_service.into_parts();
+    let (registry, event_workers) =
+        FeedRegistry::start(db.clone(), registry_config, shutdown.cancellation_token());
     let tls_config =
         serve::rustls_config_from_pem_files(synd_test::certificate(), synd_test::private_key())
             .await

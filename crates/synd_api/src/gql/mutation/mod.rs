@@ -151,10 +151,10 @@ impl Mutation {
         input: SubscribeFeedInput,
     ) -> async_graphql::Result<SubscribeFeedPayload> {
         let subscriber_id = subscriber_id(cx);
-        let crawl_policy = match input.crawl_policy {
-            Some(policy) => policy.into_policy()?,
-            None => registry(cx).default_crawl_policy(),
-        };
+        let crawl_policy = input
+            .crawl_policy
+            .map(CrawlPolicyInput::into_policy)
+            .transpose()?;
         let out = registry(cx)
             .subscribe(SubscribeFeedCommand {
                 subscriber_id,

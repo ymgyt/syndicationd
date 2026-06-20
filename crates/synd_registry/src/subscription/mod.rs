@@ -9,12 +9,11 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 use crate::crawl::policy::CrawlPolicy;
 
 pub mod decider;
+mod handler;
 pub mod query;
 
-pub use decider::{
-    Decider, SubscriptionCommand, SubscriptionDecider, SubscriptionReject, SubscriptionState,
-    decide, evolve,
-};
+pub use decider::{SubCommand, SubDecider, SubReject, SubState, evolve};
+pub(crate) use handler::SubHandler;
 
 /// Opaque registry identity that owns subscriptions.
 ///

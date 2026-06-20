@@ -1,85 +1,92 @@
 use thiserror::Error;
 
 use crate::{
-    event::{Event, FeedSubscribedEvent, FeedUnsubscribedEvent, SubscriptionChangedEvent},
+    event::{FeedSubscribedEvent, FeedUnsubscribedEvent, SubEvent, SubscriptionChangedEvent},
+    handler::Decider,
     subscription::{FeedSubscriptionAttrs, SubscriptionKey},
 };
 
-pub trait Decider {
-    type Command;
-    type State;
-    type Event;
-    type Reject;
-
-    fn decide(
-        command: Self::Command,
-        state: Self::State,
-        subscription: SubscriptionKey,
-    ) -> Result<Self::Event, Self::Reject>;
-}
-
+/// Decides subscription domain events from a subscription command and state.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct SubscriptionDecider;
+pub struct SubDecider;
 
+/// Current command-time state of one subscriber/feed relation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SubscriptionState {
+pub enum SubState {
     NotSubscribed,
     Subscribed,
 }
 
+/// Domain command over one subscriber/feed relation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SubscriptionCommand {
-    Subscribe { attrs: FeedSubscriptionAttrs },
-    Unsubscribe,
+pub enum SubCommand {
+    Subscribe {
+        subscription: SubscriptionKey,
+        attrs: FeedSubscriptionAttrs,
+    },
+    Unsubscribe {
+        subscription: SubscriptionKey,
+    },
 }
 
+impl SubCommand {
+    pub fn subscription(&self) -> &SubscriptionKey {
+        match self {
+            Self::Subscribe { subscription, .. } | Self::Unsubscribe { subscription } => {
+                subscription
+            }
+        }
+    }
+}
+
+/// Domain rejection returned before any state mutation or journal append.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum SubscriptionReject {
+pub enum SubReject {
     #[error("feed is not subscribed: {0:?}")]
     NotSubscribed(SubscriptionKey),
 }
 
-pub fn decide(
-    command: SubscriptionCommand,
-    state: SubscriptionState,
-    subscription: SubscriptionKey,
-) -> Result<Event, SubscriptionReject> {
-    Ok(match (command, state) {
-        (SubscriptionCommand::Subscribe { attrs }, SubscriptionState::NotSubscribed) => {
-            FeedSubscribedEvent::new(subscription, attrs).into()
-        }
-        (SubscriptionCommand::Subscribe { attrs }, SubscriptionState::Subscribed) => {
-            SubscriptionChangedEvent::new(subscription, attrs).into()
-        }
-        (SubscriptionCommand::Unsubscribe, SubscriptionState::Subscribed) => {
-            FeedUnsubscribedEvent::new(subscription).into()
-        }
-        (SubscriptionCommand::Unsubscribe, SubscriptionState::NotSubscribed) => {
-            return Err(SubscriptionReject::NotSubscribed(subscription));
-        }
-    })
-}
-
-impl Decider for SubscriptionDecider {
-    type Command = SubscriptionCommand;
-    type State = SubscriptionState;
-    type Event = Event;
-    type Reject = SubscriptionReject;
+impl Decider for SubDecider {
+    type Command = SubCommand;
+    type State = SubState;
+    type Event = SubEvent;
+    type Reject = SubReject;
 
     fn decide(
+        &self,
         command: Self::Command,
         state: Self::State,
-        subscription: SubscriptionKey,
-    ) -> Result<Self::Event, Self::Reject> {
-        decide(command, state, subscription)
+    ) -> Result<Vec<Self::Event>, Self::Reject> {
+        let event = match (command, state) {
+            (
+                SubCommand::Subscribe {
+                    subscription,
+                    attrs,
+                },
+                SubState::NotSubscribed,
+            ) => SubEvent::Subscribed(FeedSubscribedEvent::new(subscription, attrs)),
+            (
+                SubCommand::Subscribe {
+                    subscription,
+                    attrs,
+                },
+                SubState::Subscribed,
+            ) => SubEvent::Changed(SubscriptionChangedEvent::new(subscription, attrs)),
+            (SubCommand::Unsubscribe { subscription }, SubState::Subscribed) => {
+                SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(subscription))
+            }
+            (SubCommand::Unsubscribe { subscription }, SubState::NotSubscribed) => {
+                return Err(SubReject::NotSubscribed(subscription));
+            }
+        };
+        Ok(vec![event])
     }
 }
 
-pub fn evolve(state: SubscriptionState, event: &Event) -> SubscriptionState {
-    match event {
-        Event::FeedSubscribed(_) | Event::SubscriptionChanged(_) => SubscriptionState::Subscribed,
-        Event::FeedUnsubscribed(_) => SubscriptionState::NotSubscribed,
-        _ => state,
+pub fn evolve(state: SubState, event: &SubEvent) -> SubState {
+    match (state, event) {
+        (_, SubEvent::Subscribed(_) | SubEvent::Changed(_)) => SubState::Subscribed,
+        (_, SubEvent::Unsubscribed(_)) => SubState::NotSubscribed,
     }
 }
 
@@ -90,6 +97,7 @@ mod tests {
     use synd_feed::types::FeedUrl;
 
     use super::*;
+    use crate::handler::Decider;
     use crate::{
         SubscriberId,
         crawl::policy::{CrawlPolicy, PollingInterval},
@@ -99,17 +107,18 @@ mod tests {
     fn decides_subscribe_when_not_subscribed() -> anyhow::Result<()> {
         let subscription = subscription()?;
         let attrs = attrs()?;
+        let decider = SubDecider;
 
-        let event = decide(
-            SubscriptionCommand::Subscribe {
+        let events = decider.decide(
+            SubCommand::Subscribe {
+                subscription: subscription.clone(),
                 attrs: attrs.clone(),
             },
-            SubscriptionState::NotSubscribed,
-            subscription.clone(),
+            SubState::NotSubscribed,
         )?;
 
-        let Event::FeedSubscribed(event) = event else {
-            panic!("expected FeedSubscribed");
+        let [SubEvent::Subscribed(event)] = events.as_slice() else {
+            panic!("expected Subscribed");
         };
         assert_eq!(event.subscription, subscription);
         assert_eq!(event.attrs, attrs);
@@ -120,17 +129,18 @@ mod tests {
     fn decides_change_when_already_subscribed() -> anyhow::Result<()> {
         let subscription = subscription()?;
         let attrs = attrs()?;
+        let decider = SubDecider;
 
-        let event = decide(
-            SubscriptionCommand::Subscribe {
+        let events = decider.decide(
+            SubCommand::Subscribe {
+                subscription: subscription.clone(),
                 attrs: attrs.clone(),
             },
-            SubscriptionState::Subscribed,
-            subscription.clone(),
+            SubState::Subscribed,
         )?;
 
-        let Event::SubscriptionChanged(event) = event else {
-            panic!("expected SubscriptionChanged");
+        let [SubEvent::Changed(event)] = events.as_slice() else {
+            panic!("expected Changed");
         };
         assert_eq!(event.subscription, subscription);
         assert_eq!(event.attrs, attrs);
@@ -140,15 +150,17 @@ mod tests {
     #[test]
     fn decides_unsubscribe_when_subscribed() -> anyhow::Result<()> {
         let subscription = subscription()?;
+        let decider = SubDecider;
 
-        let event = decide(
-            SubscriptionCommand::Unsubscribe,
-            SubscriptionState::Subscribed,
-            subscription.clone(),
+        let events = decider.decide(
+            SubCommand::Unsubscribe {
+                subscription: subscription.clone(),
+            },
+            SubState::Subscribed,
         )?;
 
-        let Event::FeedUnsubscribed(event) = event else {
-            panic!("expected FeedUnsubscribed");
+        let [SubEvent::Unsubscribed(event)] = events.as_slice() else {
+            panic!("expected Unsubscribed");
         };
         assert_eq!(event.subscription, subscription);
         Ok(())
@@ -157,15 +169,18 @@ mod tests {
     #[test]
     fn rejects_unsubscribe_when_not_subscribed() -> anyhow::Result<()> {
         let subscription = subscription()?;
+        let decider = SubDecider;
 
-        let err = decide(
-            SubscriptionCommand::Unsubscribe,
-            SubscriptionState::NotSubscribed,
-            subscription.clone(),
-        )
-        .unwrap_err();
+        let err = decider
+            .decide(
+                SubCommand::Unsubscribe {
+                    subscription: subscription.clone(),
+                },
+                SubState::NotSubscribed,
+            )
+            .unwrap_err();
 
-        assert_eq!(err, SubscriptionReject::NotSubscribed(subscription));
+        assert_eq!(err, SubReject::NotSubscribed(subscription));
         Ok(())
     }
 
@@ -173,21 +188,21 @@ mod tests {
     fn evolves_subscription_state() -> anyhow::Result<()> {
         let subscription = subscription()?;
         let attrs = attrs()?;
-        let subscribed = FeedSubscribedEvent::new(subscription.clone(), attrs.clone()).into();
-        let changed = SubscriptionChangedEvent::new(subscription.clone(), attrs).into();
-        let unsubscribed = FeedUnsubscribedEvent::new(subscription).into();
+        let subscribed = SubEvent::Subscribed(FeedSubscribedEvent::new(
+            subscription.clone(),
+            attrs.clone(),
+        ));
+        let changed = SubEvent::Changed(SubscriptionChangedEvent::new(subscription.clone(), attrs));
+        let unsubscribed = SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(subscription));
 
         assert_eq!(
-            evolve(SubscriptionState::NotSubscribed, &subscribed),
-            SubscriptionState::Subscribed
+            evolve(SubState::NotSubscribed, &subscribed),
+            SubState::Subscribed
         );
+        assert_eq!(evolve(SubState::Subscribed, &changed), SubState::Subscribed);
         assert_eq!(
-            evolve(SubscriptionState::Subscribed, &changed),
-            SubscriptionState::Subscribed
-        );
-        assert_eq!(
-            evolve(SubscriptionState::Subscribed, &unsubscribed),
-            SubscriptionState::NotSubscribed
+            evolve(SubState::Subscribed, &unsubscribed),
+            SubState::NotSubscribed
         );
         Ok(())
     }
