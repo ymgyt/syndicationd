@@ -164,7 +164,7 @@ impl fmt::Display for CrawlJobId {
     }
 }
 
-/// Durable crawl job state.
+/// Current lifecycle state of one crawl job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlJobState {
@@ -210,7 +210,7 @@ impl FromStr for CrawlJobState {
     }
 }
 
-/// Reason a crawl job was enqueued.
+/// Reason a crawl job was requested.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlJobTrigger {
@@ -256,7 +256,7 @@ impl FromStr for CrawlJobTrigger {
     }
 }
 
-/// Worker queue lane for one crawl job.
+/// Queue lane used to prioritize crawl job claiming.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlJobQueueLane {
@@ -298,6 +298,7 @@ impl FromStr for CrawlJobQueueLane {
     }
 }
 
+/// Error returned when stored crawl job values are unknown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnknownCrawlJobValue {
     field: &'static str,

@@ -2,8 +2,10 @@ use std::error::Error as StdError;
 
 use thiserror::Error;
 
+/// Result type returned by registry storage adapters.
 pub type RegistryDbResult<T> = Result<T, RegistryDbError>;
 
+/// Error raised by registry storage operations.
 #[derive(Debug, Error)]
 pub enum RegistryDbError {
     #[error(transparent)]
@@ -25,6 +27,7 @@ impl RegistryDbError {
     }
 }
 
+/// Error returned by registry command and query operations.
 #[derive(Debug, Error)]
 pub enum FeedRegistryError {
     #[error(transparent)]

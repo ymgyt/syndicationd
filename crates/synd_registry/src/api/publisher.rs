@@ -19,19 +19,6 @@ pub struct ApiEventPublisher {
     sender: broadcast::Sender<ApiEvent>,
 }
 
-/// Receives API events for one subscriber.
-pub struct ApiEventSubscriber {
-    subscriber_id: SubscriberId,
-    receiver: broadcast::Receiver<ApiEvent>,
-}
-
-/// Error returned while receiving API events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApiEventRecvError {
-    Closed,
-    Lagged(u64),
-}
-
 impl ApiEventPublisher {
     pub fn new(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
@@ -47,6 +34,12 @@ impl ApiEventPublisher {
 
     pub fn publish(&self, event: ApiEvent) -> usize {
         self.sender.send(event).unwrap_or_default()
+    }
+}
+
+impl fmt::Debug for ApiEventPublisher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ApiEventPublisher").finish_non_exhaustive()
     }
 }
 
@@ -82,10 +75,10 @@ impl EventInput for ApiEvent {
     }
 }
 
-impl fmt::Debug for ApiEventPublisher {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiEventPublisher").finish_non_exhaustive()
-    }
+/// Receives API events for one subscriber.
+pub struct ApiEventSubscriber {
+    subscriber_id: SubscriberId,
+    receiver: broadcast::Receiver<ApiEvent>,
 }
 
 impl ApiEventSubscriber {
@@ -100,4 +93,11 @@ impl ApiEventSubscriber {
             }
         }
     }
+}
+
+/// Error returned while receiving API events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiEventRecvError {
+    Closed,
+    Lagged(u64),
 }

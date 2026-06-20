@@ -183,6 +183,7 @@ where
     }
 }
 
+/// Coalesced timeline changes produced by one projection batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TimelineInvalidations {
     changes: Vec<TimelineInvalidation>,
@@ -231,6 +232,7 @@ impl TimelineInvalidations {
     }
 }
 
+/// A timeline membership change grouped by affected feeds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TimelineInvalidation {
     timeline: TimelineKey,

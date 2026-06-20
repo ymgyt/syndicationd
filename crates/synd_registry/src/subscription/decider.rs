@@ -6,10 +6,6 @@ use crate::{
     subscription::{FeedSubscriptionAttrs, SubscriptionKey},
 };
 
-/// Decides subscription domain events from a subscription command and state.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SubDecider;
-
 /// Current command-time state of one subscriber/feed relation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubState {
@@ -45,6 +41,10 @@ pub enum SubReject {
     #[error("feed is not subscribed: {0:?}")]
     NotSubscribed(SubscriptionKey),
 }
+
+/// Decides subscription domain events from a subscription command and state.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SubDecider;
 
 impl Decider for SubDecider {
     type Command = SubCommand;

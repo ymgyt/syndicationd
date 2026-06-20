@@ -32,19 +32,7 @@ use crate::{
     timeline::{TimelineCatchup, TimelineKey},
 };
 
-/// In-memory registry adapter for orchestration tests that should not exercise SQL semantics.
-#[derive(Debug, Clone, Default)]
-pub struct InMemoryFeedRegistryDb {
-    state: Arc<Mutex<InMemoryState>>,
-}
-
-/// Snapshot transaction handle for `InMemoryFeedRegistryDb`.
-#[derive(Debug)]
-pub struct InMemoryRegistryTx<'a> {
-    guard: MutexGuard<'a, InMemoryState>,
-    state: InMemoryState,
-}
-
+/// Mutable registry state held by the in-memory adapter.
 #[derive(Debug, Clone, Default)]
 struct InMemoryState {
     journal: Vec<InMemoryJournalEntry>,
@@ -59,6 +47,7 @@ struct InMemoryState {
     next_result_pk: i64,
 }
 
+/// Hashable subscription identity used by in-memory maps.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SubscriptionKeyParts {
     subscriber_id: String,
@@ -74,12 +63,19 @@ impl SubscriptionKeyParts {
     }
 }
 
+/// Journal row stored by the in-memory adapter.
 #[derive(Debug, Clone)]
 struct InMemoryJournalEntry {
     position: i64,
     event_type: EventType,
     event: Event,
     occurred_at: DateTime<Utc>,
+}
+
+/// In-memory registry adapter for orchestration tests that should not exercise SQL semantics.
+#[derive(Debug, Clone, Default)]
+pub struct InMemoryFeedRegistryDb {
+    state: Arc<Mutex<InMemoryState>>,
 }
 
 impl InMemoryFeedRegistryDb {
@@ -96,6 +92,13 @@ impl FeedRegistryDb for InMemoryFeedRegistryDb {
         let state = guard.clone();
         Ok(InMemoryRegistryTx { guard, state })
     }
+}
+
+/// Snapshot transaction handle for `InMemoryFeedRegistryDb`.
+#[derive(Debug)]
+pub struct InMemoryRegistryTx<'a> {
+    guard: MutexGuard<'a, InMemoryState>,
+    state: InMemoryState,
 }
 
 impl CommitTx for InMemoryRegistryTx<'_> {

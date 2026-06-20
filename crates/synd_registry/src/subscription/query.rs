@@ -1,5 +1,6 @@
 use crate::subscription::{SubscriberId, Subscription};
 
+/// Query for one subscriber's current subscriptions.
 #[derive(Debug, Clone)]
 pub struct SubscriptionsQuery {
     pub subscriber_id: SubscriberId,
@@ -7,6 +8,7 @@ pub struct SubscriptionsQuery {
     pub first: usize,
 }
 
+/// Page of current subscriptions returned by a subscription query.
 #[derive(Debug, Clone)]
 pub struct Subscriptions {
     pub subscriptions: Vec<Subscription>,

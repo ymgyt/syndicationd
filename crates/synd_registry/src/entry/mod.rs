@@ -92,12 +92,6 @@ impl EntryAttrs {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EntryOrderKey(DateTime<Utc>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EntryOrderFallback {
-    FirstSeenAt(DateTime<Utc>),
-    Existing(EntryOrderKey),
-}
-
 impl EntryOrderKey {
     pub fn from_datetime(time: DateTime<Utc>) -> Self {
         Self(time)
@@ -113,6 +107,13 @@ impl EntryOrderKey {
     pub fn as_datetime(self) -> DateTime<Utc> {
         self.0
     }
+}
+
+/// Fallback used when deriving an entry ordering key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryOrderFallback {
+    FirstSeenAt(DateTime<Utc>),
+    Existing(EntryOrderKey),
 }
 
 impl EntryOrderFallback {

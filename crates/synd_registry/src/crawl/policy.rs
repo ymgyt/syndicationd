@@ -3,6 +3,7 @@ use std::{fmt, num::NonZeroU64, time::Duration};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 
+/// Error returned when a polling interval cannot be represented.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvalidPollingInterval;
 
@@ -14,6 +15,7 @@ impl fmt::Display for InvalidPollingInterval {
 
 impl std::error::Error for InvalidPollingInterval {}
 
+/// Non-zero whole-second interval used by polling crawl policies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct PollingInterval(NonZeroU64);
 
@@ -58,6 +60,7 @@ impl<'de> Deserialize<'de> for PollingInterval {
     }
 }
 
+/// Policy for when a feed endpoint may be crawled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PollingPolicy {
@@ -85,6 +88,7 @@ impl PollingPolicy {
     }
 }
 
+/// Registry-owned crawl policy attached to a subscription or target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlPolicy {
     pub polling: PollingPolicy,

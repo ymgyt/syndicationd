@@ -8,7 +8,7 @@ pub(crate) use mutation::Mutation;
 mod subscription;
 pub(crate) use subscription::RegistrySubscription;
 
-use crate::{dependency::AppFeedRegistry, principal::Principal};
+use crate::{dependency::LiveFeedRegistry, principal::Principal};
 use synd_registry::SubscriberId;
 
 pub(crate) mod object;
@@ -86,8 +86,8 @@ pub(crate) fn principal(cx: &async_graphql::Context<'_>) -> Principal {
     cx.data_unchecked::<Principal>().clone()
 }
 
-pub(crate) fn registry<'a>(cx: &'a async_graphql::Context<'_>) -> &'a AppFeedRegistry {
-    cx.data_unchecked::<AppFeedRegistry>()
+pub(crate) fn registry<'a>(cx: &'a async_graphql::Context<'_>) -> &'a LiveFeedRegistry {
+    cx.data_unchecked::<LiveFeedRegistry>()
 }
 
 pub(crate) fn subscriber_id(cx: &async_graphql::Context<'_>) -> SubscriberId {

@@ -103,6 +103,7 @@ impl FeedEndpointSubscriptionSet {
     }
 }
 
+/// Desired crawl target state derived from current endpoint subscriptions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlTargetDecision {
     feed_url: FeedUrl,

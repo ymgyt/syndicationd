@@ -38,7 +38,7 @@ impl ApiService {
         serve_options: ServeOptions,
         shutdown: &Shutdown,
     ) -> Result<Self> {
-        let db = Repository::open(database_path).await?;
+        let db = open_sqlite_registry_db(database_path).await?;
         let config = FeedRegistryConfig::default();
         let (registry, event_workers) =
             FeedRegistry::start(db, config, shutdown.cancellation_token());
@@ -56,17 +56,13 @@ impl ApiService {
     }
 }
 
-/// Opens and migrates the `SQLite` repository used by a runtime API.
-struct Repository;
-
-impl Repository {
-    async fn open(path: &Path) -> Result<SqliteFeedRegistryDb> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let db = SqliteDatabase::create_or_open(path).await?;
-        db.migrate().await?;
-        Ok(SqliteFeedRegistryDb::new(db))
+/// Opens and migrates the registry database as `SqliteFeedRegistryDb`.
+async fn open_sqlite_registry_db(path: &Path) -> Result<SqliteFeedRegistryDb> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
     }
+
+    let db = SqliteDatabase::create_or_open(path).await?;
+    db.migrate().await?;
+    Ok(SqliteFeedRegistryDb::new(db))
 }

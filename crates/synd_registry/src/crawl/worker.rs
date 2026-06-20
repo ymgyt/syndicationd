@@ -235,6 +235,7 @@ where
     }
 }
 
+/// Runs one claimed crawl job through fetch, parse, and completion recording.
 struct CrawlWorker<S, F> {
     db: S,
     fetcher: F,
@@ -416,6 +417,7 @@ fn feed_fetch_request(job: &CrawlJob, previous_state: Option<&CrawlState>) -> Fe
     FeedFetchRequest::new(job.feed_url.clone()).with_conditional(conditional)
 }
 
+/// Runtime permits controlling global and lane-local crawl concurrency.
 struct CrawlWorkerCapacity {
     global: Arc<Semaphore>,
     manual: Arc<Semaphore>,
@@ -458,6 +460,7 @@ impl CrawlWorkerCapacity {
     }
 }
 
+/// Acquired capacity permits for one running crawl job.
 struct CrawlWorkerSlot {
     lane: CrawlJobQueueLane,
     _global_permit: OwnedSemaphorePermit,

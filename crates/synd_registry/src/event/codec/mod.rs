@@ -2,8 +2,10 @@ use thiserror::Error;
 
 use super::domain::{Event, EventType};
 
+/// Result type returned while encoding or decoding registry events.
 pub type EventEncodingResult<T> = Result<T, EventEncodingError>;
 
+/// Error returned when converting between typed events and persisted payloads.
 #[derive(Debug, Error)]
 pub enum EventEncodingError {
     #[error(transparent)]
@@ -17,12 +19,14 @@ pub enum EventEncodingError {
     },
 }
 
+/// Serialized representation of one registry event payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncodedEvent {
     pub event_type: EventType,
     pub payload_json: String,
 }
 
+/// Converts registry events to and from the journal payload shape.
 pub trait EventEncoding: Sized {
     fn encode(&self) -> EventEncodingResult<EncodedEvent>;
 

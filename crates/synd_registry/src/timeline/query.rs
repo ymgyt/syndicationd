@@ -10,6 +10,7 @@ use crate::{
     subscription::{SubscriberId, Subscription},
 };
 
+/// Query for timeline items visible to one subscriber.
 #[derive(Debug, Clone)]
 pub struct TimelineItemsQuery {
     pub subscriber_id: SubscriberId,
@@ -18,6 +19,7 @@ pub struct TimelineItemsQuery {
     pub first: usize,
 }
 
+/// Opaque pagination cursor for timeline item ordering.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineItemCursor {
@@ -72,16 +74,17 @@ impl PartialOrd for TimelineItemCursor {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum TimelineItemCursorError {
-    #[error("invalid timeline item cursor: {0}")]
-    Invalid(serde_json::Error),
-}
-
 impl fmt::Display for TimelineItemCursor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.encode())
     }
+}
+
+/// Error returned when decoding a timeline item cursor.
+#[derive(Debug, Error)]
+pub enum TimelineItemCursorError {
+    #[error("invalid timeline item cursor: {0}")]
+    Invalid(serde_json::Error),
 }
 
 /// GraphQL/query node assembled for one timeline item.
@@ -93,6 +96,7 @@ pub struct TimelineItemNode {
     pub cursor: TimelineItemCursor,
 }
 
+/// Page of timeline items returned by a timeline query.
 #[derive(Debug, Clone)]
 pub struct TimelineItemsPage {
     pub nodes: Vec<TimelineItemNode>,

@@ -5,14 +5,7 @@ use crate::crawl::{
     worker::CrawlWorkerPoolConfig,
 };
 
-#[derive(Debug, Clone, Copy)]
-pub struct FeedRegistryConfig {
-    pub default_crawl_policy: CrawlPolicy,
-    pub event_wake_channel_capacity: usize,
-    pub workers: FeedRegistryWorkerConfig,
-    pub crawl_worker_pool: CrawlWorkerPoolConfig,
-}
-
+/// Poll intervals for each registry background worker family.
 #[derive(Debug, Clone, Copy)]
 pub struct FeedRegistryWorkerConfig {
     pub crawl_target_projection_poll_interval: Duration,
@@ -44,6 +37,15 @@ impl Default for FeedRegistryWorkerConfig {
     fn default() -> Self {
         Self::with_poll_interval(Duration::from_secs(30))
     }
+}
+
+/// Runtime configuration for the registry facade and event workers.
+#[derive(Debug, Clone, Copy)]
+pub struct FeedRegistryConfig {
+    pub default_crawl_policy: CrawlPolicy,
+    pub event_wake_channel_capacity: usize,
+    pub workers: FeedRegistryWorkerConfig,
+    pub crawl_worker_pool: CrawlWorkerPoolConfig,
 }
 
 impl Default for FeedRegistryConfig {

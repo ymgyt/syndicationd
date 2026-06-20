@@ -8,11 +8,11 @@ use crate::{
     session::DaemonSessions,
 };
 
-pub type AppFeedRegistry = FeedRegistry<SqliteFeedRegistryDb>;
+pub type LiveFeedRegistry = FeedRegistry<SqliteFeedRegistryDb>;
 
 pub struct Dependency {
     pub authenticator: Authenticator,
-    pub registry: AppFeedRegistry,
+    pub registry: LiveFeedRegistry,
     pub tls_config: Option<RustlsConfig>,
     pub serve_options: ServeOptions,
     pub monitors: Monitors,
@@ -22,7 +22,7 @@ pub struct Dependency {
 impl Dependency {
     pub fn new(
         authenticator: Authenticator,
-        registry: AppFeedRegistry,
+        registry: LiveFeedRegistry,
         tls_config: Option<RustlsConfig>,
         serve_options: impl Into<ServeOptions>,
     ) -> Self {

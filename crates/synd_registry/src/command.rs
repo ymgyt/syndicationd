@@ -7,6 +7,7 @@ use crate::{
     },
 };
 
+/// Request to create or update one subscriber/feed relation.
 #[derive(Debug, Clone)]
 pub struct SubscribeFeedCommand {
     pub subscriber_id: SubscriberId,
@@ -31,6 +32,7 @@ impl SubscribeFeedCommand {
     }
 }
 
+/// Result returned after handling a subscribe request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscribeFeedOutput {
     pub outcome: SubscribeOutcome,
@@ -45,6 +47,7 @@ impl SubscribeFeedOutput {
     }
 }
 
+/// Request to end one subscriber/feed relation.
 #[derive(Debug, Clone)]
 pub struct UnsubscribeFeedCommand {
     pub subscriber_id: SubscriberId,
@@ -57,6 +60,7 @@ impl UnsubscribeFeedCommand {
     }
 }
 
+/// Result returned after handling an unsubscribe request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsubscribeFeedOutput {
     pub outcome: UnsubscribeOutcome,

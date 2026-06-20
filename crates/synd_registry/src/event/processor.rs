@@ -194,6 +194,7 @@ where
     ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
 }
 
+/// Cursor-processing role shared by projectors and cursor-driven reconcilers.
 pub(crate) trait CursorRole<S>: Processor
 where
     S: FeedRegistryDb,

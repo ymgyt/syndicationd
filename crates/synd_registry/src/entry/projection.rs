@@ -114,6 +114,7 @@ where
     }
 }
 
+/// Counts of entry changes produced by one projection batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct EntryProjectionCounts {
     discovered: usize,

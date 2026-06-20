@@ -271,6 +271,7 @@ pub struct CrawlCompletionRecord {
     pub health: CrawlHealth,
 }
 
+/// Operational summary of one recorded crawl completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CrawlCompletionSummary {
     outcome: CrawlCompletionOutcome,
@@ -339,6 +340,7 @@ impl CrawlCompletionOutcome {
     }
 }
 
+/// Derived persistence payloads for one crawl completion outcome.
 struct PersistedOutcome {
     detail: CrawlResultDetail,
     last: LastCrawlResult,

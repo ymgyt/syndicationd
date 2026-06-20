@@ -15,6 +15,7 @@ use crate::{
 
 const DEFAULT_BATCH_SIZE: usize = 100;
 
+/// Synthetic input used to run a scheduler scan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScanTick;
 

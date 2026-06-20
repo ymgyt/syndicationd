@@ -91,30 +91,6 @@ impl fmt::Debug for EventWakePublisher {
     }
 }
 
-/// Receives journal wake notifications for one event worker.
-pub struct EventWakeSubscriber {
-    receiver: broadcast::Receiver<RecordedEvents>,
-}
-
-/// Worker-local connection to the registry event wake channel.
-pub struct EventWake {
-    publisher: EventWakePublisher,
-    subscriber: EventWakeSubscriber,
-}
-
-/// Owns the task running one event processor.
-#[derive(Debug)]
-pub struct WorkerHandle {
-    id: WorkerId,
-    task: JoinHandle<()>,
-}
-
-/// Owns the set of registry event worker tasks.
-#[derive(Debug)]
-pub struct WorkerSet {
-    handles: Vec<WorkerHandle>,
-}
-
 impl EventWakePublisher {
     pub fn new(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
@@ -135,6 +111,11 @@ impl EventWakePublisher {
     }
 }
 
+/// Receives journal wake notifications for one event worker.
+pub struct EventWakeSubscriber {
+    receiver: broadcast::Receiver<RecordedEvents>,
+}
+
 impl EventWakeSubscriber {
     pub async fn recv(&mut self) -> Result<RecordedEvents, EventWakeRecvError> {
         self.receiver.recv().await.map_err(|err| match err {
@@ -142,6 +123,12 @@ impl EventWakeSubscriber {
             broadcast::error::RecvError::Lagged(skipped) => EventWakeRecvError::Lagged(skipped),
         })
     }
+}
+
+/// Worker-local connection to the registry event wake channel.
+pub struct EventWake {
+    publisher: EventWakePublisher,
+    subscriber: EventWakeSubscriber,
 }
 
 impl EventWake {
@@ -160,6 +147,13 @@ impl EventWake {
     pub fn publish(&self, recorded: RecordedEvents) -> usize {
         self.publisher.publish(recorded)
     }
+}
+
+/// Owns the task running one event processor.
+#[derive(Debug)]
+pub struct WorkerHandle {
+    id: WorkerId,
+    task: JoinHandle<()>,
 }
 
 impl WorkerHandle {
@@ -185,6 +179,12 @@ impl WorkerHandle {
     pub async fn join(self) -> Result<(), tokio::task::JoinError> {
         self.task.await
     }
+}
+
+/// Owns the set of registry event worker tasks.
+#[derive(Debug)]
+pub struct WorkerSet {
+    handles: Vec<WorkerHandle>,
 }
 
 impl WorkerSet {
