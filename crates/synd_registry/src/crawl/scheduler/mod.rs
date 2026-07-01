@@ -1,5 +1,14 @@
+#![allow(dead_code)]
+
 use chrono::{DateTime, Utc};
 use tracing::info;
+
+pub(crate) mod dispatch;
+pub(crate) mod driver;
+pub(crate) mod input;
+pub(crate) mod policy;
+pub(crate) mod queue;
+pub(crate) mod tier;
 
 use crate::{
     crawl::{
