@@ -135,6 +135,19 @@ impl CrawlScheduleCandidate {
     }
 }
 
+/// Row read from durable target/schedule state to synchronize `crawl_schedule`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduleSyncRow {
+    pub target: ScheduledCrawlTarget,
+    pub schedule: Option<CrawlSchedule>,
+}
+
+impl ScheduleSyncRow {
+    pub fn new(target: ScheduledCrawlTarget, schedule: Option<CrawlSchedule>) -> Self {
+        Self { target, schedule }
+    }
+}
+
 /// `crawl_target` facts needed by the scheduler.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScheduledCrawlTarget {
