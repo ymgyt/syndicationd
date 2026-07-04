@@ -10,8 +10,8 @@ use crate::{
     event::{
         CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
         Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch,
-        Processor, ProcessorError, ProcessorId, ProcessorResult, Reconciler, RegistryEvent,
-        SubEvent, SubscriptionChangedEvent, skip_permanent_error,
+        Processor, ProcessorError, ProcessorId, ProcessorResult, Reaction, Reconciler,
+        RegistryEvent, SubEvent, SubscriptionChangedEvent, skip_permanent_error,
     },
     subscription::SubscriptionKey,
 };
@@ -155,29 +155,29 @@ impl EventInput for CrawlTargetListInput {
 
 /// Reconciler that reacts to subscription events for the crawl target list.
 #[derive(Debug, Clone)]
-pub struct CrawlTargetListProj;
+pub struct CrawlTargetReconciler;
 
-impl CrawlTargetListProj {
+impl CrawlTargetReconciler {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Default for CrawlTargetListProj {
+impl Default for CrawlTargetReconciler {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Processor for CrawlTargetListProj {
+impl Processor for CrawlTargetReconciler {
     type Input = CrawlTargetListInput;
 
     fn id(&self) -> ProcessorId {
-        ProcessorId::CrawlTargetProjection
+        ProcessorId::CrawlTargetReconciler
     }
 }
 
-impl<S> Reconciler<S> for CrawlTargetListProj
+impl<S> Reconciler<S> for CrawlTargetReconciler
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + Send,
@@ -186,8 +186,9 @@ where
         &mut self,
         tx: &mut S::Tx<'_>,
         _now: DateTime<Utc>,
+        _trigger: crate::event::Trigger,
         batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Vec<Event>> {
+    ) -> ProcessorResult<Reaction<Vec<Event>>> {
         let processor = self.id();
         let mut events = Vec::new();
         for input in batch.into_inputs() {
@@ -220,7 +221,7 @@ where
                 Err(err) => skip_permanent_error(processor, err, "input")?,
             }
         }
-        Ok(events)
+        Ok(Reaction::done(events))
     }
 }
 

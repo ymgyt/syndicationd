@@ -1,6 +1,6 @@
-use crate::crawl::scheduler::{
+use crate::crawl::{
     dispatch::{DispatchBatch, DispatchContext},
-    input::SchedInput,
+    scheduler::input::SchedInput,
 };
 
 /// Policy interface that decides crawl dispatch order from submitted inputs.

@@ -1,5 +1,6 @@
 pub mod blob;
 pub mod completion;
+pub(crate) mod dispatch;
 pub mod job;
 pub mod policy;
 pub mod result;

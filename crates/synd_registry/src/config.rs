@@ -8,7 +8,7 @@ use crate::crawl::{
 /// Poll intervals for each registry background worker family.
 #[derive(Debug, Clone, Copy)]
 pub struct FeedRegistryWorkerConfig {
-    pub crawl_target_projection_poll_interval: Duration,
+    pub crawl_target_reconciler_poll_interval: Duration,
     pub feed_projection_poll_interval: Duration,
     pub entry_projection_poll_interval: Duration,
     pub timeline_projection_poll_interval: Duration,
@@ -21,7 +21,7 @@ pub struct FeedRegistryWorkerConfig {
 impl FeedRegistryWorkerConfig {
     pub fn with_poll_interval(poll_interval: Duration) -> Self {
         Self {
-            crawl_target_projection_poll_interval: poll_interval,
+            crawl_target_reconciler_poll_interval: poll_interval,
             feed_projection_poll_interval: poll_interval,
             entry_projection_poll_interval: poll_interval,
             timeline_projection_poll_interval: poll_interval,

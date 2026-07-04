@@ -95,15 +95,15 @@ where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: TimelineStore + Send,
 {
-    async fn apply(
+    async fn project(
         &mut self,
         tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
-        <Self as Projector<S>>::apply_batch(self, tx, InputBatch::new(vec![input])).await
+        <Self as Projector<S>>::project_batch(self, tx, InputBatch::new(vec![input])).await
     }
 
-    async fn apply_batch(
+    async fn project_batch(
         &mut self,
         tx: &mut S::Tx<'_>,
         batch: InputBatch<Self::Input>,

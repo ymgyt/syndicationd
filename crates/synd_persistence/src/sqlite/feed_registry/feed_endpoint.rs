@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 
-use super::error::{DecodeResultExt, SqliteError, SqliteResult};
+use super::error::{SqliteError, SqliteResult};
 
 pub(super) async fn upsert(
     tx: &mut Transaction<'_, Sqlite>,
@@ -51,33 +51,7 @@ pub(super) async fn resolve_pk(
         .ok_or_else(|| SqliteError::not_found("feed endpoint", feed_url.as_str()))
 }
 
-pub(super) async fn resolve_url(
-    tx: &mut Transaction<'_, Sqlite>,
-    pk: i64,
-) -> SqliteResult<FeedUrl> {
-    let row = sqlx::query_as::<_, UrlRow>(
-        r#"
-        SELECT url
-        FROM feed_endpoint
-        WHERE pk = ?
-        "#,
-    )
-    .bind(pk)
-    .fetch_optional(&mut **tx)
-    .await?;
-
-    let Some(row) = row else {
-        return Err(SqliteError::not_found("feed endpoint", pk.to_string()));
-    };
-    FeedUrl::parse(&row.url).decode()
-}
-
 #[derive(sqlx::FromRow)]
 struct PkRow {
     pk: i64,
-}
-
-#[derive(sqlx::FromRow)]
-struct UrlRow {
-    url: String,
 }

@@ -7,18 +7,19 @@ use tokio::sync::{Mutex, MutexGuard};
 use crate::{
     crawl::{
         blob::{BlobRef, PutBlobCommand},
-        job::{
-            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobId, CrawlJobState,
-            EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome, FinishCrawlJobCommand,
-            FinishCrawlJobOutcome,
-        },
+        job::CrawlJobId,
         result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
-        schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
-        target_list::{CrawlTarget, FeedEndpointSubscription, FeedEndpointSubscriptionSet},
+        schedule::{
+            CrawlSchedule, ScheduleSyncEntry, ScheduledCrawlTarget, ScheduledDue,
+            UpsertCrawlScheduleCommand,
+        },
+        target_list::{
+            CrawlTarget, CrawlTargetState, FeedEndpointSubscription, FeedEndpointSubscriptionSet,
+        },
     },
     db::{
-        BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
-        EntryStore, FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
+        BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, EntryStore,
+        FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
@@ -39,10 +40,10 @@ struct InMemoryState {
     cursors: HashMap<ProcessorId, i64>,
     subscriptions: HashMap<SubscriptionKeyParts, Subscription>,
     crawl_targets: HashMap<String, CrawlTarget>,
+    crawl_schedules: HashMap<String, CrawlSchedule>,
     crawl_states: HashMap<String, CrawlState>,
     timeline_catchup_counts: HashMap<String, u64>,
     blobs: HashMap<i64, Vec<u8>>,
-    jobs: Vec<CrawlJob>,
     next_blob_pk: i64,
     next_result_pk: i64,
 }
@@ -329,82 +330,113 @@ impl CrawlTargetStore for InMemoryRegistryTx<'_> {
 }
 
 impl CrawlScheduleStore for InMemoryRegistryTx<'_> {
-    async fn list_candidates(
+    async fn load_schedule_sync_entry(
         &mut self,
-        _now: DateTime<Utc>,
-        _limit: usize,
-    ) -> RegistryDbResult<Vec<CrawlScheduleCandidate>> {
-        Ok(Vec::new())
+        feed_url: &FeedUrl,
+    ) -> RegistryDbResult<Option<ScheduleSyncEntry>> {
+        let state = &self.state;
+        let Some(target) = state.crawl_targets.get(feed_url.as_str()) else {
+            return Ok(None);
+        };
+        let schedule = state.crawl_schedules.get(feed_url.as_str()).cloned();
+        Ok(Some(ScheduleSyncEntry::new(
+            ScheduledCrawlTarget::from(target),
+            schedule,
+        )))
+    }
+
+    async fn list_schedule_sync_entries(
+        &mut self,
+        limit: usize,
+    ) -> RegistryDbResult<Vec<ScheduleSyncEntry>> {
+        let state = &self.state;
+        let mut entries = state
+            .crawl_targets
+            .values()
+            .filter_map(|target| {
+                let schedule = state.crawl_schedules.get(target.feed_url.as_str()).cloned();
+                let needs_sync = schedule
+                    .as_ref()
+                    .is_none_or(|schedule| schedule.target_updated_at != target.updated_at);
+
+                needs_sync
+                    .then(|| ScheduleSyncEntry::new(ScheduledCrawlTarget::from(target), schedule))
+            })
+            .collect::<Vec<_>>();
+        entries.sort_by(|a, b| a.target.feed_url.as_str().cmp(b.target.feed_url.as_str()));
+        entries.truncate(limit);
+        Ok(entries)
+    }
+
+    async fn list_scheduled_due(
+        &mut self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> RegistryDbResult<Vec<ScheduledDue>> {
+        let state = &self.state;
+        let mut entries = state
+            .crawl_schedules
+            .values()
+            .filter_map(|schedule| {
+                let due_at = schedule.next_crawl_after?;
+                if due_at > now {
+                    return None;
+                }
+                let target = state.crawl_targets.get(schedule.feed_url.as_str())?;
+                if !matches!(target.state, CrawlTargetState::Active { .. }) {
+                    return None;
+                }
+
+                Some(ScheduledDue::new(schedule.feed_url.clone(), due_at))
+            })
+            .collect::<Vec<_>>();
+        entries.sort_by(|a, b| {
+            a.due_at
+                .cmp(&b.due_at)
+                .then_with(|| a.feed_url.as_str().cmp(b.feed_url.as_str()))
+        });
+        entries.truncate(limit);
+        Ok(entries)
+    }
+
+    async fn next_scheduled_due(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Option<DateTime<Utc>>> {
+        let state = &self.state;
+        Ok(state
+            .crawl_schedules
+            .values()
+            .filter_map(|schedule| {
+                let due_at = schedule.next_crawl_after?;
+                if due_at <= now {
+                    return None;
+                }
+                let target = state.crawl_targets.get(schedule.feed_url.as_str())?;
+                matches!(target.state, CrawlTargetState::Active { .. }).then_some(due_at)
+            })
+            .min())
     }
 
     async fn upsert_schedule(
         &mut self,
-        _command: UpsertCrawlScheduleCommand,
+        command: UpsertCrawlScheduleCommand,
     ) -> RegistryDbResult<()> {
-        Ok(())
-    }
-}
-
-impl CrawlJobQueue for InMemoryRegistryTx<'_> {
-    async fn enqueue_job(
-        &mut self,
-        command: EnqueueCrawlJobCommand,
-    ) -> RegistryDbResult<EnqueueCrawlJobOutcome> {
         let state = &mut self.state;
-        if state.jobs.iter().any(|job| {
-            job.feed_url == command.feed_url
-                && matches!(job.state, CrawlJobState::Pending | CrawlJobState::Running)
-        }) {
-            return Ok(EnqueueCrawlJobOutcome::AlreadyActive);
-        }
-
-        let job = CrawlJob::new(
-            CrawlJobId::generate(),
+        let key = command.feed_url.as_str().to_owned();
+        let created_at = state
+            .crawl_schedules
+            .get(&key)
+            .map_or(command.reconciled_at, |schedule| schedule.created_at);
+        let schedule = CrawlSchedule::new(
             command.feed_url,
-            CrawlJobState::Pending,
-            command.trigger,
-            command.queue,
-            command.priority,
-            command.run_after,
-            command.enqueued_at,
-            command.enqueued_at,
+            command.target_updated_at,
+            command.next_crawl_after,
+            created_at,
+            command.reconciled_at,
         );
-        state.jobs.push(job.clone());
-        Ok(EnqueueCrawlJobOutcome::Enqueued(job))
-    }
-
-    async fn claim_job(
-        &mut self,
-        command: ClaimCrawlJobCommand,
-    ) -> RegistryDbResult<ClaimCrawlJobOutcome> {
-        let state = &mut self.state;
-        let Some(job) = state.jobs.iter_mut().find(|job| {
-            job.state == CrawlJobState::Pending
-                && job.queue == command.queue
-                && job.run_after <= command.claimed_at
-        }) else {
-            return Ok(ClaimCrawlJobOutcome::NoClaimableJob);
-        };
-        job.state = CrawlJobState::Running;
-        job.updated_at = command.claimed_at;
-        Ok(ClaimCrawlJobOutcome::Claimed(job.clone()))
-    }
-
-    async fn finish_job(
-        &mut self,
-        command: FinishCrawlJobCommand,
-    ) -> RegistryDbResult<FinishCrawlJobOutcome> {
-        let state = &mut self.state;
-        let Some(job) = state
-            .jobs
-            .iter_mut()
-            .find(|job| job.job_id == command.job_id && job.state == CrawlJobState::Running)
-        else {
-            return Ok(FinishCrawlJobOutcome::NotRunning);
-        };
-        job.state = CrawlJobState::Finished;
-        job.updated_at = command.finished_at;
-        Ok(FinishCrawlJobOutcome::Finished(job.clone()))
+        state.crawl_schedules.insert(key, schedule);
+        Ok(())
     }
 }
 
@@ -626,7 +658,7 @@ mod tests {
         registry.subscribe(subscribe_command("event", 3600)).await?;
 
         let mut tx = db.begin().await?;
-        let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
+        let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
         let batch = tx
             .read_after(&cursor, EventInterests::new([FeedSubscribedEvent::TYPE]))
             .await?;

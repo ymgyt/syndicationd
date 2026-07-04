@@ -1,7 +1,7 @@
 use crate::sqlite::feed_registry::test_support::*;
 
 #[tokio::test]
-async fn crawl_target_projection_activates_target_after_subscription() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_activates_target_after_subscription() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let subscription = subscription("crawl-target-subscribed");
 
@@ -9,7 +9,7 @@ async fn crawl_target_projection_activates_target_after_subscription() -> anyhow
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
@@ -19,7 +19,7 @@ async fn crawl_target_projection_activates_target_after_subscription() -> anyhow
     let target = tx
         .load_target_for_endpoint(&subscription.feed_url)
         .await?
-        .expect("crawl target should be projected");
+        .expect("crawl target should be reconciled");
 
     let CrawlTargetState::Active {
         subscription_count,
@@ -39,7 +39,7 @@ async fn crawl_target_projection_activates_target_after_subscription() -> anyhow
 }
 
 #[tokio::test]
-async fn crawl_target_projection_emits_target_activated_event() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_emits_target_activated_event() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let subscription = subscription("crawl-target-activated-event");
 
@@ -47,7 +47,7 @@ async fn crawl_target_projection_emits_target_activated_event() -> anyhow::Resul
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
@@ -64,7 +64,7 @@ async fn crawl_target_projection_emits_target_activated_event() -> anyhow::Resul
 }
 
 #[tokio::test]
-async fn crawl_target_projection_aggregates_multiple_subscriptions() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_aggregates_multiple_subscriptions() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let one_hour = subscription_with(
         SubscriberId::new("one-hour"),
@@ -88,7 +88,7 @@ async fn crawl_target_projection_aggregates_multiple_subscriptions() -> anyhow::
     store_subscription(&mut tx, manual).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&one_hour))],
     )
@@ -98,7 +98,7 @@ async fn crawl_target_projection_aggregates_multiple_subscriptions() -> anyhow::
     let target = tx
         .load_target_for_endpoint(&one_hour.feed_url)
         .await?
-        .expect("crawl target should be projected");
+        .expect("crawl target should be reconciled");
 
     let CrawlTargetState::Active {
         subscription_count,
@@ -118,7 +118,7 @@ async fn crawl_target_projection_aggregates_multiple_subscriptions() -> anyhow::
 }
 
 #[tokio::test]
-async fn crawl_target_projection_recalculates_after_subscription_change() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_recalculates_after_subscription_change() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let mut subscription = subscription("crawl-target-changed");
 
@@ -126,7 +126,7 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
@@ -137,7 +137,7 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Changed(subscription_changed_event(&subscription))],
     )
@@ -147,7 +147,7 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
     let target = tx
         .load_target_for_endpoint(&subscription.feed_url)
         .await?
-        .expect("crawl target should be projected");
+        .expect("crawl target should be reconciled");
 
     let CrawlTargetState::Active {
         subscription_count,
@@ -167,7 +167,7 @@ async fn crawl_target_projection_recalculates_after_subscription_change() -> any
 }
 
 #[tokio::test]
-async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_emits_target_policy_changed_event() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let mut subscription = subscription("crawl-target-policy-changed-event");
 
@@ -175,7 +175,7 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
@@ -186,7 +186,7 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Changed(subscription_changed_event(&subscription))],
     )
@@ -203,7 +203,7 @@ async fn crawl_target_projection_emits_target_policy_changed_event() -> anyhow::
 }
 
 #[tokio::test]
-async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_inactivates_target_after_last_unsubscribe() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let subscription = subscription("crawl-target-unsubscribed");
 
@@ -211,7 +211,7 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
@@ -222,7 +222,7 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
         .await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(
             subscription_key(&subscription),
@@ -234,14 +234,14 @@ async fn crawl_target_projection_inactivates_target_after_last_unsubscribe() -> 
     let target = tx
         .load_target_for_endpoint(&subscription.feed_url)
         .await?
-        .expect("crawl target should be projected");
+        .expect("crawl target should be reconciled");
 
     assert_eq!(target.state, CrawlTargetState::Inactive);
     Ok(())
 }
 
 #[tokio::test]
-async fn crawl_target_projection_emits_target_deactivated_event() -> anyhow::Result<()> {
+async fn crawl_target_reconciler_emits_target_deactivated_event() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let subscription = subscription("crawl-target-deactivated-event");
 
@@ -249,7 +249,7 @@ async fn crawl_target_projection_emits_target_deactivated_event() -> anyhow::Res
     store_subscription(&mut tx, subscription.clone()).await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Subscribed(feed_subscribed_event(&subscription))],
     )
@@ -260,7 +260,7 @@ async fn crawl_target_projection_emits_target_deactivated_event() -> anyhow::Res
         .await?;
     tx.commit().await?;
 
-    project_crawl_targets(
+    reconcile_crawl_targets(
         &db,
         vec![SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(
             subscription_key(&subscription),

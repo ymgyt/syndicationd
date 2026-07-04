@@ -8,11 +8,45 @@ use tracing::warn;
 use crate::{
     db::FeedRegistryDb,
     error::RegistryDbError,
-    event::{Event, EventInterests, EventType},
+    event::{Event, EventInterests, EventType, Trigger},
 };
 
 /// Result type returned by event processors.
 pub type ProcessorResult<T> = Result<T, ProcessorError>;
+
+/// Result of one worker reaction, plus an optional request to be woken later.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reaction<T> {
+    output: T,
+    wake: WakeRequest,
+}
+
+impl<T> Reaction<T> {
+    pub fn new(output: T, wake: WakeRequest) -> Self {
+        Self { output, wake }
+    }
+
+    pub fn done(output: T) -> Self {
+        Self::new(output, WakeRequest::None)
+    }
+
+    pub fn into_parts(self) -> (T, WakeRequest) {
+        (self.output, self.wake)
+    }
+}
+
+/// Request for the event loop to wake a worker at a specific future time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WakeRequest {
+    None,
+    At(DateTime<Utc>),
+}
+
+impl WakeRequest {
+    pub fn at(wake_at: DateTime<Utc>) -> Self {
+        Self::At(wake_at)
+    }
+}
 
 /// Error returned while converting or processing registry events.
 #[derive(Debug, Error)]
@@ -63,25 +97,25 @@ impl ClassifyError for ProcessorError {
 /// Stable identity for an event processor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProcessorId {
-    CrawlTargetProjection,
+    CrawlTargetReconciler,
     FeedProjection,
     EntryProjection,
     TimelineProjection,
     ApiEventProjection,
     ApiEventPublisher,
-    CrawlScheduler,
+    CrawlReconciler,
 }
 
 impl ProcessorId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::CrawlTargetProjection => "CrawlTargetProjection",
+            Self::CrawlTargetReconciler => "CrawlTargetReconciler",
             Self::FeedProjection => "FeedProjection",
             Self::EntryProjection => "EntryProjection",
             Self::TimelineProjection => "TimelineProjection",
             Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
-            Self::CrawlScheduler => "CrawlScheduler",
+            Self::CrawlReconciler => "CrawlReconciler",
         }
     }
 }
@@ -156,13 +190,13 @@ pub trait Projector<S>: Processor
 where
     S: FeedRegistryDb,
 {
-    fn apply(
+    fn project(
         &mut self,
         tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
 
-    fn apply_batch(
+    fn project_batch(
         &mut self,
         tx: &mut S::Tx<'_>,
         batch: InputBatch<Self::Input>,
@@ -171,7 +205,7 @@ where
             let processor = self.id();
             let mut events = Vec::new();
             for input in batch.into_inputs() {
-                match self.apply(tx, input).await {
+                match self.project(tx, input).await {
                     Ok(mut produced) => events.append(&mut produced),
                     Err(err) => skip_permanent_error(processor, err, "input")?,
                 }
@@ -181,7 +215,7 @@ where
     }
 }
 
-/// An idempotent reconciler that may be driven by a cursor or by a scan tick.
+/// An idempotent reconciler driven by selected journal events.
 pub trait Reconciler<S>: Processor
 where
     S: FeedRegistryDb,
@@ -190,35 +224,37 @@ where
         &mut self,
         tx: &mut S::Tx<'_>,
         now: DateTime<Utc>,
+        trigger: Trigger,
         batch: InputBatch<Self::Input>,
-    ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
+    ) -> impl Future<Output = ProcessorResult<Reaction<Vec<Event>>>> + Send;
 }
 
-/// Cursor-processing role shared by projectors and cursor-driven reconcilers.
-pub(crate) trait CursorRole<S>: Processor
+/// Handles one input batch read from the event journal.
+pub(crate) trait JournalHandler<S>: Processor
 where
     S: FeedRegistryDb,
 {
-    fn process_cursor_batch(
+    fn handle_journal_batch(
         &mut self,
         tx: &mut S::Tx<'_>,
         now: DateTime<Utc>,
+        trigger: Trigger,
         batch: InputBatch<Self::Input>,
-    ) -> impl Future<Output = ProcessorResult<Vec<Event>>> + Send;
+    ) -> impl Future<Output = ProcessorResult<Reaction<Vec<Event>>>> + Send;
 }
 
-/// Marks a projector as cursor-driven when it reacts to selected journal facts.
-pub(crate) struct CursorProjector<P> {
+/// Adapts a projector to the journal handler interface.
+pub(crate) struct ProjectorAdapter<P> {
     processor: P,
 }
 
-impl<P> CursorProjector<P> {
+impl<P> ProjectorAdapter<P> {
     pub(crate) fn new(processor: P) -> Self {
         Self { processor }
     }
 }
 
-impl<P> Processor for CursorProjector<P>
+impl<P> Processor for ProjectorAdapter<P>
 where
     P: Processor,
 {
@@ -233,33 +269,37 @@ where
     }
 }
 
-impl<S, P> CursorRole<S> for CursorProjector<P>
+impl<S, P> JournalHandler<S> for ProjectorAdapter<P>
 where
     S: FeedRegistryDb,
     P: Projector<S>,
 {
-    async fn process_cursor_batch(
+    async fn handle_journal_batch(
         &mut self,
         tx: &mut S::Tx<'_>,
         _now: DateTime<Utc>,
+        _trigger: Trigger,
         batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Vec<Event>> {
-        self.processor.apply_batch(tx, batch).await
+    ) -> ProcessorResult<Reaction<Vec<Event>>> {
+        self.processor
+            .project_batch(tx, batch)
+            .await
+            .map(Reaction::done)
     }
 }
 
-/// Marks a reconciler as cursor-driven when it reacts to selected journal facts.
-pub(crate) struct CursorReconciler<P> {
+/// Adapts a reconciler to the journal handler interface.
+pub(crate) struct ReconcilerAdapter<P> {
     processor: P,
 }
 
-impl<P> CursorReconciler<P> {
+impl<P> ReconcilerAdapter<P> {
     pub(crate) fn new(processor: P) -> Self {
         Self { processor }
     }
 }
 
-impl<P> Processor for CursorReconciler<P>
+impl<P> Processor for ReconcilerAdapter<P>
 where
     P: Processor,
 {
@@ -274,18 +314,19 @@ where
     }
 }
 
-impl<S, P> CursorRole<S> for CursorReconciler<P>
+impl<S, P> JournalHandler<S> for ReconcilerAdapter<P>
 where
     S: FeedRegistryDb,
     P: Reconciler<S>,
 {
-    async fn process_cursor_batch(
+    async fn handle_journal_batch(
         &mut self,
         tx: &mut S::Tx<'_>,
         now: DateTime<Utc>,
+        trigger: Trigger,
         batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Vec<Event>> {
-        self.processor.reconcile(tx, now, batch).await
+    ) -> ProcessorResult<Reaction<Vec<Event>>> {
+        self.processor.reconcile(tx, now, trigger, batch).await
     }
 }
 

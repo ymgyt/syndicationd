@@ -28,32 +28,6 @@ CREATE INDEX crawl_schedule_due_idx
     ON crawl_schedule(next_crawl_after)
     WHERE next_crawl_after IS NOT NULL;
 
-CREATE TABLE crawl_job (
-    pk               INTEGER PRIMARY KEY,
-    job_id           TEXT NOT NULL UNIQUE,
-    feed_endpoint_pk INTEGER NOT NULL,
-    state            TEXT NOT NULL,
-    trigger          TEXT NOT NULL,
-    queue            TEXT NOT NULL,
-    priority         INTEGER NOT NULL,
-    run_after        DATETIME NOT NULL,
-    created_at       DATETIME NOT NULL,
-    updated_at       DATETIME NOT NULL,
-
-    FOREIGN KEY (feed_endpoint_pk)
-        REFERENCES feed_endpoint(pk),
-
-    CHECK (length(job_id) > 0)
-);
-
-CREATE UNIQUE INDEX crawl_job_active_feed_endpoint_idx
-    ON crawl_job(feed_endpoint_pk)
-    WHERE state IN ('pending', 'running');
-
-CREATE INDEX crawl_job_pending_queue_ready_idx
-    ON crawl_job(queue, run_after, priority DESC, pk)
-    WHERE state = 'pending';
-
 CREATE TABLE blob (
     pk               INTEGER PRIMARY KEY,
     digest_algo      TEXT NOT NULL,
@@ -82,8 +56,6 @@ CREATE TABLE crawl_result (
     finished_at      DATETIME NOT NULL,
     created_at       DATETIME NOT NULL,
 
-    FOREIGN KEY (job_id)
-        REFERENCES crawl_job(job_id),
     FOREIGN KEY (feed_endpoint_pk)
         REFERENCES feed_endpoint(pk)
 );

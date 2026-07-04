@@ -8,20 +8,17 @@ pub(crate) use synd_feed::feed::service::{
 };
 pub(crate) use synd_feed::types::{EntryId, FeedUrl};
 pub(crate) use synd_registry::{
-    BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
-    FeedRegistryDb, FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId,
-    Subscription, SubscriptionKey, SubscriptionStore, TimelineStore,
+    BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, FeedRegistryDb,
+    FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
+    SubscriptionKey, SubscriptionStore, TimelineStore,
     crawl::completion::CrawlCompletionRecorder,
     crawl::{
         blob::PutBlobCommand,
-        job::{
-            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJobQueueLane, CrawlJobState,
-            CrawlJobTrigger, EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome,
-        },
+        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobState, CrawlJobTrigger},
         policy::{CrawlPolicy, PollingInterval, PollingPolicy},
         result::CrawlStateErrorKind,
         schedule::UpsertCrawlScheduleCommand,
-        target_list::{CrawlTargetListInput, CrawlTargetListProj, CrawlTargetState},
+        target_list::{CrawlTargetListInput, CrawlTargetReconciler, CrawlTargetState},
     },
     entry::{EntryProj, EntryProjectionInput},
     event::{
@@ -30,7 +27,7 @@ pub(crate) use synd_registry::{
         EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
         FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
         Projector, Reconciler, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
-        TimelineChangedEvent,
+        TimelineChangedEvent, Trigger,
     },
     feed::FeedProj,
     query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
@@ -225,21 +222,23 @@ pub(crate) fn timeline_interests() -> EventInterests {
     EventInterests::new([TimelineChangedEvent::TYPE])
 }
 
-pub(crate) async fn project_crawl_targets(
+pub(crate) async fn reconcile_crawl_targets(
     db: &SqliteFeedRegistryDb,
     events: Vec<SubEvent>,
 ) -> anyhow::Result<()> {
-    let mut projector = CrawlTargetListProj::new();
+    let mut reconciler = CrawlTargetReconciler::new();
     let mut tx = db.begin().await?;
     let mut generated = Vec::new();
     for event in events {
-        let events = <CrawlTargetListProj as Reconciler<SqliteFeedRegistryDb>>::reconcile(
-            &mut projector,
+        let reaction = <CrawlTargetReconciler as Reconciler<SqliteFeedRegistryDb>>::reconcile(
+            &mut reconciler,
             &mut tx,
             test_occurred_at(),
+            Trigger::Wake,
             InputBatch::new(vec![CrawlTargetListInput::new(event, test_occurred_at())]),
         )
         .await?;
+        let (events, _wake_request) = reaction.into_parts();
         generated.extend(events);
     }
     record_generated_events(&mut tx, generated).await?;
@@ -251,7 +250,7 @@ pub(crate) async fn read_crawl_target_events(
     db: &SqliteFeedRegistryDb,
 ) -> anyhow::Result<Vec<Event>> {
     let mut tx = db.begin().await?;
-    let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
+    let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
     let batch = tx.read_after(&cursor, crawl_target_interests()).await?;
     tx.commit().await?;
 
@@ -283,34 +282,22 @@ pub(crate) async fn record_fetched_crawl(
     body: Vec<u8>,
     seq: i64,
 ) -> anyhow::Result<CrawlJobFinishedEvent> {
-    let enqueued_at =
+    let started_at =
         Utc.with_ymd_and_hms(2026, 6, 8, 12, 0, 0).unwrap() + chrono::Duration::minutes(seq * 3);
-    let claimed_at = enqueued_at + chrono::Duration::minutes(1);
-    let finished_at = enqueued_at + chrono::Duration::minutes(2);
+    let finished_at = started_at + chrono::Duration::minutes(2);
     let mut tx = db.begin().await?;
-    store_feed_endpoint(&mut tx, feed_url, enqueued_at).await?;
-    let enqueue = tx
-        .enqueue_job(EnqueueCrawlJobCommand::new(
-            feed_url.clone(),
-            CrawlJobTrigger::TargetChanged,
-            CrawlJobQueueLane::Default,
-            0,
-            enqueued_at,
-            enqueued_at,
-        ))
-        .await?;
-    assert!(matches!(enqueue, EnqueueCrawlJobOutcome::Enqueued(_)));
-
-    let job = match tx
-        .claim_job(ClaimCrawlJobCommand::new(
-            CrawlJobQueueLane::Default,
-            claimed_at,
-        ))
-        .await?
-    {
-        ClaimCrawlJobOutcome::Claimed(job) => job,
-        ClaimCrawlJobOutcome::NoClaimableJob => anyhow::bail!("job should be claimable"),
-    };
+    store_feed_endpoint(&mut tx, feed_url, started_at).await?;
+    let job = CrawlJob::new(
+        CrawlJobId::generate(),
+        feed_url.clone(),
+        CrawlJobState::Running,
+        CrawlJobTrigger::TargetChanged,
+        CrawlJobQueueLane::Default,
+        0,
+        started_at,
+        started_at,
+        started_at,
+    );
     let event = CrawlJobFinishedEvent::new(job.job_id.clone(), job.feed_url.clone());
     let outcome = fetched_outcome(feed_url.clone(), body, finished_at)?;
     let (_record, events) = CrawlCompletionRecorder::new(&mut tx)
@@ -328,7 +315,7 @@ pub(crate) async fn project_feed(
     let mut tx = db.begin().await?;
     let mut proj = FeedProj::new();
     let events =
-        <FeedProj as Projector<SqliteFeedRegistryDb>>::apply(&mut proj, &mut tx, event).await?;
+        <FeedProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, event).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -341,7 +328,7 @@ pub(crate) async fn project_entries(
     let mut tx = db.begin().await?;
     let mut proj = EntryProj::new();
     let events =
-        <EntryProj as Projector<SqliteFeedRegistryDb>>::apply(&mut proj, &mut tx, input).await?;
+        <EntryProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, input).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -360,7 +347,7 @@ pub(crate) async fn project_timeline_batch(
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = TimelineProj::new();
-    let events = <TimelineProj as Projector<SqliteFeedRegistryDb>>::apply_batch(
+    let events = <TimelineProj as Projector<SqliteFeedRegistryDb>>::project_batch(
         &mut proj,
         &mut tx,
         InputBatch::new(inputs),

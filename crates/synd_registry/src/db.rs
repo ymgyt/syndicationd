@@ -6,12 +6,9 @@ use synd_feed::types::{EntryId, FeedUrl};
 use crate::{
     crawl::{
         blob::{BlobRef, PutBlobCommand},
-        job::{
-            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJobId, EnqueueCrawlJobCommand,
-            EnqueueCrawlJobOutcome, FinishCrawlJobCommand, FinishCrawlJobOutcome,
-        },
+        job::CrawlJobId,
         result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
-        schedule::{CrawlScheduleCandidate, UpsertCrawlScheduleCommand},
+        schedule::{ScheduleSyncEntry, ScheduledDue, UpsertCrawlScheduleCommand},
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
     entry::{EntryChanges, EntrySet},
@@ -79,34 +76,31 @@ pub trait CrawlTargetStore {
 
 /// Transactional scheduler-state operations.
 pub trait CrawlScheduleStore {
-    fn list_candidates(
+    fn load_schedule_sync_entry(
+        &mut self,
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Option<ScheduleSyncEntry>>> + Send;
+
+    fn list_schedule_sync_entries(
+        &mut self,
+        limit: usize,
+    ) -> impl Future<Output = RegistryDbResult<Vec<ScheduleSyncEntry>>> + Send;
+
+    fn list_scheduled_due(
         &mut self,
         now: DateTime<Utc>,
         limit: usize,
-    ) -> impl Future<Output = RegistryDbResult<Vec<CrawlScheduleCandidate>>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<Vec<ScheduledDue>>> + Send;
+
+    fn next_scheduled_due(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<Option<DateTime<Utc>>>> + Send;
 
     fn upsert_schedule(
         &mut self,
         command: UpsertCrawlScheduleCommand,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-}
-
-/// Transactional crawl-job queue operations.
-pub trait CrawlJobQueue {
-    fn enqueue_job(
-        &mut self,
-        command: EnqueueCrawlJobCommand,
-    ) -> impl Future<Output = RegistryDbResult<EnqueueCrawlJobOutcome>> + Send;
-
-    fn claim_job(
-        &mut self,
-        command: ClaimCrawlJobCommand,
-    ) -> impl Future<Output = RegistryDbResult<ClaimCrawlJobOutcome>> + Send;
-
-    fn finish_job(
-        &mut self,
-        command: FinishCrawlJobCommand,
-    ) -> impl Future<Output = RegistryDbResult<FinishCrawlJobOutcome>> + Send;
 }
 
 /// Transactional generic blob-store operations.
