@@ -1,7 +1,7 @@
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
 use crate::{
-    crawl::policy::CrawlPolicy,
+    crawl::{policy::CrawlPolicy, request::RequestCrawlOutcome},
     subscription::{
         FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
     },
@@ -72,4 +72,16 @@ impl UnsubscribeFeedOutput {
             UnsubscribeOutcome::Unsubscribed(subscription) => subscription,
         }
     }
+}
+
+/// Request to trigger one crawl outside the periodic schedule.
+#[derive(Debug, Clone)]
+pub struct RequestCrawlCommand {
+    pub feed_url: FeedUrl,
+}
+
+/// Result returned after handling a crawl request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestCrawlOutput {
+    pub outcome: RequestCrawlOutcome,
 }

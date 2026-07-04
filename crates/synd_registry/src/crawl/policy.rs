@@ -88,6 +88,15 @@ impl PollingPolicy {
     }
 }
 
+impl fmt::Display for PollingPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Manual => f.write_str("manual"),
+            Self::Interval { interval } => write!(f, "interval:{}s", interval.as_secs()),
+        }
+    }
+}
+
 /// Registry-owned crawl policy attached to a subscription or target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlPolicy {

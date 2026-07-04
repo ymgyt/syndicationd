@@ -62,6 +62,13 @@ where
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
         let Some(source) = tx.load_crawl_source(&input.job_id).await? else {
+            // Crawls without an accepted body (failures, not-modified) leave
+            // no source; nothing to project.
+            debug!(
+                feed_url = input.feed_url.as_str(),
+                job_id = %input.job_id,
+                "feed projection skipped: no crawl source"
+            );
             return Ok(Vec::new());
         };
         let body = tx.load_blob(source.body_blob).await?;
@@ -76,17 +83,9 @@ where
         debug!(
             feed_url = source.feed_url.as_str(),
             job_id = %source.crawl_job_id,
-            outcome = feed_projection_outcome(outcome),
+            outcome = outcome.as_str(),
             "feed state projected"
         );
         Ok(outcome.into_event(&source).into_iter().collect())
-    }
-}
-
-fn feed_projection_outcome(outcome: crate::feed::UpsertFeedOutcome) -> &'static str {
-    match outcome {
-        crate::feed::UpsertFeedOutcome::Discovered => "discovered",
-        crate::feed::UpsertFeedOutcome::Changed => "changed",
-        crate::feed::UpsertFeedOutcome::Unchanged => "unchanged",
     }
 }

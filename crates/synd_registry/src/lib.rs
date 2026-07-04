@@ -19,9 +19,11 @@ pub mod subscription;
 pub mod timeline;
 
 pub use command::{
-    SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
+    RequestCrawlCommand, RequestCrawlOutput, SubscribeFeedCommand, SubscribeFeedOutput,
+    UnsubscribeFeedCommand, UnsubscribeFeedOutput,
 };
-pub use config::{FeedRegistryConfig, FeedRegistryWorkerConfig};
+pub use config::{CrawlDispatchConfig, FeedRegistryConfig, FeedRegistryWorkerConfig};
+pub use crawl::request::{CrawlRequestReject, RequestCrawlOutcome};
 pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
 pub use db::{
     BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, EntryStore,

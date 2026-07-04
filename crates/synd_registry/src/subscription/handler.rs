@@ -40,9 +40,43 @@ impl<S> SubHandler<S> {
     }
 }
 
+impl SubState {
+    /// Loads the current command-time state of one subscriber/feed relation.
+    async fn load<Tx>(tx: &mut Tx, subscription: &SubscriptionKey) -> RegistryDbResult<Self>
+    where
+        Tx: SubscriptionStore + Send,
+    {
+        if tx
+            .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
+            .await?
+        {
+            Ok(Self::Subscribed)
+        } else {
+            Ok(Self::NotSubscribed)
+        }
+    }
+}
+
 /// Applies subscription domain events to the subscription store transaction.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct SubStateApplier;
+
+impl SubStateApplier {
+    async fn apply_all<Tx>(
+        &self,
+        tx: &mut Tx,
+        events: &[SubEvent],
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<()>
+    where
+        Tx: SubscriptionStore + Send,
+    {
+        for event in events {
+            self.apply(tx, event, now).await?;
+        }
+        Ok(())
+    }
+}
 
 impl<Tx> StateApplier<Tx> for SubStateApplier
 where
@@ -76,6 +110,88 @@ where
     }
 }
 
+/// Translates the events decided for one subscription command into the
+/// command-specific output.
+trait SubCommandOutput: Sized {
+    const COMMAND_NAME: &'static str;
+
+    fn from_event(event: &SubEvent) -> Result<Self, FeedRegistryError>;
+
+    fn from_events(events: &[SubEvent]) -> Result<Self, FeedRegistryError> {
+        match events {
+            [event] => Self::from_event(event),
+            events => Err(unexpected_event_count(Self::COMMAND_NAME, events.len())),
+        }
+    }
+}
+
+impl SubCommandOutput for SubscribeFeedOutput {
+    const COMMAND_NAME: &'static str = "subscribe";
+
+    fn from_event(event: &SubEvent) -> Result<Self, FeedRegistryError> {
+        let outcome = match event {
+            SubEvent::Subscribed(event) => SubscribeOutcome::Subscribed(event.subscription.clone()),
+            SubEvent::Changed(event) => SubscribeOutcome::Changed(event.subscription.clone()),
+            SubEvent::Unsubscribed(_) => {
+                return Err(unexpected_event(Self::COMMAND_NAME, event));
+            }
+        };
+        Ok(Self { outcome })
+    }
+}
+
+impl SubCommandOutput for UnsubscribeFeedOutput {
+    const COMMAND_NAME: &'static str = "unsubscribe";
+
+    fn from_event(event: &SubEvent) -> Result<Self, FeedRegistryError> {
+        let outcome = match event {
+            SubEvent::Unsubscribed(event) => {
+                UnsubscribeOutcome::Unsubscribed(event.subscription.clone())
+            }
+            SubEvent::Subscribed(_) | SubEvent::Changed(_) => {
+                return Err(unexpected_event(Self::COMMAND_NAME, event));
+            }
+        };
+        Ok(Self { outcome })
+    }
+}
+
+impl<S> SubHandler<S>
+where
+    S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: SubscriptionStore,
+{
+    /// Runs one subscription command through the shared decide -> apply ->
+    /// record -> commit flow.
+    async fn handle_sub_command<O>(
+        &self,
+        sub_command: SubCommand,
+    ) -> Result<HandledCommand<O>, FeedRegistryError>
+    where
+        O: SubCommandOutput,
+    {
+        let mut tx = self.db.begin().await?;
+        let state = SubState::load(&mut tx, sub_command.subscription()).await?;
+        let events = self.decider.decide(sub_command, state)?;
+        let output = O::from_events(&events)?;
+
+        self.applier
+            .apply_all(&mut tx, &events, self.clock.now())
+            .await?;
+        let mut recorded_events = RecordedEvents::with_capacity(events.len());
+        EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref())
+            .record_all(events.iter().cloned())
+            .await?;
+        tx.commit().await?;
+        log_events(&events);
+
+        Ok(HandledCommand {
+            output,
+            recorded_events,
+        })
+    }
+}
+
 impl<S> CommandHandler<SubscribeFeedCommand> for SubHandler<S>
 where
     S: FeedRegistryDb,
@@ -89,25 +205,11 @@ where
         command: SubscribeFeedCommand,
     ) -> Result<HandledCommand<Self::Output>, Self::Error> {
         let (subscription, attrs) = command.into_parts(self.default_crawl_policy);
-        let sub_command = SubCommand::Subscribe {
-            subscription: subscription.clone(),
+        self.handle_sub_command(SubCommand::Subscribe {
+            subscription,
             attrs,
-        };
-
-        let mut tx = self.db.begin().await?;
-        let state = load_state(&mut tx, &subscription).await?;
-        let events = self.decider.decide(sub_command, state)?;
-        let output = subscribe_output(&events)?;
-
-        apply_events(&self.applier, &mut tx, &events, self.clock.now()).await?;
-        let recorded_events = record_events(&mut tx, &events, self.clock.as_ref()).await?;
-        tx.commit().await?;
-        log_events(&events);
-
-        Ok(HandledCommand {
-            output,
-            recorded_events,
         })
+        .await
     }
 }
 
@@ -123,109 +225,10 @@ where
         &self,
         command: UnsubscribeFeedCommand,
     ) -> Result<HandledCommand<Self::Output>, Self::Error> {
-        let subscription = command.into_subscription();
-        let sub_command = SubCommand::Unsubscribe {
-            subscription: subscription.clone(),
-        };
-
-        let mut tx = self.db.begin().await?;
-        let state = load_state(&mut tx, &subscription).await?;
-        let events = self.decider.decide(sub_command, state)?;
-        let output = unsubscribe_output(&events)?;
-
-        apply_events(&self.applier, &mut tx, &events, self.clock.now()).await?;
-        let recorded_events = record_events(&mut tx, &events, self.clock.as_ref()).await?;
-        tx.commit().await?;
-        log_events(&events);
-
-        Ok(HandledCommand {
-            output,
-            recorded_events,
+        self.handle_sub_command(SubCommand::Unsubscribe {
+            subscription: command.into_subscription(),
         })
-    }
-}
-
-async fn load_state<Tx>(
-    tx: &mut Tx,
-    subscription: &SubscriptionKey,
-) -> Result<SubState, FeedRegistryError>
-where
-    Tx: SubscriptionStore + Send,
-{
-    if tx
-        .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
-        .await?
-    {
-        Ok(SubState::Subscribed)
-    } else {
-        Ok(SubState::NotSubscribed)
-    }
-}
-
-async fn apply_events<Tx>(
-    applier: &SubStateApplier,
-    tx: &mut Tx,
-    events: &[SubEvent],
-    now: DateTime<Utc>,
-) -> RegistryDbResult<()>
-where
-    Tx: SubscriptionStore + Send,
-{
-    for event in events {
-        applier.apply(tx, event, now).await?;
-    }
-    Ok(())
-}
-
-async fn record_events<Tx>(
-    tx: &mut Tx,
-    events: &[SubEvent],
-    clock: &(dyn Clock + '_),
-) -> RegistryDbResult<RecordedEvents>
-where
-    Tx: crate::event::EventJournalAppend + Send,
-{
-    let mut recorded_events = RecordedEvents::with_capacity(events.len());
-    {
-        let mut recorder = EventRecorder::new(tx, &mut recorded_events, clock);
-        recorder.record_all(events.iter().cloned()).await?;
-    }
-    Ok(recorded_events)
-}
-
-fn subscribe_output(events: &[SubEvent]) -> Result<SubscribeFeedOutput, FeedRegistryError> {
-    let event = exactly_one(events, "subscribe")?;
-
-    let outcome = match event {
-        SubEvent::Subscribed(event) => SubscribeOutcome::Subscribed(event.subscription.clone()),
-        SubEvent::Changed(event) => SubscribeOutcome::Changed(event.subscription.clone()),
-        SubEvent::Unsubscribed(_) => return Err(unexpected_event("subscribe", event)),
-    };
-    Ok(SubscribeFeedOutput { outcome })
-}
-
-fn unsubscribe_output(events: &[SubEvent]) -> Result<UnsubscribeFeedOutput, FeedRegistryError> {
-    let event = exactly_one(events, "unsubscribe")?;
-
-    let outcome = match event {
-        SubEvent::Unsubscribed(event) => {
-            UnsubscribeOutcome::Unsubscribed(event.subscription.clone())
-        }
-        SubEvent::Subscribed(_) | SubEvent::Changed(_) => {
-            return Err(unexpected_event("unsubscribe", event));
-        }
-    };
-    Ok(UnsubscribeFeedOutput { outcome })
-}
-
-fn exactly_one<'a>(
-    events: &'a [SubEvent],
-    command_name: &'static str,
-) -> Result<&'a SubEvent, FeedRegistryError> {
-    match events {
-        [] => Err(unexpected_event_count(command_name, 0)),
-        [event] => Ok(event),
-        events => Err(unexpected_event_count(command_name, events.len())),
+        .await
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
     api::{ApiEvent, ApiTimelineChanged},
     event::{
         Event, EventInput, EventType, Processor, ProcessorError, ProcessorId, ProcessorResult,
-        RegistryEvent, Sink,
+        RegistryEvent, Sink, TimelineChangedEvent,
     },
 };
 
@@ -65,11 +65,15 @@ impl Sink for ApiEventPublisher {
 }
 
 impl EventInput for ApiEvent {
-    const INTERESTS: &'static [EventType] = &[ApiTimelineChanged::TYPE];
+    const INTERESTS: &'static [EventType] = &[TimelineChangedEvent::TYPE];
 
-    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
+    fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
-            Event::ApiTimelineChanged(event) => Ok(Self::TimelineChanged(event)),
+            Event::TimelineChanged(event) => Ok(Self::TimelineChanged(ApiTimelineChanged::new(
+                event.timeline,
+                occurred_at,
+                event.affected_feeds,
+            ))),
             event => Err(ProcessorError::unexpected_input("api event", &event)),
         }
     }

@@ -4,28 +4,6 @@ use tokio::sync::mpsc;
 
 use crate::crawl::job::CrawlJobTrigger;
 
-/// Scheduler-facing facts available when deciding dispatch output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct DispatchContext {
-    pub(crate) now: DateTime<Utc>,
-    pub(crate) dispatch_queue_len: usize,
-    pub(crate) dispatch_queue_remaining_capacity: usize,
-}
-
-impl DispatchContext {
-    pub(crate) fn new(
-        now: DateTime<Utc>,
-        dispatch_queue_len: usize,
-        dispatch_queue_remaining_capacity: usize,
-    ) -> Self {
-        Self {
-            now,
-            dispatch_queue_len,
-            dispatch_queue_remaining_capacity,
-        }
-    }
-}
-
 /// Worker-facing crawl request whose dispatch order has already been decided.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DispatchEntry {
@@ -48,32 +26,6 @@ impl DispatchEntry {
     }
 }
 
-/// Ordered dispatch entries returned by one scheduler dispatch decision.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(crate) struct DispatchBatch {
-    entries: Vec<DispatchEntry>,
-}
-
-impl DispatchBatch {
-    pub(crate) fn empty() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn one(entry: DispatchEntry) -> Self {
-        Self {
-            entries: vec![entry],
-        }
-    }
-
-    pub(crate) fn into_entries(self) -> Vec<DispatchEntry> {
-        self.entries
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        self.entries.len()
-    }
-}
-
 pub(crate) fn dispatch_queue(capacity: usize) -> (DispatchQueueWriter, DispatchQueueReader) {
     let (sender, receiver) = mpsc::channel(capacity);
     (
@@ -89,12 +41,6 @@ pub(crate) struct DispatchQueueWriter {
 }
 
 impl DispatchQueueWriter {
-    pub(crate) fn len(&self) -> usize {
-        self.sender
-            .max_capacity()
-            .saturating_sub(self.sender.capacity())
-    }
-
     pub(crate) fn remaining_capacity(&self) -> usize {
         self.sender.capacity()
     }
@@ -114,8 +60,9 @@ pub(crate) struct DispatchQueueReader {
 }
 
 impl DispatchQueueReader {
-    pub(crate) fn try_pop(&mut self) -> Option<DispatchEntry> {
-        self.receiver.try_recv().ok()
+    /// Waits for the next dispatched entry; `None` when all writers dropped.
+    pub(crate) async fn recv(&mut self) -> Option<DispatchEntry> {
+        self.receiver.recv().await
     }
 }
 

@@ -71,7 +71,7 @@ async fn read_after(
 
     let mut query = QueryBuilder::<Sqlite>::new(
         r"
-        SELECT position, event_type, occurred_at, payload_json
+        SELECT event_type, occurred_at, payload_json
         FROM event_journal
         WHERE position > ",
     );
@@ -91,7 +91,7 @@ async fn read_after(
         .await?;
     let events = rows
         .into_iter()
-        .map(|row| row.into_journaled_event(processor))
+        .map(JournalRow::into_journaled_event)
         .collect::<SqliteResult<Vec<_>>>()?;
 
     Ok(EventReadBatch::new(events, scanned_cursor))
@@ -153,19 +153,14 @@ struct ScannedPositionRow {
 
 #[derive(sqlx::FromRow)]
 struct JournalRow {
-    position: i64,
     event_type: String,
     occurred_at: DateTime<Utc>,
     payload_json: String,
 }
 
 impl JournalRow {
-    fn into_journaled_event(self, processor: ProcessorId) -> SqliteResult<JournaledEvent> {
+    fn into_journaled_event(self) -> SqliteResult<JournaledEvent> {
         Ok(JournaledEvent::new(
-            EventCursor::at(
-                processor,
-                EventCursorPos::position(self.position.to_string()),
-            ),
             Event::decode(&self.event_type, &self.payload_json)?,
             self.occurred_at,
         ))

@@ -12,7 +12,7 @@ use crate::{
 
 mod projection;
 
-pub use projection::{EntryProj, EntryProjectionInput};
+pub use projection::{EntryProj, EntryProjInput};
 
 /// A registry entry entity recognized by synd.
 #[derive(Debug, Clone, Builder, PartialEq, Eq)]

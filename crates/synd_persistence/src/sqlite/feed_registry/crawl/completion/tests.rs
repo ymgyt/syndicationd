@@ -12,12 +12,7 @@ async fn crawl_completion_records_result_state_and_finished_event() -> anyhow::R
     let job = CrawlJob::new(
         CrawlJobId::generate(),
         feed_url.clone(),
-        CrawlJobState::Running,
-        CrawlJobTrigger::TargetChanged,
-        CrawlJobQueueLane::Default,
-        0,
-        started_at,
-        started_at,
+        CrawlJobTrigger::PeriodicDue,
         started_at,
     );
     let (_record, events) = CrawlCompletionRecorder::new(&mut tx)

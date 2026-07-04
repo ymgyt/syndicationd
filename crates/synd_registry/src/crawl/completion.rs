@@ -20,6 +20,11 @@ use crate::{
 };
 
 /// Records the durable completion facts for one dispatched crawl.
+///
+/// Recording is split into two single-concern steps: [`store_detail`] persists
+/// the observed payload (blobs plus the immutable result detail), and
+/// [`derive_crawl_state`] purely classifies that detail into the current
+/// crawl-state facts.
 pub struct CrawlCompletionRecorder<'a, Tx> {
     tx: &'a mut Tx,
 }
@@ -41,7 +46,7 @@ where
         previous_state: Option<CrawlState>,
         finished_at: DateTime<Utc>,
     ) -> RegistryDbResult<(CrawlCompletionRecord, Vec<Event>)> {
-        let started_at = job.updated_at;
+        let started_at = job.started_at;
         let feed_url = job.feed_url.clone();
         let finished_event = CrawlJobFinishedEvent::new(job.job_id.clone(), feed_url.clone());
         let previous_conditional = previous_state
@@ -49,32 +54,27 @@ where
             .map(|state| state.conditional.clone())
             .unwrap_or_default();
 
-        let observed = self
-            .persist_outcome(outcome, started_at, finished_at, &previous_conditional)
-            .await?;
-        let summary = CrawlCompletionSummary::from_detail(&observed.detail);
+        let detail = self.store_detail(outcome, finished_at).await?;
+        let derived =
+            DerivedCrawlState::derive(&detail, started_at, finished_at, &previous_conditional);
+        let summary = CrawlCompletionSummary::from_detail(&detail);
 
         let result_ref = self
             .tx
             .record_crawl_result(RecordCrawlResultCommand::new(
-                CrawlResultRecord::new(
-                    job.job_id.clone(),
-                    feed_url.clone(),
-                    started_at,
-                    finished_at,
-                ),
-                observed.detail,
+                CrawlResultRecord::new(job.job_id, feed_url.clone(), started_at, finished_at),
+                detail,
             ))
             .await?;
 
-        let health = CrawlHealth::for_last_result(&observed.last, previous_state.as_ref());
+        let health = CrawlHealth::for_last_result(&derived.last, previous_state.as_ref());
         self.tx
             .upsert_crawl_state(UpsertCrawlStateCommand::new(
                 result_ref,
                 feed_url,
-                observed.last,
+                derived.last,
                 health,
-                observed.conditional,
+                derived.conditional,
                 finished_at,
             ))
             .await?;
@@ -91,121 +91,52 @@ where
         ))
     }
 
-    async fn persist_outcome(
+    /// Persists the observed payload of one fetch outcome: headers and body
+    /// blobs plus the immutable result detail shape. No classification
+    /// happens here.
+    async fn store_detail(
         &mut self,
         outcome: FeedFetchOutcome,
-        started_at: DateTime<Utc>,
-        finished_at: DateTime<Utc>,
-        previous_conditional: &FeedConditionalFetch,
-    ) -> RegistryDbResult<PersistedOutcome> {
+        created_at: DateTime<Utc>,
+    ) -> RegistryDbResult<CrawlResultDetail> {
         match outcome {
             FeedFetchOutcome::Fetched(fetched) => {
-                let fetched = *fetched;
-                let response = fetched.body.response.clone();
-                let (http, body) = self.persist_body(fetched.body, finished_at).await?;
-                Ok(PersistedOutcome {
-                    detail: CrawlResultDetail::Fetched { http, body },
-                    last: LastCrawlResult::normal(
-                        started_at,
-                        finished_at,
-                        Some(response.status),
-                        retry_after_at(&response),
-                    ),
-                    conditional: conditional_from_success(&response),
-                })
+                let (http, body) = self.persist_body(fetched.body, created_at).await?;
+                Ok(CrawlResultDetail::Fetched { http, body })
             }
             FeedFetchOutcome::NotModified(response) => {
-                let http = self.persist_response(&response, finished_at).await?;
-                Ok(PersistedOutcome {
-                    detail: CrawlResultDetail::NotModified { http },
-                    last: LastCrawlResult::normal(
-                        started_at,
-                        finished_at,
-                        Some(response.status),
-                        retry_after_at(&response),
-                    ),
-                    conditional: conditional_from_not_modified(&response, previous_conditional),
-                })
+                let http = self.persist_response(&response, created_at).await?;
+                Ok(CrawlResultDetail::NotModified { http })
             }
             FeedFetchOutcome::UnexpectedStatus(body) => {
-                let response = body.response.clone();
-                let (http, body) = self.persist_body(body, finished_at).await?;
-                let error = CrawlStateError::http(CrawlHttpErrorKind::from_status(response.status));
-                Ok(PersistedOutcome {
-                    detail: CrawlResultDetail::UnexpectedStatus { http, body },
-                    last: LastCrawlResult::abnormal(
-                        started_at,
-                        finished_at,
-                        Some(response.status),
-                        error,
-                        retry_after_at(&response),
-                    ),
-                    conditional: previous_conditional.clone(),
-                })
+                let (http, body) = self.persist_body(body, created_at).await?;
+                Ok(CrawlResultDetail::UnexpectedStatus { http, body })
             }
             FeedFetchOutcome::BodyReadFailed(failure) => {
-                let http = self
-                    .persist_response(&failure.response, finished_at)
-                    .await?;
-                let error = CrawlFetchErrorDetail {
-                    kind: failure.failure.kind,
-                    message: failure.failure.message,
-                };
-                Ok(PersistedOutcome {
-                    detail: CrawlResultDetail::BodyReadFailed {
-                        http,
-                        error: error.clone(),
+                let http = self.persist_response(&failure.response, created_at).await?;
+                Ok(CrawlResultDetail::BodyReadFailed {
+                    http,
+                    error: CrawlFetchErrorDetail {
+                        kind: failure.failure.kind,
+                        message: failure.failure.message,
                     },
-                    last: LastCrawlResult::abnormal(
-                        started_at,
-                        finished_at,
-                        Some(failure.response.status),
-                        CrawlStateError::fetch(error.kind),
-                        retry_after_at(&failure.response),
-                    ),
-                    conditional: previous_conditional.clone(),
                 })
             }
-            FeedFetchOutcome::FetchFailed(failure) => {
-                let error = CrawlFetchErrorDetail {
+            FeedFetchOutcome::FetchFailed(failure) => Ok(CrawlResultDetail::FetchFailed {
+                error: CrawlFetchErrorDetail {
                     kind: failure.kind,
                     message: failure.message,
-                };
-                Ok(PersistedOutcome {
-                    detail: CrawlResultDetail::FetchFailed {
-                        error: error.clone(),
-                    },
-                    last: LastCrawlResult::abnormal(
-                        started_at,
-                        finished_at,
-                        None,
-                        CrawlStateError::fetch(error.kind),
-                        None,
-                    ),
-                    conditional: previous_conditional.clone(),
-                })
-            }
+                },
+            }),
             FeedFetchOutcome::ParseFailed(failure) => {
-                let response = failure.body.response.clone();
-                let (http, body) = self.persist_body(failure.body, finished_at).await?;
-                let error = CrawlFeedParseErrorDetail {
-                    kind: failure.failure.kind,
-                    message: failure.failure.message,
-                };
-                Ok(PersistedOutcome {
-                    detail: CrawlResultDetail::ParseFailed {
-                        http,
-                        body,
-                        error: error.clone(),
+                let (http, body) = self.persist_body(failure.body, created_at).await?;
+                Ok(CrawlResultDetail::ParseFailed {
+                    http,
+                    body,
+                    error: CrawlFeedParseErrorDetail {
+                        kind: failure.failure.kind,
+                        message: failure.failure.message,
                     },
-                    last: LastCrawlResult::abnormal(
-                        started_at,
-                        finished_at,
-                        Some(response.status),
-                        CrawlStateError::parse(error.kind),
-                        retry_after_at(&response),
-                    ),
-                    conditional: conditional_from_success(&response),
                 })
             }
         }
@@ -249,6 +180,70 @@ where
     }
 }
 
+/// Current crawl-state facts purely classified from one recorded result
+/// detail: the last-result summary and the conditional-fetch headers to use
+/// next time.
+struct DerivedCrawlState {
+    last: LastCrawlResult,
+    conditional: FeedConditionalFetch,
+}
+
+impl DerivedCrawlState {
+    fn derive(
+        detail: &CrawlResultDetail,
+        started_at: DateTime<Utc>,
+        finished_at: DateTime<Utc>,
+        previous_conditional: &FeedConditionalFetch,
+    ) -> Self {
+        let http = detail.http_response();
+        let http_status = http.map(|http| http.status);
+        let retry_after = http.and_then(|http| http.retry_after_at);
+
+        let error = match detail {
+            CrawlResultDetail::Fetched { .. } | CrawlResultDetail::NotModified { .. } => None,
+            CrawlResultDetail::UnexpectedStatus { http, .. } => Some(CrawlStateError::http(
+                CrawlHttpErrorKind::from_status(http.status),
+            )),
+            CrawlResultDetail::BodyReadFailed { error, .. }
+            | CrawlResultDetail::FetchFailed { error } => Some(CrawlStateError::fetch(error.kind)),
+            CrawlResultDetail::ParseFailed { error, .. } => {
+                Some(CrawlStateError::parse(error.kind))
+            }
+        };
+        let last = match error {
+            None => LastCrawlResult::normal(started_at, finished_at, http_status, retry_after),
+            Some(error) => {
+                LastCrawlResult::abnormal(started_at, finished_at, http_status, error, retry_after)
+            }
+        };
+
+        let conditional = match detail {
+            // A parse failure still observed a complete response, so its
+            // validators stay usable for the next conditional fetch.
+            CrawlResultDetail::Fetched { http, .. }
+            | CrawlResultDetail::ParseFailed { http, .. } => FeedConditionalFetch {
+                etag: http.etag.clone(),
+                last_modified: http.last_modified.clone(),
+            },
+            CrawlResultDetail::NotModified { http } => FeedConditionalFetch {
+                etag: http
+                    .etag
+                    .clone()
+                    .or_else(|| previous_conditional.etag.clone()),
+                last_modified: http
+                    .last_modified
+                    .clone()
+                    .or_else(|| previous_conditional.last_modified.clone()),
+            },
+            CrawlResultDetail::UnexpectedStatus { .. }
+            | CrawlResultDetail::BodyReadFailed { .. }
+            | CrawlResultDetail::FetchFailed { .. } => previous_conditional.clone(),
+        };
+
+        Self { last, conditional }
+    }
+}
+
 /// Result of recording one crawl completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CrawlCompletionRecord {
@@ -269,37 +264,21 @@ struct CrawlCompletionSummary {
 
 impl CrawlCompletionSummary {
     fn from_detail(detail: &CrawlResultDetail) -> Self {
-        match detail {
-            CrawlResultDetail::Fetched { http, .. } => Self {
-                outcome: CrawlCompletionOutcome::Fetched,
-                http_status: Some(http.status),
-                error_kind: None,
-            },
-            CrawlResultDetail::NotModified { http } => Self {
-                outcome: CrawlCompletionOutcome::NotModified,
-                http_status: Some(http.status),
-                error_kind: None,
-            },
-            CrawlResultDetail::UnexpectedStatus { http, .. } => Self {
-                outcome: CrawlCompletionOutcome::UnexpectedStatus,
-                http_status: Some(http.status),
-                error_kind: Some(CrawlHttpErrorKind::from_status(http.status).as_str()),
-            },
-            CrawlResultDetail::BodyReadFailed { http, error } => Self {
-                outcome: CrawlCompletionOutcome::BodyReadFailed,
-                http_status: Some(http.status),
-                error_kind: Some(error.kind.as_str()),
-            },
-            CrawlResultDetail::FetchFailed { error } => Self {
-                outcome: CrawlCompletionOutcome::FetchFailed,
-                http_status: None,
-                error_kind: Some(error.kind.as_str()),
-            },
-            CrawlResultDetail::ParseFailed { http, error, .. } => Self {
-                outcome: CrawlCompletionOutcome::ParseFailed,
-                http_status: Some(http.status),
-                error_kind: Some(error.kind.as_str()),
-            },
+        let outcome = CrawlCompletionOutcome::from_detail(detail);
+        let http_status = detail.http_response().map(|http| http.status);
+        let error_kind = match detail {
+            CrawlResultDetail::Fetched { .. } | CrawlResultDetail::NotModified { .. } => None,
+            CrawlResultDetail::UnexpectedStatus { http, .. } => {
+                Some(CrawlHttpErrorKind::from_status(http.status).as_str())
+            }
+            CrawlResultDetail::BodyReadFailed { error, .. }
+            | CrawlResultDetail::FetchFailed { error } => Some(error.kind.as_str()),
+            CrawlResultDetail::ParseFailed { error, .. } => Some(error.kind.as_str()),
+        };
+        Self {
+            outcome,
+            http_status,
+            error_kind,
         }
     }
 }
@@ -316,6 +295,17 @@ pub enum CrawlCompletionOutcome {
 }
 
 impl CrawlCompletionOutcome {
+    fn from_detail(detail: &CrawlResultDetail) -> Self {
+        match detail {
+            CrawlResultDetail::Fetched { .. } => Self::Fetched,
+            CrawlResultDetail::NotModified { .. } => Self::NotModified,
+            CrawlResultDetail::UnexpectedStatus { .. } => Self::UnexpectedStatus,
+            CrawlResultDetail::BodyReadFailed { .. } => Self::BodyReadFailed,
+            CrawlResultDetail::FetchFailed { .. } => Self::FetchFailed,
+            CrawlResultDetail::ParseFailed { .. } => Self::ParseFailed,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Fetched => "fetched",
@@ -325,38 +315,6 @@ impl CrawlCompletionOutcome {
             Self::FetchFailed => "fetch_failed",
             Self::ParseFailed => "parse_failed",
         }
-    }
-}
-
-/// Derived persistence payloads for one crawl completion outcome.
-struct PersistedOutcome {
-    detail: CrawlResultDetail,
-    last: LastCrawlResult,
-    conditional: FeedConditionalFetch,
-}
-
-fn conditional_from_success(response: &FeedHttpResponse) -> FeedConditionalFetch {
-    FeedConditionalFetch {
-        etag: response.headers.etag.clone(),
-        last_modified: response.headers.last_modified.clone(),
-    }
-}
-
-fn conditional_from_not_modified(
-    response: &FeedHttpResponse,
-    previous: &FeedConditionalFetch,
-) -> FeedConditionalFetch {
-    FeedConditionalFetch {
-        etag: response
-            .headers
-            .etag
-            .clone()
-            .or_else(|| previous.etag.clone()),
-        last_modified: response
-            .headers
-            .last_modified
-            .clone()
-            .or_else(|| previous.last_modified.clone()),
     }
 }
 

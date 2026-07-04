@@ -19,12 +19,12 @@ use crate::{
 
 /// Event input used to project entry state.
 #[derive(Debug, Clone, Builder, PartialEq, Eq)]
-pub struct EntryProjectionInput {
+pub struct EntryProjInput {
     pub feed_url: FeedUrl,
     pub crawl_job_id: CrawlJobId,
 }
 
-impl From<FeedDiscoveredEvent> for EntryProjectionInput {
+impl From<FeedDiscoveredEvent> for EntryProjInput {
     fn from(event: FeedDiscoveredEvent) -> Self {
         Self::builder()
             .feed_url(event.feed_url)
@@ -33,7 +33,7 @@ impl From<FeedDiscoveredEvent> for EntryProjectionInput {
     }
 }
 
-impl From<FeedChangedEvent> for EntryProjectionInput {
+impl From<FeedChangedEvent> for EntryProjInput {
     fn from(event: FeedChangedEvent) -> Self {
         Self::builder()
             .feed_url(event.feed_url)
@@ -42,7 +42,7 @@ impl From<FeedChangedEvent> for EntryProjectionInput {
     }
 }
 
-impl EventInput for EntryProjectionInput {
+impl EventInput for EntryProjInput {
     const INTERESTS: &'static [EventType] = &[FeedDiscoveredEvent::TYPE, FeedChangedEvent::TYPE];
 
     fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
@@ -75,7 +75,7 @@ impl Default for EntryProj {
 }
 
 impl Processor for EntryProj {
-    type Input = EntryProjectionInput;
+    type Input = EntryProjInput;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::EntryProjection
@@ -92,14 +92,14 @@ where
         tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
-        let source = load_source(tx, &input).await?;
+        let source = input.load_source(tx).await?;
         let body = tx.load_blob(source.body_blob).await?;
         let feed = FeedService::parse_feed(source.feed_url.clone(), body.as_slice())?;
         let appearances = EntryAppearances::from_feed(&feed);
         let entry_ids = appearances.ids();
         let existing = tx.load_entries(&source.feed_url, &entry_ids).await?;
         let changes = EntryReconciliation::new(source, appearances, existing).reconcile();
-        let events = entry_events(&changes);
+        let events = changes.lifecycle_events();
         let counts = EntryProjectionCounts::from_changes(&changes);
         debug!(
             feed_url = input.feed_url.as_str(),
@@ -140,46 +140,53 @@ impl EntryProjectionCounts {
     }
 }
 
-async fn load_source<Tx>(tx: &mut Tx, input: &EntryProjectionInput) -> RegistryDbResult<FeedSource>
-where
-    Tx: CrawlResultStore + Send,
-{
-    let Some(source) = tx.load_crawl_source(&input.crawl_job_id).await? else {
-        return Err(RegistryDbError::internal_message(format!(
-            "entry projection source not found for crawl job {}",
-            input.crawl_job_id
-        )));
-    };
-    if source.feed_url != input.feed_url {
-        return Err(RegistryDbError::internal_message(format!(
-            "entry projection source feed URL mismatch: event={}, source={}",
-            input.feed_url, source.feed_url
-        )));
+impl EntryProjInput {
+    /// Loads the accepted feed source referenced by this input; `Discovered`
+    /// and `Changed` events guarantee it exists.
+    async fn load_source<Tx>(&self, tx: &mut Tx) -> RegistryDbResult<FeedSource>
+    where
+        Tx: CrawlResultStore + Send,
+    {
+        let Some(source) = tx.load_crawl_source(&self.crawl_job_id).await? else {
+            return Err(RegistryDbError::internal_message(format!(
+                "entry projection source not found for crawl job {}",
+                self.crawl_job_id
+            )));
+        };
+        if source.feed_url != self.feed_url {
+            return Err(RegistryDbError::internal_message(format!(
+                "entry projection source feed URL mismatch: event={}, source={}",
+                self.feed_url, source.feed_url
+            )));
+        }
+        Ok(source)
     }
-    Ok(source)
 }
 
-fn entry_events(changes: &EntryChanges) -> Vec<Event> {
-    changes
-        .iter()
-        .filter_map(|change| match change {
-            EntryChange::Discovered(entry) => Some(
-                EntryDiscoveredEvent::new(
-                    entry.feed_url.clone(),
-                    entry.id.clone(),
-                    entry.source.crawl_job_id.clone(),
-                )
-                .into(),
-            ),
-            EntryChange::Changed(entry) => Some(
-                EntryChangedEvent::new(
-                    entry.feed_url.clone(),
-                    entry.id.clone(),
-                    entry.source.crawl_job_id.clone(),
-                )
-                .into(),
-            ),
-            EntryChange::AlreadySeen(_) => None,
-        })
-        .collect()
+impl EntryChanges {
+    /// The lifecycle events represented by these changes; already-seen
+    /// entries produce none.
+    fn lifecycle_events(&self) -> Vec<Event> {
+        self.iter()
+            .filter_map(|change| match change {
+                EntryChange::Discovered(entry) => Some(
+                    EntryDiscoveredEvent::new(
+                        entry.feed_url.clone(),
+                        entry.id.clone(),
+                        entry.source.crawl_job_id.clone(),
+                    )
+                    .into(),
+                ),
+                EntryChange::Changed(entry) => Some(
+                    EntryChangedEvent::new(
+                        entry.feed_url.clone(),
+                        entry.id.clone(),
+                        entry.source.crawl_job_id.clone(),
+                    )
+                    .into(),
+                ),
+                EntryChange::AlreadySeen(_) => None,
+            })
+            .collect()
+    }
 }

@@ -9,9 +9,9 @@ use crate::{
     db::{CrawlTargetStore, FeedRegistryDb, SubscriptionStore},
     event::{
         CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
-        Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch,
-        Processor, ProcessorError, ProcessorId, ProcessorResult, Reaction, Reconciler,
-        RegistryEvent, SubEvent, SubscriptionChangedEvent, skip_permanent_error,
+        Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, Processor,
+        ProcessorError, ProcessorId, ProcessorResult, Projector, RegistryEvent, SubEvent,
+        SubscriptionChangedEvent,
     },
     subscription::SubscriptionKey,
 };
@@ -37,6 +37,73 @@ impl CrawlTarget {
 
     pub fn inactive(feed_url: FeedUrl, now: DateTime<Utc>) -> Self {
         Self::new(feed_url, CrawlTargetState::Inactive, now)
+    }
+
+    /// The lifecycle event represented by the transition from `previous` to
+    /// this target, if any.
+    pub fn lifecycle_event(&self, previous: Option<&CrawlTarget>) -> Option<Event> {
+        match (previous.map(|target| &target.state), &self.state) {
+            (
+                None | Some(CrawlTargetState::Inactive),
+                CrawlTargetState::Active {
+                    effective_policy, ..
+                },
+            ) => Some(
+                CrawlTargetActivatedEvent::new(self.feed_url.clone(), *effective_policy).into(),
+            ),
+            (
+                Some(CrawlTargetState::Active {
+                    effective_policy: previous_policy,
+                    ..
+                }),
+                CrawlTargetState::Active {
+                    effective_policy, ..
+                },
+            ) if previous_policy != effective_policy => Some(
+                CrawlTargetPolicyChangedEvent::new(self.feed_url.clone(), *effective_policy).into(),
+            ),
+            (Some(CrawlTargetState::Active { .. }), CrawlTargetState::Inactive) => {
+                Some(CrawlTargetDeactivatedEvent::new(self.feed_url.clone()).into())
+            }
+            _ => None,
+        }
+    }
+
+    fn active_subscription_count(&self) -> usize {
+        match &self.state {
+            CrawlTargetState::Active {
+                subscription_count, ..
+            } => subscription_count.get(),
+            CrawlTargetState::Inactive => 0,
+        }
+    }
+
+    fn log_lifecycle_event(&self, event: &Event) {
+        match event {
+            Event::CrawlTargetActivated(event) => {
+                info!(
+                    feed_url = event.feed_url.as_str(),
+                    subscriptions = self.active_subscription_count(),
+                    policy = %event.policy.polling,
+                    "crawl target activated"
+                );
+            }
+            Event::CrawlTargetPolicyChanged(event) => {
+                info!(
+                    feed_url = event.feed_url.as_str(),
+                    subscriptions = self.active_subscription_count(),
+                    policy = %event.policy.polling,
+                    "crawl target policy changed"
+                );
+            }
+            Event::CrawlTargetDeactivated(event) => {
+                info!(
+                    feed_url = event.feed_url.as_str(),
+                    "crawl target deactivated"
+                );
+            }
+            _ => {}
+        }
     }
 }
 
@@ -90,7 +157,7 @@ impl FeedEndpointSubscriptionSet {
         let state = if let Some(subscription_count) = NonZeroUsize::new(self.subscriptions.len()) {
             CrawlTargetState::Active {
                 subscription_count,
-                effective_policy: effective_policy(&self.subscriptions),
+                effective_policy: self.effective_policy(),
             }
         } else {
             CrawlTargetState::Inactive
@@ -99,6 +166,25 @@ impl FeedEndpointSubscriptionSet {
         CrawlTargetDecision {
             feed_url: self.feed_url,
             state,
+        }
+    }
+
+    /// The most demanding polling policy across all subscriptions: the
+    /// shortest interval wins; manual applies only when every subscription is
+    /// manual.
+    fn effective_policy(&self) -> CrawlPolicy {
+        let interval = self
+            .subscriptions
+            .iter()
+            .filter_map(|subscription| match subscription.crawl_policy.polling {
+                PollingPolicy::Manual => None,
+                PollingPolicy::Interval { interval } => Some(interval),
+            })
+            .reduce(PollingInterval::min);
+
+        match interval {
+            Some(interval) => CrawlPolicy::interval(interval),
+            None => CrawlPolicy::manual(),
         }
     }
 }
@@ -116,20 +202,20 @@ impl CrawlTargetDecision {
     }
 }
 
-/// Subscription lifecycle events relevant to the crawl target list.
+/// Event input used to project crawl target state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CrawlTargetListInput {
+pub struct CrawlTargetProjInput {
     event: SubEvent,
     occurred_at: DateTime<Utc>,
 }
 
-impl CrawlTargetListInput {
+impl CrawlTargetProjInput {
     pub fn new(event: SubEvent, occurred_at: DateTime<Utc>) -> Self {
         Self { event, occurred_at }
     }
 }
 
-impl EventInput for CrawlTargetListInput {
+impl EventInput for CrawlTargetProjInput {
     const INTERESTS: &'static [EventType] = &[
         FeedSubscribedEvent::TYPE,
         SubscriptionChangedEvent::TYPE,
@@ -146,169 +232,66 @@ impl EventInput for CrawlTargetListInput {
                 Ok(Self::new(SubEvent::Unsubscribed(event), occurred_at))
             }
             event => Err(ProcessorError::unexpected_input(
-                "crawl target list event",
+                "crawl target projection event",
                 &event,
             )),
         }
     }
 }
 
-/// Reconciler that reacts to subscription events for the crawl target list.
+/// Projects subscription lifecycle events into the crawl target list.
 #[derive(Debug, Clone)]
-pub struct CrawlTargetReconciler;
+pub struct CrawlTargetProj;
 
-impl CrawlTargetReconciler {
+impl CrawlTargetProj {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Default for CrawlTargetReconciler {
+impl Default for CrawlTargetProj {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Processor for CrawlTargetReconciler {
-    type Input = CrawlTargetListInput;
+impl Processor for CrawlTargetProj {
+    type Input = CrawlTargetProjInput;
 
     fn id(&self) -> ProcessorId {
-        ProcessorId::CrawlTargetReconciler
+        ProcessorId::CrawlTargetProjection
     }
 }
 
-impl<S> Reconciler<S> for CrawlTargetReconciler
+impl<S> Projector<S> for CrawlTargetProj
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + Send,
 {
-    async fn reconcile(
+    async fn project(
         &mut self,
         tx: &mut S::Tx<'_>,
-        _now: DateTime<Utc>,
-        _trigger: crate::event::Trigger,
-        batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Reaction<Vec<Event>>> {
-        let processor = self.id();
-        let mut events = Vec::new();
-        for input in batch.into_inputs() {
-            let Self::Input { event, occurred_at } = input;
+        input: Self::Input,
+    ) -> ProcessorResult<Vec<Event>> {
+        let Self::Input { event, occurred_at } = input;
+        let feed_url = event.affected_feed_url().clone();
+        let previous = tx.load_target_for_endpoint(&feed_url).await?;
+        let subscriptions = tx.load_endpoint_subscriptions(&feed_url).await?;
+        let target = subscriptions
+            .crawl_target_decision()
+            .into_target(occurred_at);
+        tx.upsert_target(&target).await?;
 
-            let produced = async {
-                let feed_url = event.affected_feed_url().clone();
-                let previous = tx.load_target_for_endpoint(&feed_url).await?;
-                let subscriptions = tx.load_endpoint_subscriptions(&feed_url).await?;
-                let target = subscriptions
-                    .crawl_target_decision()
-                    .into_target(occurred_at);
-                tx.upsert_target(&target).await?;
-
-                debug!(
-                    feed_url = target.feed_url.as_str(),
-                    ?target.state,
-                    "crawl target reconciled"
-                );
-                let event = crawl_target_event(previous.as_ref(), &target);
-                if let Some(event) = &event {
-                    log_crawl_target_event(event, &target);
-                }
-                Ok(event.into_iter().collect::<Vec<_>>())
-            }
-            .await;
-
-            match produced {
-                Ok(mut produced) => events.append(&mut produced),
-                Err(err) => skip_permanent_error(processor, err, "input")?,
-            }
+        debug!(
+            feed_url = target.feed_url.as_str(),
+            ?target.state,
+            "crawl target projected"
+        );
+        let event = target.lifecycle_event(previous.as_ref());
+        if let Some(event) = &event {
+            target.log_lifecycle_event(event);
         }
-        Ok(Reaction::done(events))
-    }
-}
-
-fn log_crawl_target_event(event: &Event, target: &CrawlTarget) {
-    match event {
-        Event::CrawlTargetActivated(event) => {
-            info!(
-                feed_url = event.feed_url.as_str(),
-                subscriptions = active_subscription_count(target),
-                policy = %crawl_policy_label(event.policy),
-                "crawl target activated"
-            );
-        }
-        Event::CrawlTargetPolicyChanged(event) => {
-            info!(
-                feed_url = event.feed_url.as_str(),
-                subscriptions = active_subscription_count(target),
-                policy = %crawl_policy_label(event.policy),
-                "crawl target policy changed"
-            );
-        }
-        Event::CrawlTargetDeactivated(event) => {
-            info!(
-                feed_url = event.feed_url.as_str(),
-                "crawl target deactivated"
-            );
-        }
-        _ => {}
-    }
-}
-
-fn active_subscription_count(target: &CrawlTarget) -> usize {
-    match &target.state {
-        CrawlTargetState::Active {
-            subscription_count, ..
-        } => subscription_count.get(),
-        CrawlTargetState::Inactive => 0,
-    }
-}
-
-fn crawl_policy_label(policy: CrawlPolicy) -> String {
-    match policy.polling {
-        PollingPolicy::Manual => "manual".to_owned(),
-        PollingPolicy::Interval { interval } => format!("interval:{}s", interval.as_secs()),
-    }
-}
-
-fn crawl_target_event(previous: Option<&CrawlTarget>, target: &CrawlTarget) -> Option<Event> {
-    match (previous.map(|target| &target.state), &target.state) {
-        (
-            None | Some(CrawlTargetState::Inactive),
-            CrawlTargetState::Active {
-                effective_policy, ..
-            },
-        ) => {
-            Some(CrawlTargetActivatedEvent::new(target.feed_url.clone(), *effective_policy).into())
-        }
-        (
-            Some(CrawlTargetState::Active {
-                effective_policy: previous_policy,
-                ..
-            }),
-            CrawlTargetState::Active {
-                effective_policy, ..
-            },
-        ) if previous_policy != effective_policy => Some(
-            CrawlTargetPolicyChangedEvent::new(target.feed_url.clone(), *effective_policy).into(),
-        ),
-        (Some(CrawlTargetState::Active { .. }), CrawlTargetState::Inactive) => {
-            Some(CrawlTargetDeactivatedEvent::new(target.feed_url.clone()).into())
-        }
-        _ => None,
-    }
-}
-
-fn effective_policy(subscriptions: &[FeedEndpointSubscription]) -> CrawlPolicy {
-    let interval = subscriptions
-        .iter()
-        .filter_map(|subscription| match subscription.crawl_policy.polling {
-            PollingPolicy::Manual => None,
-            PollingPolicy::Interval { interval } => Some(interval),
-        })
-        .reduce(PollingInterval::min);
-
-    match interval {
-        Some(interval) => CrawlPolicy::interval(interval),
-        None => CrawlPolicy::manual(),
+        Ok(event.into_iter().collect())
     }
 }
 

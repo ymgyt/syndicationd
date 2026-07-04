@@ -14,24 +14,24 @@ pub(crate) use synd_registry::{
     crawl::completion::CrawlCompletionRecorder,
     crawl::{
         blob::PutBlobCommand,
-        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobState, CrawlJobTrigger},
+        job::{CrawlJob, CrawlJobId, CrawlJobTrigger},
         policy::{CrawlPolicy, PollingInterval, PollingPolicy},
         result::CrawlStateErrorKind,
         schedule::UpsertCrawlScheduleCommand,
-        target_list::{CrawlTargetListInput, CrawlTargetReconciler, CrawlTargetState},
+        target_list::{CrawlTargetProj, CrawlTargetProjInput, CrawlTargetState},
     },
-    entry::{EntryProj, EntryProjectionInput},
+    entry::{EntryProj, EntryProjInput},
     event::{
         CrawlJobFinishedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
         CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, Event, EventCursor,
         EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
         FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
-        Projector, Reconciler, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
-        TimelineChangedEvent, Trigger,
+        Projector, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
+        TimelineChangedEvent,
     },
     feed::FeedProj,
     query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
-    timeline::{TimelineProj, TimelineProjectionInput},
+    timeline::{TimelineProj, TimelineProjInput},
 };
 pub(crate) use synd_support::time::Clock;
 
@@ -71,29 +71,29 @@ pub(crate) async fn record_generated_events(
     Ok(recorded)
 }
 
-pub(crate) fn timeline_feed_subscribed(event: FeedSubscribedEvent) -> TimelineProjectionInput {
-    TimelineProjectionInput::FeedSubscribed {
+pub(crate) fn timeline_feed_subscribed(event: FeedSubscribedEvent) -> TimelineProjInput {
+    TimelineProjInput::FeedSubscribed {
         event,
         occurred_at: test_occurred_at(),
     }
 }
 
-pub(crate) fn timeline_feed_unsubscribed(event: FeedUnsubscribedEvent) -> TimelineProjectionInput {
-    TimelineProjectionInput::FeedUnsubscribed {
+pub(crate) fn timeline_feed_unsubscribed(event: FeedUnsubscribedEvent) -> TimelineProjInput {
+    TimelineProjInput::FeedUnsubscribed {
         event,
         occurred_at: test_occurred_at(),
     }
 }
 
-pub(crate) fn timeline_entry_discovered(event: EntryDiscoveredEvent) -> TimelineProjectionInput {
-    TimelineProjectionInput::EntryDiscovered {
+pub(crate) fn timeline_entry_discovered(event: EntryDiscoveredEvent) -> TimelineProjInput {
+    TimelineProjInput::EntryDiscovered {
         event,
         occurred_at: test_occurred_at(),
     }
 }
 
-pub(crate) fn timeline_entry_changed(event: EntryChangedEvent) -> TimelineProjectionInput {
-    TimelineProjectionInput::EntryChanged {
+pub(crate) fn timeline_entry_changed(event: EntryChangedEvent) -> TimelineProjInput {
+    TimelineProjInput::EntryChanged {
         event,
         occurred_at: test_occurred_at(),
     }
@@ -222,25 +222,22 @@ pub(crate) fn timeline_interests() -> EventInterests {
     EventInterests::new([TimelineChangedEvent::TYPE])
 }
 
-pub(crate) async fn reconcile_crawl_targets(
+pub(crate) async fn project_crawl_targets(
     db: &SqliteFeedRegistryDb,
     events: Vec<SubEvent>,
 ) -> anyhow::Result<()> {
-    let mut reconciler = CrawlTargetReconciler::new();
+    let mut projection = CrawlTargetProj::new();
     let mut tx = db.begin().await?;
-    let mut generated = Vec::new();
-    for event in events {
-        let reaction = <CrawlTargetReconciler as Reconciler<SqliteFeedRegistryDb>>::reconcile(
-            &mut reconciler,
-            &mut tx,
-            test_occurred_at(),
-            Trigger::Wake,
-            InputBatch::new(vec![CrawlTargetListInput::new(event, test_occurred_at())]),
-        )
-        .await?;
-        let (events, _wake_request) = reaction.into_parts();
-        generated.extend(events);
-    }
+    let inputs = events
+        .into_iter()
+        .map(|event| CrawlTargetProjInput::new(event, test_occurred_at()))
+        .collect();
+    let generated = <CrawlTargetProj as Projector<SqliteFeedRegistryDb>>::project_batch(
+        &mut projection,
+        &mut tx,
+        InputBatch::new(inputs),
+    )
+    .await?;
     record_generated_events(&mut tx, generated).await?;
     tx.commit().await?;
     Ok(())
@@ -250,7 +247,7 @@ pub(crate) async fn read_crawl_target_events(
     db: &SqliteFeedRegistryDb,
 ) -> anyhow::Result<Vec<Event>> {
     let mut tx = db.begin().await?;
-    let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
+    let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
     let batch = tx.read_after(&cursor, crawl_target_interests()).await?;
     tx.commit().await?;
 
@@ -264,7 +261,7 @@ pub(crate) async fn read_crawl_target_events(
 
 pub(crate) async fn read_timeline_events(db: &SqliteFeedRegistryDb) -> anyhow::Result<Vec<Event>> {
     let mut tx = db.begin().await?;
-    let cursor = tx.load_cursor(ProcessorId::ApiEventProjection).await?;
+    let cursor = tx.load_cursor(ProcessorId::ApiEventPublisher).await?;
     let batch = tx.read_after(&cursor, timeline_interests()).await?;
     tx.commit().await?;
 
@@ -290,12 +287,7 @@ pub(crate) async fn record_fetched_crawl(
     let job = CrawlJob::new(
         CrawlJobId::generate(),
         feed_url.clone(),
-        CrawlJobState::Running,
-        CrawlJobTrigger::TargetChanged,
-        CrawlJobQueueLane::Default,
-        0,
-        started_at,
-        started_at,
+        CrawlJobTrigger::PeriodicDue,
         started_at,
     );
     let event = CrawlJobFinishedEvent::new(job.job_id.clone(), job.feed_url.clone());
@@ -323,7 +315,7 @@ pub(crate) async fn project_feed(
 
 pub(crate) async fn project_entries(
     db: &SqliteFeedRegistryDb,
-    input: EntryProjectionInput,
+    input: EntryProjInput,
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = EntryProj::new();
@@ -336,14 +328,14 @@ pub(crate) async fn project_entries(
 
 pub(crate) async fn project_timeline(
     db: &SqliteFeedRegistryDb,
-    input: TimelineProjectionInput,
+    input: TimelineProjInput,
 ) -> anyhow::Result<RecordedEvents> {
     project_timeline_batch(db, vec![input]).await
 }
 
 pub(crate) async fn project_timeline_batch(
     db: &SqliteFeedRegistryDb,
-    inputs: Vec<TimelineProjectionInput>,
+    inputs: Vec<TimelineProjInput>,
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = TimelineProj::new();

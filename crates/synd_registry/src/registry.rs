@@ -5,15 +5,18 @@ use synd_support::time::{Clock, SystemClock};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    api::{ApiEventProj, ApiEventPublisher, ApiEventSubscriber},
+    api::{ApiEventPublisher, ApiEventSubscriber},
     command::{
-        SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
+        RequestCrawlCommand, RequestCrawlOutput, SubscribeFeedCommand, SubscribeFeedOutput,
+        UnsubscribeFeedCommand, UnsubscribeFeedOutput,
     },
     config::FeedRegistryConfig,
     crawl::{
         dispatch::{DispatchQueueReader, DispatchQueueWriter, dispatch_queue},
-        scheduler::{driver::SchedDriver, reconciler::CrawlReconciler, tier::TierScheduler},
-        target_list::CrawlTargetReconciler,
+        dispatcher::CrawlDispatcher,
+        request::CrawlRequestHandler,
+        schedule::CrawlScheduleProj,
+        target_list::CrawlTargetProj,
         worker::CrawlWorkerPool,
     },
     db::{
@@ -23,9 +26,8 @@ use crate::{
     entry::EntryProj,
     error::FeedRegistryError,
     event::{
-        EventJournal, EventJournalAppend, EventWakePublisher, JournalHandler, JournalWorker,
-        PostCommitWorker, Processor, ProjectorAdapter, ReconcilerAdapter, Sink, WorkerHandle,
-        WorkerSet, spawn_event_loop,
+        EventJournal, EventJournalAppend, EventLoop, EventWakePublisher, JournalWorker,
+        PostCommitWorker, Projector, ReconcilerWorker, Sink, WorkerHandle, WorkerSet,
     },
     feed::FeedProj,
     handler::CommandHandler,
@@ -76,6 +78,7 @@ where
                 self.config.default_crawl_policy,
                 Arc::clone(&self.clock),
             ),
+            crawl_requests: CrawlRequestHandler::new(self.db.clone(), Arc::clone(&self.clock)),
         };
 
         FeedRegistry {
@@ -90,6 +93,7 @@ where
 #[derive(Clone)]
 pub(crate) struct RegistryHandlers<S> {
     subscriptions: SubHandler<S>,
+    crawl_requests: CrawlRequestHandler<S>,
 }
 
 /// Facade for registry commands, queries, and API event subscriptions.
@@ -105,10 +109,6 @@ where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: EventJournalAppend + SubscriptionStore,
 {
-    pub fn new(db: S, config: FeedRegistryConfig) -> Self {
-        Self::builder(db, config).build()
-    }
-
     pub(crate) fn builder(db: S, config: FeedRegistryConfig) -> FeedRegistryBuilder<S> {
         FeedRegistryBuilder::new(db, config)
     }
@@ -143,6 +143,23 @@ where
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: CrawlScheduleStore + EventJournalAppend,
+{
+    pub async fn request_crawl(
+        &self,
+        command: RequestCrawlCommand,
+    ) -> Result<RequestCrawlOutput, FeedRegistryError> {
+        let handled = self.handlers.crawl_requests.handle(command).await?;
+        self.event_dispatch
+            .wake_publisher
+            .publish(handled.recorded_events);
+        Ok(handled.output)
+    }
+}
+
+impl<S> FeedRegistry<S>
+where
+    S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: BlobStore
         + CrawlResultStore
         + CrawlScheduleStore
@@ -156,14 +173,14 @@ where
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> (Self, WorkerSet) {
         let builder = FeedRegistry::builder(db.clone(), config);
         let event_dispatch = builder.event_dispatch();
-        let workers = spawn_event_workers(
+        let workers = WorkerSpawnCtx::new(
             db,
-            &event_dispatch.wake_publisher,
-            event_dispatch.api_events.clone(),
+            event_dispatch.wake_publisher.clone(),
             config,
             ct,
             Arc::clone(builder.clock()),
-        );
+        )
+        .spawn_all(event_dispatch.api_events.clone());
         let registry = builder.build();
 
         (registry, workers)
@@ -212,41 +229,6 @@ impl EventDispatch {
     }
 }
 
-fn spawn_event_workers<S>(
-    db: S,
-    wake_publisher: &EventWakePublisher,
-    api_events: ApiEventPublisher,
-    config: FeedRegistryConfig,
-    ct: CancellationToken,
-    clock: Arc<dyn Clock>,
-) -> WorkerSet
-where
-    S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStore
-        + CrawlResultStore
-        + CrawlScheduleStore
-        + CrawlTargetStore
-        + FeedStore
-        + EntryStore
-        + SubscriptionStore
-        + TimelineStore
-        + EventJournalAppend,
-{
-    let ctx = WorkerSpawnCtx::new(db, wake_publisher.clone(), config, ct, clock);
-    let (dispatch_queue_writer, dispatch_queue_reader) = ctx.dispatch_queue();
-
-    WorkerSet::new(vec![
-        ctx.spawn_crawl_target_reconciler(),
-        ctx.spawn_feed_projection(),
-        ctx.spawn_entry_projection(),
-        ctx.spawn_timeline_projection(),
-        ctx.spawn_api_event_projection(),
-        ctx.spawn_api_event_publisher(api_events),
-        ctx.spawn_crawl_scheduler(dispatch_queue_writer),
-        ctx.spawn_crawl_worker_pool(dispatch_queue_reader),
-    ])
-}
-
 struct WorkerSpawnCtx<S> {
     db: S,
     wake_publisher: EventWakePublisher,
@@ -275,13 +257,51 @@ where
         }
     }
 
-    fn spawn_crawl_target_reconciler(&self) -> WorkerHandle
+    fn spawn_all(self, api_events: ApiEventPublisher) -> WorkerSet
+    where
+        for<'tx> S::Tx<'tx>: BlobStore
+            + CrawlResultStore
+            + CrawlScheduleStore
+            + CrawlTargetStore
+            + FeedStore
+            + EntryStore
+            + SubscriptionStore
+            + TimelineStore
+            + EventJournal
+            + EventJournalAppend
+            + Send,
+    {
+        let (dispatch_queue_writer, dispatch_queue_reader) = self.dispatch_queue();
+
+        WorkerSet::new(vec![
+            self.spawn_crawl_target_projection(),
+            self.spawn_crawl_schedule_projection(),
+            self.spawn_crawl_dispatcher(dispatch_queue_writer),
+            self.spawn_crawl_worker_pool(dispatch_queue_reader),
+            self.spawn_feed_projection(),
+            self.spawn_entry_projection(),
+            self.spawn_timeline_projection(),
+            self.spawn_api_event_publisher(api_events),
+        ])
+    }
+
+    fn spawn_crawl_target_projection(&self) -> WorkerHandle
     where
         for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + EventJournalAppend,
     {
         self.spawn_journal_worker(
-            self.config.workers.crawl_target_reconciler_poll_interval,
-            ReconcilerAdapter::new(CrawlTargetReconciler::new()),
+            self.config.workers.crawl_target_projection_poll_interval,
+            CrawlTargetProj::new(),
+        )
+    }
+
+    fn spawn_crawl_schedule_projection(&self) -> WorkerHandle
+    where
+        for<'tx> S::Tx<'tx>: CrawlScheduleStore + CrawlResultStore + EventJournalAppend,
+    {
+        self.spawn_journal_worker(
+            self.config.workers.crawl_schedule_projection_poll_interval,
+            CrawlScheduleProj::new(),
         )
     }
 
@@ -291,7 +311,7 @@ where
     {
         self.spawn_journal_worker(
             self.config.workers.feed_projection_poll_interval,
-            ProjectorAdapter::new(FeedProj::new()),
+            FeedProj::new(),
         )
     }
 
@@ -301,7 +321,7 @@ where
     {
         self.spawn_journal_worker(
             self.config.workers.entry_projection_poll_interval,
-            ProjectorAdapter::new(EntryProj::new()),
+            EntryProj::new(),
         )
     }
 
@@ -311,17 +331,7 @@ where
     {
         self.spawn_journal_worker(
             self.config.workers.timeline_projection_poll_interval,
-            ProjectorAdapter::new(TimelineProj::new()),
-        )
-    }
-
-    fn spawn_api_event_projection(&self) -> WorkerHandle
-    where
-        for<'tx> S::Tx<'tx>: EventJournalAppend,
-    {
-        self.spawn_journal_worker(
-            self.config.workers.api_event_projection_poll_interval,
-            ProjectorAdapter::new(ApiEventProj::new()),
+            TimelineProj::new(),
         )
     }
 
@@ -339,15 +349,18 @@ where
         dispatch_queue(self.config.crawl_worker_pool.max_running_jobs.max(1))
     }
 
-    fn spawn_crawl_scheduler(&self, dispatch_queue_writer: DispatchQueueWriter) -> WorkerHandle
+    fn spawn_crawl_dispatcher(&self, dispatch_queue_writer: DispatchQueueWriter) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: CrawlScheduleStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: CrawlScheduleStore + Send,
     {
-        let sched_driver = SchedDriver::new(Box::new(TierScheduler::new()), dispatch_queue_writer);
-        self.spawn_journal_worker(
-            self.config.workers.crawl_scheduler_poll_interval,
-            ReconcilerAdapter::new(CrawlReconciler::new(sched_driver)),
+        let dispatcher = CrawlDispatcher::new(dispatch_queue_writer, self.config.crawl_dispatch);
+        EventLoop::new(
+            ReconcilerWorker::new(self.db.clone(), dispatcher, Arc::clone(&self.clock)),
+            self.wake_publisher.clone(),
+            self.config.workers.crawl_dispatcher_poll_interval,
+            self.ct.clone(),
         )
+        .spawn()
     }
 
     fn spawn_crawl_worker_pool(&self, dispatch_queue_reader: DispatchQueueReader) -> WorkerHandle
@@ -359,7 +372,7 @@ where
             self.config.crawl_worker_pool.fetch.user_agent,
             self.config.crawl_worker_pool.fetch.max_body_bytes,
         ));
-        let pool = CrawlWorkerPool::new(
+        CrawlWorkerPool::new(
             self.db.clone(),
             fetcher,
             self.wake_publisher.clone(),
@@ -367,37 +380,34 @@ where
             self.config.crawl_worker_pool,
             self.ct.clone(),
             Arc::clone(&self.clock),
-        );
-        spawn_event_loop(
-            pool,
-            self.wake_publisher.clone(),
-            self.config.workers.crawl_worker_pool_poll_interval,
-            self.ct.clone(),
         )
+        .spawn()
     }
 
-    fn spawn_journal_worker<P>(&self, poll_interval: Duration, processor: P) -> WorkerHandle
+    fn spawn_journal_worker<P>(&self, poll_interval: Duration, projector: P) -> WorkerHandle
     where
-        P: JournalHandler<S>,
+        P: Projector<S>,
         for<'tx> S::Tx<'tx>: EventJournalAppend,
     {
-        spawn_event_loop(
-            JournalWorker::new(self.db.clone(), processor, Arc::clone(&self.clock)),
+        EventLoop::new(
+            JournalWorker::new(self.db.clone(), projector, Arc::clone(&self.clock)),
             self.wake_publisher.clone(),
             poll_interval,
             self.ct.clone(),
         )
+        .spawn()
     }
 
     fn spawn_post_commit_worker<P>(&self, poll_interval: Duration, processor: P) -> WorkerHandle
     where
-        P: Processor + Sink,
+        P: Sink,
     {
-        spawn_event_loop(
+        EventLoop::new(
             PostCommitWorker::new(self.db.clone(), processor),
             self.wake_publisher.clone(),
             poll_interval,
             self.ct.clone(),
         )
+        .spawn()
     }
 }

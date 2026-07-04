@@ -33,6 +33,14 @@ pub enum UpsertFeedOutcome {
 }
 
 impl UpsertFeedOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Discovered => "discovered",
+            Self::Changed => "changed",
+            Self::Unchanged => "unchanged",
+        }
+    }
+
     /// Returns the feed lifecycle event represented by this write outcome.
     pub fn into_event(self, source: &FeedSource) -> Option<Event> {
         match self {

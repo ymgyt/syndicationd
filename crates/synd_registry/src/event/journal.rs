@@ -66,10 +66,6 @@ impl EventReadBatch {
         &self.events
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.events.is_empty()
-    }
-
     pub fn into_events(self) -> Vec<JournaledEvent> {
         self.events
     }
@@ -79,25 +75,16 @@ impl EventReadBatch {
     }
 }
 
-/// A registry event returned from the journal with its journal position.
+/// A registry event returned from the journal with its recorded time.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JournaledEvent {
-    cursor: EventCursor,
     event: Event,
     occurred_at: DateTime<Utc>,
 }
 
 impl JournaledEvent {
-    pub fn new(cursor: EventCursor, event: Event, occurred_at: DateTime<Utc>) -> Self {
-        Self {
-            cursor,
-            event,
-            occurred_at,
-        }
-    }
-
-    pub fn cursor(&self) -> &EventCursor {
-        &self.cursor
+    pub fn new(event: Event, occurred_at: DateTime<Utc>) -> Self {
+        Self { event, occurred_at }
     }
 
     pub fn event(&self) -> &Event {
@@ -110,10 +97,6 @@ impl JournaledEvent {
 
     pub fn into_event(self) -> Event {
         self.event
-    }
-
-    pub fn into_parts(self) -> (EventCursor, Event, DateTime<Utc>) {
-        (self.cursor, self.event, self.occurred_at)
     }
 }
 

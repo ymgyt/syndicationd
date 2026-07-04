@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use synd_feed::feed::service::{FeedFetchRequest, FetchFeed};
+use synd_feed::feed::service::{FeedFetchRequest, FeedHttpStatus, FetchFeed};
 use synd_support::time::Clock;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
@@ -11,13 +11,13 @@ use crate::{
     crawl::{
         completion::{CrawlCompletionRecord, CrawlCompletionRecorder},
         dispatch::{DispatchEntry, DispatchQueueReader},
-        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobState, CrawlJobTrigger},
+        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
         result::CrawlState,
     },
     db::{BlobStore, CommitTx, CrawlResultStore, FeedRegistryDb},
     event::{
-        EventInterests, EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher,
-        EventWorker, Reaction, RecordedEvents, Trigger, WorkerId, WorkerResult,
+        EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher, RecordedEvents,
+        WorkerHandle, WorkerId, WorkerResult,
     },
 };
 
@@ -71,13 +71,16 @@ impl Default for CrawlWorkerFetchConfig {
     }
 }
 
-/// Runs crawl dispatch entries selected by the scheduler.
+/// Runs crawl dispatch entries handed over through the dispatch queue.
+///
+/// The pool is queue-driven: it awaits the next dispatched entry, waits for
+/// global and lane capacity, then runs the crawl on its own task. The
+/// dispatch queue is its only input; it does not consume registry events.
 pub(crate) struct CrawlWorkerPool<S, F> {
     db: S,
     fetcher: F,
     wake_publisher: EventWakePublisher,
     dispatch_queue: DispatchQueueReader,
-    pending_dispatch: Option<DispatchEntry>,
     ct: CancellationToken,
     capacity: CrawlWorkerCapacity,
     clock: Arc<dyn Clock>,
@@ -98,7 +101,6 @@ impl<S, F> CrawlWorkerPool<S, F> {
             fetcher,
             wake_publisher,
             dispatch_queue,
-            pending_dispatch: None,
             ct,
             capacity: CrawlWorkerCapacity::new(config),
             clock,
@@ -112,28 +114,36 @@ where
     F: FetchFeed + Clone + Send + Sync + 'static,
     for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
 {
-    fn poll_and_dispatch(&mut self) -> RecordedEvents {
-        while self.try_start_next_dispatch() {}
-
-        RecordedEvents::empty()
+    pub(crate) fn spawn(self) -> WorkerHandle {
+        WorkerHandle::new(WorkerId::CrawlWorkerPool, tokio::spawn(self.run()))
     }
 
-    fn try_start_next_dispatch(&mut self) -> bool {
-        let Some(entry) = self
-            .pending_dispatch
-            .take()
-            .or_else(|| self.dispatch_queue.try_pop())
-        else {
-            return false;
-        };
-        let lane = dispatch_lane(entry.trigger);
-        let Some(slot) = self.capacity.try_reserve(lane) else {
-            self.pending_dispatch = Some(entry);
-            return false;
-        };
+    async fn run(mut self) {
+        debug!(
+            worker = WorkerId::CrawlWorkerPool.as_str(),
+            "crawl worker pool started"
+        );
 
-        self.start_worker(entry, slot);
-        true
+        loop {
+            let entry = tokio::select! {
+                () = self.ct.cancelled() => break,
+                entry = self.dispatch_queue.recv() => match entry {
+                    Some(entry) => entry,
+                    None => break,
+                },
+            };
+            let lane = entry.trigger.queue_lane();
+            let slot = tokio::select! {
+                () = self.ct.cancelled() => break,
+                slot = self.capacity.reserve(lane) => slot,
+            };
+            self.start_worker(entry, slot);
+        }
+
+        debug!(
+            worker = WorkerId::CrawlWorkerPool.as_str(),
+            "crawl worker pool stopped"
+        );
     }
 
     fn start_worker(&self, entry: DispatchEntry, slot: CrawlWorkerSlot) {
@@ -142,7 +152,7 @@ where
         let wake_publisher = self.wake_publisher.clone();
         let worker_ct = self.ct.child_token();
         let clock = Arc::clone(&self.clock);
-        let job = crawl_job_from_dispatch(entry, slot.lane());
+        let job = entry.into_crawl_job();
         tokio::spawn(async move {
             info!(
                 worker = WorkerId::CrawlWorkerPool.as_str(),
@@ -165,25 +175,6 @@ where
             }
             drop(slot);
         });
-    }
-}
-
-impl<S, F> EventWorker for CrawlWorkerPool<S, F>
-where
-    S: FeedRegistryDb,
-    F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
-{
-    fn id(&self) -> WorkerId {
-        WorkerId::CrawlWorkerPool
-    }
-
-    fn interests(&self) -> EventInterests {
-        EventInterests::empty()
-    }
-
-    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<Reaction<RecordedEvents>> {
-        Ok(Reaction::done(self.poll_and_dispatch()))
     }
 }
 
@@ -233,9 +224,9 @@ where
         let job_id = job.job_id.clone();
         let feed_url = job.feed_url.clone();
         let trigger = job.trigger;
-        let started_at = job.updated_at;
+        let started_at = job.started_at;
         let previous_state = self.load_previous_state(&job).await?;
-        let request = feed_fetch_request(&job, previous_state.as_ref());
+        let request = job.fetch_request(previous_state.as_ref());
 
         let outcome = tokio::select! {
             () = self.ct.cancelled() => {
@@ -254,13 +245,12 @@ where
         let (completion, recorded) = self
             .record_completion(job, outcome, previous_state, finished_at)
             .await?;
-        log_crawl_job_completed(
+        completion.log_completed(
             &job_id,
             feed_url.as_str(),
             lane,
             trigger,
             (finished_at - started_at).num_milliseconds(),
-            &completion,
         );
         self.wake_publisher.publish(recorded);
         Ok(())
@@ -293,101 +283,52 @@ where
     }
 }
 
-fn log_crawl_job_completed(
-    job_id: &CrawlJobId,
-    feed_url: &str,
-    lane: CrawlJobQueueLane,
-    trigger: CrawlJobTrigger,
-    duration_ms: i64,
-    completion: &CrawlCompletionRecord,
-) {
-    match (completion.http_status, completion.error_kind) {
-        (Some(status), Some(error_kind)) => {
-            info!(
-                job_id = %job_id,
-                feed_url,
-                queue = lane.as_str(),
-                trigger = trigger.as_str(),
-                outcome = completion.outcome.as_str(),
-                http_status = status.as_u16(),
-                error_kind,
-                result_ref = completion.result_ref.pk(),
-                failure_streak = completion.health.failure_streak.value(),
-                duration_ms,
-                "crawl job completed"
-            );
-        }
-        (Some(status), None) => {
-            info!(
-                job_id = %job_id,
-                feed_url,
-                queue = lane.as_str(),
-                trigger = trigger.as_str(),
-                outcome = completion.outcome.as_str(),
-                http_status = status.as_u16(),
-                result_ref = completion.result_ref.pk(),
-                failure_streak = completion.health.failure_streak.value(),
-                duration_ms,
-                "crawl job completed"
-            );
-        }
-        (None, Some(error_kind)) => {
-            info!(
-                job_id = %job_id,
-                feed_url,
-                queue = lane.as_str(),
-                trigger = trigger.as_str(),
-                outcome = completion.outcome.as_str(),
-                error_kind,
-                result_ref = completion.result_ref.pk(),
-                failure_streak = completion.health.failure_streak.value(),
-                duration_ms,
-                "crawl job completed"
-            );
-        }
-        (None, None) => {
-            info!(
-                job_id = %job_id,
-                feed_url,
-                queue = lane.as_str(),
-                trigger = trigger.as_str(),
-                outcome = completion.outcome.as_str(),
-                result_ref = completion.result_ref.pk(),
-                failure_streak = completion.health.failure_streak.value(),
-                duration_ms,
-                "crawl job completed"
-            );
-        }
+impl CrawlCompletionRecord {
+    fn log_completed(
+        &self,
+        job_id: &CrawlJobId,
+        feed_url: &str,
+        lane: CrawlJobQueueLane,
+        trigger: CrawlJobTrigger,
+        duration_ms: i64,
+    ) {
+        // `Option` fields are recorded only when present.
+        info!(
+            job_id = %job_id,
+            feed_url,
+            queue = lane.as_str(),
+            trigger = trigger.as_str(),
+            outcome = self.outcome.as_str(),
+            http_status = self.http_status.map(FeedHttpStatus::as_u16),
+            error_kind = self.error_kind,
+            result_ref = self.result_ref.pk(),
+            failure_streak = self.health.failure_streak.value(),
+            duration_ms,
+            "crawl job completed"
+        );
     }
 }
 
-fn dispatch_lane(trigger: CrawlJobTrigger) -> CrawlJobQueueLane {
-    match trigger {
-        CrawlJobTrigger::ManualRequest => CrawlJobQueueLane::Manual,
-        CrawlJobTrigger::RetryDue => CrawlJobQueueLane::Retry,
-        CrawlJobTrigger::TargetChanged | CrawlJobTrigger::PeriodicDue => CrawlJobQueueLane::Default,
+impl DispatchEntry {
+    fn into_crawl_job(self) -> CrawlJob {
+        CrawlJob::new(
+            CrawlJobId::generate(),
+            self.feed_url,
+            self.trigger,
+            self.dispatched_at,
+        )
     }
 }
 
-fn crawl_job_from_dispatch(entry: DispatchEntry, lane: CrawlJobQueueLane) -> CrawlJob {
-    CrawlJob::new(
-        CrawlJobId::generate(),
-        entry.feed_url,
-        CrawlJobState::Running,
-        entry.trigger,
-        lane,
-        0,
-        entry.dispatched_at,
-        entry.dispatched_at,
-        entry.dispatched_at,
-    )
-}
-
-fn feed_fetch_request(job: &CrawlJob, previous_state: Option<&CrawlState>) -> FeedFetchRequest {
-    let conditional = previous_state
-        .map(|state| state.conditional.clone())
-        .unwrap_or_default();
-    FeedFetchRequest::new(job.feed_url.clone()).with_conditional(conditional)
+impl CrawlJob {
+    /// Builds the conditional fetch request for this job from the previous
+    /// crawl state.
+    fn fetch_request(&self, previous_state: Option<&CrawlState>) -> FeedFetchRequest {
+        let conditional = previous_state
+            .map(|state| state.conditional.clone())
+            .unwrap_or_default();
+        FeedFetchRequest::new(self.feed_url.clone()).with_conditional(conditional)
+    }
 }
 
 /// Runtime permits controlling global and lane-local crawl concurrency.
@@ -408,6 +349,30 @@ impl CrawlWorkerCapacity {
         }
     }
 
+    /// Waits until both a global and a lane slot are available.
+    ///
+    /// The global permit is held while waiting for the lane permit, so a
+    /// saturated lane blocks subsequent dispatches (head-of-line), matching
+    /// the single-consumer dispatch queue semantics.
+    async fn reserve(&self, lane: CrawlJobQueueLane) -> CrawlWorkerSlot {
+        let global_permit = Arc::clone(&self.global)
+            .acquire_owned()
+            .await
+            .expect("crawl worker global semaphore is never closed");
+        let lane_permit = self
+            .lane_capacity(lane)
+            .acquire_owned()
+            .await
+            .expect("crawl worker lane semaphore is never closed");
+
+        CrawlWorkerSlot {
+            lane,
+            _global_permit: global_permit,
+            _lane_permit: lane_permit,
+        }
+    }
+
+    #[cfg(test)]
     fn try_reserve(&self, lane: CrawlJobQueueLane) -> Option<CrawlWorkerSlot> {
         let lane_capacity = self.lane_capacity(lane);
         if self.global.available_permits() == 0 || lane_capacity.available_permits() == 0 {

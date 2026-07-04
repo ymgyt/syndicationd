@@ -1,47 +1,34 @@
-use std::{fmt, str::FromStr};
+use std::fmt;
 
 use chrono::{DateTime, Utc};
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::FeedUrl;
 
-/// Runtime crawl job.
+/// One crawl accepted from the dispatch queue and handed to a worker.
+///
+/// Crawl jobs live only for the duration of one fetch; durable facts about
+/// the run are recorded as crawl results keyed by `job_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlJob {
     pub job_id: CrawlJobId,
     pub feed_url: FeedUrl,
-    pub state: CrawlJobState,
     pub trigger: CrawlJobTrigger,
-    pub queue: CrawlJobQueueLane,
-    pub priority: i64,
-    pub run_after: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub started_at: DateTime<Utc>,
 }
 
 impl CrawlJob {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         job_id: CrawlJobId,
         feed_url: FeedUrl,
-        state: CrawlJobState,
         trigger: CrawlJobTrigger,
-        queue: CrawlJobQueueLane,
-        priority: i64,
-        run_after: DateTime<Utc>,
-        created_at: DateTime<Utc>,
-        updated_at: DateTime<Utc>,
+        started_at: DateTime<Utc>,
     ) -> Self {
         Self {
             job_id,
             feed_url,
-            state,
             trigger,
-            queue,
-            priority,
-            run_after,
-            created_at,
-            updated_at,
+            started_at,
         }
     }
 }
@@ -70,74 +57,30 @@ impl fmt::Display for CrawlJobId {
     }
 }
 
-/// Current lifecycle state of one crawl job.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CrawlJobState {
-    Pending,
-    Running,
-    Finished,
-    Cancelled,
-}
-
-impl CrawlJobState {
-    pub const PENDING: &'static str = "pending";
-    pub const RUNNING: &'static str = "running";
-    pub const FINISHED: &'static str = "finished";
-    pub const CANCELLED: &'static str = "cancelled";
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Pending => Self::PENDING,
-            Self::Running => Self::RUNNING,
-            Self::Finished => Self::FINISHED,
-            Self::Cancelled => Self::CANCELLED,
-        }
-    }
-}
-
-impl fmt::Display for CrawlJobState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for CrawlJobState {
-    type Err = UnknownCrawlJobValue;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            Self::PENDING => Ok(Self::Pending),
-            Self::RUNNING => Ok(Self::Running),
-            Self::FINISHED => Ok(Self::Finished),
-            Self::CANCELLED => Ok(Self::Cancelled),
-            value => Err(UnknownCrawlJobValue::new("state", value)),
-        }
-    }
-}
-
 /// Reason a crawl job was requested.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CrawlJobTrigger {
-    TargetChanged,
     PeriodicDue,
     ManualRequest,
     RetryDue,
 }
 
 impl CrawlJobTrigger {
-    pub const TARGET_CHANGED: &'static str = "target_changed";
-    pub const PERIODIC_DUE: &'static str = "periodic_due";
-    pub const MANUAL_REQUEST: &'static str = "manual_request";
-    pub const RETRY_DUE: &'static str = "retry_due";
-
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::TargetChanged => Self::TARGET_CHANGED,
-            Self::PeriodicDue => Self::PERIODIC_DUE,
-            Self::ManualRequest => Self::MANUAL_REQUEST,
-            Self::RetryDue => Self::RETRY_DUE,
+            Self::PeriodicDue => "periodic_due",
+            Self::ManualRequest => "manual_request",
+            Self::RetryDue => "retry_due",
+        }
+    }
+
+    /// The worker queue lane that runs jobs with this trigger.
+    pub fn queue_lane(self) -> CrawlJobQueueLane {
+        match self {
+            Self::ManualRequest => CrawlJobQueueLane::Manual,
+            Self::RetryDue => CrawlJobQueueLane::Retry,
+            Self::PeriodicDue => CrawlJobQueueLane::Default,
         }
     }
 }
@@ -145,20 +88,6 @@ impl CrawlJobTrigger {
 impl fmt::Display for CrawlJobTrigger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for CrawlJobTrigger {
-    type Err = UnknownCrawlJobValue;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            Self::TARGET_CHANGED => Ok(Self::TargetChanged),
-            Self::PERIODIC_DUE => Ok(Self::PeriodicDue),
-            Self::MANUAL_REQUEST => Ok(Self::ManualRequest),
-            Self::RETRY_DUE => Ok(Self::RetryDue),
-            value => Err(UnknownCrawlJobValue::new("trigger", value)),
-        }
     }
 }
 
@@ -172,15 +101,11 @@ pub enum CrawlJobQueueLane {
 }
 
 impl CrawlJobQueueLane {
-    pub const DEFAULT: &'static str = "default";
-    pub const MANUAL: &'static str = "manual";
-    pub const RETRY: &'static str = "retry";
-
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Default => Self::DEFAULT,
-            Self::Manual => Self::MANUAL,
-            Self::Retry => Self::RETRY,
+            Self::Default => "default",
+            Self::Manual => "manual",
+            Self::Retry => "retry",
         }
     }
 }
@@ -190,40 +115,3 @@ impl fmt::Display for CrawlJobQueueLane {
         f.write_str(self.as_str())
     }
 }
-
-impl FromStr for CrawlJobQueueLane {
-    type Err = UnknownCrawlJobValue;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            Self::DEFAULT => Ok(Self::Default),
-            Self::MANUAL => Ok(Self::Manual),
-            Self::RETRY => Ok(Self::Retry),
-            value => Err(UnknownCrawlJobValue::new("queue", value)),
-        }
-    }
-}
-
-/// Error returned when stored crawl job values are unknown.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnknownCrawlJobValue {
-    field: &'static str,
-    value: String,
-}
-
-impl UnknownCrawlJobValue {
-    fn new(field: &'static str, value: impl Into<String>) -> Self {
-        Self {
-            field,
-            value: value.into(),
-        }
-    }
-}
-
-impl fmt::Display for UnknownCrawlJobValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "unknown crawl job {}: {}", self.field, self.value)
-    }
-}
-
-impl std::error::Error for UnknownCrawlJobValue {}

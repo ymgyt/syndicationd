@@ -8,7 +8,10 @@ use crate::{
         blob::{BlobRef, PutBlobCommand},
         job::CrawlJobId,
         result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
-        schedule::{ScheduleSyncEntry, ScheduledDue, UpsertCrawlScheduleCommand},
+        schedule::{
+            CompleteDispatchCommand, DispatchCandidate, ScheduleSyncEntry,
+            UpsertCrawlScheduleCommand,
+        },
         target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
     },
     entry::{EntryChanges, EntrySet},
@@ -74,33 +77,50 @@ pub trait CrawlTargetStore {
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
 }
 
-/// Transactional scheduler-state operations.
+/// Transactional crawl schedule operations.
 pub trait CrawlScheduleStore {
     fn load_schedule_sync_entry(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<ScheduleSyncEntry>>> + Send;
 
-    fn list_schedule_sync_entries(
-        &mut self,
-        limit: usize,
-    ) -> impl Future<Output = RegistryDbResult<Vec<ScheduleSyncEntry>>> + Send;
-
-    fn list_scheduled_due(
-        &mut self,
-        now: DateTime<Utc>,
-        limit: usize,
-    ) -> impl Future<Output = RegistryDbResult<Vec<ScheduledDue>>> + Send;
-
-    fn next_scheduled_due(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<Option<DateTime<Utc>>>> + Send;
-
+    /// Creates or updates one schedule row, preserving any inflight dispatch marker.
     fn upsert_schedule(
         &mut self,
         command: UpsertCrawlScheduleCommand,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    /// Clears the inflight dispatch marker and schedules the next crawl.
+    fn complete_dispatch(
+        &mut self,
+        command: CompleteDispatchCommand,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    /// Lists active-target rows that are due and not inflight, plus inflight
+    /// rows whose dispatch became stale, ordered by due-reason priority and
+    /// due time.
+    fn list_dispatchable(
+        &mut self,
+        now: DateTime<Utc>,
+        stale_before: DateTime<Utc>,
+        limit: usize,
+    ) -> impl Future<Output = RegistryDbResult<Vec<DispatchCandidate>>> + Send;
+
+    /// Marks the rows as inflight so they are not dispatched again before
+    /// their crawl finishes or the stale deadline passes.
+    fn mark_dispatched(
+        &mut self,
+        feed_urls: &[FeedUrl],
+        dispatched_at: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    /// Earliest future instant the dispatcher must run: the next due time of
+    /// a non-inflight row, or the stale deadline of an inflight row.
+    fn next_dispatch_at(
+        &mut self,
+        now: DateTime<Utc>,
+        stale_timeout: std::time::Duration,
+    ) -> impl Future<Output = RegistryDbResult<Option<DateTime<Utc>>>> + Send;
 }
 
 /// Transactional generic blob-store operations.

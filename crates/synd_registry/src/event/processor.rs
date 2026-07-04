@@ -8,30 +8,34 @@ use tracing::warn;
 use crate::{
     db::FeedRegistryDb,
     error::RegistryDbError,
-    event::{Event, EventInterests, EventType, Trigger},
+    event::{Event, EventInterests, EventType},
 };
 
 /// Result type returned by event processors.
 pub type ProcessorResult<T> = Result<T, ProcessorError>;
 
-/// Result of one worker reaction, plus an optional request to be woken later.
+/// Result of one worker reaction: events recorded into the journal plus an
+/// optional request to be woken at a specific future time.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reaction<T> {
-    output: T,
+pub struct Reaction {
+    recorded_events: RecordedEvents,
     wake: WakeRequest,
 }
 
-impl<T> Reaction<T> {
-    pub fn new(output: T, wake: WakeRequest) -> Self {
-        Self { output, wake }
+impl Reaction {
+    pub fn new(recorded_events: RecordedEvents, wake: WakeRequest) -> Self {
+        Self {
+            recorded_events,
+            wake,
+        }
     }
 
-    pub fn done(output: T) -> Self {
-        Self::new(output, WakeRequest::None)
+    pub fn done(recorded_events: RecordedEvents) -> Self {
+        Self::new(recorded_events, WakeRequest::None)
     }
 
-    pub fn into_parts(self) -> (T, WakeRequest) {
-        (self.output, self.wake)
+    pub fn into_parts(self) -> (RecordedEvents, WakeRequest) {
+        (self.recorded_events, self.wake)
     }
 }
 
@@ -63,19 +67,20 @@ pub enum ProcessorError {
 }
 
 impl ProcessorError {
-    pub fn unexpected_event(expected: &'static str, actual: EventType) -> Self {
-        Self::UnexpectedEvent { expected, actual }
-    }
-
     pub fn unexpected_input(expected: &'static str, event: &Event) -> Self {
-        Self::unexpected_event(expected, event.event_type())
+        Self::UnexpectedEvent {
+            expected,
+            actual: event.event_type(),
+        }
     }
 }
 
 /// Retry behavior for a processor failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FailureClass {
+    /// Aborts the batch; the cursor stays put and the pass is retried.
     Retryable,
+    /// Skips the offending input; retrying would fail the same way.
     Permanent,
 }
 
@@ -87,9 +92,12 @@ pub trait ClassifyError {
 impl ClassifyError for ProcessorError {
     fn classify(&self) -> FailureClass {
         match self {
-            Self::RegistryDb(_) | Self::UnexpectedEvent { .. } | Self::FeedParse(_) => {
-                FailureClass::Permanent
-            }
+            // Storage failures may be transient (lock contention, I/O); the
+            // input must not be lost, so the whole pass is retried.
+            Self::RegistryDb(_) => FailureClass::Retryable,
+            // Deterministic failures of the input itself: retrying the same
+            // event can never succeed.
+            Self::UnexpectedEvent { .. } | Self::FeedParse(_) => FailureClass::Permanent,
         }
     }
 }
@@ -97,45 +105,48 @@ impl ClassifyError for ProcessorError {
 /// Stable identity for an event processor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProcessorId {
-    CrawlTargetReconciler,
+    CrawlTargetProjection,
+    CrawlScheduleProjection,
     FeedProjection,
     EntryProjection,
     TimelineProjection,
-    ApiEventProjection,
     ApiEventPublisher,
-    CrawlReconciler,
 }
 
 impl ProcessorId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::CrawlTargetReconciler => "CrawlTargetReconciler",
+            Self::CrawlTargetProjection => "CrawlTargetProjection",
+            Self::CrawlScheduleProjection => "CrawlScheduleProjection",
             Self::FeedProjection => "FeedProjection",
             Self::EntryProjection => "EntryProjection",
             Self::TimelineProjection => "TimelineProjection",
-            Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
-            Self::CrawlReconciler => "CrawlReconciler",
         }
     }
 }
 
-pub(crate) fn skip_permanent_error(
-    processor: ProcessorId,
-    err: ProcessorError,
-    context: &'static str,
-) -> ProcessorResult<()> {
-    match err.classify() {
-        FailureClass::Permanent => {
-            warn!(
-                processor = processor.as_str(),
-                context,
-                error = %err,
-                "registry event processor skipped permanent failure"
-            );
-            Ok(())
+impl ProcessorError {
+    /// The shared failure policy for per-input processing: permanent
+    /// failures are logged and skipped, retryable ones abort the batch so
+    /// the pass is retried from the same cursor.
+    pub(crate) fn skip_permanent(
+        self,
+        processor: ProcessorId,
+        context: &'static str,
+    ) -> ProcessorResult<()> {
+        match self.classify() {
+            FailureClass::Permanent => {
+                warn!(
+                    processor = processor.as_str(),
+                    context,
+                    error = %self,
+                    "registry event processor skipped permanent failure"
+                );
+                Ok(())
+            }
+            FailureClass::Retryable => Err(self),
         }
-        FailureClass::Retryable => Err(err),
     }
 }
 
@@ -168,24 +179,17 @@ impl<I> InputBatch<I> {
         Self { inputs }
     }
 
-    pub fn len(&self) -> usize {
-        self.inputs.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.inputs.is_empty()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &I> {
-        self.inputs.iter()
-    }
-
     pub fn into_inputs(self) -> Vec<I> {
         self.inputs
     }
 }
 
-/// A non-idempotent cursor-driven projection over journaled facts.
+/// A cursor-driven projection over journaled facts.
+///
+/// Projectors are the only journal consumers: state updates, produced
+/// events, and the cursor advance are committed in one transaction, so
+/// every selected event is applied exactly once and never reordered.
+/// Time-driven convergence belongs to [`crate::event::Reconciler`] instead.
 pub trait Projector<S>: Processor
 where
     S: FeedRegistryDb,
@@ -207,126 +211,11 @@ where
             for input in batch.into_inputs() {
                 match self.project(tx, input).await {
                     Ok(mut produced) => events.append(&mut produced),
-                    Err(err) => skip_permanent_error(processor, err, "input")?,
+                    Err(err) => err.skip_permanent(processor, "input")?,
                 }
             }
             Ok(events)
         }
-    }
-}
-
-/// An idempotent reconciler driven by selected journal events.
-pub trait Reconciler<S>: Processor
-where
-    S: FeedRegistryDb,
-{
-    fn reconcile(
-        &mut self,
-        tx: &mut S::Tx<'_>,
-        now: DateTime<Utc>,
-        trigger: Trigger,
-        batch: InputBatch<Self::Input>,
-    ) -> impl Future<Output = ProcessorResult<Reaction<Vec<Event>>>> + Send;
-}
-
-/// Handles one input batch read from the event journal.
-pub(crate) trait JournalHandler<S>: Processor
-where
-    S: FeedRegistryDb,
-{
-    fn handle_journal_batch(
-        &mut self,
-        tx: &mut S::Tx<'_>,
-        now: DateTime<Utc>,
-        trigger: Trigger,
-        batch: InputBatch<Self::Input>,
-    ) -> impl Future<Output = ProcessorResult<Reaction<Vec<Event>>>> + Send;
-}
-
-/// Adapts a projector to the journal handler interface.
-pub(crate) struct ProjectorAdapter<P> {
-    processor: P,
-}
-
-impl<P> ProjectorAdapter<P> {
-    pub(crate) fn new(processor: P) -> Self {
-        Self { processor }
-    }
-}
-
-impl<P> Processor for ProjectorAdapter<P>
-where
-    P: Processor,
-{
-    type Input = P::Input;
-
-    fn id(&self) -> ProcessorId {
-        self.processor.id()
-    }
-
-    fn interests(&self) -> EventInterests {
-        self.processor.interests()
-    }
-}
-
-impl<S, P> JournalHandler<S> for ProjectorAdapter<P>
-where
-    S: FeedRegistryDb,
-    P: Projector<S>,
-{
-    async fn handle_journal_batch(
-        &mut self,
-        tx: &mut S::Tx<'_>,
-        _now: DateTime<Utc>,
-        _trigger: Trigger,
-        batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Reaction<Vec<Event>>> {
-        self.processor
-            .project_batch(tx, batch)
-            .await
-            .map(Reaction::done)
-    }
-}
-
-/// Adapts a reconciler to the journal handler interface.
-pub(crate) struct ReconcilerAdapter<P> {
-    processor: P,
-}
-
-impl<P> ReconcilerAdapter<P> {
-    pub(crate) fn new(processor: P) -> Self {
-        Self { processor }
-    }
-}
-
-impl<P> Processor for ReconcilerAdapter<P>
-where
-    P: Processor,
-{
-    type Input = P::Input;
-
-    fn id(&self) -> ProcessorId {
-        self.processor.id()
-    }
-
-    fn interests(&self) -> EventInterests {
-        self.processor.interests()
-    }
-}
-
-impl<S, P> JournalHandler<S> for ReconcilerAdapter<P>
-where
-    S: FeedRegistryDb,
-    P: Reconciler<S>,
-{
-    async fn handle_journal_batch(
-        &mut self,
-        tx: &mut S::Tx<'_>,
-        now: DateTime<Utc>,
-        trigger: Trigger,
-        batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Reaction<Vec<Event>>> {
-        self.processor.reconcile(tx, now, trigger, batch).await
     }
 }
 
@@ -368,9 +257,5 @@ impl RecordedEvents {
 
     pub fn push(&mut self, event_type: EventType) {
         self.types.push(event_type);
-    }
-
-    pub fn extend(&mut self, mut other: Self) {
-        self.types.append(&mut other.types);
     }
 }

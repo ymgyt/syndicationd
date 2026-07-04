@@ -2,11 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::FeedUrl;
 
-use crate::{
-    event::{EventType, RegistryEvent},
-    subscription::SubscriberId,
-    timeline::TimelineKey,
-};
+use crate::{subscription::SubscriberId, timeline::TimelineKey};
 
 /// Public event contract exposed through the API stream.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,8 +38,4 @@ impl ApiTimelineChanged {
             affected_feeds,
         }
     }
-}
-
-impl RegistryEvent for ApiTimelineChanged {
-    const TYPE: EventType = EventType::ApiTimelineChanged;
 }

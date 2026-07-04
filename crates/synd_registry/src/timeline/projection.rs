@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use synd_feed::types::FeedUrl;
+use synd_feed::types::{EntryId, FeedUrl};
 use tracing::info;
 
 use crate::{
@@ -7,14 +7,14 @@ use crate::{
     event::{
         EntryChangedEvent, EntryDiscoveredEvent, Event, EventInput, EventType, FeedSubscribedEvent,
         FeedUnsubscribedEvent, InputBatch, Processor, ProcessorError, ProcessorId, ProcessorResult,
-        Projector, RegistryEvent, TimelineChangedEvent, skip_permanent_error,
+        Projector, RegistryEvent, TimelineChangedEvent,
     },
     timeline::TimelineKey,
 };
 
 /// Event input used to project timeline state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TimelineProjectionInput {
+pub enum TimelineProjInput {
     FeedSubscribed {
         event: FeedSubscribedEvent,
         occurred_at: DateTime<Utc>,
@@ -33,7 +33,7 @@ pub enum TimelineProjectionInput {
     },
 }
 
-impl TimelineProjectionInput {
+impl TimelineProjInput {
     fn occurred_at(&self) -> DateTime<Utc> {
         match self {
             Self::FeedSubscribed { occurred_at, .. }
@@ -42,9 +42,64 @@ impl TimelineProjectionInput {
             | Self::EntryChanged { occurred_at, .. } => *occurred_at,
         }
     }
+
+    /// Applies this input to timeline membership and returns the touched
+    /// timelines with the feed that caused the change.
+    async fn apply<Tx>(self, tx: &mut Tx) -> ProcessorResult<Vec<(TimelineKey, FeedUrl)>>
+    where
+        Tx: TimelineStore + Send,
+    {
+        let occurred_at = self.occurred_at();
+        match self {
+            Self::FeedSubscribed { event, .. } => {
+                let subscription = event.subscription;
+                let timeline = TimelineKey::default_for(subscription.subscriber_id);
+                let catchup = tx
+                    .catchup_subscribed_feed(&timeline, &subscription.feed_url, occurred_at)
+                    .await?;
+                Ok(if catchup.inserted_items() > 0 {
+                    vec![(catchup.timeline().clone(), catchup.feed_url().clone())]
+                } else {
+                    Vec::new()
+                })
+            }
+            Self::FeedUnsubscribed { event, .. } => {
+                let subscription = event.subscription;
+                let timeline = tx.apply_feed_unsubscribed(&subscription).await?;
+                Ok(timeline
+                    .map(|timeline| (timeline, subscription.feed_url))
+                    .into_iter()
+                    .collect())
+            }
+            Self::EntryDiscovered { event, .. } => {
+                Self::apply_entry(tx, event.feed_url, &event.entry_id, occurred_at).await
+            }
+            Self::EntryChanged { event, .. } => {
+                Self::apply_entry(tx, event.feed_url, &event.entry_id, occurred_at).await
+            }
+        }
+    }
+
+    async fn apply_entry<Tx>(
+        tx: &mut Tx,
+        feed_url: FeedUrl,
+        entry_id: &EntryId,
+        occurred_at: DateTime<Utc>,
+    ) -> ProcessorResult<Vec<(TimelineKey, FeedUrl)>>
+    where
+        Tx: TimelineStore + Send,
+    {
+        let timelines = tx
+            .apply_entry_to_timelines(&feed_url, entry_id, occurred_at)
+            .await?;
+        Ok(timelines
+            .into_iter()
+            .map(|timeline| (timeline, feed_url.clone()))
+            .collect())
+    }
 }
 
-impl EventInput for TimelineProjectionInput {
+impl EventInput for TimelineProjInput {
     const INTERESTS: &'static [EventType] = &[
         FeedSubscribedEvent::TYPE,
         FeedUnsubscribedEvent::TYPE,
@@ -83,7 +138,7 @@ impl Default for TimelineProj {
 }
 
 impl Processor for TimelineProj {
-    type Input = TimelineProjectionInput;
+    type Input = TimelineProjInput;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::TimelineProjection
@@ -112,69 +167,13 @@ where
         let mut invalidations = TimelineInvalidations::empty();
 
         for input in batch.into_inputs() {
-            let occurred_at = input.occurred_at();
-            let consumed = match input {
-                TimelineProjectionInput::FeedSubscribed { event, .. } => {
-                    let subscription = event.subscription;
-                    let timeline = TimelineKey::default_for(subscription.subscriber_id);
-                    match tx
-                        .catchup_subscribed_feed(&timeline, &subscription.feed_url, occurred_at)
-                        .await
-                    {
-                        Ok(catchup) => {
-                            if catchup.inserted_items() > 0 {
-                                invalidations
-                                    .mark(catchup.timeline().clone(), catchup.feed_url().clone());
-                            }
-                            Ok(())
-                        }
-                        Err(err) => Err(err.into()),
+            match input.apply(tx).await {
+                Ok(touched) => {
+                    for (timeline, feed_url) in touched {
+                        invalidations.mark(timeline, feed_url);
                     }
                 }
-                TimelineProjectionInput::FeedUnsubscribed { event, .. } => {
-                    let subscription = event.subscription;
-                    match tx.apply_feed_unsubscribed(&subscription).await {
-                        Ok(timeline) => {
-                            if let Some(timeline) = timeline {
-                                invalidations.mark(timeline, subscription.feed_url);
-                            }
-                            Ok(())
-                        }
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                TimelineProjectionInput::EntryDiscovered { event, .. } => {
-                    match tx
-                        .apply_entry_to_timelines(&event.feed_url, &event.entry_id, occurred_at)
-                        .await
-                    {
-                        Ok(timelines) => {
-                            for timeline in timelines {
-                                invalidations.mark(timeline, event.feed_url.clone());
-                            }
-                            Ok(())
-                        }
-                        Err(err) => Err(err.into()),
-                    }
-                }
-                TimelineProjectionInput::EntryChanged { event, .. } => {
-                    match tx
-                        .apply_entry_to_timelines(&event.feed_url, &event.entry_id, occurred_at)
-                        .await
-                    {
-                        Ok(timelines) => {
-                            for timeline in timelines {
-                                invalidations.mark(timeline, event.feed_url.clone());
-                            }
-                            Ok(())
-                        }
-                        Err(err) => Err(err.into()),
-                    }
-                }
-            };
-
-            if let Err(err) = consumed {
-                skip_permanent_error(processor, err, "input")?;
+                Err(err) => err.skip_permanent(processor, "input")?,
             }
         }
 

@@ -4,7 +4,6 @@ use strum::{Display, EnumDiscriminants, EnumString, IntoStaticStr};
 use synd_feed::types::{EntryId, FeedUrl};
 
 use crate::{
-    api::{ApiEvent, ApiTimelineChanged},
     crawl::{
         job::{CrawlJob, CrawlJobId},
         policy::CrawlPolicy,
@@ -37,6 +36,9 @@ pub enum Event {
     #[serde(rename = "crawl.target.deactivated")]
     #[strum_discriminants(strum(serialize = "crawl.target.deactivated"))]
     CrawlTargetDeactivated(CrawlTargetDeactivatedEvent),
+    #[serde(rename = "crawl.schedule.updated")]
+    #[strum_discriminants(strum(serialize = "crawl.schedule.updated"))]
+    CrawlScheduleUpdated(CrawlScheduleUpdatedEvent),
     #[serde(rename = "crawl.requested")]
     #[strum_discriminants(strum(serialize = "crawl.requested"))]
     CrawlRequested(CrawlRequestedEvent),
@@ -58,22 +60,11 @@ pub enum Event {
     #[serde(rename = "timeline.changed")]
     #[strum_discriminants(strum(serialize = "timeline.changed"))]
     TimelineChanged(TimelineChangedEvent),
-    #[serde(rename = "api.timeline.changed")]
-    #[strum_discriminants(strum(serialize = "api.timeline.changed"))]
-    ApiTimelineChanged(ApiTimelineChanged),
 }
 
 impl Event {
     pub fn event_type(&self) -> EventType {
         EventType::from(self)
-    }
-}
-
-impl From<ApiEvent> for Event {
-    fn from(event: ApiEvent) -> Self {
-        match event {
-            ApiEvent::TimelineChanged(event) => Self::ApiTimelineChanged(event),
-        }
     }
 }
 
@@ -254,6 +245,18 @@ impl CrawlTargetDeactivatedEvent {
     }
 }
 
+/// The crawl schedule row for one feed was created or updated.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrawlScheduleUpdatedEvent {
+    pub feed_url: FeedUrl,
+}
+
+impl CrawlScheduleUpdatedEvent {
+    pub fn new(feed_url: FeedUrl) -> Self {
+        Self { feed_url }
+    }
+}
+
 /// A crawl was explicitly requested for one feed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlRequestedEvent {
@@ -395,6 +398,10 @@ impl RegistryEvent for CrawlTargetPolicyChangedEvent {
 
 impl RegistryEvent for CrawlTargetDeactivatedEvent {
     const TYPE: EventType = EventType::CrawlTargetDeactivated;
+}
+
+impl RegistryEvent for CrawlScheduleUpdatedEvent {
+    const TYPE: EventType = EventType::CrawlScheduleUpdated;
 }
 
 impl RegistryEvent for CrawlRequestedEvent {

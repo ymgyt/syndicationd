@@ -83,10 +83,14 @@ impl Decider for SubDecider {
     }
 }
 
-pub fn evolve(state: SubState, event: &SubEvent) -> SubState {
-    match (state, event) {
-        (_, SubEvent::Subscribed(_) | SubEvent::Changed(_)) => SubState::Subscribed,
-        (_, SubEvent::Unsubscribed(_)) => SubState::NotSubscribed,
+impl SubState {
+    /// The state after one subscription event, the decider's `evolve` companion.
+    #[must_use]
+    pub fn evolve(self, event: &SubEvent) -> Self {
+        match (self, event) {
+            (_, SubEvent::Subscribed(_) | SubEvent::Changed(_)) => Self::Subscribed,
+            (_, SubEvent::Unsubscribed(_)) => Self::NotSubscribed,
+        }
     }
 }
 
@@ -196,12 +200,12 @@ mod tests {
         let unsubscribed = SubEvent::Unsubscribed(FeedUnsubscribedEvent::new(subscription));
 
         assert_eq!(
-            evolve(SubState::NotSubscribed, &subscribed),
+            SubState::NotSubscribed.evolve(&subscribed),
             SubState::Subscribed
         );
-        assert_eq!(evolve(SubState::Subscribed, &changed), SubState::Subscribed);
+        assert_eq!(SubState::Subscribed.evolve(&changed), SubState::Subscribed);
         assert_eq!(
-            evolve(SubState::Subscribed, &unsubscribed),
+            SubState::Subscribed.evolve(&unsubscribed),
             SubState::NotSubscribed
         );
         Ok(())

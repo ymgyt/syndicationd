@@ -12,7 +12,7 @@ pub mod decider;
 mod handler;
 pub mod query;
 
-pub use decider::{SubCommand, SubDecider, SubReject, SubState, evolve};
+pub use decider::{SubCommand, SubDecider, SubReject, SubState};
 pub(crate) use handler::SubHandler;
 
 /// Opaque registry identity that owns subscriptions.

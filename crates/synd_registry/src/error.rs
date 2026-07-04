@@ -34,4 +34,6 @@ pub enum FeedRegistryError {
     Db(#[from] RegistryDbError),
     #[error(transparent)]
     Rejected(#[from] crate::subscription::SubReject),
+    #[error(transparent)]
+    CrawlRequestRejected(#[from] crate::crawl::request::CrawlRequestReject),
 }

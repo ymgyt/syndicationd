@@ -5,12 +5,12 @@ async fn load_cursor_returns_initial_cursor_for_new_processor() -> anyhow::Resul
     let db = migrated_db().await?;
     let mut tx = db.begin().await?;
 
-    let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
+    let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
     tx.commit().await?;
 
     assert_eq!(
         cursor,
-        EventCursor::initial(ProcessorId::CrawlTargetReconciler)
+        EventCursor::initial(ProcessorId::CrawlTargetProjection)
     );
     Ok(())
 }
@@ -29,7 +29,7 @@ async fn append_and_read_subscription_events_for_processor() -> anyhow::Result<(
     }
 
     let mut tx = db.begin().await?;
-    let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
+    let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
     let batch = tx
         .read_after(&cursor, subscription_lifecycle_interests())
         .await?;
@@ -43,7 +43,7 @@ async fn append_and_read_subscription_events_for_processor() -> anyhow::Result<(
     assert_eq!(
         batch.scanned_cursor(),
         &EventCursor::at(
-            ProcessorId::CrawlTargetReconciler,
+            ProcessorId::CrawlTargetProjection,
             EventCursorPos::position("2")
         )
     );
