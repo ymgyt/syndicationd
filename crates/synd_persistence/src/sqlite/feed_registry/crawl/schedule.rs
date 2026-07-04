@@ -125,6 +125,34 @@ async fn list_scheduled_due(
         .collect()
 }
 
+async fn next_scheduled_due(
+    tx: &mut Transaction<'_, Sqlite>,
+    now: DateTime<Utc>,
+) -> SqliteResult<Option<DateTime<Utc>>> {
+    let row = sqlx::query_as::<_, NextScheduledDueDbRow>(
+        r#"
+            SELECT
+                cs.next_crawl_after AS due_at
+            FROM crawl_schedule AS cs
+            INNER JOIN crawl_target AS ct
+                ON ct.feed_endpoint_pk = cs.feed_endpoint_pk
+            WHERE cs.next_crawl_after IS NOT NULL
+              AND cs.next_crawl_after > ?
+              AND ct.state = ?
+            ORDER BY
+                cs.next_crawl_after,
+                cs.feed_endpoint_pk
+            LIMIT 1
+            "#,
+    )
+    .bind(now)
+    .bind(ScheduledTargetStateDb::ACTIVE)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    Ok(row.map(|row| row.due_at))
+}
+
 async fn upsert(
     tx: &mut Transaction<'_, Sqlite>,
     schedule: UpsertCrawlScheduleCommand,
@@ -210,6 +238,11 @@ struct ScheduledDueDbRow {
     due_at: DateTime<Utc>,
 }
 
+#[derive(sqlx::FromRow)]
+struct NextScheduledDueDbRow {
+    due_at: DateTime<Utc>,
+}
+
 impl ScheduledDueDbRow {
     fn into_scheduled_due(self) -> SqliteResult<ScheduledDue> {
         Ok(ScheduledDue::new(
@@ -282,6 +315,13 @@ impl CrawlScheduleStore for SqliteRegistryTx<'_> {
         limit: usize,
     ) -> RegistryDbResult<Vec<ScheduledDue>> {
         list_scheduled_due(&mut self.tx, now, limit).await.db()
+    }
+
+    async fn next_scheduled_due(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Option<DateTime<Utc>>> {
+        next_scheduled_due(&mut self.tx, now).await.db()
     }
 
     async fn upsert_schedule(

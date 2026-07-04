@@ -18,13 +18,13 @@ pub use journal::{
 };
 pub(crate) use processor::skip_permanent_error;
 pub use processor::{
-    ClassifyError, EventInput, EventReconciler, FailureClass, InputBatch, Processor,
-    ProcessorError, ProcessorId, ProcessorResult, Projector, RecordedEvents, Sink,
+    ClassifyError, EventInput, FailureClass, InputBatch, Processor, ProcessorError, ProcessorId,
+    ProcessorResult, Projector, Reaction, Reconciler, RecordedEvents, Sink, WakeRequest,
 };
-pub(crate) use processor::{CursorProjector, CursorRole, EventReconcilerAdapter};
+pub(crate) use processor::{JournalHandler, ProjectorAdapter, ReconcilerAdapter};
 pub use recorder::EventRecorder;
-pub(crate) use worker::{CursorAdapter, EventWorker, PostCommitAdapter, spawn_event_loop};
 pub use worker::{
     EventWake, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, WorkerError,
     WorkerHandle, WorkerId, WorkerResult, WorkerSet,
 };
+pub(crate) use worker::{EventWorker, JournalWorker, PostCommitWorker, spawn_event_loop};

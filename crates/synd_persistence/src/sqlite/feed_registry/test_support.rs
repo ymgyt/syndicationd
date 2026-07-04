@@ -18,16 +18,16 @@ pub(crate) use synd_registry::{
         policy::{CrawlPolicy, PollingInterval, PollingPolicy},
         result::CrawlStateErrorKind,
         schedule::UpsertCrawlScheduleCommand,
-        target_list::{CrawlTargetListInput, CrawlTargetListProj, CrawlTargetState},
+        target_list::{CrawlTargetListInput, CrawlTargetReconciler, CrawlTargetState},
     },
     entry::{EntryProj, EntryProjectionInput},
     event::{
         CrawlJobFinishedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
         CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, Event, EventCursor,
-        EventCursorPos, EventInterests, EventJournal, EventReconciler, EventRecorder,
-        FeedChangedEvent, FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent,
-        InputBatch, ProcessorId, Projector, RecordedEvents, RegistryEvent, SubEvent,
-        SubscriptionChangedEvent, TimelineChangedEvent,
+        EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
+        FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
+        Projector, Reconciler, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
+        TimelineChangedEvent, Trigger,
     },
     feed::FeedProj,
     query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
@@ -222,21 +222,23 @@ pub(crate) fn timeline_interests() -> EventInterests {
     EventInterests::new([TimelineChangedEvent::TYPE])
 }
 
-pub(crate) async fn project_crawl_targets(
+pub(crate) async fn reconcile_crawl_targets(
     db: &SqliteFeedRegistryDb,
     events: Vec<SubEvent>,
 ) -> anyhow::Result<()> {
-    let mut projector = CrawlTargetListProj::new();
+    let mut reconciler = CrawlTargetReconciler::new();
     let mut tx = db.begin().await?;
     let mut generated = Vec::new();
     for event in events {
-        let events = <CrawlTargetListProj as EventReconciler<SqliteFeedRegistryDb>>::reconcile(
-            &mut projector,
+        let reaction = <CrawlTargetReconciler as Reconciler<SqliteFeedRegistryDb>>::reconcile(
+            &mut reconciler,
             &mut tx,
             test_occurred_at(),
+            Trigger::Wake,
             InputBatch::new(vec![CrawlTargetListInput::new(event, test_occurred_at())]),
         )
         .await?;
+        let (events, _wake_request) = reaction.into_parts();
         generated.extend(events);
     }
     record_generated_events(&mut tx, generated).await?;
@@ -248,7 +250,7 @@ pub(crate) async fn read_crawl_target_events(
     db: &SqliteFeedRegistryDb,
 ) -> anyhow::Result<Vec<Event>> {
     let mut tx = db.begin().await?;
-    let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
+    let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
     let batch = tx.read_after(&cursor, crawl_target_interests()).await?;
     tx.commit().await?;
 
@@ -313,7 +315,7 @@ pub(crate) async fn project_feed(
     let mut tx = db.begin().await?;
     let mut proj = FeedProj::new();
     let events =
-        <FeedProj as Projector<SqliteFeedRegistryDb>>::apply(&mut proj, &mut tx, event).await?;
+        <FeedProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, event).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -326,7 +328,7 @@ pub(crate) async fn project_entries(
     let mut tx = db.begin().await?;
     let mut proj = EntryProj::new();
     let events =
-        <EntryProj as Projector<SqliteFeedRegistryDb>>::apply(&mut proj, &mut tx, input).await?;
+        <EntryProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, input).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -345,7 +347,7 @@ pub(crate) async fn project_timeline_batch(
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = TimelineProj::new();
-    let events = <TimelineProj as Projector<SqliteFeedRegistryDb>>::apply_batch(
+    let events = <TimelineProj as Projector<SqliteFeedRegistryDb>>::project_batch(
         &mut proj,
         &mut tx,
         InputBatch::new(inputs),

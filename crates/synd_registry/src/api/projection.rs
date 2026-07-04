@@ -58,7 +58,7 @@ impl<S> Projector<S> for ApiEventProj
 where
     S: FeedRegistryDb,
 {
-    async fn apply(
+    async fn project(
         &mut self,
         _tx: &mut S::Tx<'_>,
         input: Self::Input,

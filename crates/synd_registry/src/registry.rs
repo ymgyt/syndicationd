@@ -13,7 +13,7 @@ use crate::{
     crawl::{
         dispatch::dispatch_queue,
         scheduler::{driver::SchedDriver, reconciler::CrawlReconciler, tier::TierScheduler},
-        target_list::CrawlTargetListProj,
+        target_list::CrawlTargetReconciler,
         worker::spawn_crawl_worker_pool,
     },
     db::{
@@ -23,8 +23,8 @@ use crate::{
     entry::EntryProj,
     error::FeedRegistryError,
     event::{
-        CursorAdapter, CursorProjector, CursorRole, EventJournalAppend, EventReconcilerAdapter,
-        EventWakePublisher, PostCommitAdapter, Processor, Sink, WorkerHandle, WorkerSet,
+        EventJournalAppend, EventWakePublisher, JournalHandler, JournalWorker, PostCommitWorker,
+        Processor, ProjectorAdapter, ReconcilerAdapter, Sink, WorkerHandle, WorkerSet,
         spawn_event_loop,
     },
     feed::FeedProj,
@@ -232,12 +232,12 @@ where
         + TimelineStore
         + EventJournalAppend,
 {
-    let crawl_target_projection_worker = spawn_event_worker(
+    let crawl_target_reconciler_worker = spawn_event_worker(
         db.clone(),
         wake_publisher.clone(),
-        config.workers.crawl_target_projection_poll_interval,
+        config.workers.crawl_target_reconciler_poll_interval,
         ct.clone(),
-        EventReconcilerAdapter::new(CrawlTargetListProj::new()),
+        ReconcilerAdapter::new(CrawlTargetReconciler::new()),
         Arc::clone(&clock),
     );
     let api_event_projection_worker = spawn_event_worker(
@@ -245,7 +245,7 @@ where
         wake_publisher.clone(),
         config.workers.api_event_projection_poll_interval,
         ct.clone(),
-        CursorProjector::new(ApiEventProj::new()),
+        ProjectorAdapter::new(ApiEventProj::new()),
         Arc::clone(&clock),
     );
     let feed_projection_worker = spawn_event_worker(
@@ -253,7 +253,7 @@ where
         wake_publisher.clone(),
         config.workers.feed_projection_poll_interval,
         ct.clone(),
-        CursorProjector::new(FeedProj::new()),
+        ProjectorAdapter::new(FeedProj::new()),
         Arc::clone(&clock),
     );
     let entry_projection_worker = spawn_event_worker(
@@ -261,7 +261,7 @@ where
         wake_publisher.clone(),
         config.workers.entry_projection_poll_interval,
         ct.clone(),
-        CursorProjector::new(EntryProj::new()),
+        ProjectorAdapter::new(EntryProj::new()),
         Arc::clone(&clock),
     );
     let timeline_projection_worker = spawn_event_worker(
@@ -269,7 +269,7 @@ where
         wake_publisher.clone(),
         config.workers.timeline_projection_poll_interval,
         ct.clone(),
-        CursorProjector::new(TimelineProj::new()),
+        ProjectorAdapter::new(TimelineProj::new()),
         Arc::clone(&clock),
     );
     let api_event_publisher_worker = spawn_post_commit_worker(
@@ -279,19 +279,48 @@ where
         ct.clone(),
         api_events,
     );
+
+    let mut workers = vec![
+        crawl_target_reconciler_worker,
+        feed_projection_worker,
+        entry_projection_worker,
+        timeline_projection_worker,
+        api_event_projection_worker,
+        api_event_publisher_worker,
+    ];
+    workers.extend(spawn_crawl_runtime_workers(
+        db,
+        wake_publisher.clone(),
+        config,
+        ct,
+        clock,
+    ));
+
+    WorkerSet::new(workers)
+}
+
+fn spawn_crawl_runtime_workers<S>(
+    db: S,
+    wake_publisher: EventWakePublisher,
+    config: FeedRegistryConfig,
+    ct: CancellationToken,
+    clock: Arc<dyn Clock>,
+) -> Vec<WorkerHandle>
+where
+    S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + CrawlScheduleStore + EventJournalAppend,
+{
     let (dispatch_queue_writer, dispatch_queue_reader) =
         dispatch_queue(config.crawl_worker_pool.max_running_jobs.max(1));
-    let crawl_scheduler_worker = {
-        let sched_driver = SchedDriver::new(Box::new(TierScheduler::new()), dispatch_queue_writer);
-        spawn_event_worker(
-            db.clone(),
-            wake_publisher.clone(),
-            config.workers.crawl_scheduler_poll_interval,
-            ct.clone(),
-            EventReconcilerAdapter::new(CrawlReconciler::new(sched_driver)),
-            Arc::clone(&clock),
-        )
-    };
+    let sched_driver = SchedDriver::new(Box::new(TierScheduler::new()), dispatch_queue_writer);
+    let crawl_scheduler_worker = spawn_event_worker(
+        db.clone(),
+        wake_publisher.clone(),
+        config.workers.crawl_scheduler_poll_interval,
+        ct.clone(),
+        ReconcilerAdapter::new(CrawlReconciler::new(sched_driver)),
+        Arc::clone(&clock),
+    );
     let crawl_fetcher = Arc::new(FeedService::new(
         config.crawl_worker_pool.fetch.user_agent,
         config.crawl_worker_pool.fetch.max_body_bytes,
@@ -300,23 +329,14 @@ where
         db,
         crawl_fetcher,
         dispatch_queue_reader,
-        wake_publisher.clone(),
+        wake_publisher,
         config.workers.crawl_worker_pool_poll_interval,
         config.crawl_worker_pool,
         ct,
         clock,
     );
 
-    WorkerSet::new(vec![
-        crawl_target_projection_worker,
-        feed_projection_worker,
-        entry_projection_worker,
-        timeline_projection_worker,
-        api_event_projection_worker,
-        api_event_publisher_worker,
-        crawl_scheduler_worker,
-        crawl_worker_pool,
-    ])
+    vec![crawl_scheduler_worker, crawl_worker_pool]
 }
 
 fn spawn_event_worker<S, P>(
@@ -329,11 +349,11 @@ fn spawn_event_worker<S, P>(
 ) -> WorkerHandle
 where
     S: FeedRegistryDb,
-    P: CursorRole<S>,
+    P: JournalHandler<S>,
     for<'tx> S::Tx<'tx>: EventJournalAppend,
 {
     spawn_event_loop(
-        CursorAdapter::new(db, processor, clock),
+        JournalWorker::new(db, processor, clock),
         wake_publisher,
         poll_interval,
         ct,
@@ -352,7 +372,7 @@ where
     P: Processor + Sink,
 {
     spawn_event_loop(
-        PostCommitAdapter::new(db, processor),
+        PostCommitWorker::new(db, processor),
         wake_publisher,
         poll_interval,
         ct,

@@ -1,5 +1,6 @@
 use std::{fmt, future::Future, sync::Arc, time::Duration};
 
+use chrono::{DateTime, Utc};
 use synd_support::time::Clock;
 use thiserror::Error;
 use tokio::{sync::broadcast, task::JoinHandle};
@@ -10,9 +11,9 @@ use crate::{
     db::{CommitTx, FeedRegistryDb},
     error::RegistryDbError,
     event::{
-        CursorRole, EventInput, EventInterests, EventJournal, EventJournalAppend, EventReadBatch,
-        EventRecorder, InputBatch, Processor, ProcessorError, ProcessorId, RecordedEvents, Sink,
-        skip_permanent_error,
+        EventInput, EventInterests, EventJournal, EventJournalAppend, EventReadBatch,
+        EventRecorder, InputBatch, JournalHandler, Processor, ProcessorError, ProcessorId,
+        Reaction, RecordedEvents, Sink, WakeRequest, skip_permanent_error,
     },
 };
 
@@ -34,6 +35,7 @@ pub enum Trigger {
     Startup,
     Wake,
     WakeLagged,
+    ScheduledWake,
     Poll,
 }
 
@@ -43,6 +45,7 @@ impl Trigger {
             Self::Startup => "startup",
             Self::Wake => "wake",
             Self::WakeLagged => "wake_lagged",
+            Self::ScheduledWake => "scheduled_wake",
             Self::Poll => "poll",
         }
     }
@@ -238,7 +241,7 @@ pub(crate) trait EventWorker: Send + 'static {
     fn react(
         &mut self,
         trigger: Trigger,
-    ) -> impl Future<Output = WorkerResult<RecordedEvents>> + Send;
+    ) -> impl Future<Output = WorkerResult<Reaction<RecordedEvents>>> + Send;
 }
 
 pub(crate) fn spawn_event_loop<W>(
@@ -272,19 +275,24 @@ async fn run_event_loop<W>(
 {
     let id = worker.id();
     debug!(worker = id.as_str(), "registry event worker started");
-    process_event_worker(&mut worker, &wake, Trigger::Startup).await;
+    let mut requested_wake = process_event_worker(&mut worker, &wake, Trigger::Startup).await;
 
     let mut interval = tokio::time::interval(poll_interval);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     interval.tick().await;
 
     loop {
+        let requested_wake_timer = wait_for_wake_request(requested_wake);
+        tokio::pin!(requested_wake_timer);
         tokio::select! {
             () = ct.cancelled() => break,
+            () = &mut requested_wake_timer => {
+                requested_wake = process_event_worker(&mut worker, &wake, Trigger::ScheduledWake).await;
+            }
             received = wake.recv() => {
                 match received {
                     Ok(recorded) if worker.interests().matches_any(recorded.types()) => {
-                        process_event_worker(&mut worker, &wake, Trigger::Wake).await;
+                        requested_wake = process_event_worker(&mut worker, &wake, Trigger::Wake).await;
                     }
                     Ok(_) => {}
                     Err(EventWakeRecvError::Lagged(skipped)) => {
@@ -293,7 +301,7 @@ async fn run_event_loop<W>(
                             skipped,
                             "registry event worker wake lagged"
                         );
-                        process_event_worker(&mut worker, &wake, Trigger::WakeLagged).await;
+                        requested_wake = process_event_worker(&mut worker, &wake, Trigger::WakeLagged).await;
                     }
                     Err(EventWakeRecvError::Closed) => {
                         warn!(
@@ -305,7 +313,7 @@ async fn run_event_loop<W>(
                 }
             }
             _ = interval.tick() => {
-                process_event_worker(&mut worker, &wake, Trigger::Poll).await;
+                requested_wake = process_event_worker(&mut worker, &wake, Trigger::Poll).await;
             }
         }
     }
@@ -318,13 +326,14 @@ async fn run_event_loop<W>(
     skip_all,
     fields(worker = worker.id().as_str(), trigger = trigger.as_str())
 )]
-async fn process_event_worker<W>(worker: &mut W, wake: &EventWake, trigger: Trigger)
+async fn process_event_worker<W>(worker: &mut W, wake: &EventWake, trigger: Trigger) -> WakeRequest
 where
     W: EventWorker,
 {
     let id = worker.id();
     match worker.react(trigger).await {
-        Ok(recorded) => {
+        Ok(reaction) => {
+            let (recorded, wake_request) = reaction.into_parts();
             let recorded_count = recorded.len();
             let receivers = wake.publish(recorded);
             debug!(
@@ -334,6 +343,7 @@ where
                 receivers,
                 "registry event worker reacted"
             );
+            wake_request
         }
         Err(err) => {
             error!(
@@ -342,18 +352,38 @@ where
                 error = %err,
                 "registry event worker failed"
             );
+            WakeRequest::None
         }
     }
 }
 
-/// Adapts a transactional event consumer to the shared wake-driven loop.
-pub(crate) struct CursorAdapter<S, P> {
+async fn wait_for_wake_request(wake_request: WakeRequest) {
+    match wake_request {
+        WakeRequest::None => std::future::pending().await,
+        WakeRequest::At(wake_at) => tokio::time::sleep_until(wake_instant(wake_at)).await,
+    }
+}
+
+fn wake_instant(wake_at: DateTime<Utc>) -> tokio::time::Instant {
+    let now = Utc::now();
+    if wake_at <= now {
+        return tokio::time::Instant::now();
+    }
+    let delay = wake_at
+        .signed_duration_since(now)
+        .to_std()
+        .unwrap_or(Duration::ZERO);
+    tokio::time::Instant::now() + delay
+}
+
+/// Runs one journal-backed handler on the shared wake-driven loop.
+pub(crate) struct JournalWorker<S, P> {
     db: S,
     processor: P,
     clock: Arc<dyn Clock>,
 }
 
-impl<S, P> CursorAdapter<S, P> {
+impl<S, P> JournalWorker<S, P> {
     pub fn new(db: S, processor: P, clock: Arc<dyn Clock>) -> Self {
         Self {
             db,
@@ -363,10 +393,10 @@ impl<S, P> CursorAdapter<S, P> {
     }
 }
 
-impl<S, P> EventWorker for CursorAdapter<S, P>
+impl<S, P> EventWorker for JournalWorker<S, P>
 where
     S: FeedRegistryDb,
-    P: CursorRole<S>,
+    P: JournalHandler<S>,
     for<'tx> S::Tx<'tx>: EventJournalAppend,
 {
     fn id(&self) -> WorkerId {
@@ -377,7 +407,7 @@ where
         self.processor.interests()
     }
 
-    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
+    async fn react(&mut self, trigger: Trigger) -> WorkerResult<Reaction<RecordedEvents>> {
         let processor_id = self.processor.id();
         let mut tx = self.db.begin().await?;
         let cursor = tx.load_cursor(processor_id).await?;
@@ -386,10 +416,11 @@ where
         let scanned_cursor = batch.scanned_cursor().clone();
 
         let inputs = collect_inputs::<P>(processor_id, batch)?;
-        let produced = self
+        let reaction = self
             .processor
-            .process_cursor_batch(&mut tx, self.clock.now(), InputBatch::new(inputs))
+            .handle_journal_batch(&mut tx, self.clock.now(), trigger, InputBatch::new(inputs))
             .await?;
+        let (produced, wake_request) = reaction.into_parts();
         let mut recorded_events = RecordedEvents::with_capacity(produced.len());
         {
             let mut event_recorder =
@@ -404,26 +435,26 @@ where
             worker = self.id().as_str(),
             event_count,
             cursor_position = ?scanned_cursor.position(),
-            "registry cursor worker advanced"
+            "registry journal worker advanced"
         );
 
-        Ok(recorded_events)
+        Ok(Reaction::new(recorded_events, wake_request))
     }
 }
 
-/// Adapts a post-commit sink to the shared wake-driven loop.
-pub(crate) struct PostCommitAdapter<S, P> {
+/// Runs one post-commit sink on the shared wake-driven loop.
+pub(crate) struct PostCommitWorker<S, P> {
     db: S,
     processor: P,
 }
 
-impl<S, P> PostCommitAdapter<S, P> {
+impl<S, P> PostCommitWorker<S, P> {
     pub fn new(db: S, processor: P) -> Self {
         Self { db, processor }
     }
 }
 
-impl<S, P> EventWorker for PostCommitAdapter<S, P>
+impl<S, P> EventWorker for PostCommitWorker<S, P>
 where
     S: FeedRegistryDb,
     P: Sink,
@@ -436,7 +467,7 @@ where
         self.processor.interests()
     }
 
-    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
+    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<Reaction<RecordedEvents>> {
         let processor_id = self.processor.id();
         let mut tx = self.db.begin().await?;
         let cursor = tx.load_cursor(processor_id).await?;
@@ -459,7 +490,7 @@ where
             "registry post-commit worker advanced"
         );
 
-        Ok(RecordedEvents::empty())
+        Ok(Reaction::done(RecordedEvents::empty()))
     }
 }
 

@@ -17,7 +17,7 @@ use crate::{
     db::{BlobStore, CommitTx, CrawlResultStore, FeedRegistryDb},
     event::{
         EventInterests, EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher,
-        EventWorker, RecordedEvents, Trigger, WorkerHandle, WorkerId, WorkerResult,
+        EventWorker, Reaction, RecordedEvents, Trigger, WorkerHandle, WorkerId, WorkerResult,
         spawn_event_loop,
     },
 };
@@ -183,8 +183,8 @@ where
         EventInterests::empty()
     }
 
-    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
-        self.poll_and_dispatch().await
+    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<Reaction<RecordedEvents>> {
+        self.poll_and_dispatch().await.map(Reaction::done)
     }
 }
 

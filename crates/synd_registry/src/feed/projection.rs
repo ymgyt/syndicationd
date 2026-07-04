@@ -56,7 +56,7 @@ where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + FeedStore + Send,
 {
-    async fn apply(
+    async fn project(
         &mut self,
         tx: &mut S::Tx<'_>,
         input: Self::Input,

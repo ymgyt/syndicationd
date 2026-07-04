@@ -399,6 +399,25 @@ impl CrawlScheduleStore for InMemoryRegistryTx<'_> {
         Ok(entries)
     }
 
+    async fn next_scheduled_due(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> RegistryDbResult<Option<DateTime<Utc>>> {
+        let state = &self.state;
+        Ok(state
+            .crawl_schedules
+            .values()
+            .filter_map(|schedule| {
+                let due_at = schedule.next_crawl_after?;
+                if due_at <= now {
+                    return None;
+                }
+                let target = state.crawl_targets.get(schedule.feed_url.as_str())?;
+                matches!(target.state, CrawlTargetState::Active { .. }).then_some(due_at)
+            })
+            .min())
+    }
+
     async fn upsert_schedule(
         &mut self,
         command: UpsertCrawlScheduleCommand,
@@ -639,7 +658,7 @@ mod tests {
         registry.subscribe(subscribe_command("event", 3600)).await?;
 
         let mut tx = db.begin().await?;
-        let cursor = tx.load_cursor(ProcessorId::CrawlTargetProjection).await?;
+        let cursor = tx.load_cursor(ProcessorId::CrawlTargetReconciler).await?;
         let batch = tx
             .read_after(&cursor, EventInterests::new([FeedSubscribedEvent::TYPE]))
             .await?;

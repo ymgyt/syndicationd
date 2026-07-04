@@ -92,6 +92,11 @@ pub trait CrawlScheduleStore {
         limit: usize,
     ) -> impl Future<Output = RegistryDbResult<Vec<ScheduledDue>>> + Send;
 
+    fn next_scheduled_due(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> impl Future<Output = RegistryDbResult<Option<DateTime<Utc>>>> + Send;
+
     fn upsert_schedule(
         &mut self,
         command: UpsertCrawlScheduleCommand,

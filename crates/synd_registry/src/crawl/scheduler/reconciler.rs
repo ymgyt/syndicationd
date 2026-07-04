@@ -12,8 +12,8 @@ use crate::{
     },
     db::{CrawlScheduleStore, FeedRegistryDb},
     event::{
-        Event, EventInput, EventReconciler, EventType, InputBatch, Processor, ProcessorError,
-        ProcessorId, ProcessorResult,
+        Event, EventInput, EventType, InputBatch, Processor, ProcessorError, ProcessorId,
+        ProcessorResult, Reaction, Reconciler, WakeRequest,
     },
 };
 
@@ -41,7 +41,7 @@ impl Processor for CrawlReconciler {
     }
 }
 
-impl<S> EventReconciler<S> for CrawlReconciler
+impl<S> Reconciler<S> for CrawlReconciler
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: CrawlScheduleStore + Send,
@@ -50,8 +50,9 @@ where
         &mut self,
         tx: &mut S::Tx<'_>,
         now: DateTime<Utc>,
+        _trigger: crate::event::Trigger,
         batch: InputBatch<Self::Input>,
-    ) -> ProcessorResult<Vec<Event>> {
+    ) -> ProcessorResult<Reaction<Vec<Event>>> {
         let sync = ScheduleSync::new(now);
         let input_count = batch.len();
         let mut target_update_count = 0;
@@ -100,6 +101,11 @@ where
         self.driver
             .submit_batch(scheduled_due.into_iter().map(SchedInput::from));
         debug!(scheduled_due_count, "scheduled crawl due submitted");
+        let wake_request = tx
+            .next_scheduled_due(now)
+            .await?
+            .map(WakeRequest::at)
+            .unwrap_or(WakeRequest::None);
 
         match self.driver.dispatch(now) {
             Ok(dispatched_count) => {
@@ -109,7 +115,7 @@ where
                 debug!(error = ?err, "crawl dispatch queue update skipped");
             }
         }
-        Ok(Vec::new())
+        Ok(Reaction::new(Vec::new(), wake_request))
     }
 }
 
