@@ -6,7 +6,7 @@ use synd_feed::feed::service::{
 use crate::{
     crawl::{
         blob::PutBlobCommand,
-        job::{CrawlJob, FinishCrawlJobCommand, FinishCrawlJobOutcome},
+        job::CrawlJob,
         result::{
             CrawlFeedParseErrorDetail, CrawlFetchErrorDetail, CrawlHealth, CrawlHttpBodyDetail,
             CrawlHttpErrorKind, CrawlHttpResponseDetail, CrawlResultDetail, CrawlResultRecord,
@@ -14,12 +14,12 @@ use crate::{
             UpsertCrawlStateCommand,
         },
     },
-    db::{BlobStore, CrawlJobQueue, CrawlResultStore},
-    error::{RegistryDbError, RegistryDbResult},
+    db::{BlobStore, CrawlResultStore},
+    error::RegistryDbResult,
     event::{CrawlJobFinishedEvent, Event},
 };
 
-/// Records the durable completion facts for one claimed crawl job.
+/// Records the durable completion facts for one dispatched crawl.
 pub struct CrawlCompletionRecorder<'a, Tx> {
     tx: &'a mut Tx,
 }
@@ -32,7 +32,7 @@ impl<'a, Tx> CrawlCompletionRecorder<'a, Tx> {
 
 impl<Tx> CrawlCompletionRecorder<'_, Tx>
 where
-    Tx: BlobStore + CrawlResultStore + CrawlJobQueue + Send,
+    Tx: BlobStore + CrawlResultStore + Send,
 {
     pub async fn record(
         &mut self,
@@ -43,6 +43,7 @@ where
     ) -> RegistryDbResult<(CrawlCompletionRecord, Vec<Event>)> {
         let started_at = job.updated_at;
         let feed_url = job.feed_url.clone();
+        let finished_event = CrawlJobFinishedEvent::new(job.job_id.clone(), feed_url.clone());
         let previous_conditional = previous_state
             .as_ref()
             .map(|state| state.conditional.clone())
@@ -78,19 +79,6 @@ where
             ))
             .await?;
 
-        let finished_job = match self
-            .tx
-            .finish_job(FinishCrawlJobCommand::new(job.job_id, finished_at))
-            .await?
-        {
-            FinishCrawlJobOutcome::Finished(job) => job,
-            FinishCrawlJobOutcome::NotRunning => {
-                return Err(RegistryDbError::internal_message(
-                    "claimed crawl job was not running when completion was recorded",
-                ));
-            }
-        };
-
         Ok((
             CrawlCompletionRecord {
                 result_ref,
@@ -99,7 +87,7 @@ where
                 error_kind: summary.error_kind,
                 health,
             },
-            vec![CrawlJobFinishedEvent::from(finished_job).into()],
+            vec![finished_event.into()],
         ))
     }
 

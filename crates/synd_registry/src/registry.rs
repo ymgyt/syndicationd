@@ -11,19 +11,21 @@ use crate::{
     },
     config::FeedRegistryConfig,
     crawl::{
-        scheduler::CrawlScheduler, target_list::CrawlTargetListProj,
+        dispatch::dispatch_queue,
+        scheduler::{driver::SchedDriver, reconciler::CrawlReconciler, tier::TierScheduler},
+        target_list::CrawlTargetListProj,
         worker::spawn_crawl_worker_pool,
     },
     db::{
-        BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
-        EntryStore, FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
+        BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, EntryStore,
+        FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
     },
     entry::EntryProj,
     error::FeedRegistryError,
     event::{
-        CursorAdapter, CursorProjector, CursorReconciler, CursorRole, EventJournalAppend,
-        EventWakePublisher, PostCommitAdapter, Processor, Reconciler, ScanAdapter, Sink,
-        WorkerHandle, WorkerSet, spawn_event_loop,
+        CursorAdapter, CursorProjector, CursorRole, EventJournalAppend, EventReconcilerAdapter,
+        EventWakePublisher, PostCommitAdapter, Processor, Sink, WorkerHandle, WorkerSet,
+        spawn_event_loop,
     },
     feed::FeedProj,
     handler::CommandHandler,
@@ -31,22 +33,6 @@ use crate::{
     subscription::{SubHandler, SubscriberId},
     timeline::TimelineProj,
 };
-
-/// Channels shared by registry commands and post-commit event workers.
-#[derive(Clone)]
-struct EventDispatch {
-    api_events: ApiEventPublisher,
-    wake_publisher: EventWakePublisher,
-}
-
-impl EventDispatch {
-    fn new(config: FeedRegistryConfig) -> Self {
-        Self {
-            api_events: ApiEventPublisher::default(),
-            wake_publisher: EventWakePublisher::new(config.event_wake_channel_capacity),
-        }
-    }
-}
 
 /// Builds a registry facade with shared dispatch channels and clock wiring.
 pub(crate) struct FeedRegistryBuilder<S> {
@@ -160,7 +146,6 @@ where
     for<'tx> S::Tx<'tx>: BlobStore
         + CrawlResultStore
         + CrawlScheduleStore
-        + CrawlJobQueue
         + CrawlTargetStore
         + FeedStore
         + EntryStore
@@ -169,17 +154,17 @@ where
         + EventJournalAppend,
 {
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> (Self, WorkerSet) {
-        let registry_builder = FeedRegistry::builder(db.clone(), config);
-        let event_dispatch = registry_builder.event_dispatch();
+        let builder = FeedRegistry::builder(db.clone(), config);
+        let event_dispatch = builder.event_dispatch();
         let workers = spawn_event_workers(
             db,
             &event_dispatch.wake_publisher,
             event_dispatch.api_events.clone(),
             config,
             ct,
-            Arc::clone(registry_builder.clock()),
+            Arc::clone(builder.clock()),
         );
-        let registry = registry_builder.build();
+        let registry = builder.build();
 
         (registry, workers)
     }
@@ -211,6 +196,22 @@ where
     }
 }
 
+/// Channels shared by registry commands and post-commit event workers.
+#[derive(Clone)]
+struct EventDispatch {
+    api_events: ApiEventPublisher,
+    wake_publisher: EventWakePublisher,
+}
+
+impl EventDispatch {
+    fn new(config: FeedRegistryConfig) -> Self {
+        Self {
+            api_events: ApiEventPublisher::default(),
+            wake_publisher: EventWakePublisher::new(config.event_wake_channel_capacity),
+        }
+    }
+}
+
 fn spawn_event_workers<S>(
     db: S,
     wake_publisher: &EventWakePublisher,
@@ -224,7 +225,6 @@ where
     for<'tx> S::Tx<'tx>: BlobStore
         + CrawlResultStore
         + CrawlScheduleStore
-        + CrawlJobQueue
         + CrawlTargetStore
         + FeedStore
         + EntryStore
@@ -237,7 +237,7 @@ where
         wake_publisher.clone(),
         config.workers.crawl_target_projection_poll_interval,
         ct.clone(),
-        CursorReconciler::new(CrawlTargetListProj::new()),
+        EventReconcilerAdapter::new(CrawlTargetListProj::new()),
         Arc::clone(&clock),
     );
     let api_event_projection_worker = spawn_event_worker(
@@ -279,14 +279,19 @@ where
         ct.clone(),
         api_events,
     );
-    let crawl_scheduler_worker = spawn_scan_worker(
-        db.clone(),
-        wake_publisher.clone(),
-        config.workers.crawl_scheduler_poll_interval,
-        ct.clone(),
-        CrawlScheduler::new(),
-        Arc::clone(&clock),
-    );
+    let (dispatch_queue_writer, dispatch_queue_reader) =
+        dispatch_queue(config.crawl_worker_pool.max_running_jobs.max(1));
+    let crawl_scheduler_worker = {
+        let sched_driver = SchedDriver::new(Box::new(TierScheduler::new()), dispatch_queue_writer);
+        spawn_event_worker(
+            db.clone(),
+            wake_publisher.clone(),
+            config.workers.crawl_scheduler_poll_interval,
+            ct.clone(),
+            EventReconcilerAdapter::new(CrawlReconciler::new(sched_driver)),
+            Arc::clone(&clock),
+        )
+    };
     let crawl_fetcher = Arc::new(FeedService::new(
         config.crawl_worker_pool.fetch.user_agent,
         config.crawl_worker_pool.fetch.max_body_bytes,
@@ -294,6 +299,7 @@ where
     let crawl_worker_pool = spawn_crawl_worker_pool(
         db,
         crawl_fetcher,
+        dispatch_queue_reader,
         wake_publisher.clone(),
         config.workers.crawl_worker_pool_poll_interval,
         config.crawl_worker_pool,
@@ -328,27 +334,6 @@ where
 {
     spawn_event_loop(
         CursorAdapter::new(db, processor, clock),
-        wake_publisher,
-        poll_interval,
-        ct,
-    )
-}
-
-fn spawn_scan_worker<S, P>(
-    db: S,
-    wake_publisher: EventWakePublisher,
-    poll_interval: Duration,
-    ct: CancellationToken,
-    processor: P,
-    clock: Arc<dyn Clock>,
-) -> WorkerHandle
-where
-    S: FeedRegistryDb,
-    P: Reconciler<S>,
-    for<'tx> S::Tx<'tx>: EventJournalAppend,
-{
-    spawn_event_loop(
-        ScanAdapter::new(db, processor, clock),
         wake_publisher,
         poll_interval,
         ct,

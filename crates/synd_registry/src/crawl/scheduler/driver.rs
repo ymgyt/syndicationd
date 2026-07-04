@@ -1,10 +1,8 @@
 use chrono::{DateTime, Utc};
 
-use crate::crawl::scheduler::{
-    dispatch::DispatchContext,
-    input::SchedInput,
-    policy::Scheduler,
-    queue::{DispatchQueuePushError, DispatchQueueWriter},
+use crate::crawl::{
+    dispatch::{DispatchContext, DispatchQueuePushError, DispatchQueueWriter},
+    scheduler::{input::SchedInput, policy::Scheduler},
 };
 
 pub(crate) struct SchedDriver {

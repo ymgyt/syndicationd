@@ -8,16 +8,13 @@ pub(crate) use synd_feed::feed::service::{
 };
 pub(crate) use synd_feed::types::{EntryId, FeedUrl};
 pub(crate) use synd_registry::{
-    BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore,
-    FeedRegistryDb, FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId,
-    Subscription, SubscriptionKey, SubscriptionStore, TimelineStore,
+    BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, FeedRegistryDb,
+    FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
+    SubscriptionKey, SubscriptionStore, TimelineStore,
     crawl::completion::CrawlCompletionRecorder,
     crawl::{
         blob::PutBlobCommand,
-        job::{
-            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJobQueueLane, CrawlJobState,
-            CrawlJobTrigger, EnqueueCrawlJobCommand, EnqueueCrawlJobOutcome,
-        },
+        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobState, CrawlJobTrigger},
         policy::{CrawlPolicy, PollingInterval, PollingPolicy},
         result::CrawlStateErrorKind,
         schedule::UpsertCrawlScheduleCommand,
@@ -27,10 +24,10 @@ pub(crate) use synd_registry::{
     event::{
         CrawlJobFinishedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
         CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, Event, EventCursor,
-        EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
-        FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
-        Projector, Reconciler, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
-        TimelineChangedEvent,
+        EventCursorPos, EventInterests, EventJournal, EventReconciler, EventRecorder,
+        FeedChangedEvent, FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent,
+        InputBatch, ProcessorId, Projector, RecordedEvents, RegistryEvent, SubEvent,
+        SubscriptionChangedEvent, TimelineChangedEvent,
     },
     feed::FeedProj,
     query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
@@ -233,7 +230,7 @@ pub(crate) async fn project_crawl_targets(
     let mut tx = db.begin().await?;
     let mut generated = Vec::new();
     for event in events {
-        let events = <CrawlTargetListProj as Reconciler<SqliteFeedRegistryDb>>::reconcile(
+        let events = <CrawlTargetListProj as EventReconciler<SqliteFeedRegistryDb>>::reconcile(
             &mut projector,
             &mut tx,
             test_occurred_at(),
@@ -283,34 +280,22 @@ pub(crate) async fn record_fetched_crawl(
     body: Vec<u8>,
     seq: i64,
 ) -> anyhow::Result<CrawlJobFinishedEvent> {
-    let enqueued_at =
+    let started_at =
         Utc.with_ymd_and_hms(2026, 6, 8, 12, 0, 0).unwrap() + chrono::Duration::minutes(seq * 3);
-    let claimed_at = enqueued_at + chrono::Duration::minutes(1);
-    let finished_at = enqueued_at + chrono::Duration::minutes(2);
+    let finished_at = started_at + chrono::Duration::minutes(2);
     let mut tx = db.begin().await?;
-    store_feed_endpoint(&mut tx, feed_url, enqueued_at).await?;
-    let enqueue = tx
-        .enqueue_job(EnqueueCrawlJobCommand::new(
-            feed_url.clone(),
-            CrawlJobTrigger::TargetChanged,
-            CrawlJobQueueLane::Default,
-            0,
-            enqueued_at,
-            enqueued_at,
-        ))
-        .await?;
-    assert!(matches!(enqueue, EnqueueCrawlJobOutcome::Enqueued(_)));
-
-    let job = match tx
-        .claim_job(ClaimCrawlJobCommand::new(
-            CrawlJobQueueLane::Default,
-            claimed_at,
-        ))
-        .await?
-    {
-        ClaimCrawlJobOutcome::Claimed(job) => job,
-        ClaimCrawlJobOutcome::NoClaimableJob => anyhow::bail!("job should be claimable"),
-    };
+    store_feed_endpoint(&mut tx, feed_url, started_at).await?;
+    let job = CrawlJob::new(
+        CrawlJobId::generate(),
+        feed_url.clone(),
+        CrawlJobState::Running,
+        CrawlJobTrigger::TargetChanged,
+        CrawlJobQueueLane::Default,
+        0,
+        started_at,
+        started_at,
+        started_at,
+    );
     let event = CrawlJobFinishedEvent::new(job.job_id.clone(), job.feed_url.clone());
     let outcome = fetched_outcome(feed_url.clone(), body, finished_at)?;
     let (_record, events) = CrawlCompletionRecorder::new(&mut tx)

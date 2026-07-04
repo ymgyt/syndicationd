@@ -10,25 +10,17 @@ use tracing::{debug, error, info};
 use crate::{
     crawl::{
         completion::{CrawlCompletionRecord, CrawlCompletionRecorder},
-        job::{
-            ClaimCrawlJobCommand, ClaimCrawlJobOutcome, CrawlJob, CrawlJobId, CrawlJobQueueLane,
-            CrawlJobTrigger,
-        },
+        dispatch::{DispatchEntry, DispatchQueueReader},
+        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobState, CrawlJobTrigger},
         result::CrawlState,
     },
-    db::{BlobStore, CommitTx, CrawlJobQueue, CrawlResultStore, FeedRegistryDb},
+    db::{BlobStore, CommitTx, CrawlResultStore, FeedRegistryDb},
     event::{
-        CrawlJobEnqueuedEvent, CrawlJobStartedEvent, EventInterests, EventJournal,
-        EventJournalAppend, EventRecorder, EventWakePublisher, EventWorker, RecordedEvents,
-        RegistryEvent, Trigger, WorkerHandle, WorkerId, WorkerResult, spawn_event_loop,
+        EventInterests, EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher,
+        EventWorker, RecordedEvents, Trigger, WorkerHandle, WorkerId, WorkerResult,
+        spawn_event_loop,
     },
 };
-
-const CLAIM_LANES: [CrawlJobQueueLane; 3] = [
-    CrawlJobQueueLane::Manual,
-    CrawlJobQueueLane::Default,
-    CrawlJobQueueLane::Retry,
-];
 
 /// Runtime configuration for the crawl job worker pool.
 #[derive(Debug, Clone, Copy)]
@@ -80,11 +72,13 @@ impl Default for CrawlWorkerFetchConfig {
     }
 }
 
-/// Claims and runs durable crawl jobs.
+/// Runs crawl dispatch entries selected by the scheduler.
 pub(crate) struct CrawlWorkerPool<S, F> {
     db: S,
     fetcher: F,
     wake_publisher: EventWakePublisher,
+    dispatch_queue: DispatchQueueReader,
+    pending_dispatch: Option<DispatchEntry>,
     ct: CancellationToken,
     capacity: CrawlWorkerCapacity,
     clock: Arc<dyn Clock>,
@@ -95,6 +89,7 @@ impl<S, F> CrawlWorkerPool<S, F> {
         db: S,
         fetcher: F,
         wake_publisher: EventWakePublisher,
+        dispatch_queue: DispatchQueueReader,
         config: CrawlWorkerPoolConfig,
         ct: CancellationToken,
         clock: Arc<dyn Clock>,
@@ -103,6 +98,8 @@ impl<S, F> CrawlWorkerPool<S, F> {
             db,
             fetcher,
             wake_publisher,
+            dispatch_queue,
+            pending_dispatch: None,
             ct,
             capacity: CrawlWorkerCapacity::new(config),
             clock,
@@ -114,82 +111,39 @@ impl<S, F> CrawlWorkerPool<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>:
-        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
 {
     async fn poll_and_dispatch(&mut self) -> WorkerResult<RecordedEvents> {
-        let mut recorded = RecordedEvents::empty();
-        let mut no_claimable_lanes = Vec::new();
+        while self.try_start_next_dispatch() {}
 
-        while self
-            .try_start_next_job(&mut no_claimable_lanes, &mut recorded)
-            .await?
-        {}
-
-        Ok(recorded)
+        Ok(RecordedEvents::empty())
     }
 
-    async fn try_start_next_job(
-        &mut self,
-        no_claimable_lanes: &mut Vec<CrawlJobQueueLane>,
-        recorded: &mut RecordedEvents,
-    ) -> WorkerResult<bool> {
-        for lane in CLAIM_LANES {
-            if no_claimable_lanes.contains(&lane) {
-                continue;
-            }
-
-            let Some(slot) = self.capacity.try_reserve(lane) else {
-                continue;
-            };
-
-            let (outcome, poll_recorded) = self.poll_queue(lane).await?;
-            recorded.extend(poll_recorded);
-
-            match outcome {
-                ClaimCrawlJobOutcome::Claimed(job) => {
-                    self.start_worker(job, slot);
-                    return Ok(true);
-                }
-                ClaimCrawlJobOutcome::NoClaimableJob => {
-                    no_claimable_lanes.push(lane);
-                    drop(slot);
-                }
-            }
-        }
-
-        Ok(false)
-    }
-
-    async fn poll_queue(
-        &mut self,
-        lane: CrawlJobQueueLane,
-    ) -> WorkerResult<(ClaimCrawlJobOutcome, RecordedEvents)> {
-        let mut tx = self.db.begin().await?;
-        let mut recorded = RecordedEvents::empty();
-        let outcome = tx
-            .claim_job(ClaimCrawlJobCommand::new(lane, self.clock.now()))
-            .await?;
-        let produced: Vec<crate::event::Event> = match &outcome {
-            ClaimCrawlJobOutcome::Claimed(job) => {
-                vec![CrawlJobStartedEvent::from(job.clone()).into()]
-            }
-            ClaimCrawlJobOutcome::NoClaimableJob => Vec::new(),
+    fn try_start_next_dispatch(&mut self) -> bool {
+        let Some(entry) = self
+            .pending_dispatch
+            .take()
+            .or_else(|| self.dispatch_queue.try_pop())
+        else {
+            return false;
         };
-        EventRecorder::new(&mut tx, &mut recorded, self.clock.as_ref())
-            .record_all(produced)
-            .await?;
-        tx.commit().await?;
+        let lane = dispatch_lane(entry.trigger);
+        let Some(slot) = self.capacity.try_reserve(lane) else {
+            self.pending_dispatch = Some(entry);
+            return false;
+        };
 
-        Ok((outcome, recorded))
+        self.start_worker(entry, slot);
+        true
     }
 
-    fn start_worker(&self, job: CrawlJob, slot: CrawlWorkerSlot) {
+    fn start_worker(&self, entry: DispatchEntry, slot: CrawlWorkerSlot) {
         let db = self.db.clone();
         let fetcher = self.fetcher.clone();
         let wake_publisher = self.wake_publisher.clone();
         let worker_ct = self.ct.child_token();
         let clock = Arc::clone(&self.clock);
+        let job = crawl_job_from_dispatch(entry, slot.lane());
         tokio::spawn(async move {
             info!(
                 worker = WorkerId::CrawlWorkerPool.as_str(),
@@ -219,15 +173,14 @@ impl<S, F> EventWorker for CrawlWorkerPool<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>:
-        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
 {
     fn id(&self) -> WorkerId {
         WorkerId::CrawlWorkerPool
     }
 
     fn interests(&self) -> EventInterests {
-        EventInterests::new([CrawlJobEnqueuedEvent::TYPE])
+        EventInterests::empty()
     }
 
     async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
@@ -235,7 +188,7 @@ where
     }
 }
 
-/// Runs one claimed crawl job through fetch, parse, and completion recording.
+/// Runs one dispatched crawl through fetch, parse, and completion recording.
 struct CrawlWorker<S, F> {
     db: S,
     fetcher: F,
@@ -266,8 +219,7 @@ impl<S, F> CrawlWorker<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Send + Sync,
-    for<'tx> S::Tx<'tx>:
-        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
 {
     #[tracing::instrument(
         name = "registry.crawl.worker.run",
@@ -410,6 +362,28 @@ fn log_crawl_job_completed(
     }
 }
 
+fn dispatch_lane(trigger: CrawlJobTrigger) -> CrawlJobQueueLane {
+    match trigger {
+        CrawlJobTrigger::ManualRequest => CrawlJobQueueLane::Manual,
+        CrawlJobTrigger::RetryDue => CrawlJobQueueLane::Retry,
+        CrawlJobTrigger::TargetChanged | CrawlJobTrigger::PeriodicDue => CrawlJobQueueLane::Default,
+    }
+}
+
+fn crawl_job_from_dispatch(entry: DispatchEntry, lane: CrawlJobQueueLane) -> CrawlJob {
+    CrawlJob::new(
+        CrawlJobId::generate(),
+        entry.feed_url,
+        CrawlJobState::Running,
+        entry.trigger,
+        lane,
+        0,
+        entry.dispatched_at,
+        entry.dispatched_at,
+        entry.dispatched_at,
+    )
+}
+
 fn feed_fetch_request(job: &CrawlJob, previous_state: Option<&CrawlState>) -> FeedFetchRequest {
     let conditional = previous_state
         .map(|state| state.conditional.clone())
@@ -476,6 +450,7 @@ impl CrawlWorkerSlot {
 pub(crate) fn spawn_crawl_worker_pool<S, F>(
     db: S,
     fetcher: F,
+    dispatch_queue: DispatchQueueReader,
     wake_publisher: EventWakePublisher,
     poll_interval: Duration,
     config: CrawlWorkerPoolConfig,
@@ -485,13 +460,13 @@ pub(crate) fn spawn_crawl_worker_pool<S, F>(
 where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>:
-        BlobStore + CrawlResultStore + CrawlJobQueue + EventJournalAppend + EventJournal + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
 {
     let pool = CrawlWorkerPool::new(
         db,
         fetcher,
         wake_publisher.clone(),
+        dispatch_queue,
         config,
         ct.clone(),
         clock,
@@ -502,13 +477,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        CLAIM_LANES, CrawlWorkerCapacity, CrawlWorkerFetchConfig, CrawlWorkerPoolConfig,
-        CrawlWorkerQueueConfig,
+        CrawlWorkerCapacity, CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig,
     };
     use crate::crawl::job::CrawlJobQueueLane;
 
     mod capacity {
-        use super::{CLAIM_LANES, CrawlJobQueueLane, CrawlWorkerCapacity, config};
+        use super::{CrawlJobQueueLane, CrawlWorkerCapacity, config};
 
         #[test]
         fn enforces_global_and_lane_capacity() {
@@ -531,18 +505,6 @@ mod tests {
 
             drop(default);
             drop(retry);
-        }
-
-        #[test]
-        fn claim_lanes_are_fixed_priority_order() {
-            assert_eq!(
-                CLAIM_LANES,
-                [
-                    CrawlJobQueueLane::Manual,
-                    CrawlJobQueueLane::Default,
-                    CrawlJobQueueLane::Retry
-                ]
-            );
         }
     }
 

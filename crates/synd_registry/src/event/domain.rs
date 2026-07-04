@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use derive_more::From;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use strum::{Display, EnumDiscriminants, EnumString, IntoStaticStr};
@@ -7,7 +6,7 @@ use synd_feed::types::{EntryId, FeedUrl};
 use crate::{
     api::{ApiEvent, ApiTimelineChanged},
     crawl::{
-        job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
+        job::{CrawlJob, CrawlJobId},
         policy::CrawlPolicy,
     },
     subscription::{FeedSubscriptionAttrs, SubscriptionKey},
@@ -38,12 +37,9 @@ pub enum Event {
     #[serde(rename = "crawl.target.deactivated")]
     #[strum_discriminants(strum(serialize = "crawl.target.deactivated"))]
     CrawlTargetDeactivated(CrawlTargetDeactivatedEvent),
-    #[serde(rename = "crawl.job.enqueued")]
-    #[strum_discriminants(strum(serialize = "crawl.job.enqueued"))]
-    CrawlJobEnqueued(CrawlJobEnqueuedEvent),
-    #[serde(rename = "crawl.job.started")]
-    #[strum_discriminants(strum(serialize = "crawl.job.started"))]
-    CrawlJobStarted(CrawlJobStartedEvent),
+    #[serde(rename = "crawl.requested")]
+    #[strum_discriminants(strum(serialize = "crawl.requested"))]
+    CrawlRequested(CrawlRequestedEvent),
     #[serde(rename = "crawl.job.finished")]
     #[strum_discriminants(strum(serialize = "crawl.job.finished"))]
     CrawlJobFinished(CrawlJobFinishedEvent),
@@ -258,66 +254,15 @@ impl CrawlTargetDeactivatedEvent {
     }
 }
 
-/// A durable crawl job was created and can wake crawl workers.
+/// A crawl was explicitly requested for one feed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CrawlJobEnqueuedEvent {
-    pub job_id: CrawlJobId,
-    pub feed_url: FeedUrl,
-    pub trigger: CrawlJobTrigger,
-    pub queue: CrawlJobQueueLane,
-    pub priority: i64,
-    pub run_after: DateTime<Utc>,
-}
-
-impl CrawlJobEnqueuedEvent {
-    pub fn new(
-        job_id: CrawlJobId,
-        feed_url: FeedUrl,
-        trigger: CrawlJobTrigger,
-        queue: CrawlJobQueueLane,
-        priority: i64,
-        run_after: DateTime<Utc>,
-    ) -> Self {
-        Self {
-            job_id,
-            feed_url,
-            trigger,
-            queue,
-            priority,
-            run_after,
-        }
-    }
-}
-
-impl From<CrawlJob> for CrawlJobEnqueuedEvent {
-    fn from(job: CrawlJob) -> Self {
-        Self::new(
-            job.job_id,
-            job.feed_url,
-            job.trigger,
-            job.queue,
-            job.priority,
-            job.run_after,
-        )
-    }
-}
-
-/// A crawl job moved from pending to running.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CrawlJobStartedEvent {
-    pub job_id: CrawlJobId,
+pub struct CrawlRequestedEvent {
     pub feed_url: FeedUrl,
 }
 
-impl CrawlJobStartedEvent {
-    pub fn new(job_id: CrawlJobId, feed_url: FeedUrl) -> Self {
-        Self { job_id, feed_url }
-    }
-}
-
-impl From<CrawlJob> for CrawlJobStartedEvent {
-    fn from(job: CrawlJob) -> Self {
-        Self::new(job.job_id, job.feed_url)
+impl CrawlRequestedEvent {
+    pub fn new(feed_url: FeedUrl) -> Self {
+        Self { feed_url }
     }
 }
 
@@ -452,12 +397,8 @@ impl RegistryEvent for CrawlTargetDeactivatedEvent {
     const TYPE: EventType = EventType::CrawlTargetDeactivated;
 }
 
-impl RegistryEvent for CrawlJobEnqueuedEvent {
-    const TYPE: EventType = EventType::CrawlJobEnqueued;
-}
-
-impl RegistryEvent for CrawlJobStartedEvent {
-    const TYPE: EventType = EventType::CrawlJobStarted;
+impl RegistryEvent for CrawlRequestedEvent {
+    const TYPE: EventType = EventType::CrawlRequested;
 }
 
 impl RegistryEvent for CrawlJobFinishedEvent {

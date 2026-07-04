@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 
-use crate::crawl::result::FailureStreak;
+use crate::crawl::{result::FailureStreak, schedule::ScheduledDue};
 
 /// Scheduler-facing crawl fact submitted before dispatch ordering is decided.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,19 +10,6 @@ pub(crate) enum SchedInput {
     ManualRequested(ManualRequested),
     RetryDue(RetryDue),
     CrawlFinished(CrawlFinished),
-}
-
-/// Periodic crawl due fact reconstructed from durable crawl schedule state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ScheduledDue {
-    pub(crate) feed_url: FeedUrl,
-    pub(crate) due_at: DateTime<Utc>,
-}
-
-impl ScheduledDue {
-    pub(crate) fn new(feed_url: FeedUrl, due_at: DateTime<Utc>) -> Self {
-        Self { feed_url, due_at }
-    }
 }
 
 impl From<ScheduledDue> for SchedInput {
@@ -38,15 +25,6 @@ pub(crate) struct ManualRequested {
     pub(crate) requested_at: DateTime<Utc>,
 }
 
-impl ManualRequested {
-    pub(crate) fn new(feed_url: FeedUrl, requested_at: DateTime<Utc>) -> Self {
-        Self {
-            feed_url,
-            requested_at,
-        }
-    }
-}
-
 impl From<ManualRequested> for SchedInput {
     fn from(value: ManualRequested) -> Self {
         Self::ManualRequested(value)
@@ -59,20 +37,6 @@ pub(crate) struct RetryDue {
     pub(crate) feed_url: FeedUrl,
     pub(crate) due_at: DateTime<Utc>,
     pub(crate) failure_streak: FailureStreak,
-}
-
-impl RetryDue {
-    pub(crate) fn new(
-        feed_url: FeedUrl,
-        due_at: DateTime<Utc>,
-        failure_streak: FailureStreak,
-    ) -> Self {
-        Self {
-            feed_url,
-            due_at,
-            failure_streak,
-        }
-    }
 }
 
 impl From<RetryDue> for SchedInput {

@@ -4,11 +4,12 @@ use chrono::{DateTime, Utc};
 use synd_feed::types::FeedUrl;
 use tracing::debug;
 
+use crate::crawl::dispatch::{DispatchBatch, DispatchContext, DispatchEntry};
 use crate::crawl::{
     job::CrawlJobTrigger,
+    schedule::ScheduledDue,
     scheduler::{
-        dispatch::{DispatchBatch, DispatchContext, DispatchEntry},
-        input::{ManualRequested, RetryDue, SchedInput, ScheduledDue},
+        input::{ManualRequested, RetryDue, SchedInput},
         policy::Scheduler,
     },
 };

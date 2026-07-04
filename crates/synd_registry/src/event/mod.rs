@@ -7,7 +7,7 @@ mod worker;
 
 pub use codec::{EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult};
 pub use domain::{
-    CrawlJobEnqueuedEvent, CrawlJobFinishedEvent, CrawlJobStartedEvent, CrawlTargetActivatedEvent,
+    CrawlJobFinishedEvent, CrawlRequestedEvent, CrawlTargetActivatedEvent,
     CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
     EntryDiscoveredEvent, Event, EventInterests, EventType, FeedChangedEvent, FeedDiscoveredEvent,
     FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubEvent, SubscriptionChangedEvent,
@@ -18,14 +18,12 @@ pub use journal::{
 };
 pub(crate) use processor::skip_permanent_error;
 pub use processor::{
-    ClassifyError, EventInput, FailureClass, InputBatch, Processor, ProcessorError, ProcessorId,
-    ProcessorResult, Projector, Reconciler, RecordedEvents, Sink,
+    ClassifyError, EventInput, EventReconciler, FailureClass, InputBatch, Processor,
+    ProcessorError, ProcessorId, ProcessorResult, Projector, RecordedEvents, Sink,
 };
-pub(crate) use processor::{CursorProjector, CursorReconciler, CursorRole};
+pub(crate) use processor::{CursorProjector, CursorRole, EventReconcilerAdapter};
 pub use recorder::EventRecorder;
-pub(crate) use worker::{
-    CursorAdapter, EventWorker, PostCommitAdapter, ScanAdapter, spawn_event_loop,
-};
+pub(crate) use worker::{CursorAdapter, EventWorker, PostCommitAdapter, spawn_event_loop};
 pub use worker::{
     EventWake, EventWakePublisher, EventWakeRecvError, EventWakeSubscriber, Trigger, WorkerError,
     WorkerHandle, WorkerId, WorkerResult, WorkerSet,

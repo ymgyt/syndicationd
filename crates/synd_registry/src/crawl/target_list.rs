@@ -9,8 +9,8 @@ use crate::{
     db::{CrawlTargetStore, FeedRegistryDb, SubscriptionStore},
     event::{
         CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
-        Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch,
-        Processor, ProcessorError, ProcessorId, ProcessorResult, Reconciler, RegistryEvent,
+        Event, EventInput, EventReconciler, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent,
+        InputBatch, Processor, ProcessorError, ProcessorId, ProcessorResult, RegistryEvent,
         SubEvent, SubscriptionChangedEvent, skip_permanent_error,
     },
     subscription::SubscriptionKey,
@@ -177,7 +177,7 @@ impl Processor for CrawlTargetListProj {
     }
 }
 
-impl<S> Reconciler<S> for CrawlTargetListProj
+impl<S> EventReconciler<S> for CrawlTargetListProj
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + Send,

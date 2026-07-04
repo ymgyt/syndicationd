@@ -69,7 +69,7 @@ pub enum ProcessorId {
     TimelineProjection,
     ApiEventProjection,
     ApiEventPublisher,
-    CrawlScheduler,
+    CrawlReconciler,
 }
 
 impl ProcessorId {
@@ -81,7 +81,7 @@ impl ProcessorId {
             Self::TimelineProjection => "TimelineProjection",
             Self::ApiEventProjection => "ApiEventProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
-            Self::CrawlScheduler => "CrawlScheduler",
+            Self::CrawlReconciler => "CrawlReconciler",
         }
     }
 }
@@ -181,8 +181,8 @@ where
     }
 }
 
-/// An idempotent reconciler that may be driven by a cursor or by a scan tick.
-pub trait Reconciler<S>: Processor
+/// An idempotent reconciler driven by selected journal events.
+pub trait EventReconciler<S>: Processor
 where
     S: FeedRegistryDb,
 {
@@ -249,17 +249,17 @@ where
 }
 
 /// Marks a reconciler as cursor-driven when it reacts to selected journal facts.
-pub(crate) struct CursorReconciler<P> {
+pub(crate) struct EventReconcilerAdapter<P> {
     processor: P,
 }
 
-impl<P> CursorReconciler<P> {
+impl<P> EventReconcilerAdapter<P> {
     pub(crate) fn new(processor: P) -> Self {
         Self { processor }
     }
 }
 
-impl<P> Processor for CursorReconciler<P>
+impl<P> Processor for EventReconcilerAdapter<P>
 where
     P: Processor,
 {
@@ -274,10 +274,10 @@ where
     }
 }
 
-impl<S, P> CursorRole<S> for CursorReconciler<P>
+impl<S, P> CursorRole<S> for EventReconcilerAdapter<P>
 where
     S: FeedRegistryDb,
-    P: Reconciler<S>,
+    P: EventReconciler<S>,
 {
     async fn process_cursor_batch(
         &mut self,

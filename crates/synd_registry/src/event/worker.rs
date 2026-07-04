@@ -11,8 +11,8 @@ use crate::{
     error::RegistryDbError,
     event::{
         CursorRole, EventInput, EventInterests, EventJournal, EventJournalAppend, EventReadBatch,
-        EventRecorder, InputBatch, Processor, ProcessorError, ProcessorId, Reconciler,
-        RecordedEvents, Sink, skip_permanent_error,
+        EventRecorder, InputBatch, Processor, ProcessorError, ProcessorId, RecordedEvents, Sink,
+        skip_permanent_error,
     },
 };
 
@@ -52,7 +52,6 @@ impl Trigger {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WorkerId {
     Processor(ProcessorId),
-    CrawlScheduler,
     CrawlWorkerPool,
 }
 
@@ -60,7 +59,6 @@ impl WorkerId {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Processor(processor) => processor.as_str(),
-            Self::CrawlScheduler => "CrawlScheduler",
             Self::CrawlWorkerPool => "CrawlWorkerPool",
         }
     }
@@ -407,61 +405,6 @@ where
             event_count,
             cursor_position = ?scanned_cursor.position(),
             "registry cursor worker advanced"
-        );
-
-        Ok(recorded_events)
-    }
-}
-
-/// Adapts an idempotent scan reconciler to the shared wake-driven loop.
-pub(crate) struct ScanAdapter<S, P> {
-    db: S,
-    processor: P,
-    clock: Arc<dyn Clock>,
-}
-
-impl<S, P> ScanAdapter<S, P> {
-    pub fn new(db: S, processor: P, clock: Arc<dyn Clock>) -> Self {
-        Self {
-            db,
-            processor,
-            clock,
-        }
-    }
-}
-
-impl<S, P> EventWorker for ScanAdapter<S, P>
-where
-    S: FeedRegistryDb,
-    P: Reconciler<S>,
-    for<'tx> S::Tx<'tx>: EventJournalAppend,
-{
-    fn id(&self) -> WorkerId {
-        self.processor.id().into()
-    }
-
-    fn interests(&self) -> EventInterests {
-        EventInterests::empty()
-    }
-
-    async fn react(&mut self, _trigger: Trigger) -> WorkerResult<RecordedEvents> {
-        let mut tx = self.db.begin().await?;
-        let produced = self
-            .processor
-            .reconcile(&mut tx, self.clock.now(), InputBatch::new(Vec::new()))
-            .await?;
-        let mut recorded_events = RecordedEvents::with_capacity(produced.len());
-        {
-            let mut event_recorder =
-                EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref());
-            event_recorder.record_all(produced).await?;
-        }
-        tx.commit().await?;
-
-        debug!(
-            worker = self.id().as_str(),
-            recorded_count = recorded_events.len(),
-            "registry scan worker reconciled"
         );
 
         Ok(recorded_events)
