@@ -28,8 +28,9 @@ zstd       = { workspace = true }
 [dev-dependencies]
 anyhow       = { workspace = true }
 synd-support = { path = "../synd_support", version = "0.1.0" }
+synd-test    = { path = "../synd_test", version = "0.1.0" }
 tempfile   = { workspace = true }
-tokio      = { workspace = true, features = ["macros", "rt"] }
+tokio      = { workspace = true, features = ["macros", "net", "rt", "time"] }
 tokio-util = { workspace = true }
 
 [lints]

@@ -5587,6 +5587,7 @@ dependencies = [
  "synd-feed",
  "synd-registry",
  "synd-support",
+ "synd-test",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
