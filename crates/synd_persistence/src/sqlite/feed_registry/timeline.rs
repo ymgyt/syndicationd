@@ -14,6 +14,7 @@ use synd_registry::{
 use super::{
     codec,
     error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
+    pagination::PageLimit,
 };
 
 const TIMELINE_ITEM_SELECT: &str = r#"
@@ -188,7 +189,7 @@ async fn list_items(
     tx: &mut Transaction<'_, Sqlite>,
     query: TimelineItemsQuery,
 ) -> SqliteResult<TimelineItemsPage> {
-    let first = i64::try_from(query.first.saturating_add(1)).unwrap_or(i64::MAX);
+    let page_limit = PageLimit::new(query.first);
     let mut sql = QueryBuilder::<Sqlite>::new(TIMELINE_ITEM_SELECT);
     sql.push(" WHERE t.subscriber_id = ");
     sql.push_bind(query.subscriber_id.as_str());
@@ -210,7 +211,7 @@ async fn list_items(
     }
 
     sql.push(" ORDER BY ti.order_time DESC, fe.url DESC, e.entry_id DESC LIMIT ");
-    sql.push_bind(first);
+    sql.push_bind(page_limit.sql_limit());
 
     let rows = sql
         .build_query_as::<TimelineItemRow>()
@@ -220,10 +221,7 @@ async fn list_items(
         .into_iter()
         .map(|row| row.into_node(&query.subscriber_id))
         .collect::<SqliteResult<Vec<_>>>()?;
-    let has_next_page = nodes.len() > query.first;
-    if has_next_page {
-        nodes.truncate(query.first);
-    }
+    let has_next_page = page_limit.truncate_overfetch(&mut nodes);
     let end_cursor = nodes.last().map(|node| node.cursor.clone());
 
     Ok(TimelineItemsPage {

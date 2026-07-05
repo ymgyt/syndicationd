@@ -14,6 +14,7 @@ mod error;
 mod feed;
 mod feed_endpoint;
 mod journal;
+mod pagination;
 mod subscription;
 #[cfg(test)]
 mod test_support;

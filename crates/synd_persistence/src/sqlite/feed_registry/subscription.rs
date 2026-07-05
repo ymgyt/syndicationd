@@ -14,6 +14,7 @@ use super::{
     SqliteRegistryTx, codec,
     error::{DecodeResultExt, IntoDbResult, SqliteResult},
     feed_endpoint,
+    pagination::PageLimit,
 };
 
 const SUBSCRIPTION_SELECT_COLUMNS: &str = r#"
@@ -120,7 +121,7 @@ async fn list(
     tx: &mut Transaction<'_, Sqlite>,
     query: SubscriptionsQuery,
 ) -> SqliteResult<Subscriptions> {
-    let first = i64::try_from(query.first.saturating_add(1)).unwrap_or(i64::MAX);
+    let page_limit = PageLimit::new(query.first);
     let rows = if let Some(after) = query.after {
         let sql = format!(
             r#"
@@ -136,7 +137,7 @@ async fn list(
         sqlx::query_as::<_, SubscriptionRow>(&sql)
             .bind(query.subscriber_id.as_str())
             .bind(after)
-            .bind(first)
+            .bind(page_limit.sql_limit())
             .fetch_all(&mut **tx)
             .await
     } else {
@@ -153,7 +154,7 @@ async fn list(
         );
         sqlx::query_as::<_, SubscriptionRow>(&sql)
             .bind(query.subscriber_id.as_str())
-            .bind(first)
+            .bind(page_limit.sql_limit())
             .fetch_all(&mut **tx)
             .await
     }?;
@@ -162,10 +163,7 @@ async fn list(
         .into_iter()
         .map(SubscriptionRow::into_subscription)
         .collect::<SqliteResult<Vec<_>>>()?;
-    let has_next_page = nodes.len() > query.first;
-    if has_next_page {
-        nodes.truncate(query.first);
-    }
+    let has_next_page = page_limit.truncate_overfetch(&mut nodes);
     let end_cursor = nodes.last().map(|sub| sub.feed_url.to_string());
 
     Ok(Subscriptions::from_subscriptions(
