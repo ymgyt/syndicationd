@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-pub struct TermInit;
+pub struct TermUninit;
 pub struct TermReady;
 pub struct TermRestored;
 

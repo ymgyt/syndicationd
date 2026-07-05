@@ -22,7 +22,7 @@ impl FeedDriver {
         cx: &mut DriverContext<'_>,
         input: payload::SubscribeFeedInput,
     ) -> Vec<Event> {
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::SubscribeFeed);
         let fut = async move {
             match feed_api.subscribe_feed(input).await {
@@ -42,7 +42,7 @@ impl FeedDriver {
     }
 
     pub(super) fn refresh_feed(cx: &mut DriverContext<'_>, url: FeedUrl) -> Vec<Event> {
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::RefreshFeed);
         let event = Event::FeedRefreshRequested {
             request_seq,
@@ -87,7 +87,7 @@ impl FeedDriver {
         request_id: String,
         remaining: u16,
     ) -> Vec<Event> {
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchFeedStatus);
         let fut = async move {
             match feed_api.fetch_feed_status(url.clone()).await {
@@ -114,7 +114,7 @@ impl FeedDriver {
     }
 
     pub(super) fn unsubscribe_feed(cx: &mut DriverContext<'_>, url: FeedUrl) -> Vec<Event> {
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::UnsubscribeFeed);
         let fut = async move {
             match feed_api.unsubscribe_feed(url.clone()).await {
@@ -135,7 +135,7 @@ impl FeedDriver {
         subscriptions_first: i64,
         timeline_first: i64,
     ) -> Vec<Event> {
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchSubscription);
         let fut = async move {
             match feed_api
@@ -166,7 +166,7 @@ impl FeedDriver {
         if first <= 0 {
             return Vec::new();
         }
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchSubscription);
         let fut = async move {
             match feed_api.fetch_subscription(after, Some(first)).await {
@@ -202,7 +202,7 @@ impl FeedDriver {
             timeline_refetch,
             "fetch entries"
         );
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         let request_seq = cx.runtime.request_started(RequestId::FetchEntries);
         let mut events = vec![Event::EntryFetchStarted {
             request_seq,

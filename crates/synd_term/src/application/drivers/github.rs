@@ -19,7 +19,7 @@ impl GitHubDriver {
         populate: Populate,
         params: FetchNotificationsParams,
     ) -> Vec<Event> {
-        let Some(client) = cx.adapters.github_client.clone() else {
+        let Some(client) = cx.handles.github_client.clone() else {
             return vec![Event::Error {
                 message: "github client is not configured".to_owned(),
             }];
@@ -51,7 +51,7 @@ impl GitHubDriver {
         cx: &mut DriverContext<'_>,
         contexts: Vec<IssueOrPullRequest>,
     ) -> Vec<Event> {
-        let Some(client) = cx.adapters.github_client.clone() else {
+        let Some(client) = cx.handles.github_client.clone() else {
             return vec![Event::Error {
                 message: "github client is not configured".to_owned(),
             }];
@@ -119,7 +119,7 @@ impl GitHubDriver {
         cx: &mut DriverContext<'_>,
         id: NotificationId,
     ) -> Vec<Event> {
-        let Some(client) = cx.adapters.github_client.clone() else {
+        let Some(client) = cx.handles.github_client.clone() else {
             return vec![Event::Error {
                 message: "github client is not configured".to_owned(),
             }];
@@ -147,7 +147,7 @@ impl GitHubDriver {
     }
 
     pub(super) fn unsubscribe_thread(cx: &mut DriverContext<'_>, id: ThreadId) -> Vec<Event> {
-        let Some(client) = cx.adapters.github_client.clone() else {
+        let Some(client) = cx.handles.github_client.clone() else {
             return vec![Event::Error {
                 message: "github client is not configured".to_owned(),
             }];

@@ -16,24 +16,24 @@ use crate::{
     ui::widgets::gh_notifications::GhNotificationFilterOptions,
 };
 
-mod adapters;
 mod auth;
 mod dispatcher;
 mod feed;
 mod feed_events;
 mod github;
+mod handles;
 mod interaction;
 mod runtime;
 
-use adapters::DriverAdapters;
 use dispatcher::OperationDispatcher;
 pub(in crate::application) use feed_events::FeedEventMessage;
 use feed_events::FeedEventSubscription;
+use handles::DriverHandles;
 use runtime::{DriverPollers, DriverRuntime};
 
-/// Facade over outside-world adapters, execution machinery, and operation routing.
+/// Facade over outside-world handles, execution machinery, and operation routing.
 pub(super) struct Drivers {
-    adapters: DriverAdapters,
+    pub(super) handles: DriverHandles,
     runtime: DriverRuntime,
     feed_events: FeedEventSubscription,
     operation_dispatcher: OperationDispatcher,
@@ -53,7 +53,7 @@ pub(super) struct DriverParts {
 }
 
 pub(super) struct DriverContext<'a> {
-    adapters: &'a mut DriverAdapters,
+    handles: &'a mut DriverHandles,
     runtime: &'a mut DriverRuntime,
     feed_events: &'a mut FeedEventSubscription,
 }
@@ -74,7 +74,7 @@ impl Drivers {
         } = parts;
 
         Self {
-            adapters: DriverAdapters::new(adapters::DriverAdapterParts {
+            handles: DriverHandles::new(handles::DriverHandleParts {
                 terminal,
                 feed_api,
                 feed_api_session,
@@ -123,25 +123,17 @@ impl Drivers {
         &self,
         cred: &Verified<Credential>,
     ) -> Result<(), PersistCacheError> {
-        self.adapters.cache.persist_credential(cred)
+        self.handles.cache.persist_credential(cred)
     }
 
     pub(super) async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
         let restore = crate::auth::Restore {
-            jwt_service: self.adapters.jwt_service(),
-            cache: &self.adapters.cache,
-            now: self.adapters.now(),
+            jwt_service: self.handles.jwt_service(),
+            cache: &self.handles.cache,
+            now: self.handles.now(),
             persist_when_refreshed: true,
         };
         restore.restore().await
-    }
-
-    pub(super) fn init_terminal(&mut self) -> std::io::Result<()> {
-        self.adapters.terminal.init()
-    }
-
-    pub(super) fn restore_terminal(&mut self) -> std::io::Result<()> {
-        self.adapters.terminal.restore()
     }
 
     pub(super) fn render<F>(&mut self, f: F) -> anyhow::Result<()>
@@ -149,41 +141,40 @@ impl Drivers {
         F: FnOnce(&mut Frame, &super::InFlight, DateTime<Utc>),
     {
         let in_flight = &self.runtime.in_flight;
-        let now = self.adapters.now();
-        self.adapters
+        let now = self.handles.now();
+        self.handles
             .terminal
             .render(|frame| f(frame, in_flight, now))
     }
 
     pub(super) fn feed_api_session_requires_user_credential(&self) -> bool {
-        self.adapters.feed_api_session.requires_user_credential()
+        self.handles.feed_api_session.requires_user_credential()
     }
 
     pub(super) fn supports_feed_event_subscription(&self) -> bool {
-        self.adapters.feed_api.supports_feed_event_subscription()
+        self.handles.feed_api.supports_feed_event_subscription()
     }
 
     pub(super) fn restart_feed_events_if_running(&mut self) -> bool {
-        let feed_api = self.adapters.feed_api.clone();
+        let feed_api = self.handles.feed_api.clone();
         self.feed_events.restart_if_running(feed_api)
     }
 
     pub(super) fn load_gh_notification_filter_options(
         &self,
     ) -> Result<GhNotificationFilterOptions, LoadCacheError> {
-        self.adapters.cache.load_gh_notification_filter_options()
+        self.handles.cache.load_gh_notification_filter_options()
     }
 
     pub(super) fn persist_gh_notification_filter_options(
         &self,
         options: &GhNotificationFilterOptions,
     ) -> Result<(), PersistCacheError> {
-        self.adapters
-            .persist_gh_notification_filter_options(options)
+        self.handles.persist_gh_notification_filter_options(options)
     }
 
     pub(super) fn clean_cache(&self) {
-        self.adapters.cache.clean_credential().ok();
+        self.handles.cache.clean_credential().ok();
     }
 
     pub(super) fn clear_idle_timer(&mut self) {
@@ -200,7 +191,7 @@ impl Drivers {
 
     #[cfg(feature = "integration")]
     pub(super) fn buffer(&self) -> &ratatui::buffer::Buffer {
-        self.adapters.terminal.buffer()
+        self.handles.terminal.buffer()
     }
 
     #[cfg(feature = "integration")]
@@ -210,7 +201,7 @@ impl Drivers {
 
     fn context(&mut self) -> DriverContext<'_> {
         DriverContext {
-            adapters: &mut self.adapters,
+            handles: &mut self.handles,
             runtime: &mut self.runtime,
             feed_events: &mut self.feed_events,
         }

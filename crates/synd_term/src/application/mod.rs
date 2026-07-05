@@ -62,7 +62,7 @@ mod operations;
 use component::AppComponent;
 use drivers::{DriverParts, Drivers};
 use lifecycle::Lifecycle;
-pub use lifecycle::{SessPending, SessReady, TermInit, TermReady, TermRestored};
+pub use lifecycle::{SessPending, SessReady, TermReady, TermRestored, TermUninit};
 
 const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
 const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -76,7 +76,7 @@ pub enum Populate {
 }
 
 /// Composition root that owns the event loop and connects components to drivers.
-pub struct Application<Term = TermInit, Sess = SessPending> {
+pub struct Application<Term = TermUninit, Sess = SessPending> {
     drivers: Drivers,
     components: AppComponent,
     keymap: crate::keymap::Keymap,
@@ -109,7 +109,7 @@ impl FeedRefreshPollKey {
     }
 }
 
-impl Application<TermInit, SessPending> {
+impl Application<TermUninit, SessPending> {
     /// Construct `ApplicationBuilder`
     pub fn builder() -> ApplicationBuilder {
         ApplicationBuilder::default()
@@ -166,45 +166,53 @@ impl Application<TermInit, SessPending> {
         }
     }
 
-    pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
+    #[expect(clippy::large_futures)]
+    pub async fn run<S>(self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        self.init().await?;
-
-        self.event_loop(input).await;
-
-        self.shutdown_drivers();
-
-        self.cleanup().ok();
+        match self.init().await? {
+            StartSession::Ready(app) => {
+                let _app = app.run_until_exit(input).await?;
+            }
+            StartSession::Pending(app) => {
+                let _app = app.run_until_exit(input).await?;
+            }
+        }
 
         Ok(())
     }
 
-    pub fn init_terminal(mut self) -> anyhow::Result<Application<TermReady, SessPending>> {
-        self.init_terminal_driver()?;
-        Ok(self.into_terminal_ready())
+    /// Initialize terminal and application state.
+    async fn init(self) -> anyhow::Result<StartSession> {
+        let mut app = self.init_terminal()?;
+        app.restore_github_notification_filter_options();
+        Ok(app.start_session().await)
+    }
+}
+
+impl<Sess> Application<TermUninit, Sess> {
+    pub fn init_terminal(mut self) -> anyhow::Result<Application<TermReady, Sess>> {
+        match self.drivers.handles.terminal.init() {
+            Ok(()) => Ok(self.into_terminal_ready()),
+            Err(err) => {
+                if self.components.shell.should_quit() {
+                    warn!("Failed to init terminal: {err}");
+                    Ok(self.into_terminal_ready())
+                } else {
+                    Err(err.into())
+                }
+            }
+        }
     }
 
     #[cfg(feature = "integration")]
     #[must_use]
-    pub fn assume_terminal_ready(self) -> Application<TermReady, SessPending> {
+    pub fn assume_terminal_ready(self) -> Application<TermReady, Sess> {
         self.into_terminal_ready()
     }
 
-    /// Initialize application.
-    /// Setup terminal and handle cache.
-    async fn init(&mut self) -> anyhow::Result<()> {
-        self.init_terminal_driver()?;
-        self.restore_github_notification_filter_options();
-        let _ = self.start_feed_session_in_place().await;
-
-        Ok(())
-    }
-}
-
-impl Application<TermInit, SessPending> {
-    fn into_terminal_ready(self) -> Application<TermReady, SessPending> {
+    fn into_terminal_ready(self) -> Application<TermReady, Sess> {
         let Self {
             drivers,
             components,
@@ -252,6 +260,17 @@ impl Application<TermReady, SessPending> {
 }
 
 impl<Sess> Application<TermReady, Sess> {
+    async fn run_until_exit<S>(
+        mut self,
+        input: &mut S,
+    ) -> anyhow::Result<Application<TermRestored, Sess>>
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        self.event_loop(input).await;
+        self.stop()
+    }
+
     pub fn stop(mut self) -> anyhow::Result<Application<TermRestored, Sess>> {
         self.shutdown_drivers();
         self.cleanup()?;
@@ -275,20 +294,6 @@ impl<Sess> Application<TermReady, Sess> {
 }
 
 impl<Term, Sess> Application<Term, Sess> {
-    fn init_terminal_driver(&mut self) -> anyhow::Result<()> {
-        match self.drivers.init_terminal() {
-            Ok(()) => Ok(()),
-            Err(err) => {
-                if self.components.shell.should_quit() {
-                    warn!("Failed to init terminal: {err}");
-                    Ok(())
-                } else {
-                    Err(err.into())
-                }
-            }
-        }
-    }
-
     fn restore_github_notification_filter_options(&mut self) {
         if !self.config.features.enable_github_notification {
             return;
@@ -373,7 +378,7 @@ impl<Term, Sess> Application<Term, Sess> {
             }
         }
 
-        self.drivers.restore_terminal()?;
+        self.drivers.handles.terminal.restore()?;
 
         Ok(())
     }

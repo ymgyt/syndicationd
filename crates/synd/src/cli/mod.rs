@@ -44,9 +44,6 @@ pub struct Args {
     /// Cache directory
     #[arg(long, env = config::env::CACHE_DIR)]
     pub cache_dir: Option<PathBuf>,
-    /// Color theme
-    #[arg(value_enum, long = "theme", env = config::env::THEME, value_name = "THEME")]
-    pub palette: Option<Palette>,
     #[command(subcommand)]
     pub command: Option<Command>,
     #[command(flatten)]
@@ -56,11 +53,7 @@ pub struct Args {
     #[command(flatten)]
     pub backend: BackendOptions,
     #[command(flatten)]
-    pub feed: FeedOptions,
-    #[command(flatten)]
-    pub github: GithubOptions,
-    #[arg(hide = true, long = "dry-run", hide_long_help = true)]
-    pub dry_run: bool,
+    pub term: command::term::TermCommand,
 }
 
 #[derive(clap::Args, Debug)]
@@ -93,7 +86,7 @@ pub struct BackendOptions {
     pub sqlite_db: Option<PathBuf>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Clone, Debug)]
 #[command(next_help_heading = "Feed options")]
 pub struct FeedOptions {
     /// Feed entries limit to fetch
@@ -107,7 +100,7 @@ pub struct FeedOptions {
     pub browser_args: Option<Vec<String>>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Clone, Debug)]
 #[command(next_help_heading = "GitHub options")]
 pub struct GithubOptions {
     /// Enable GitHub notification feature
@@ -129,6 +122,7 @@ pub struct GithubOptions {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    Term(command::term::TermCommand),
     #[command(alias = "clear")]
     Clean(command::clean::CleanCommand),
     Daemon(command::daemon::DaemonCommand),
@@ -144,5 +138,8 @@ pub enum OutputFormat {
 }
 
 pub fn parse() -> Args {
-    Args::parse()
+    let mut args = Args::parse();
+    args.command
+        .get_or_insert_with(|| Command::Term(args.term.clone()));
+    args
 }

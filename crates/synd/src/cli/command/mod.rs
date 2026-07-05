@@ -5,6 +5,7 @@ pub mod doctor;
 pub mod export;
 pub mod feed;
 pub mod import;
+pub mod term;
 
 use std::{io, process::ExitCode};
 

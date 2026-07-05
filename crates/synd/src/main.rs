@@ -1,20 +1,9 @@
-use std::{io::IsTerminal as _, path::PathBuf, process::ExitCode};
+use std::{io::IsTerminal as _, process::ExitCode};
 
-use anyhow::Context as _;
-use synd_runtime::Session;
 use synd_support::fs::fsimpl::FileSystem;
-use synd_term::{
-    application::{Application, Cache, Config, Features, FeedBackend},
-    client::github::GithubClient,
-    interact::{ProcessInteractor, TextBrowserInteractor},
-    terminal::{self, Terminal},
-    ui::theme::Theme,
-};
-use tracing::error;
-use tracing::{info, warn};
 use tracing_appender::non_blocking::WorkerGuard;
 
-use crate::{cli::Args, config::ConfigResolver, runtime::FeedRuntime};
+use crate::{cli::Args, config::ConfigResolver};
 
 mod cli;
 mod config;
@@ -22,9 +11,8 @@ mod release;
 mod runtime;
 
 fn init_tracing(
-    log_path: Option<PathBuf>,
-    default_filter: &'static str,
-    stderr: bool,
+    config: &ConfigResolver,
+    command: &cli::Command,
 ) -> anyhow::Result<Option<WorkerGuard>> {
     use synd_support::o11y::{
         opentelemetry::init_propagation, tracing_subscriber::otel_metrics::metrics_event_filter,
@@ -37,28 +25,32 @@ fn init_tracing(
         util::SubscriberInitExt as _,
     };
 
-    let (writer, guard, enable_ansi) = if let Some(log_path) = log_path {
-        if let Some(parent) = log_path.parent() {
-            std::fs::create_dir_all(parent)?;
+    let default_filter = match command {
+        cli::Command::Term(_) | cli::Command::Daemon(_) => "info",
+        cli::Command::Clean(_)
+        | cli::Command::Doctor(_)
+        | cli::Command::Feed(_)
+        | cli::Command::Config(_) => "warn",
+    };
+
+    let (writer, guard, enable_ansi) = match command {
+        cli::Command::Term(_) => {
+            let log_path = config.log_file();
+            if let Some(parent) = log_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let log = std::fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(log_path)?;
+            let (non_blocking, guard) = tracing_appender::non_blocking(log);
+            (BoxMakeWriter::new(non_blocking), Some(guard), false)
         }
-        let log = std::fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(log_path)?;
-        let (non_blocking, guard) = tracing_appender::non_blocking(log);
-        (BoxMakeWriter::new(non_blocking), Some(guard), false)
-    } else if stderr {
-        (
+        _ => (
             BoxMakeWriter::new(std::io::stderr),
             None,
             std::io::stderr().is_terminal(),
-        )
-    } else {
-        (
-            BoxMakeWriter::new(std::io::stdout),
-            None,
-            std::io::stdout().is_terminal(),
-        )
+        ),
     };
 
     Registry::default()
@@ -102,51 +94,11 @@ mod crypto_provider {
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
-async fn build_app(
-    config: ConfigResolver,
-    dry_run: bool,
-) -> anyhow::Result<(Application, Session)> {
-    let terminal = Terminal::new().context("Failed to construct terminal")?;
-    let github_client = if config.is_github_enable() {
-        Some(GithubClient::new(config.github_pat()).context("Failed to construct github client")?)
-    } else {
-        None
-    };
-    let session = FeedRuntime::new(&config)?.acquire_session().await?;
-    let feed_backend = FeedBackend::established(session.client().clone());
-
-    let mut builder = Application::builder()
-        .terminal(terminal)
-        .feed_backend(feed_backend)
-        .categories(config.categories())
-        .config(Config {
-            entries_limit: config.feed_entries_limit(),
-            features: Features {
-                enable_github_notification: config.is_github_enable(),
-            },
-            keymaps: config.keymaps(),
-            ..Default::default()
-        })
-        .cache(Cache::new(config.cache_dir()))
-        .theme(Theme::with_palette(config.palette()))
-        .interactor(Box::new(ProcessInteractor::new(
-            TextBrowserInteractor::new(config.feed_browser_command(), config.feed_browser_args()),
-        )))
-        .dry_run(dry_run);
-
-    if let Some(github_client) = github_client {
-        builder = builder.github_client(github_client);
-    }
-
-    Ok((builder.build(), session))
-}
-
 #[tokio::main]
 async fn main() -> ExitCode {
     crypto_provider::init();
 
-    let (config, command, dry_run) = {
+    let (config, command) = {
         let Args {
             config,
             log,
@@ -154,11 +106,8 @@ async fn main() -> ExitCode {
             api,
             daemon,
             backend,
-            feed,
-            github,
+            term,
             command,
-            palette,
-            dry_run,
         } = cli::parse();
 
         let config = match ConfigResolver::builder()
@@ -168,9 +117,9 @@ async fn main() -> ExitCode {
             .api_options(api)
             .daemon_options(daemon)
             .backend_options(backend)
-            .feed_options(feed)
-            .github_options(github)
-            .palette(palette)
+            .feed_options(term.feed)
+            .github_options(term.github)
+            .palette(term.palette)
             .try_build()
         {
             Ok(config) => config,
@@ -179,70 +128,25 @@ async fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-        (config, command, dry_run)
+        let command = command.expect("cli::parse should default missing command to term");
+        (config, command)
     };
 
-    let _guard = {
-        let is_subcommand = command.is_some();
-        let is_daemon_command = matches!(command, Some(cli::Command::Daemon(_)));
-        let log = if is_subcommand {
-            None
-        } else {
-            Some(config.log_file())
-        };
-        let default_filter = if is_subcommand && !is_daemon_command {
-            "warn"
-        } else {
-            "info"
-        };
-        match init_tracing(log, default_filter, is_subcommand) {
-            Ok(guard) => guard,
-            Err(err) => {
-                eprintln!("{err:?}");
-                return ExitCode::FAILURE;
-            }
-        }
-    };
-
-    if let Some(command) = command {
-        return match command {
-            cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
-            cli::Command::Daemon(daemon) => daemon.run(config).await,
-            cli::Command::Doctor(doctor) => doctor.run(config).await,
-            cli::Command::Feed(feed) => feed.run(config).await,
-            cli::Command::Config(command) => command.run(&config),
-        };
-    }
-
-    let log_file = config.log_file();
-    let (app, session) = match build_app(config, dry_run).await {
-        Ok(started) => started,
+    let _guard = match init_tracing(&config, &command) {
+        Ok(guard) => guard,
         Err(err) => {
-            error!("{err:?}");
-            eprintln!("error: {err:#}");
-            eprintln!("see log: {}", log_file.display());
+            eprintln!("{err:?}");
             return ExitCode::FAILURE;
         }
     };
 
-    let mut event_stream = terminal::event_stream();
-    let release_check = release::ReleaseCheck::spawn();
-    let result = {
-        info!("Running...");
-        app.run(&mut event_stream)
-    }
-    .await;
-
-    if let Err(err) = session.close().await {
-        warn!("Failed to close runtime session: {err}");
-    }
-
-    release_check.print_notice_if_ready();
-
-    if let Err(err) = result {
-        error!("{err:?}");
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
+    match command {
+        #[expect(clippy::large_futures)]
+        cli::Command::Term(term) => return term.run(config).await,
+        cli::Command::Clean(clean) => return clean.run(&config, &FileSystem::new()),
+        cli::Command::Daemon(daemon) => return daemon.run(config).await,
+        cli::Command::Doctor(doctor) => return doctor.run(config).await,
+        cli::Command::Feed(feed) => return feed.run(config).await,
+        cli::Command::Config(command) => return command.run(&config),
     }
 }

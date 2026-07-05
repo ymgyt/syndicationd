@@ -8,9 +8,9 @@ use crate::{
     ui::widgets::gh_notifications::GhNotificationFilterOptions,
 };
 
-pub(super) struct DriverAdapters {
+pub(in crate::application) struct DriverHandles {
     pub(super) clock: Box<dyn Clock>,
-    pub(super) terminal: Terminal,
+    pub(in crate::application) terminal: Terminal,
     pub(super) feed_api: FeedApiRef,
     pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
@@ -19,7 +19,7 @@ pub(super) struct DriverAdapters {
     pub(super) authenticator: Authenticator,
 }
 
-pub(super) struct DriverAdapterParts {
+pub(super) struct DriverHandleParts {
     pub(super) terminal: Terminal,
     pub(super) feed_api: FeedApiRef,
     pub(super) feed_api_session: FeedApiSession,
@@ -30,9 +30,9 @@ pub(super) struct DriverAdapterParts {
     pub(super) clock: Option<Box<dyn Clock>>,
 }
 
-impl DriverAdapters {
-    pub(super) fn new(parts: DriverAdapterParts) -> Self {
-        let DriverAdapterParts {
+impl DriverHandles {
+    pub(super) fn new(parts: DriverHandleParts) -> Self {
+        let DriverHandleParts {
             terminal,
             feed_api,
             feed_api_session,

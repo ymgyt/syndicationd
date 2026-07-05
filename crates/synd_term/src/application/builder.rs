@@ -2,7 +2,7 @@ use crate::{
     application::outbound::github::GithubClient,
     application::{
         Application, Authenticator, Cache, Clock, Config, FeedApiRef, FeedApiSession, FeedBackend,
-        SessPending, TermInit,
+        SessPending, TermUninit,
     },
     config::Categories,
     interact::Interact,
@@ -248,7 +248,7 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
 
 impl ApplicationBuilder<Terminal, FeedApiRef, Categories, Cache, Config, Theme, Box<dyn Interact>> {
     #[must_use]
-    pub fn build(self) -> Application<TermInit, SessPending> {
+    pub fn build(self) -> Application<TermUninit, SessPending> {
         Application::new(self)
     }
 }

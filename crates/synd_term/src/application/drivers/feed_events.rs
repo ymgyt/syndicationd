@@ -103,7 +103,7 @@ pub(super) struct FeedEventDriver;
 
 impl FeedEventDriver {
     pub(super) fn start_subscription(cx: &mut DriverContext<'_>) -> Vec<crate::event::Event> {
-        let feed_api = cx.adapters.feed_api.clone();
+        let feed_api = cx.handles.feed_api.clone();
         cx.feed_events.start(feed_api);
         Vec::new()
     }
