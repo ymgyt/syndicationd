@@ -90,6 +90,7 @@ pub enum TimelineItemCursorError {
 /// GraphQL/query node assembled for one timeline item.
 #[derive(Debug, Clone)]
 pub struct TimelineItemNode {
+    pub entry_id: EntryId,
     pub attrs: EntryAttrs,
     pub feed_meta: Annotated<FeedMeta>,
     pub subscription: Subscription,

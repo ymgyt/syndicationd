@@ -115,6 +115,7 @@ fragment SubscribedFeed on SubscribedFeed {
 }
 
 fragment Entry on Entry {
+  id
   title
   published
   updated

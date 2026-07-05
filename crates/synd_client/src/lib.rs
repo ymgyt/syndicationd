@@ -1107,6 +1107,7 @@ query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
     timeline {
       entries(first: $timelineFirst) {
         nodes {
+          id
           title
           published
           updated
@@ -1193,6 +1194,7 @@ query Entries($after: String, $first: Int!) {
   output: subscription {
     entries(after: $after, first: $first) {
       nodes {
+        id
         title
         published
         updated
@@ -1219,6 +1221,7 @@ query FeedEntries($url: FeedUrl!, $after: String, $first: Int!) {
   output: subscription {
     entries(url: $url, after: $after, first: $first) {
       nodes {
+        id
         title
         published
         updated

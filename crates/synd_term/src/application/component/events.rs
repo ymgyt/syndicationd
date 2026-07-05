@@ -578,7 +578,7 @@ fn next_entries_first(
 mod tests {
     use core::assert_matches;
     use synd_client::payload::{ResponseCode, ResponseStatus};
-    use synd_feed::types::FeedUrl;
+    use synd_feed::types::{EntryId, FeedUrl};
 
     use crate::{
         application::Features, config::Categories, event::FeedsApiEvent, types::PageInfo,
@@ -598,6 +598,7 @@ mod tests {
 
     fn entry(index: usize) -> payload::Entry {
         payload::Entry {
+            id: EntryId::parse(format!("synd:entry:v1:{index:064x}")).unwrap(),
             title: Some(format!("entry-{index}")),
             published: None,
             updated: None,

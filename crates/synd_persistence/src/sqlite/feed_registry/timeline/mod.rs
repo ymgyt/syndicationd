@@ -466,7 +466,7 @@ impl TimelineItemRow {
             created_at: self.subscription_created_at,
             updated_at: self.subscription_updated_at,
         };
-        let cursor = TimelineItemCursor::new(self.order_time, feed_url, entry_id);
+        let cursor = TimelineItemCursor::new(self.order_time, feed_url, entry_id.clone());
         let feed_meta = Annotated {
             feed: feed_meta,
             requirement,
@@ -474,6 +474,7 @@ impl TimelineItemRow {
         };
 
         Ok(TimelineItemNode {
+            entry_id,
             attrs,
             feed_meta,
             subscription,

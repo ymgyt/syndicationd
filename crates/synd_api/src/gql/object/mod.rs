@@ -35,6 +35,7 @@ impl From<&types::Link> for Link {
 }
 
 pub(crate) struct Entry {
+    id: types::EntryId,
     meta: Annotated<types::FeedMeta>,
     body: EntryBody,
 }
@@ -46,6 +47,11 @@ pub(crate) enum EntryBody {
 
 #[Object]
 impl Entry {
+    /// Entry id
+    async fn id(&self) -> ID {
+        self.id.as_str().into()
+    }
+
     /// Feed of this entry
     async fn feed(&self) -> FeedMeta<'_> {
         Cow::Borrowed(&self.meta).into()
@@ -96,6 +102,7 @@ impl Entry {
 impl Entry {
     pub fn new(meta: Annotated<types::FeedMeta>, entry: types::Entry) -> Self {
         Self {
+            id: entry.id(),
             meta,
             body: EntryBody::Feed(Box::new(entry)),
         }
@@ -103,6 +110,7 @@ impl Entry {
 
     pub fn from_timeline_item_node(node: TimelineItemNode) -> Self {
         Self {
+            id: node.entry_id,
             meta: node.feed_meta,
             body: EntryBody::Timeline(node.attrs),
         }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use synd_feed::types::{Category, FeedType, FeedUrl, Requirement, Time};
+use synd_feed::types::{Category, EntryId, FeedType, FeedUrl, Requirement, Time};
 
 #[derive(Debug, Clone)]
 pub struct FetchEntriesPayload {
@@ -106,6 +106,7 @@ pub struct EntryConnection {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Entry {
+    pub id: EntryId,
     pub title: Option<String>,
     pub published: Option<Time>,
     pub updated: Option<Time>,
