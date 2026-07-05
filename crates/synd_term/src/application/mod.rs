@@ -6,8 +6,10 @@ use ratatui::widgets::Widget;
 use synd_feed::types::FeedUrl;
 use tracing::{debug, info, warn};
 
+#[cfg(feature = "integration")]
+use crate::auth::CredentialError;
 use crate::{
-    auth::{Credential, CredentialError, Verified},
+    auth::{Credential, Verified},
     config::Categories,
     event::Event,
     interact::Interact,
@@ -41,7 +43,7 @@ mod builder;
 pub use builder::ApplicationBuilder;
 
 pub mod outbound;
-pub use outbound::feed::{FeedApi, FeedApiRef, FeedApiSession, FeedBackend};
+pub use outbound::feed::{ClientFeedApi, FeedApi, FeedApiRef};
 
 mod app_config;
 pub use app_config::{Config, Features};
@@ -82,11 +84,6 @@ pub struct Application<Term = TermUninit, Sess = SessPending> {
     keymap: crate::keymap::Keymap,
     config: Config,
     _lifecycle: Lifecycle<Term, Sess>,
-}
-
-pub enum StartSession {
-    Ready(Application<TermReady, SessReady>),
-    Pending(Application<TermReady, SessPending>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -131,7 +128,6 @@ impl Application<TermUninit, SessPending> {
         let ApplicationBuilder {
             terminal,
             feed_api,
-            feed_api_session,
             github_client,
             categories,
             cache,
@@ -147,7 +143,6 @@ impl Application<TermUninit, SessPending> {
         let drivers = Drivers::new(DriverParts {
             terminal,
             feed_api,
-            feed_api_session,
             github_client,
             cache,
             authenticator,
@@ -166,53 +161,55 @@ impl Application<TermUninit, SessPending> {
         }
     }
 
-    #[expect(clippy::large_futures)]
     pub async fn run<S>(self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        match self.init().await? {
-            StartSession::Ready(app) => {
-                let _app = app.run_until_exit(input).await?;
-            }
-            StartSession::Pending(app) => {
-                let _app = app.run_until_exit(input).await?;
-            }
-        }
-
+        self.init()?.run_until_exit(input).await?;
         Ok(())
     }
 
     /// Initialize terminal and application state.
-    async fn init(self) -> anyhow::Result<StartSession> {
+    fn init(self) -> anyhow::Result<Application<TermReady, SessReady>> {
         let mut app = self.init_terminal()?;
         app.restore_github_notification_filter_options();
-        Ok(app.start_session().await)
+        Ok(app.enter_feed_api_session())
     }
 }
 
 impl<Sess> Application<TermUninit, Sess> {
     pub fn init_terminal(mut self) -> anyhow::Result<Application<TermReady, Sess>> {
         match self.drivers.handles.terminal.init() {
-            Ok(()) => Ok(self.into_terminal_ready()),
+            Ok(()) => {}
             Err(err) => {
                 if self.components.shell.should_quit() {
                     warn!("Failed to init terminal: {err}");
-                    Ok(self.into_terminal_ready())
                 } else {
-                    Err(err.into())
+                    return Err(err.into());
                 }
             }
         }
+
+        let Self {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: _,
+        } = self;
+
+        Ok(Application {
+            drivers,
+            components,
+            keymap,
+            config,
+            _lifecycle: Lifecycle::new(),
+        })
     }
 
     #[cfg(feature = "integration")]
     #[must_use]
     pub fn assume_terminal_ready(self) -> Application<TermReady, Sess> {
-        self.into_terminal_ready()
-    }
-
-    fn into_terminal_ready(self) -> Application<TermReady, Sess> {
         let Self {
             drivers,
             components,
@@ -232,15 +229,13 @@ impl<Sess> Application<TermUninit, Sess> {
 }
 
 impl Application<TermReady, SessPending> {
-    pub async fn start_session(mut self) -> StartSession {
-        if self.start_feed_session_in_place().await {
-            StartSession::Ready(self.into_session_ready())
-        } else {
-            StartSession::Pending(self)
-        }
-    }
+    pub fn enter_feed_api_session(mut self) -> Application<TermReady, SessReady> {
+        self.initial_fetch();
+        self.components.shell.auth.authenticated();
+        self.reset_idle_timer();
+        self.should_render();
+        self.keymap.clear_pending();
 
-    fn into_session_ready(self) -> Application<TermReady, SessReady> {
         let Self {
             drivers,
             components,
@@ -299,7 +294,12 @@ impl<Term, Sess> Application<Term, Sess> {
             return;
         }
 
-        match self.drivers.load_gh_notification_filter_options() {
+        match self
+            .drivers
+            .handles
+            .cache
+            .load_gh_notification_filter_options()
+        {
             Ok(options) => {
                 self.components.github.notifications =
                     GitHubNotificationsWidget::with_filter_options(options);
@@ -310,34 +310,13 @@ impl<Term, Sess> Application<Term, Sess> {
         }
     }
 
-    async fn start_feed_session_in_place(&mut self) -> bool {
-        if self.drivers.feed_api_session_requires_user_credential() {
-            match self.restore_credential().await {
-                Ok(cred) => {
-                    self.handle_restored_credential(cred);
-                    true
-                }
-                Err(err) => {
-                    warn!("Restore credential: {err}");
-                    false
-                }
-            }
-        } else {
-            self.enter_feed_api_session();
-            true
-        }
-    }
-
+    #[cfg(feature = "integration")]
     async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
         self.drivers.restore_credential().await
     }
 
     fn handle_restored_credential(&mut self, cred: Verified<Credential>) {
         self.set_credential(cred);
-        self.enter_feed_api_session();
-    }
-
-    fn enter_feed_api_session(&mut self) {
         self.initial_fetch();
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
@@ -351,9 +330,7 @@ impl<Term, Sess> Application<Term, Sess> {
 
     fn initial_fetch(&mut self) {
         info!("Initial fetch");
-        if self.drivers.supports_feed_event_subscription() {
-            self.perform_operation(Operation::StartFeedEventSubscription);
-        }
+        self.perform_operation(Operation::StartFeedEventSubscription);
         self.perform_operation(Operation::FetchInitialFeedView {
             subscriptions_first: self.config.feeds_per_pagination,
             timeline_first: self.next_entries_first(0),
@@ -370,7 +347,12 @@ impl<Term, Sess> Application<Term, Sess> {
     fn cleanup(&mut self) -> anyhow::Result<()> {
         if self.config.features.enable_github_notification {
             let options = self.components.github.notifications.filter_options();
-            match self.drivers.persist_gh_notification_filter_options(options) {
+            match self
+                .drivers
+                .handles
+                .cache
+                .persist_gh_notification_filter_options(options)
+            {
                 Ok(()) => {}
                 Err(err) => {
                     warn!("Failed to persist github notification filter options: {err}");

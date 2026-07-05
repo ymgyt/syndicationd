@@ -16,8 +16,7 @@ impl OperationDispatcher {
     }
 
     pub(super) fn dispatch(self, operation: Operation, cx: &mut DriverContext<'_>) -> Vec<Event> {
-        let Self { _marker: () } = self;
-
+        let _ = self;
         match operation {
             Operation::StartDeviceFlow { provider } => AuthDriver::start_device_flow(cx, provider),
             Operation::PollDeviceFlowAccessToken {

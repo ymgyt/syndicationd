@@ -23,7 +23,9 @@ use synd_registry::{
 };
 pub use synd_term::integration::{event_stream, new_test_terminal};
 use synd_term::{
-    application::{Application, Authenticator, Cache, Config, DeviceFlows, JwtService},
+    application::{
+        Application, Authenticator, Cache, ClientFeedApi, Config, DeviceFlows, JwtService,
+    },
     auth::Credential,
     config::Categories,
     interact::mock::MockInteractor,
@@ -210,7 +212,7 @@ impl TestCase {
 
             let mut app = Application::builder()
                 .terminal(terminal)
-                .client(client)
+                .feed_api(ClientFeedApi::new(client))
                 .categories(Categories::default_toml())
                 .config(config)
                 .cache(cache)

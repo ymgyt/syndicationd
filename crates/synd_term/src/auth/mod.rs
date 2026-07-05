@@ -1,18 +1,18 @@
-use std::{
-    borrow::Borrow,
-    cmp::Ordering,
-    fmt,
-    ops::{Deref, Sub},
-};
+use std::{borrow::Borrow, fmt, ops::Deref};
+#[cfg(feature = "integration")]
+use std::{cmp::Ordering, ops::Sub};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use synd_auth::jwt::google::JwtError;
 use thiserror::Error;
+#[cfg(feature = "integration")]
 use tracing::debug;
 
+use crate::application::PersistCacheError;
+#[cfg(feature = "integration")]
 use crate::{
-    application::{Cache, JwtService, LoadCacheError, PersistCacheError},
+    application::{Cache, JwtService, LoadCacheError},
     config,
     types::Time,
 };
@@ -38,6 +38,7 @@ pub enum CredentialError {
     #[error("persist credential: {0}")]
     PersistCredential(#[from] PersistCacheError),
     #[error("load credential: {0}")]
+    #[cfg(feature = "integration")]
     LoadCredential(#[from] LoadCacheError),
 }
 
@@ -61,6 +62,7 @@ impl fmt::Debug for Credential {
 
 /// Represents expired state
 #[derive(PartialEq, Eq, Debug)]
+#[cfg(feature = "integration")]
 pub(super) struct Expired<C = Credential>(pub(super) C);
 
 /// Represents verified state
@@ -97,11 +99,13 @@ impl From<Credential> for Unverified<Credential> {
     }
 }
 
+#[cfg(feature = "integration")]
 pub(super) enum VerifyResult {
     Verified(Verified<Credential>),
     Expired(Expired<Credential>),
 }
 
+#[cfg(feature = "integration")]
 impl Unverified<Credential> {
     pub(super) fn verify(
         self,
@@ -139,6 +143,7 @@ impl Unverified<Credential> {
 }
 
 /// Process for restoring credential from cache
+#[cfg(feature = "integration")]
 pub(crate) struct Restore<'a> {
     pub(crate) jwt_service: &'a JwtService,
     pub(crate) cache: &'a Cache,
@@ -146,6 +151,7 @@ pub(crate) struct Restore<'a> {
     pub(crate) persist_when_refreshed: bool,
 }
 
+#[cfg(feature = "integration")]
 impl Restore<'_> {
     pub(crate) async fn restore(self) -> Result<Verified<Credential>, CredentialError> {
         let Restore {

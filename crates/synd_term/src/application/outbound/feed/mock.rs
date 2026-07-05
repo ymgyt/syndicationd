@@ -21,31 +21,39 @@ pub enum MockFeedApiResponse {
 /// In-memory `FeedApi` implementation for terminal workflow tests.
 pub struct MockFeedApi {
     responses: Mutex<VecDeque<MockFeedApiResponse>>,
-    supports_feed_event_subscription: bool,
 }
 
 impl MockFeedApi {
     pub fn new(responses: impl IntoIterator<Item = MockFeedApiResponse>) -> Self {
         Self {
             responses: Mutex::new(responses.into_iter().collect()),
-            supports_feed_event_subscription: false,
         }
     }
 
-    #[must_use]
-    pub fn with_feed_event_subscription(mut self) -> Self {
-        self.supports_feed_event_subscription = true;
-        self
-    }
-
-    fn pop_response(&self) -> Result<MockFeedApiResponse, SyndApiError> {
-        self.responses
+    fn pop_response(
+        &self,
+        mut matches: impl FnMut(&MockFeedApiResponse) -> bool,
+    ) -> Result<MockFeedApiResponse, SyndApiError> {
+        let mut responses = self
+            .responses
             .lock()
-            .expect("mock feed API response lock must not be poisoned")
-            .pop_front()
-            .ok_or(SyndApiError::UnexpectedResponse {
+            .expect("mock feed API response lock must not be poisoned");
+
+        if let Some(index) = responses.iter().position(&mut matches) {
+            return responses
+                .remove(index)
+                .ok_or(SyndApiError::UnexpectedResponse {
+                    context: "mock feed API response queue index is invalid",
+                });
+        }
+
+        if responses.is_empty() {
+            Err(SyndApiError::UnexpectedResponse {
                 context: "mock feed API response queue is empty",
             })
+        } else {
+            Err(Self::mismatch())
+        }
     }
 
     fn mismatch() -> SyndApiError {
@@ -60,16 +68,14 @@ impl FeedApi for MockFeedApi {
         Ok(())
     }
 
-    fn supports_feed_event_subscription(&self) -> bool {
-        self.supports_feed_event_subscription
-    }
-
     fn fetch_initial_feed_view(
         &self,
         _subscriptions_first: i64,
         _timeline_first: i64,
     ) -> BoxFuture<'static, Result<payload::InitialFeedViewPayload, SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::InitialFeedView(_)))
+        {
             Ok(MockFeedApiResponse::InitialFeedView(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -82,7 +88,9 @@ impl FeedApi for MockFeedApi {
         _after: Option<String>,
         _first: Option<i64>,
     ) -> BoxFuture<'static, Result<payload::SubscriptionPayload, SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::Subscription(_)))
+        {
             Ok(MockFeedApiResponse::Subscription(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -94,7 +102,9 @@ impl FeedApi for MockFeedApi {
         &self,
         _input: payload::SubscribeFeedInput,
     ) -> BoxFuture<'static, Result<payload::SubscribeFeedPayload, SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::SubscribeFeed(_)))
+        {
             Ok(MockFeedApiResponse::SubscribeFeed(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -103,7 +113,9 @@ impl FeedApi for MockFeedApi {
     }
 
     fn unsubscribe_feed(&self, _url: FeedUrl) -> BoxFuture<'static, Result<(), SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::UnsubscribeFeed(_)))
+        {
             Ok(MockFeedApiResponse::UnsubscribeFeed(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -115,7 +127,9 @@ impl FeedApi for MockFeedApi {
         &self,
         _url: FeedUrl,
     ) -> BoxFuture<'static, Result<payload::RefreshFeedPayload, SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::RefreshFeed(_)))
+        {
             Ok(MockFeedApiResponse::RefreshFeed(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -127,7 +141,9 @@ impl FeedApi for MockFeedApi {
         &self,
         _url: FeedUrl,
     ) -> BoxFuture<'static, Result<payload::RefreshStatus, SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::FeedStatus(_)))
+        {
             Ok(MockFeedApiResponse::FeedStatus(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -140,7 +156,9 @@ impl FeedApi for MockFeedApi {
         _after: Option<String>,
         _first: i64,
     ) -> BoxFuture<'static, Result<payload::FetchEntriesPayload, SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::Entries(_)))
+        {
             Ok(MockFeedApiResponse::Entries(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
@@ -152,7 +170,9 @@ impl FeedApi for MockFeedApi {
         &self,
         events: mpsc::UnboundedSender<payload::FeedEvent>,
     ) -> BoxFuture<'static, Result<(), SyndApiError>> {
-        let result = match self.pop_response() {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::FeedEvents(_)))
+        {
             Ok(MockFeedApiResponse::FeedEvents(Ok(feed_events))) => {
                 for event in feed_events {
                     if events.send(event).is_err() {

@@ -6,8 +6,7 @@ use serde_json::json;
 use synd_client::payload;
 use synd_term::{
     application::{
-        Application, Cache, Config, FeedApiSession, FeedBackend, SessReady, StartSession,
-        TermReady,
+        Application, Cache, Config, SessReady, TermReady,
         outbound::feed::{MockFeedApi, MockFeedApiResponse},
     },
     config::Categories,
@@ -25,7 +24,7 @@ mod established_session {
 
     #[tokio::test]
     async fn initial_view() {
-        let (_cache_dir, mut app) = start_app().await;
+        let (_cache_dir, mut app) = start_app();
 
         let (_tx, mut input) = event_stream();
         app.wait_until_jobs_completed(&mut input).await;
@@ -40,7 +39,7 @@ mod established_session {
 
     #[tokio::test]
     async fn terminal_events() {
-        let (_cache_dir, mut app) = start_app().await;
+        let (_cache_dir, mut app) = start_app();
         let (tx, mut input) = event_stream();
         app.wait_until_jobs_completed(&mut input).await;
 
@@ -62,16 +61,16 @@ mod established_session {
     }
 }
 
-async fn start_app() -> (TempDir, Application<TermReady, SessReady>) {
+fn start_app() -> (TempDir, Application<TermReady, SessReady>) {
     let payload = initial_feed_view();
-    let api = MockFeedApi::new([MockFeedApiResponse::InitialFeedView(Ok(payload))]);
+    let api = MockFeedApi::new([
+        MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
+        MockFeedApiResponse::InitialFeedView(Ok(payload)),
+    ]);
     let (cache_dir, app) = app(api);
 
     let app = app.assume_terminal_ready();
-    let app = match app.start_session().await {
-        StartSession::Ready(app) => app,
-        StartSession::Pending(_) => panic!("feed API session should already be established"),
-    };
+    let app = app.enter_feed_api_session();
 
     (cache_dir, app)
 }
@@ -79,10 +78,9 @@ async fn start_app() -> (TempDir, Application<TermReady, SessReady>) {
 fn app(feed_api: MockFeedApi) -> (TempDir, Application) {
     let cache_dir = tempfile::tempdir().expect("temp cache dir");
     let terminal = new_test_terminal(120, 30);
-    let feed_backend = FeedBackend::with_api(feed_api, FeedApiSession::Established);
     let app = Application::builder()
         .terminal(terminal)
-        .feed_backend(feed_backend)
+        .feed_api(feed_api)
         .categories(Categories::default_toml())
         .config(Config::default().with_idle_timer_interval(Duration::from_millis(10)))
         .cache(Cache::new(cache_dir.path().to_path_buf()))
@@ -138,6 +136,7 @@ fn initial_feed_view() -> payload::InitialFeedViewPayload {
             "entries": {
                 "nodes": [
                     {
+                        "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000001",
                         "title": "Rust feed architecture",
                         "published": null,
                         "updated": null,
@@ -151,6 +150,7 @@ fn initial_feed_view() -> payload::InitialFeedViewPayload {
                         }
                     },
                     {
+                        "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000002",
                         "title": "Async GraphQL testing",
                         "published": null,
                         "updated": null,

@@ -35,10 +35,6 @@ impl FeedApi for ClientFeedApi {
             .set_credential(credential)
     }
 
-    fn supports_feed_event_subscription(&self) -> bool {
-        self.client().supports_feed_event_subscription()
-    }
-
     fn fetch_initial_feed_view(
         &self,
         subscriptions_first: i64,

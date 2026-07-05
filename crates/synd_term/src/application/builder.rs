@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use crate::{
     application::outbound::github::GithubClient,
     application::{
-        Application, Authenticator, Cache, Clock, Config, FeedApiRef, FeedApiSession, FeedBackend,
-        SessPending, TermUninit,
+        Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef, SessPending,
+        TermUninit,
     },
     config::Categories,
     interact::Interact,
@@ -21,7 +23,6 @@ pub struct ApplicationBuilder<
 > {
     pub(super) terminal: Terminal,
     pub(super) feed_api: FeedApi,
-    pub(super) feed_api_session: FeedApiSession,
     pub(super) categories: Categories,
     pub(super) cache: Cache,
     pub(super) config: Config,
@@ -39,7 +40,6 @@ impl Default for ApplicationBuilder {
         Self {
             terminal: (),
             feed_api: (),
-            feed_api_session: FeedApiSession::UserCredentialRequired,
             categories: (),
             cache: (),
             config: (),
@@ -62,7 +62,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal,
             feed_api: self.feed_api,
-            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -78,24 +77,13 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
 
 impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
     #[must_use]
-    pub fn client(
+    pub fn feed_api(
         self,
-        client: synd_client::Client,
+        feed_api: impl FeedApi,
     ) -> ApplicationBuilder<T1, FeedApiRef, T2, T3, T4, T5, T6> {
-        let feed_backend = FeedBackend::from_client(client, self.feed_api_session);
-        self.feed_backend(feed_backend)
-    }
-
-    #[must_use]
-    pub fn feed_backend(
-        self,
-        feed_backend: FeedBackend,
-    ) -> ApplicationBuilder<T1, FeedApiRef, T2, T3, T4, T5, T6> {
-        let (feed_api, feed_api_session) = feed_backend.into_parts();
         ApplicationBuilder {
             terminal: self.terminal,
-            feed_api,
-            feed_api_session,
+            feed_api: Arc::new(feed_api),
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -118,7 +106,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             feed_api: self.feed_api,
-            feed_api_session: self.feed_api_session,
             categories,
             cache: self.cache,
             config: self.config,
@@ -138,7 +125,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             feed_api: self.feed_api,
-            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache,
             config: self.config,
@@ -158,7 +144,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             feed_api: self.feed_api,
-            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config,
@@ -178,7 +163,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
         ApplicationBuilder {
             terminal: self.terminal,
             feed_api: self.feed_api,
-            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
@@ -201,7 +185,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
         ApplicationBuilder {
             terminal: self.terminal,
             feed_api: self.feed_api,
-            feed_api_session: self.feed_api_session,
             categories: self.categories,
             cache: self.cache,
             config: self.config,

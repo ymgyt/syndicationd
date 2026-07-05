@@ -11,8 +11,6 @@ pub type FeedApiRef = Arc<dyn FeedApi>;
 pub trait FeedApi: Send + Sync + 'static {
     fn set_credential(&self, credential: ApiCredential) -> Result<(), SyndApiError>;
 
-    fn supports_feed_event_subscription(&self) -> bool;
-
     fn fetch_initial_feed_view(
         &self,
         subscriptions_first: i64,

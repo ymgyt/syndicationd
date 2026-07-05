@@ -6,7 +6,7 @@ use super::Application;
 
 impl<Term, Sess> Application<Term, Sess> {
     pub(super) fn complete_device_authorize_flow(&mut self, cred: Verified<Credential>) {
-        if let Err(err) = self.drivers.persist_credential(&cred) {
+        if let Err(err) = self.drivers.handles.cache.persist_credential(&cred) {
             error!("Failed to save credential to cache: {err}");
         }
 

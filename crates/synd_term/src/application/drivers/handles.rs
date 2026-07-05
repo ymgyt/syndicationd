@@ -2,19 +2,17 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     application::outbound::github::GithubClient,
-    application::{Authenticator, Cache, Clock, FeedApiRef, FeedApiSession, SystemClock},
+    application::{Authenticator, Cache, Clock, FeedApiRef, SystemClock},
     interact::Interact,
     terminal::Terminal,
-    ui::widgets::gh_notifications::GhNotificationFilterOptions,
 };
 
 pub(in crate::application) struct DriverHandles {
     pub(super) clock: Box<dyn Clock>,
     pub(in crate::application) terminal: Terminal,
-    pub(super) feed_api: FeedApiRef,
-    pub(super) feed_api_session: FeedApiSession,
+    pub(in crate::application) feed_api: FeedApiRef,
     pub(super) github_client: Option<GithubClient>,
-    pub(super) cache: Cache,
+    pub(in crate::application) cache: Cache,
     pub(super) interactor: Box<dyn Interact>,
     pub(super) authenticator: Authenticator,
 }
@@ -22,7 +20,6 @@ pub(in crate::application) struct DriverHandles {
 pub(super) struct DriverHandleParts {
     pub(super) terminal: Terminal,
     pub(super) feed_api: FeedApiRef,
-    pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
     pub(super) cache: Cache,
     pub(super) authenticator: Option<Authenticator>,
@@ -35,7 +32,6 @@ impl DriverHandles {
         let DriverHandleParts {
             terminal,
             feed_api,
-            feed_api_session,
             github_client,
             cache,
             authenticator,
@@ -47,7 +43,6 @@ impl DriverHandles {
             clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
             terminal,
             feed_api,
-            feed_api_session,
             github_client,
             cache,
             interactor,
@@ -59,14 +54,8 @@ impl DriverHandles {
         self.clock.now()
     }
 
+    #[cfg(feature = "integration")]
     pub(super) fn jwt_service(&self) -> &crate::application::JwtService {
         &self.authenticator.jwt_service
-    }
-
-    pub(super) fn persist_gh_notification_filter_options(
-        &self,
-        options: &GhNotificationFilterOptions,
-    ) -> Result<(), crate::application::PersistCacheError> {
-        self.cache.persist_gh_notification_filter_options(options)
     }
 }

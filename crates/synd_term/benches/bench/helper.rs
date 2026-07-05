@@ -3,7 +3,7 @@ use std::time::Duration;
 use ratatui::backend::TestBackend;
 use synd_client::{Client, ClientOptions};
 use synd_term::{
-    application::{Application, Cache, Config},
+    application::{Application, Cache, ClientFeedApi, Config},
     config::Categories,
     interact::mock::MockInteractor,
     terminal::Terminal,
@@ -32,7 +32,7 @@ pub fn init_app() -> Application {
 
     Application::builder()
         .terminal(terminal)
-        .client(client)
+        .feed_api(ClientFeedApi::new(client))
         .categories(Categories::default_toml())
         .config(config)
         .cache(cache)

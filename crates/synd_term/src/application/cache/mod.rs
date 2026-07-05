@@ -8,11 +8,9 @@ use serde::{Serialize, de::DeserializeOwned};
 use synd_support::fs::{FileSystem, fsimpl};
 use thiserror::Error;
 
-use crate::{
-    auth::{Credential, Unverified},
-    config,
-    ui::widgets::gh_notifications::GhNotificationFilterOptions,
-};
+#[cfg(any(test, feature = "integration"))]
+use crate::auth::Unverified;
+use crate::{auth::Credential, config, ui::widgets::gh_notifications::GhNotificationFilterOptions};
 
 #[derive(Debug, Error)]
 pub enum PersistCacheError {
@@ -96,6 +94,7 @@ where
 
     /// Load credential from filesystem.
     /// This is blocking operation.
+    #[cfg(any(test, feature = "integration"))]
     pub fn load_credential(&self) -> Result<Unverified<Credential>, LoadCacheError> {
         self.load::<Credential>(&self.credential_file())
             .map(Unverified::from)
@@ -143,10 +142,6 @@ where
         }
 
         Ok(())
-    }
-
-    pub(crate) fn clean_credential(&self) -> io::Result<()> {
-        self.remove_file_if_exists(&self.credential_file())
     }
 
     fn remove_file_if_exists(&self, path: &Path) -> io::Result<()> {

@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use clap::Args;
 use synd_runtime::Session;
 use synd_term::{
-    application::{Application, Cache, Config, Features, FeedBackend},
+    application::{Application, Cache, ClientFeedApi, Config, Features},
     client::github::GithubClient,
     interact::{ProcessInteractor, TextBrowserInteractor},
     terminal::{self, Terminal},
@@ -35,7 +35,6 @@ pub struct TermCommand {
 }
 
 impl TermCommand {
-    #[expect(clippy::large_futures)]
     pub async fn run(self, config: ConfigResolver) -> ExitCode {
         let log_file = config.log_file();
         let (app, session) = match build_app(config, self.dry_run).await {
@@ -50,22 +49,19 @@ impl TermCommand {
 
         let mut event_stream = terminal::event_stream();
         let release_check = release::ReleaseCheck::spawn();
-        let result = {
-            info!("Running...");
-            app.run(&mut event_stream)
-        }
-        .await;
+
+        info!("Running...");
+        let result = app.run(&mut event_stream).await;
 
         if let Err(err) = session.close().await {
             warn!("Failed to close runtime session: {err}");
         }
 
-        release_check.print_notice_if_ready();
-
         if let Err(err) = result {
             error!("{err:?}");
             ExitCode::FAILURE
         } else {
+            release_check.print_notice_if_ready();
             ExitCode::SUCCESS
         }
     }
@@ -82,11 +78,10 @@ async fn build_app(
         None
     };
     let session = FeedRuntime::new(&config)?.acquire_session().await?;
-    let feed_backend = FeedBackend::established(session.client().clone());
 
     let mut builder = Application::builder()
         .terminal(terminal)
-        .feed_backend(feed_backend)
+        .feed_api(ClientFeedApi::new(session.client().clone()))
         .categories(config.categories())
         .config(Config {
             entries_limit: config.feed_entries_limit(),

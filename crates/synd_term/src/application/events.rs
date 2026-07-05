@@ -111,7 +111,7 @@ impl<Term, Sess> Application<Term, Sess> {
             Event::SyndApiError { error, request_seq } => {
                 let operations = self.components.apply_synd_api_error(request_seq);
                 self.perform_operations(operations);
-                let message = self.synd_api_error_message(error.as_ref());
+                let message = Self::synd_api_error_message(error.as_ref());
                 self.handle_error_message(message, Some(request_seq));
             }
             Event::FeedRefreshPollError {
@@ -127,7 +127,7 @@ impl<Term, Sess> Application<Term, Sess> {
                     self.drivers.remove_in_flight(request_seq);
                     return;
                 }
-                let message = self.synd_api_error_message(error.as_ref());
+                let message = Self::synd_api_error_message(error.as_ref());
                 self.handle_error_message(message, Some(request_seq));
             }
             Event::OauthApiError { error, request_seq } => {
@@ -198,21 +198,8 @@ impl<Term, Sess> Application<Term, Sess> {
         self.should_render();
     }
 
-    fn synd_api_error_message(&mut self, error: &SyndApiError) -> String {
+    fn synd_api_error_message(error: &SyndApiError) -> String {
         match error {
-            SyndApiError::Unauthorized { url }
-                if self.drivers.feed_api_session_requires_user_credential() =>
-            {
-                warn!(
-                    "api return unauthorized status code. the cached credential are likely invalid, so try to clean cache"
-                );
-                self.drivers.clean_cache();
-
-                format!(
-                    "{} unauthorized. please login again",
-                    url.as_ref().map(ToString::to_string).unwrap_or_default(),
-                )
-            }
             SyndApiError::Unauthorized { url } => {
                 format!(
                     "{} unauthorized. local feed API session is invalid",

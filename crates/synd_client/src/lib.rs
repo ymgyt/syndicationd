@@ -269,14 +269,6 @@ impl Client {
         })
     }
 
-    pub fn supports_feed_event_subscription(&self) -> bool {
-        match &self.transport {
-            ClientTransport::Tcp => self.endpoint.scheme() == "http",
-            #[cfg(unix)]
-            ClientTransport::Unix { .. } => true,
-        }
-    }
-
     #[instrument(skip(self))]
     pub async fn fetch_initial_feed_view(
         &self,
@@ -961,22 +953,6 @@ mod tests {
         ApiCredential, Client, ClientOptions, NullableEntriesResponseData, SyndApiError,
         fetch_entries_payload_from_response, header,
     };
-
-    #[test]
-    fn tcp_client_supports_feed_event_subscription_for_plain_http() {
-        let client =
-            Client::new(url::Url::parse("http://127.0.0.1:8080").unwrap(), options()).unwrap();
-
-        assert!(client.supports_feed_event_subscription());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn unix_client_supports_feed_event_subscription() {
-        let client = Client::new_unix("/tmp/synd-client-test.sock", options()).unwrap();
-
-        assert!(client.supports_feed_event_subscription());
-    }
 
     #[test]
     fn tcp_client_requires_credential_before_authorized_request() {

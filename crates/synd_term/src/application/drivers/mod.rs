@@ -3,17 +3,16 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use ratatui::Frame;
 
+#[cfg(feature = "integration")]
+use crate::auth::CredentialError;
 use crate::{
     application::outbound::github::GithubClient,
-    application::{
-        Authenticator, Cache, Clock, FeedApiRef, FeedApiSession, LoadCacheError, PersistCacheError,
-    },
-    auth::{Credential, CredentialError, Verified},
+    application::{Authenticator, Cache, Clock, FeedApiRef},
+    auth::{Credential, Verified},
     event::Event,
     interact::Interact,
     operation::Operation,
     terminal::Terminal,
-    ui::widgets::gh_notifications::GhNotificationFilterOptions,
 };
 
 mod auth;
@@ -42,7 +41,6 @@ pub(super) struct Drivers {
 pub(super) struct DriverParts {
     pub(super) terminal: Terminal,
     pub(super) feed_api: FeedApiRef,
-    pub(super) feed_api_session: FeedApiSession,
     pub(super) github_client: Option<GithubClient>,
     pub(super) cache: Cache,
     pub(super) authenticator: Option<Authenticator>,
@@ -63,7 +61,6 @@ impl Drivers {
         let DriverParts {
             terminal,
             feed_api,
-            feed_api_session,
             github_client,
             cache,
             authenticator,
@@ -77,7 +74,6 @@ impl Drivers {
             handles: DriverHandles::new(handles::DriverHandleParts {
                 terminal,
                 feed_api,
-                feed_api_session,
                 github_client,
                 cache,
                 authenticator,
@@ -119,13 +115,7 @@ impl Drivers {
         auth::AuthDriver::set_credential(&mut cx, cred);
     }
 
-    pub(super) fn persist_credential(
-        &self,
-        cred: &Verified<Credential>,
-    ) -> Result<(), PersistCacheError> {
-        self.handles.cache.persist_credential(cred)
-    }
-
+    #[cfg(feature = "integration")]
     pub(super) async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
         let restore = crate::auth::Restore {
             jwt_service: self.handles.jwt_service(),
@@ -147,34 +137,9 @@ impl Drivers {
             .render(|frame| f(frame, in_flight, now))
     }
 
-    pub(super) fn feed_api_session_requires_user_credential(&self) -> bool {
-        self.handles.feed_api_session.requires_user_credential()
-    }
-
-    pub(super) fn supports_feed_event_subscription(&self) -> bool {
-        self.handles.feed_api.supports_feed_event_subscription()
-    }
-
     pub(super) fn restart_feed_events_if_running(&mut self) -> bool {
         let feed_api = self.handles.feed_api.clone();
         self.feed_events.restart_if_running(feed_api)
-    }
-
-    pub(super) fn load_gh_notification_filter_options(
-        &self,
-    ) -> Result<GhNotificationFilterOptions, LoadCacheError> {
-        self.handles.cache.load_gh_notification_filter_options()
-    }
-
-    pub(super) fn persist_gh_notification_filter_options(
-        &self,
-        options: &GhNotificationFilterOptions,
-    ) -> Result<(), PersistCacheError> {
-        self.handles.persist_gh_notification_filter_options(options)
-    }
-
-    pub(super) fn clean_cache(&self) {
-        self.handles.cache.clean_credential().ok();
     }
 
     pub(super) fn clear_idle_timer(&mut self) {
