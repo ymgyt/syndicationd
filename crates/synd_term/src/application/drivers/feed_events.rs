@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future, time::Duration};
 
 use synd_client::payload;
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -17,25 +17,26 @@ pub(in crate::application) enum FeedEventMessage {
 }
 
 /// Running GraphQL feed event subscription and its event receiver.
-pub(in crate::application) struct FeedEventSubscription {
-    rx: mpsc::UnboundedReceiver<FeedEventMessage>,
-    task: Option<JoinHandle<()>>,
+pub(in crate::application) enum FeedEventSubscription {
+    Stopped,
+    Running {
+        rx: mpsc::UnboundedReceiver<FeedEventMessage>,
+        task: JoinHandle<()>,
+    },
 }
 
 impl FeedEventSubscription {
     pub(super) fn new() -> Self {
-        let (_tx, rx) = mpsc::unbounded_channel();
-        Self { rx, task: None }
+        Self::Stopped
     }
 
     pub(super) fn start(&mut self, feed_api: FeedApiRef) {
-        if self.task.is_some() {
+        if matches!(self, Self::Running { .. }) {
             return;
         }
 
         let (tx, rx) = mpsc::unbounded_channel();
-        self.rx = rx;
-        self.task = Some(tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             let mut interruption_notified = false;
             loop {
                 if tx.is_closed() {
@@ -74,19 +75,19 @@ impl FeedEventSubscription {
                 }
                 tokio::time::sleep(FEED_EVENT_RECONNECT_DELAY).await;
             }
-        }));
+        });
+
+        *self = Self::Running { rx, task };
     }
 
     pub(super) fn stop(&mut self) {
-        if let Some(task) = self.task.take() {
+        if let Self::Running { task, .. } = std::mem::replace(self, Self::Stopped) {
             task.abort();
         }
-        let (_tx, rx) = mpsc::unbounded_channel();
-        self.rx = rx;
     }
 
     pub(super) fn restart_if_running(&mut self, feed_api: FeedApiRef) -> bool {
-        if self.task.is_none() {
+        if matches!(self, Self::Stopped) {
             return false;
         }
         self.stop();
@@ -95,7 +96,10 @@ impl FeedEventSubscription {
     }
 
     pub(in crate::application) async fn recv(&mut self) -> Option<FeedEventMessage> {
-        self.rx.recv().await
+        match self {
+            Self::Running { rx, .. } => rx.recv().await,
+            Self::Stopped => future::pending().await,
+        }
     }
 }
 
