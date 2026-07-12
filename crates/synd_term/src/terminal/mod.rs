@@ -1,5 +1,5 @@
 use crossterm::{
-    ExecutableCommand,
+    ExecutableCommand, cursor,
     event::{EnableFocusChange, EventStream},
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -33,34 +33,24 @@ impl Terminal {
         Self { backend }
     }
 
-    /// Initialize terminal
-    pub fn init(&mut self) -> io::Result<()> {
+    /// Enter raw mode + alternate screen.
+    /// The returned guard restores the terminal when dropped.
+    pub fn init(&mut self) -> io::Result<TerminalGuard> {
         terminal::enable_raw_mode()?;
         crossterm::execute!(io::stdout(), EnterAlternateScreen, EnableFocusChange)?;
 
         let panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |panic| {
-            Self::restore_backend().expect("Failed to reset terminal");
+            // Restore the terminal before printing so the panic message is
+            // readable outside the alternate screen. Never panic in the hook.
+            let _ = TerminalGuard::restore();
             panic_hook(panic);
         }));
 
         self.backend.hide_cursor().ok();
         self.backend.clear().ok();
 
-        Ok(())
-    }
-
-    /// Reset terminal
-    pub fn restore(&mut self) -> io::Result<()> {
-        Self::restore_backend()?;
-        self.backend.show_cursor().ok();
-        Ok(())
-    }
-
-    fn restore_backend() -> io::Result<()> {
-        terminal::disable_raw_mode()?;
-        io::stdout().execute(LeaveAlternateScreen)?;
-        Ok(())
+        Ok(TerminalGuard(()))
     }
 
     pub fn render<F>(&mut self, f: F) -> anyhow::Result<()>
@@ -78,6 +68,27 @@ impl Terminal {
     #[cfg(feature = "integration")]
     pub fn buffer(&self) -> &Buffer {
         self.backend.backend().buffer()
+    }
+}
+
+/// Proof that the terminal is in raw mode + alternate screen.
+/// Restores the terminal when dropped: on normal exit, on error propagation
+/// and on unwind.
+pub struct TerminalGuard(());
+
+impl TerminalGuard {
+    fn restore() -> io::Result<()> {
+        terminal::disable_raw_mode()?;
+        io::stdout()
+            .execute(LeaveAlternateScreen)?
+            .execute(cursor::Show)?;
+        Ok(())
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = Self::restore();
     }
 }
 

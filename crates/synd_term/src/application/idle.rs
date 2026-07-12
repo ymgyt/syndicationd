@@ -2,7 +2,7 @@ use super::Application;
 #[cfg(feature = "integration")]
 use tracing::debug;
 
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     pub(super) fn handle_idle(&mut self) {
         self.clear_idle_timer();
 

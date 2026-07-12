@@ -6,13 +6,13 @@ use crate::event::{ApiEvent, AuthApiEvent, Event};
 
 use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, RequestSequence};
 
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     #[instrument(skip_all)]
     pub(super) fn apply_event(&mut self, event: Event) {
         let _guard = info_span!("apply_event", %event).entered();
 
         match event {
-            Event::TerminalResized { .. } => {
+            Event::TerminalResized => {
                 self.should_render();
             }
             Event::RenderThrobber => {
@@ -59,11 +59,7 @@ impl<Term, Sess> Application<Term, Sess> {
                 self.components.apply_timeline_refetch_started(request_seq);
             }
             Event::RegistryFeed { event } => {
-                let operations = self.components.apply_feed_event(
-                    event,
-                    self.config.feeds_per_pagination,
-                    self.next_entries_first(0),
-                );
+                let operations = self.components.apply_feed_event(event);
                 self.perform_operations(operations);
             }
             Event::FeedEventSubscriptionInterrupted => {

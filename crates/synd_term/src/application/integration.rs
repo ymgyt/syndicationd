@@ -6,7 +6,7 @@ use crossterm::event::Event as CrosstermEvent;
 use futures_util::Stream;
 
 #[cfg(feature = "integration")]
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     pub fn buffer(&self) -> &ratatui::buffer::Buffer {
         self.drivers.buffer()
     }

@@ -85,8 +85,6 @@ impl AppComponent {
     pub(in crate::application) fn apply_feed_event(
         &mut self,
         event: payload::FeedEvent,
-        _feeds_first: i64,
-        _entries_first: i64,
     ) -> Vec<Operation> {
         match event {
             payload::FeedEvent::TimelineChanged(event) => self.apply_timeline_changed(&event),
@@ -250,16 +248,16 @@ impl AppComponent {
         refresh_poll_attempts: u16,
     ) -> Vec<Operation> {
         match event {
-            FeedsApiEvent::FeedSubscribed { url, payload } => {
-                let operations = FeedsComponent::feed_subscribed(
-                    url,
-                    payload,
-                    feeds_first,
-                    entries_first,
-                    refresh_poll_attempts,
-                );
+            FeedsApiEvent::FeedSubscribed => {
                 self.shell.request_render();
-                operations
+                vec![
+                    FeedsComponent::reload_subscription(feeds_first),
+                    FeedsComponent::reload_entries(entries_first),
+                    Operation::ScheduleFeedViewReload {
+                        feeds_first,
+                        entries_first,
+                    },
+                ]
             }
             FeedsApiEvent::FeedRefreshAccepted { url, payload } => {
                 let Some(operations) = self.feeds.feed_refresh_accepted(
@@ -551,7 +549,7 @@ impl AppComponent {
                 self.shell.request_render();
                 Vec::new()
             }
-            GitHubApiEvent::ThreadUnsubscribed { .. } => Vec::new(),
+            GitHubApiEvent::ThreadUnsubscribed => Vec::new(),
         }
     }
 
@@ -577,7 +575,6 @@ fn next_entries_first(
 #[cfg(test)]
 mod tests {
     use core::assert_matches;
-    use synd_client::payload::{ResponseCode, ResponseStatus};
     use synd_feed::types::{EntryId, FeedUrl};
 
     use crate::{
@@ -647,23 +644,9 @@ mod tests {
     #[test]
     fn feed_subscribed_response_reloads_subscription_and_entries() {
         let mut component = app_component();
-        let url = FeedUrl::parse("https://example.com/feed.xml").unwrap();
-        let payload = payload::SubscribeFeedPayload {
-            status: ResponseStatus {
-                code: ResponseCode::Ok,
-            },
-            url: url.clone(),
-            disposition: payload::SubscribeDisposition::Subscribed,
-        };
 
-        let operations = component.apply_feeds_api_event(
-            1,
-            FeedsApiEvent::FeedSubscribed { url, payload },
-            10,
-            20,
-            100,
-            3,
-        );
+        let operations =
+            component.apply_feeds_api_event(1, FeedsApiEvent::FeedSubscribed, 10, 20, 100, 3);
 
         assert_matches!(
             operations.as_slice(),
@@ -728,7 +711,7 @@ mod tests {
             ]),
         });
 
-        let operations = component.apply_feed_event(event, 10, 20);
+        let operations = component.apply_feed_event(event);
 
         assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
     }

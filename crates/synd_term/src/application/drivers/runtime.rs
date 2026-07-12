@@ -1,9 +1,11 @@
 use std::{num::NonZero, pin::Pin, time::Duration};
 
+use futures_util::FutureExt;
 use tokio::time::{Instant, Sleep};
 
 use crate::{
     application::{InFlight, RequestId, RequestSequence},
+    event::Event,
     job::{JobFuture, Jobs},
 };
 
@@ -49,6 +51,16 @@ impl DriverRuntime {
 
     pub(super) fn push_background_job(&mut self, job: JobFuture) {
         self.background_jobs.push(job);
+    }
+
+    /// Schedule `event` to fire after `delay`.
+    pub(super) fn schedule_event(&mut self, delay: Duration, event: Event) {
+        let fut = async move {
+            tokio::time::sleep(delay).await;
+            Ok(event)
+        }
+        .boxed();
+        self.push_background_job(fut);
     }
 
     pub(super) fn reset_throbber(&mut self) {

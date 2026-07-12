@@ -7,7 +7,7 @@ use ratatui::Frame;
 use crate::auth::CredentialError;
 use crate::{
     application::outbound::github::GithubClient,
-    application::{Authenticator, Cache, Clock, FeedApiRef},
+    application::{Authenticator, Cache, Clock, FeedApiRef, SystemClock},
     auth::{Credential, Verified},
     event::Event,
     interact::Interact,
@@ -15,27 +15,36 @@ use crate::{
     terminal::Terminal,
 };
 
+use super::{FEED_REFRESH_POLL_INTERVAL, FEED_VIEW_SYNC_INTERVAL, TIMELINE_INVALIDATION_DEBOUNCE};
+
 mod auth;
-mod dispatcher;
 mod feed;
 mod feed_events;
 mod github;
-mod handles;
 mod interaction;
 mod runtime;
 
-use dispatcher::OperationDispatcher;
+use auth::AuthDriver;
+use feed::FeedDriver;
 pub(in crate::application) use feed_events::FeedEventMessage;
 use feed_events::FeedEventSubscription;
-use handles::DriverHandles;
+use github::GitHubDriver;
+use interaction::InteractionDriver;
 use runtime::{DriverPollers, DriverRuntime};
 
-/// Facade over outside-world handles, execution machinery, and operation routing.
+/// Executes side effects requested as `Operation`, owning the external-world
+/// handles and the machinery(job queues, timers, in-flight tracking) that
+/// runs them.
 pub(super) struct Drivers {
-    pub(super) handles: DriverHandles,
-    runtime: DriverRuntime,
+    pub(super) terminal: Terminal,
+    pub(super) cache: Cache,
+    clock: Box<dyn Clock>,
+    feed: FeedDriver,
+    auth: AuthDriver,
+    github: GitHubDriver,
+    interaction: InteractionDriver,
     feed_events: FeedEventSubscription,
-    operation_dispatcher: OperationDispatcher,
+    runtime: DriverRuntime,
 }
 
 pub(super) struct DriverParts {
@@ -48,12 +57,6 @@ pub(super) struct DriverParts {
     pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) throbber_timer_interval: Duration,
     pub(super) idle_timer_interval: Duration,
-}
-
-pub(super) struct DriverContext<'a> {
-    handles: &'a mut DriverHandles,
-    runtime: &'a mut DriverRuntime,
-    feed_events: &'a mut FeedEventSubscription,
 }
 
 impl Drivers {
@@ -71,25 +74,180 @@ impl Drivers {
         } = parts;
 
         Self {
-            handles: DriverHandles::new(handles::DriverHandleParts {
-                terminal,
-                feed_api,
-                github_client,
-                cache,
-                authenticator,
-                interactor,
-                clock,
-            }),
-            runtime: DriverRuntime::new(throbber_timer_interval, idle_timer_interval),
+            terminal,
+            cache,
+            clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
+            feed: FeedDriver {
+                api: feed_api.clone(),
+            },
+            auth: AuthDriver {
+                authenticator: authenticator.unwrap_or_else(Authenticator::new),
+                api: feed_api,
+            },
+            github: GitHubDriver {
+                client: github_client,
+            },
+            interaction: InteractionDriver { interactor },
             feed_events: FeedEventSubscription::new(),
-            operation_dispatcher: OperationDispatcher::new(),
+            runtime: DriverRuntime::new(throbber_timer_interval, idle_timer_interval),
         }
     }
 
-    pub(super) fn perform_operation(&mut self, operation: Operation) -> Vec<Event> {
-        let dispatcher = self.operation_dispatcher;
-        let mut cx = self.context();
-        dispatcher.dispatch(operation, &mut cx)
+    /// Route an `Operation` to the driver that executes it.
+    /// The length comes from the routing table itself, not from logic.
+    #[expect(clippy::too_many_lines)]
+    pub(super) fn dispatch(&mut self, operation: Operation) -> Vec<Event> {
+        match operation {
+            Operation::StartDeviceFlow { provider } => {
+                self.auth.start_device_flow(&mut self.runtime, provider);
+                Vec::new()
+            }
+            Operation::PollDeviceFlowAccessToken {
+                provider,
+                device_authorization,
+            } => {
+                self.auth.poll_device_flow_access_token(
+                    &mut self.runtime,
+                    self.clock.now(),
+                    provider,
+                    *device_authorization,
+                );
+                Vec::new()
+            }
+            Operation::OpenFeedSubscriptionEditor => vec![
+                self.interaction
+                    .open_feed_subscription_editor(&mut self.terminal),
+            ],
+            Operation::OpenFeedEditionEditor { prompt } => vec![
+                self.interaction
+                    .open_feed_edition_editor(&mut self.terminal, prompt.as_str()),
+            ],
+            Operation::SubscribeFeed { input } => {
+                self.feed.subscribe_feed(&mut self.runtime, input);
+                Vec::new()
+            }
+            Operation::RefreshFeed { url } => {
+                vec![self.feed.refresh_feed(&mut self.runtime, url)]
+            }
+            Operation::FetchFeedRefreshStatus {
+                url,
+                request_id,
+                remaining,
+            } => {
+                self.feed
+                    .fetch_feed_refresh_status(&mut self.runtime, url, request_id, remaining);
+                Vec::new()
+            }
+            Operation::ScheduleFeedRefreshPoll {
+                url,
+                request_id,
+                remaining,
+            } => {
+                self.runtime.schedule_event(
+                    FEED_REFRESH_POLL_INTERVAL,
+                    Event::FeedRefreshPollElapsed {
+                        url,
+                        request_id,
+                        remaining,
+                    },
+                );
+                Vec::new()
+            }
+            Operation::FetchSubscription {
+                populate,
+                after,
+                first,
+            } => {
+                self.feed
+                    .fetch_subscription(&mut self.runtime, populate, after, first);
+                Vec::new()
+            }
+            Operation::FetchEntries {
+                populate,
+                after,
+                first,
+            } => self
+                .feed
+                .fetch_entries(&mut self.runtime, populate, after, first, false),
+            Operation::FetchInitialFeedView {
+                subscriptions_first,
+                timeline_first,
+            } => vec![self.feed.fetch_initial_feed_view(
+                &mut self.runtime,
+                subscriptions_first,
+                timeline_first,
+            )],
+            Operation::RefetchTimelineEntries {
+                populate,
+                after,
+                first,
+            } => self
+                .feed
+                .fetch_entries(&mut self.runtime, populate, after, first, true),
+            Operation::StartFeedEventSubscription => {
+                self.feed_events.start(self.feed.api.clone());
+                Vec::new()
+            }
+            Operation::ScheduleFeedViewReload {
+                feeds_first,
+                entries_first,
+            } => {
+                self.runtime.schedule_event(
+                    TIMELINE_INVALIDATION_DEBOUNCE,
+                    Event::FeedViewReloadDebounced {
+                        feeds_first,
+                        entries_first,
+                    },
+                );
+                Vec::new()
+            }
+            Operation::UnsubscribeFeed { url } => {
+                self.feed.unsubscribe_feed(&mut self.runtime, url);
+                Vec::new()
+            }
+            Operation::ScheduleFeedViewSync => {
+                self.runtime
+                    .schedule_event(FEED_VIEW_SYNC_INTERVAL, Event::FeedViewSyncElapsed);
+                Vec::new()
+            }
+            Operation::ScheduleTimelineReload => {
+                self.runtime
+                    .schedule_event(TIMELINE_INVALIDATION_DEBOUNCE, Event::TimelineReloadDebounced);
+                Vec::new()
+            }
+            Operation::FetchGitHubNotifications { populate, params } => self
+                .github
+                .fetch_notifications(&mut self.runtime, populate, params)
+                .into_iter()
+                .collect(),
+            Operation::FetchGitHubNotificationDetails { contexts } => self
+                .github
+                .fetch_notification_details(&mut self.runtime, contexts)
+                .into_iter()
+                .collect(),
+            Operation::MarkGitHubNotificationAsDone { id } => self
+                .github
+                .mark_notification_as_done(&mut self.runtime, id)
+                .into_iter()
+                .collect(),
+            Operation::UnsubscribeGitHubThread { id } => self
+                .github
+                .unsubscribe_thread(&mut self.runtime, id)
+                .into_iter()
+                .collect(),
+            Operation::OpenBrowser { url } => {
+                self.interaction.open_browser(url).into_iter().collect()
+            }
+            Operation::OpenTextBrowser { url } => self
+                .interaction
+                .open_text_browser(url)
+                .into_iter()
+                .collect(),
+            Operation::ForceRedrawTerminal => {
+                self.terminal.force_redraw();
+                Vec::new()
+            }
+        }
     }
 
     pub(super) fn pollers(&mut self) -> DriverPollers<'_> {
@@ -111,16 +269,16 @@ impl Drivers {
     }
 
     pub(super) fn set_credential(&mut self, cred: Verified<Credential>) {
-        let mut cx = self.context();
-        auth::AuthDriver::set_credential(&mut cx, cred);
+        let now = self.clock.now();
+        self.auth.set_credential(&mut self.runtime, now, cred);
     }
 
     #[cfg(feature = "integration")]
     pub(super) async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
         let restore = crate::auth::Restore {
-            jwt_service: self.handles.jwt_service(),
-            cache: &self.handles.cache,
-            now: self.handles.now(),
+            jwt_service: &self.auth.authenticator.jwt_service,
+            cache: &self.cache,
+            now: self.clock.now(),
             persist_when_refreshed: true,
         };
         restore.restore().await
@@ -131,15 +289,12 @@ impl Drivers {
         F: FnOnce(&mut Frame, &super::InFlight, DateTime<Utc>),
     {
         let in_flight = &self.runtime.in_flight;
-        let now = self.handles.now();
-        self.handles
-            .terminal
-            .render(|frame| f(frame, in_flight, now))
+        let now = self.clock.now();
+        self.terminal.render(|frame| f(frame, in_flight, now))
     }
 
     pub(super) fn restart_feed_events_if_running(&mut self) -> bool {
-        let feed_api = self.handles.feed_api.clone();
-        self.feed_events.restart_if_running(feed_api)
+        self.feed_events.restart_if_running(self.feed.api.clone())
     }
 
     pub(super) fn clear_idle_timer(&mut self) {
@@ -156,19 +311,11 @@ impl Drivers {
 
     #[cfg(feature = "integration")]
     pub(super) fn buffer(&self) -> &ratatui::buffer::Buffer {
-        self.handles.terminal.buffer()
+        self.terminal.buffer()
     }
 
     #[cfg(feature = "integration")]
     pub(super) fn foreground_jobs_is_empty(&self) -> bool {
         self.runtime.jobs.is_empty()
-    }
-
-    fn context(&mut self) -> DriverContext<'_> {
-        DriverContext {
-            handles: &mut self.handles,
-            runtime: &mut self.runtime,
-            feed_events: &mut self.feed_events,
-        }
     }
 }

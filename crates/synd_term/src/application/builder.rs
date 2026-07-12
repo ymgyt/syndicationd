@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     application::outbound::github::GithubClient,
-    application::{
-        Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef, SessPending,
-        TermUninit,
-    },
+    application::{Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef},
     config::Categories,
     interact::Interact,
     terminal::Terminal,
@@ -231,7 +228,7 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
 
 impl ApplicationBuilder<Terminal, FeedApiRef, Categories, Cache, Config, Theme, Box<dyn Interact>> {
     #[must_use]
-    pub fn build(self) -> Application<TermUninit, SessPending> {
+    pub fn build(self) -> Application {
         Application::new(self)
     }
 }

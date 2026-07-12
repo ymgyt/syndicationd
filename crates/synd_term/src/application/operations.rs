@@ -2,9 +2,9 @@ use crate::operation::Operation;
 
 use super::Application;
 
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     pub(super) fn perform_operation(&mut self, operation: Operation) {
-        for event in self.drivers.perform_operation(operation) {
+        for event in self.drivers.dispatch(operation) {
             self.apply_event(event);
         }
     }

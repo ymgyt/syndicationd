@@ -7,7 +7,7 @@ use crate::{
     ui::widgets::{authentication::AuthenticateState, tabs::Tab},
 };
 
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     pub(super) fn handle_keymap(&mut self, key: KeyEvent) {
         let layers = self.active_keymap_layers();
         let result = self.keymap.resolve(&layers, key);

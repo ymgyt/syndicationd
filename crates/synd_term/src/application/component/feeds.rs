@@ -146,23 +146,6 @@ impl FeedsComponent {
         }
     }
 
-    pub(in crate::application) fn feed_subscribed(
-        _url: FeedUrl,
-        _payload: payload::SubscribeFeedPayload,
-        feeds_first: i64,
-        entries_first: i64,
-        _refresh_poll_attempts: u16,
-    ) -> Vec<Operation> {
-        vec![
-            Self::reload_subscription(feeds_first),
-            Self::reload_entries(entries_first),
-            Operation::ScheduleFeedViewReload {
-                feeds_first,
-                entries_first,
-            },
-        ]
-    }
-
     pub(in crate::application) fn feed_refresh_accepted(
         &mut self,
         request_seq: RequestSequence,

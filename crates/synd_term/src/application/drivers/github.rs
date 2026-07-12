@@ -3,30 +3,32 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 
 use crate::{
+    application::outbound::github::GithubClient,
     application::{Populate, RequestId},
     client::github::FetchNotificationsParams,
     event::{ApiEvent, Event, GitHubApiEvent},
     types::github::{IssueOrPullRequest, NotificationId, ThreadId},
 };
 
-use super::DriverContext;
+use super::runtime::DriverRuntime;
 
-pub(super) struct GitHubDriver;
+/// Executes GitHub notification API requests.
+pub(super) struct GitHubDriver {
+    pub(super) client: Option<GithubClient>,
+}
 
 impl GitHubDriver {
     pub(super) fn fetch_notifications(
-        cx: &mut DriverContext<'_>,
+        &self,
+        runtime: &mut DriverRuntime,
         populate: Populate,
         params: FetchNotificationsParams,
-    ) -> Vec<Event> {
-        let Some(client) = cx.handles.github_client.clone() else {
-            return vec![Event::Error {
-                message: "github client is not configured".to_owned(),
-            }];
+    ) -> Option<Event> {
+        let Some(client) = self.client.clone() else {
+            return Some(Self::client_not_configured());
         };
-        let request_seq = cx
-            .runtime
-            .request_started(RequestId::FetchGithubNotifications { page: params.page });
+        let request_seq =
+            runtime.request_started(RequestId::FetchGithubNotifications { page: params.page });
         let fut = async move {
             match client.fetch_notifications(params).await {
                 Ok(notifications) => Ok(Event::Api {
@@ -43,18 +45,17 @@ impl GitHubDriver {
             }
         }
         .boxed();
-        cx.runtime.push_job(fut);
-        Vec::new()
+        runtime.push_job(fut);
+        None
     }
 
     pub(super) fn fetch_notification_details(
-        cx: &mut DriverContext<'_>,
+        &self,
+        runtime: &mut DriverRuntime,
         contexts: Vec<IssueOrPullRequest>,
-    ) -> Vec<Event> {
-        let Some(client) = cx.handles.github_client.clone() else {
-            return vec![Event::Error {
-                message: "github client is not configured".to_owned(),
-            }];
+    ) -> Option<Event> {
+        let Some(client) = self.client.clone() else {
+            return Some(Self::client_not_configured());
         };
 
         for context in contexts {
@@ -62,9 +63,8 @@ impl GitHubDriver {
 
             let fut = match context {
                 either::Either::Left(issue) => {
-                    let request_seq = cx
-                        .runtime
-                        .request_started(RequestId::FetchGithubIssue { id: issue.id });
+                    let request_seq =
+                        runtime.request_started(RequestId::FetchGithubIssue { id: issue.id });
                     let notification_id = issue.notification_id;
                     async move {
                         match client.fetch_issue(issue).await {
@@ -84,11 +84,9 @@ impl GitHubDriver {
                     .boxed()
                 }
                 either::Either::Right(pull_request) => {
-                    let request_seq =
-                        cx.runtime
-                            .request_started(RequestId::FetchGithubPullRequest {
-                                id: pull_request.id,
-                            });
+                    let request_seq = runtime.request_started(RequestId::FetchGithubPullRequest {
+                        id: pull_request.id,
+                    });
                     let notification_id = pull_request.notification_id;
 
                     async move {
@@ -109,24 +107,21 @@ impl GitHubDriver {
                     .boxed()
                 }
             };
-            cx.runtime.push_job(fut);
+            runtime.push_job(fut);
         }
 
-        Vec::new()
+        None
     }
 
     pub(super) fn mark_notification_as_done(
-        cx: &mut DriverContext<'_>,
+        &self,
+        runtime: &mut DriverRuntime,
         id: NotificationId,
-    ) -> Vec<Event> {
-        let Some(client) = cx.handles.github_client.clone() else {
-            return vec![Event::Error {
-                message: "github client is not configured".to_owned(),
-            }];
+    ) -> Option<Event> {
+        let Some(client) = self.client.clone() else {
+            return Some(Self::client_not_configured());
         };
-        let request_seq = cx
-            .runtime
-            .request_started(RequestId::MarkGithubNotificationAsDone { id });
+        let request_seq = runtime.request_started(RequestId::MarkGithubNotificationAsDone { id });
         let fut = async move {
             match client.mark_thread_as_done(id).await {
                 Ok(()) => Ok(Event::Api {
@@ -142,24 +137,24 @@ impl GitHubDriver {
             }
         }
         .boxed();
-        cx.runtime.push_job(fut);
-        Vec::new()
+        runtime.push_job(fut);
+        None
     }
 
-    pub(super) fn unsubscribe_thread(cx: &mut DriverContext<'_>, id: ThreadId) -> Vec<Event> {
-        let Some(client) = cx.handles.github_client.clone() else {
-            return vec![Event::Error {
-                message: "github client is not configured".to_owned(),
-            }];
+    pub(super) fn unsubscribe_thread(
+        &self,
+        runtime: &mut DriverRuntime,
+        id: ThreadId,
+    ) -> Option<Event> {
+        let Some(client) = self.client.clone() else {
+            return Some(Self::client_not_configured());
         };
-        let request_seq = cx
-            .runtime
-            .request_started(RequestId::UnsubscribeGithubThread);
+        let request_seq = runtime.request_started(RequestId::UnsubscribeGithubThread);
         let fut = async move {
             match client.unsubscribe_thread(id).await {
                 Ok(()) => Ok(Event::Api {
                     request_seq,
-                    event: ApiEvent::GitHub(GitHubApiEvent::ThreadUnsubscribed {}),
+                    event: ApiEvent::GitHub(GitHubApiEvent::ThreadUnsubscribed),
                 }),
                 Err(error) => Ok(Event::GithubApiError {
                     error: Arc::new(error),
@@ -168,7 +163,13 @@ impl GitHubDriver {
             }
         }
         .boxed();
-        cx.runtime.push_job(fut);
-        Vec::new()
+        runtime.push_job(fut);
+        None
+    }
+
+    fn client_not_configured() -> Event {
+        Event::Error {
+            message: "github client is not configured".to_owned(),
+        }
     }
 }

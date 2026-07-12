@@ -1,5 +1,3 @@
-use crate::command::Command;
-
 use bitflags::bitflags;
 
 bitflags! {
@@ -33,13 +31,11 @@ impl State {
         self.focus
     }
 
-    pub(super) fn focus_gained(&mut self) -> Option<Command> {
+    pub(super) fn focus_gained(&mut self) {
         self.focus = TerminalFocus::Gained;
-        None
     }
 
-    pub(super) fn focus_lost(&mut self) -> Option<Command> {
+    pub(super) fn focus_lost(&mut self) {
         self.focus = TerminalFocus::Lost;
-        None
     }
 }

@@ -7,7 +7,7 @@ use crate::{
 
 use super::Application;
 
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     #[instrument(skip_all)]
     pub(super) fn apply_command(&mut self, command: Command) {
         let _guard = info_span!("apply_command", %command).entered();

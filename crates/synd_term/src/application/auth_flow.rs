@@ -4,9 +4,9 @@ use crate::auth::{Credential, Verified};
 
 use super::Application;
 
-impl<Term, Sess> Application<Term, Sess> {
+impl Application {
     pub(super) fn complete_device_authorize_flow(&mut self, cred: Verified<Credential>) {
-        if let Err(err) = self.drivers.handles.cache.persist_credential(&cred) {
+        if let Err(err) = self.drivers.cache.persist_credential(&cred) {
             error!("Failed to save credential to cache: {err}");
         }
 

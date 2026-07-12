@@ -5,7 +5,6 @@ use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::application::FeedApiRef;
 
-use super::DriverContext;
 use tracing::{debug, warn};
 
 const FEED_EVENT_RECONNECT_DELAY: Duration = Duration::from_secs(2);
@@ -100,15 +99,5 @@ impl FeedEventSubscription {
             Self::Running { rx, .. } => rx.recv().await,
             Self::Stopped => future::pending().await,
         }
-    }
-}
-
-pub(super) struct FeedEventDriver;
-
-impl FeedEventDriver {
-    pub(super) fn start_subscription(cx: &mut DriverContext<'_>) -> Vec<crate::event::Event> {
-        let feed_api = cx.handles.feed_api.clone();
-        cx.feed_events.start(feed_api);
-        Vec::new()
     }
 }

@@ -32,10 +32,7 @@ pub(crate) enum AuthApiEvent {
 
 #[derive(Debug, Clone)]
 pub(crate) enum FeedsApiEvent {
-    FeedSubscribed {
-        url: FeedUrl,
-        payload: payload::SubscribeFeedPayload,
-    },
+    FeedSubscribed,
     FeedRefreshAccepted {
         url: FeedUrl,
         payload: payload::RefreshFeedPayload,
@@ -79,7 +76,7 @@ pub(crate) enum GitHubApiEvent {
     NotificationMarkedAsDone {
         notification_id: NotificationId,
     },
-    ThreadUnsubscribed {},
+    ThreadUnsubscribed,
 }
 
 impl Display for ApiEvent {
@@ -109,10 +106,7 @@ impl Display for ApiEvent {
 /// Fact that already happened and can update application state.
 #[derive(Debug, Clone)]
 pub(crate) enum Event {
-    TerminalResized {
-        _columns: u16,
-        _rows: u16,
-    },
+    TerminalResized,
     RenderThrobber,
     Idle,
     Api {

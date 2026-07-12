@@ -14,7 +14,7 @@ use crate::{
     event::Event,
     interact::Interact,
     operation::Operation,
-    terminal::Terminal,
+    terminal::{Terminal, TerminalGuard},
     ui::{
         self,
         theme::Theme,
@@ -59,12 +59,9 @@ mod events;
 mod feeds;
 mod idle;
 mod integration;
-mod lifecycle;
 mod operations;
 use component::AppComponent;
 use drivers::{DriverParts, Drivers};
-use lifecycle::Lifecycle;
-pub use lifecycle::{SessPending, SessReady, TermReady, TermRestored, TermUninit};
 
 const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
 const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -78,12 +75,11 @@ pub enum Populate {
 }
 
 /// Composition root that owns the event loop and connects components to drivers.
-pub struct Application<Term = TermUninit, Sess = SessPending> {
+pub struct Application {
     drivers: Drivers,
     components: AppComponent,
     keymap: crate::keymap::Keymap,
     config: Config,
-    _lifecycle: Lifecycle<Term, Sess>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -106,7 +102,7 @@ impl FeedRefreshPollKey {
     }
 }
 
-impl Application<TermUninit, SessPending> {
+impl Application {
     /// Construct `ApplicationBuilder`
     pub fn builder() -> ApplicationBuilder {
         ApplicationBuilder::default()
@@ -157,148 +153,72 @@ impl Application<TermUninit, SessPending> {
             components,
             keymap: crate::keymap::Keymap::new(config.keymaps.clone()),
             config,
-            _lifecycle: Lifecycle::new(),
         }
     }
 
-    pub async fn run<S>(self, input: &mut S) -> anyhow::Result<()>
+    pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        self.init()?.run_until_exit(input).await?;
+        let _guard = self.init_terminal()?;
+        self.restore_github_notification_filter_options();
+        self.start_session();
+        self.event_loop(input).await;
+        self.shutdown();
         Ok(())
     }
 
-    /// Initialize terminal and application state.
-    fn init(self) -> anyhow::Result<Application<TermReady, SessReady>> {
-        let mut app = self.init_terminal()?;
-        app.restore_github_notification_filter_options();
-        Ok(app.enter_feed_api_session())
-    }
-}
-
-impl<Sess> Application<TermUninit, Sess> {
-    pub fn init_terminal(mut self) -> anyhow::Result<Application<TermReady, Sess>> {
-        match self.drivers.handles.terminal.init() {
-            Ok(()) => {}
+    /// Enter the terminal UI screen. The returned guard restores the terminal
+    /// when dropped.
+    /// The startup probe(dry run) tolerates init failure because test
+    /// environments may not have a tty.
+    fn init_terminal(&mut self) -> anyhow::Result<Option<TerminalGuard>> {
+        match self.drivers.terminal.init() {
+            Ok(guard) => Ok(Some(guard)),
             Err(err) => {
                 if self.components.shell.should_quit() {
                     warn!("Failed to init terminal: {err}");
+                    Ok(None)
                 } else {
-                    return Err(err.into());
+                    Err(err.into())
                 }
             }
         }
-
-        let Self {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: _,
-        } = self;
-
-        Ok(Application {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: Lifecycle::new(),
-        })
     }
 
-    #[cfg(feature = "integration")]
-    #[must_use]
-    pub fn assume_terminal_ready(self) -> Application<TermReady, Sess> {
-        let Self {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: _,
-        } = self;
-
-        Application {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: Lifecycle::new(),
-        }
-    }
-}
-
-impl Application<TermReady, SessPending> {
-    pub fn enter_feed_api_session(mut self) -> Application<TermReady, SessReady> {
+    /// Begin the feed api session: fire the initial fetches and mark the
+    /// session authenticated.
+    /// Also used by integration tests to start the application without
+    /// initializing the terminal.
+    pub fn start_session(&mut self) {
         self.initial_fetch();
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
         self.should_render();
         self.keymap.clear_pending();
+    }
 
-        let Self {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: _,
-        } = self;
+    fn shutdown(&mut self) {
+        self.drivers.shutdown();
 
-        Application {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: Lifecycle::new(),
+        if self.config.features.enable_github_notification {
+            let options = self.components.github.notifications.filter_options();
+            if let Err(err) = self
+                .drivers
+                .cache
+                .persist_gh_notification_filter_options(options)
+            {
+                warn!("Failed to persist github notification filter options: {err}");
+            }
         }
     }
-}
 
-impl<Sess> Application<TermReady, Sess> {
-    async fn run_until_exit<S>(
-        mut self,
-        input: &mut S,
-    ) -> anyhow::Result<Application<TermRestored, Sess>>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        self.event_loop(input).await;
-        self.stop()
-    }
-
-    pub fn stop(mut self) -> anyhow::Result<Application<TermRestored, Sess>> {
-        self.shutdown_drivers();
-        self.cleanup()?;
-
-        let Self {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: _,
-        } = self;
-
-        Ok(Application {
-            drivers,
-            components,
-            keymap,
-            config,
-            _lifecycle: Lifecycle::new(),
-        })
-    }
-}
-
-impl<Term, Sess> Application<Term, Sess> {
     fn restore_github_notification_filter_options(&mut self) {
         if !self.config.features.enable_github_notification {
             return;
         }
 
-        match self
-            .drivers
-            .handles
-            .cache
-            .load_gh_notification_filter_options()
+        match self.drivers.cache.load_gh_notification_filter_options()
         {
             Ok(options) => {
                 self.components.github.notifications =
@@ -317,11 +237,7 @@ impl<Term, Sess> Application<Term, Sess> {
 
     fn handle_restored_credential(&mut self, cred: Verified<Credential>) {
         self.set_credential(cred);
-        self.initial_fetch();
-        self.components.shell.auth.authenticated();
-        self.reset_idle_timer();
-        self.should_render();
-        self.keymap.clear_pending();
+        self.start_session();
     }
 
     fn set_credential(&mut self, cred: Verified<Credential>) {
@@ -341,32 +257,6 @@ impl<Term, Sess> Application<Term, Sess> {
             self.perform_operation(operation);
         }
         self.perform_operation(Operation::ScheduleFeedViewSync);
-    }
-
-    /// Restore terminal state and print something to console if necessary
-    fn cleanup(&mut self) -> anyhow::Result<()> {
-        if self.config.features.enable_github_notification {
-            let options = self.components.github.notifications.filter_options();
-            match self
-                .drivers
-                .handles
-                .cache
-                .persist_gh_notification_filter_options(options)
-            {
-                Ok(()) => {}
-                Err(err) => {
-                    warn!("Failed to persist github notification filter options: {err}");
-                }
-            }
-        }
-
-        self.drivers.handles.terminal.restore()?;
-
-        Ok(())
-    }
-
-    fn shutdown_drivers(&mut self) {
-        self.drivers.shutdown();
     }
 
     async fn event_loop<S>(&mut self, input: &mut S)
@@ -483,21 +373,14 @@ impl<Term, Sess> Application<Term, Sess> {
         };
 
         match event {
-            CrosstermEvent::Resize(columns, rows) => self.apply_event(Event::TerminalResized {
-                _columns: columns,
-                _rows: rows,
-            }),
+            CrosstermEvent::Resize(..) => self.apply_event(Event::TerminalResized),
             CrosstermEvent::FocusGained => {
+                self.components.shell.focus_gained();
                 self.should_render();
-                if let Some(command) = self.components.shell.focus_gained() {
-                    self.apply_command(command);
-                }
             }
             CrosstermEvent::FocusLost => {
+                self.components.shell.focus_lost();
                 self.should_render();
-                if let Some(command) = self.components.shell.focus_lost() {
-                    self.apply_command(command);
-                }
             }
             CrosstermEvent::Key(KeyEvent {
                 kind: KeyEventKind::Release,

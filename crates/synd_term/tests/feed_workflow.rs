@@ -6,7 +6,7 @@ use serde_json::json;
 use synd_client::payload;
 use synd_term::{
     application::{
-        Application, Cache, Config, SessReady, TermReady,
+        Application, Cache, Config,
         outbound::feed::{MockFeedApi, MockFeedApiResponse},
     },
     config::Categories,
@@ -61,16 +61,15 @@ mod established_session {
     }
 }
 
-fn start_app() -> (TempDir, Application<TermReady, SessReady>) {
+fn start_app() -> (TempDir, Application) {
     let payload = initial_feed_view();
     let api = MockFeedApi::new([
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
         MockFeedApiResponse::InitialFeedView(Ok(payload)),
     ]);
-    let (cache_dir, app) = app(api);
+    let (cache_dir, mut app) = app(api);
 
-    let app = app.assume_terminal_ready();
-    let app = app.enter_feed_api_session();
+    app.start_session();
 
     (cache_dir, app)
 }

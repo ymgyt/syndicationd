@@ -77,12 +77,12 @@ impl ShellComponent {
         self.state.focus()
     }
 
-    pub(in crate::application) fn focus_gained(&mut self) -> Option<crate::command::Command> {
-        self.state.focus_gained()
+    pub(in crate::application) fn focus_gained(&mut self) {
+        self.state.focus_gained();
     }
 
-    pub(in crate::application) fn focus_lost(&mut self) -> Option<crate::command::Command> {
-        self.state.focus_lost()
+    pub(in crate::application) fn focus_lost(&mut self) {
+        self.state.focus_lost();
     }
 
     pub(in crate::application) fn authenticate(&self) -> Option<Operation> {
