@@ -7,7 +7,7 @@ pub use file::INIT_CONFIG;
 pub(crate) mod parse;
 
 mod resolver;
-pub use resolver::ConfigResolver;
+pub use resolver::{ConfigResolver, ConfigResolverBuilder};
 
 pub mod env {
     macro_rules! env_key {

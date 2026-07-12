@@ -1,7 +1,6 @@
 use std::process::ExitCode;
 
 use anyhow::Context as _;
-use clap::Args;
 use synd_runtime::Session;
 use synd_term::{
     application::{Application, Cache, ClientFeedApi, Config, Features},
@@ -12,29 +11,21 @@ use synd_term::{
 };
 use tracing::{error, info, warn};
 
-use crate::{
-    cli::{FeedOptions, GithubOptions, Palette},
-    config::{self, ConfigResolver},
-    release,
-    runtime::FeedRuntime,
-};
+use crate::{config::ConfigResolver, release, runtime::FeedRuntime};
 
-/// Run terminal UI
-#[derive(Args, Clone, Debug)]
-#[command(next_help_heading = "Term options")]
+/// Run the terminal UI.
+/// This is the default command executed when `synd` is invoked without a subcommand;
+/// its options are defined on the top-level CLI(`cli::TermOptions`).
+#[derive(Debug)]
 pub struct TermCommand {
-    /// Color theme
-    #[arg(value_enum, long = "theme", env = config::env::THEME, value_name = "THEME")]
-    pub palette: Option<Palette>,
-    #[command(flatten)]
-    pub feed: FeedOptions,
-    #[command(flatten)]
-    pub github: GithubOptions,
-    #[arg(hide = true, long = "dry-run", hide_long_help = true)]
-    pub dry_run: bool,
+    dry_run: bool,
 }
 
 impl TermCommand {
+    pub(crate) fn new(dry_run: bool) -> Self {
+        Self { dry_run }
+    }
+
     pub async fn run(self, config: ConfigResolver) -> ExitCode {
         let log_file = config.log_file();
         let (app, session) = match build_app(config, self.dry_run).await {

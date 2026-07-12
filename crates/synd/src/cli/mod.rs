@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use synd_term::ui::theme;
 
-use crate::config;
+use crate::config::{self, ConfigResolver, ConfigResolverBuilder};
 
 mod command;
 mod port;
+
+use command::term::TermCommand;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, clap::ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "kebab-case"))]
@@ -34,26 +36,44 @@ impl From<Palette> for theme::Palette {
 
 #[derive(Parser, Debug)]
 #[command(version, propagate_version = true, name = "synd")]
-pub struct Args {
+struct Args {
     /// Configuration file path
     #[arg(long, short = 'c', env = config::env::CONFIG_FILE)]
-    pub config: Option<PathBuf>,
+    config: Option<PathBuf>,
     /// Log file path
     #[arg(long, env = config::env::LOG_FILE)]
-    pub log: Option<PathBuf>,
+    log: Option<PathBuf>,
     /// Cache directory
     #[arg(long, env = config::env::CACHE_DIR)]
-    pub cache_dir: Option<PathBuf>,
+    cache_dir: Option<PathBuf>,
+    /// Exit before starting the terminal UI. Used by smoke tests to verify startup
+    #[arg(hide = true, long = "dry-run", hide_long_help = true)]
+    dry_run: bool,
     #[command(subcommand)]
-    pub command: Option<Command>,
+    command: Option<Command>,
     #[command(flatten)]
-    pub api: ApiOptions,
+    api: ApiOptions,
     #[command(flatten)]
-    pub daemon: DaemonOptions,
+    daemon: DaemonOptions,
     #[command(flatten)]
-    pub backend: BackendOptions,
+    backend: BackendOptions,
     #[command(flatten)]
-    pub term: command::term::TermCommand,
+    term: TermOptions,
+}
+
+/// Configuration inputs for the terminal UI, the default command of `synd`.
+/// Defined only at the top level: the terminal UI is the program itself,
+/// not a subcommand. Every field is resolved by `ConfigResolver`.
+#[derive(clap::Args, Debug)]
+#[command(next_help_heading = "Term options")]
+pub struct TermOptions {
+    /// Color theme
+    #[arg(value_enum, long = "theme", env = config::env::THEME, value_name = "THEME")]
+    pub palette: Option<Palette>,
+    #[command(flatten)]
+    pub feed: FeedOptions,
+    #[command(flatten)]
+    pub github: GithubOptions,
 }
 
 #[derive(clap::Args, Debug)]
@@ -86,7 +106,7 @@ pub struct BackendOptions {
     pub sqlite_db: Option<PathBuf>,
 }
 
-#[derive(clap::Args, Clone, Debug)]
+#[derive(clap::Args, Debug)]
 #[command(next_help_heading = "Feed options")]
 pub struct FeedOptions {
     /// Feed entries limit to fetch
@@ -100,7 +120,7 @@ pub struct FeedOptions {
     pub browser_args: Option<Vec<String>>,
 }
 
-#[derive(clap::Args, Clone, Debug)]
+#[derive(clap::Args, Debug)]
 #[command(next_help_heading = "GitHub options")]
 pub struct GithubOptions {
     /// Enable GitHub notification feature
@@ -122,7 +142,9 @@ pub struct GithubOptions {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    Term(command::term::TermCommand),
+    /// Not parsed as a subcommand: `synd` without a subcommand resolves to this
+    #[command(skip)]
+    Term(TermCommand),
     #[command(alias = "clear")]
     Clean(command::clean::CleanCommand),
     Daemon(command::daemon::DaemonCommand),
@@ -137,9 +159,33 @@ pub enum OutputFormat {
     Json,
 }
 
-pub fn parse() -> Args {
-    let mut args = Args::parse();
-    args.command
-        .get_or_insert_with(|| Command::Term(args.term.clone()));
-    args
+/// Parse CLI arguments, then decide the command to run and prime the config
+/// resolver with the parsed flags.
+/// `synd` without a subcommand runs the terminal UI.
+pub fn parse() -> (ConfigResolverBuilder, Command) {
+    let Args {
+        config,
+        log,
+        cache_dir,
+        dry_run,
+        command,
+        api,
+        daemon,
+        backend,
+        term,
+    } = Args::parse();
+
+    let command = command.unwrap_or_else(|| Command::Term(TermCommand::new(dry_run)));
+    let builder = ConfigResolver::builder()
+        .config_file(config)
+        .log_file(log)
+        .cache_dir(cache_dir)
+        .api_options(api)
+        .daemon_options(daemon)
+        .backend_options(backend)
+        .feed_options(term.feed)
+        .github_options(term.github)
+        .palette(term.palette);
+
+    (builder, command)
 }

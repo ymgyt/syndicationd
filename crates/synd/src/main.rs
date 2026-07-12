@@ -3,7 +3,7 @@ use std::{io::IsTerminal as _, process::ExitCode};
 use synd_support::fs::fsimpl::FileSystem;
 use tracing_appender::non_blocking::WorkerGuard;
 
-use crate::{cli::Args, config::ConfigResolver};
+use crate::config::ConfigResolver;
 
 mod cli;
 mod config;
@@ -98,38 +98,13 @@ mod crypto_provider {
 async fn main() -> ExitCode {
     crypto_provider::init();
 
-    let (config, command) = {
-        let Args {
-            config,
-            log,
-            cache_dir,
-            api,
-            daemon,
-            backend,
-            term,
-            command,
-        } = cli::parse();
-
-        let config = match ConfigResolver::builder()
-            .config_file(config)
-            .log_file(log)
-            .cache_dir(cache_dir)
-            .api_options(api)
-            .daemon_options(daemon)
-            .backend_options(backend)
-            .feed_options(term.feed)
-            .github_options(term.github)
-            .palette(term.palette)
-            .try_build()
-        {
-            Ok(config) => config,
-            Err(err) => {
-                eprintln!("{err}");
-                return ExitCode::FAILURE;
-            }
-        };
-        let command = command.expect("cli::parse should default missing command to term");
-        (config, command)
+    let (config_builder, command) = cli::parse();
+    let config = match config_builder.try_build() {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("{err}");
+            return ExitCode::FAILURE;
+        }
     };
 
     let _guard = match init_tracing(&config, &command) {
@@ -141,7 +116,6 @@ async fn main() -> ExitCode {
     };
 
     match command {
-        #[expect(clippy::large_futures)]
         cli::Command::Term(term) => return term.run(config).await,
         cli::Command::Clean(clean) => return clean.run(&config, &FileSystem::new()),
         cli::Command::Daemon(daemon) => return daemon.run(config).await,
