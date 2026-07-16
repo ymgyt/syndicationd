@@ -1,8 +1,5 @@
 use crate::{
-    application::{
-        Features,
-        state::{Should, State},
-    },
+    application::{Features, state::State},
     config::Categories,
     ui::theme::Theme,
 };
@@ -33,7 +30,7 @@ impl AppComponent {
     ) -> Self {
         let mut state = State::new();
         if dry_run {
-            state.flags = Should::Quit;
+            state.should_quit = true;
         }
 
         Self {

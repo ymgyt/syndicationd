@@ -23,7 +23,6 @@ impl AppComponent {
         self.shell
             .auth
             .set_device_authorization_response(device_authorization.clone());
-        self.shell.request_render();
 
         let mut operations = Vec::new();
         if let Ok(url) = Url::parse(device_authorization.verification_uri().to_string().as_str()) {
@@ -44,13 +43,11 @@ impl AppComponent {
             Ok(input) if self.feeds.is_already_subscribed(&input.url) => {
                 let message = format!("{} already subscribed", input.url);
                 self.shell.prompt.set_error_message(message);
-                self.shell.request_render();
                 Vec::new()
             }
             Ok(input) => vec![Operation::SubscribeFeed { input }],
             Err(err) => {
                 self.shell.prompt.set_error_message(err.to_string());
-                self.shell.request_render();
                 Vec::new()
             }
         }
@@ -64,7 +61,6 @@ impl AppComponent {
             Ok(input) => vec![Operation::SubscribeFeed { input }],
             Err(err) => {
                 self.shell.prompt.set_error_message(err.to_string());
-                self.shell.request_render();
                 Vec::new()
             }
         }
@@ -91,34 +87,6 @@ impl AppComponent {
         }
     }
 
-    pub(in crate::application) fn apply_feed_event_subscription_interrupted(
-        &mut self,
-        feeds_first: i64,
-        entries_first: i64,
-    ) -> Vec<Operation> {
-        self.shell.request_render();
-        vec![Operation::ScheduleFeedViewReload {
-            feeds_first,
-            entries_first,
-        }]
-    }
-
-    pub(in crate::application) fn apply_feed_view_reload_debounced(
-        &mut self,
-        feeds_first: i64,
-        entries_first: i64,
-    ) -> Vec<Operation> {
-        self.shell.request_render();
-        vec![
-            Operation::FetchSubscription {
-                populate: Populate::Replace,
-                after: None,
-                first: feeds_first,
-            },
-            FeedsComponent::reload_entries(entries_first),
-        ]
-    }
-
     pub(in crate::application) fn mark_timeline_dirty(&mut self) -> Vec<Operation> {
         self.feeds.mark_timeline_dirty().into_iter().collect()
     }
@@ -129,28 +97,10 @@ impl AppComponent {
         request_id: String,
         remaining: u16,
     ) -> Vec<Operation> {
-        let operation = self.feeds.refresh_poll_elapsed(url, request_id, remaining);
-        if operation.is_some() {
-            self.shell.request_render();
-        }
-        operation.into_iter().collect()
-    }
-
-    pub(in crate::application) fn apply_feed_view_sync_elapsed(
-        &mut self,
-        feeds_first: i64,
-        entries_first: i64,
-    ) -> Vec<Operation> {
-        self.shell.request_render();
-        vec![
-            Operation::FetchSubscription {
-                populate: Populate::Replace,
-                after: None,
-                first: feeds_first,
-            },
-            FeedsComponent::reload_entries(entries_first),
-            Operation::ScheduleFeedViewSync,
-        ]
+        self.feeds
+            .refresh_poll_elapsed(url, request_id, remaining)
+            .into_iter()
+            .collect()
     }
 
     pub(in crate::application) fn apply_timeline_reload_debounced(
@@ -249,7 +199,6 @@ impl AppComponent {
     ) -> Vec<Operation> {
         match event {
             FeedsApiEvent::FeedSubscribed => {
-                self.shell.request_render();
                 vec![
                     FeedsComponent::reload_subscription(feeds_first),
                     FeedsComponent::reload_entries(entries_first),
@@ -270,7 +219,6 @@ impl AppComponent {
                     return Vec::new();
                 };
                 debug!(%url, "refresh request accepted");
-                self.shell.request_render();
                 operations
             }
             FeedsApiEvent::FeedRefreshStatusFetched {
@@ -289,7 +237,6 @@ impl AppComponent {
                 ) else {
                     return Vec::new();
                 };
-                self.shell.request_render();
                 operations
             }
             FeedsApiEvent::FeedUnsubscribed { url } => {
@@ -299,7 +246,6 @@ impl AppComponent {
                     Populate::Replace,
                     self.feeds.entries.entries(),
                 );
-                self.shell.request_render();
                 Vec::new()
             }
             FeedsApiEvent::SubscriptionFetched {
@@ -355,7 +301,6 @@ impl AppComponent {
             });
         }
 
-        self.shell.request_render();
         operations
     }
 
@@ -415,7 +360,6 @@ impl AppComponent {
         {
             operations.push(operation);
         }
-        self.shell.request_render();
         operations
     }
 
@@ -476,7 +420,6 @@ impl AppComponent {
             });
         }
 
-        self.shell.request_render();
         operations
     }
 
@@ -503,7 +446,6 @@ impl AppComponent {
                 if populate == Populate::Replace {
                     self.shell.filter.clear_gh_notifications_categories();
                 }
-                self.shell.request_render();
                 operations
             }
             GitHubApiEvent::IssueFetched {
@@ -522,7 +464,6 @@ impl AppComponent {
                         categories,
                     );
                 }
-                self.shell.request_render();
                 Vec::new()
             }
             GitHubApiEvent::PullRequestFetched {
@@ -541,12 +482,10 @@ impl AppComponent {
                         categories,
                     );
                 }
-                self.shell.request_render();
                 Vec::new()
             }
             GitHubApiEvent::NotificationMarkedAsDone { notification_id } => {
                 self.github.notifications.marked_as_done(notification_id);
-                self.shell.request_render();
                 Vec::new()
             }
             GitHubApiEvent::ThreadUnsubscribed => Vec::new(),
@@ -664,38 +603,6 @@ mod tests {
                 Operation::ScheduleFeedViewReload {
                     feeds_first: 10,
                     entries_first: 20,
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn feed_event_subscription_interruption_schedules_delayed_feed_view_reload() {
-        let mut component = app_component();
-
-        let operations = component.apply_feed_event_subscription_interrupted(10, 20);
-
-        assert_matches!(
-            operations.as_slice(),
-            [Operation::ScheduleFeedViewReload {
-                feeds_first: 10,
-                entries_first: 20,
-            }]
-        );
-
-        let operations = component.apply_feed_view_reload_debounced(10, 20);
-        assert_matches!(
-            operations.as_slice(),
-            [
-                Operation::FetchSubscription {
-                    populate: Populate::Replace,
-                    after: None,
-                    first: 10,
-                },
-                Operation::FetchEntries {
-                    populate: Populate::Replace,
-                    after: None,
-                    first: 20,
                 },
             ]
         );

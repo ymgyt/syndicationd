@@ -2,9 +2,12 @@ use itertools::Itertools;
 use synd_client::SyndApiError;
 use tracing::{error, info_span, instrument, warn};
 
-use crate::event::{ApiEvent, AuthApiEvent, Event};
+use crate::{
+    event::{ApiEvent, AuthApiEvent, Event},
+    operation::Operation,
+};
 
-use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, RequestSequence};
+use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, Populate, RequestSequence};
 
 impl Application {
     #[instrument(skip_all)]
@@ -12,12 +15,10 @@ impl Application {
         let _guard = info_span!("apply_event", %event).entered();
 
         match event {
-            Event::TerminalResized => {
-                self.should_render();
-            }
+            // The event loop renders after every event; resize needs no extra handling
+            Event::TerminalResized => {}
             Event::RenderThrobber => {
                 self.drivers.reset_throbber();
-                self.should_render();
             }
             Event::Idle => {
                 self.handle_idle();
@@ -63,20 +64,27 @@ impl Application {
                 self.perform_operations(operations);
             }
             Event::FeedEventSubscriptionInterrupted => {
-                let operations = self.components.apply_feed_event_subscription_interrupted(
-                    self.config.feeds_per_pagination,
-                    self.next_entries_first(0),
-                );
-                self.perform_operations(operations);
+                self.perform_operation(Operation::ScheduleFeedViewReload {
+                    feeds_first: self.config.feeds_per_pagination,
+                    entries_first: self.next_entries_first(0),
+                });
             }
             Event::FeedViewReloadDebounced {
                 feeds_first,
                 entries_first,
             } => {
-                let operations = self
-                    .components
-                    .apply_feed_view_reload_debounced(feeds_first, entries_first);
-                self.perform_operations(operations);
+                self.perform_operations([
+                    Operation::FetchSubscription {
+                        populate: Populate::Replace,
+                        after: None,
+                        first: feeds_first,
+                    },
+                    Operation::FetchEntries {
+                        populate: Populate::Replace,
+                        after: None,
+                        first: entries_first,
+                    },
+                ]);
             }
             Event::FeedRefreshPollElapsed {
                 url,
@@ -89,11 +97,19 @@ impl Application {
                 self.perform_operations(operations);
             }
             Event::FeedViewSyncElapsed => {
-                let operations = self.components.apply_feed_view_sync_elapsed(
-                    self.config.feeds_per_pagination,
-                    self.next_entries_first(0),
-                );
-                self.perform_operations(operations);
+                self.perform_operations([
+                    Operation::FetchSubscription {
+                        populate: Populate::Replace,
+                        after: None,
+                        first: self.config.feeds_per_pagination,
+                    },
+                    Operation::FetchEntries {
+                        populate: Populate::Replace,
+                        after: None,
+                        first: self.next_entries_first(0),
+                    },
+                    Operation::ScheduleFeedViewSync,
+                ]);
             }
             Event::TimelineReloadDebounced => {
                 let operations = self
@@ -191,7 +207,6 @@ impl Application {
             .shell
             .prompt
             .set_error_message(error_message);
-        self.should_render();
     }
 
     fn synd_api_error_message(error: &SyndApiError) -> String {
@@ -229,8 +244,4 @@ impl Application {
         }
     }
 
-    #[inline]
-    pub(super) fn should_render(&mut self) {
-        self.components.shell.request_render();
-    }
 }

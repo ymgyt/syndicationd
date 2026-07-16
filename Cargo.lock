@@ -5683,7 +5683,6 @@ name = "synd-term"
 version = "0.3.2"
 dependencies = [
  "anyhow",
- "bitflags 2.13.0",
  "chrono",
  "chrono-humanize",
  "criterion",

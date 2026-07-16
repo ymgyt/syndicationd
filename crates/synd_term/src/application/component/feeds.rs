@@ -58,12 +58,11 @@ impl FeedsComponent {
         self.subscription.move_last();
     }
 
-    pub(in crate::application) fn open_unsubscribe_popup(&mut self) -> bool {
+    pub(in crate::application) fn open_unsubscribe_popup(&mut self) {
         if self.subscription.selected_feed().is_none() {
-            return false;
+            return;
         }
         self.subscription.toggle_unsubscribe_popup(true);
-        true
     }
 
     pub(in crate::application) fn is_unsubscribe_popup_open(&self) -> bool {

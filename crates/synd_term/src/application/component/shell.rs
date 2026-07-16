@@ -1,7 +1,7 @@
 use crate::{
     application::{
         Direction, Features, TerminalFocus,
-        state::{Should, State},
+        state::State,
     },
     auth::AuthenticationProvider,
     config::Categories,
@@ -50,27 +50,15 @@ impl ShellComponent {
     }
 
     pub(in crate::application) fn quit(&mut self) {
-        self.state.flags.insert(Should::Quit);
+        self.state.should_quit = true;
     }
 
     pub(in crate::application) fn should_quit(&self) -> bool {
-        self.state.flags.contains(Should::Quit)
+        self.state.should_quit
     }
 
     pub(in crate::application) fn clear_quit_request(&mut self) {
-        self.state.flags.remove(Should::Quit);
-    }
-
-    pub(in crate::application) fn request_render(&mut self) {
-        self.state.flags.insert(Should::Render);
-    }
-
-    pub(in crate::application) fn should_render(&self) -> bool {
-        self.state.flags.contains(Should::Render)
-    }
-
-    pub(in crate::application) fn clear_render_request(&mut self) {
-        self.state.flags.remove(Should::Render);
+        self.state.should_quit = false;
     }
 
     pub(in crate::application) fn focus(&self) -> TerminalFocus {

@@ -194,7 +194,6 @@ impl Application {
         self.initial_fetch();
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
-        self.should_render();
         self.keymap.clear_pending();
     }
 
@@ -321,16 +320,12 @@ impl Application {
                 }
             }
 
-            if self.components.shell.should_render() {
-                self.render();
-                self.components.shell.clear_render_request();
-                self.components.shell.prompt.clear_error_message();
-            }
-
             if self.components.shell.should_quit() {
                 self.components.shell.clear_quit_request(); // for testing
                 break ControlFlow::Break(());
             }
+
+            self.render();
         }
     }
 
@@ -376,11 +371,9 @@ impl Application {
             CrosstermEvent::Resize(..) => self.apply_event(Event::TerminalResized),
             CrosstermEvent::FocusGained => {
                 self.components.shell.focus_gained();
-                self.should_render();
             }
             CrosstermEvent::FocusLost => {
                 self.components.shell.focus_lost();
-                self.should_render();
             }
             CrosstermEvent::Key(KeyEvent {
                 kind: KeyEventKind::Release,
@@ -389,6 +382,8 @@ impl Application {
             CrosstermEvent::Key(key) => {
                 debug!("Handle key event: {key:?}");
 
+                // An error message stays visible until the next key input
+                self.components.shell.prompt.clear_error_message();
                 self.reset_idle_timer();
 
                 self.handle_keymap(key);
