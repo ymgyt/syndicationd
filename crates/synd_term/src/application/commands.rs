@@ -22,51 +22,19 @@ impl Application {
     }
 
     fn apply_shell_command(&mut self, command: ShellCommand) {
-        let move_tab = matches!(command, ShellCommand::MoveTabSelection(_));
-
         let operations = self
             .components
             .apply_shell_command(command, self.config.feeds_per_pagination);
-
-        if move_tab {
-            self.keymap.clear_pending();
-        }
-
         self.perform_operations(operations);
     }
 
     fn apply_feeds_command(&mut self, command: FeedsCommand) {
-        match command {
-            FeedsCommand::PromptFeedUnsubscription => {
-                let operations = self.components.apply_feeds_command(
-                    command,
-                    self.config.feeds_per_pagination,
-                    self.next_entries_first(0),
-                );
-                self.perform_operations(operations);
-                if self.components.is_feed_unsubscription_popup_open() {
-                    self.keymap.clear_pending();
-                }
-            }
-            FeedsCommand::SelectFeedUnsubscriptionPopup
-            | FeedsCommand::CancelFeedUnsubscriptionPopup => {
-                let operations = self.components.apply_feeds_command(
-                    command,
-                    self.config.feeds_per_pagination,
-                    self.next_entries_first(0),
-                );
-                self.perform_operations(operations);
-                self.keymap.clear_pending();
-            }
-            command => {
-                let operations = self.components.apply_feeds_command(
-                    command,
-                    self.config.feeds_per_pagination,
-                    self.next_entries_first(0),
-                );
-                self.perform_operations(operations);
-            }
-        }
+        let operations = self.components.apply_feeds_command(
+            command,
+            self.config.feeds_per_pagination,
+            self.next_entries_first(0),
+        );
+        self.perform_operations(operations);
     }
 
     fn apply_filter_command(&mut self, command: FilterCommand) {
@@ -80,13 +48,11 @@ impl Application {
                 if let Some(layer_keymap) = self.components.category_filter_keymap() {
                     self.keymap.set_layer_keymap(layer_keymap);
                 }
-                self.keymap.clear_pending();
             }
             FilterCommand::ActivateSearchFiltering => {
                 self.components.activate_search_filtering();
                 self.keymap
                     .set_layer_keymap(keymap::LayerKeymap::search_prompt());
-                self.keymap.clear_pending();
             }
             FilterCommand::PromptInsertChar(ch) => {
                 let operations = self.components.insert_prompt_char(ch);
@@ -101,7 +67,6 @@ impl Application {
                 self.keymap
                     .clear_layer_keymap(keymap::Layer::CategoryFilter);
                 self.keymap.clear_layer_keymap(keymap::Layer::SearchPrompt);
-                self.keymap.clear_pending();
             }
             FilterCommand::ToggleFilterCategory { category, lane } => {
                 let operations = self.components.toggle_filter_category(&category, lane);
@@ -119,17 +84,7 @@ impl Application {
     }
 
     fn apply_github_command(&mut self, command: GitHubCommand) {
-        match command {
-            GitHubCommand::OpenGhNotificationFilterPopup
-            | GitHubCommand::CloseGhNotificationFilterPopup => {
-                let operations = self.components.apply_github_command(command);
-                self.perform_operations(operations);
-                self.keymap.clear_pending();
-            }
-            command => {
-                let operations = self.components.apply_github_command(command);
-                self.perform_operations(operations);
-            }
-        }
+        let operations = self.components.apply_github_command(command);
+        self.perform_operations(operations);
     }
 }

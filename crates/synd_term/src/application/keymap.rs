@@ -26,7 +26,7 @@ impl Application {
         }
     }
 
-    fn active_keymap_layers(&self) -> LayerStack {
+    pub(super) fn active_keymap_layers(&self) -> LayerStack {
         let mut layers = LayerStack::empty();
         layers.push(Layer::App);
         layers.push(Layer::Global);

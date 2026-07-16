@@ -194,7 +194,6 @@ impl Application {
         self.initial_fetch();
         self.components.shell.auth.authenticated();
         self.reset_idle_timer();
-        self.keymap.clear_pending();
     }
 
     fn shutdown(&mut self) {
@@ -299,6 +298,7 @@ impl Application {
                 }
             };
 
+            let keymap_layers = self.active_keymap_layers();
             match result {
                 PollResult::Terminal(event) => self.handle_terminal_event(event),
                 PollResult::Job(event) | PollResult::BackgroundJob(event) => {
@@ -318,6 +318,11 @@ impl Application {
                 PollResult::Idle => {
                     self.apply_event(Event::Idle);
                 }
+            }
+
+            // Discard a pending key sequence when the keymap context changed
+            if self.active_keymap_layers() != keymap_layers {
+                self.keymap.clear_pending();
             }
 
             if self.components.shell.should_quit() {
