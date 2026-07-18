@@ -65,7 +65,9 @@ impl TimelineProjInput {
             }
             Self::FeedUnsubscribed { event, .. } => {
                 let subscription = event.subscription;
-                let timeline = tx.apply_feed_unsubscribed(&subscription, occurred_at).await?;
+                let timeline = tx
+                    .apply_feed_unsubscribed(&subscription, occurred_at)
+                    .await?;
                 Ok(timeline
                     .map(|timeline| (timeline, subscription.feed_url))
                     .into_iter()

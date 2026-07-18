@@ -93,7 +93,12 @@ impl FeedDriver {
         if first <= 0 {
             return None;
         }
-        debug!(?populate, has_after = after.is_some(), first, "fetch entries");
+        debug!(
+            ?populate,
+            has_after = after.is_some(),
+            first,
+            "fetch entries"
+        );
         let api = self.api.clone();
         let request_seq = runtime.request_started(RequestId::FetchEntries);
         let fut = async move {

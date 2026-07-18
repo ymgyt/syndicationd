@@ -1,8 +1,5 @@
 use crate::{
-    application::{
-        Direction, Features, TerminalFocus,
-        state::State,
-    },
+    application::{Direction, Features, TerminalFocus, state::State},
     auth::AuthenticationProvider,
     config::Categories,
     operation::Operation,

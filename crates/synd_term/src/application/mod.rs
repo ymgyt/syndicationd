@@ -193,8 +193,7 @@ impl Application {
             return;
         }
 
-        match self.drivers.cache.load_gh_notification_filter_options()
-        {
+        match self.drivers.cache.load_gh_notification_filter_options() {
             Ok(options) => {
                 self.components.github.notifications =
                     GitHubNotificationsWidget::with_filter_options(options);

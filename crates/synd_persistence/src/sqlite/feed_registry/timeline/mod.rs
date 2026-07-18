@@ -7,8 +7,8 @@ use synd_registry::{
     RegistryDbResult, TimelineStore,
     entry::EntryAttrs,
     query::{
-        TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntryCursor,
-        TimelineEntry, TimelineEntriesPage, TimelineEntriesQuery,
+        TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntriesPage,
+        TimelineEntriesQuery, TimelineEntry, TimelineEntryCursor,
     },
     subscription::{SubscriberId, Subscription, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey, TimelineKind},

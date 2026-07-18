@@ -444,4 +444,3 @@ pub(crate) fn rss_body_with_entry(
     )
     .into_bytes()
 }
-

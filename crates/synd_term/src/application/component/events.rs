@@ -457,8 +457,12 @@ mod tests {
             }),
         };
 
-        let operations =
-            component.apply_timeline_changes_fetched(vec![upsert(1), upsert(3), upsert(2)], 3, 20, 100);
+        let operations = component.apply_timeline_changes_fetched(
+            vec![upsert(1), upsert(3), upsert(2)],
+            3,
+            20,
+            100,
+        );
         assert!(operations.is_empty());
         assert_eq!(component.feeds.timeline_seq(), 3);
         let titles = component

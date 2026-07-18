@@ -197,5 +197,4 @@ impl Application {
             | SyndApiError::SubscriptionProtocol { .. } => error.to_string(),
         }
     }
-
 }

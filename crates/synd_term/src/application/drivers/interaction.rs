@@ -47,9 +47,12 @@ impl InteractionDriver {
     }
 
     pub(super) fn open_browser(&self, url: Url) -> Option<Event> {
-        self.interactor.open_browser(url).err().map(|err| Event::Error {
-            message: format!("open browser: {err}"),
-        })
+        self.interactor
+            .open_browser(url)
+            .err()
+            .map(|err| Event::Error {
+                message: format!("open browser: {err}"),
+            })
     }
 
     pub(super) fn open_text_browser(&self, url: Url) -> Option<Event> {

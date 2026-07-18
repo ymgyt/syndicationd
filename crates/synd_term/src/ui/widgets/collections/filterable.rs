@@ -142,7 +142,11 @@ where
         O: Fn(&T, &T) -> Ordering,
         I: Fn(&T, &T) -> bool,
     {
-        if let Some(existing) = self.items.iter_mut().find(|existing| identity(existing, &item)) {
+        if let Some(existing) = self
+            .items
+            .iter_mut()
+            .find(|existing| identity(existing, &item))
+        {
             *existing = item;
         } else {
             let index = self
