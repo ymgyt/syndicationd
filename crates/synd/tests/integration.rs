@@ -99,7 +99,7 @@ mod test {
 
             let screen = Screen::new(application.buffer());
             assert!(screen.contains_text("Syndicationd"));
-            assert!(screen.contains_text("unauthorized. please login again"));
+            assert!(screen.contains_text("unauthorized. local feed API session is invalid"));
 
             Ok(())
         }
