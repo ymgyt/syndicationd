@@ -293,16 +293,16 @@ impl FilterWidget {
         MatcherFilterer::new(matcher)
     }
 
-    pub fn update_categories(
+    pub fn update_categories<'a>(
         &mut self,
         config: &Categories,
         populate: Populate,
-        entries: &[payload::Entry],
+        entries: impl IntoIterator<Item = &'a payload::Entry>,
     ) {
         self.feed.categories_state.update(
             config,
             populate,
-            entries.iter().map(EntryExt::category).cloned(),
+            entries.into_iter().map(EntryExt::category).cloned(),
         );
     }
 

@@ -14,7 +14,7 @@ use synd_registry::{
     SubscribeFeedCommand, SubscriberId,
     api::ApiEvent,
     crawl::schedule::{CrawlSchedule, DueReason},
-    query::TimelineItemsQuery,
+    query::TimelineEntriesQuery,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -101,7 +101,7 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
 
     // Timeline items are queryable through the read side.
     let page = registry
-        .list_timeline_items(TimelineItemsQuery {
+        .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: subscriber_id.clone(),
             feed_url: None,
             after: None,

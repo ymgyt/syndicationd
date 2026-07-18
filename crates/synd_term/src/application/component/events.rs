@@ -1,5 +1,5 @@
 use synd_client::payload;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     application::{Populate, RequestSequence, input_parser::InputParser},
@@ -103,31 +103,6 @@ impl AppComponent {
             .collect()
     }
 
-    pub(in crate::application) fn apply_timeline_reload_debounced(
-        &mut self,
-        entries_first: i64,
-    ) -> Vec<Operation> {
-        if !self.feeds.should_refetch_timeline() {
-            return Vec::new();
-        }
-        if entries_first <= 0 {
-            self.feeds.skip_timeline_refetch();
-            return Vec::new();
-        }
-        vec![Operation::RefetchTimelineEntries {
-            populate: Populate::Replace,
-            after: None,
-            first: entries_first,
-        }]
-    }
-
-    pub(in crate::application) fn apply_timeline_refetch_started(
-        &mut self,
-        request_seq: RequestSequence,
-    ) {
-        self.feeds.start_timeline_refetch(request_seq);
-    }
-
     pub(in crate::application) fn apply_entry_fetch_started(
         &mut self,
         request_seq: RequestSequence,
@@ -144,16 +119,9 @@ impl AppComponent {
         self.feeds.track_refresh_request(request_seq, url);
     }
 
-    pub(in crate::application) fn apply_synd_api_error(
-        &mut self,
-        request_seq: RequestSequence,
-    ) -> Vec<Operation> {
+    pub(in crate::application) fn apply_synd_api_error(&mut self, request_seq: RequestSequence) {
         self.feeds.forget_refresh_request(request_seq);
         self.feeds.forget_entry_fetch(request_seq);
-        self.feeds
-            .fail_timeline_refetch(request_seq)
-            .into_iter()
-            .collect()
     }
 
     pub(in crate::application) fn apply_feed_refresh_poll_error(
@@ -198,15 +166,13 @@ impl AppComponent {
         refresh_poll_attempts: u16,
     ) -> Vec<Operation> {
         match event {
+            // New entries arrive through the timeline change push once the
+            // registry crawls the feed
             FeedsApiEvent::FeedSubscribed => {
-                vec![
-                    FeedsComponent::reload_subscription(feeds_first),
-                    FeedsComponent::reload_entries(entries_first),
-                    Operation::ScheduleFeedViewReload {
-                        feeds_first,
-                        entries_first,
-                    },
-                ]
+                vec![FeedsComponent::reload_subscription(feeds_first)]
+            }
+            FeedsApiEvent::TimelineChangesFetched { changes, seq } => {
+                self.apply_timeline_changes_fetched(changes, seq, entries_first, entries_limit)
             }
             FeedsApiEvent::FeedRefreshAccepted { url, payload } => {
                 let Some(operations) = self.feeds.feed_refresh_accepted(
@@ -233,7 +199,6 @@ impl AppComponent {
                     remaining,
                     status,
                     feeds_first,
-                    entries_first,
                 ) else {
                     return Vec::new();
                 };
@@ -308,59 +273,73 @@ impl AppComponent {
         &mut self,
         request_seq: RequestSequence,
         populate: Populate,
-        payload: payload::FetchEntriesPayload,
+        payload: payload::TimelineEntryConnection,
         entries_first: i64,
         entries_limit: usize,
     ) -> Vec<Operation> {
-        let is_timeline_refetch = self.feeds.is_active_timeline_refetch(request_seq);
         if !self.feeds.accept_entry_response(request_seq) {
             debug!(request_seq, ?populate, "ignore stale entries response");
-            if is_timeline_refetch {
-                return self
-                    .feeds
-                    .fail_timeline_refetch(request_seq)
-                    .into_iter()
-                    .collect();
-            }
             return Vec::new();
         }
 
         let page_info = payload.page_info.clone();
         let loaded_after_response =
-            self.entries_loaded_after_response(populate, payload.entries.len());
+            self.entries_loaded_after_response(populate, payload.nodes.len());
         let next_first = next_entries_first(entries_limit, entries_first, loaded_after_response);
         let mut operations = Vec::new();
 
         self.shell.filter.update_categories(
             &self.shell.categories,
             populate,
-            payload.entries.as_slice(),
+            payload.nodes.iter().map(|entry| &entry.entry),
         );
-        let should_fetch_next_page = page_info.has_next_page && next_first > 0;
-        if should_fetch_next_page {
-            if is_timeline_refetch {
-                operations.push(Operation::RefetchTimelineEntries {
-                    populate: Populate::Append,
-                    after: page_info.end_cursor,
-                    first: next_first,
-                });
-            } else {
-                operations.push(Operation::FetchEntries {
-                    populate: Populate::Append,
-                    after: page_info.end_cursor,
-                    first: next_first,
-                });
-            }
+        if page_info.has_next_page && next_first > 0 {
+            operations.push(Operation::FetchEntries {
+                populate: Populate::Append,
+                after: page_info.end_cursor,
+                first: next_first,
+            });
+        }
+        // Bootstrap contract: the seq of the first(Replace) page is the sync
+        // starting point. Drift within later pages heals through idempotent
+        // change application
+        if populate == Populate::Replace {
+            self.feeds.set_timeline_seq(payload.seq);
         }
         self.feeds
             .entries
             .update_entries_with_limit(populate, payload, entries_limit);
-        if !should_fetch_next_page
-            && let Some(operation) = self.feeds.complete_timeline_refetch(request_seq)
-        {
-            operations.push(operation);
-        }
         operations
+    }
+
+    /// Apply synced timeline changes to the local timeline.
+    fn apply_timeline_changes_fetched(
+        &mut self,
+        changes: Vec<payload::TimelineChange>,
+        seq: i64,
+        entries_first: i64,
+        entries_limit: usize,
+    ) -> Vec<Operation> {
+        // A seq going backwards means our sync position is invalid
+        // (e.g. the server database was recreated): bootstrap from the window
+        if seq < self.feeds.timeline_seq() {
+            warn!(
+                seq,
+                current = self.feeds.timeline_seq(),
+                "timeline seq went backwards; bootstrap from the window"
+            );
+            self.feeds.set_timeline_seq(0);
+            return vec![FeedsComponent::reload_entries(entries_first)];
+        }
+
+        self.feeds.entries.apply_changes(changes, entries_limit);
+        self.feeds.set_timeline_seq(seq);
+        self.shell.filter.update_categories(
+            &self.shell.categories,
+            Populate::Replace,
+            self.feeds.entries.entries(),
+        );
+        Vec::new()
     }
 
     fn apply_initial_feed_view_fetched(
@@ -371,7 +350,7 @@ impl AppComponent {
         entries_first: i64,
         entries_limit: usize,
     ) -> Vec<Operation> {
-        let (subscription, entries) = payload.into_parts();
+        let (subscription, timeline) = payload.into_parts();
         let mut operations = Vec::new();
 
         if let Some(subscription) = subscription {
@@ -394,24 +373,24 @@ impl AppComponent {
         }
 
         let accept_timeline = self.feeds.accept_entry_response(request_seq);
-        if let Some(entries) = entries.filter(|_| accept_timeline) {
-            let next_first =
-                next_entries_first(entries_limit, entries_first, entries.entries.len());
-            if entries.page_info.has_next_page && next_first > 0 {
+        if let Some(timeline) = timeline.filter(|_| accept_timeline) {
+            let next_first = next_entries_first(entries_limit, entries_first, timeline.nodes.len());
+            if timeline.page_info.has_next_page && next_first > 0 {
                 operations.push(Operation::FetchEntries {
                     populate: Populate::Append,
-                    after: entries.page_info.end_cursor.clone(),
+                    after: timeline.page_info.end_cursor.clone(),
                     first: next_first,
                 });
             }
             self.shell.filter.update_categories(
                 &self.shell.categories,
                 Populate::Replace,
-                entries.entries.as_slice(),
+                timeline.nodes.iter().map(|entry| &entry.entry),
             );
+            self.feeds.set_timeline_seq(timeline.seq);
             self.feeds
                 .entries
-                .update_entries_with_limit(Populate::Replace, entries, entries_limit);
+                .update_entries_with_limit(Populate::Replace, timeline, entries_limit);
         } else if accept_timeline {
             operations.push(Operation::FetchEntries {
                 populate: Populate::Replace,
@@ -516,10 +495,7 @@ mod tests {
     use core::assert_matches;
     use synd_feed::types::{EntryId, FeedUrl};
 
-    use crate::{
-        application::Features, config::Categories, event::FeedsApiEvent, types::PageInfo,
-        ui::theme::Theme,
-    };
+    use crate::{application::Features, config::Categories, ui::theme::Theme};
 
     use super::*;
 
@@ -549,16 +525,6 @@ mod tests {
         }
     }
 
-    fn entries_payload(entry_count: usize, has_next_page: bool) -> payload::FetchEntriesPayload {
-        payload::FetchEntriesPayload {
-            entries: (0..entry_count).map(entry).collect(),
-            page_info: PageInfo {
-                has_next_page,
-                end_cursor: Some("cursor".to_owned()),
-            },
-        }
-    }
-
     #[test]
     fn feed_subscription_editor_emits_subscribe_operation() {
         let mut component = app_component();
@@ -581,35 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn feed_subscribed_response_reloads_subscription_and_entries() {
-        let mut component = app_component();
-
-        let operations =
-            component.apply_feeds_api_event(1, FeedsApiEvent::FeedSubscribed, 10, 20, 100, 3);
-
-        assert_matches!(
-            operations.as_slice(),
-            [
-                Operation::FetchSubscription {
-                    populate: Populate::Replace,
-                    after: None,
-                    first: 10,
-                },
-                Operation::FetchEntries {
-                    populate: Populate::Replace,
-                    after: None,
-                    first: 20,
-                },
-                Operation::ScheduleFeedViewReload {
-                    feeds_first: 10,
-                    entries_first: 20,
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn feed_event_timeline_changed_schedules_timeline_reload() {
+    fn feed_event_timeline_changed_schedules_timeline_sync() {
         let mut component = app_component();
         let event = payload::FeedEvent::TimelineChanged(payload::TimelineChangeEvent {
             changed_at: "2026-06-13T00:00:00Z".to_owned(),
@@ -620,187 +558,80 @@ mod tests {
 
         let operations = component.apply_feed_event(event);
 
-        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
+        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineSync]);
+        // Hints are coalesced until the debounced sync runs
+        assert!(
+            component
+                .apply_feed_event(payload::FeedEvent::TimelineChanged(
+                    payload::TimelineChangeEvent {
+                        changed_at: "2026-06-13T00:00:01Z".to_owned(),
+                        affected_feeds: None,
+                    }
+                ))
+                .is_empty()
+        );
     }
 
     #[test]
-    fn timeline_changed_event_schedules_debounced_refetch() {
+    fn timeline_changes_apply_upsert_and_remove_in_display_order() {
         let mut component = app_component();
-        let event = payload::TimelineChangeEvent {
-            changed_at: "2026-06-13T00:00:00Z".to_owned(),
-            affected_feeds: Some(vec![
-                FeedUrl::parse("https://example.com/feed.xml").unwrap(),
-            ]),
+        let upsert = |index: usize| payload::TimelineChange::Upsert {
+            timeline_entry: Box::new(payload::TimelineEntry {
+                order_time: chrono::DateTime::parse_from_rfc3339(&format!(
+                    "2026-06-{index:02}T00:00:00Z"
+                ))
+                .unwrap()
+                .to_utc(),
+                entry: entry(index),
+            }),
         };
 
-        let operations = component.apply_timeline_changed(&event);
+        let operations =
+            component.apply_timeline_changes_fetched(vec![upsert(1), upsert(3), upsert(2)], 3, 20, 100);
+        assert!(operations.is_empty());
+        assert_eq!(component.feeds.timeline_seq(), 3);
+        let titles = component
+            .feeds
+            .entries
+            .entries()
+            .map(|entry| entry.title.clone().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(titles, ["entry-3", "entry-2", "entry-1"]);
 
-        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
+        let operations = component.apply_timeline_changes_fetched(
+            vec![payload::TimelineChange::Remove {
+                entry_id: entry(2).id,
+            }],
+            4,
+            20,
+            100,
+        );
+        assert!(operations.is_empty());
+        let titles = component
+            .feeds
+            .entries
+            .entries()
+            .map(|entry| entry.title.clone().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(titles, ["entry-3", "entry-1"]);
+        assert_eq!(component.feeds.timeline_seq(), 4);
+    }
 
-        let operations = component.apply_timeline_reload_debounced(20);
+    #[test]
+    fn timeline_seq_going_backwards_falls_back_to_window_bootstrap() {
+        let mut component = app_component();
+        component.feeds.set_timeline_seq(10);
+
+        let operations = component.apply_timeline_changes_fetched(Vec::new(), 3, 20, 100);
 
         assert_matches!(
             operations.as_slice(),
-            [Operation::RefetchTimelineEntries {
+            [Operation::FetchEntries {
                 populate: Populate::Replace,
                 after: None,
                 first: 20,
             }]
         );
-    }
-
-    #[test]
-    fn timeline_refetch_next_page_keeps_timeline_operation() {
-        let mut component = app_component();
-        component.apply_entry_fetch_started(1, Populate::Replace);
-        component.apply_timeline_refetch_started(1);
-
-        let operations = component.apply_feeds_api_event(
-            1,
-            FeedsApiEvent::EntriesFetched {
-                populate: Populate::Replace,
-                payload: entries_payload(1, true),
-            },
-            10,
-            2,
-            4,
-            3,
-        );
-
-        assert!(component.feeds.is_active_timeline_refetch(1));
-        assert_eq!(operations.len(), 1);
-        let Operation::RefetchTimelineEntries {
-            populate,
-            after,
-            first,
-        } = &operations[0]
-        else {
-            panic!("expected RefetchTimelineEntries");
-        };
-        assert_eq!(*populate, Populate::Append);
-        assert_eq!(after.as_deref(), Some("cursor"));
-        assert_eq!(*first, 2);
-    }
-
-    #[test]
-    fn timeline_refetch_completes_after_last_page() {
-        let mut component = app_component();
-        component.apply_entry_fetch_started(1, Populate::Replace);
-        component.apply_timeline_refetch_started(1);
-        assert!(component.mark_timeline_dirty().is_empty());
-
-        let operations = component.apply_feeds_api_event(
-            1,
-            FeedsApiEvent::EntriesFetched {
-                populate: Populate::Replace,
-                payload: entries_payload(1, false),
-            },
-            10,
-            2,
-            4,
-            3,
-        );
-
-        assert!(!component.feeds.is_active_timeline_refetch(1));
-        assert!(component.feeds.should_refetch_timeline());
-        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
-    }
-
-    #[test]
-    fn timeline_refetch_preserves_dirty_state_across_next_page_start() {
-        let mut component = app_component();
-        component.apply_entry_fetch_started(1, Populate::Replace);
-        component.apply_timeline_refetch_started(1);
-        assert!(component.mark_timeline_dirty().is_empty());
-
-        let operations = component.apply_feeds_api_event(
-            1,
-            FeedsApiEvent::EntriesFetched {
-                populate: Populate::Replace,
-                payload: entries_payload(1, true),
-            },
-            10,
-            2,
-            4,
-            3,
-        );
-        assert_matches!(
-            operations.as_slice(),
-            [Operation::RefetchTimelineEntries { .. }]
-        );
-
-        component.apply_entry_fetch_started(2, Populate::Append);
-        component.apply_timeline_refetch_started(2);
-        let operations = component.apply_feeds_api_event(
-            2,
-            FeedsApiEvent::EntriesFetched {
-                populate: Populate::Append,
-                payload: entries_payload(1, false),
-            },
-            10,
-            2,
-            4,
-            3,
-        );
-
-        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
-        assert!(component.feeds.should_refetch_timeline());
-    }
-
-    #[test]
-    fn stale_entries_response_is_ignored_after_newer_replace_starts() {
-        let mut component = app_component();
-        component.apply_entry_fetch_started(1, Populate::Append);
-        assert_matches!(
-            component.mark_timeline_dirty().as_slice(),
-            [Operation::ScheduleTimelineReload]
-        );
-        let operations = component.apply_timeline_reload_debounced(2);
-        assert_matches!(
-            operations.as_slice(),
-            [Operation::RefetchTimelineEntries { .. }]
-        );
-        component.apply_entry_fetch_started(2, Populate::Replace);
-        component.apply_timeline_refetch_started(2);
-
-        let operations = component.apply_feeds_api_event(
-            1,
-            FeedsApiEvent::EntriesFetched {
-                populate: Populate::Append,
-                payload: entries_payload(1, true),
-            },
-            10,
-            2,
-            4,
-            3,
-        );
-
-        assert!(operations.is_empty());
-        assert_eq!(component.feeds.entries.count(), 0);
-    }
-
-    #[test]
-    fn stale_active_timeline_refetch_does_not_remain_pending() {
-        let mut component = app_component();
-        component.apply_entry_fetch_started(1, Populate::Replace);
-        component.apply_timeline_refetch_started(1);
-        component.apply_entry_fetch_started(2, Populate::Replace);
-
-        let operations = component.apply_feeds_api_event(
-            1,
-            FeedsApiEvent::EntriesFetched {
-                populate: Populate::Replace,
-                payload: entries_payload(1, true),
-            },
-            10,
-            2,
-            4,
-            3,
-        );
-
-        assert!(!component.feeds.is_active_timeline_refetch(1));
-        assert!(component.feeds.should_refetch_timeline());
-        assert_matches!(operations.as_slice(), [Operation::ScheduleTimelineReload]);
-        assert_eq!(component.feeds.entries.count(), 0);
+        assert_eq!(component.feeds.timeline_seq(), 0);
     }
 }

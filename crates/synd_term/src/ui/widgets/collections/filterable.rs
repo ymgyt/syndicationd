@@ -1,4 +1,4 @@
-use std::ops::ControlFlow;
+use std::{cmp::Ordering, ops::ControlFlow};
 
 use crate::{
     application::{Direction, IndexOutOfRange, Populate},
@@ -130,6 +130,26 @@ where
         With: FnOnce(&mut F),
     {
         f(&mut self.filterer);
+        self.refresh();
+    }
+
+    /// Insert `item` at the position given by `order`, or replace the item
+    /// with the same `identity` in place.
+    /// Requires `items` to be sorted by `order`. In-place replacement assumes
+    /// the order key of an item never changes.
+    pub(crate) fn upsert_sorted<O, I>(&mut self, item: T, order: O, identity: I)
+    where
+        O: Fn(&T, &T) -> Ordering,
+        I: Fn(&T, &T) -> bool,
+    {
+        if let Some(existing) = self.items.iter_mut().find(|existing| identity(existing, &item)) {
+            *existing = item;
+        } else {
+            let index = self
+                .items
+                .partition_point(|existing| order(existing, &item) == Ordering::Less);
+            self.items.insert(index, item);
+        }
         self.refresh();
     }
 

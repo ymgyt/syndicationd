@@ -108,6 +108,7 @@ impl StatusLineWidget {
                     }
                     RequestId::DeviceFlowPollAccessToken => Cow::Borrowed("Polling..."),
                     RequestId::FetchEntries => Cow::Borrowed("Fetch entries..."),
+                    RequestId::SyncTimeline => Cow::Borrowed("Sync timeline..."),
                     RequestId::FetchSubscription => Cow::Borrowed("Fetch subscription..."),
                     RequestId::FetchFeedStatus => Cow::Borrowed("Fetch feed status..."),
                     RequestId::FetchGithubNotifications { page } => {

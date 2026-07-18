@@ -30,7 +30,7 @@ pub(crate) use synd_registry::{
         TimelineChangedEvent,
     },
     feed::FeedProj,
-    query::{SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
+    query::{SubscriptionsQuery, TimelineEntriesPage, TimelineEntriesQuery},
     timeline::{TimelineProj, TimelineProjInput},
 };
 pub(crate) use synd_support::time::Clock;
@@ -381,13 +381,13 @@ pub(crate) async fn current_entry_id(db: &SqliteFeedRegistryDb) -> anyhow::Resul
     EntryId::parse(entry_id).map_err(Into::into)
 }
 
-pub(crate) async fn list_timeline_items(
+pub(crate) async fn list_timeline_entries(
     db: &SqliteFeedRegistryDb,
     subscriber_id: SubscriberId,
-) -> anyhow::Result<TimelineItemsPage> {
+) -> anyhow::Result<TimelineEntriesPage> {
     let mut tx = db.begin().await?;
     let page = tx
-        .list_timeline_items(TimelineItemsQuery {
+        .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id,
             feed_url: None,
             after: None,

@@ -44,6 +44,12 @@ impl RequirementFilterer {
     }
 }
 
+impl Filterable<payload::TimelineEntry> for RequirementFilterer {
+    fn filter(&self, entry: &payload::TimelineEntry) -> FilterResult {
+        self.filter(&entry.entry)
+    }
+}
+
 impl Filterable<payload::Entry> for RequirementFilterer {
     fn filter(&self, entry: &payload::Entry) -> FilterResult {
         if entry.requirement().is_satisfied(self.requirement) {

@@ -94,8 +94,6 @@ impl Drivers {
     }
 
     /// Route an `Operation` to the driver that executes it.
-    /// The length comes from the routing table itself, not from logic.
-    #[expect(clippy::too_many_lines)]
     pub(super) fn dispatch(&mut self, operation: Operation) -> Vec<Event> {
         match operation {
             Operation::StartDeviceFlow { provider } => {
@@ -168,7 +166,9 @@ impl Drivers {
                 first,
             } => self
                 .feed
-                .fetch_entries(&mut self.runtime, populate, after, first, false),
+                .fetch_entries(&mut self.runtime, populate, after, first)
+                .into_iter()
+                .collect(),
             Operation::FetchInitialFeedView {
                 subscriptions_first,
                 timeline_first,
@@ -177,27 +177,18 @@ impl Drivers {
                 subscriptions_first,
                 timeline_first,
             )],
-            Operation::RefetchTimelineEntries {
-                populate,
-                after,
-                first,
-            } => self
-                .feed
-                .fetch_entries(&mut self.runtime, populate, after, first, true),
+            Operation::SyncTimeline { since } => {
+                self.feed.sync_timeline(&mut self.runtime, since);
+                Vec::new()
+            }
             Operation::StartFeedEventSubscription => {
                 self.feed_events.start(self.feed.api.clone());
                 Vec::new()
             }
-            Operation::ScheduleFeedViewReload {
-                feeds_first,
-                entries_first,
-            } => {
+            Operation::ScheduleFeedViewReload { feeds_first } => {
                 self.runtime.schedule_event(
                     TIMELINE_INVALIDATION_DEBOUNCE,
-                    Event::FeedViewReloadDebounced {
-                        feeds_first,
-                        entries_first,
-                    },
+                    Event::FeedViewReloadDebounced { feeds_first },
                 );
                 Vec::new()
             }
@@ -210,9 +201,9 @@ impl Drivers {
                     .schedule_event(FEED_VIEW_SYNC_INTERVAL, Event::FeedViewSyncElapsed);
                 Vec::new()
             }
-            Operation::ScheduleTimelineReload => {
+            Operation::ScheduleTimelineSync => {
                 self.runtime
-                    .schedule_event(TIMELINE_INVALIDATION_DEBOUNCE, Event::TimelineReloadDebounced);
+                    .schedule_event(TIMELINE_INVALIDATION_DEBOUNCE, Event::TimelineSyncDebounced);
                 Vec::new()
             }
             Operation::FetchGitHubNotifications { populate, params } => self

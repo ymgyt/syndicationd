@@ -7,8 +7,8 @@ use synd_registry::{
     RegistryDbResult, TimelineStore,
     entry::EntryAttrs,
     query::{
-        TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineItemCursor,
-        TimelineItemNode, TimelineItemsPage, TimelineItemsQuery,
+        TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntryCursor,
+        TimelineEntry, TimelineEntriesPage, TimelineEntriesQuery,
     },
     subscription::{SubscriberId, Subscription, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey, TimelineKind},
@@ -20,7 +20,7 @@ use super::{
     pagination::PageLimit,
 };
 
-const TIMELINE_ITEM_SELECT: &str = r#"
+const TIMELINE_ENTRY_SELECT: &str = r#"
 SELECT
     ti.order_time,
     ti.entry_id,
@@ -33,7 +33,7 @@ SELECT
     s.created_at AS subscription_created_at,
     s.updated_at AS subscription_updated_at
 FROM timeline AS t
-INNER JOIN timeline_item AS ti
+INNER JOIN timeline_entry AS ti
     ON ti.timeline_pk = t.pk
 INNER JOIN entry AS e
     ON e.pk = ti.entry_pk
@@ -82,11 +82,11 @@ async fn catchup_feed(
 ) -> SqliteResult<TimelineCatchup> {
     let timeline_pk = resolve_timeline_pk(tx, timeline).await?;
     let seq = next_seq(tx, timeline_pk).await?;
-    // Insert missing items and revive tombstoned ones(resubscribe).
+    // Insert missing entries and revive tombstoned ones(resubscribe).
     // Live rows are left untouched so they emit no sync change.
     let result = sqlx::query(
         r#"
-            INSERT INTO timeline_item (
+            INSERT INTO timeline_entry (
                 timeline_pk,
                 entry_pk,
                 entry_id,
@@ -110,7 +110,7 @@ async fn catchup_feed(
             ON CONFLICT (timeline_pk, entry_pk) DO UPDATE SET
                 seq = excluded.seq,
                 deleted_at = NULL
-            WHERE timeline_item.deleted_at IS NOT NULL
+            WHERE timeline_entry.deleted_at IS NOT NULL
             "#,
     )
     .bind(timeline_pk)
@@ -138,17 +138,17 @@ async fn apply_entry_to_timelines(
 
     let mut affected = Vec::new();
     for target in load_entry_timeline_targets(tx, feed_url, entry_id).await? {
-        let touched = match &target.item {
+        let touched = match &target.existing {
             None => {
                 let seq = next_seq(tx, target.timeline_pk).await?;
-                insert_entry_item(tx, &target, seq, now).await?;
+                insert_timeline_entry(tx, &target, seq, now).await?;
                 true
             }
             // order_time is frozen; the seq bump only tells syncing clients
             // to re-read the entry content or that a tombstone was revived
-            Some(item) if content_changed || item.deleted => {
+            Some(existing) if content_changed || existing.deleted => {
                 let seq = next_seq(tx, target.timeline_pk).await?;
-                bump_entry_item(tx, &target, seq).await?;
+                bump_timeline_entry(tx, &target, seq).await?;
                 true
             }
             Some(_) => false,
@@ -175,7 +175,7 @@ async fn apply_feed_unsubscribed(
     // through the seq bump
     let result = sqlx::query(
         r#"
-            UPDATE timeline_item
+            UPDATE timeline_entry
             SET
                 deleted_at = ?,
                 seq = ?
@@ -205,13 +205,13 @@ async fn apply_feed_unsubscribed(
     Ok(Some(timeline))
 }
 
-async fn list_items(
+async fn list_entries(
     tx: &mut Transaction<'_, Sqlite>,
-    query: TimelineItemsQuery,
-) -> SqliteResult<TimelineItemsPage> {
+    query: TimelineEntriesQuery,
+) -> SqliteResult<TimelineEntriesPage> {
     let timeline = TimelineKey::default_for(query.subscriber_id.clone());
     let Some(head) = try_resolve_timeline(tx, &timeline).await? else {
-        return Ok(TimelineItemsPage {
+        return Ok(TimelineEntriesPage {
             nodes: Vec::new(),
             has_next_page: false,
             end_cursor: None,
@@ -220,7 +220,7 @@ async fn list_items(
     };
 
     let page_limit = PageLimit::new(query.first);
-    let mut sql = QueryBuilder::<Sqlite>::new(TIMELINE_ITEM_SELECT);
+    let mut sql = QueryBuilder::<Sqlite>::new(TIMELINE_ENTRY_SELECT);
     sql.push(" WHERE ti.timeline_pk = ");
     sql.push_bind(head.pk);
     sql.push(" AND ti.deleted_at IS NULL");
@@ -241,7 +241,7 @@ async fn list_items(
     sql.push_bind(page_limit.sql_limit());
 
     let rows = sql
-        .build_query_as::<TimelineItemRow>()
+        .build_query_as::<TimelineEntryRow>()
         .fetch_all(&mut **tx)
         .await?;
     let mut nodes = rows
@@ -251,7 +251,7 @@ async fn list_items(
     let has_next_page = page_limit.truncate_overfetch(&mut nodes);
     let end_cursor = nodes.last().map(|node| node.cursor.clone());
 
-    Ok(TimelineItemsPage {
+    Ok(TimelineEntriesPage {
         nodes,
         has_next_page,
         end_cursor,
@@ -273,7 +273,7 @@ async fn list_changes(
     };
 
     let page_limit = PageLimit::new(query.limit);
-    // Tombstoned items have lost their subscription, so subscription columns
+    // Tombstoned entries have lost their subscription, so subscription columns
     // are joined optionally and their absence also means removal
     let mut rows = sqlx::query_as::<_, TimelineChangeRow>(
         r#"
@@ -290,7 +290,7 @@ async fn list_changes(
                 s.crawl_policy_json,
                 s.created_at AS subscription_created_at,
                 s.updated_at AS subscription_updated_at
-            FROM timeline_item AS ti
+            FROM timeline_entry AS ti
             INNER JOIN entry AS e
                 ON e.pk = ti.entry_pk
             INNER JOIN feed AS f
@@ -440,8 +440,8 @@ async fn load_entry_timeline_targets(
                 e.pk AS entry_pk,
                 e.entry_id,
                 e.current_order_time AS entry_order_time,
-                ti.entry_pk IS NOT NULL AS item_exists,
-                ti.deleted_at IS NOT NULL AS item_deleted
+                ti.entry_pk IS NOT NULL AS entry_exists,
+                ti.deleted_at IS NOT NULL AS entry_deleted
             FROM feed_endpoint_subscription AS s
             INNER JOIN feed_endpoint AS fe
                 ON fe.pk = s.feed_endpoint_pk
@@ -452,7 +452,7 @@ async fn load_entry_timeline_targets(
                 ON f.feed_endpoint_pk = fe.pk
             INNER JOIN entry AS e
                 ON e.feed_pk = f.pk
-            LEFT JOIN timeline_item AS ti
+            LEFT JOIN timeline_entry AS ti
                 ON ti.timeline_pk = t.pk
                AND ti.entry_pk = e.pk
             WHERE fe.url = ?
@@ -472,7 +472,7 @@ async fn load_entry_timeline_targets(
         .collect())
 }
 
-async fn insert_entry_item(
+async fn insert_timeline_entry(
     tx: &mut Transaction<'_, Sqlite>,
     target: &TimelineEntryTarget,
     seq: i64,
@@ -480,7 +480,7 @@ async fn insert_entry_item(
 ) -> SqliteResult<()> {
     sqlx::query(
         r#"
-            INSERT INTO timeline_item (
+            INSERT INTO timeline_entry (
                 timeline_pk,
                 entry_pk,
                 entry_id,
@@ -502,14 +502,14 @@ async fn insert_entry_item(
     Ok(())
 }
 
-async fn bump_entry_item(
+async fn bump_timeline_entry(
     tx: &mut Transaction<'_, Sqlite>,
     target: &TimelineEntryTarget,
     seq: i64,
 ) -> SqliteResult<()> {
     sqlx::query(
         r#"
-            UPDATE timeline_item
+            UPDATE timeline_entry
             SET
                 seq = ?,
                 deleted_at = NULL
@@ -531,10 +531,10 @@ struct TimelineEntryTarget {
     entry_pk: i64,
     entry_id: String,
     entry_order_time: DateTime<Utc>,
-    item: Option<TimelineItemState>,
+    existing: Option<ExistingTimelineEntry>,
 }
 
-struct TimelineItemState {
+struct ExistingTimelineEntry {
     deleted: bool,
 }
 
@@ -545,8 +545,8 @@ struct TimelineEntryTargetRow {
     entry_pk: i64,
     entry_id: String,
     entry_order_time: DateTime<Utc>,
-    item_exists: bool,
-    item_deleted: bool,
+    entry_exists: bool,
+    entry_deleted: bool,
 }
 
 impl TimelineEntryTargetRow {
@@ -557,8 +557,8 @@ impl TimelineEntryTargetRow {
             entry_pk: self.entry_pk,
             entry_id: self.entry_id,
             entry_order_time: self.entry_order_time,
-            item: self.item_exists.then_some(TimelineItemState {
-                deleted: self.item_deleted,
+            existing: self.entry_exists.then_some(ExistingTimelineEntry {
+                deleted: self.entry_deleted,
             }),
         }
     }
@@ -592,7 +592,7 @@ impl TimelineChangeRow {
                 "timeline change row without subscription column: {column}"
             ))
         };
-        let item = TimelineItemRow {
+        let row = TimelineEntryRow {
             order_time: self.order_time,
             entry_id: self.entry_id,
             current_content_json: self.current_content_json,
@@ -611,13 +611,13 @@ impl TimelineChangeRow {
                 .ok_or_else(|| missing("subscription_updated_at"))?,
         };
         Ok(TimelineChange::Upsert(Box::new(
-            item.into_node(subscriber_id)?,
+            row.into_node(subscriber_id)?,
         )))
     }
 }
 
 #[derive(sqlx::FromRow)]
-struct TimelineItemRow {
+struct TimelineEntryRow {
     order_time: DateTime<Utc>,
     entry_id: String,
     current_content_json: String,
@@ -630,8 +630,8 @@ struct TimelineItemRow {
     subscription_updated_at: DateTime<Utc>,
 }
 
-impl TimelineItemRow {
-    fn into_node(self, subscriber_id: &SubscriberId) -> SqliteResult<TimelineItemNode> {
+impl TimelineEntryRow {
+    fn into_node(self, subscriber_id: &SubscriberId) -> SqliteResult<TimelineEntry> {
         let entry_id = EntryId::parse(self.entry_id).decode()?;
         let feed_url = FeedUrl::parse(&self.feed_url).decode()?;
         let attrs = serde_json::from_str::<EntryAttrs>(&self.current_content_json)?;
@@ -653,14 +653,14 @@ impl TimelineItemRow {
             created_at: self.subscription_created_at,
             updated_at: self.subscription_updated_at,
         };
-        let cursor = TimelineItemCursor::new(self.order_time, entry_id.clone());
+        let cursor = TimelineEntryCursor::new(self.order_time, entry_id.clone());
         let feed_meta = Annotated {
             feed: feed_meta,
             requirement,
             category,
         };
 
-        Ok(TimelineItemNode {
+        Ok(TimelineEntry {
             entry_id,
             attrs,
             feed_meta,
@@ -671,11 +671,11 @@ impl TimelineItemRow {
 }
 
 impl TimelineStore for super::SqliteRegistryTx<'_> {
-    async fn list_timeline_items(
+    async fn list_timeline_entries(
         &mut self,
-        query: TimelineItemsQuery,
-    ) -> RegistryDbResult<TimelineItemsPage> {
-        list_items(&mut self.tx, query).await.db()
+        query: TimelineEntriesQuery,
+    ) -> RegistryDbResult<TimelineEntriesPage> {
+        list_entries(&mut self.tx, query).await.db()
     }
 
     async fn list_timeline_changes(

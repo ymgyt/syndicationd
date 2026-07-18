@@ -135,38 +135,45 @@ fn initial_feed_view() -> payload::InitialFeedViewPayload {
             "entries": {
                 "nodes": [
                     {
-                        "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000001",
-                        "title": "Rust feed architecture",
-                        "published": null,
-                        "updated": null,
-                        "websiteUrl": "https://example.com/rust-feed-architecture",
-                        "summary": "A note about feed architecture.",
-                        "feed": {
-                            "title": "Engineering Notes",
-                            "url": "https://example.com/feed.xml",
-                            "requirement": "SHOULD",
-                            "category": "rust"
+                        "orderTime": "2026-06-02T00:00:00Z",
+                        "entry": {
+                            "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000001",
+                            "title": "Rust feed architecture",
+                            "published": null,
+                            "updated": null,
+                            "websiteUrl": "https://example.com/rust-feed-architecture",
+                            "summary": "A note about feed architecture.",
+                            "feed": {
+                                "title": "Engineering Notes",
+                                "url": "https://example.com/feed.xml",
+                                "requirement": "SHOULD",
+                                "category": "rust"
+                            }
                         }
                     },
                     {
-                        "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000002",
-                        "title": "Async GraphQL testing",
-                        "published": null,
-                        "updated": null,
-                        "websiteUrl": "https://example.com/async-graphql-testing",
-                        "summary": "A note about testing async GraphQL code.",
-                        "feed": {
-                            "title": "Engineering Notes",
-                            "url": "https://example.com/feed.xml",
-                            "requirement": "SHOULD",
-                            "category": "rust"
+                        "orderTime": "2026-06-01T00:00:00Z",
+                        "entry": {
+                            "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000002",
+                            "title": "Async GraphQL testing",
+                            "published": null,
+                            "updated": null,
+                            "websiteUrl": "https://example.com/async-graphql-testing",
+                            "summary": "A note about testing async GraphQL code.",
+                            "feed": {
+                                "title": "Engineering Notes",
+                                "url": "https://example.com/feed.xml",
+                                "requirement": "SHOULD",
+                                "category": "rust"
+                            }
                         }
                     }
                 ],
                 "pageInfo": {
                     "hasNextPage": false,
                     "endCursor": null
-                }
+                },
+                "seq": 2
             }
         }
     }))

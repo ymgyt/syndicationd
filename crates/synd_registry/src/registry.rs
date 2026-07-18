@@ -33,7 +33,7 @@ use crate::{
     handler::CommandHandler,
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
-        TimelineItemsPage, TimelineItemsQuery,
+        TimelineEntriesPage, TimelineEntriesQuery,
     },
     subscription::{SubHandler, SubscriberId},
     timeline::TimelineProj,
@@ -205,12 +205,12 @@ where
         Ok(page)
     }
 
-    pub async fn list_timeline_items(
+    pub async fn list_timeline_entries(
         &self,
-        query: TimelineItemsQuery,
-    ) -> Result<TimelineItemsPage, FeedRegistryError> {
+        query: TimelineEntriesQuery,
+    ) -> Result<TimelineEntriesPage, FeedRegistryError> {
         let mut tx = self.db.begin().await?;
-        let page = tx.list_timeline_items(query).await?;
+        let page = tx.list_timeline_entries(query).await?;
         tx.commit().await?;
         Ok(page)
     }

@@ -315,6 +315,52 @@ impl Client {
     }
 
     #[instrument(skip(self))]
+    pub async fn fetch_timeline_entries(
+        &self,
+        after: Option<String>,
+        first: i64,
+    ) -> Result<payload::TimelineEntryConnection, SyndApiError> {
+        #[derive(Serialize, Debug)]
+        struct Variables {
+            after: Option<String>,
+            first: i64,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct ResponseData {
+            output: Output,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct Output {
+            timeline: Timeline,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct Timeline {
+            entries: payload::TimelineEntryConnection,
+        }
+
+        let response: Response<ResponseData> = self
+            .execute_graphql(&graphql(TIMELINE_ENTRIES_QUERY, Variables { after, first }))
+            .await?;
+
+        let errors = response.errors.unwrap_or_default();
+        match response.data {
+            Some(data) => {
+                if !errors.is_empty() {
+                    warn!(
+                        errors = ?errors,
+                        "timeline entries query returned partial GraphQL errors"
+                    );
+                }
+                Ok(data.output.timeline.entries)
+            }
+            None if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
+            None => Err(SyndApiError::UnexpectedResponse {
+                context: "response does not contain data and errors",
+            }),
+        }
+    }
+
+    #[instrument(skip(self))]
     pub async fn fetch_timeline_changes(
         &self,
         since: i64,
@@ -1129,23 +1175,27 @@ query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
     timeline {
       entries(first: $timelineFirst) {
         nodes {
-          id
-          title
-          published
-          updated
-          summary
-          websiteUrl
-          feed {
+          orderTime
+          entry {
+            id
             title
-            url
-            requirement
-            category
+            published
+            updated
+            summary
+            websiteUrl
+            feed {
+              title
+              url
+              requirement
+              category
+            }
           }
         }
         pageInfo {
           hasNextPage
           endCursor
         }
+        seq
       }
     }
   }
@@ -1219,19 +1269,21 @@ query TimelineChanges($since: Int!, $first: Int!) {
         changes {
           __typename
           ... on TimelineChangeUpsert {
-            orderTime
-            entry {
-              id
-              title
-              published
-              updated
-              summary
-              websiteUrl
-              feed {
+            timelineEntry {
+              orderTime
+              entry {
+                id
                 title
-                url
-                requirement
-                category
+                published
+                updated
+                summary
+                websiteUrl
+                feed {
+                  title
+                  url
+                  requirement
+                  category
+                }
               }
             }
           }
@@ -1241,6 +1293,39 @@ query TimelineChanges($since: Int!, $first: Int!) {
         }
         seq
         hasMore
+      }
+    }
+  }
+}
+";
+
+const TIMELINE_ENTRIES_QUERY: &str = r"
+query TimelineEntries($after: String, $first: Int!) {
+  output: feedRegistry {
+    timeline {
+      entries(after: $after, first: $first) {
+        nodes {
+          orderTime
+          entry {
+            id
+            title
+            published
+            updated
+            summary
+            websiteUrl
+            feed {
+              title
+              url
+              requirement
+              category
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        seq
       }
     }
   }

@@ -20,7 +20,7 @@ use crate::{
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
-        TimelineItemsPage, TimelineItemsQuery,
+        TimelineEntriesPage, TimelineEntriesQuery,
     },
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey},
@@ -186,10 +186,10 @@ pub trait EntryStore {
 
 /// Transactional operations for reading and applying timeline membership.
 pub trait TimelineStore {
-    fn list_timeline_items(
+    fn list_timeline_entries(
         &mut self,
-        query: TimelineItemsQuery,
-    ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send;
+        query: TimelineEntriesQuery,
+    ) -> impl Future<Output = RegistryDbResult<TimelineEntriesPage>> + Send;
 
     fn list_timeline_changes(
         &mut self,

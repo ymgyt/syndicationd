@@ -14,17 +14,16 @@ use crate::{
 };
 
 use super::super::{
-    Direction, FeedRefreshPollKey, Populate, RequestSequence, TimelineInvalidationState,
-    input_parser::InputParser,
+    Direction, FeedRefreshPollKey, Populate, RequestSequence, input_parser::InputParser,
 };
 
-/// Feed timeline, subscription, refresh, and invalidation state machine.
+/// Feed timeline, subscription, refresh, and sync state.
 pub(crate) struct FeedsComponent {
     pub(crate) subscription: SubscriptionWidget,
     pub(crate) entries: EntriesWidget,
     entry_fetches: EntryFetches,
     refreshes: FeedRefreshes,
-    timeline: TimelineInvalidation,
+    timeline: TimelineSync,
 }
 
 impl FeedsComponent {
@@ -34,7 +33,7 @@ impl FeedsComponent {
             entries: EntriesWidget::new(),
             entry_fetches: EntryFetches::new(),
             refreshes: FeedRefreshes::new(),
-            timeline: TimelineInvalidation::new(),
+            timeline: TimelineSync::new(),
         }
     }
 
@@ -178,7 +177,6 @@ impl FeedsComponent {
         remaining: u16,
         status: payload::RefreshStatus,
         feeds_first: i64,
-        entries_first: i64,
     ) -> Option<Vec<Operation>> {
         let poll_key = FeedRefreshPollKey::new(url.clone(), request_id.clone());
         if !self.refreshes.contains_poll(&poll_key) {
@@ -199,11 +197,10 @@ impl FeedsComponent {
                 remaining: remaining.saturating_sub(1),
             }])
         } else if is_current_request || !is_active {
+            // Refresh finished: reload the refresh status column. New entries
+            // arrive through the timeline change push
             self.refreshes.remove_poll(&poll_key);
-            Some(vec![
-                Self::reload_subscription(feeds_first),
-                Self::reload_entries(entries_first),
-            ])
+            Some(vec![Self::reload_subscription(feeds_first)])
         } else {
             self.refreshes.remove_poll(&poll_key);
             Some(Vec::new())
@@ -319,18 +316,34 @@ impl FeedRefreshes {
     }
 }
 
-/// Debounced timeline invalidation state.
-struct TimelineInvalidation {
-    state: TimelineInvalidationState,
-    active_refetch: Option<RequestSequence>,
+/// Cursor of the timeline change feed and its debounce state.
+struct TimelineSync {
+    /// Last change seq applied to the local timeline
+    seq: i64,
+    /// Whether a debounced sync is already scheduled
+    scheduled: bool,
 }
 
-impl TimelineInvalidation {
+impl TimelineSync {
     fn new() -> Self {
         Self {
-            state: TimelineInvalidationState::Clean,
-            active_refetch: None,
+            seq: 0,
+            scheduled: false,
         }
+    }
+
+    /// Coalesce change hints into one debounced sync.
+    fn mark_dirty(&mut self) -> Option<Operation> {
+        if self.scheduled {
+            return None;
+        }
+        self.scheduled = true;
+        Some(Operation::ScheduleTimelineSync)
+    }
+
+    fn debounce_elapsed(&mut self) -> Operation {
+        self.scheduled = false;
+        Operation::SyncTimeline { since: self.seq }
     }
 }
 
@@ -362,76 +375,6 @@ impl FeedRefreshes {
     fn remove_for_url(&mut self, url: &FeedUrl) {
         self.requests.retain(|_, request_url| request_url != url);
         self.polls.retain(|key| &key.url != url);
-    }
-}
-
-impl TimelineInvalidation {
-    fn mark_dirty(&mut self) -> Option<Operation> {
-        match self.state {
-            TimelineInvalidationState::Clean => {
-                self.state = TimelineInvalidationState::DirtyWaiting;
-                Some(Operation::ScheduleTimelineReload)
-            }
-            TimelineInvalidationState::Refetching => {
-                self.state = TimelineInvalidationState::DirtyWhileRefetching;
-                None
-            }
-            TimelineInvalidationState::DirtyWaiting
-            | TimelineInvalidationState::DirtyWhileRefetching => None,
-        }
-    }
-
-    fn should_refetch(&self) -> bool {
-        self.state == TimelineInvalidationState::DirtyWaiting
-    }
-
-    fn skip_refetch(&mut self) {
-        self.state = TimelineInvalidationState::Clean;
-    }
-
-    fn start_refetch(&mut self, request_seq: RequestSequence) {
-        self.active_refetch = Some(request_seq);
-        if self.state != TimelineInvalidationState::DirtyWhileRefetching {
-            self.state = TimelineInvalidationState::Refetching;
-        }
-    }
-
-    fn is_active_refetch(&self, request_seq: RequestSequence) -> bool {
-        self.active_refetch == Some(request_seq)
-    }
-
-    fn complete_refetch(&mut self, request_seq: RequestSequence) -> Option<Operation> {
-        if self.active_refetch != Some(request_seq) {
-            return None;
-        }
-
-        self.active_refetch = None;
-        match self.state {
-            TimelineInvalidationState::Refetching => {
-                self.state = TimelineInvalidationState::Clean;
-                None
-            }
-            TimelineInvalidationState::DirtyWhileRefetching => {
-                self.state = TimelineInvalidationState::DirtyWaiting;
-                Some(Operation::ScheduleTimelineReload)
-            }
-            TimelineInvalidationState::Clean | TimelineInvalidationState::DirtyWaiting => None,
-        }
-    }
-
-    fn fail_refetch(&mut self, request_seq: RequestSequence) -> Option<Operation> {
-        if self.active_refetch != Some(request_seq) {
-            return None;
-        }
-
-        self.active_refetch = None;
-        self.state = TimelineInvalidationState::DirtyWaiting;
-        Some(Operation::ScheduleTimelineReload)
-    }
-
-    #[cfg(feature = "integration")]
-    fn has_pending_background_work(&self) -> bool {
-        self.state != TimelineInvalidationState::Clean
     }
 }
 
@@ -487,42 +430,28 @@ impl FeedsComponent {
         self.entry_fetches.forget(request_seq);
     }
 
-    pub(in crate::application) fn should_refetch_timeline(&self) -> bool {
-        self.timeline.should_refetch()
+    pub(in crate::application) fn timeline_sync_debounced(&mut self) -> Operation {
+        self.timeline.debounce_elapsed()
     }
 
-    pub(in crate::application) fn skip_timeline_refetch(&mut self) {
-        self.timeline.skip_refetch();
+    pub(in crate::application) fn timeline_seq(&self) -> i64 {
+        self.timeline.seq
     }
 
-    pub(in crate::application) fn start_timeline_refetch(&mut self, request_seq: RequestSequence) {
-        self.timeline.start_refetch(request_seq);
+    pub(in crate::application) fn set_timeline_seq(&mut self, seq: i64) {
+        self.timeline.seq = seq;
     }
 
-    pub(in crate::application) fn is_active_timeline_refetch(
-        &self,
-        request_seq: RequestSequence,
-    ) -> bool {
-        self.timeline.is_active_refetch(request_seq)
-    }
-
-    pub(in crate::application) fn complete_timeline_refetch(
-        &mut self,
-        request_seq: RequestSequence,
-    ) -> Option<Operation> {
-        self.timeline.complete_refetch(request_seq)
-    }
-
-    pub(in crate::application) fn fail_timeline_refetch(
-        &mut self,
-        request_seq: RequestSequence,
-    ) -> Option<Operation> {
-        self.timeline.fail_refetch(request_seq)
+    /// Operation that syncs the timeline from the current seq immediately.
+    pub(in crate::application) fn sync_timeline(&self) -> Operation {
+        Operation::SyncTimeline {
+            since: self.timeline.seq,
+        }
     }
 
     #[cfg(feature = "integration")]
     pub(in crate::application) fn has_pending_short_background_work(&self) -> bool {
-        !self.refreshes.polls.is_empty() || self.timeline.has_pending_background_work()
+        !self.refreshes.polls.is_empty() || self.timeline.scheduled
     }
 }
 
@@ -568,10 +497,6 @@ mod tests {
         assert_eq!(remaining, expected_remaining);
     }
 
-    fn assert_schedule_timeline_reload(operation: Option<&Operation>) {
-        assert_matches!(operation, Some(Operation::ScheduleTimelineReload));
-    }
-
     #[test]
     fn duplicate_refresh_poll_is_not_scheduled_twice() {
         let mut feeds = FeedsComponent::new();
@@ -603,7 +528,6 @@ mod tests {
                 3,
                 refresh_status(Some("refresh-2"), payload::RefreshStatusState::Running),
                 10,
-                20,
             )
             .expect("active poll should accept status response");
 
@@ -628,7 +552,6 @@ mod tests {
                 3,
                 refresh_status(Some("refresh-1"), payload::RefreshStatusState::Running),
                 10,
-                20,
             )
             .expect("active poll should accept status response");
 
@@ -659,56 +582,17 @@ mod tests {
                 3,
                 refresh_status(Some("refresh-1"), payload::RefreshStatusState::Idle),
                 10,
-                20,
             )
             .expect("active poll should accept status response");
 
         assert_matches!(
             operations.as_slice(),
-            [
-                Operation::FetchSubscription { first: 10, .. },
-                Operation::FetchEntries { first: 20, .. }
-            ]
+            [Operation::FetchSubscription { first: 10, .. }]
         );
         assert!(
             feeds
                 .refresh_poll_elapsed(url, "refresh-1".to_owned(), 2)
                 .is_none()
         );
-    }
-
-    #[test]
-    fn timeline_change_while_refetching_schedules_another_reload_on_completion() {
-        let mut timeline = TimelineInvalidation::new();
-
-        assert_schedule_timeline_reload(timeline.mark_dirty().as_ref());
-        assert!(timeline.should_refetch());
-        timeline.start_refetch(1);
-        assert!(timeline.mark_dirty().is_none());
-
-        assert_schedule_timeline_reload(timeline.complete_refetch(1).as_ref());
-        assert!(timeline.should_refetch());
-    }
-
-    #[test]
-    fn timeline_refetch_failure_reschedules_reload() {
-        let mut timeline = TimelineInvalidation::new();
-
-        assert_schedule_timeline_reload(timeline.mark_dirty().as_ref());
-        timeline.start_refetch(1);
-
-        assert_schedule_timeline_reload(timeline.fail_refetch(1).as_ref());
-        assert!(timeline.should_refetch());
-    }
-
-    #[test]
-    fn timeline_refetch_ignores_unrelated_request() {
-        let mut timeline = TimelineInvalidation::new();
-
-        assert_schedule_timeline_reload(timeline.mark_dirty().as_ref());
-        timeline.start_refetch(1);
-
-        assert!(timeline.complete_refetch(2).is_none());
-        assert!(timeline.fail_refetch(2).is_none());
     }
 }

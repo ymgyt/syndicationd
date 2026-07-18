@@ -5,7 +5,7 @@ use async_graphql::{
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
 use synd_feed::types::{self, Annotated, Category, FeedType, FeedUrl, Requirement};
-use synd_registry::{entry::EntryAttrs as RegistryEntryAttrs, query::TimelineItemNode};
+use synd_registry::{entry::EntryAttrs as RegistryEntryAttrs, query::TimelineEntry};
 
 use crate::gql::scalar;
 
@@ -108,7 +108,7 @@ impl Entry {
         }
     }
 
-    pub fn from_timeline_item_node(node: TimelineItemNode) -> Self {
+    pub fn from_timeline_entry(node: TimelineEntry) -> Self {
         Self {
             id: node.entry_id,
             meta: node.feed_meta,

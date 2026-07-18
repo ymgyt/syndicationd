@@ -27,7 +27,7 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
 
     let mut tx = db.begin().await?;
     let page = tx
-        .list_timeline_items(TimelineItemsQuery {
+        .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: subscription.subscriber_id.clone(),
             feed_url: None,
             after: None,
@@ -46,7 +46,7 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
 }
 
 #[tokio::test]
-async fn list_timeline_items_can_filter_by_feed_url() -> anyhow::Result<()> {
+async fn list_timeline_entries_can_filter_by_feed_url() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let first = subscription("timeline-filter-one");
     let second = subscription("timeline-filter-two");
@@ -88,7 +88,7 @@ async fn list_timeline_items_can_filter_by_feed_url() -> anyhow::Result<()> {
 
     let mut tx = db.begin().await?;
     let page = tx
-        .list_timeline_items(TimelineItemsQuery {
+        .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: first.subscriber_id.clone(),
             feed_url: Some(first.feed_url.clone()),
             after: None,
@@ -166,7 +166,7 @@ async fn timeline_projection_preserves_feed_lifecycle_order_inside_batch() -> an
     .await?;
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
 
-    let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+    let page = list_timeline_entries(&db, subscription.subscriber_id.clone()).await?;
     assert_eq!(page.nodes.len(), 1);
     assert_eq!(page.nodes[0].attrs.title.as_deref(), Some("timeline entry"));
     Ok(())
@@ -202,7 +202,7 @@ async fn timeline_projection_adds_discovered_entry_for_active_subscription() -> 
     .await?;
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
 
-    let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+    let page = list_timeline_entries(&db, subscription.subscriber_id.clone()).await?;
     assert_eq!(page.nodes.len(), 1);
     assert_eq!(page.nodes[0].attrs.title.as_deref(), Some("timeline entry"));
     Ok(())
@@ -286,7 +286,7 @@ async fn timeline_projection_invalidates_changed_entry_payload() -> anyhow::Resu
     .await?;
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
 
-    let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
+    let page = list_timeline_entries(&db, subscription.subscriber_id.clone()).await?;
     assert_eq!(page.nodes.len(), 1);
     assert_eq!(page.nodes[0].attrs.title.as_deref(), Some("new title"));
     Ok(())

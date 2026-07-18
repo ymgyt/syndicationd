@@ -30,7 +30,7 @@ use crate::{
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
-        TimelineItemsPage, TimelineItemsQuery,
+        TimelineEntriesPage, TimelineEntriesQuery,
     },
     subscription::{FeedSubscriptionAttrs, SubscriberId, Subscription, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey},
@@ -563,11 +563,11 @@ impl EntryStore for InMemoryRegistryTx<'_> {
 }
 
 impl TimelineStore for InMemoryRegistryTx<'_> {
-    async fn list_timeline_items(
+    async fn list_timeline_entries(
         &mut self,
-        _query: TimelineItemsQuery,
-    ) -> RegistryDbResult<TimelineItemsPage> {
-        Ok(TimelineItemsPage {
+        _query: TimelineEntriesQuery,
+    ) -> RegistryDbResult<TimelineEntriesPage> {
+        Ok(TimelineEntriesPage {
             nodes: Vec::new(),
             has_next_page: false,
             end_cursor: None,

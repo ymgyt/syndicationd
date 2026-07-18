@@ -52,7 +52,11 @@ pub(crate) enum FeedsApiEvent {
     },
     EntriesFetched {
         populate: Populate,
-        payload: payload::FetchEntriesPayload,
+        payload: payload::TimelineEntryConnection,
+    },
+    TimelineChangesFetched {
+        changes: Vec<payload::TimelineChange>,
+        seq: i64,
     },
     InitialFeedViewFetched {
         payload: payload::InitialFeedViewPayload,
@@ -130,16 +134,12 @@ pub(crate) enum Event {
         request_seq: RequestSequence,
         populate: Populate,
     },
-    TimelineRefetchStarted {
-        request_seq: RequestSequence,
-    },
     RegistryFeed {
         event: payload::FeedEvent,
     },
     FeedEventSubscriptionInterrupted,
     FeedViewReloadDebounced {
         feeds_first: i64,
-        entries_first: i64,
     },
     FeedRefreshPollElapsed {
         url: FeedUrl,
@@ -147,7 +147,7 @@ pub(crate) enum Event {
         remaining: u16,
     },
     FeedViewSyncElapsed,
-    TimelineReloadDebounced,
+    TimelineSyncDebounced,
     Error {
         message: String,
     },

@@ -54,21 +54,19 @@ pub(crate) enum Operation {
         subscriptions_first: i64,
         timeline_first: i64,
     },
-    RefetchTimelineEntries {
-        populate: Populate,
-        after: Option<String>,
-        first: i64,
+    /// Fetch timeline changes after `since` and apply them
+    SyncTimeline {
+        since: i64,
     },
     StartFeedEventSubscription,
     ScheduleFeedViewReload {
         feeds_first: i64,
-        entries_first: i64,
     },
     UnsubscribeFeed {
         url: FeedUrl,
     },
     ScheduleFeedViewSync,
-    ScheduleTimelineReload,
+    ScheduleTimelineSync,
     FetchGitHubNotifications {
         populate: Populate,
         params: FetchNotificationsParams,

@@ -44,7 +44,7 @@ CREATE TABLE timeline (
     kind            TEXT NOT NULL,
     name            TEXT,
     definition_json TEXT CHECK (definition_json IS NULL OR json_valid(definition_json)),
-    -- Monotonic change counter. Every timeline_item mutation takes its seq
+    -- Monotonic change counter. Every timeline_entry mutation takes its seq
     -- from here, so clients sync incrementally with WHERE seq > ?
     last_seq        INTEGER NOT NULL DEFAULT 0,
     created_at      DATETIME NOT NULL,
@@ -66,7 +66,7 @@ CREATE INDEX timeline_subscriber_idx
 -- stay stable.
 -- seq records the change that last touched the row. Removed rows stay as
 -- tombstones (deleted_at) so removals are observable through seq.
-CREATE TABLE timeline_item (
+CREATE TABLE timeline_entry (
     timeline_pk INTEGER NOT NULL,
     entry_pk    INTEGER NOT NULL,
     entry_id    TEXT NOT NULL,
@@ -86,10 +86,10 @@ CREATE TABLE timeline_item (
 
 -- Serves the display page query over live rows:
 -- ORDER BY order_time DESC, entry_id DESC with a keyset cursor over the same pair.
-CREATE INDEX timeline_item_order_idx
-    ON timeline_item(timeline_pk, order_time DESC, entry_id DESC)
+CREATE INDEX timeline_entry_order_idx
+    ON timeline_entry(timeline_pk, order_time DESC, entry_id DESC)
     WHERE deleted_at IS NULL;
 
 -- Serves the sync query: WHERE seq > ?
-CREATE INDEX timeline_item_seq_idx
-    ON timeline_item(timeline_pk, seq);
+CREATE INDEX timeline_entry_seq_idx
+    ON timeline_entry(timeline_pk, seq);

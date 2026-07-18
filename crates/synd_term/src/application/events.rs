@@ -56,9 +56,6 @@ impl Application {
                 self.components
                     .apply_entry_fetch_started(request_seq, populate);
             }
-            Event::TimelineRefetchStarted { request_seq } => {
-                self.components.apply_timeline_refetch_started(request_seq);
-            }
             Event::RegistryFeed { event } => {
                 let operations = self.components.apply_feed_event(event);
                 self.perform_operations(operations);
@@ -66,24 +63,18 @@ impl Application {
             Event::FeedEventSubscriptionInterrupted => {
                 self.perform_operation(Operation::ScheduleFeedViewReload {
                     feeds_first: self.config.feeds_per_pagination,
-                    entries_first: self.next_entries_first(0),
                 });
             }
-            Event::FeedViewReloadDebounced {
-                feeds_first,
-                entries_first,
-            } => {
+            // Recover what happened while the feed event subscription was down
+            Event::FeedViewReloadDebounced { feeds_first } => {
+                let sync = self.components.feeds.sync_timeline();
                 self.perform_operations([
                     Operation::FetchSubscription {
                         populate: Populate::Replace,
                         after: None,
                         first: feeds_first,
                     },
-                    Operation::FetchEntries {
-                        populate: Populate::Replace,
-                        after: None,
-                        first: entries_first,
-                    },
+                    sync,
                 ]);
             }
             Event::FeedRefreshPollElapsed {
@@ -97,32 +88,26 @@ impl Application {
                 self.perform_operations(operations);
             }
             Event::FeedViewSyncElapsed => {
+                let sync = self.components.feeds.sync_timeline();
                 self.perform_operations([
                     Operation::FetchSubscription {
                         populate: Populate::Replace,
                         after: None,
                         first: self.config.feeds_per_pagination,
                     },
-                    Operation::FetchEntries {
-                        populate: Populate::Replace,
-                        after: None,
-                        first: self.next_entries_first(0),
-                    },
+                    sync,
                     Operation::ScheduleFeedViewSync,
                 ]);
             }
-            Event::TimelineReloadDebounced => {
-                let operations = self
-                    .components
-                    .apply_timeline_reload_debounced(self.next_entries_first(0));
-                self.perform_operations(operations);
+            Event::TimelineSyncDebounced => {
+                let operation = self.components.feeds.timeline_sync_debounced();
+                self.perform_operation(operation);
             }
             Event::Error { message } => {
                 self.handle_error_message(message, None);
             }
             Event::SyndApiError { error, request_seq } => {
-                let operations = self.components.apply_synd_api_error(request_seq);
-                self.perform_operations(operations);
+                self.components.apply_synd_api_error(request_seq);
                 let message = Self::synd_api_error_message(error.as_ref());
                 self.handle_error_message(message, Some(request_seq));
             }

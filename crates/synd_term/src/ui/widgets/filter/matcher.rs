@@ -17,6 +17,12 @@ impl MatcherFilterer {
     }
 }
 
+impl Filterable<payload::TimelineEntry> for MatcherFilterer {
+    fn filter(&self, entry: &payload::TimelineEntry) -> super::FilterResult {
+        self.filter(&entry.entry)
+    }
+}
+
 impl Filterable<payload::Entry> for MatcherFilterer {
     fn filter(&self, entry: &payload::Entry) -> super::FilterResult {
         if self

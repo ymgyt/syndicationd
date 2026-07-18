@@ -88,14 +88,6 @@ pub(super) struct FeedRefreshPollKey {
     request_id: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum TimelineInvalidationState {
-    Clean,
-    DirtyWaiting,
-    Refetching,
-    DirtyWhileRefetching,
-}
-
 impl FeedRefreshPollKey {
     fn new(url: FeedUrl, request_id: String) -> Self {
         Self { url, request_id }

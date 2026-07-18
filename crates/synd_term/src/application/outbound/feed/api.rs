@@ -40,11 +40,17 @@ pub trait FeedApi: Send + Sync + 'static {
         url: FeedUrl,
     ) -> BoxFuture<'static, Result<payload::RefreshStatus, SyndApiError>>;
 
-    fn fetch_entries(
+    fn fetch_timeline_entries(
         &self,
         after: Option<String>,
         first: i64,
-    ) -> BoxFuture<'static, Result<payload::FetchEntriesPayload, SyndApiError>>;
+    ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>>;
+
+    fn fetch_timeline_changes(
+        &self,
+        since: i64,
+        first: i64,
+    ) -> BoxFuture<'static, Result<payload::TimelineChangesPayload, SyndApiError>>;
 
     fn run_feed_events(
         &self,

@@ -87,13 +87,22 @@ impl FeedApi for ClientFeedApi {
         async move { client.fetch_feed_status(url).await }.boxed()
     }
 
-    fn fetch_entries(
+    fn fetch_timeline_entries(
         &self,
         after: Option<String>,
         first: i64,
-    ) -> BoxFuture<'static, Result<payload::FetchEntriesPayload, SyndApiError>> {
+    ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>> {
         let client = self.client();
-        async move { client.fetch_entries(after, first).await }.boxed()
+        async move { client.fetch_timeline_entries(after, first).await }.boxed()
+    }
+
+    fn fetch_timeline_changes(
+        &self,
+        since: i64,
+        first: i64,
+    ) -> BoxFuture<'static, Result<payload::TimelineChangesPayload, SyndApiError>> {
+        let client = self.client();
+        async move { client.fetch_timeline_changes(since, first).await }.boxed()
     }
 
     fn run_feed_events(

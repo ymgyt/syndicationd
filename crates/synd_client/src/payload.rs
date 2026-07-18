@@ -65,16 +65,13 @@ impl<'de> Deserialize<'de> for InitialTimelinePayload {
 }
 
 impl InitialFeedViewPayload {
-    pub fn into_parts(self) -> (Option<SubscriptionPayload>, Option<FetchEntriesPayload>) {
+    pub fn into_parts(self) -> (Option<SubscriptionPayload>, Option<TimelineEntryConnection>) {
         let subscriptions = match self.subscriptions {
             InitialSubscriptionsPayload::Ready(feeds) => Some(SubscriptionPayload { feeds }),
             InitialSubscriptionsPayload::Unavailable => None,
         };
         let timeline = match self.timeline {
-            InitialTimelinePayload::Ready(timeline) => Some(FetchEntriesPayload {
-                entries: timeline.entries.nodes,
-                page_info: timeline.entries.page_info,
-            }),
+            InitialTimelinePayload::Ready(timeline) => Some(timeline.entries),
             InitialTimelinePayload::Unavailable => None,
         };
         (subscriptions, timeline)
@@ -83,7 +80,24 @@ impl InitialFeedViewPayload {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TimelinePayload {
-    pub entries: EntryConnection,
+    pub entries: TimelineEntryConnection,
+}
+
+/// Entry as it appears on one timeline: display position + content.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEntry {
+    pub order_time: Time,
+    pub entry: Entry,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEntryConnection {
+    pub nodes: Vec<TimelineEntry>,
+    pub page_info: PageInfo,
+    /// Change seq this page reflects. The client syncs changes from here
+    pub seq: i64,
 }
 
 /// Page of timeline changes for incremental sync, ordered by seq.
@@ -100,12 +114,9 @@ pub struct TimelineChangesPayload {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "__typename")]
 pub enum TimelineChange {
-    /// Insert or overwrite the entry at its `(order_time, entry_id)` position
+    /// Insert or overwrite the entry at its `(order_time, entry.id)` position
     #[serde(rename = "TimelineChangeUpsert", rename_all = "camelCase")]
-    Upsert {
-        order_time: Time,
-        entry: Box<Entry>,
-    },
+    Upsert { timeline_entry: Box<TimelineEntry> },
     /// Remove the entry identified by `entry_id`
     #[serde(rename = "TimelineChangeRemove", rename_all = "camelCase")]
     Remove { entry_id: EntryId },

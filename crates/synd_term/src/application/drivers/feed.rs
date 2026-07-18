@@ -165,37 +165,22 @@ impl FeedDriver {
         runtime.push_job(fut);
     }
 
-    /// Returns the started events: `EntryFetchStarted` and, for a timeline
-    /// refetch, `TimelineRefetchStarted`.
+    /// Returns the `EntryFetchStarted` event for the started request.
     pub(super) fn fetch_entries(
         &self,
         runtime: &mut DriverRuntime,
         populate: Populate,
         after: Option<String>,
         first: i64,
-        timeline_refetch: bool,
-    ) -> Vec<Event> {
+    ) -> Option<Event> {
         if first <= 0 {
-            return Vec::new();
+            return None;
         }
-        debug!(
-            ?populate,
-            has_after = after.is_some(),
-            first,
-            timeline_refetch,
-            "fetch entries"
-        );
+        debug!(?populate, has_after = after.is_some(), first, "fetch entries");
         let api = self.api.clone();
         let request_seq = runtime.request_started(RequestId::FetchEntries);
-        let mut events = vec![Event::EntryFetchStarted {
-            request_seq,
-            populate,
-        }];
-        if timeline_refetch {
-            events.push(Event::TimelineRefetchStarted { request_seq });
-        }
         let fut = async move {
-            match api.fetch_entries(after, first).await {
+            match api.fetch_timeline_entries(after, first).await {
                 Ok(payload) => Ok(Event::Api {
                     request_seq,
                     event: ApiEvent::Feeds(FeedsApiEvent::EntriesFetched { populate, payload }),
@@ -208,6 +193,41 @@ impl FeedDriver {
         }
         .boxed();
         runtime.push_job(fut);
-        events
+        Some(Event::EntryFetchStarted {
+            request_seq,
+            populate,
+        })
+    }
+
+    /// Fetch and coalesce all timeline changes after `since` in one job.
+    pub(super) fn sync_timeline(&self, runtime: &mut DriverRuntime, since: i64) {
+        const CHANGES_PER_PAGE: i64 = 200;
+
+        let api = self.api.clone();
+        let request_seq = runtime.request_started(RequestId::SyncTimeline);
+        let fut = async move {
+            let mut changes = Vec::new();
+            let mut since = since;
+            loop {
+                match api.fetch_timeline_changes(since, CHANGES_PER_PAGE).await {
+                    Ok(mut page) => {
+                        changes.append(&mut page.changes);
+                        since = page.seq;
+                        if !page.has_more {
+                            return Ok(Event::Api {
+                                request_seq,
+                                event: ApiEvent::Feeds(FeedsApiEvent::TimelineChangesFetched {
+                                    changes,
+                                    seq: page.seq,
+                                }),
+                            });
+                        }
+                    }
+                    Err(error) => return Ok(Event::synd_api_error(error, request_seq)),
+                }
+            }
+        }
+        .boxed();
+        runtime.push_job(fut);
     }
 }

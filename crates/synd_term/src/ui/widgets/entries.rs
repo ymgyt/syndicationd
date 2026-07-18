@@ -21,7 +21,7 @@ use synd_feed::types::FeedUrl;
 
 #[allow(clippy::struct_field_names)]
 pub(crate) struct EntriesWidget {
-    entries: FilterableVec<payload::Entry, FeedFilterer>,
+    entries: FilterableVec<payload::TimelineEntry, FeedFilterer>,
 }
 
 impl EntriesWidget {
@@ -40,22 +40,39 @@ impl EntriesWidget {
         self.entries.unfiltered_len()
     }
 
-    pub(crate) fn update_entries(
-        &mut self,
-        populate: Populate,
-        payload: payload::FetchEntriesPayload,
-    ) {
-        self.entries.update(populate, payload.entries);
-    }
-
     pub(crate) fn update_entries_with_limit(
         &mut self,
         populate: Populate,
-        payload: payload::FetchEntriesPayload,
+        payload: payload::TimelineEntryConnection,
         limit: usize,
     ) {
-        self.update_entries(populate, payload);
+        self.entries.update(populate, payload.nodes);
         self.entries.truncate(limit);
+    }
+
+    /// Apply timeline changes in seq order, keeping the display order.
+    pub(crate) fn apply_changes(&mut self, changes: Vec<payload::TimelineChange>, limit: usize) {
+        for change in changes {
+            match change {
+                payload::TimelineChange::Upsert { timeline_entry } => {
+                    self.entries
+                        .upsert_sorted(*timeline_entry, Self::display_order, |a, b| {
+                            a.entry.id == b.entry.id
+                        });
+                }
+                payload::TimelineChange::Remove { entry_id } => {
+                    self.entries.retain(|entry| entry.entry.id != entry_id);
+                }
+            }
+        }
+        self.entries.truncate(limit);
+    }
+
+    /// Timeline display order: `(order_time, entry.id)` descending.
+    fn display_order(a: &payload::TimelineEntry, b: &payload::TimelineEntry) -> std::cmp::Ordering {
+        b.order_time
+            .cmp(&a.order_time)
+            .then_with(|| b.entry.id.cmp(&a.entry.id))
     }
 
     pub(crate) fn update_filterer(&mut self, filterer: FeedFilterer) {
@@ -63,7 +80,7 @@ impl EntriesWidget {
     }
 
     pub(crate) fn remove_unsubscribed_entries(&mut self, url: &FeedUrl) {
-        self.entries.retain(|entry| &entry.feed.url != url);
+        self.entries.retain(|entry| &entry.entry.feed.url != url);
     }
 
     pub(crate) fn move_selection(&mut self, direction: Direction) {
@@ -78,18 +95,20 @@ impl EntriesWidget {
         self.entries.move_last();
     }
 
-    pub(crate) fn entries(&self) -> &[payload::Entry] {
-        self.entries.as_unfiltered_slice()
+    pub(crate) fn entries(&self) -> impl Iterator<Item = &payload::Entry> {
+        self.entries
+            .as_unfiltered_slice()
+            .iter()
+            .map(|entry| &entry.entry)
     }
 
     pub(crate) fn selected_entry_website_url(&self) -> Option<&str> {
-        self.entries
-            .selected()
+        self.selected_entry()
             .and_then(|entry| entry.website_url.as_deref())
     }
 
     fn selected_entry(&self) -> Option<&payload::Entry> {
-        self.entries.selected()
+        self.entries.selected().map(|entry| &entry.entry)
     }
 }
 
@@ -167,7 +186,8 @@ impl EntriesWidget {
             Constraint::Length(4),
         ];
 
-        let row = |entry: &'a payload::Entry| {
+        let row = |timeline_entry: &'a payload::TimelineEntry| {
+            let entry = &timeline_entry.entry;
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let published = entry
                 .published

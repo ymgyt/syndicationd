@@ -16,6 +16,7 @@ pub(crate) enum RequestId {
     DeviceFlowDeviceAuthorize,
     DeviceFlowPollAccessToken,
     FetchEntries,
+    SyncTimeline,
     FetchSubscription,
     FetchFeedStatus,
     FetchGithubNotifications { page: u8 },

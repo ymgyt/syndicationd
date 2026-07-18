@@ -8,7 +8,8 @@ use synd_registry::{
     crawl::policy::{CrawlPolicy as RegistryCrawlPolicy, PollingPolicy as RegistryPollingPolicy},
     query::{
         SubscriptionsQuery, TimelineChange as RegistryTimelineChange, TimelineChangesQuery,
-        TimelineItemCursor, TimelineItemsQuery,
+        TimelineEntriesPage, TimelineEntriesQuery, TimelineEntry as RegistryTimelineEntry,
+        TimelineEntryCursor,
     },
 };
 
@@ -132,6 +133,8 @@ impl Subscription {
         subscriptions_connection(cx, after, first).await
     }
 
+    /// Legacy entries surface kept for older clients; new clients read
+    /// `feedRegistry.timeline`
     async fn entries(
         &self,
         cx: &Context<'_>,
@@ -139,7 +142,19 @@ impl Subscription {
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, Entry, TimelineEntriesFields>> {
-        timeline_entries_connection(cx, url, after, first).await
+        let page = timeline_entries_page(cx, url, after, first).await?;
+
+        let mut connection = Connection::with_additional_fields(
+            false,
+            page.has_next_page,
+            TimelineEntriesFields { seq: page.seq },
+        );
+        connection.edges.extend(page.nodes.into_iter().map(|node| {
+            let cursor = node.cursor.encode();
+            Edge::new(cursor, Entry::from_timeline_entry(node))
+        }));
+
+        Ok(connection)
     }
 
     #[expect(clippy::unused_async)]
@@ -179,8 +194,20 @@ impl Timeline {
         url: Option<FeedUrl>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, Entry, TimelineEntriesFields>> {
-        timeline_entries_connection(cx, url, after, first).await
+    ) -> Result<Connection<String, TimelineEntry, TimelineEntriesFields>> {
+        let page = timeline_entries_page(cx, url, after, first).await?;
+
+        let mut connection = Connection::with_additional_fields(
+            false,
+            page.has_next_page,
+            TimelineEntriesFields { seq: page.seq },
+        );
+        connection.edges.extend(page.nodes.into_iter().map(|node| {
+            let cursor = node.cursor.encode();
+            Edge::new(cursor, TimelineEntry::from(node))
+        }));
+
+        Ok(connection)
     }
 
     async fn changes(
@@ -203,6 +230,23 @@ impl Timeline {
             seq: page.seq,
             has_more: page.has_more,
         })
+    }
+}
+
+/// Entry as it appears on one timeline: display position and content.
+#[derive(SimpleObject)]
+struct TimelineEntry {
+    /// Display position on the timeline
+    order_time: crate::gql::scalar::Rfc3339Time,
+    entry: Entry,
+}
+
+impl From<RegistryTimelineEntry> for TimelineEntry {
+    fn from(node: RegistryTimelineEntry) -> Self {
+        Self {
+            order_time: node.cursor.order_time().into(),
+            entry: Entry::from_timeline_entry(node),
+        }
     }
 }
 
@@ -230,9 +274,7 @@ enum TimelineChange {
 
 #[derive(SimpleObject)]
 struct TimelineChangeUpsert {
-    /// Display position of the entry
-    order_time: crate::gql::scalar::Rfc3339Time,
-    entry: Box<Entry>,
+    timeline_entry: Box<TimelineEntry>,
 }
 
 #[derive(SimpleObject)]
@@ -244,8 +286,7 @@ impl From<RegistryTimelineChange> for TimelineChange {
     fn from(change: RegistryTimelineChange) -> Self {
         match change {
             RegistryTimelineChange::Upsert(node) => Self::Upsert(TimelineChangeUpsert {
-                order_time: node.cursor.order_time().into(),
-                entry: Box::new(Entry::from_timeline_item_node(*node)),
+                timeline_entry: Box::new(TimelineEntry::from(*node)),
             }),
             RegistryTimelineChange::Remove { entry_id } => Self::Remove(TimelineChangeRemove {
                 entry_id: entry_id.as_str().to_owned(),
@@ -293,36 +334,25 @@ async fn subscriptions_connection(
     Ok(connection)
 }
 
-async fn timeline_entries_connection(
+async fn timeline_entries_page(
     cx: &Context<'_>,
     feed_url: Option<FeedUrl>,
     after: Option<String>,
     first: Option<i32>,
-) -> Result<Connection<String, Entry, TimelineEntriesFields>> {
+) -> Result<TimelineEntriesPage> {
     let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
     let after = after
         .as_deref()
-        .map(TimelineItemCursor::decode)
+        .map(TimelineEntryCursor::decode)
         .transpose()
         .map_err(|err| async_graphql::Error::new(err.to_string()))?;
     let page = registry(cx)
-        .list_timeline_items(TimelineItemsQuery {
+        .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: subscriber_id(cx),
             feed_url,
             after,
             first,
         })
         .await?;
-
-    let mut connection = Connection::with_additional_fields(
-        false,
-        page.has_next_page,
-        TimelineEntriesFields { seq: page.seq },
-    );
-    connection.edges.extend(page.nodes.into_iter().map(|node| {
-        let cursor = node.cursor.encode();
-        Edge::new(cursor, Entry::from_timeline_item_node(node))
-    }));
-
-    Ok(connection)
+    Ok(page)
 }
