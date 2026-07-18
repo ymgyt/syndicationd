@@ -446,28 +446,3 @@ pub(crate) fn rss_body_with_entry(
     .into_bytes()
 }
 
-pub(crate) fn rss_body_with_entry_published_at(
-    feed_title: &str,
-    entry_title: &str,
-    entry_guid: &str,
-    published_at: DateTime<Utc>,
-) -> Vec<u8> {
-    format!(
-        r#"<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0">
-  <channel>
-    <title>{feed_title}</title>
-    <link>https://example.com/</link>
-    <description>example feed</description>
-    <item>
-      <title>{entry_title}</title>
-      <link>https://example.com/entry/1</link>
-      <guid>{entry_guid}</guid>
-      <pubDate>{}</pubDate>
-    </item>
-  </channel>
-</rss>"#,
-        published_at.to_rfc2822()
-    )
-    .into_bytes()
-}

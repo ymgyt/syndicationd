@@ -28,7 +28,10 @@ use crate::{
         EventType, JournaledEvent, ProcessorId,
     },
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
-    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
+    query::{
+        Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
+        TimelineItemsPage, TimelineItemsQuery,
+    },
     subscription::{FeedSubscriptionAttrs, SubscriberId, Subscription, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey},
 };
@@ -568,6 +571,18 @@ impl TimelineStore for InMemoryRegistryTx<'_> {
             nodes: Vec::new(),
             has_next_page: false,
             end_cursor: None,
+            seq: 0,
+        })
+    }
+
+    async fn list_timeline_changes(
+        &mut self,
+        _query: TimelineChangesQuery,
+    ) -> RegistryDbResult<TimelineChangesPage> {
+        Ok(TimelineChangesPage {
+            changes: Vec::new(),
+            seq: 0,
+            has_more: false,
         })
     }
 
@@ -594,6 +609,7 @@ impl TimelineStore for InMemoryRegistryTx<'_> {
         &mut self,
         _feed_url: &FeedUrl,
         _entry_id: &EntryId,
+        _content_changed: bool,
         _now: DateTime<Utc>,
     ) -> RegistryDbResult<Vec<TimelineKey>> {
         Ok(Vec::new())
@@ -602,6 +618,7 @@ impl TimelineStore for InMemoryRegistryTx<'_> {
     async fn apply_feed_unsubscribed(
         &mut self,
         _subscription: &SubscriptionKey,
+        _now: DateTime<Utc>,
     ) -> RegistryDbResult<Option<TimelineKey>> {
         Ok(None)
     }

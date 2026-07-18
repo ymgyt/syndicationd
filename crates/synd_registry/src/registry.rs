@@ -31,7 +31,10 @@ use crate::{
     },
     feed::FeedProj,
     handler::CommandHandler,
-    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
+    query::{
+        Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
+        TimelineItemsPage, TimelineItemsQuery,
+    },
     subscription::{SubHandler, SubscriberId},
     timeline::TimelineProj,
 };
@@ -208,6 +211,16 @@ where
     ) -> Result<TimelineItemsPage, FeedRegistryError> {
         let mut tx = self.db.begin().await?;
         let page = tx.list_timeline_items(query).await?;
+        tx.commit().await?;
+        Ok(page)
+    }
+
+    pub async fn list_timeline_changes(
+        &self,
+        query: TimelineChangesQuery,
+    ) -> Result<TimelineChangesPage, FeedRegistryError> {
+        let mut tx = self.db.begin().await?;
+        let page = tx.list_timeline_changes(query).await?;
         tx.commit().await?;
         Ok(page)
     }

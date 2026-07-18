@@ -18,7 +18,10 @@ use crate::{
     error::{RegistryDbError, RegistryDbResult},
     event::{EventJournal, EventJournalAppend},
     feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
-    query::{Subscriptions, SubscriptionsQuery, TimelineItemsPage, TimelineItemsQuery},
+    query::{
+        Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
+        TimelineItemsPage, TimelineItemsQuery,
+    },
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
     timeline::{TimelineCatchup, TimelineKey},
 };
@@ -188,6 +191,11 @@ pub trait TimelineStore {
         query: TimelineItemsQuery,
     ) -> impl Future<Output = RegistryDbResult<TimelineItemsPage>> + Send;
 
+    fn list_timeline_changes(
+        &mut self,
+        query: TimelineChangesQuery,
+    ) -> impl Future<Output = RegistryDbResult<TimelineChangesPage>> + Send;
+
     fn catchup_subscribed_feed(
         &mut self,
         timeline: &TimelineKey,
@@ -195,16 +203,21 @@ pub trait TimelineStore {
         now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<TimelineCatchup>> + Send;
 
+    /// Applies one entry to the timelines of its subscribers.
+    /// `content_changed` marks that the entry content itself changed, which
+    /// bumps the item seq so syncing clients re-read the entry.
     fn apply_entry_to_timelines(
         &mut self,
         feed_url: &FeedUrl,
         entry_id: &EntryId,
+        content_changed: bool,
         now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<Vec<TimelineKey>>> + Send;
 
     fn apply_feed_unsubscribed(
         &mut self,
         subscription: &SubscriptionKey,
+        now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<Option<TimelineKey>>> + Send;
 }
 

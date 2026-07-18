@@ -27,10 +27,7 @@ pub struct Entry {
 
 impl Entry {
     fn discover(source: &FeedSource, appearance: EntryAppearance) -> Self {
-        let order_key = EntryOrderKey::resolve(
-            &appearance.attrs,
-            EntryOrderFallback::FirstSeenAt(source.seen_at),
-        );
+        let order_key = EntryOrderKey::resolve(&appearance.attrs, source.seen_at);
         Self::builder()
             .id(appearance.id)
             .feed_url(source.feed_url.clone())
@@ -42,16 +39,14 @@ impl Entry {
     }
 
     fn reconcile(self, source: &FeedSource, appearance: EntryAppearance) -> EntryChange {
-        let order_key = EntryOrderKey::resolve(
-            &appearance.attrs,
-            EntryOrderFallback::Existing(self.order_key),
-        );
-        let changed = self.attrs != appearance.attrs || self.order_key != order_key;
+        let changed = self.attrs != appearance.attrs;
         let entry = Self::builder()
             .id(self.id)
             .feed_url(self.feed_url)
             .attrs(appearance.attrs)
-            .order_key(order_key)
+            // order_key is immutable: keep the key resolved at discovery even
+            // if the feed later changes published/updated timestamps
+            .order_key(self.order_key)
             .lifecycle(self.lifecycle.seen_again(source.seen_at))
             .source(EntrySourceRef::from(source))
             .build();
@@ -88,7 +83,9 @@ impl EntryAttrs {
     }
 }
 
-/// Interpreted order key for placing an entry in timeline projections.
+/// Order key that places an entry in timeline projections.
+/// Resolved once when the entry is discovered and frozen afterwards so that
+/// timeline order and pagination cursors stay stable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EntryOrderKey(DateTime<Utc>);
 
@@ -97,31 +94,15 @@ impl EntryOrderKey {
         Self(time)
     }
 
-    pub fn resolve(attrs: &EntryAttrs, fallback: EntryOrderFallback) -> Self {
+    pub fn resolve(attrs: &EntryAttrs, first_seen_at: DateTime<Utc>) -> Self {
         attrs
             .published_at
             .or(attrs.updated_at)
-            .map_or_else(|| fallback.into_order_key(), Self::from_datetime)
+            .map_or(Self(first_seen_at), Self::from_datetime)
     }
 
     pub fn as_datetime(self) -> DateTime<Utc> {
         self.0
-    }
-}
-
-/// Fallback used when deriving an entry ordering key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EntryOrderFallback {
-    FirstSeenAt(DateTime<Utc>),
-    Existing(EntryOrderKey),
-}
-
-impl EntryOrderFallback {
-    fn into_order_key(self) -> EntryOrderKey {
-        match self {
-            Self::FirstSeenAt(seen_at) => EntryOrderKey::from_datetime(seen_at),
-            Self::Existing(order_key) => order_key,
-        }
     }
 }
 

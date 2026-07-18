@@ -315,6 +315,52 @@ impl Client {
     }
 
     #[instrument(skip(self))]
+    pub async fn fetch_timeline_changes(
+        &self,
+        since: i64,
+        first: i64,
+    ) -> Result<payload::TimelineChangesPayload, SyndApiError> {
+        #[derive(Serialize, Debug)]
+        struct Variables {
+            since: i64,
+            first: i64,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct ResponseData {
+            output: Output,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct Output {
+            timeline: Timeline,
+        }
+        #[derive(Debug, serde::Deserialize)]
+        struct Timeline {
+            changes: payload::TimelineChangesPayload,
+        }
+
+        let response: Response<ResponseData> = self
+            .execute_graphql(&graphql(TIMELINE_CHANGES_QUERY, Variables { since, first }))
+            .await?;
+
+        let errors = response.errors.unwrap_or_default();
+        match response.data {
+            Some(data) => {
+                if !errors.is_empty() {
+                    warn!(
+                        errors = ?errors,
+                        "timeline changes query returned partial GraphQL errors"
+                    );
+                }
+                Ok(data.output.timeline.changes)
+            }
+            None if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
+            None => Err(SyndApiError::UnexpectedResponse {
+                context: "response does not contain data and errors",
+            }),
+        }
+    }
+
+    #[instrument(skip(self))]
     pub async fn fetch_subscription(
         &self,
         after: Option<String>,
@@ -1159,6 +1205,42 @@ query Subscription($after: String, $first: Int) {
       pageInfo {
         hasNextPage
         endCursor
+      }
+    }
+  }
+}
+";
+
+const TIMELINE_CHANGES_QUERY: &str = r"
+query TimelineChanges($since: Int!, $first: Int!) {
+  output: feedRegistry {
+    timeline {
+      changes(since: $since, first: $first) {
+        changes {
+          __typename
+          ... on TimelineChangeUpsert {
+            orderTime
+            entry {
+              id
+              title
+              published
+              updated
+              summary
+              websiteUrl
+              feed {
+                title
+                url
+                requirement
+                category
+              }
+            }
+          }
+          ... on TimelineChangeRemove {
+            entryId
+          }
+        }
+        seq
+        hasMore
       }
     }
   }

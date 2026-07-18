@@ -86,6 +86,31 @@ pub struct TimelinePayload {
     pub entries: EntryConnection,
 }
 
+/// Page of timeline changes for incremental sync, ordered by seq.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineChangesPayload {
+    pub changes: Vec<TimelineChange>,
+    /// Seq the client remembers after applying this page
+    pub seq: i64,
+    pub has_more: bool,
+}
+
+/// One timeline change, applied in seq order.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "__typename")]
+pub enum TimelineChange {
+    /// Insert or overwrite the entry at its `(order_time, entry_id)` position
+    #[serde(rename = "TimelineChangeUpsert", rename_all = "camelCase")]
+    Upsert {
+        order_time: Time,
+        entry: Box<Entry>,
+    },
+    /// Remove the entry identified by `entry_id`
+    #[serde(rename = "TimelineChangeRemove", rename_all = "camelCase")]
+    Remove { entry_id: EntryId },
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct EntriesResponseData {
     pub output: EntriesOutput,

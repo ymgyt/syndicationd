@@ -1,11 +1,9 @@
 use std::fmt;
 
-use bon::Builder;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::types::FeedUrl;
 
-use crate::{entry::EntryOrderKey, subscription::SubscriberId};
+use crate::subscription::SubscriberId;
 
 mod projection;
 pub mod query;
@@ -47,23 +45,6 @@ impl TimelineKey {
             kind: TimelineKind::Default,
         }
     }
-}
-
-/// Persisted timeline scope.
-#[derive(Debug, Clone, Builder, PartialEq, Eq)]
-pub struct Timeline {
-    pub key: TimelineKey,
-    pub name: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Current relation that includes one entry in one timeline.
-#[derive(Debug, Clone, Builder, PartialEq, Eq)]
-pub struct TimelineItem {
-    pub timeline: TimelineKey,
-    pub entry_id: EntryId,
-    pub order_key: EntryOrderKey,
 }
 
 /// Result of catching up one feed into one timeline.

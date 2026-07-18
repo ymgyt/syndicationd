@@ -65,17 +65,17 @@ impl TimelineProjInput {
             }
             Self::FeedUnsubscribed { event, .. } => {
                 let subscription = event.subscription;
-                let timeline = tx.apply_feed_unsubscribed(&subscription).await?;
+                let timeline = tx.apply_feed_unsubscribed(&subscription, occurred_at).await?;
                 Ok(timeline
                     .map(|timeline| (timeline, subscription.feed_url))
                     .into_iter()
                     .collect())
             }
             Self::EntryDiscovered { event, .. } => {
-                Self::apply_entry(tx, event.feed_url, &event.entry_id, occurred_at).await
+                Self::apply_entry(tx, event.feed_url, &event.entry_id, false, occurred_at).await
             }
             Self::EntryChanged { event, .. } => {
-                Self::apply_entry(tx, event.feed_url, &event.entry_id, occurred_at).await
+                Self::apply_entry(tx, event.feed_url, &event.entry_id, true, occurred_at).await
             }
         }
     }
@@ -84,13 +84,14 @@ impl TimelineProjInput {
         tx: &mut Tx,
         feed_url: FeedUrl,
         entry_id: &EntryId,
+        content_changed: bool,
         occurred_at: DateTime<Utc>,
     ) -> ProcessorResult<Vec<(TimelineKey, FeedUrl)>>
     where
         Tx: TimelineStore + Send,
     {
         let timelines = tx
-            .apply_entry_to_timelines(&feed_url, entry_id, occurred_at)
+            .apply_entry_to_timelines(&feed_url, entry_id, content_changed, occurred_at)
             .await?;
         Ok(timelines
             .into_iter()

@@ -293,65 +293,6 @@ async fn timeline_projection_invalidates_changed_entry_payload() -> anyhow::Resu
 }
 
 #[tokio::test]
-async fn timeline_projection_updates_changed_entry_order() -> anyhow::Result<()> {
-    let db = migrated_db().await?;
-    let subscription = subscription("timeline-entry-order");
-    let older = Utc.with_ymd_and_hms(2026, 6, 1, 12, 0, 0).unwrap();
-    let newer = Utc.with_ymd_and_hms(2026, 6, 2, 12, 0, 0).unwrap();
-
-    let first = record_fetched_crawl(
-        &db,
-        &subscription.feed_url,
-        rss_body_with_entry_published_at("timeline feed", "old title", "entry-1", older),
-        0,
-    )
-    .await?;
-    let first_feed_event = FeedDiscoveredEvent::new(first.feed_url.clone(), first.job_id.clone());
-    let _ = project_feed(&db, first.clone()).await?;
-    let _ = project_entries(&db, EntryProjInput::from(first_feed_event)).await?;
-    let entry_id = current_entry_id(&db).await?;
-
-    store_subscription_in_db(&db, subscription.clone()).await?;
-    let _ = project_timeline(
-        &db,
-        timeline_entry_discovered(EntryDiscoveredEvent::new(
-            subscription.feed_url.clone(),
-            entry_id.clone(),
-            first.job_id,
-        )),
-    )
-    .await?;
-    let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
-    assert_eq!(page.nodes[0].cursor.order_time(), older);
-
-    let second = record_fetched_crawl(
-        &db,
-        &subscription.feed_url,
-        rss_body_with_entry_published_at("timeline feed", "new title", "entry-1", newer),
-        1,
-    )
-    .await?;
-    let second_feed_event = FeedChangedEvent::new(second.feed_url.clone(), second.job_id.clone());
-    let _ = project_feed(&db, second.clone()).await?;
-    let _ = project_entries(&db, EntryProjInput::from(second_feed_event)).await?;
-
-    let recorded = project_timeline(
-        &db,
-        timeline_entry_changed(EntryChangedEvent::new(
-            subscription.feed_url.clone(),
-            entry_id,
-            second.job_id,
-        )),
-    )
-    .await?;
-    assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
-
-    let page = list_timeline_items(&db, subscription.subscriber_id.clone()).await?;
-    assert_eq!(page.nodes[0].cursor.order_time(), newer);
-    Ok(())
-}
-
-#[tokio::test]
 async fn timeline_projection_coalesces_entry_invalidations_by_feed() -> anyhow::Result<()> {
     let db = migrated_db().await?;
     let subscription = subscription("timeline-entry-coalesce");
