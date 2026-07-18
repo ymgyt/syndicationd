@@ -81,7 +81,29 @@ async fn catchup_feed(
     now: DateTime<Utc>,
 ) -> SqliteResult<TimelineCatchup> {
     let timeline_pk = resolve_timeline_pk(tx, timeline).await?;
-    let seq = next_seq(tx, timeline_pk).await?;
+    let candidates = sqlx::query_scalar::<_, i64>(
+        r#"
+            SELECT COUNT(*)
+            FROM entry AS e
+            INNER JOIN feed AS f
+                ON f.pk = e.feed_pk
+            INNER JOIN feed_endpoint AS fe
+                ON fe.pk = f.feed_endpoint_pk
+            WHERE fe.url = ?
+            "#,
+    )
+    .bind(feed_url.as_str())
+    .fetch_one(&mut **tx)
+    .await?;
+    if candidates == 0 {
+        return Ok(TimelineCatchup::new(timeline.clone(), feed_url.clone(), 0));
+    }
+
+    // Every row gets its own seq: change pagination pages by seq alone, so
+    // rows sharing a seq would be lost at page boundaries. Candidates left
+    // untouched leave gaps, which is fine because seq only needs to be
+    // unique and increasing.
+    let base_seq = alloc_seq_range(tx, timeline_pk, candidates).await?;
     // Insert missing entries and revive tombstoned ones(resubscribe).
     // Live rows are left untouched so they emit no sync change.
     let result = sqlx::query(
@@ -99,7 +121,7 @@ async fn catchup_feed(
                 e.pk,
                 e.entry_id,
                 e.current_order_time,
-                ?,
+                ? + ROW_NUMBER() OVER (ORDER BY e.pk),
                 ?
             FROM entry AS e
             INNER JOIN feed AS f
@@ -114,7 +136,7 @@ async fn catchup_feed(
             "#,
     )
     .bind(timeline_pk)
-    .bind(seq)
+    .bind(base_seq)
     .bind(now)
     .bind(feed_url.as_str())
     .execute(&mut **tx)
@@ -170,18 +192,13 @@ async fn apply_feed_unsubscribed(
         return Ok(None);
     };
     let timeline_pk = head.pk;
-    let seq = next_seq(tx, timeline_pk).await?;
-    // Removal keeps the row as a tombstone so syncing clients observe it
-    // through the seq bump
-    let result = sqlx::query(
+    let candidates = sqlx::query_scalar::<_, i64>(
         r#"
-            UPDATE timeline_entry
-            SET
-                deleted_at = ?,
-                seq = ?
-            WHERE timeline_pk = ?
-              AND deleted_at IS NULL
-              AND entry_pk IN (
+            SELECT COUNT(*)
+            FROM timeline_entry AS ti
+            WHERE ti.timeline_pk = ?
+              AND ti.deleted_at IS NULL
+              AND ti.entry_pk IN (
                 SELECT e.pk
                 FROM entry AS e
                 INNER JOIN feed AS f
@@ -192,16 +209,54 @@ async fn apply_feed_unsubscribed(
               )
             "#,
     )
-    .bind(now)
-    .bind(seq)
     .bind(timeline_pk)
     .bind(subscription.feed_url.as_str())
+    .fetch_one(&mut **tx)
+    .await?;
+    if candidates == 0 {
+        return Ok(None);
+    }
+
+    // Removal keeps the row as a tombstone so syncing clients observe it
+    // through the seq bump. Every row gets its own seq: change pagination
+    // pages by seq alone, so rows sharing a seq would be lost at page
+    // boundaries
+    let base_seq = alloc_seq_range(tx, timeline_pk, candidates).await?;
+    sqlx::query(
+        r#"
+            UPDATE timeline_entry
+            SET
+                deleted_at = ?,
+                seq = ? + ranked.rn
+            FROM (
+                SELECT
+                    ti.entry_pk,
+                    ROW_NUMBER() OVER (ORDER BY ti.entry_pk) AS rn
+                FROM timeline_entry AS ti
+                WHERE ti.timeline_pk = ?
+                  AND ti.deleted_at IS NULL
+                  AND ti.entry_pk IN (
+                    SELECT e.pk
+                    FROM entry AS e
+                    INNER JOIN feed AS f
+                        ON f.pk = e.feed_pk
+                    INNER JOIN feed_endpoint AS fe
+                        ON fe.pk = f.feed_endpoint_pk
+                    WHERE fe.url = ?
+                  )
+            ) AS ranked
+            WHERE timeline_entry.timeline_pk = ?
+              AND timeline_entry.entry_pk = ranked.entry_pk
+            "#,
+    )
+    .bind(now)
+    .bind(base_seq)
+    .bind(timeline_pk)
+    .bind(subscription.feed_url.as_str())
+    .bind(timeline_pk)
     .execute(&mut **tx)
     .await?;
 
-    if result.rows_affected() == 0 {
-        return Ok(None);
-    }
     Ok(Some(timeline))
 }
 
@@ -371,18 +426,30 @@ struct TimelineHead {
 
 /// Takes the next change seq of one timeline.
 async fn next_seq(tx: &mut Transaction<'_, Sqlite>, timeline_pk: i64) -> SqliteResult<i64> {
-    let seq = sqlx::query_scalar::<_, i64>(
+    Ok(alloc_seq_range(tx, timeline_pk, 1).await? + 1)
+}
+
+/// Allocates `count` change seqs of one timeline in one contiguous range.
+/// The allocated seqs are `base + 1 ..= base + count` where `base` is the
+/// returned value.
+async fn alloc_seq_range(
+    tx: &mut Transaction<'_, Sqlite>,
+    timeline_pk: i64,
+    count: i64,
+) -> SqliteResult<i64> {
+    let last_seq = sqlx::query_scalar::<_, i64>(
         r#"
             UPDATE timeline
-            SET last_seq = last_seq + 1
+            SET last_seq = last_seq + ?
             WHERE pk = ?
             RETURNING last_seq
             "#,
     )
+    .bind(count)
     .bind(timeline_pk)
     .fetch_one(&mut **tx)
     .await?;
-    Ok(seq)
+    Ok(last_seq - count)
 }
 
 async fn catchup_subscribed_feeds_for_feed(

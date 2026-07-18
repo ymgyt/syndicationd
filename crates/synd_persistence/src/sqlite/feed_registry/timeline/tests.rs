@@ -267,3 +267,85 @@ async fn timeline_projection_coalesces_entry_invalidations_by_feed() -> anyhow::
     assert_eq!(event.affected_feeds, vec![subscription.feed_url]);
     Ok(())
 }
+
+#[tokio::test]
+async fn timeline_changes_paginate_batch_without_loss() -> anyhow::Result<()> {
+    let db = migrated_db().await?;
+    let subscription = subscription("timeline-changes-paging");
+
+    let crawl = record_fetched_crawl(
+        &db,
+        &subscription.feed_url,
+        rss_body_with_entries(
+            "timeline feed",
+            &[("one", "entry-1"), ("two", "entry-2"), ("three", "entry-3")],
+        ),
+        0,
+    )
+    .await?;
+    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+    let _ = project_feed(&db, crawl).await?;
+    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    store_subscription_in_db(&db, subscription.clone()).await?;
+
+    // Subscribe catches up 3 entries in one batch. Paging with limit 2 must
+    // deliver all of them: rows sharing a seq would lose the tail
+    let _ = project_timeline(
+        &db,
+        timeline_feed_subscribed(feed_subscribed_event(&subscription)),
+    )
+    .await?;
+
+    let changes_query = |since: i64| TimelineChangesQuery {
+        subscriber_id: subscription.subscriber_id.clone(),
+        since,
+        limit: 2,
+    };
+    let mut tx = db.begin().await?;
+    let first = tx.list_timeline_changes(changes_query(0)).await?;
+    let second = tx.list_timeline_changes(changes_query(first.seq)).await?;
+    tx.commit().await?;
+
+    assert_eq!(first.changes.len(), 2);
+    assert!(first.has_more);
+    assert_eq!(second.changes.len(), 1);
+    assert!(!second.has_more);
+    let upserted = first
+        .changes
+        .iter()
+        .chain(second.changes.iter())
+        .map(|change| match change {
+            TimelineChange::Upsert(node) => node.cursor.entry_id().as_str().to_owned(),
+            TimelineChange::Remove { .. } => panic!("expected upsert"),
+        })
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(upserted.len(), 3);
+
+    // Unsubscribe tombstones the same 3 rows in one batch
+    let _ = project_timeline(
+        &db,
+        timeline_feed_unsubscribed(FeedUnsubscribedEvent::new(subscription_key(&subscription))),
+    )
+    .await?;
+
+    let mut tx = db.begin().await?;
+    let third = tx.list_timeline_changes(changes_query(second.seq)).await?;
+    let fourth = tx.list_timeline_changes(changes_query(third.seq)).await?;
+    tx.commit().await?;
+
+    assert_eq!(third.changes.len(), 2);
+    assert!(third.has_more);
+    assert_eq!(fourth.changes.len(), 1);
+    assert!(!fourth.has_more);
+    let removed = third
+        .changes
+        .iter()
+        .chain(fourth.changes.iter())
+        .map(|change| match change {
+            TimelineChange::Remove { entry_id } => entry_id.as_str().to_owned(),
+            TimelineChange::Upsert(_) => panic!("expected remove"),
+        })
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(removed.len(), 3);
+    Ok(())
+}

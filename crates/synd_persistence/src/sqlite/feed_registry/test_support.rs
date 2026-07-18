@@ -30,7 +30,10 @@ pub(crate) use synd_registry::{
         TimelineChangedEvent,
     },
     feed::FeedProj,
-    query::{SubscriptionsQuery, TimelineEntriesPage, TimelineEntriesQuery},
+    query::{
+        SubscriptionsQuery, TimelineChange, TimelineChangesQuery, TimelineEntriesPage,
+        TimelineEntriesQuery,
+    },
     timeline::{TimelineProj, TimelineProjInput},
 };
 pub(crate) use synd_support::time::Clock;
@@ -427,6 +430,25 @@ pub(crate) fn rss_body_with_entry(
     entry_title: &str,
     entry_guid: &str,
 ) -> Vec<u8> {
+    rss_body_with_entries(feed_title, &[(entry_title, entry_guid)])
+}
+
+pub(crate) fn rss_body_with_entries(feed_title: &str, entries: &[(&str, &str)]) -> Vec<u8> {
+    use std::fmt::Write;
+    let items = entries
+        .iter()
+        .fold(String::new(), |mut items, (entry_title, entry_guid)| {
+            let _ = write!(
+                items,
+                r#"    <item>
+      <title>{entry_title}</title>
+      <link>https://example.com/entry/{entry_guid}</link>
+      <guid>{entry_guid}</guid>
+    </item>
+"#
+            );
+            items
+        });
     format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0">
@@ -434,12 +456,7 @@ pub(crate) fn rss_body_with_entry(
     <title>{feed_title}</title>
     <link>https://example.com/</link>
     <description>example feed</description>
-    <item>
-      <title>{entry_title}</title>
-      <link>https://example.com/entry/1</link>
-      <guid>{entry_guid}</guid>
-    </item>
-  </channel>
+{items}  </channel>
 </rss>"#
     )
     .into_bytes()
