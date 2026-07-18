@@ -31,11 +31,6 @@ impl EntriesWidget {
         }
     }
 
-    /// Return entries count
-    pub(crate) fn count(&self) -> usize {
-        self.entries.len()
-    }
-
     pub(crate) fn loaded_count(&self) -> usize {
         self.entries.unfiltered_len()
     }

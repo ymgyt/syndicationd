@@ -155,7 +155,7 @@ impl AppComponent {
             FeedsApiEvent::SubscriptionFetched {
                 populate,
                 subscription,
-            } => self.apply_subscription_fetched(populate, subscription, entries_first),
+            } => self.apply_subscription_fetched(populate, subscription),
             FeedsApiEvent::EntriesFetched { populate, payload } => self.apply_entries_fetched(
                 request_seq,
                 populate,
@@ -170,13 +170,7 @@ impl AppComponent {
         &mut self,
         populate: Populate,
         subscription: payload::SubscriptionPayload,
-        entries_first: i64,
     ) -> Vec<Operation> {
-        let has_snapshot = subscription
-            .feeds
-            .nodes
-            .iter()
-            .any(|feed| feed.feed.is_some());
         let mut operations = Vec::new();
 
         if subscription.feeds.page_info.has_next_page {
@@ -189,13 +183,6 @@ impl AppComponent {
         self.feeds
             .subscription
             .update_subscription(populate, subscription);
-        if populate == Populate::Replace && self.feeds.entries.count() == 0 && has_snapshot {
-            operations.push(Operation::FetchEntries {
-                populate: Populate::Replace,
-                after: None,
-                first: entries_first,
-            });
-        }
 
         operations
     }
