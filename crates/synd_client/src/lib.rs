@@ -1060,8 +1060,8 @@ query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
 
 const SUBSCRIPTION_QUERY: &str = r"
 query Subscription($after: String, $first: Int) {
-  output: subscription {
-    feeds(after: $after, first: $first) {
+  output: feedRegistry {
+    feeds: subscriptions(after: $after, first: $first) {
       nodes {
         url
         requirement

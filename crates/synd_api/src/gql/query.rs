@@ -95,20 +95,6 @@ impl From<RegistrySubscription> for SubscribedFeed {
     }
 }
 
-struct Subscription;
-
-#[Object]
-impl Subscription {
-    async fn feeds(
-        &self,
-        cx: &Context<'_>,
-        after: Option<String>,
-        #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, SubscribedFeed>> {
-        subscriptions_connection(cx, after, first).await
-    }
-}
-
 struct FeedRegistry;
 
 #[Object]
@@ -243,10 +229,6 @@ pub(crate) struct Query;
 impl Query {
     async fn feed_registry(&self) -> FeedRegistry {
         FeedRegistry
-    }
-
-    async fn subscription(&self) -> Subscription {
-        Subscription {}
     }
 }
 
