@@ -103,7 +103,6 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
     let page = registry
         .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: subscriber_id.clone(),
-            feed_url: None,
             after: None,
             first: 10,
         })

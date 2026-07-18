@@ -185,32 +185,6 @@ enum ClientTransport {
     },
 }
 
-#[derive(Debug, serde::Deserialize)]
-struct NullableEntriesResponseData {
-    output: Option<payload::EntriesOutput>,
-}
-
-fn fetch_entries_payload_from_response(
-    response: Response<NullableEntriesResponseData>,
-) -> Result<payload::FetchEntriesPayload, SyndApiError> {
-    let errors = response.errors.unwrap_or_default();
-    match response.data.and_then(|data| data.output) {
-        Some(output) => {
-            if !errors.is_empty() {
-                warn!(
-                    errors = ?errors,
-                    "entries query returned partial GraphQL errors"
-                );
-            }
-            Ok(output.into())
-        }
-        None if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
-        None => Err(SyndApiError::UnexpectedResponse {
-            context: "response does not contain data and errors",
-        }),
-    }
-}
-
 impl Client {
     const GRAPHQL: &'static str = "/graphql";
     const HEALTH_CHECK: &'static str = "/health";
@@ -525,57 +499,6 @@ impl Client {
             .request(&graphql(FEED_STATUS_QUERY, Variables { url }))
             .await?;
         Ok(response.output.feed_status)
-    }
-
-    #[instrument(skip(self))]
-    pub async fn fetch_entries(
-        &self,
-        after: Option<String>,
-        first: i64,
-    ) -> Result<payload::FetchEntriesPayload, SyndApiError> {
-        debug!("Fetch entries...");
-
-        #[derive(Serialize, Debug)]
-        struct Variables {
-            after: Option<String>,
-            first: i64,
-        }
-
-        let response: Response<NullableEntriesResponseData> = self
-            .execute_graphql(&graphql(ENTRIES_QUERY, Variables { after, first }))
-            .await?;
-
-        debug!("Got response");
-
-        fetch_entries_payload_from_response(response)
-    }
-
-    #[instrument(skip(self))]
-    pub async fn fetch_feed_entries(
-        &self,
-        url: FeedUrl,
-        after: Option<String>,
-        first: i64,
-    ) -> Result<payload::FetchEntriesPayload, SyndApiError> {
-        debug!("Fetch feed entries...");
-
-        #[derive(Serialize, Debug)]
-        struct Variables {
-            url: FeedUrl,
-            after: Option<String>,
-            first: i64,
-        }
-
-        let response: Response<NullableEntriesResponseData> = self
-            .execute_graphql(&graphql(
-                FEED_ENTRIES_QUERY,
-                Variables { url, after, first },
-            ))
-            .await?;
-
-        debug!("Got response");
-
-        fetch_entries_payload_from_response(response)
     }
 
     #[instrument(skip_all, err(Display))]
@@ -1041,10 +964,7 @@ where
 mod tests {
     use core::assert_matches;
 
-    use super::{
-        ApiCredential, Client, ClientOptions, NullableEntriesResponseData, SyndApiError,
-        fetch_entries_payload_from_response, header,
-    };
+    use super::{ApiCredential, Client, ClientOptions, SyndApiError, header};
 
     #[test]
     fn tcp_client_requires_credential_before_authorized_request() {
@@ -1092,24 +1012,6 @@ mod tests {
             .unwrap();
 
         assert!(!headers.contains_key(header::AUTHORIZATION));
-    }
-
-    #[test]
-    fn entries_response_with_graphql_errors_returns_graphql_error() {
-        let response = graphql_client::Response::<NullableEntriesResponseData> {
-            data: Some(NullableEntriesResponseData { output: None }),
-            errors: Some(vec![graphql_client::Error {
-                message: "timeline entries are not implemented".to_owned(),
-                locations: None,
-                path: None,
-                extensions: None,
-            }]),
-            extensions: None,
-        };
-
-        let err = fetch_entries_payload_from_response(response).unwrap_err();
-
-        assert_matches!(err, SyndApiError::Graphql { .. });
     }
 
     fn options() -> ClientOptions {
@@ -1326,60 +1228,6 @@ query TimelineEntries($after: String, $first: Int!) {
           endCursor
         }
         seq
-      }
-    }
-  }
-}
-";
-
-const ENTRIES_QUERY: &str = r"
-query Entries($after: String, $first: Int!) {
-  output: subscription {
-    entries(after: $after, first: $first) {
-      nodes {
-        id
-        title
-        published
-        updated
-        summary
-        websiteUrl
-        feed {
-          title
-          url
-          requirement
-          category
-        }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }
-}
-";
-
-const FEED_ENTRIES_QUERY: &str = r"
-query FeedEntries($url: FeedUrl!, $after: String, $first: Int!) {
-  output: subscription {
-    entries(url: $url, after: $after, first: $first) {
-      nodes {
-        id
-        title
-        published
-        updated
-        summary
-        websiteUrl
-        feed {
-          title
-          url
-          requirement
-          category
-        }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
       }
     }
   }

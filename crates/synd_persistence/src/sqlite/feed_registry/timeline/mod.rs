@@ -224,11 +224,6 @@ async fn list_entries(
     sql.push(" WHERE ti.timeline_pk = ");
     sql.push_bind(head.pk);
     sql.push(" AND ti.deleted_at IS NULL");
-    if let Some(feed_url) = query.feed_url.as_ref() {
-        sql.push(" AND fe.url = ");
-        sql.push_bind(feed_url.as_str());
-    }
-
     if let Some(after) = query.after.as_ref() {
         sql.push(" AND (ti.order_time, ti.entry_id) < (");
         sql.push_bind(after.order_time());

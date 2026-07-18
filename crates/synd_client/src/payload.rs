@@ -1,21 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use synd_feed::types::{Category, EntryId, FeedType, FeedUrl, Requirement, Time};
 
-#[derive(Debug, Clone)]
-pub struct FetchEntriesPayload {
-    pub entries: Vec<Entry>,
-    pub page_info: PageInfo,
-}
-
-impl From<EntriesOutput> for FetchEntriesPayload {
-    fn from(v: EntriesOutput) -> Self {
-        let page_info = v.entries.page_info;
-        let entries = v.entries.nodes;
-
-        Self { entries, page_info }
-    }
-}
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct InitialFeedViewPayload {
     #[serde(default)]
@@ -120,23 +105,6 @@ pub enum TimelineChange {
     /// Remove the entry identified by `entry_id`
     #[serde(rename = "TimelineChangeRemove", rename_all = "camelCase")]
     Remove { entry_id: EntryId },
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EntriesResponseData {
-    pub output: EntriesOutput,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct EntriesOutput {
-    pub entries: EntryConnection,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EntryConnection {
-    pub nodes: Vec<Entry>,
-    pub page_info: PageInfo,
 }
 
 #[derive(Debug, Clone, Deserialize)]

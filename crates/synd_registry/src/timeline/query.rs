@@ -2,7 +2,7 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Annotated, EntryId, FeedMeta, FeedUrl};
+use synd_feed::types::{Annotated, EntryId, FeedMeta};
 use thiserror::Error;
 
 use crate::{
@@ -14,7 +14,6 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct TimelineEntriesQuery {
     pub subscriber_id: SubscriberId,
-    pub feed_url: Option<FeedUrl>,
     pub after: Option<TimelineEntryCursor>,
     pub first: usize,
 }

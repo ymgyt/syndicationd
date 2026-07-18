@@ -133,30 +133,6 @@ impl Subscription {
         subscriptions_connection(cx, after, first).await
     }
 
-    /// Legacy entries surface kept for older clients; new clients read
-    /// `feedRegistry.timeline`
-    async fn entries(
-        &self,
-        cx: &Context<'_>,
-        url: Option<FeedUrl>,
-        after: Option<String>,
-        #[graphql(default = 20)] first: Option<i32>,
-    ) -> Result<Connection<String, Entry, TimelineEntriesFields>> {
-        let page = timeline_entries_page(cx, url, after, first).await?;
-
-        let mut connection = Connection::with_additional_fields(
-            false,
-            page.has_next_page,
-            TimelineEntriesFields { seq: page.seq },
-        );
-        connection.edges.extend(page.nodes.into_iter().map(|node| {
-            let cursor = node.cursor.encode();
-            Edge::new(cursor, Entry::from_timeline_entry(node))
-        }));
-
-        Ok(connection)
-    }
-
     #[expect(clippy::unused_async)]
     async fn feed_status(&self, cx: &Context<'_>, url: FeedUrl) -> Result<RefreshStatus> {
         let _ = (cx, url);
@@ -191,11 +167,10 @@ impl Timeline {
     async fn entries(
         &self,
         cx: &Context<'_>,
-        url: Option<FeedUrl>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, TimelineEntry, TimelineEntriesFields>> {
-        let page = timeline_entries_page(cx, url, after, first).await?;
+        let page = timeline_entries_page(cx, after, first).await?;
 
         let mut connection = Connection::with_additional_fields(
             false,
@@ -336,7 +311,6 @@ async fn subscriptions_connection(
 
 async fn timeline_entries_page(
     cx: &Context<'_>,
-    feed_url: Option<FeedUrl>,
     after: Option<String>,
     first: Option<i32>,
 ) -> Result<TimelineEntriesPage> {
@@ -349,7 +323,6 @@ async fn timeline_entries_page(
     let page = registry(cx)
         .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: subscriber_id(cx),
-            feed_url,
             after,
             first,
         })
