@@ -8,7 +8,6 @@ use tokio::sync::mpsc;
 use super::FeedApi;
 
 pub enum MockFeedApiResponse {
-    InitialFeedView(Result<payload::InitialFeedViewPayload, SyndApiError>),
     Subscription(Result<payload::SubscriptionPayload, SyndApiError>),
     SubscribeFeed(Result<payload::SubscribeFeedPayload, SyndApiError>),
     UnsubscribeFeed(Result<(), SyndApiError>),
@@ -65,21 +64,6 @@ impl MockFeedApi {
 impl FeedApi for MockFeedApi {
     fn set_credential(&self, _credential: ApiCredential) -> Result<(), SyndApiError> {
         Ok(())
-    }
-
-    fn fetch_initial_feed_view(
-        &self,
-        _subscriptions_first: i64,
-        _timeline_first: i64,
-    ) -> BoxFuture<'static, Result<payload::InitialFeedViewPayload, SyndApiError>> {
-        let result = match self
-            .pop_response(|response| matches!(response, MockFeedApiResponse::InitialFeedView(_)))
-        {
-            Ok(MockFeedApiResponse::InitialFeedView(result)) => result,
-            Ok(_) => Err(Self::mismatch()),
-            Err(err) => Err(err),
-        };
-        future::ready(result).boxed()
     }
 
     fn fetch_subscription(

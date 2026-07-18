@@ -54,35 +54,6 @@ impl FeedDriver {
         runtime.push_job(fut);
     }
 
-    /// Returns the `EntryFetchStarted` event for the started request.
-    pub(super) fn fetch_initial_feed_view(
-        &self,
-        runtime: &mut DriverRuntime,
-        subscriptions_first: i64,
-        timeline_first: i64,
-    ) -> Event {
-        let api = self.api.clone();
-        let request_seq = runtime.request_started(RequestId::FetchSubscription);
-        let fut = async move {
-            match api
-                .fetch_initial_feed_view(subscriptions_first, timeline_first)
-                .await
-            {
-                Ok(payload) => Ok(Event::Api {
-                    request_seq,
-                    event: ApiEvent::Feeds(FeedsApiEvent::InitialFeedViewFetched { payload }),
-                }),
-                Err(err) => Ok(Event::synd_api_error(err, request_seq)),
-            }
-        }
-        .boxed();
-        runtime.push_job(fut);
-        Event::EntryFetchStarted {
-            request_seq,
-            populate: Populate::Replace,
-        }
-    }
-
     pub(super) fn fetch_subscription(
         &self,
         runtime: &mut DriverRuntime,

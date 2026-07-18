@@ -163,14 +163,6 @@ impl AppComponent {
                 entries_first,
                 entries_limit,
             ),
-            FeedsApiEvent::InitialFeedViewFetched { payload } => self
-                .apply_initial_feed_view_fetched(
-                    request_seq,
-                    payload,
-                    feeds_first,
-                    entries_first,
-                    entries_limit,
-                ),
         }
     }
 
@@ -279,66 +271,6 @@ impl AppComponent {
             self.feeds.entries.entries(),
         );
         Vec::new()
-    }
-
-    fn apply_initial_feed_view_fetched(
-        &mut self,
-        request_seq: RequestSequence,
-        payload: payload::InitialFeedViewPayload,
-        feeds_first: i64,
-        entries_first: i64,
-        entries_limit: usize,
-    ) -> Vec<Operation> {
-        let (subscription, timeline) = payload.into_parts();
-        let mut operations = Vec::new();
-
-        if let Some(subscription) = subscription {
-            if subscription.feeds.page_info.has_next_page {
-                operations.push(Operation::FetchSubscription {
-                    populate: Populate::Append,
-                    after: subscription.feeds.page_info.end_cursor.clone(),
-                    first: subscription.feeds.nodes.len().try_into().unwrap_or(0),
-                });
-            }
-            self.feeds
-                .subscription
-                .update_subscription(Populate::Replace, subscription);
-        } else {
-            operations.push(Operation::FetchSubscription {
-                populate: Populate::Replace,
-                after: None,
-                first: feeds_first,
-            });
-        }
-
-        let accept_timeline = self.feeds.accept_entry_response(request_seq);
-        if let Some(timeline) = timeline.filter(|_| accept_timeline) {
-            let next_first = next_entries_first(entries_limit, entries_first, timeline.nodes.len());
-            if timeline.page_info.has_next_page && next_first > 0 {
-                operations.push(Operation::FetchEntries {
-                    populate: Populate::Append,
-                    after: timeline.page_info.end_cursor.clone(),
-                    first: next_first,
-                });
-            }
-            self.shell.filter.update_categories(
-                &self.shell.categories,
-                Populate::Replace,
-                timeline.nodes.iter().map(|entry| &entry.entry),
-            );
-            self.feeds.set_timeline_seq(timeline.seq);
-            self.feeds
-                .entries
-                .update_entries_with_limit(Populate::Replace, timeline, entries_limit);
-        } else if accept_timeline {
-            operations.push(Operation::FetchEntries {
-                populate: Populate::Replace,
-                after: None,
-                first: entries_first,
-            });
-        }
-
-        operations
     }
 
     pub(in crate::application) fn apply_github_api_event(

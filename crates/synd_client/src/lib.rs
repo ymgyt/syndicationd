@@ -35,8 +35,8 @@ use tracing::{debug, instrument, warn};
 use url::Url;
 
 use crate::payload::{
-    FeedEvent, InitialFeedViewPayload, SubscribeFeedInput, SubscribeFeedPayload,
-    SubscriptionPayload, UnsubscribeFeedPayload,
+    FeedEvent, SubscribeFeedInput, SubscribeFeedPayload, SubscriptionPayload,
+    UnsubscribeFeedPayload,
 };
 
 mod scalar;
@@ -241,51 +241,6 @@ impl Client {
         self.set_credential(ApiCredential::LocalBearer {
             token: token.to_owned(),
         })
-    }
-
-    #[instrument(skip(self))]
-    pub async fn fetch_initial_feed_view(
-        &self,
-        subscriptions_first: i64,
-        timeline_first: i64,
-    ) -> Result<InitialFeedViewPayload, SyndApiError> {
-        #[derive(Serialize, Debug)]
-        #[serde(rename_all = "camelCase")]
-        struct Variables {
-            subscriptions_first: i64,
-            timeline_first: i64,
-        }
-        #[derive(Debug, serde::Deserialize)]
-        struct ResponseData {
-            output: InitialFeedViewPayload,
-        }
-
-        let response: Response<ResponseData> = self
-            .execute_graphql(&graphql(
-                INITIAL_FEED_VIEW_QUERY,
-                Variables {
-                    subscriptions_first,
-                    timeline_first,
-                },
-            ))
-            .await?;
-
-        let errors = response.errors.unwrap_or_default();
-        match response.data {
-            Some(data) => {
-                if !errors.is_empty() {
-                    warn!(
-                        errors = ?errors,
-                        "initial feed view query returned partial GraphQL errors"
-                    );
-                }
-                Ok(data.output)
-            }
-            None if !errors.is_empty() => Err(SyndApiError::Graphql { errors }),
-            None => Err(SyndApiError::UnexpectedResponse {
-                context: "response does not contain data and errors",
-            }),
-        }
     }
 
     #[instrument(skip(self))]
@@ -980,83 +935,6 @@ mod tests {
         ClientOptions::new(std::time::Duration::from_secs(1), "synd-client-test")
     }
 }
-
-const INITIAL_FEED_VIEW_QUERY: &str = r"
-query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
-  output: feedRegistry {
-    subscriptions(first: $subscriptionsFirst) {
-      nodes {
-        url
-        requirement
-        category
-        crawlPolicy {
-          polling {
-            kind
-            intervalSeconds
-          }
-        }
-        feed {
-          type
-          title
-          updated
-          websiteUrl
-          description
-          generator
-          entries(first: 10) {
-            nodes {
-              title
-              published
-              updated
-              summary
-            }
-          }
-          links {
-            nodes {
-              href
-              rel
-              mediaType
-              title
-            }
-          }
-          authors {
-            nodes
-          }
-        }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-    timeline {
-      entries(first: $timelineFirst) {
-        nodes {
-          orderTime
-          entry {
-            id
-            title
-            published
-            updated
-            summary
-            websiteUrl
-            feed {
-              title
-              url
-              requirement
-              category
-            }
-          }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        seq
-      }
-    }
-  }
-}
-";
 
 const SUBSCRIPTION_QUERY: &str = r"
 query Subscription($after: String, $first: Int) {

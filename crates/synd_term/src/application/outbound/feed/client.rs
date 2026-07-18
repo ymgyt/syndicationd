@@ -35,20 +35,6 @@ impl FeedApi for ClientFeedApi {
             .set_credential(credential)
     }
 
-    fn fetch_initial_feed_view(
-        &self,
-        subscriptions_first: i64,
-        timeline_first: i64,
-    ) -> BoxFuture<'static, Result<payload::InitialFeedViewPayload, SyndApiError>> {
-        let client = self.client();
-        async move {
-            client
-                .fetch_initial_feed_view(subscriptions_first, timeline_first)
-                .await
-        }
-        .boxed()
-    }
-
     fn fetch_subscription(
         &self,
         after: Option<String>,

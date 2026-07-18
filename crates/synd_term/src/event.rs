@@ -48,9 +48,6 @@ pub(crate) enum FeedsApiEvent {
         changes: Vec<payload::TimelineChange>,
         seq: i64,
     },
-    InitialFeedViewFetched {
-        payload: payload::InitialFeedViewPayload,
-    },
 }
 
 #[derive(Debug, Clone)]

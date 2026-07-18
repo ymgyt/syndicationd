@@ -222,9 +222,15 @@ impl Application {
     fn initial_fetch(&mut self) {
         info!("Initial fetch");
         self.perform_operation(Operation::StartFeedEventSubscription);
-        self.perform_operation(Operation::FetchInitialFeedView {
-            subscriptions_first: self.config.feeds_per_pagination,
-            timeline_first: self.next_entries_first(0),
+        self.perform_operation(Operation::FetchSubscription {
+            populate: Populate::Replace,
+            after: None,
+            first: self.config.feeds_per_pagination,
+        });
+        self.perform_operation(Operation::FetchEntries {
+            populate: Populate::Replace,
+            after: None,
+            first: self.next_entries_first(0),
         });
         if self.config.features.enable_github_notification
             && let Some(operation) = self.components.github.fetch_next_notifications_if_needed()

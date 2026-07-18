@@ -37,10 +37,6 @@ pub(crate) enum Operation {
         after: Option<String>,
         first: i64,
     },
-    FetchInitialFeedView {
-        subscriptions_first: i64,
-        timeline_first: i64,
-    },
     /// Fetch timeline changes after `since` and apply them
     SyncTimeline {
         since: i64,

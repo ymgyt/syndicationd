@@ -62,10 +62,10 @@ mod established_session {
 }
 
 fn start_app() -> (TempDir, Application) {
-    let payload = initial_feed_view();
     let api = MockFeedApi::new([
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
-        MockFeedApiResponse::InitialFeedView(Ok(payload)),
+        MockFeedApiResponse::Subscription(Ok(subscription())),
+        MockFeedApiResponse::TimelineEntries(Ok(timeline_entries())),
     ]);
     let (cache_dir, mut app) = app(api);
 
@@ -90,9 +90,9 @@ fn app(feed_api: MockFeedApi) -> (TempDir, Application) {
     (cache_dir, app)
 }
 
-fn initial_feed_view() -> payload::InitialFeedViewPayload {
+fn subscription() -> payload::SubscriptionPayload {
     serde_json::from_value(json!({
-        "subscriptions": {
+        "feeds": {
             "nodes": [{
                 "url": "https://example.com/feed.xml",
                 "requirement": "SHOULD",
@@ -103,7 +103,6 @@ fn initial_feed_view() -> payload::InitialFeedViewPayload {
                         "intervalSeconds": 3600
                     }
                 },
-                "refreshStatus": null,
                 "feed": {
                     "type": "RSS2",
                     "title": "Engineering Notes",
@@ -130,52 +129,54 @@ fn initial_feed_view() -> payload::InitialFeedViewPayload {
                 "hasNextPage": false,
                 "endCursor": null
             }
-        },
-        "timeline": {
-            "entries": {
-                "nodes": [
-                    {
-                        "orderTime": "2026-06-02T00:00:00Z",
-                        "entry": {
-                            "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000001",
-                            "title": "Rust feed architecture",
-                            "published": null,
-                            "updated": null,
-                            "websiteUrl": "https://example.com/rust-feed-architecture",
-                            "summary": "A note about feed architecture.",
-                            "feed": {
-                                "title": "Engineering Notes",
-                                "url": "https://example.com/feed.xml",
-                                "requirement": "SHOULD",
-                                "category": "rust"
-                            }
-                        }
-                    },
-                    {
-                        "orderTime": "2026-06-01T00:00:00Z",
-                        "entry": {
-                            "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000002",
-                            "title": "Async GraphQL testing",
-                            "published": null,
-                            "updated": null,
-                            "websiteUrl": "https://example.com/async-graphql-testing",
-                            "summary": "A note about testing async GraphQL code.",
-                            "feed": {
-                                "title": "Engineering Notes",
-                                "url": "https://example.com/feed.xml",
-                                "requirement": "SHOULD",
-                                "category": "rust"
-                            }
-                        }
-                    }
-                ],
-                "pageInfo": {
-                    "hasNextPage": false,
-                    "endCursor": null
-                },
-                "seq": 2
-            }
         }
     }))
-    .expect("initial feed view fixture")
+    .expect("subscription fixture")
+}
+
+fn timeline_entries() -> payload::TimelineEntryConnection {
+    serde_json::from_value(json!({
+        "nodes": [
+            {
+                "orderTime": "2026-06-02T00:00:00Z",
+                "entry": {
+                    "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000001",
+                    "title": "Rust feed architecture",
+                    "published": null,
+                    "updated": null,
+                    "websiteUrl": "https://example.com/rust-feed-architecture",
+                    "summary": "A note about feed architecture.",
+                    "feed": {
+                        "title": "Engineering Notes",
+                        "url": "https://example.com/feed.xml",
+                        "requirement": "SHOULD",
+                        "category": "rust"
+                    }
+                }
+            },
+            {
+                "orderTime": "2026-06-01T00:00:00Z",
+                "entry": {
+                    "id": "synd:entry:v1:0000000000000000000000000000000000000000000000000000000000000002",
+                    "title": "Async GraphQL testing",
+                    "published": null,
+                    "updated": null,
+                    "websiteUrl": "https://example.com/async-graphql-testing",
+                    "summary": "A note about testing async GraphQL code.",
+                    "feed": {
+                        "title": "Engineering Notes",
+                        "url": "https://example.com/feed.xml",
+                        "requirement": "SHOULD",
+                        "category": "rust"
+                    }
+                }
+            }
+        ],
+        "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+        },
+        "seq": 2
+    }))
+    .expect("timeline entries fixture")
 }

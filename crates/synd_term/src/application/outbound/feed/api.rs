@@ -11,12 +11,6 @@ pub type FeedApiRef = Arc<dyn FeedApi>;
 pub trait FeedApi: Send + Sync + 'static {
     fn set_credential(&self, credential: ApiCredential) -> Result<(), SyndApiError>;
 
-    fn fetch_initial_feed_view(
-        &self,
-        subscriptions_first: i64,
-        timeline_first: i64,
-    ) -> BoxFuture<'static, Result<payload::InitialFeedViewPayload, SyndApiError>>;
-
     fn fetch_subscription(
         &self,
         after: Option<String>,

@@ -142,14 +142,6 @@ impl Drivers {
                 .fetch_entries(&mut self.runtime, populate, after, first)
                 .into_iter()
                 .collect(),
-            Operation::FetchInitialFeedView {
-                subscriptions_first,
-                timeline_first,
-            } => vec![self.feed.fetch_initial_feed_view(
-                &mut self.runtime,
-                subscriptions_first,
-                timeline_first,
-            )],
             Operation::SyncTimeline { since } => {
                 self.feed.sync_timeline(&mut self.runtime, since);
                 Vec::new()
