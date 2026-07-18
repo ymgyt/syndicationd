@@ -33,16 +33,6 @@ pub(crate) enum AuthApiEvent {
 #[derive(Debug, Clone)]
 pub(crate) enum FeedsApiEvent {
     FeedSubscribed,
-    FeedRefreshAccepted {
-        url: FeedUrl,
-        payload: payload::RefreshFeedPayload,
-    },
-    FeedRefreshStatusFetched {
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-        status: payload::RefreshStatus,
-    },
     FeedUnsubscribed {
         url: FeedUrl,
     },
@@ -126,10 +116,6 @@ pub(crate) enum Event {
     FeedEditionEditorClosed {
         input: String,
     },
-    FeedRefreshRequested {
-        request_seq: RequestSequence,
-        url: FeedUrl,
-    },
     EntryFetchStarted {
         request_seq: RequestSequence,
         populate: Populate,
@@ -141,23 +127,12 @@ pub(crate) enum Event {
     FeedViewReloadDebounced {
         feeds_first: i64,
     },
-    FeedRefreshPollElapsed {
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    },
     FeedViewSyncElapsed,
     TimelineSyncDebounced,
     Error {
         message: String,
     },
     SyndApiError {
-        error: Arc<SyndApiError>,
-        request_seq: RequestSequence,
-    },
-    FeedRefreshPollError {
-        url: FeedUrl,
-        request_id: String,
         error: Arc<SyndApiError>,
         request_seq: RequestSequence,
     },

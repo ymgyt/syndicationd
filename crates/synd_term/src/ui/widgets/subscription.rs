@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ops::ControlFlow};
+use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
@@ -10,12 +10,12 @@ use ratatui::{
         Tabs as RatatuiTabs, Widget,
     },
 };
-use synd_client::payload::{self, SubscriptionPayload};
+use synd_client::payload::SubscriptionPayload;
 use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::{Direction, Populate},
-    types::{self, EntryMeta, EntryMetaExt, Feed, RefreshStatusStateExt, RequirementExt, TimeExt},
+    types::{self, EntryMeta, EntryMetaExt, Feed, RequirementExt, TimeExt},
     ui::{
         self, Context,
         extension::RectExt,
@@ -73,16 +73,6 @@ impl SubscriptionWidget {
         self.feeds.selected()
     }
 
-    pub(crate) fn update_refresh_status(&mut self, url: &FeedUrl, status: &payload::RefreshStatus) {
-        self.feeds.with_mut(|feed| {
-            if &feed.url == url {
-                feed.refresh_status = Some(status.clone());
-                ControlFlow::Break(())
-            } else {
-                ControlFlow::Continue(())
-            }
-        });
-    }
 
     pub(crate) fn toggle_unsubscribe_popup(&mut self, show: bool) {
         if show {
@@ -211,7 +201,6 @@ impl SubscriptionWidget {
             Cell::from(format!("Feed {n}/{m}")),
             Cell::from("URL"),
             Cell::from("Description"),
-            Cell::from("Status"),
             Cell::from("Req"),
         ]);
 
@@ -220,7 +209,6 @@ impl SubscriptionWidget {
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(2),
-            Constraint::Length(9),
             Constraint::Length(4),
         ];
 
@@ -260,12 +248,6 @@ impl SubscriptionWidget {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
-                Cell::from(Span::from(
-                    feed_meta
-                        .refresh_status
-                        .as_ref()
-                        .map_or("", |status| status.state.label()),
-                )),
                 Cell::from(Line::from(vec![requirement, Span::from(" ")])),
             ])
         };
@@ -348,23 +330,6 @@ impl SubscriptionWidget {
                     Span::styled(" Req  ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::from(feed.requirement().to_string()),
                 ])),
-            ]),
-            Row::new([
-                Cell::new(Span::styled(
-                    "󰑓 Refresh",
-                    Style::default().add_modifier(Modifier::BOLD),
-                )),
-                Cell::new(Span::from(
-                    feed.refresh_status
-                        .as_ref()
-                        .map_or("", |status| status.state.label()),
-                )),
-                Cell::new(Span::from(
-                    feed.refresh_status
-                        .as_ref()
-                        .and_then(|status| status.last_error_message.as_deref())
-                        .unwrap_or(""),
-                )),
             ]),
         ];
 

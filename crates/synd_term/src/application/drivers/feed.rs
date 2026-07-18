@@ -38,60 +38,6 @@ impl FeedDriver {
         runtime.push_job(fut);
     }
 
-    /// Returns the `FeedRefreshRequested` event for the accepted request.
-    pub(super) fn refresh_feed(&self, runtime: &mut DriverRuntime, url: FeedUrl) -> Event {
-        let api = self.api.clone();
-        let request_seq = runtime.request_started(RequestId::RefreshFeed);
-        let event = Event::FeedRefreshRequested {
-            request_seq,
-            url: url.clone(),
-        };
-        let fut = async move {
-            match api.refresh_feed(url.clone()).await {
-                Ok(payload) => Ok(Event::Api {
-                    request_seq,
-                    event: ApiEvent::Feeds(FeedsApiEvent::FeedRefreshAccepted { url, payload }),
-                }),
-                Err(error) => Ok(Event::synd_api_error(error, request_seq)),
-            }
-        }
-        .boxed();
-        runtime.push_job(fut);
-        event
-    }
-
-    pub(super) fn fetch_feed_refresh_status(
-        &self,
-        runtime: &mut DriverRuntime,
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    ) {
-        let api = self.api.clone();
-        let request_seq = runtime.request_started(RequestId::FetchFeedStatus);
-        let fut = async move {
-            match api.fetch_feed_status(url.clone()).await {
-                Ok(status) => Ok(Event::Api {
-                    request_seq,
-                    event: ApiEvent::Feeds(FeedsApiEvent::FeedRefreshStatusFetched {
-                        url,
-                        request_id: request_id.clone(),
-                        remaining,
-                        status,
-                    }),
-                }),
-                Err(err) => Ok(Event::FeedRefreshPollError {
-                    url,
-                    request_id,
-                    error: Arc::new(err),
-                    request_seq,
-                }),
-            }
-        }
-        .boxed();
-        runtime.push_job(fut);
-    }
-
     pub(super) fn unsubscribe_feed(&self, runtime: &mut DriverRuntime, url: FeedUrl) {
         let api = self.api.clone();
         let request_seq = runtime.request_started(RequestId::UnsubscribeFeed);

@@ -15,7 +15,7 @@ use crate::{
     terminal::Terminal,
 };
 
-use super::{FEED_REFRESH_POLL_INTERVAL, FEED_VIEW_SYNC_INTERVAL, TIMELINE_INVALIDATION_DEBOUNCE};
+use super::{FEED_VIEW_SYNC_INTERVAL, TIMELINE_INVALIDATION_DEBOUNCE};
 
 mod auth;
 mod feed;
@@ -122,33 +122,6 @@ impl Drivers {
             ],
             Operation::SubscribeFeed { input } => {
                 self.feed.subscribe_feed(&mut self.runtime, input);
-                Vec::new()
-            }
-            Operation::RefreshFeed { url } => {
-                vec![self.feed.refresh_feed(&mut self.runtime, url)]
-            }
-            Operation::FetchFeedRefreshStatus {
-                url,
-                request_id,
-                remaining,
-            } => {
-                self.feed
-                    .fetch_feed_refresh_status(&mut self.runtime, url, request_id, remaining);
-                Vec::new()
-            }
-            Operation::ScheduleFeedRefreshPoll {
-                url,
-                request_id,
-                remaining,
-            } => {
-                self.runtime.schedule_event(
-                    FEED_REFRESH_POLL_INTERVAL,
-                    Event::FeedRefreshPollElapsed {
-                        url,
-                        request_id,
-                        remaining,
-                    },
-                );
                 Vec::new()
             }
             Operation::FetchSubscription {

@@ -120,27 +120,6 @@ enum UnsubscribeDisposition {
     Unsubscribed,
 }
 
-#[derive(InputObject)]
-struct RefreshFeedInput {
-    url: FeedUrl,
-}
-
-#[derive(SimpleObject)]
-struct RefreshFeedPayload {
-    status: ResponseStatus,
-    request_id: String,
-    disposition: RefreshDisposition,
-}
-
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
-enum RefreshDisposition {
-    Created,
-    Promoted,
-    CoalescedPending,
-    JoinedRunning,
-    AlreadyFresh,
-}
-
 pub(crate) struct Mutation;
 
 #[Object]
@@ -205,15 +184,4 @@ impl Mutation {
         })
     }
 
-    #[expect(clippy::unused_async)]
-    async fn refresh_feed(
-        &self,
-        cx: &Context<'_>,
-        input: RefreshFeedInput,
-    ) -> async_graphql::Result<RefreshFeedPayload> {
-        let _ = (cx, input);
-        Err(Error::new(
-            "refreshFeed is not implemented while crawl runtime is redesigned",
-        ))
-    }
 }

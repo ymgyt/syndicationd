@@ -19,25 +19,6 @@ use crate::gql::{
 };
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
-enum RefreshStatusState {
-    NeverRefreshed,
-    Idle,
-    Pending,
-    Running,
-    LastFailed,
-}
-
-#[derive(SimpleObject)]
-struct RefreshStatus {
-    state: RefreshStatusState,
-    request_id: Option<String>,
-    last_attempt_at: Option<crate::gql::scalar::Rfc3339Time>,
-    last_success_at: Option<crate::gql::scalar::Rfc3339Time>,
-    last_failure_at: Option<crate::gql::scalar::Rfc3339Time>,
-    last_error_message: Option<String>,
-}
-
-#[derive(Enum, Clone, Copy, PartialEq, Eq)]
 enum PollingPolicyKind {
     Manual,
     Interval,
@@ -80,7 +61,6 @@ impl From<RegistryCrawlPolicy> for CrawlPolicy {
 struct SubscribedFeed {
     subscription: RegistrySubscription,
     feed: Option<object::Feed>,
-    refresh_status: Option<RefreshStatus>,
 }
 
 #[Object]
@@ -101,10 +81,6 @@ impl SubscribedFeed {
         self.subscription.crawl_policy.into()
     }
 
-    async fn refresh_status(&self) -> Option<&RefreshStatus> {
-        self.refresh_status.as_ref()
-    }
-
     async fn feed(&self) -> Option<&object::Feed> {
         self.feed.as_ref()
     }
@@ -115,7 +91,6 @@ impl From<RegistrySubscription> for SubscribedFeed {
         Self {
             subscription,
             feed: None,
-            refresh_status: None,
         }
     }
 }
@@ -131,14 +106,6 @@ impl Subscription {
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, SubscribedFeed>> {
         subscriptions_connection(cx, after, first).await
-    }
-
-    #[expect(clippy::unused_async)]
-    async fn feed_status(&self, cx: &Context<'_>, url: FeedUrl) -> Result<RefreshStatus> {
-        let _ = (cx, url);
-        Err(async_graphql::Error::new(
-            "feedStatus is not implemented while crawl runtime is redesigned",
-        ))
     }
 }
 

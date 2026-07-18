@@ -61,23 +61,6 @@ impl PollingPolicyExt for payload::PollingPolicy {
     }
 }
 
-pub trait RefreshStatusStateExt {
-    fn label(&self) -> &str;
-}
-
-impl RefreshStatusStateExt for payload::RefreshStatusState {
-    fn label(&self) -> &str {
-        match self {
-            Self::NeverRefreshed => "Never",
-            Self::Idle => "Idle",
-            Self::Pending => "Pending",
-            Self::Running => "Running",
-            Self::LastFailed => "Failed",
-            Self::Other(_) => "Unknown",
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(fake::Dummy))]
 pub struct Feed {
@@ -92,7 +75,6 @@ pub struct Feed {
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
     pub crawl_policy: payload::CrawlPolicy,
-    pub refresh_status: Option<payload::RefreshStatus>,
     requirement: Option<Requirement>,
     category: Option<Category<'static>>,
 }
@@ -135,7 +117,6 @@ impl From<payload::SubscribedFeed> for Feed {
             requirement,
             category,
             crawl_policy,
-            refresh_status,
             feed: details,
         } = f;
         Self {
@@ -167,7 +148,6 @@ impl From<payload::SubscribedFeed> for Feed {
                 .map(|details| details.authors.nodes.clone())
                 .unwrap_or_default(),
             crawl_policy,
-            refresh_status,
             requirement,
             category,
         }

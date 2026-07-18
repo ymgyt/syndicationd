@@ -156,7 +156,6 @@ pub struct SubscribedFeed {
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     pub crawl_policy: CrawlPolicy,
-    pub refresh_status: Option<RefreshStatus>,
     pub feed: Option<FeedDetails>,
 }
 
@@ -195,94 +194,6 @@ impl<'de> Deserialize<'de> for PollingPolicyKind {
             _ => Self::Other(value),
         })
     }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub struct RefreshStatus {
-    pub state: RefreshStatusState,
-    pub request_id: Option<String>,
-    pub last_attempt_at: Option<String>,
-    pub last_success_at: Option<String>,
-    pub last_failure_at: Option<String>,
-    pub last_error_message: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub enum RefreshStatusState {
-    NeverRefreshed,
-    Idle,
-    Pending,
-    Running,
-    LastFailed,
-    Other(String),
-}
-
-impl RefreshStatusState {
-    pub fn is_active(&self) -> bool {
-        matches!(self, Self::Pending | Self::Running)
-    }
-}
-
-impl RefreshStatus {
-    pub fn is_active(&self) -> bool {
-        self.state.is_active()
-    }
-}
-
-impl From<&RefreshDisposition> for RefreshStatusState {
-    fn from(value: &RefreshDisposition) -> Self {
-        match value {
-            RefreshDisposition::JoinedRunning => Self::Running,
-            RefreshDisposition::Created
-            | RefreshDisposition::Promoted
-            | RefreshDisposition::CoalescedPending
-            | RefreshDisposition::Other(_) => Self::Pending,
-        }
-    }
-}
-
-impl From<&RefreshFeedPayload> for RefreshStatus {
-    fn from(value: &RefreshFeedPayload) -> Self {
-        Self {
-            state: RefreshStatusState::from(&value.disposition),
-            request_id: Some(value.request_id.clone()),
-            last_attempt_at: None,
-            last_success_at: None,
-            last_failure_at: None,
-            last_error_message: None,
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for RefreshStatusState {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "NEVER_REFRESHED" => Self::NeverRefreshed,
-            "IDLE" => Self::Idle,
-            "PENDING" => Self::Pending,
-            "RUNNING" => Self::Running,
-            "LAST_FAILED" => Self::LastFailed,
-            _ => Self::Other(value),
-        })
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeedStatusOutput {
-    pub feed_status: RefreshStatus,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct FeedStatusResponseData {
-    pub output: FeedStatusOutput,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -470,39 +381,6 @@ impl<'de> Deserialize<'de> for UnsubscribeDisposition {
         let value = String::deserialize(deserializer)?;
         Ok(match value.as_str() {
             "UNSUBSCRIBED" => Self::Unsubscribed,
-            _ => Self::Other(value),
-        })
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RefreshFeedPayload {
-    pub status: ResponseStatus,
-    pub request_id: String,
-    pub disposition: RefreshDisposition,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RefreshDisposition {
-    Created,
-    Promoted,
-    CoalescedPending,
-    JoinedRunning,
-    Other(String),
-}
-
-impl<'de> Deserialize<'de> for RefreshDisposition {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "CREATED" => Self::Created,
-            "PROMOTED" => Self::Promoted,
-            "COALESCED_PENDING" => Self::CoalescedPending,
-            "JOINED_RUNNING" => Self::JoinedRunning,
             _ => Self::Other(value),
         })
     }

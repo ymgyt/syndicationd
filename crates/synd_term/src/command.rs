@@ -37,7 +37,6 @@ pub(crate) enum FeedsCommand {
     MoveFeedUnsubscriptionPopupSelection(Direction),
     SelectFeedUnsubscriptionPopup,
     CancelFeedUnsubscriptionPopup,
-    RefreshSelectedFeed,
     ReloadSubscription,
     OpenFeed,
 
@@ -167,9 +166,6 @@ impl Command {
     }
     pub fn reload_subscription() -> Self {
         Command::Feeds(FeedsCommand::ReloadSubscription)
-    }
-    pub fn refresh_selected_feed() -> Self {
-        Command::Feeds(FeedsCommand::RefreshSelectedFeed)
     }
     pub fn open_feed() -> Self {
         Command::Feeds(FeedsCommand::OpenFeed)

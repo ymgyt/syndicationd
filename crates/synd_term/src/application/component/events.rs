@@ -9,7 +9,6 @@ use crate::{
     ui::widgets::filter::Filterer,
 };
 use synd_auth::device_flow::DeviceAuthorizationResponse;
-use synd_feed::types::FeedUrl;
 use url::Url;
 
 use super::{AppComponent, FeedsComponent};
@@ -91,18 +90,6 @@ impl AppComponent {
         self.feeds.mark_timeline_dirty().into_iter().collect()
     }
 
-    pub(in crate::application) fn apply_feed_refresh_poll_elapsed(
-        &mut self,
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    ) -> Vec<Operation> {
-        self.feeds
-            .refresh_poll_elapsed(url, request_id, remaining)
-            .into_iter()
-            .collect()
-    }
-
     pub(in crate::application) fn apply_entry_fetch_started(
         &mut self,
         request_seq: RequestSequence,
@@ -111,25 +98,8 @@ impl AppComponent {
         self.feeds.start_entry_fetch(request_seq, populate);
     }
 
-    pub(in crate::application) fn apply_feed_refresh_requested(
-        &mut self,
-        request_seq: RequestSequence,
-        url: FeedUrl,
-    ) {
-        self.feeds.track_refresh_request(request_seq, url);
-    }
-
     pub(in crate::application) fn apply_synd_api_error(&mut self, request_seq: RequestSequence) {
-        self.feeds.forget_refresh_request(request_seq);
         self.feeds.forget_entry_fetch(request_seq);
-    }
-
-    pub(in crate::application) fn apply_feed_refresh_poll_error(
-        &mut self,
-        url: FeedUrl,
-        request_id: String,
-    ) -> bool {
-        self.feeds.refresh_poll_failed(url, request_id)
     }
 
     #[must_use]
@@ -163,7 +133,6 @@ impl AppComponent {
         feeds_first: i64,
         entries_first: i64,
         entries_limit: usize,
-        refresh_poll_attempts: u16,
     ) -> Vec<Operation> {
         match event {
             // New entries arrive through the timeline change push once the
@@ -173,36 +142,6 @@ impl AppComponent {
             }
             FeedsApiEvent::TimelineChangesFetched { changes, seq } => {
                 self.apply_timeline_changes_fetched(changes, seq, entries_first, entries_limit)
-            }
-            FeedsApiEvent::FeedRefreshAccepted { url, payload } => {
-                let Some(operations) = self.feeds.feed_refresh_accepted(
-                    request_seq,
-                    url.clone(),
-                    payload,
-                    feeds_first,
-                    refresh_poll_attempts,
-                ) else {
-                    return Vec::new();
-                };
-                debug!(%url, "refresh request accepted");
-                operations
-            }
-            FeedsApiEvent::FeedRefreshStatusFetched {
-                url,
-                request_id,
-                remaining,
-                status,
-            } => {
-                let Some(operations) = self.feeds.refresh_status_fetched(
-                    url,
-                    request_id,
-                    remaining,
-                    status,
-                    feeds_first,
-                ) else {
-                    return Vec::new();
-                };
-                operations
             }
             FeedsApiEvent::FeedUnsubscribed { url } => {
                 self.feeds.feed_unsubscribed(&url);

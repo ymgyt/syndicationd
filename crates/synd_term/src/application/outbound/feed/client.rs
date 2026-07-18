@@ -71,22 +71,6 @@ impl FeedApi for ClientFeedApi {
         async move { client.unsubscribe_feed(url).await.map(|_| ()) }.boxed()
     }
 
-    fn refresh_feed(
-        &self,
-        url: FeedUrl,
-    ) -> BoxFuture<'static, Result<payload::RefreshFeedPayload, SyndApiError>> {
-        let client = self.client();
-        async move { client.refresh_feed(url).await }.boxed()
-    }
-
-    fn fetch_feed_status(
-        &self,
-        url: FeedUrl,
-    ) -> BoxFuture<'static, Result<payload::RefreshStatus, SyndApiError>> {
-        let client = self.client();
-        async move { client.fetch_feed_status(url).await }.boxed()
-    }
-
     fn fetch_timeline_entries(
         &self,
         after: Option<String>,

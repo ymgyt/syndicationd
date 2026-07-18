@@ -27,19 +27,6 @@ pub(crate) enum Operation {
     SubscribeFeed {
         input: payload::SubscribeFeedInput,
     },
-    RefreshFeed {
-        url: FeedUrl,
-    },
-    FetchFeedRefreshStatus {
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    },
-    ScheduleFeedRefreshPoll {
-        url: FeedUrl,
-        request_id: String,
-        remaining: u16,
-    },
     FetchSubscription {
         populate: Populate,
         after: Option<String>,

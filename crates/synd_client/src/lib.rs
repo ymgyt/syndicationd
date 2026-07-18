@@ -35,8 +35,8 @@ use tracing::{debug, instrument, warn};
 use url::Url;
 
 use crate::payload::{
-    FeedEvent, InitialFeedViewPayload, RefreshFeedPayload, RefreshStatus, SubscribeFeedInput,
-    SubscribeFeedPayload, SubscriptionPayload, UnsubscribeFeedPayload,
+    FeedEvent, InitialFeedViewPayload, SubscribeFeedInput, SubscribeFeedPayload,
+    SubscriptionPayload, UnsubscribeFeedPayload,
 };
 
 mod scalar;
@@ -461,44 +461,6 @@ impl Client {
             ))
             .await?;
         Ok(response.unsubscribe_feed)
-    }
-
-    pub async fn refresh_feed(&self, url: FeedUrl) -> Result<RefreshFeedPayload, SyndApiError> {
-        #[derive(Serialize, Debug)]
-        struct Variables {
-            input: RefreshFeedInput,
-        }
-        #[derive(Serialize, Debug)]
-        struct RefreshFeedInput {
-            url: FeedUrl,
-        }
-        #[derive(Debug, serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct ResponseData {
-            refresh_feed: RefreshFeedPayload,
-        }
-
-        let response: ResponseData = self
-            .request(&graphql(
-                REFRESH_FEED_MUTATION,
-                Variables {
-                    input: RefreshFeedInput { url },
-                },
-            ))
-            .await?;
-        Ok(response.refresh_feed)
-    }
-
-    pub async fn fetch_feed_status(&self, url: FeedUrl) -> Result<RefreshStatus, SyndApiError> {
-        #[derive(Serialize, Debug)]
-        struct Variables {
-            url: FeedUrl,
-        }
-
-        let response: payload::FeedStatusResponseData = self
-            .request(&graphql(FEED_STATUS_QUERY, Variables { url }))
-            .await?;
-        Ok(response.output.feed_status)
     }
 
     #[instrument(skip_all, err(Display))]
@@ -1033,14 +995,6 @@ query InitialFeedView($subscriptionsFirst: Int!, $timelineFirst: Int!) {
             intervalSeconds
           }
         }
-        refreshStatus {
-          state
-          requestId
-          lastAttemptAt
-          lastSuccessAt
-          lastFailureAt
-          lastErrorMessage
-        }
         feed {
           type
           title
@@ -1117,14 +1071,6 @@ query Subscription($after: String, $first: Int) {
             kind
             intervalSeconds
           }
-        }
-        refreshStatus {
-          state
-          requestId
-          lastAttemptAt
-          lastSuccessAt
-          lastFailureAt
-          lastErrorMessage
         }
         feed {
           type
@@ -1234,21 +1180,6 @@ query TimelineEntries($after: String, $first: Int!) {
 }
 ";
 
-const FEED_STATUS_QUERY: &str = r"
-query FeedStatus($url: FeedUrl!) {
-  output: subscription {
-    feedStatus(url: $url) {
-      state
-      requestId
-      lastAttemptAt
-      lastSuccessAt
-      lastFailureAt
-      lastErrorMessage
-    }
-  }
-}
-";
-
 const SUBSCRIBE_FEED_MUTATION: &str = r"
 mutation SubscribeFeed($input: SubscribeFeedInput!) {
   subscribeFeed(input: $input) {
@@ -1264,16 +1195,6 @@ mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
   unsubscribeFeed(input: $input) {
     status { code }
     url
-    disposition
-  }
-}
-";
-
-const REFRESH_FEED_MUTATION: &str = r"
-mutation RefreshFeed($input: RefreshFeedInput!) {
-  refreshFeed(input: $input) {
-    status { code }
-    requestId
     disposition
   }
 }

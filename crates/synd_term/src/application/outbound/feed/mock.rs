@@ -12,8 +12,6 @@ pub enum MockFeedApiResponse {
     Subscription(Result<payload::SubscriptionPayload, SyndApiError>),
     SubscribeFeed(Result<payload::SubscribeFeedPayload, SyndApiError>),
     UnsubscribeFeed(Result<(), SyndApiError>),
-    RefreshFeed(Result<payload::RefreshFeedPayload, SyndApiError>),
-    FeedStatus(Result<payload::RefreshStatus, SyndApiError>),
     TimelineEntries(Result<payload::TimelineEntryConnection, SyndApiError>),
     TimelineChanges(Result<payload::TimelineChangesPayload, SyndApiError>),
     FeedEvents(Result<Vec<payload::FeedEvent>, SyndApiError>),
@@ -118,34 +116,6 @@ impl FeedApi for MockFeedApi {
             .pop_response(|response| matches!(response, MockFeedApiResponse::UnsubscribeFeed(_)))
         {
             Ok(MockFeedApiResponse::UnsubscribeFeed(result)) => result,
-            Ok(_) => Err(Self::mismatch()),
-            Err(err) => Err(err),
-        };
-        future::ready(result).boxed()
-    }
-
-    fn refresh_feed(
-        &self,
-        _url: FeedUrl,
-    ) -> BoxFuture<'static, Result<payload::RefreshFeedPayload, SyndApiError>> {
-        let result = match self
-            .pop_response(|response| matches!(response, MockFeedApiResponse::RefreshFeed(_)))
-        {
-            Ok(MockFeedApiResponse::RefreshFeed(result)) => result,
-            Ok(_) => Err(Self::mismatch()),
-            Err(err) => Err(err),
-        };
-        future::ready(result).boxed()
-    }
-
-    fn fetch_feed_status(
-        &self,
-        _url: FeedUrl,
-    ) -> BoxFuture<'static, Result<payload::RefreshStatus, SyndApiError>> {
-        let result = match self
-            .pop_response(|response| matches!(response, MockFeedApiResponse::FeedStatus(_)))
-        {
-            Ok(MockFeedApiResponse::FeedStatus(result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
         };

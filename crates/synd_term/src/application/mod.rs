@@ -3,7 +3,6 @@ use std::{ops::ControlFlow, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
-use synd_feed::types::FeedUrl;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "integration")]
@@ -63,8 +62,6 @@ mod operations;
 use component::AppComponent;
 use drivers::{DriverParts, Drivers};
 
-const FEED_REFRESH_POLL_ATTEMPTS: u16 = 300;
-const FEED_REFRESH_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const FEED_VIEW_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const TIMELINE_INVALIDATION_DEBOUNCE: Duration = Duration::from_secs(1);
 
@@ -80,18 +77,6 @@ pub struct Application {
     components: AppComponent,
     keymap: crate::keymap::Keymap,
     config: Config,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) struct FeedRefreshPollKey {
-    url: FeedUrl,
-    request_id: String,
-}
-
-impl FeedRefreshPollKey {
-    fn new(url: FeedUrl, request_id: String) -> Self {
-        Self { url, request_id }
-    }
 }
 
 impl Application {

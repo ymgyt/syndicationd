@@ -160,12 +160,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     );
     bind!(
         Layer::Feeds,
-        ["r"],
-        CommandId::RefreshSelectedFeed,
-        "Refresh selected feed"
-    );
-    bind!(
-        Layer::Feeds,
         ["S-r"],
         CommandId::ReloadSubscription,
         "Reload subscriptions"

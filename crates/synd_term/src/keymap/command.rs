@@ -31,7 +31,6 @@ pub enum CommandId {
     PromptFeedSubscription,
     PromptFeedEdition,
     PromptFeedUnsubscription,
-    RefreshSelectedFeed,
     ReloadSubscription,
     OpenFeed,
     MoveFeedUnsubscriptionPopupSelectionPrev,
@@ -91,7 +90,6 @@ impl CommandId {
             Self::PromptFeedSubscription => "feeds.subscribe",
             Self::PromptFeedEdition => "feeds.edit",
             Self::PromptFeedUnsubscription => "feeds.unsubscribe",
-            Self::RefreshSelectedFeed => "feeds.refresh-selected",
             Self::ReloadSubscription => "feeds.reload",
             Self::OpenFeed => "feeds.open",
             Self::MoveFeedUnsubscriptionPopupSelectionPrev => "feeds.unsubscribe-popup.prev",
@@ -169,7 +167,6 @@ impl CommandId {
             Self::PromptFeedSubscription => Command::prompt_feed_subscription(),
             Self::PromptFeedEdition => Command::prompt_feed_edition(),
             Self::PromptFeedUnsubscription => Command::prompt_feed_unsubscription(),
-            Self::RefreshSelectedFeed => Command::refresh_selected_feed(),
             Self::ReloadSubscription => Command::reload_subscription(),
             Self::OpenFeed => Command::open_feed(),
             Self::MoveFeedUnsubscriptionPopupSelectionPrev => {
@@ -474,12 +471,6 @@ const COMMAND_SPECS: &[CommandSpec] = specs![
         aliases: ["prompt_feed_unsubscription"],
         typable: None,
         desc: "Delete feed subscription",
-        layers: [Feeds],
-    },
-    RefreshSelectedFeed {
-        aliases: ["refresh_selected_feed"],
-        typable: Some(":refresh-selected-feed"),
-        desc: "Refresh selected feed",
         layers: [Feeds],
     },
     ReloadSubscription {

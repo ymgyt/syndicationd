@@ -84,9 +84,6 @@ impl AppComponent {
                 self.feeds.move_unsubscribe_popup_selection(direction);
                 Vec::new()
             }
-            FeedsCommand::RefreshSelectedFeed => {
-                self.feeds.refresh_selected_feed().into_iter().collect()
-            }
             FeedsCommand::ReloadSubscription => {
                 vec![FeedsComponent::reload_subscription(feeds_first)]
             }
@@ -225,76 +222,5 @@ impl AppComponent {
     ) -> Vec<Operation> {
         let filterer = self.shell.deactivate_all_filter_categories(lane);
         self.apply_filterer(filterer).into_iter().collect()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use synd_client::payload;
-    use synd_feed::types::FeedUrl;
-
-    use crate::{
-        application::{Features, Populate},
-        command::FeedsCommand,
-        config::Categories,
-        operation::Operation,
-        types::PageInfo,
-        ui::theme::Theme,
-    };
-
-    use super::*;
-
-    fn subscribed_feed(url: FeedUrl) -> payload::SubscribedFeed {
-        payload::SubscribedFeed {
-            url,
-            requirement: None,
-            category: None,
-            crawl_policy: payload::CrawlPolicy {
-                polling: payload::PollingPolicy {
-                    kind: payload::PollingPolicyKind::Manual,
-                    interval_seconds: None,
-                },
-            },
-            refresh_status: Some(payload::RefreshStatus {
-                state: payload::RefreshStatusState::Idle,
-                request_id: None,
-                last_attempt_at: None,
-                last_success_at: None,
-                last_failure_at: None,
-                last_error_message: None,
-            }),
-            feed: None,
-        }
-    }
-
-    #[test]
-    fn refresh_selected_feed_emits_refresh_operation() {
-        let mut component = AppComponent::new(
-            &Features::default(),
-            Theme::default(),
-            Categories::default_toml(),
-            false,
-        );
-        let url = FeedUrl::parse("https://example.com/feed.xml").unwrap();
-        component.feeds.subscription.update_subscription(
-            Populate::Replace,
-            payload::SubscriptionPayload {
-                feeds: payload::FeedConnection {
-                    nodes: vec![subscribed_feed(url.clone())],
-                    page_info: PageInfo {
-                        has_next_page: false,
-                        end_cursor: None,
-                    },
-                },
-            },
-        );
-
-        let operations = component.apply_feeds_command(FeedsCommand::RefreshSelectedFeed, 10, 20);
-
-        assert_eq!(operations.len(), 1);
-        let Operation::RefreshFeed { url: operation_url } = &operations[0] else {
-            panic!("expected RefreshFeed operation");
-        };
-        assert_eq!(operation_url, &url);
     }
 }

@@ -30,16 +30,6 @@ pub trait FeedApi: Send + Sync + 'static {
 
     fn unsubscribe_feed(&self, url: FeedUrl) -> BoxFuture<'static, Result<(), SyndApiError>>;
 
-    fn refresh_feed(
-        &self,
-        url: FeedUrl,
-    ) -> BoxFuture<'static, Result<payload::RefreshFeedPayload, SyndApiError>>;
-
-    fn fetch_feed_status(
-        &self,
-        url: FeedUrl,
-    ) -> BoxFuture<'static, Result<payload::RefreshStatus, SyndApiError>>;
-
     fn fetch_timeline_entries(
         &self,
         after: Option<String>,

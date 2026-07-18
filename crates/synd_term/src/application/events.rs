@@ -7,7 +7,7 @@ use crate::{
     operation::Operation,
 };
 
-use super::{Application, FEED_REFRESH_POLL_ATTEMPTS, Populate, RequestSequence};
+use super::{Application, Populate, RequestSequence};
 
 impl Application {
     #[instrument(skip_all)]
@@ -45,10 +45,6 @@ impl Application {
                     .apply_feed_edition_editor_closed(input.as_str());
                 self.perform_operations(operations);
             }
-            Event::FeedRefreshRequested { request_seq, url } => {
-                self.components
-                    .apply_feed_refresh_requested(request_seq, url);
-            }
             Event::EntryFetchStarted {
                 request_seq,
                 populate,
@@ -77,16 +73,6 @@ impl Application {
                     sync,
                 ]);
             }
-            Event::FeedRefreshPollElapsed {
-                url,
-                request_id,
-                remaining,
-            } => {
-                let operations = self
-                    .components
-                    .apply_feed_refresh_poll_elapsed(url, request_id, remaining);
-                self.perform_operations(operations);
-            }
             Event::FeedViewSyncElapsed => {
                 let sync = self.components.feeds.sync_timeline();
                 self.perform_operations([
@@ -108,22 +94,6 @@ impl Application {
             }
             Event::SyndApiError { error, request_seq } => {
                 self.components.apply_synd_api_error(request_seq);
-                let message = Self::synd_api_error_message(error.as_ref());
-                self.handle_error_message(message, Some(request_seq));
-            }
-            Event::FeedRefreshPollError {
-                url,
-                request_id,
-                error,
-                request_seq,
-            } => {
-                if !self
-                    .components
-                    .apply_feed_refresh_poll_error(url, request_id)
-                {
-                    self.drivers.remove_in_flight(request_seq);
-                    return;
-                }
                 let message = Self::synd_api_error_message(error.as_ref());
                 self.handle_error_message(message, Some(request_seq));
             }
@@ -149,7 +119,6 @@ impl Application {
                     self.config.feeds_per_pagination,
                     entries_first,
                     self.config.entries_limit,
-                    FEED_REFRESH_POLL_ATTEMPTS,
                 );
                 self.perform_operations(operations);
             }
