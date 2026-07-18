@@ -52,11 +52,12 @@ let
     "org.opencontainers.image.source" = "https://github.com/ymgyt/syndicationd";
   };
 
+  # The synd crate owns the CLI binary; synd_term is a library crate
   syndTerm = craneLib.buildPackage (
     individualCrateArgs
     // (
       let
-        crate = craneLib.crateNameFromCargoToml { cargoToml = ../../crates/synd_term/Cargo.toml; };
+        crate = craneLib.crateNameFromCargoToml { cargoToml = ../../crates/synd/Cargo.toml; };
       in
       {
         inherit (crate) pname version;
