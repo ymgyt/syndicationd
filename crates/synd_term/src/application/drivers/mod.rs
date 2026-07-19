@@ -15,7 +15,7 @@ use crate::{
     terminal::Terminal,
 };
 
-use super::{FEED_VIEW_SYNC_INTERVAL, TIMELINE_INVALIDATION_DEBOUNCE};
+use super::TIMELINE_INVALIDATION_DEBOUNCE;
 
 mod auth;
 mod feed;
@@ -26,7 +26,6 @@ mod runtime;
 
 use auth::AuthDriver;
 use feed::FeedDriver;
-pub(in crate::application) use feed_events::FeedEventMessage;
 use feed_events::FeedEventSubscription;
 use github::GitHubDriver;
 use interaction::InteractionDriver;
@@ -150,20 +149,8 @@ impl Drivers {
                 self.feed_events.start(self.feed.api.clone());
                 Vec::new()
             }
-            Operation::ScheduleFeedViewReload { feeds_first } => {
-                self.runtime.schedule_event(
-                    TIMELINE_INVALIDATION_DEBOUNCE,
-                    Event::FeedViewReloadDebounced { feeds_first },
-                );
-                Vec::new()
-            }
             Operation::UnsubscribeFeed { url } => {
                 self.feed.unsubscribe_feed(&mut self.runtime, url);
-                Vec::new()
-            }
-            Operation::ScheduleFeedViewSync => {
-                self.runtime
-                    .schedule_event(FEED_VIEW_SYNC_INTERVAL, Event::FeedViewSyncElapsed);
                 Vec::new()
             }
             Operation::ScheduleTimelineSync => {

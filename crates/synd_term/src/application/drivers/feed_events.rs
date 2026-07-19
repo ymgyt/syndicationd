@@ -9,17 +9,11 @@ use tracing::{debug, warn};
 
 const FEED_EVENT_RECONNECT_DELAY: Duration = Duration::from_secs(2);
 
-#[derive(Debug, Clone)]
-pub(in crate::application) enum FeedEventMessage {
-    Event(payload::FeedEvent),
-    Interrupted,
-}
-
 /// Running GraphQL feed event subscription and its event receiver.
 pub(in crate::application) enum FeedEventSubscription {
     Stopped,
     Running {
-        rx: mpsc::UnboundedReceiver<FeedEventMessage>,
+        rx: mpsc::UnboundedReceiver<payload::FeedEvent>,
         task: JoinHandle<()>,
     },
 }
@@ -36,37 +30,14 @@ impl FeedEventSubscription {
 
         let (tx, rx) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
-            let mut interruption_notified = false;
             loop {
                 if tx.is_closed() {
                     break;
                 }
 
-                let (event_tx, mut event_rx) = mpsc::unbounded_channel();
-                let mut run = feed_api.run_feed_events(event_tx);
-                loop {
-                    tokio::select! {
-                        biased;
-
-                        Some(event) = event_rx.recv() => {
-                            interruption_notified = false;
-                            if tx.send(FeedEventMessage::Event(event)).is_err() {
-                                return;
-                            }
-                        }
-                        result = &mut run => {
-                            match result {
-                                Ok(()) => debug!("feed event subscription stopped"),
-                                Err(error) => warn!("feed event subscription failed: {error}"),
-                            }
-                            if !interruption_notified
-                                && tx.send(FeedEventMessage::Interrupted).is_ok()
-                            {
-                                interruption_notified = true;
-                            }
-                            break;
-                        }
-                    }
+                match feed_api.run_feed_events(tx.clone()).await {
+                    Ok(()) => debug!("feed event subscription stopped"),
+                    Err(error) => warn!("feed event subscription failed: {error}"),
                 }
 
                 if tx.is_closed() {
@@ -94,7 +65,7 @@ impl FeedEventSubscription {
         true
     }
 
-    pub(in crate::application) async fn recv(&mut self) -> Option<FeedEventMessage> {
+    pub(in crate::application) async fn recv(&mut self) -> Option<payload::FeedEvent> {
         match self {
             Self::Running { rx, .. } => rx.recv().await,
             Self::Stopped => future::pending().await,

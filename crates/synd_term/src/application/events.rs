@@ -2,12 +2,9 @@ use itertools::Itertools;
 use synd_client::SyndApiError;
 use tracing::{error, info_span, instrument, warn};
 
-use crate::{
-    event::{ApiEvent, AuthApiEvent, Event},
-    operation::Operation,
-};
+use crate::event::{ApiEvent, AuthApiEvent, Event};
 
-use super::{Application, Populate, RequestSequence};
+use super::{Application, RequestSequence};
 
 impl Application {
     #[instrument(skip_all)]
@@ -55,35 +52,6 @@ impl Application {
             Event::RegistryFeed { event } => {
                 let operations = self.components.apply_feed_event(event);
                 self.perform_operations(operations);
-            }
-            Event::FeedEventSubscriptionInterrupted => {
-                self.perform_operation(Operation::ScheduleFeedViewReload {
-                    feeds_first: self.config.feeds_per_pagination,
-                });
-            }
-            // Recover what happened while the feed event subscription was down
-            Event::FeedViewReloadDebounced { feeds_first } => {
-                let sync = self.components.feeds.sync_timeline();
-                self.perform_operations([
-                    Operation::FetchSubscription {
-                        populate: Populate::Replace,
-                        after: None,
-                        first: feeds_first,
-                    },
-                    sync,
-                ]);
-            }
-            Event::FeedViewSyncElapsed => {
-                let sync = self.components.feeds.sync_timeline();
-                self.perform_operations([
-                    Operation::FetchSubscription {
-                        populate: Populate::Replace,
-                        after: None,
-                        first: self.config.feeds_per_pagination,
-                    },
-                    sync,
-                    Operation::ScheduleFeedViewSync,
-                ]);
             }
             Event::TimelineSyncDebounced => {
                 let operation = self.components.feeds.timeline_sync_debounced();

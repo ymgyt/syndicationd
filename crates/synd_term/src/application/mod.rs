@@ -3,6 +3,7 @@ use std::{ops::ControlFlow, time::Duration};
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
+use synd_client::payload::FeedEvent;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "integration")]
@@ -62,7 +63,6 @@ mod operations;
 use component::AppComponent;
 use drivers::{DriverParts, Drivers};
 
-const FEED_VIEW_SYNC_INTERVAL: Duration = Duration::from_mins(5);
 const TIMELINE_INVALIDATION_DEBOUNCE: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -236,7 +236,6 @@ impl Application {
         {
             self.perform_operation(operation);
         }
-        self.perform_operation(Operation::ScheduleFeedViewSync);
     }
 
     async fn event_loop<S>(&mut self, input: &mut S)
@@ -260,7 +259,7 @@ impl Application {
             Terminal(std::io::Result<CrosstermEvent>),
             Job(anyhow::Result<Event>),
             BackgroundJob(anyhow::Result<Event>),
-            FeedEvent(drivers::FeedEventMessage),
+            FeedEvent(FeedEvent),
             Throbber,
             Idle,
         }
@@ -286,14 +285,7 @@ impl Application {
                 PollResult::Job(event) | PollResult::BackgroundJob(event) => {
                     self.apply_job_result(event);
                 }
-                PollResult::FeedEvent(message) => match message {
-                    drivers::FeedEventMessage::Event(event) => {
-                        self.apply_event(Event::RegistryFeed { event });
-                    }
-                    drivers::FeedEventMessage::Interrupted => {
-                        self.apply_event(Event::FeedEventSubscriptionInterrupted);
-                    }
-                },
+                PollResult::FeedEvent(event) => self.apply_event(Event::RegistryFeed { event }),
                 PollResult::Throbber => {
                     self.apply_event(Event::RenderThrobber);
                 }

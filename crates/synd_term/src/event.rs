@@ -120,11 +120,6 @@ pub(crate) enum Event {
     RegistryFeed {
         event: payload::FeedEvent,
     },
-    FeedEventSubscriptionInterrupted,
-    FeedViewReloadDebounced {
-        feeds_first: i64,
-    },
-    FeedViewSyncElapsed,
     TimelineSyncDebounced,
     Error {
         message: String,

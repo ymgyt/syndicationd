@@ -42,13 +42,9 @@ pub(crate) enum Operation {
         since: i64,
     },
     StartFeedEventSubscription,
-    ScheduleFeedViewReload {
-        feeds_first: i64,
-    },
     UnsubscribeFeed {
         url: FeedUrl,
     },
-    ScheduleFeedViewSync,
     ScheduleTimelineSync,
     FetchGitHubNotifications {
         populate: Populate,

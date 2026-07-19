@@ -266,13 +266,6 @@ impl FeedsComponent {
         self.timeline.seq = seq;
     }
 
-    /// Operation that syncs the timeline from the current seq immediately.
-    pub(in crate::application) fn sync_timeline(&self) -> Operation {
-        Operation::SyncTimeline {
-            since: self.timeline.seq,
-        }
-    }
-
     #[cfg(feature = "integration")]
     pub(in crate::application) fn has_pending_short_background_work(&self) -> bool {
         self.timeline.scheduled
