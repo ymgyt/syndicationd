@@ -161,7 +161,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     );
     bind!(
         Layer::Feeds,
-        ["S-r"],
+        ["r"],
         CommandId::ReloadSubscription,
         "Reload subscriptions"
     );
