@@ -4,8 +4,14 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{CommandId, KeymapError};
 
-/// Normalized key used for keymap lookup.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+/// Key used for keymap lookup.
+///
+/// Equality and hashing normalize the case of `Char` keys the same way
+/// crossterm's `KeyEvent` does: terminals report Shift+letter as an
+/// uppercase char + SHIFT, while the keymap notation writes it as a
+/// lowercase char + `S-` modifier. Comparing through the normalized form
+/// makes both spellings identical.
+#[derive(Clone, Copy, Debug)]
 pub struct KeyStroke {
     code: KeyCode,
     modifiers: KeyModifiers,
@@ -14,6 +20,20 @@ pub struct KeyStroke {
 impl KeyStroke {
     pub(crate) fn new(code: KeyCode, modifiers: KeyModifiers) -> Self {
         Self { code, modifiers }
+    }
+
+    /// Convert `Char` keys into the canonical spelling: an uppercase char
+    /// always carries SHIFT, and a SHIFT-modified char is always uppercase.
+    fn normalize_case(mut self) -> Self {
+        let KeyCode::Char(ch) = self.code else {
+            return self;
+        };
+        if ch.is_ascii_uppercase() {
+            self.modifiers.insert(KeyModifiers::SHIFT);
+        } else if self.modifiers.contains(KeyModifiers::SHIFT) {
+            self.code = KeyCode::Char(ch.to_ascii_uppercase());
+        }
+        self
     }
 
     pub(crate) fn from_char(ch: char) -> Self {
@@ -31,6 +51,24 @@ impl KeyStroke {
             KeyCode::Char(ch) => Some(ch),
             _ => None,
         }
+    }
+}
+
+impl PartialEq for KeyStroke {
+    fn eq(&self, other: &Self) -> bool {
+        let lhs = self.normalize_case();
+        let rhs = other.normalize_case();
+        lhs.code == rhs.code && lhs.modifiers == rhs.modifiers
+    }
+}
+
+impl Eq for KeyStroke {}
+
+impl std::hash::Hash for KeyStroke {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let normalized = self.normalize_case();
+        normalized.code.hash(state);
+        normalized.modifiers.hash(state);
     }
 }
 

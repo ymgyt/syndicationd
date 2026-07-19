@@ -199,6 +199,34 @@ fn dynamic_category_filter_layer_resolves_runtime_category_actions() {
     );
 }
 
+#[test]
+fn shifted_letter_from_terminal_matches_s_notation_binding() {
+    let mut keymap = Keymap::default_keymaps();
+    let layers = LayerStack::from([Layer::App, Layer::Global, Layer::Entries]);
+
+    // Terminals report Shift+t as an uppercase char + SHIFT
+    let event = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('T'),
+        crossterm::event::KeyModifiers::SHIFT,
+    );
+    let result = keymap.resolve(&layers, event);
+    assert_eq!(
+        matched_action(&result),
+        Some(&KeymapAction::Command(CommandId::RotateTheme))
+    );
+
+    // The kitty keyboard protocol reports the base key: lowercase + SHIFT
+    let event = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('r'),
+        crossterm::event::KeyModifiers::SHIFT,
+    );
+    let result = keymap.resolve(&layers, event);
+    assert_eq!(
+        matched_action(&result),
+        Some(&KeymapAction::Command(CommandId::ForceRedraw))
+    );
+}
+
 fn result_to_command(result: &KeymapResult) -> Option<Command> {
     match result {
         KeymapResult::Matched(action) => Some(action.build_command()),
