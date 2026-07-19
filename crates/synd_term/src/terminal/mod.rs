@@ -4,7 +4,7 @@ use crossterm::{
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures_util::{Stream, future::Either, stream};
-use ratatui::Frame;
+use ratatui::{Frame, backend::Backend as _};
 use std::io::{self, IsTerminal};
 
 #[cfg(not(feature = "integration"))]
@@ -62,7 +62,16 @@ impl Terminal {
     }
 
     pub fn force_redraw(&mut self) {
-        self.backend.clear().unwrap();
+        // Repaint without `ratatui::Terminal::clear()`: it queries the cursor
+        // position synchronously and blocks (then fails) when nothing answers.
+        // Swapping buffers resets the diff baseline so the next draw re-emits
+        // every cell; clearing the screen keeps untouched cells consistent
+        // with the reset baseline.
+        self.backend.swap_buffers();
+        let _ = self
+            .backend
+            .backend_mut()
+            .clear_region(ratatui::backend::ClearType::All);
     }
 
     #[cfg(feature = "integration")]
