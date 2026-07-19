@@ -82,11 +82,12 @@ impl Entry {
         .map(Into::into)
     }
 
-    /// Entry summary. If there is no summary of the entry, return the content(is this bad api?)
+    /// Entry summary. When the feed declares none, the registry materializes
+    /// a content-derived fallback at observation, so no fallback happens here.
     async fn summary(&self) -> Option<&str> {
         match &self.body {
             EntryBody::Feed(entry) => entry.summary().or(entry.content()),
-            EntryBody::Timeline(attrs) => attrs.summary.as_deref().or(attrs.content.as_deref()),
+            EntryBody::Timeline(attrs) => attrs.summary.as_deref(),
         }
     }
 

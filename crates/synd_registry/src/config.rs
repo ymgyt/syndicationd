@@ -9,7 +9,6 @@ use crate::crawl::{
 #[derive(Debug, Clone, Copy)]
 pub struct FeedRegistryWorkerConfig {
     pub crawl_target_projection_poll_interval: Duration,
-    pub crawl_schedule_projection_poll_interval: Duration,
     pub feed_projection_poll_interval: Duration,
     pub entry_projection_poll_interval: Duration,
     pub timeline_projection_poll_interval: Duration,
@@ -21,7 +20,6 @@ impl FeedRegistryWorkerConfig {
     pub fn with_poll_interval(poll_interval: Duration) -> Self {
         Self {
             crawl_target_projection_poll_interval: poll_interval,
-            crawl_schedule_projection_poll_interval: poll_interval,
             feed_projection_poll_interval: poll_interval,
             entry_projection_poll_interval: poll_interval,
             timeline_projection_poll_interval: poll_interval,
@@ -40,10 +38,7 @@ impl Default for FeedRegistryWorkerConfig {
 /// Runtime configuration for the crawl dispatcher.
 #[derive(Debug, Clone, Copy)]
 pub struct CrawlDispatchConfig {
-    /// How long an inflight dispatch may stay unfinished before the schedule
-    /// row becomes dispatchable again (crash recovery).
-    pub stale_dispatch_timeout: Duration,
-    /// Delay before re-checking when due rows remain but the dispatch queue
+    /// Delay before re-checking when due feeds remain but the dispatch queue
     /// was saturated.
     pub saturated_retry_delay: Duration,
 }
@@ -51,7 +46,6 @@ pub struct CrawlDispatchConfig {
 impl Default for CrawlDispatchConfig {
     fn default() -> Self {
         Self {
-            stale_dispatch_timeout: Duration::from_mins(5),
             saturated_retry_delay: Duration::from_secs(1),
         }
     }

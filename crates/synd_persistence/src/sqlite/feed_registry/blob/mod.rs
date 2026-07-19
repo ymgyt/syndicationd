@@ -11,7 +11,6 @@ use crate::compression::{
 
 use super::error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult};
 
-const DIGEST_ALGO_SHA256: &str = "sha256";
 const DEFAULT_COMPRESSION_ALGO: CompressionAlgo = CompressionAlgo::Zstd;
 
 async fn put<C>(
@@ -25,33 +24,26 @@ where
     let digest = Sha256::digest(&command.bytes);
     let uncompressed_len = to_i64(command.bytes.len(), "uncompressed blob length")?;
     let compressed = compression.compress(DEFAULT_COMPRESSION_ALGO, command.bytes.as_slice())?;
-    let compressed_len = to_i64(compressed.len(), "compressed blob length")?;
 
     let row = sqlx::query_as::<_, PkRow>(
         r#"
             INSERT INTO blob (
-                digest_algo,
                 digest,
                 compression_algo,
-                compression_opts,
                 uncompressed_len,
-                compressed_len,
                 bytes,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(digest_algo, digest) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(digest) DO UPDATE SET
                 digest = excluded.digest
             RETURNING pk
             "#,
     )
-    .bind(DIGEST_ALGO_SHA256)
     .bind(digest.to_vec())
     .bind(DEFAULT_COMPRESSION_ALGO.as_str())
-    .bind(compressed.opts_json())
     .bind(uncompressed_len)
-    .bind(compressed_len)
-    .bind(compressed.bytes())
+    .bind(compressed)
     .bind(command.created_at)
     .fetch_one(&mut **tx)
     .await?;
@@ -71,7 +63,6 @@ where
         r#"
             SELECT
                 compression_algo,
-                compression_opts,
                 uncompressed_len,
                 bytes
             FROM blob
@@ -91,7 +82,6 @@ where
     Ok(compression.decompress(
         algo,
         StoredCompressedBytes {
-            opts_json: &row.compression_opts,
             bytes: row.bytes.as_slice(),
             uncompressed_len,
         },
@@ -106,7 +96,6 @@ struct PkRow {
 #[derive(sqlx::FromRow)]
 struct BlobRow {
     compression_algo: String,
-    compression_opts: String,
     uncompressed_len: i64,
     bytes: Vec<u8>,
 }

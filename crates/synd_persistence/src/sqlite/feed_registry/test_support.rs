@@ -2,22 +2,17 @@ pub(crate) use std::time::Duration;
 
 pub(crate) use chrono::{DateTime, TimeZone, Utc};
 pub(crate) use sqlx::Row;
-pub(crate) use synd_feed::feed::service::{
-    FeedFetchFailure, FeedFetchFailureKind, FeedFetchOutcome, FeedHttpResponse, FeedHttpStatus,
-    FeedResponseBody, FeedResponseHeaders, FeedService, FetchedFeed,
-};
+pub(crate) use synd_feed::feed::service::FeedHttpStatus;
 pub(crate) use synd_feed::types::{EntryId, FeedUrl};
 pub(crate) use synd_registry::{
-    BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, FeedRegistryDb,
-    FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
-    SubscriptionKey, SubscriptionStore, TimelineStore,
-    crawl::completion::CrawlCompletionRecorder,
+    BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, FeedRegistryDb, FeedSubscriptionAttrs,
+    RegistryDbError, RegistryDbResult, SubscriberId, Subscription, SubscriptionKey,
+    SubscriptionStore, TimelineStore,
     crawl::{
         blob::PutBlobCommand,
-        job::{CrawlJob, CrawlJobId, CrawlJobTrigger},
+        job::CrawlJobId,
         policy::{CrawlPolicy, PollingInterval, PollingPolicy},
-        result::CrawlStateErrorKind,
-        schedule::UpsertCrawlScheduleCommand,
+        state::CrawlStateErrorKind,
         target_list::{CrawlTargetProj, CrawlTargetProjInput, CrawlTargetState},
     },
     entry::{EntryProj, EntryProjInput},
@@ -29,7 +24,7 @@ pub(crate) use synd_registry::{
         Projector, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
         TimelineChangedEvent,
     },
-    feed::FeedProj,
+    feed::{FeedProj, FeedProjInput},
     query::{
         SubscriptionsQuery, TimelineChange, TimelineChangesQuery, TimelineEntriesPage,
         TimelineEntriesQuery,
@@ -38,7 +33,7 @@ pub(crate) use synd_registry::{
 };
 pub(crate) use synd_support::time::Clock;
 
-use super::{error::IntoDbResult, feed_endpoint};
+use super::{error::IntoDbResult, feed};
 
 pub(crate) use super::{SqliteFeedRegistryDb, SqliteRegistryTx};
 pub(crate) use crate::sqlite::SqliteDatabase;
@@ -74,34 +69,6 @@ pub(crate) async fn record_generated_events(
     Ok(recorded)
 }
 
-pub(crate) fn timeline_feed_subscribed(event: FeedSubscribedEvent) -> TimelineProjInput {
-    TimelineProjInput::FeedSubscribed {
-        event,
-        occurred_at: test_occurred_at(),
-    }
-}
-
-pub(crate) fn timeline_feed_unsubscribed(event: FeedUnsubscribedEvent) -> TimelineProjInput {
-    TimelineProjInput::FeedUnsubscribed {
-        event,
-        occurred_at: test_occurred_at(),
-    }
-}
-
-pub(crate) fn timeline_entry_discovered(event: EntryDiscoveredEvent) -> TimelineProjInput {
-    TimelineProjInput::EntryDiscovered {
-        event,
-        occurred_at: test_occurred_at(),
-    }
-}
-
-pub(crate) fn timeline_entry_changed(event: EntryChangedEvent) -> TimelineProjInput {
-    TimelineProjInput::EntryChanged {
-        event,
-        occurred_at: test_occurred_at(),
-    }
-}
-
 pub(crate) fn feed_url(path: &str) -> FeedUrl {
     FeedUrl::parse(&format!("https://example.com/{path}.xml")).unwrap()
 }
@@ -123,15 +90,13 @@ pub(crate) fn subscription_with(
     path: &str,
     crawl_policy: CrawlPolicy,
 ) -> Subscription {
-    let now = Utc.with_ymd_and_hms(2026, 5, 24, 12, 0, 0).unwrap();
     Subscription {
         subscriber_id,
         feed_url: feed_url(path),
         requirement: None,
         category: None,
         crawl_policy,
-        created_at: now,
-        updated_at: now,
+        subscribed_at: Utc.with_ymd_and_hms(2026, 5, 24, 12, 0, 0).unwrap(),
     }
 }
 
@@ -170,19 +135,15 @@ pub(crate) async fn store_subscription(
 ) -> RegistryDbResult<()> {
     let key = subscription_key(&subscription);
     let attrs = subscription_attrs(&subscription);
-    tx.upsert_subscription(&key, attrs, subscription.created_at)
+    tx.upsert_subscription(&key, attrs, subscription.subscribed_at)
         .await
 }
 
-pub(crate) async fn store_feed_endpoint(
+pub(crate) async fn store_feed(
     tx: &mut SqliteRegistryTx<'_>,
     feed_url: &FeedUrl,
-    now: DateTime<Utc>,
 ) -> RegistryDbResult<()> {
-    feed_endpoint::upsert(&mut tx.tx, feed_url, now, now)
-        .await
-        .map(|_| ())
-        .db()
+    feed::upsert_pk(&mut tx.tx, feed_url).await.map(|_| ()).db()
 }
 
 pub(crate) async fn store_subscription_in_db(
@@ -276,6 +237,8 @@ pub(crate) async fn read_timeline_events(db: &SqliteFeedRegistryDb) -> anyhow::R
     Ok(events)
 }
 
+/// Registers the feed, stores the fetched body as a blob, and returns the
+/// `CrawlJobFinished` fact a crawl worker would have recorded.
 pub(crate) async fn record_fetched_crawl(
     db: &SqliteFeedRegistryDb,
     feed_url: &FeedUrl,
@@ -286,21 +249,25 @@ pub(crate) async fn record_fetched_crawl(
         Utc.with_ymd_and_hms(2026, 6, 8, 12, 0, 0).unwrap() + chrono::Duration::minutes(seq * 3);
     let finished_at = started_at + chrono::Duration::minutes(2);
     let mut tx = db.begin().await?;
-    store_feed_endpoint(&mut tx, feed_url, started_at).await?;
-    let job = CrawlJob::new(
+    store_feed(&mut tx, feed_url).await?;
+    let body_blob = tx.put_blob(PutBlobCommand::new(body, finished_at)).await?;
+    let event = CrawlJobFinishedEvent::new(
         CrawlJobId::generate(),
         feed_url.clone(),
-        CrawlJobTrigger::PeriodicDue,
         started_at,
+        Some(body_blob),
     );
-    let event = CrawlJobFinishedEvent::new(job.job_id.clone(), job.feed_url.clone());
-    let outcome = fetched_outcome(feed_url.clone(), body, finished_at)?;
-    let (_record, events) = CrawlCompletionRecorder::new(&mut tx)
-        .record(job, outcome, None, finished_at)
-        .await?;
-    record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(event)
+}
+
+pub(crate) fn entry_proj_input(event: &CrawlJobFinishedEvent) -> EntryProjInput {
+    EntryProjInput::builder()
+        .feed_url(event.feed_url.clone())
+        .crawl_job_id(event.job_id.clone())
+        .body_blob(event.body_blob.expect("fetched crawl has a body"))
+        .occurred_at(test_occurred_at())
+        .build()
 }
 
 pub(crate) async fn project_feed(
@@ -309,8 +276,12 @@ pub(crate) async fn project_feed(
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = FeedProj::new();
+    let input = FeedProjInput {
+        event,
+        occurred_at: test_occurred_at(),
+    };
     let events =
-        <FeedProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, event).await?;
+        <FeedProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, input).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -353,20 +324,19 @@ pub(crate) async fn project_timeline_batch(
     Ok(recorded)
 }
 
-pub(crate) async fn entry_current_row(db: &SqliteFeedRegistryDb) -> anyhow::Result<(String, i64)> {
+pub(crate) async fn entry_current_row(db: &SqliteFeedRegistryDb) -> anyhow::Result<String> {
     let mut tx = db.begin().await?;
     let row = sqlx::query(
         r#"
-            SELECT current_content_json, current_source_result_pk
+            SELECT attrs_json
             FROM entry
             "#,
     )
     .fetch_one(&mut *tx.tx)
     .await?;
-    let content_json = row.try_get::<String, _>("current_content_json")?;
-    let source_result_pk = row.try_get::<i64, _>("current_source_result_pk")?;
+    let attrs_json = row.try_get::<String, _>("attrs_json")?;
     tx.commit().await?;
-    Ok((content_json, source_result_pk))
+    Ok(attrs_json)
 }
 
 pub(crate) async fn current_entry_id(db: &SqliteFeedRegistryDb) -> anyhow::Result<EntryId> {
@@ -398,27 +368,6 @@ pub(crate) async fn list_timeline_entries(
         .await?;
     tx.commit().await?;
     Ok(page)
-}
-
-pub(crate) fn fetched_outcome(
-    feed_url: FeedUrl,
-    body: Vec<u8>,
-    fetched_at: DateTime<Utc>,
-) -> anyhow::Result<FeedFetchOutcome> {
-    let feed = FeedService::parse_feed(feed_url.clone(), body.as_slice())?;
-    Ok(FeedFetchOutcome::Fetched(Box::new(FetchedFeed {
-        body: FeedResponseBody {
-            response: FeedHttpResponse {
-                requested_url: feed_url.clone(),
-                response_url: feed_url,
-                status: FeedHttpStatus::new(200),
-                headers: FeedResponseHeaders::default(),
-                fetched_at,
-            },
-            bytes: body,
-        },
-        feed,
-    })))
 }
 
 pub(crate) fn rss_body(title: &str) -> Vec<u8> {

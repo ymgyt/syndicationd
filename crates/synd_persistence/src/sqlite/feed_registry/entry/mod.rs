@@ -3,15 +3,13 @@ use sqlx::{Sqlite, Transaction};
 use synd_feed::types::{EntryId, FeedUrl};
 use synd_registry::{
     EntryStore, RegistryDbResult,
-    crawl::{job::CrawlJobId, result::CrawlResultRef},
-    entry::{
-        Entry, EntryChange, EntryChanges, EntryLifecycle, EntryOrderKey, EntrySet, EntrySourceRef,
-    },
+    entry::{Entry, EntryChange, EntryChanges, EntryOrderKey, EntrySet},
 };
 
 use super::{
     codec::{decode_entry_attrs_json, encode_entry_attrs_json},
     error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
+    feed,
 };
 
 async fn load_entries(
@@ -33,23 +31,15 @@ async fn load_entries(
             )
             SELECT
                 e.entry_id,
-                e.current_content_json,
-                e.current_order_time,
-                e.current_source_result_pk,
-                e.first_seen_at,
-                e.last_seen_at,
-                e.updated_at,
-                cr.job_id AS source_job_id
+                e.attrs_json,
+                e.content,
+                e.order_time
             FROM requested AS r
             INNER JOIN entry AS e
                 ON e.entry_id = r.entry_id
             INNER JOIN feed AS f
                 ON f.pk = e.feed_pk
-            INNER JOIN feed_endpoint AS fe
-                ON fe.pk = f.feed_endpoint_pk
-            INNER JOIN crawl_result AS cr
-                ON cr.pk = e.current_source_result_pk
-            WHERE fe.url = ?
+            WHERE f.url = ?
             ORDER BY e.entry_id
             "#,
     )
@@ -72,73 +62,52 @@ async fn apply_entry_changes(
     for change in changes.into_changes() {
         match change {
             EntryChange::Discovered(entry) => insert_entry(tx, &entry).await?,
-            EntryChange::Changed(entry) | EntryChange::AlreadySeen(entry) => {
-                update_entry(tx, &entry).await?;
-            }
+            EntryChange::Changed(entry) => update_entry(tx, &entry).await?,
         }
     }
     Ok(())
 }
 
 async fn insert_entry(tx: &mut Transaction<'_, Sqlite>, entry: &Entry) -> SqliteResult<()> {
-    let feed_pk = resolve_feed_pk(tx, &entry.feed_url).await?;
+    let feed_pk = feed::resolve_pk(tx, &entry.feed_url).await?;
     let attrs_json = encode_entry_attrs_json(&entry.attrs)?;
     sqlx::query(
         r#"
             INSERT INTO entry (
-                feed_pk,
                 entry_id,
-                current_content_json,
-                current_order_time,
-                current_source_result_pk,
-                first_seen_at,
-                last_seen_at,
-                updated_at
+                feed_pk,
+                attrs_json,
+                content,
+                order_time
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             "#,
     )
-    .bind(feed_pk)
     .bind(entry.id.as_str())
+    .bind(feed_pk)
     .bind(attrs_json)
+    .bind(entry.content.as_deref())
     .bind(entry.order_key.as_datetime())
-    .bind(entry.source.result_ref.pk())
-    .bind(entry.lifecycle.first_seen_at)
-    .bind(entry.lifecycle.last_seen_at)
-    .bind(entry.lifecycle.updated_at)
     .execute(&mut **tx)
     .await?;
     Ok(())
 }
 
+// order_time is immutable after discovery, so updates never touch it.
 async fn update_entry(tx: &mut Transaction<'_, Sqlite>, entry: &Entry) -> SqliteResult<()> {
     let attrs_json = encode_entry_attrs_json(&entry.attrs)?;
     let result = sqlx::query(
         r#"
             UPDATE entry
             SET
-                current_content_json = ?,
-                current_order_time = ?,
-                current_source_result_pk = ?,
-                last_seen_at = ?,
-                updated_at = ?
+                attrs_json = ?,
+                content = ?
             WHERE entry_id = ?
-              AND feed_pk = (
-                SELECT f.pk
-                FROM feed AS f
-                INNER JOIN feed_endpoint AS fe
-                    ON fe.pk = f.feed_endpoint_pk
-                WHERE fe.url = ?
-              )
             "#,
     )
     .bind(attrs_json)
-    .bind(entry.order_key.as_datetime())
-    .bind(entry.source.result_ref.pk())
-    .bind(entry.lifecycle.last_seen_at)
-    .bind(entry.lifecycle.updated_at)
+    .bind(entry.content.as_deref())
     .bind(entry.id.as_str())
-    .bind(entry.feed_url.as_str())
     .execute(&mut **tx)
     .await?;
 
@@ -152,42 +121,12 @@ async fn update_entry(tx: &mut Transaction<'_, Sqlite>, entry: &Entry) -> Sqlite
     Ok(())
 }
 
-async fn resolve_feed_pk(
-    tx: &mut Transaction<'_, Sqlite>,
-    feed_url: &FeedUrl,
-) -> SqliteResult<i64> {
-    let row = sqlx::query_as::<_, FeedPkRow>(
-        r#"
-            SELECT f.pk
-            FROM feed AS f
-            INNER JOIN feed_endpoint AS fe
-                ON fe.pk = f.feed_endpoint_pk
-            WHERE fe.url = ?
-            "#,
-    )
-    .bind(feed_url.as_str())
-    .fetch_optional(&mut **tx)
-    .await?;
-
-    let Some(row) = row else {
-        return Err(SqliteError::not_found(
-            "feed for entry projection",
-            feed_url.as_str(),
-        ));
-    };
-    Ok(row.pk)
-}
-
 #[derive(sqlx::FromRow)]
 struct EntryRow {
     entry_id: String,
-    current_content_json: String,
-    current_order_time: DateTime<Utc>,
-    current_source_result_pk: i64,
-    first_seen_at: DateTime<Utc>,
-    last_seen_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    source_job_id: String,
+    attrs_json: String,
+    content: Option<String>,
+    order_time: DateTime<Utc>,
 }
 
 impl EntryRow {
@@ -195,28 +134,11 @@ impl EntryRow {
         Ok(Entry::builder()
             .id(EntryId::parse(self.entry_id).decode()?)
             .feed_url(feed_url.clone())
-            .attrs(decode_entry_attrs_json(&self.current_content_json)?)
-            .order_key(EntryOrderKey::from_datetime(self.current_order_time))
-            .lifecycle(
-                EntryLifecycle::builder()
-                    .first_seen_at(self.first_seen_at)
-                    .last_seen_at(self.last_seen_at)
-                    .updated_at(self.updated_at)
-                    .build(),
-            )
-            .source(
-                EntrySourceRef::builder()
-                    .crawl_job_id(CrawlJobId::new(self.source_job_id))
-                    .result_ref(CrawlResultRef::new(self.current_source_result_pk))
-                    .build(),
-            )
+            .attrs(decode_entry_attrs_json(&self.attrs_json)?)
+            .maybe_content(self.content)
+            .order_key(EntryOrderKey::from_datetime(self.order_time))
             .build())
     }
-}
-
-#[derive(sqlx::FromRow)]
-struct FeedPkRow {
-    pk: i64,
 }
 
 impl EntryStore for super::SqliteRegistryTx<'_> {

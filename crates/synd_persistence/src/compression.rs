@@ -9,11 +9,6 @@ pub(crate) type CompressionResult<T> = Result<T, CompressionError>;
 pub(crate) enum CompressionError {
     #[error("unsupported compression algorithm: {0}")]
     UnsupportedAlgo(String),
-    #[error("invalid compression options for {algo}: {source}")]
-    InvalidOptions {
-        algo: CompressionAlgo,
-        source: serde_json::Error,
-    },
     #[error("compression failed for {algo}: {source}")]
     Compress {
         algo: CompressionAlgo,
@@ -63,7 +58,7 @@ impl FromStr for CompressionAlgo {
 /// Compresses and decompresses byte payloads.
 pub(crate) trait CompressionCodec {
     /// Compresses bytes using the requested algorithm.
-    fn compress(&self, algo: CompressionAlgo, bytes: &[u8]) -> CompressionResult<CompressedBytes>;
+    fn compress(&self, algo: CompressionAlgo, bytes: &[u8]) -> CompressionResult<Vec<u8>>;
 
     /// Decompresses stored bytes using the recorded algorithm.
     fn decompress(
@@ -78,7 +73,7 @@ pub(crate) trait CompressionCodec {
 pub(crate) struct DefaultCompressionCodec;
 
 impl CompressionCodec for DefaultCompressionCodec {
-    fn compress(&self, algo: CompressionAlgo, bytes: &[u8]) -> CompressionResult<CompressedBytes> {
+    fn compress(&self, algo: CompressionAlgo, bytes: &[u8]) -> CompressionResult<Vec<u8>> {
         match algo {
             CompressionAlgo::Zstd => zstd::compress(bytes),
         }
@@ -95,79 +90,26 @@ impl CompressionCodec for DefaultCompressionCodec {
     }
 }
 
-/// Compressed bytes and options ready for persistence.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct CompressedBytes {
-    opts_json: String,
-    bytes: Vec<u8>,
-}
-
-impl CompressedBytes {
-    /// Returns the encoded compression options.
-    pub(crate) fn opts_json(&self) -> &str {
-        &self.opts_json
-    }
-
-    /// Returns the compressed bytes.
-    pub(crate) fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-
-    /// Returns the compressed byte length.
-    pub(crate) fn len(&self) -> usize {
-        self.bytes.len()
-    }
-
-    fn new(opts_json: String, bytes: Vec<u8>) -> Self {
-        Self { opts_json, bytes }
-    }
-}
-
 /// Stored compressed bytes and metadata needed to decode them.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct StoredCompressedBytes<'a> {
-    pub(crate) opts_json: &'a str,
     pub(crate) bytes: &'a [u8],
     pub(crate) uncompressed_len: usize,
 }
 
 mod zstd {
-    use serde::{Deserialize, Serialize};
-
-    use super::{
-        CompressedBytes, CompressionAlgo, CompressionError, CompressionResult,
-        StoredCompressedBytes,
-    };
+    use super::{CompressionAlgo, CompressionError, CompressionResult, StoredCompressedBytes};
 
     const LEVEL: i32 = 3;
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-    struct ZstdOptions {
-        level: i32,
-    }
-
-    pub(super) fn compress(bytes: &[u8]) -> CompressionResult<CompressedBytes> {
-        let compressed =
-            ::zstd::bulk::compress(bytes, LEVEL).map_err(|source| CompressionError::Compress {
-                algo: CompressionAlgo::Zstd,
-                source,
-            })?;
-        let opts = serde_json::to_string(&ZstdOptions { level: LEVEL }).map_err(|source| {
-            CompressionError::InvalidOptions {
-                algo: CompressionAlgo::Zstd,
-                source,
-            }
-        })?;
-        Ok(CompressedBytes::new(opts, compressed))
+    pub(super) fn compress(bytes: &[u8]) -> CompressionResult<Vec<u8>> {
+        ::zstd::bulk::compress(bytes, LEVEL).map_err(|source| CompressionError::Compress {
+            algo: CompressionAlgo::Zstd,
+            source,
+        })
     }
 
     pub(super) fn decompress(stored: StoredCompressedBytes<'_>) -> CompressionResult<Vec<u8>> {
-        let _opts = serde_json::from_str::<ZstdOptions>(stored.opts_json).map_err(|source| {
-            CompressionError::InvalidOptions {
-                algo: CompressionAlgo::Zstd,
-                source,
-            }
-        })?;
         ::zstd::bulk::decompress(stored.bytes, stored.uncompressed_len).map_err(|source| {
             CompressionError::Decompress {
                 algo: CompressionAlgo::Zstd,

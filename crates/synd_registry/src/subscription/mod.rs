@@ -83,6 +83,6 @@ pub struct Subscription {
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     pub crawl_policy: CrawlPolicy,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    /// When the relation was created. Editing attributes keeps this value.
+    pub subscribed_at: DateTime<Utc>,
 }

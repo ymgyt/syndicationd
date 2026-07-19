@@ -70,7 +70,7 @@ impl EventInput for ApiEvent {
     fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
             Event::TimelineChanged(event) => Ok(Self::TimelineChanged(ApiTimelineChanged::new(
-                event.timeline,
+                event.subscriber_id,
                 occurred_at,
                 event.affected_feeds,
             ))),

@@ -12,16 +12,15 @@ use crate::{
     },
     config::FeedRegistryConfig,
     crawl::{
-        dispatch::{DispatchQueueReader, DispatchQueueWriter, dispatch_queue},
+        dispatch::{DispatchQueueReader, DispatchQueueWriter, InflightCrawls, dispatch_queue},
         dispatcher::CrawlDispatcher,
         request::CrawlRequestHandler,
-        schedule::CrawlScheduleProj,
         target_list::CrawlTargetProj,
         worker::CrawlWorkerPool,
     },
     db::{
-        BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, EntryStore,
-        FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
+        BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, EntryStore, FeedRegistryDb,
+        FeedStore, SubscriptionStore, TimelineStore,
     },
     entry::EntryProj,
     error::FeedRegistryError,
@@ -146,7 +145,7 @@ where
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlScheduleStore + EventJournalAppend,
+    for<'tx> S::Tx<'tx>: CrawlTargetStore + EventJournalAppend,
 {
     pub async fn request_crawl(
         &self,
@@ -164,8 +163,7 @@ impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: BlobStore
-        + CrawlResultStore
-        + CrawlScheduleStore
+        + CrawlStateStore
         + CrawlTargetStore
         + FeedStore
         + EntryStore
@@ -273,8 +271,7 @@ where
     fn spawn_all(self, api_events: ApiEventPublisher) -> WorkerSet
     where
         for<'tx> S::Tx<'tx>: BlobStore
-            + CrawlResultStore
-            + CrawlScheduleStore
+            + CrawlStateStore
             + CrawlTargetStore
             + FeedStore
             + EntryStore
@@ -285,11 +282,12 @@ where
             + Send,
     {
         let (dispatch_queue_writer, dispatch_queue_reader) = self.dispatch_queue();
+        // Shared between the dispatcher (claims) and crawl jobs (releases).
+        let inflight = InflightCrawls::new();
 
         WorkerSet::new(vec![
             self.spawn_crawl_target_projection(),
-            self.spawn_crawl_schedule_projection(),
-            self.spawn_crawl_dispatcher(dispatch_queue_writer),
+            self.spawn_crawl_dispatcher(dispatch_queue_writer, inflight),
             self.spawn_crawl_worker_pool(dispatch_queue_reader),
             self.spawn_feed_projection(),
             self.spawn_entry_projection(),
@@ -308,19 +306,9 @@ where
         )
     }
 
-    fn spawn_crawl_schedule_projection(&self) -> WorkerHandle
-    where
-        for<'tx> S::Tx<'tx>: CrawlScheduleStore + CrawlResultStore + EventJournalAppend,
-    {
-        self.spawn_journal_worker(
-            self.config.workers.crawl_schedule_projection_poll_interval,
-            CrawlScheduleProj::new(),
-        )
-    }
-
     fn spawn_feed_projection(&self) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + FeedStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: BlobStore + FeedStore + EventJournalAppend,
     {
         self.spawn_journal_worker(
             self.config.workers.feed_projection_poll_interval,
@@ -330,7 +318,7 @@ where
 
     fn spawn_entry_projection(&self) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EntryStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: BlobStore + EntryStore + EventJournalAppend,
     {
         self.spawn_journal_worker(
             self.config.workers.entry_projection_poll_interval,
@@ -362,11 +350,16 @@ where
         dispatch_queue(self.config.crawl_worker_pool.max_running_jobs.max(1))
     }
 
-    fn spawn_crawl_dispatcher(&self, dispatch_queue_writer: DispatchQueueWriter) -> WorkerHandle
+    fn spawn_crawl_dispatcher(
+        &self,
+        dispatch_queue_writer: DispatchQueueWriter,
+        inflight: InflightCrawls,
+    ) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: CrawlScheduleStore + Send,
+        for<'tx> S::Tx<'tx>: CrawlTargetStore + Send,
     {
-        let dispatcher = CrawlDispatcher::new(dispatch_queue_writer, self.config.crawl_dispatch);
+        let dispatcher =
+            CrawlDispatcher::new(dispatch_queue_writer, inflight, self.config.crawl_dispatch);
         EventLoop::new(
             ReconcilerWorker::new(self.db.clone(), dispatcher, Arc::clone(&self.clock)),
             self.wake_publisher.clone(),
@@ -378,8 +371,12 @@ where
 
     fn spawn_crawl_worker_pool(&self, dispatch_queue_reader: DispatchQueueReader) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>:
-            BlobStore + CrawlResultStore + EventJournal + EventJournalAppend + Send,
+        for<'tx> S::Tx<'tx>: BlobStore
+            + CrawlStateStore
+            + CrawlTargetStore
+            + EventJournal
+            + EventJournalAppend
+            + Send,
     {
         let fetcher = Arc::new(FeedService::new(
             self.config.crawl_worker_pool.fetch.user_agent,

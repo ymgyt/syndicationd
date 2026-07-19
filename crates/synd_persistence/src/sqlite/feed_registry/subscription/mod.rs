@@ -6,25 +6,24 @@ use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     FeedSubscriptionAttrs, RegistryDbResult, SubscriberId, Subscription, SubscriptionKey,
     SubscriptionStore,
-    crawl::target_list::{FeedEndpointSubscription, FeedEndpointSubscriptionSet},
+    crawl::target_list::{FeedSubscriptions, SubscriptionPolicy},
     query::{Subscriptions, SubscriptionsQuery},
 };
 
 use super::{
     SqliteRegistryTx, codec,
     error::{DecodeResultExt, IntoDbResult, SqliteResult},
-    feed_endpoint,
+    feed,
     pagination::PageLimit,
 };
 
 const SUBSCRIPTION_SELECT_COLUMNS: &str = r#"
 s.subscriber_id AS subscriber_id,
-e.url AS feed_url,
+f.url AS feed_url,
 s.requirement AS requirement,
 s.category AS category,
 s.crawl_policy_json AS crawl_policy_json,
-s.created_at AS created_at,
-s.updated_at AS updated_at
+s.subscribed_at AS subscribed_at
 "#;
 
 async fn upsert(
@@ -36,33 +35,31 @@ async fn upsert(
     let requirement = attrs.requirement.map(|r| r.to_string());
     let category = attrs.category.map(|c| c.to_string());
     let policy_json = codec::encode_crawl_policy_json(attrs.crawl_policy)?;
-    let feed_endpoint_pk = feed_endpoint::upsert(tx, &subscription.feed_url, now, now).await?;
+    let feed_pk = feed::upsert_pk(tx, &subscription.feed_url).await?;
 
+    // Editing attributes keeps subscribed_at.
     sqlx::query(
         r#"
-            INSERT INTO feed_endpoint_subscription (
+            INSERT INTO feed_subscription (
                 subscriber_id,
-                feed_endpoint_pk,
+                feed_pk,
                 requirement,
                 category,
                 crawl_policy_json,
-                created_at,
-                updated_at
+                subscribed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(subscriber_id, feed_endpoint_pk) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(subscriber_id, feed_pk) DO UPDATE SET
                 requirement = excluded.requirement,
                 category = excluded.category,
-                crawl_policy_json = excluded.crawl_policy_json,
-                updated_at = excluded.updated_at
+                crawl_policy_json = excluded.crawl_policy_json
             "#,
     )
     .bind(subscription.subscriber_id.as_str())
-    .bind(feed_endpoint_pk)
+    .bind(feed_pk)
     .bind(requirement)
     .bind(category)
     .bind(policy_json)
-    .bind(now)
     .bind(now)
     .execute(&mut **tx)
     .await?;
@@ -77,11 +74,11 @@ async fn delete(
 ) -> SqliteResult<()> {
     sqlx::query(
         r#"
-            DELETE FROM feed_endpoint_subscription
+            DELETE FROM feed_subscription
             WHERE subscriber_id = ?
-              AND feed_endpoint_pk = (
+              AND feed_pk = (
                   SELECT pk
-                  FROM feed_endpoint
+                  FROM feed
                   WHERE url = ?
               )
             "#,
@@ -102,10 +99,10 @@ async fn contains(
     let row = sqlx::query(
         r#"
             SELECT 1 AS found
-            FROM feed_endpoint_subscription AS s
-            INNER JOIN feed_endpoint AS e
-                ON e.pk = s.feed_endpoint_pk
-            WHERE s.subscriber_id = ? AND e.url = ?
+            FROM feed_subscription AS s
+            INNER JOIN feed AS f
+                ON f.pk = s.feed_pk
+            WHERE s.subscriber_id = ? AND f.url = ?
             LIMIT 1
             "#,
     )
@@ -126,11 +123,11 @@ async fn list(
         let sql = format!(
             r#"
                 SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-                FROM feed_endpoint_subscription AS s
-                INNER JOIN feed_endpoint AS e
-                    ON e.pk = s.feed_endpoint_pk
-                WHERE s.subscriber_id = ? AND e.url > ?
-                ORDER BY e.url
+                FROM feed_subscription AS s
+                INNER JOIN feed AS f
+                    ON f.pk = s.feed_pk
+                WHERE s.subscriber_id = ? AND f.url > ?
+                ORDER BY f.url
                 LIMIT ?
                 "#
         );
@@ -144,11 +141,11 @@ async fn list(
         let sql = format!(
             r#"
                 SELECT {SUBSCRIPTION_SELECT_COLUMNS}
-                FROM feed_endpoint_subscription AS s
-                INNER JOIN feed_endpoint AS e
-                    ON e.pk = s.feed_endpoint_pk
+                FROM feed_subscription AS s
+                INNER JOIN feed AS f
+                    ON f.pk = s.feed_pk
                 WHERE s.subscriber_id = ?
-                ORDER BY e.url
+                ORDER BY f.url
                 LIMIT ?
                 "#
         );
@@ -173,20 +170,20 @@ async fn list(
     ))
 }
 
-async fn load_for_endpoint(
+async fn load_for_feed(
     tx: &mut Transaction<'_, Sqlite>,
     feed_url: &FeedUrl,
-) -> SqliteResult<FeedEndpointSubscriptionSet> {
-    let rows = sqlx::query_as::<_, FeedEndpointSubscriptionRow>(
+) -> SqliteResult<FeedSubscriptions> {
+    let rows = sqlx::query_as::<_, FeedSubscriptionRow>(
         r#"
             SELECT
                 s.subscriber_id AS subscriber_id,
-                e.url AS feed_url,
+                f.url AS feed_url,
                 s.crawl_policy_json AS crawl_policy_json
-            FROM feed_endpoint_subscription AS s
-            INNER JOIN feed_endpoint AS e
-                ON e.pk = s.feed_endpoint_pk
-            WHERE e.url = ?
+            FROM feed_subscription AS s
+            INNER JOIN feed AS f
+                ON f.pk = s.feed_pk
+            WHERE f.url = ?
             ORDER BY s.subscriber_id
             "#,
     )
@@ -196,13 +193,10 @@ async fn load_for_endpoint(
 
     let subscriptions = rows
         .into_iter()
-        .map(FeedEndpointSubscriptionRow::into_subscription)
+        .map(FeedSubscriptionRow::into_policy)
         .collect::<SqliteResult<Vec<_>>>()?;
 
-    Ok(FeedEndpointSubscriptionSet::new(
-        feed_url.clone(),
-        subscriptions,
-    ))
+    Ok(FeedSubscriptions::new(feed_url.clone(), subscriptions))
 }
 
 #[derive(sqlx::FromRow)]
@@ -212,8 +206,7 @@ struct SubscriptionRow {
     requirement: Option<String>,
     category: Option<String>,
     crawl_policy_json: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    subscribed_at: DateTime<Utc>,
 }
 
 impl SubscriptionRow {
@@ -229,27 +222,26 @@ impl SubscriptionRow {
                 .decode()?,
             category: self.category.map(Category::new).transpose().decode()?,
             crawl_policy: codec::decode_crawl_policy_json(&self.crawl_policy_json)?,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
+            subscribed_at: self.subscribed_at,
         })
     }
 }
 
 #[derive(sqlx::FromRow)]
-struct FeedEndpointSubscriptionRow {
+struct FeedSubscriptionRow {
     subscriber_id: String,
     feed_url: String,
     crawl_policy_json: String,
 }
 
-impl FeedEndpointSubscriptionRow {
-    fn into_subscription(self) -> SqliteResult<FeedEndpointSubscription> {
+impl FeedSubscriptionRow {
+    fn into_policy(self) -> SqliteResult<SubscriptionPolicy> {
         let subscription = SubscriptionKey::new(
             SubscriberId::new(self.subscriber_id),
             FeedUrl::parse(&self.feed_url).decode()?,
         );
 
-        Ok(FeedEndpointSubscription::new(
+        Ok(SubscriptionPolicy::new(
             subscription,
             codec::decode_crawl_policy_json(&self.crawl_policy_json)?,
         ))
@@ -289,11 +281,11 @@ impl SubscriptionStore for SqliteRegistryTx<'_> {
         list(&mut self.tx, query).await.db()
     }
 
-    async fn load_endpoint_subscriptions(
+    async fn load_feed_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<FeedEndpointSubscriptionSet> {
-        load_for_endpoint(&mut self.tx, feed_url).await.db()
+    ) -> RegistryDbResult<FeedSubscriptions> {
+        load_for_feed(&mut self.tx, feed_url).await.db()
     }
 }
 

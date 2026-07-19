@@ -7,19 +7,13 @@ use tokio::sync::{Mutex, MutexGuard};
 use crate::{
     crawl::{
         blob::{BlobRef, PutBlobCommand},
-        job::CrawlJobId,
-        result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
-        schedule::{
-            CompleteDispatchCommand, CrawlSchedule, DispatchCandidate, DueReason,
-            ScheduleSyncEntry, ScheduledCrawlTarget, UpsertCrawlScheduleCommand,
-        },
-        target_list::{
-            CrawlTarget, CrawlTargetState, FeedEndpointSubscription, FeedEndpointSubscriptionSet,
-        },
+        due::CrawlDueInput,
+        state::{CrawlState, UpsertCrawlStateCommand},
+        target_list::{CrawlTarget, CrawlTargetState, FeedSubscriptions, SubscriptionPolicy},
     },
     db::{
-        BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, EntryStore,
-        FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
+        BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, EntryStore, FeedRegistryDb,
+        FeedStore, SubscriptionStore, TimelineStore,
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
@@ -27,13 +21,13 @@ use crate::{
         Event, EventCursor, EventCursorPos, EventInterests, EventJournal, EventJournalAppend,
         EventType, JournaledEvent, ProcessorId,
     },
-    feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
+    feed::{UpsertFeedCommand, UpsertFeedOutcome},
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
         TimelineEntriesPage, TimelineEntriesQuery,
     },
     subscription::{FeedSubscriptionAttrs, SubscriberId, Subscription, SubscriptionKey},
-    timeline::{TimelineCatchup, TimelineKey},
+    timeline::TimelineCatchup,
 };
 
 /// Mutable registry state held by the in-memory adapter.
@@ -43,12 +37,11 @@ struct InMemoryState {
     cursors: HashMap<ProcessorId, i64>,
     subscriptions: HashMap<SubscriptionKeyParts, Subscription>,
     crawl_targets: HashMap<String, CrawlTarget>,
-    crawl_schedules: HashMap<String, CrawlSchedule>,
+    manual_requests: HashMap<String, DateTime<Utc>>,
     crawl_states: HashMap<String, CrawlState>,
     timeline_catchup_counts: HashMap<String, u64>,
     blobs: HashMap<i64, Vec<u8>>,
     next_blob_pk: i64,
-    next_result_pk: i64,
 }
 
 /// Hashable subscription identity used by in-memory maps.
@@ -199,10 +192,10 @@ impl SubscriptionStore for InMemoryRegistryTx<'_> {
     ) -> RegistryDbResult<()> {
         let state = &mut self.state;
         let key = SubscriptionKeyParts::new(&subscription.subscriber_id, &subscription.feed_url);
-        let created_at = state
+        let subscribed_at = state
             .subscriptions
             .get(&key)
-            .map_or(now, |subscription| subscription.created_at);
+            .map_or(now, |subscription| subscription.subscribed_at);
         state.subscriptions.insert(
             key,
             Subscription {
@@ -211,8 +204,7 @@ impl SubscriptionStore for InMemoryRegistryTx<'_> {
                 requirement: attrs.requirement,
                 category: attrs.category,
                 crawl_policy: attrs.crawl_policy,
-                created_at,
-                updated_at: now,
+                subscribed_at,
             },
         );
         Ok(())
@@ -273,17 +265,17 @@ impl SubscriptionStore for InMemoryRegistryTx<'_> {
         ))
     }
 
-    async fn load_endpoint_subscriptions(
+    async fn load_feed_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<FeedEndpointSubscriptionSet> {
+    ) -> RegistryDbResult<FeedSubscriptions> {
         let state = &self.state;
         let mut subscriptions = state
             .subscriptions
             .values()
             .filter(|subscription| subscription.feed_url == *feed_url)
             .map(|subscription| {
-                FeedEndpointSubscription::new(
+                SubscriptionPolicy::new(
                     SubscriptionKey::new(
                         subscription.subscriber_id.clone(),
                         subscription.feed_url.clone(),
@@ -298,10 +290,21 @@ impl SubscriptionStore for InMemoryRegistryTx<'_> {
                 .as_str()
                 .cmp(b.subscription.subscriber_id.as_str())
         });
-        Ok(FeedEndpointSubscriptionSet::new(
-            feed_url.clone(),
-            subscriptions,
-        ))
+        Ok(FeedSubscriptions::new(feed_url.clone(), subscriptions))
+    }
+}
+
+impl InMemoryState {
+    fn crawl_due_input(&self, target: &CrawlTarget) -> Option<CrawlDueInput> {
+        let CrawlTargetState::Active { effective_policy } = &target.state else {
+            return None;
+        };
+        Some(CrawlDueInput {
+            feed_url: target.feed_url.clone(),
+            polling: effective_policy.polling,
+            manual_requested_at: self.manual_requests.get(target.feed_url.as_str()).copied(),
+            state: self.crawl_states.get(target.feed_url.as_str()).cloned(),
+        })
     }
 }
 
@@ -314,164 +317,60 @@ impl CrawlTargetStore for InMemoryRegistryTx<'_> {
         Ok(())
     }
 
-    async fn load_target_for_endpoint(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> RegistryDbResult<Option<CrawlTarget>> {
+    async fn load_target(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<Option<CrawlTarget>> {
         let state = &self.state;
         Ok(state.crawl_targets.get(feed_url.as_str()).cloned())
     }
-}
 
-impl InMemoryRegistryTx<'_> {
-    fn store_schedule(
-        &mut self,
-        feed_url: FeedUrl,
-        target_updated_at: DateTime<Utc>,
-        next_crawl_after: Option<DateTime<Utc>>,
-        due_reason: DueReason,
-        dispatched_at: Option<DateTime<Utc>>,
-        synced_at: DateTime<Utc>,
-    ) {
-        let state = &mut self.state;
-        let key = feed_url.as_str().to_owned();
-        let created_at = state
-            .crawl_schedules
-            .get(&key)
-            .map_or(synced_at, |schedule| schedule.created_at);
-        let schedule = CrawlSchedule::builder()
-            .feed_url(feed_url)
-            .target_updated_at(target_updated_at)
-            .maybe_next_crawl_after(next_crawl_after)
-            .due_reason(due_reason)
-            .maybe_dispatched_at(dispatched_at)
-            .created_at(created_at)
-            .updated_at(synced_at)
-            .build();
-        state.crawl_schedules.insert(key, schedule);
-    }
-}
-
-impl CrawlScheduleStore for InMemoryRegistryTx<'_> {
-    async fn load_schedule_sync_entry(
+    async fn load_crawl_due_input(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<Option<ScheduleSyncEntry>> {
-        let state = &self.state;
-        let Some(target) = state.crawl_targets.get(feed_url.as_str()) else {
-            return Ok(None);
-        };
-        let schedule = state.crawl_schedules.get(feed_url.as_str()).cloned();
-        Ok(Some(ScheduleSyncEntry::new(
-            ScheduledCrawlTarget::from(target),
-            schedule,
-        )))
-    }
-
-    async fn upsert_schedule(
-        &mut self,
-        command: UpsertCrawlScheduleCommand,
-    ) -> RegistryDbResult<()> {
-        let dispatched_at = self
-            .state
-            .crawl_schedules
-            .get(command.feed_url.as_str())
-            .and_then(|schedule| schedule.dispatched_at);
-        self.store_schedule(
-            command.feed_url,
-            command.target_updated_at,
-            command.next_crawl_after,
-            command.due_reason,
-            dispatched_at,
-            command.synced_at,
-        );
-        Ok(())
-    }
-
-    async fn complete_dispatch(
-        &mut self,
-        command: CompleteDispatchCommand,
-    ) -> RegistryDbResult<()> {
-        self.store_schedule(
-            command.feed_url,
-            command.target_updated_at,
-            command.next_crawl_after,
-            command.due_reason,
-            None,
-            command.synced_at,
-        );
-        Ok(())
-    }
-
-    async fn list_dispatchable(
-        &mut self,
-        now: DateTime<Utc>,
-        stale_before: DateTime<Utc>,
-        limit: usize,
-    ) -> RegistryDbResult<Vec<DispatchCandidate>> {
-        let state = &self.state;
-        let mut candidates = state
-            .crawl_schedules
-            .values()
-            .filter_map(|schedule| {
-                let target = state.crawl_targets.get(schedule.feed_url.as_str())?;
-                if !matches!(target.state, CrawlTargetState::Active { .. }) {
-                    return None;
-                }
-                if !schedule.is_dispatchable(now, stale_before) {
-                    return None;
-                }
-
-                Some(DispatchCandidate {
-                    feed_url: schedule.feed_url.clone(),
-                    due_at: schedule.next_crawl_after.unwrap_or(now),
-                    due_reason: schedule.due_reason,
-                })
-            })
-            .collect::<Vec<_>>();
-        candidates.sort_by(|a, b| {
-            a.due_reason
-                .dispatch_priority()
-                .cmp(&b.due_reason.dispatch_priority())
-                .then_with(|| a.due_at.cmp(&b.due_at))
-                .then_with(|| a.feed_url.as_str().cmp(b.feed_url.as_str()))
-        });
-        candidates.truncate(limit);
-        Ok(candidates)
-    }
-
-    async fn mark_dispatched(
-        &mut self,
-        feed_urls: &[FeedUrl],
-        dispatched_at: DateTime<Utc>,
-    ) -> RegistryDbResult<()> {
-        let state = &mut self.state;
-        for feed_url in feed_urls {
-            if let Some(schedule) = state.crawl_schedules.get_mut(feed_url.as_str()) {
-                schedule.dispatched_at = Some(dispatched_at);
-                schedule.updated_at = dispatched_at;
-            }
-        }
-        Ok(())
-    }
-
-    async fn next_dispatch_at(
-        &mut self,
-        now: DateTime<Utc>,
-        stale_timeout: std::time::Duration,
-    ) -> RegistryDbResult<Option<DateTime<Utc>>> {
+    ) -> RegistryDbResult<Option<CrawlDueInput>> {
         let state = &self.state;
         Ok(state
-            .crawl_schedules
+            .crawl_targets
+            .get(feed_url.as_str())
+            .and_then(|target| state.crawl_due_input(target)))
+    }
+
+    async fn list_crawl_due_inputs(&mut self) -> RegistryDbResult<Vec<CrawlDueInput>> {
+        let state = &self.state;
+        let mut inputs = state
+            .crawl_targets
             .values()
-            .filter_map(|schedule| {
-                let target = state.crawl_targets.get(schedule.feed_url.as_str())?;
-                if !matches!(target.state, CrawlTargetState::Active { .. }) {
-                    return None;
-                }
-                schedule.next_dispatch_wake(now, stale_timeout)
-            })
-            .min())
+            .filter_map(|target| state.crawl_due_input(target))
+            .collect::<Vec<_>>();
+        inputs.sort_by(|a, b| a.feed_url.as_str().cmp(b.feed_url.as_str()));
+        Ok(inputs)
+    }
+
+    async fn set_manual_request(
+        &mut self,
+        feed_url: &FeedUrl,
+        requested_at: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        let state = &mut self.state;
+        state
+            .manual_requests
+            .entry(feed_url.as_str().to_owned())
+            .or_insert(requested_at);
+        Ok(())
+    }
+
+    async fn clear_manual_request(
+        &mut self,
+        feed_url: &FeedUrl,
+        served_by_crawl_started_at: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        let state = &mut self.state;
+        if state
+            .manual_requests
+            .get(feed_url.as_str())
+            .is_some_and(|requested_at| *requested_at <= served_by_crawl_started_at)
+        {
+            state.manual_requests.remove(feed_url.as_str());
+        }
+        Ok(())
     }
 }
 
@@ -492,29 +391,13 @@ impl BlobStore for InMemoryRegistryTx<'_> {
     }
 }
 
-impl CrawlResultStore for InMemoryRegistryTx<'_> {
-    async fn load_crawl_source(
-        &mut self,
-        _job_id: &CrawlJobId,
-    ) -> RegistryDbResult<Option<FeedSource>> {
-        Ok(None)
-    }
-
+impl CrawlStateStore for InMemoryRegistryTx<'_> {
     async fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<Option<CrawlState>> {
         let state = &self.state;
         Ok(state.crawl_states.get(feed_url.as_str()).cloned())
-    }
-
-    async fn record_crawl_result(
-        &mut self,
-        _command: RecordCrawlResultCommand,
-    ) -> RegistryDbResult<CrawlResultRef> {
-        let state = &mut self.state;
-        state.next_result_pk = state.next_result_pk.saturating_add(1);
-        Ok(CrawlResultRef::new(state.next_result_pk))
     }
 
     async fn upsert_crawl_state(
@@ -529,10 +412,6 @@ impl CrawlResultStore for InMemoryRegistryTx<'_> {
                 last: command.last,
                 health: command.health,
                 conditional: command.conditional,
-                timestamps: crate::crawl::result::CrawlStateTimestamps::new(
-                    command.updated_at,
-                    command.updated_at,
-                ),
             },
         );
         Ok(())
@@ -588,9 +467,8 @@ impl TimelineStore for InMemoryRegistryTx<'_> {
 
     async fn catchup_subscribed_feed(
         &mut self,
-        timeline: &TimelineKey,
+        subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
-        _now: DateTime<Utc>,
     ) -> RegistryDbResult<TimelineCatchup> {
         let inserted_items = self
             .state
@@ -599,7 +477,7 @@ impl TimelineStore for InMemoryRegistryTx<'_> {
             .copied()
             .unwrap_or_default();
         Ok(TimelineCatchup::new(
-            timeline.clone(),
+            subscriber_id.clone(),
             feed_url.clone(),
             inserted_items,
         ))
@@ -610,16 +488,14 @@ impl TimelineStore for InMemoryRegistryTx<'_> {
         _feed_url: &FeedUrl,
         _entry_id: &EntryId,
         _content_changed: bool,
-        _now: DateTime<Utc>,
-    ) -> RegistryDbResult<Vec<TimelineKey>> {
+    ) -> RegistryDbResult<Vec<SubscriberId>> {
         Ok(Vec::new())
     }
 
     async fn apply_feed_unsubscribed(
         &mut self,
         _subscription: &SubscriptionKey,
-        _now: DateTime<Utc>,
-    ) -> RegistryDbResult<Option<TimelineKey>> {
+    ) -> RegistryDbResult<Option<SubscriberId>> {
         Ok(None)
     }
 }
@@ -849,7 +725,7 @@ mod tests {
         let event = tokio::time::timeout(Duration::from_secs(1), api_events.recv()).await?;
         let event = event.map_err(|err| anyhow::anyhow!("api event recv failed: {err:?}"))?;
         let ApiEvent::TimelineChanged(event) = event;
-        assert_eq!(event.timeline.subscriber_id, subscriber_id());
+        assert_eq!(event.subscriber_id, subscriber_id());
         assert_eq!(event.affected_feeds, vec![feed_url]);
 
         ct.cancel();

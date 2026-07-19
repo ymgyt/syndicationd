@@ -4,25 +4,48 @@ use chrono::{DateTime, Utc};
 use tracing::debug;
 
 use crate::{
-    db::{BlobStore, CrawlResultStore, FeedRegistryDb, FeedStore},
+    db::{BlobStore, FeedRegistryDb, FeedStore},
     event::{
         CrawlJobFinishedEvent, Event, EventInput, EventType, Processor, ProcessorId,
         ProcessorResult, Projector, RegistryEvent,
     },
-    feed::UpsertFeedCommand,
+    feed::{FeedSource, UpsertFeedCommand},
 };
 
-impl EventInput for CrawlJobFinishedEvent {
-    const INTERESTS: &'static [EventType] = &[Self::TYPE];
+/// Event input used to project feed state: a finished crawl and when it was
+/// recorded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FeedProjInput {
+    pub event: CrawlJobFinishedEvent,
+    pub occurred_at: DateTime<Utc>,
+}
 
-    fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
+impl EventInput for FeedProjInput {
+    const INTERESTS: &'static [EventType] = &[CrawlJobFinishedEvent::TYPE];
+
+    fn from_event(event: Event, occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
-            Event::CrawlJobFinished(event) => Ok(event),
+            Event::CrawlJobFinished(event) => Ok(Self { event, occurred_at }),
             event => Err(crate::event::ProcessorError::unexpected_input(
                 "crawl job finished event",
                 &event,
             )),
         }
+    }
+}
+
+impl FeedProjInput {
+    /// The feed source observed by the finished crawl, if it accepted a body.
+    fn into_source(self) -> Option<FeedSource> {
+        let body_blob = self.event.body_blob?;
+        Some(
+            FeedSource::builder()
+                .feed_url(self.event.feed_url)
+                .crawl_job_id(self.event.job_id)
+                .body_blob(body_blob)
+                .seen_at(self.occurred_at)
+                .build(),
+        )
     }
 }
 
@@ -44,7 +67,7 @@ impl Default for FeedProj {
 }
 
 impl Processor for FeedProj {
-    type Input = CrawlJobFinishedEvent;
+    type Input = FeedProjInput;
 
     fn id(&self) -> ProcessorId {
         ProcessorId::FeedProjection
@@ -54,21 +77,16 @@ impl Processor for FeedProj {
 impl<S> Projector<S> for FeedProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + FeedStore + Send,
+    for<'tx> S::Tx<'tx>: BlobStore + FeedStore + Send,
 {
     async fn project(
         &mut self,
         tx: &mut S::Tx<'_>,
         input: Self::Input,
     ) -> ProcessorResult<Vec<Event>> {
-        let Some(source) = tx.load_crawl_source(&input.job_id).await? else {
+        let Some(source) = input.into_source() else {
             // Crawls without an accepted body (failures, not-modified) leave
             // no source; nothing to project.
-            debug!(
-                feed_url = input.feed_url.as_str(),
-                job_id = %input.job_id,
-                "feed projection skipped: no crawl source"
-            );
             return Ok(Vec::new());
         };
         let body = tx.load_blob(source.body_blob).await?;

@@ -12,7 +12,7 @@ mod crawl;
 mod entry;
 mod error;
 mod feed;
-mod feed_endpoint;
+
 mod journal;
 mod pagination;
 mod subscription;

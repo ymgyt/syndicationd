@@ -8,16 +8,14 @@ use synd_feed::{
     types::FeedUrl,
 };
 
-use super::CrawlResultRef;
-
-/// Current crawl state for one feed endpoint.
+/// Observation: what crawling has learned about one feed — the summary of
+/// the last crawl plus the conditional-fetch context for the next one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrawlState {
     pub feed_url: FeedUrl,
     pub last: LastCrawlResult,
     pub health: CrawlHealth,
     pub conditional: FeedConditionalFetch,
-    pub timestamps: CrawlStateTimestamps,
 }
 
 /// Last crawl-result facts projected into current state.
@@ -114,22 +112,6 @@ impl FailureStreak {
     }
 }
 
-/// Stored timestamps for the current crawl-state row.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CrawlStateTimestamps {
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl CrawlStateTimestamps {
-    pub fn new(created_at: DateTime<Utc>, updated_at: DateTime<Utc>) -> Self {
-        Self {
-            created_at,
-            updated_at,
-        }
-    }
-}
-
 /// Error fact projected into current crawl state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CrawlStateError {
@@ -221,30 +203,24 @@ impl fmt::Display for CrawlHttpErrorKind {
 /// Command to update current crawl state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpsertCrawlStateCommand {
-    pub last_result: CrawlResultRef,
     pub feed_url: FeedUrl,
     pub last: LastCrawlResult,
     pub health: CrawlHealth,
     pub conditional: FeedConditionalFetch,
-    pub updated_at: DateTime<Utc>,
 }
 
 impl UpsertCrawlStateCommand {
     pub fn new(
-        last_result: CrawlResultRef,
         feed_url: FeedUrl,
         last: LastCrawlResult,
         health: CrawlHealth,
         conditional: FeedConditionalFetch,
-        updated_at: DateTime<Utc>,
     ) -> Self {
         Self {
-            last_result,
             feed_url,
             last,
             health,
             conditional,
-            updated_at,
         }
     }
 }

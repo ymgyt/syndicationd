@@ -1,70 +1,67 @@
-use std::{fmt, num::NonZeroUsize, str::FromStr};
+use std::{fmt, str::FromStr};
 
 use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
     CrawlTargetStore, RegistryDbResult,
-    crawl::target_list::{CrawlTarget, CrawlTargetState},
+    crawl::{
+        due::CrawlDueInput,
+        target_list::{CrawlTarget, CrawlTargetState},
+    },
 };
 
-use super::super::{
-    SqliteRegistryTx, codec,
-    error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
-    feed_endpoint,
+use super::{
+    super::{
+        SqliteRegistryTx, codec,
+        error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
+        feed,
+    },
+    state::CrawlStateRow,
 };
 
 async fn upsert(tx: &mut Transaction<'_, Sqlite>, target: &CrawlTarget) -> SqliteResult<()> {
-    let feed_endpoint_pk = feed_endpoint::resolve_pk(tx, &target.feed_url).await?;
+    let feed_pk = feed::resolve_pk(tx, &target.feed_url).await?;
     let state = CrawlTargetStateRow::try_from(&target.state)?;
 
+    // A pending manual request belongs to the request/completion lifecycle
+    // and is preserved across target upserts.
     sqlx::query(
         r#"
             INSERT INTO crawl_target (
-                feed_endpoint_pk,
+                feed_pk,
                 state,
-                subscription_count,
-                effective_policy_json,
-                created_at,
-                updated_at
+                effective_policy_json
             )
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(feed_endpoint_pk) DO UPDATE SET
+            VALUES (?, ?, ?)
+            ON CONFLICT(feed_pk) DO UPDATE SET
                 state = excluded.state,
-                subscription_count = excluded.subscription_count,
-                effective_policy_json = excluded.effective_policy_json,
-                updated_at = excluded.updated_at
+                effective_policy_json = excluded.effective_policy_json
             "#,
     )
-    .bind(feed_endpoint_pk)
+    .bind(feed_pk)
     .bind(state.state.to_string())
-    .bind(state.subscription_count)
     .bind(state.effective_policy_json.as_deref())
-    .bind(target.created_at)
-    .bind(target.updated_at)
     .execute(&mut **tx)
     .await?;
 
     Ok(())
 }
 
-async fn load_for_endpoint(
+async fn load(
     tx: &mut Transaction<'_, Sqlite>,
     feed_url: &FeedUrl,
 ) -> SqliteResult<Option<CrawlTarget>> {
     let row = sqlx::query_as::<_, CrawlTargetRow>(
         r#"
             SELECT
-                e.url AS feed_url,
+                f.url AS feed_url,
                 ct.state AS state,
-                ct.subscription_count AS subscription_count,
-                ct.effective_policy_json AS effective_policy_json,
-                ct.created_at AS created_at,
-                ct.updated_at AS updated_at
+                ct.effective_policy_json AS effective_policy_json
             FROM crawl_target AS ct
-            INNER JOIN feed_endpoint AS e
-                ON e.pk = ct.feed_endpoint_pk
-            WHERE e.url = ?
+            INNER JOIN feed AS f
+                ON f.pk = ct.feed_pk
+            WHERE f.url = ?
             "#,
     )
     .bind(feed_url.as_str())
@@ -72,6 +69,89 @@ async fn load_for_endpoint(
     .await?;
 
     row.map(CrawlTargetRow::into_target).transpose()
+}
+
+const DUE_INPUT_SELECT: &str = r#"
+SELECT
+    f.url AS feed_url,
+    ct.effective_policy_json AS effective_policy_json,
+    ct.manual_requested_at AS manual_requested_at,
+    cs.last_started_at,
+    cs.last_finished_at,
+    cs.last_http_status,
+    cs.last_error_kind,
+    cs.failure_streak,
+    cs.retry_after,
+    cs.etag,
+    cs.last_modified
+FROM crawl_target AS ct
+INNER JOIN feed AS f
+    ON f.pk = ct.feed_pk
+LEFT JOIN crawl_state AS cs
+    ON cs.feed_pk = ct.feed_pk
+WHERE ct.state = 'active'
+"#;
+
+async fn load_due_input(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_url: &FeedUrl,
+) -> SqliteResult<Option<CrawlDueInput>> {
+    let sql = format!("{DUE_INPUT_SELECT} AND f.url = ?");
+    let row = sqlx::query_as::<_, CrawlDueInputRow>(&sql)
+        .bind(feed_url.as_str())
+        .fetch_optional(&mut **tx)
+        .await?;
+
+    row.map(CrawlDueInputRow::into_input).transpose()
+}
+
+async fn list_due_inputs(tx: &mut Transaction<'_, Sqlite>) -> SqliteResult<Vec<CrawlDueInput>> {
+    let sql = format!("{DUE_INPUT_SELECT} ORDER BY f.url");
+    let rows = sqlx::query_as::<_, CrawlDueInputRow>(&sql)
+        .fetch_all(&mut **tx)
+        .await?;
+
+    rows.into_iter().map(CrawlDueInputRow::into_input).collect()
+}
+
+async fn set_manual_request(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_url: &FeedUrl,
+    requested_at: DateTime<Utc>,
+) -> SqliteResult<()> {
+    sqlx::query(
+        r#"
+            UPDATE crawl_target
+            SET manual_requested_at = ?
+            WHERE feed_pk = (SELECT pk FROM feed WHERE url = ?)
+              AND manual_requested_at IS NULL
+            "#,
+    )
+    .bind(requested_at)
+    .bind(feed_url.as_str())
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn clear_manual_request(
+    tx: &mut Transaction<'_, Sqlite>,
+    feed_url: &FeedUrl,
+    served_by_crawl_started_at: DateTime<Utc>,
+) -> SqliteResult<()> {
+    sqlx::query(
+        r#"
+            UPDATE crawl_target
+            SET manual_requested_at = NULL
+            WHERE feed_pk = (SELECT pk FROM feed WHERE url = ?)
+              AND manual_requested_at <= ?
+            "#,
+    )
+    .bind(feed_url.as_str())
+    .bind(served_by_crawl_started_at)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,7 +190,6 @@ impl FromStr for CrawlTargetStateDb {
 
 struct CrawlTargetStateRow {
     state: CrawlTargetStateDb,
-    subscription_count: i64,
     effective_policy_json: Option<String>,
 }
 
@@ -119,19 +198,12 @@ impl TryFrom<&CrawlTargetState> for CrawlTargetStateRow {
 
     fn try_from(state: &CrawlTargetState) -> Result<Self, Self::Error> {
         match state {
-            CrawlTargetState::Active {
-                subscription_count,
-                effective_policy,
-            } => Ok(Self {
+            CrawlTargetState::Active { effective_policy } => Ok(Self {
                 state: CrawlTargetStateDb::Active,
-                subscription_count: i64::try_from(subscription_count.get()).map_err(|_| {
-                    SqliteError::decode_message("subscription count exceeds SQLite INTEGER range")
-                })?,
                 effective_policy_json: Some(codec::encode_crawl_policy_json(*effective_policy)?),
             }),
             CrawlTargetState::Inactive => Ok(Self {
                 state: CrawlTargetStateDb::Inactive,
-                subscription_count: 0,
                 effective_policy_json: None,
             }),
         }
@@ -142,39 +214,17 @@ impl TryFrom<CrawlTargetStateRow> for CrawlTargetState {
     type Error = SqliteError;
 
     fn try_from(row: CrawlTargetStateRow) -> Result<Self, Self::Error> {
-        if row.subscription_count < 0 {
-            return Err(SqliteError::decode_message(format!(
-                "crawl target subscription count must be non-negative: {}",
-                row.subscription_count
-            )));
-        }
-        let subscription_count = usize::try_from(row.subscription_count).map_err(|_| {
-            SqliteError::decode_message("crawl target subscription count exceeds usize range")
-        })?;
-
-        match (row.state, subscription_count, row.effective_policy_json) {
-            (CrawlTargetStateDb::Active, 0, _) => Err(SqliteError::decode_message(
-                "active crawl target subscription count must be positive",
-            )),
-            (CrawlTargetStateDb::Active, subscription_count, Some(policy_json)) => {
-                Ok(CrawlTargetState::Active {
-                    subscription_count: NonZeroUsize::new(subscription_count)
-                        .expect("active subscription count checked above"),
-                    effective_policy: codec::decode_crawl_policy_json(&policy_json)?,
-                })
-            }
-            (CrawlTargetStateDb::Active, _, None) => Err(SqliteError::decode_message(
+        match (row.state, row.effective_policy_json) {
+            (CrawlTargetStateDb::Active, Some(policy_json)) => Ok(CrawlTargetState::Active {
+                effective_policy: codec::decode_crawl_policy_json(&policy_json)?,
+            }),
+            (CrawlTargetStateDb::Active, None) => Err(SqliteError::decode_message(
                 "active crawl target requires an effective policy",
             )),
-            (CrawlTargetStateDb::Inactive, 0, None) => Ok(CrawlTargetState::Inactive),
-            (CrawlTargetStateDb::Inactive, _, Some(_)) => Err(SqliteError::decode_message(
+            (CrawlTargetStateDb::Inactive, None) => Ok(CrawlTargetState::Inactive),
+            (CrawlTargetStateDb::Inactive, Some(_)) => Err(SqliteError::decode_message(
                 "inactive crawl target must not have an effective policy",
             )),
-            (CrawlTargetStateDb::Inactive, subscription_count, None) => {
-                Err(SqliteError::decode_message(format!(
-                    "inactive crawl target subscription count must be zero: {subscription_count}"
-                )))
-            }
         }
     }
 }
@@ -183,25 +233,75 @@ impl TryFrom<CrawlTargetStateRow> for CrawlTargetState {
 struct CrawlTargetRow {
     feed_url: String,
     state: String,
-    subscription_count: i64,
     effective_policy_json: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
 }
 
 impl CrawlTargetRow {
     fn into_target(self) -> SqliteResult<CrawlTarget> {
         let state = CrawlTargetState::try_from(CrawlTargetStateRow {
             state: self.state.parse()?,
-            subscription_count: self.subscription_count,
             effective_policy_json: self.effective_policy_json,
         })?;
 
         Ok(CrawlTarget {
             feed_url: FeedUrl::parse(&self.feed_url).decode()?,
             state,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
+        })
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct CrawlDueInputRow {
+    feed_url: String,
+    effective_policy_json: Option<String>,
+    manual_requested_at: Option<DateTime<Utc>>,
+    last_started_at: Option<DateTime<Utc>>,
+    last_finished_at: Option<DateTime<Utc>>,
+    last_http_status: Option<i64>,
+    last_error_kind: Option<String>,
+    failure_streak: Option<i64>,
+    retry_after: Option<DateTime<Utc>>,
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
+impl CrawlDueInputRow {
+    fn into_input(self) -> SqliteResult<CrawlDueInput> {
+        let feed_url = FeedUrl::parse(&self.feed_url).decode()?;
+        let Some(policy_json) = self.effective_policy_json else {
+            return Err(SqliteError::decode_message(
+                "active crawl target requires an effective policy",
+            ));
+        };
+        let policy = codec::decode_crawl_policy_json(&policy_json)?;
+
+        // The LEFT JOIN yields state columns together or not at all.
+        let state = match (
+            self.last_started_at,
+            self.last_finished_at,
+            self.failure_streak,
+        ) {
+            (Some(last_started_at), Some(last_finished_at), Some(failure_streak)) => Some(
+                CrawlStateRow {
+                    last_started_at,
+                    last_finished_at,
+                    last_http_status: self.last_http_status,
+                    last_error_kind: self.last_error_kind,
+                    failure_streak,
+                    retry_after: self.retry_after,
+                    etag: self.etag,
+                    last_modified: self.last_modified,
+                }
+                .into_state(&feed_url)?,
+            ),
+            _ => None,
+        };
+
+        Ok(CrawlDueInput {
+            feed_url,
+            polling: policy.polling,
+            manual_requested_at: self.manual_requested_at,
+            state,
         })
     }
 }
@@ -211,11 +311,39 @@ impl CrawlTargetStore for SqliteRegistryTx<'_> {
         upsert(&mut self.tx, target).await.db()
     }
 
-    async fn load_target_for_endpoint(
+    async fn load_target(&mut self, feed_url: &FeedUrl) -> RegistryDbResult<Option<CrawlTarget>> {
+        load(&mut self.tx, feed_url).await.db()
+    }
+
+    async fn load_crawl_due_input(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> RegistryDbResult<Option<CrawlTarget>> {
-        load_for_endpoint(&mut self.tx, feed_url).await.db()
+    ) -> RegistryDbResult<Option<CrawlDueInput>> {
+        load_due_input(&mut self.tx, feed_url).await.db()
+    }
+
+    async fn list_crawl_due_inputs(&mut self) -> RegistryDbResult<Vec<CrawlDueInput>> {
+        list_due_inputs(&mut self.tx).await.db()
+    }
+
+    async fn set_manual_request(
+        &mut self,
+        feed_url: &FeedUrl,
+        requested_at: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        set_manual_request(&mut self.tx, feed_url, requested_at)
+            .await
+            .db()
+    }
+
+    async fn clear_manual_request(
+        &mut self,
+        feed_url: &FeedUrl,
+        served_by_crawl_started_at: DateTime<Utc>,
+    ) -> RegistryDbResult<()> {
+        clear_manual_request(&mut self.tx, feed_url, served_by_crawl_started_at)
+            .await
+            .db()
     }
 }
 

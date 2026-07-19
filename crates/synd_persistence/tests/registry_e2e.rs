@@ -1,19 +1,17 @@
 //! End-to-end tests driving the full registry event chain against real
 //! sqlite persistence and a local mock feed server:
 //!
-//! subscribe -> crawl target -> crawl schedule -> dispatch -> fetch ->
+//! subscribe -> crawl target -> due derivation -> dispatch -> fetch ->
 //! feed/entry projection -> timeline -> api event, and the crawl completion
-//! feeding back into the schedule (periodic advance and retry backoff).
+//! feeding back into the crawl state (health and retry facts).
 
 use std::time::Duration;
 
 use synd_feed::types::FeedUrl;
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    CrawlScheduleStore, FeedRegistry, FeedRegistryConfig, FeedRegistryDb, FeedRegistryWorkerConfig,
-    SubscribeFeedCommand, SubscriberId,
-    api::ApiEvent,
-    crawl::schedule::{CrawlSchedule, DueReason},
+    CrawlStateStore, FeedRegistry, FeedRegistryConfig, FeedRegistryDb, FeedRegistryWorkerConfig,
+    SubscribeFeedCommand, SubscriberId, api::ApiEvent, crawl::state::CrawlState,
     query::TimelineEntriesQuery,
 };
 use tokio_util::sync::CancellationToken;
@@ -48,28 +46,25 @@ fn subscribe_command(subscriber_id: &SubscriberId, feed_url: &FeedUrl) -> Subscr
     }
 }
 
-/// Polls the schedule row until `condition` holds or the timeout passes.
-async fn wait_for_schedule(
+/// Polls the crawl state until `condition` holds or the timeout passes.
+async fn wait_for_crawl_state(
     db: &SqliteFeedRegistryDb,
     feed_url: &FeedUrl,
-    condition: impl Fn(&CrawlSchedule) -> bool,
-) -> anyhow::Result<CrawlSchedule> {
+    condition: impl Fn(&CrawlState) -> bool,
+) -> anyhow::Result<CrawlState> {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     loop {
         let mut tx = db.begin().await?;
-        let schedule = tx
-            .load_schedule_sync_entry(feed_url)
-            .await?
-            .and_then(|entry| entry.schedule);
+        let state = tx.load_crawl_state(feed_url).await?;
         drop(tx);
 
-        if let Some(schedule) = &schedule
-            && condition(schedule)
+        if let Some(state) = &state
+            && condition(state)
         {
-            return Ok(schedule.clone());
+            return Ok(state.clone());
         }
         if tokio::time::Instant::now() > deadline {
-            anyhow::bail!("schedule did not reach expected state: {schedule:?}");
+            anyhow::bail!("crawl state did not reach expected state: {state:?}");
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
@@ -96,7 +91,7 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
         .await?
         .map_err(|err| anyhow::anyhow!("api event recv failed: {err:?}"))?;
     let ApiEvent::TimelineChanged(changed) = event;
-    assert_eq!(changed.timeline.subscriber_id, subscriber_id);
+    assert_eq!(changed.subscriber_id, subscriber_id);
     assert_eq!(changed.affected_feeds, vec![feed_url.clone()]);
 
     // Timeline items are queryable through the read side.
@@ -109,13 +104,10 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
         .await?;
     assert!(!page.nodes.is_empty(), "timeline should contain entries");
 
-    // The finished crawl is reflected back into the schedule: the inflight
-    // marker is cleared and the next periodic crawl is scheduled.
-    let schedule = wait_for_schedule(&db, &feed_url, |schedule| {
-        schedule.dispatched_at.is_none() && schedule.next_crawl_after.is_some()
-    })
-    .await?;
-    assert_eq!(schedule.due_reason, DueReason::Periodic);
+    // The finished crawl leaves its observation behind: a healthy state the
+    // scheduler derives the next periodic crawl from.
+    let state = wait_for_crawl_state(&db, &feed_url, |state| state.last.is_normal()).await?;
+    assert_eq!(state.health.failure_streak.value(), 0);
 
     ct.cancel();
     drop(workers);
@@ -123,7 +115,7 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
 }
 
 #[tokio::test]
-async fn failed_crawl_schedules_retry() -> anyhow::Result<()> {
+async fn failed_crawl_records_failure_state_for_retry() -> anyhow::Result<()> {
     let mock_addr = spawn_mock_feed_server().await?;
     let dir = tempfile::tempdir()?;
     let db = migrated_registry_db(&dir).await?;
@@ -137,15 +129,12 @@ async fn failed_crawl_schedules_retry() -> anyhow::Result<()> {
         .subscribe(subscribe_command(&subscriber_id, &feed_url))
         .await?;
 
-    // The failed crawl must feed back into the schedule as a retry with the
-    // inflight marker cleared.
-    let schedule = wait_for_schedule(&db, &feed_url, |schedule| {
-        schedule.dispatched_at.is_none() && schedule.due_reason == DueReason::Retry
-    })
-    .await?;
+    // The failed crawl must leave the failure facts the scheduler derives
+    // the retry backoff from.
+    let state = wait_for_crawl_state(&db, &feed_url, |state| !state.last.is_normal()).await?;
     assert!(
-        schedule.next_crawl_after.is_some(),
-        "retry should schedule a next crawl"
+        state.health.failure_streak.value() >= 1,
+        "failure streak should grow"
     );
 
     ct.cancel();

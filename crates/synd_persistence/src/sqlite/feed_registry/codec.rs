@@ -2,7 +2,7 @@ use synd_feed::feed::service::{FeedFetchFailureKind, FeedParseErrorKind};
 use synd_registry::{
     crawl::{
         policy::CrawlPolicy,
-        result::{CrawlHttpErrorKind, CrawlStateErrorKind},
+        state::{CrawlHttpErrorKind, CrawlStateErrorKind},
     },
     entry::EntryAttrs,
 };
@@ -90,7 +90,7 @@ fn unknown_value(field: &'static str, value: &str) -> SqliteError {
 #[cfg(test)]
 mod tests {
     use synd_feed::feed::service::{FeedFetchFailureKind, FeedParseErrorKind};
-    use synd_registry::crawl::result::{CrawlHttpErrorKind, CrawlStateErrorKind};
+    use synd_registry::crawl::state::{CrawlHttpErrorKind, CrawlStateErrorKind};
 
     use super::{decode_crawl_state_error_kind, encode_crawl_state_error_kind};
 

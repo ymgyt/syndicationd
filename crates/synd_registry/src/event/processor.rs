@@ -106,7 +106,6 @@ impl ClassifyError for ProcessorError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProcessorId {
     CrawlTargetProjection,
-    CrawlScheduleProjection,
     FeedProjection,
     EntryProjection,
     TimelineProjection,
@@ -117,7 +116,7 @@ impl ProcessorId {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::CrawlTargetProjection => "CrawlTargetProjection",
-            Self::CrawlScheduleProjection => "CrawlScheduleProjection",
+
             Self::FeedProjection => "FeedProjection",
             Self::EntryProjection => "EntryProjection",
             Self::TimelineProjection => "TimelineProjection",

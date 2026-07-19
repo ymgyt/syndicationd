@@ -5,14 +5,16 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use synd_feed::types::{Entry as SyndFeedEntry, EntryId, Feed as SyndFeed, FeedType, FeedUrl};
 
-use crate::{
-    crawl::{job::CrawlJobId, result::CrawlResultRef},
-    feed::FeedSource,
-};
+use crate::feed::FeedSource;
 
 mod projection;
 
 pub use projection::{EntryProj, EntryProjInput};
+
+/// Upper bound of the summary materialized from content when the feed
+/// declares no summary. Keeps hot reads small; the full content is stored
+/// separately and never travels with list queries.
+const SUMMARY_FALLBACK_MAX_BYTES: usize = 4 * 1024;
 
 /// A registry entry entity recognized by synd.
 #[derive(Debug, Clone, Builder, PartialEq, Eq)]
@@ -20,9 +22,9 @@ pub struct Entry {
     pub id: EntryId,
     pub feed_url: FeedUrl,
     pub attrs: EntryAttrs,
+    /// Full entry content. Kept out of `attrs` so hot queries do not carry it.
+    pub content: Option<String>,
     pub order_key: EntryOrderKey,
-    pub lifecycle: EntryLifecycle,
-    pub source: EntrySourceRef,
 }
 
 impl Entry {
@@ -32,39 +34,40 @@ impl Entry {
             .id(appearance.id)
             .feed_url(source.feed_url.clone())
             .attrs(appearance.attrs)
+            .maybe_content(appearance.content)
             .order_key(order_key)
-            .lifecycle(EntryLifecycle::first_seen(source.seen_at))
-            .source(EntrySourceRef::from(source))
             .build()
     }
 
-    fn reconcile(self, source: &FeedSource, appearance: EntryAppearance) -> EntryChange {
-        let changed = self.attrs != appearance.attrs;
+    /// Reconciles a new appearance with this stored entry. Returns `None`
+    /// when nothing observable changed, so unchanged entries cost no write.
+    fn reconcile(self, appearance: EntryAppearance) -> Option<EntryChange> {
+        if self.attrs == appearance.attrs && self.content == appearance.content {
+            return None;
+        }
         let entry = Self::builder()
             .id(self.id)
             .feed_url(self.feed_url)
             .attrs(appearance.attrs)
+            .maybe_content(appearance.content)
             // order_key is immutable: keep the key resolved at discovery even
             // if the feed later changes published/updated timestamps
             .order_key(self.order_key)
-            .lifecycle(self.lifecycle.seen_again(source.seen_at))
-            .source(EntrySourceRef::from(source))
             .build();
-        if changed {
-            EntryChange::Changed(entry)
-        } else {
-            EntryChange::AlreadySeen(entry)
-        }
+        Some(EntryChange::Changed(entry))
     }
 }
 
 /// Feed-derived entry attributes owned by the registry current model.
+///
+/// `summary` is materialized at observation: when the feed declares none,
+/// a truncated slice of the content substitutes, so readers never need the
+/// full content for list rendering.
 #[derive(Debug, Clone, Builder, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct EntryAttrs {
     pub title: Option<String>,
     pub summary: Option<String>,
-    pub content: Option<String>,
     pub website_url: Option<String>,
     pub published_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
@@ -72,10 +75,13 @@ pub struct EntryAttrs {
 
 impl EntryAttrs {
     fn from_feed_entry(feed_type: FeedType, entry: &SyndFeedEntry) -> Self {
+        let summary = entry
+            .summary()
+            .map(str::to_owned)
+            .or_else(|| entry.content().map(summary_fallback));
         Self::builder()
             .maybe_title(entry.title().map(str::to_owned))
-            .maybe_summary(entry.summary().map(str::to_owned))
-            .maybe_content(entry.content().map(str::to_owned))
+            .maybe_summary(summary)
             .maybe_website_url(entry.website_url(feed_type).map(str::to_owned))
             .maybe_published_at(entry.published())
             .maybe_updated_at(entry.updated())
@@ -83,9 +89,17 @@ impl EntryAttrs {
     }
 }
 
-/// Order key that places an entry in timeline projections.
+fn summary_fallback(content: &str) -> String {
+    let mut end = SUMMARY_FALLBACK_MAX_BYTES.min(content.len());
+    while !content.is_char_boundary(end) {
+        end -= 1;
+    }
+    content[..end].to_owned()
+}
+
+/// Order key that places an entry in the canonical entry order.
 /// Resolved once when the entry is discovered and frozen afterwards so that
-/// timeline order and pagination cursors stay stable.
+/// display order and pagination cursors stay stable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EntryOrderKey(DateTime<Utc>);
 
@@ -106,53 +120,12 @@ impl EntryOrderKey {
     }
 }
 
-/// Lifecycle timestamps for a registry entry.
-#[derive(Debug, Clone, Copy, Builder, PartialEq, Eq)]
-pub struct EntryLifecycle {
-    pub first_seen_at: DateTime<Utc>,
-    pub last_seen_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl EntryLifecycle {
-    fn first_seen(now: DateTime<Utc>) -> Self {
-        Self::builder()
-            .first_seen_at(now)
-            .last_seen_at(now)
-            .updated_at(now)
-            .build()
-    }
-
-    fn seen_again(self, now: DateTime<Utc>) -> Self {
-        Self::builder()
-            .first_seen_at(self.first_seen_at)
-            .last_seen_at(now)
-            .updated_at(now)
-            .build()
-    }
-}
-
-/// Crawl source that last supplied a registry entry.
-#[derive(Debug, Clone, Builder, PartialEq, Eq)]
-pub struct EntrySourceRef {
-    pub crawl_job_id: CrawlJobId,
-    pub result_ref: CrawlResultRef,
-}
-
-impl From<&FeedSource> for EntrySourceRef {
-    fn from(source: &FeedSource) -> Self {
-        Self::builder()
-            .crawl_job_id(source.crawl_job_id.clone())
-            .result_ref(source.result_ref)
-            .build()
-    }
-}
-
 /// An entry's appearance in one accepted feed source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryAppearance {
     id: EntryId,
     attrs: EntryAttrs,
+    content: Option<String>,
 }
 
 impl EntryAppearance {
@@ -161,6 +134,7 @@ impl EntryAppearance {
         Self {
             id: entry.id(),
             attrs,
+            content: entry.content().map(str::to_owned),
         }
     }
 
@@ -245,14 +219,19 @@ impl EntryReconciliation {
         }
     }
 
+    /// Diffs appearances against stored entries. Unchanged entries produce
+    /// no change at all.
     pub fn reconcile(mut self) -> EntryChanges {
         let mut changes = Vec::new();
         for appearance in self.appearances.into_entries() {
             let change = match self.existing.remove(appearance.id()) {
-                Some(entry) => entry.reconcile(&self.source, appearance),
-                None => EntryChange::Discovered(Entry::discover(&self.source, appearance)),
+                Some(entry) => entry.reconcile(appearance),
+                None => Some(EntryChange::Discovered(Entry::discover(
+                    &self.source,
+                    appearance,
+                ))),
             };
-            changes.push(change);
+            changes.extend(change);
         }
         EntryChanges::new(changes)
     }
@@ -263,13 +242,12 @@ impl EntryReconciliation {
 pub enum EntryChange {
     Discovered(Entry),
     Changed(Entry),
-    AlreadySeen(Entry),
 }
 
 impl EntryChange {
     pub fn entry(&self) -> &Entry {
         match self {
-            Self::Discovered(entry) | Self::Changed(entry) | Self::AlreadySeen(entry) => entry,
+            Self::Discovered(entry) | Self::Changed(entry) => entry,
         }
     }
 }

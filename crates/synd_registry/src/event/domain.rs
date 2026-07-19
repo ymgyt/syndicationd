@@ -1,15 +1,12 @@
+use chrono::{DateTime, Utc};
 use derive_more::From;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use strum::{Display, EnumDiscriminants, EnumString, IntoStaticStr};
 use synd_feed::types::{EntryId, FeedUrl};
 
 use crate::{
-    crawl::{
-        job::{CrawlJob, CrawlJobId},
-        policy::CrawlPolicy,
-    },
-    subscription::{FeedSubscriptionAttrs, SubscriptionKey},
-    timeline::TimelineKey,
+    crawl::{blob::BlobRef, job::CrawlJobId, policy::CrawlPolicy},
+    subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
 };
 
 /// A typed fact recorded in the registry event journal.
@@ -36,9 +33,6 @@ pub enum Event {
     #[serde(rename = "crawl.target.deactivated")]
     #[strum_discriminants(strum(serialize = "crawl.target.deactivated"))]
     CrawlTargetDeactivated(CrawlTargetDeactivatedEvent),
-    #[serde(rename = "crawl.schedule.updated")]
-    #[strum_discriminants(strum(serialize = "crawl.schedule.updated"))]
-    CrawlScheduleUpdated(CrawlScheduleUpdatedEvent),
     #[serde(rename = "crawl.requested")]
     #[strum_discriminants(strum(serialize = "crawl.requested"))]
     CrawlRequested(CrawlRequestedEvent),
@@ -245,18 +239,6 @@ impl CrawlTargetDeactivatedEvent {
     }
 }
 
-/// The crawl schedule row for one feed was created or updated.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CrawlScheduleUpdatedEvent {
-    pub feed_url: FeedUrl,
-}
-
-impl CrawlScheduleUpdatedEvent {
-    pub fn new(feed_url: FeedUrl) -> Self {
-        Self { feed_url }
-    }
-}
-
 /// A crawl was explicitly requested for one feed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlRequestedEvent {
@@ -270,21 +252,30 @@ impl CrawlRequestedEvent {
 }
 
 /// A crawl job completed and moved out of the running set.
+///
+/// `body_blob` references the fetched body when the crawl observed one;
+/// events carry blob references, never the bytes themselves.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlJobFinishedEvent {
     pub job_id: CrawlJobId,
     pub feed_url: FeedUrl,
+    pub started_at: DateTime<Utc>,
+    pub body_blob: Option<BlobRef>,
 }
 
 impl CrawlJobFinishedEvent {
-    pub fn new(job_id: CrawlJobId, feed_url: FeedUrl) -> Self {
-        Self { job_id, feed_url }
-    }
-}
-
-impl From<CrawlJob> for CrawlJobFinishedEvent {
-    fn from(job: CrawlJob) -> Self {
-        Self::new(job.job_id, job.feed_url)
+    pub fn new(
+        job_id: CrawlJobId,
+        feed_url: FeedUrl,
+        started_at: DateTime<Utc>,
+        body_blob: Option<BlobRef>,
+    ) -> Self {
+        Self {
+            job_id,
+            feed_url,
+            started_at,
+            body_blob,
+        }
     }
 }
 
@@ -293,14 +284,17 @@ impl From<CrawlJob> for CrawlJobFinishedEvent {
 pub struct FeedDiscoveredEvent {
     pub feed_url: FeedUrl,
     pub crawl_job_id: CrawlJobId,
+    /// The body the feed state was parsed from; input for entry projection.
+    pub body_blob: BlobRef,
 }
 
 impl FeedDiscoveredEvent {
     /// Creates an event for a feed first observed by the registry.
-    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId) -> Self {
+    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId, body_blob: BlobRef) -> Self {
         Self {
             feed_url,
             crawl_job_id,
+            body_blob,
         }
     }
 }
@@ -310,14 +304,17 @@ impl FeedDiscoveredEvent {
 pub struct FeedChangedEvent {
     pub feed_url: FeedUrl,
     pub crawl_job_id: CrawlJobId,
+    /// The body the feed state was parsed from; input for entry projection.
+    pub body_blob: BlobRef,
 }
 
 impl FeedChangedEvent {
     /// Creates an event for a changed feed observed by a crawl job.
-    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId) -> Self {
+    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId, body_blob: BlobRef) -> Self {
         Self {
             feed_url,
             crawl_job_id,
+            body_blob,
         }
     }
 }
@@ -327,17 +324,12 @@ impl FeedChangedEvent {
 pub struct EntryDiscoveredEvent {
     pub feed_url: FeedUrl,
     pub entry_id: EntryId,
-    pub crawl_job_id: CrawlJobId,
 }
 
 impl EntryDiscoveredEvent {
     /// Creates an event for an entry first observed by the registry.
-    pub fn new(feed_url: FeedUrl, entry_id: EntryId, crawl_job_id: CrawlJobId) -> Self {
-        Self {
-            feed_url,
-            entry_id,
-            crawl_job_id,
-        }
+    pub fn new(feed_url: FeedUrl, entry_id: EntryId) -> Self {
+        Self { feed_url, entry_id }
     }
 }
 
@@ -346,31 +338,26 @@ impl EntryDiscoveredEvent {
 pub struct EntryChangedEvent {
     pub feed_url: FeedUrl,
     pub entry_id: EntryId,
-    pub crawl_job_id: CrawlJobId,
 }
 
 impl EntryChangedEvent {
     /// Creates an event for a changed entry observed by a feed source.
-    pub fn new(feed_url: FeedUrl, entry_id: EntryId, crawl_job_id: CrawlJobId) -> Self {
-        Self {
-            feed_url,
-            entry_id,
-            crawl_job_id,
-        }
+    pub fn new(feed_url: FeedUrl, entry_id: EntryId) -> Self {
+        Self { feed_url, entry_id }
     }
 }
 
-/// Timeline membership changed for a subscriber-visible timeline.
+/// Timeline membership changed for one subscriber's timeline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TimelineChangedEvent {
-    pub timeline: TimelineKey,
+    pub subscriber_id: SubscriberId,
     pub affected_feeds: Vec<FeedUrl>,
 }
 
 impl TimelineChangedEvent {
-    pub fn new(timeline: TimelineKey, affected_feeds: Vec<FeedUrl>) -> Self {
+    pub fn new(subscriber_id: SubscriberId, affected_feeds: Vec<FeedUrl>) -> Self {
         Self {
-            timeline,
+            subscriber_id,
             affected_feeds,
         }
     }
@@ -398,10 +385,6 @@ impl RegistryEvent for CrawlTargetPolicyChangedEvent {
 
 impl RegistryEvent for CrawlTargetDeactivatedEvent {
     const TYPE: EventType = EventType::CrawlTargetDeactivated;
-}
-
-impl RegistryEvent for CrawlScheduleUpdatedEvent {
-    const TYPE: EventType = EventType::CrawlScheduleUpdated;
 }
 
 impl RegistryEvent for CrawlRequestedEvent {

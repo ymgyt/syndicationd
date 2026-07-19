@@ -1,11 +1,11 @@
 pub mod blob;
-pub mod completion;
+pub(crate) mod completion;
 pub(crate) mod dispatch;
 pub(crate) mod dispatcher;
+pub mod due;
 pub mod job;
 pub mod policy;
 pub mod request;
-pub mod result;
-pub mod schedule;
+pub mod state;
 pub mod target_list;
 pub mod worker;

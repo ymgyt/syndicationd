@@ -1,7 +1,11 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Database reference to one stored byte blob.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Serializes as the raw pk so journal events can carry blob references.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct BlobRef {
     pk: i64,
 }

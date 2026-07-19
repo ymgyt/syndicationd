@@ -105,7 +105,7 @@ async fn load_cursor(
         r"
         SELECT position
         FROM event_cursor
-        WHERE consumer = ?
+        WHERE processor = ?
         ",
     )
     .bind(processor.as_str())
@@ -128,9 +128,9 @@ async fn advance_cursor(
     let position = decode_event_cursor_position(cursor.position())?;
     sqlx::query(
         r"
-        INSERT INTO event_cursor (consumer, position)
+        INSERT INTO event_cursor (processor, position)
         VALUES (?, ?)
-        ON CONFLICT(consumer) DO UPDATE SET
+        ON CONFLICT(processor) DO UPDATE SET
             position = CASE
                 WHEN excluded.position > event_cursor.position
                 THEN excluded.position

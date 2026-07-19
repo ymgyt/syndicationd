@@ -26,8 +26,8 @@ pub use config::{CrawlDispatchConfig, FeedRegistryConfig, FeedRegistryWorkerConf
 pub use crawl::request::{CrawlRequestReject, RequestCrawlOutcome};
 pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
 pub use db::{
-    BlobStore, CommitTx, CrawlResultStore, CrawlScheduleStore, CrawlTargetStore, EntryStore,
-    FeedRegistryDb, FeedStore, SubscriptionStore, TimelineStore,
+    BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, EntryStore, FeedRegistryDb, FeedStore,
+    SubscriptionStore, TimelineStore,
 };
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 #[cfg(any(test, feature = "test"))]

@@ -6,24 +6,20 @@ use synd_feed::types::{EntryId, FeedUrl};
 use crate::{
     crawl::{
         blob::{BlobRef, PutBlobCommand},
-        job::CrawlJobId,
-        result::{CrawlResultRef, CrawlState, RecordCrawlResultCommand, UpsertCrawlStateCommand},
-        schedule::{
-            CompleteDispatchCommand, DispatchCandidate, ScheduleSyncEntry,
-            UpsertCrawlScheduleCommand,
-        },
-        target_list::{CrawlTarget, FeedEndpointSubscriptionSet},
+        due::CrawlDueInput,
+        state::{CrawlState, UpsertCrawlStateCommand},
+        target_list::{CrawlTarget, FeedSubscriptions},
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
     event::{EventJournal, EventJournalAppend},
-    feed::{FeedSource, UpsertFeedCommand, UpsertFeedOutcome},
+    feed::{UpsertFeedCommand, UpsertFeedOutcome},
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
         TimelineEntriesPage, TimelineEntriesQuery,
     },
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
-    timeline::{TimelineCatchup, TimelineKey},
+    timeline::TimelineCatchup,
 };
 
 /// Opens registry database transactions.
@@ -37,6 +33,8 @@ pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
 
 /// Transactional operations over feed subscription state.
 pub trait SubscriptionStore {
+    /// Creates or updates the relation. `now` becomes `subscribed_at` on
+    /// creation; editing an existing relation keeps the original value.
     fn upsert_subscription(
         &mut self,
         subscription: &SubscriptionKey,
@@ -61,69 +59,64 @@ pub trait SubscriptionStore {
         query: SubscriptionsQuery,
     ) -> impl Future<Output = RegistryDbResult<Subscriptions>> + Send;
 
-    fn load_endpoint_subscriptions(
+    fn load_feed_subscriptions(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<FeedEndpointSubscriptionSet>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<FeedSubscriptions>> + Send;
 }
 
 /// Transactional operations over crawl target state.
 pub trait CrawlTargetStore {
+    /// Writes the target's declared state. A pending manual request on the
+    /// row is preserved: it belongs to the request/completion lifecycle.
     fn upsert_target(
         &mut self,
         target: &CrawlTarget,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    fn load_target_for_endpoint(
+    fn load_target(
         &mut self,
         feed_url: &FeedUrl,
     ) -> impl Future<Output = RegistryDbResult<Option<CrawlTarget>>> + Send;
-}
 
-/// Transactional crawl schedule operations.
-pub trait CrawlScheduleStore {
-    fn load_schedule_sync_entry(
+    /// Loads the scheduler facts for one active target.
+    fn load_crawl_due_input(
         &mut self,
         feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<Option<ScheduleSyncEntry>>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<Option<CrawlDueInput>>> + Send;
 
-    /// Creates or updates one schedule row, preserving any inflight dispatch marker.
-    fn upsert_schedule(
+    /// Loads the scheduler facts for every active target.
+    fn list_crawl_due_inputs(
         &mut self,
-        command: UpsertCrawlScheduleCommand,
+    ) -> impl Future<Output = RegistryDbResult<Vec<CrawlDueInput>>> + Send;
+
+    /// Marks a pending manual crawl request unless one is already pending.
+    fn set_manual_request(
+        &mut self,
+        feed_url: &FeedUrl,
+        requested_at: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 
-    /// Clears the inflight dispatch marker and schedules the next crawl.
-    fn complete_dispatch(
+    /// Clears a pending manual request served by a crawl that started at or
+    /// after it. Requests made while the crawl was running stay pending.
+    fn clear_manual_request(
         &mut self,
-        command: CompleteDispatchCommand,
+        feed_url: &FeedUrl,
+        served_by_crawl_started_at: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+}
 
-    /// Lists active-target rows that are due and not inflight, plus inflight
-    /// rows whose dispatch became stale, ordered by due-reason priority and
-    /// due time.
-    fn list_dispatchable(
+/// Transactional operations over per-feed crawl observation state.
+pub trait CrawlStateStore {
+    fn load_crawl_state(
         &mut self,
-        now: DateTime<Utc>,
-        stale_before: DateTime<Utc>,
-        limit: usize,
-    ) -> impl Future<Output = RegistryDbResult<Vec<DispatchCandidate>>> + Send;
+        feed_url: &FeedUrl,
+    ) -> impl Future<Output = RegistryDbResult<Option<CrawlState>>> + Send;
 
-    /// Marks the rows as inflight so they are not dispatched again before
-    /// their crawl finishes or the stale deadline passes.
-    fn mark_dispatched(
+    fn upsert_crawl_state(
         &mut self,
-        feed_urls: &[FeedUrl],
-        dispatched_at: DateTime<Utc>,
+        command: UpsertCrawlStateCommand,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
-
-    /// Earliest future instant the dispatcher must run: the next due time of
-    /// a non-inflight row, or the stale deadline of an inflight row.
-    fn next_dispatch_at(
-        &mut self,
-        now: DateTime<Utc>,
-        stale_timeout: std::time::Duration,
-    ) -> impl Future<Output = RegistryDbResult<Option<DateTime<Utc>>>> + Send;
 }
 
 /// Transactional generic blob-store operations.
@@ -137,29 +130,6 @@ pub trait BlobStore {
         &mut self,
         blob: BlobRef,
     ) -> impl Future<Output = RegistryDbResult<Vec<u8>>> + Send;
-}
-
-/// Transactional operations for persisting one crawl job completion.
-pub trait CrawlResultStore {
-    fn load_crawl_source(
-        &mut self,
-        job_id: &CrawlJobId,
-    ) -> impl Future<Output = RegistryDbResult<Option<FeedSource>>> + Send;
-
-    fn load_crawl_state(
-        &mut self,
-        feed_url: &FeedUrl,
-    ) -> impl Future<Output = RegistryDbResult<Option<CrawlState>>> + Send;
-
-    fn record_crawl_result(
-        &mut self,
-        command: RecordCrawlResultCommand,
-    ) -> impl Future<Output = RegistryDbResult<CrawlResultRef>> + Send;
-
-    fn upsert_crawl_state(
-        &mut self,
-        command: UpsertCrawlStateCommand,
-    ) -> impl Future<Output = RegistryDbResult<()>> + Send;
 }
 
 /// Transactional operations for applying parsed feed state to the registry.
@@ -198,9 +168,8 @@ pub trait TimelineStore {
 
     fn catchup_subscribed_feed(
         &mut self,
-        timeline: &TimelineKey,
+        subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
-        now: DateTime<Utc>,
     ) -> impl Future<Output = RegistryDbResult<TimelineCatchup>> + Send;
 
     /// Applies one entry to the timelines of its subscribers.
@@ -211,14 +180,12 @@ pub trait TimelineStore {
         feed_url: &FeedUrl,
         entry_id: &EntryId,
         content_changed: bool,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<Vec<TimelineKey>>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<Vec<SubscriberId>>> + Send;
 
     fn apply_feed_unsubscribed(
         &mut self,
         subscription: &SubscriptionKey,
-        now: DateTime<Utc>,
-    ) -> impl Future<Output = RegistryDbResult<Option<TimelineKey>>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<Option<SubscriberId>>> + Send;
 }
 
 /// Commits a registry database transaction.

@@ -8,11 +8,11 @@ mod worker;
 
 pub use codec::{EncodedEvent, EventEncoding, EventEncodingError, EventEncodingResult};
 pub use domain::{
-    CrawlJobFinishedEvent, CrawlRequestedEvent, CrawlScheduleUpdatedEvent,
-    CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
-    EntryChangedEvent, EntryDiscoveredEvent, Event, EventInterests, EventType, FeedChangedEvent,
-    FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubEvent,
-    SubscriptionChangedEvent, TimelineChangedEvent,
+    CrawlJobFinishedEvent, CrawlRequestedEvent, CrawlTargetActivatedEvent,
+    CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
+    EntryDiscoveredEvent, Event, EventInterests, EventType, FeedChangedEvent, FeedDiscoveredEvent,
+    FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubEvent, SubscriptionChangedEvent,
+    TimelineChangedEvent,
 };
 pub use journal::{
     EventCursor, EventCursorPos, EventJournal, EventJournalAppend, EventReadBatch, JournaledEvent,

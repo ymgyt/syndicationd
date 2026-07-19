@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use synd_feed::feed::service::{FeedFetchRequest, FeedHttpStatus, FetchFeed};
+use synd_feed::feed::service::{FeedFetchOutcome, FeedFetchRequest, FeedHttpStatus, FetchFeed};
 use synd_support::time::Clock;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
@@ -9,15 +9,16 @@ use tracing::{debug, error, info};
 
 use crate::{
     crawl::{
-        completion::{CrawlCompletionRecord, CrawlCompletionRecorder},
+        blob::PutBlobCommand,
+        completion::{CrawlCompletion, CrawlCompletionSummary},
         dispatch::{DispatchEntry, DispatchQueueReader},
         job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
-        result::CrawlState,
+        state::{CrawlHealth, CrawlState, UpsertCrawlStateCommand},
     },
-    db::{BlobStore, CommitTx, CrawlResultStore, FeedRegistryDb},
+    db::{BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, FeedRegistryDb},
     event::{
-        EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher, RecordedEvents,
-        WorkerHandle, WorkerId, WorkerResult,
+        CrawlJobFinishedEvent, EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher,
+        RecordedEvents, WorkerHandle, WorkerId, WorkerResult,
     },
 };
 
@@ -112,7 +113,8 @@ impl<S, F> CrawlWorkerPool<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
-    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
+    for<'tx> S::Tx<'tx>:
+        BlobStore + CrawlStateStore + CrawlTargetStore + EventJournalAppend + EventJournal + Send,
 {
     pub(crate) fn spawn(self) -> WorkerHandle {
         WorkerHandle::new(WorkerId::CrawlWorkerPool, tokio::spawn(self.run()))
@@ -152,7 +154,7 @@ where
         let wake_publisher = self.wake_publisher.clone();
         let worker_ct = self.ct.child_token();
         let clock = Arc::clone(&self.clock);
-        let job = entry.into_crawl_job();
+        let (job, inflight) = entry.into_crawl_job();
         tokio::spawn(async move {
             info!(
                 worker = WorkerId::CrawlWorkerPool.as_str(),
@@ -173,12 +175,16 @@ where
                     "crawl worker failed job"
                 );
             }
+            // The inflight claim releases only after the completion commit,
+            // so the dispatcher never double-dispatches a running feed.
+            drop(inflight);
             drop(slot);
         });
     }
 }
 
-/// Runs one dispatched crawl through fetch, parse, and completion recording.
+/// Runs one dispatched crawl through fetch, classification, and completion
+/// recording.
 struct CrawlWorker<S, F> {
     db: S,
     fetcher: F,
@@ -209,7 +215,8 @@ impl<S, F> CrawlWorker<S, F>
 where
     S: FeedRegistryDb,
     F: FetchFeed + Send + Sync,
-    for<'tx> S::Tx<'tx>: BlobStore + CrawlResultStore + EventJournalAppend + EventJournal + Send,
+    for<'tx> S::Tx<'tx>:
+        BlobStore + CrawlStateStore + CrawlTargetStore + EventJournalAppend + EventJournal + Send,
 {
     #[tracing::instrument(
         name = "registry.crawl.worker.run",
@@ -242,10 +249,10 @@ where
         };
 
         let finished_at = self.clock.now();
-        let (completion, recorded) = self
+        let (summary, recorded) = self
             .record_completion(job, outcome, previous_state, finished_at)
             .await?;
-        completion.log_completed(
+        summary.log_completed(
             &job_id,
             feed_url.as_str(),
             lane,
@@ -263,27 +270,54 @@ where
         Ok(state)
     }
 
+    /// Records what the finished crawl leaves behind in one transaction:
+    /// the body blob, the crawl-state summary, the served manual request,
+    /// and the `CrawlJobFinished` fact.
     async fn record_completion(
         &self,
         job: CrawlJob,
-        outcome: synd_feed::feed::service::FeedFetchOutcome,
+        outcome: FeedFetchOutcome,
         previous_state: Option<CrawlState>,
         finished_at: DateTime<Utc>,
-    ) -> WorkerResult<(CrawlCompletionRecord, RecordedEvents)> {
+    ) -> WorkerResult<(CrawlCompletionSummary, RecordedEvents)> {
+        let previous_conditional = previous_state
+            .as_ref()
+            .map(|state| state.conditional.clone())
+            .unwrap_or_default();
+        let completion =
+            CrawlCompletion::classify(outcome, job.started_at, finished_at, &previous_conditional);
+        let health = CrawlHealth::for_last_result(&completion.last, previous_state.as_ref());
+
         let mut tx = self.db.begin().await?;
-        let mut completion_events = RecordedEvents::empty();
-        let (record, produced) = CrawlCompletionRecorder::new(&mut tx)
-            .record(job, outcome, previous_state, finished_at)
+        let body_blob = match completion.body {
+            Some(bytes) => Some(tx.put_blob(PutBlobCommand::new(bytes, finished_at)).await?),
+            None => None,
+        };
+        tx.upsert_crawl_state(UpsertCrawlStateCommand::new(
+            job.feed_url.clone(),
+            completion.last,
+            health,
+            completion.conditional,
+        ))
+        .await?;
+        tx.clear_manual_request(&job.feed_url, job.started_at)
             .await?;
-        EventRecorder::new(&mut tx, &mut completion_events, self.clock.as_ref())
-            .record_all(produced)
+
+        let mut recorded_events = RecordedEvents::with_capacity(1);
+        EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref())
+            .record(CrawlJobFinishedEvent::new(
+                job.job_id,
+                job.feed_url,
+                job.started_at,
+                body_blob,
+            ))
             .await?;
         tx.commit().await?;
-        Ok((record, completion_events))
+        Ok((completion.summary, recorded_events))
     }
 }
 
-impl CrawlCompletionRecord {
+impl CrawlCompletionSummary {
     fn log_completed(
         &self,
         job_id: &CrawlJobId,
@@ -301,8 +335,6 @@ impl CrawlCompletionRecord {
             outcome = self.outcome.as_str(),
             http_status = self.http_status.map(FeedHttpStatus::as_u16),
             error_kind = self.error_kind,
-            result_ref = self.result_ref.pk(),
-            failure_streak = self.health.failure_streak.value(),
             duration_ms,
             "crawl job completed"
         );
@@ -310,12 +342,15 @@ impl CrawlCompletionRecord {
 }
 
 impl DispatchEntry {
-    fn into_crawl_job(self) -> CrawlJob {
-        CrawlJob::new(
-            CrawlJobId::generate(),
-            self.feed_url,
-            self.trigger,
-            self.dispatched_at,
+    fn into_crawl_job(self) -> (CrawlJob, super::dispatch::InflightGuard) {
+        (
+            CrawlJob::new(
+                CrawlJobId::generate(),
+                self.feed_url,
+                self.trigger,
+                self.dispatched_at,
+            ),
+            self.inflight,
         )
     }
 }

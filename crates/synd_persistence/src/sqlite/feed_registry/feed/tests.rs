@@ -21,13 +21,13 @@ async fn feed_projection_records_discovered_unchanged_and_changed() -> anyhow::R
     let mut tx = db.begin().await?;
     let row = sqlx::query(
         r#"
-        SELECT current_meta_json
-        FROM feed
+        SELECT meta_json
+        FROM feed_snapshot
         "#,
     )
     .fetch_one(&mut *tx.tx)
     .await?;
-    let meta_json = row.try_get::<String, _>("current_meta_json")?;
+    let meta_json = row.try_get::<String, _>("meta_json")?;
     tx.commit().await?;
     assert!(meta_json.contains("changed title"));
     Ok(())

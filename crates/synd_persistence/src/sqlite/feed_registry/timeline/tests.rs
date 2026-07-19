@@ -13,16 +13,16 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+    let entry_input = entry_proj_input(&crawl);
     let recorded = project_feed(&db, crawl).await?;
     assert_eq!(recorded.types(), &[FeedDiscoveredEvent::TYPE]);
-    let recorded = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let recorded = project_entries(&db, entry_input).await?;
     assert_eq!(recorded.types(), &[EntryDiscoveredEvent::TYPE]);
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
     let subscribed = feed_subscribed_event(&subscription);
-    let recorded = project_timeline(&db, timeline_feed_subscribed(subscribed)).await?;
+    let recorded = project_timeline(&db, TimelineProjInput::FeedSubscribed(subscribed)).await?;
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
 
     let mut tx = db.begin().await?;
@@ -38,7 +38,6 @@ async fn timeline_projection_catches_up_existing_feed_entries_after_subscription
     assert_eq!(page.nodes.len(), 1);
     assert!(!page.has_next_page);
     let node = &page.nodes[0];
-    assert_eq!(node.subscription, subscription);
     assert_eq!(node.attrs.title.as_deref(), Some("timeline entry"));
     assert_eq!(node.feed_meta.feed.url(), &feed_url("timeline-projection"));
     Ok(())
@@ -57,15 +56,15 @@ async fn timeline_projection_does_not_emit_changed_when_catchup_inserts_nothing(
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+    let entry_input = entry_proj_input(&crawl);
     let _ = project_feed(&db, crawl).await?;
-    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let _ = project_entries(&db, entry_input).await?;
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
     let subscribed = feed_subscribed_event(&subscription);
-    let _ = project_timeline(&db, timeline_feed_subscribed(subscribed.clone())).await?;
-    let recorded = project_timeline(&db, timeline_feed_subscribed(subscribed)).await?;
+    let _ = project_timeline(&db, TimelineProjInput::FeedSubscribed(subscribed.clone())).await?;
+    let recorded = project_timeline(&db, TimelineProjInput::FeedSubscribed(subscribed)).await?;
 
     assert!(recorded.is_empty());
     Ok(())
@@ -83,9 +82,9 @@ async fn timeline_projection_preserves_feed_lifecycle_order_inside_batch() -> an
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+    let entry_input = entry_proj_input(&crawl);
     let _ = project_feed(&db, crawl).await?;
-    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let _ = project_entries(&db, entry_input).await?;
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
@@ -93,12 +92,12 @@ async fn timeline_projection_preserves_feed_lifecycle_order_inside_batch() -> an
     let recorded = project_timeline_batch(
         &db,
         vec![
-            timeline_feed_subscribed(FeedSubscribedEvent::new(
+            TimelineProjInput::FeedSubscribed(FeedSubscribedEvent::new(
                 key.clone(),
                 subscription_attrs(&subscription),
             )),
-            timeline_feed_unsubscribed(FeedUnsubscribedEvent::new(key.clone())),
-            timeline_feed_subscribed(FeedSubscribedEvent::new(
+            TimelineProjInput::FeedUnsubscribed(FeedUnsubscribedEvent::new(key.clone())),
+            TimelineProjInput::FeedSubscribed(FeedSubscribedEvent::new(
                 key,
                 subscription_attrs(&subscription),
             )),
@@ -125,19 +124,18 @@ async fn timeline_projection_adds_discovered_entry_for_active_subscription() -> 
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
-    let _ = project_feed(&db, crawl.clone()).await?;
-    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let entry_input = entry_proj_input(&crawl);
+    let _ = project_feed(&db, crawl).await?;
+    let _ = project_entries(&db, entry_input).await?;
     let entry_id = current_entry_id(&db).await?;
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
     let recorded = project_timeline(
         &db,
-        timeline_entry_discovered(EntryDiscoveredEvent::new(
+        TimelineProjInput::EntryDiscovered(EntryDiscoveredEvent::new(
             subscription.feed_url.clone(),
             entry_id,
-            crawl.job_id,
         )),
     )
     .await?;
@@ -161,14 +159,14 @@ async fn timeline_projection_ignores_discovered_entry_without_subscription() -> 
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
-    let _ = project_feed(&db, crawl.clone()).await?;
-    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let entry_input = entry_proj_input(&crawl);
+    let _ = project_feed(&db, crawl).await?;
+    let _ = project_entries(&db, entry_input).await?;
     let entry_id = current_entry_id(&db).await?;
 
     let recorded = project_timeline(
         &db,
-        timeline_entry_discovered(EntryDiscoveredEvent::new(feed_url, entry_id, crawl.job_id)),
+        TimelineProjInput::EntryDiscovered(EntryDiscoveredEvent::new(feed_url, entry_id)),
     )
     .await?;
 
@@ -188,18 +186,17 @@ async fn timeline_projection_invalidates_changed_entry_payload() -> anyhow::Resu
         0,
     )
     .await?;
-    let first_feed_event = FeedDiscoveredEvent::new(first.feed_url.clone(), first.job_id.clone());
-    let _ = project_feed(&db, first.clone()).await?;
-    let _ = project_entries(&db, EntryProjInput::from(first_feed_event)).await?;
+    let first_entry_input = entry_proj_input(&first);
+    let _ = project_feed(&db, first).await?;
+    let _ = project_entries(&db, first_entry_input).await?;
     let entry_id = current_entry_id(&db).await?;
 
     store_subscription_in_db(&db, subscription.clone()).await?;
     let _ = project_timeline(
         &db,
-        timeline_entry_discovered(EntryDiscoveredEvent::new(
+        TimelineProjInput::EntryDiscovered(EntryDiscoveredEvent::new(
             subscription.feed_url.clone(),
             entry_id.clone(),
-            first.job_id,
         )),
     )
     .await?;
@@ -211,17 +208,16 @@ async fn timeline_projection_invalidates_changed_entry_payload() -> anyhow::Resu
         1,
     )
     .await?;
-    let second_feed_event = FeedChangedEvent::new(second.feed_url.clone(), second.job_id.clone());
-    let _ = project_feed(&db, second.clone()).await?;
-    let recorded = project_entries(&db, EntryProjInput::from(second_feed_event)).await?;
+    let second_entry_input = entry_proj_input(&second);
+    let _ = project_feed(&db, second).await?;
+    let recorded = project_entries(&db, second_entry_input).await?;
     assert_eq!(recorded.types(), &[EntryChangedEvent::TYPE]);
 
     let recorded = project_timeline(
         &db,
-        timeline_entry_changed(EntryChangedEvent::new(
+        TimelineProjInput::EntryChanged(EntryChangedEvent::new(
             subscription.feed_url.clone(),
             entry_id,
-            second.job_id,
         )),
     )
     .await?;
@@ -245,17 +241,16 @@ async fn timeline_projection_coalesces_entry_invalidations_by_feed() -> anyhow::
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
-    let _ = project_feed(&db, crawl.clone()).await?;
-    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let entry_input = entry_proj_input(&crawl);
+    let _ = project_feed(&db, crawl).await?;
+    let _ = project_entries(&db, entry_input).await?;
     let entry_id = current_entry_id(&db).await?;
 
     store_subscription_in_db(&db, subscription.clone()).await?;
 
-    let input = timeline_entry_discovered(EntryDiscoveredEvent::new(
+    let input = TimelineProjInput::EntryDiscovered(EntryDiscoveredEvent::new(
         subscription.feed_url.clone(),
         entry_id,
-        crawl.job_id,
     ));
     let recorded = project_timeline_batch(&db, vec![input.clone(), input]).await?;
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
@@ -283,16 +278,16 @@ async fn timeline_changes_paginate_batch_without_loss() -> anyhow::Result<()> {
         0,
     )
     .await?;
-    let feed_event = FeedDiscoveredEvent::new(crawl.feed_url.clone(), crawl.job_id.clone());
+    let entry_input = entry_proj_input(&crawl);
     let _ = project_feed(&db, crawl).await?;
-    let _ = project_entries(&db, EntryProjInput::from(feed_event)).await?;
+    let _ = project_entries(&db, entry_input).await?;
     store_subscription_in_db(&db, subscription.clone()).await?;
 
     // Subscribe catches up 3 entries in one batch. Paging with limit 2 must
     // deliver all of them: rows sharing a seq would lose the tail
     let _ = project_timeline(
         &db,
-        timeline_feed_subscribed(feed_subscribed_event(&subscription)),
+        TimelineProjInput::FeedSubscribed(feed_subscribed_event(&subscription)),
     )
     .await?;
 
@@ -324,7 +319,9 @@ async fn timeline_changes_paginate_batch_without_loss() -> anyhow::Result<()> {
     // Unsubscribe tombstones the same 3 rows in one batch
     let _ = project_timeline(
         &db,
-        timeline_feed_unsubscribed(FeedUnsubscribedEvent::new(subscription_key(&subscription))),
+        TimelineProjInput::FeedUnsubscribed(FeedUnsubscribedEvent::new(subscription_key(
+            &subscription,
+        ))),
     )
     .await?;
 

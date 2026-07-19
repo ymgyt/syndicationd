@@ -18,7 +18,6 @@ async fn blob_store_deduplicates_by_uncompressed_digest() -> anyhow::Result<()> 
         r#"
         SELECT
             COUNT(*) AS count,
-            digest_algo,
             compression_algo,
             uncompressed_len
         FROM blob
@@ -28,7 +27,6 @@ async fn blob_store_deduplicates_by_uncompressed_digest() -> anyhow::Result<()> 
     .await?;
 
     assert_eq!(row.try_get::<i64, _>("count")?, 1);
-    assert_eq!(row.try_get::<String, _>("digest_algo")?, "sha256");
     assert_eq!(row.try_get::<String, _>("compression_algo")?, "zstd");
     assert_eq!(row.try_get::<i64, _>("uncompressed_len")?, 12);
     assert_eq!(tx.load_blob(first).await?, b"same payload");

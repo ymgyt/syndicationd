@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 use synd_feed::types::{Annotated, EntryId, FeedMeta};
 use thiserror::Error;
 
-use crate::{
-    entry::EntryAttrs,
-    subscription::{SubscriberId, Subscription},
-};
+use crate::{entry::EntryAttrs, subscription::SubscriberId};
 
 /// Query for timeline entries visible to one subscriber.
 #[derive(Debug, Clone)]
@@ -73,7 +70,6 @@ pub struct TimelineEntry {
     pub entry_id: EntryId,
     pub attrs: EntryAttrs,
     pub feed_meta: Annotated<FeedMeta>,
-    pub subscription: Subscription,
     pub cursor: TimelineEntryCursor,
 }
 

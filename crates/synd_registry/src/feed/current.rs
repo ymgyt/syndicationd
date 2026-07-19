@@ -3,16 +3,15 @@ use chrono::{DateTime, Utc};
 use synd_feed::types::{FeedMeta, FeedUrl};
 
 use crate::{
-    crawl::{blob::BlobRef, job::CrawlJobId, result::CrawlResultRef},
+    crawl::{blob::BlobRef, job::CrawlJobId},
     event::{Event, FeedChangedEvent, FeedDiscoveredEvent},
 };
 
-/// Source crawl result used to derive the current feed state.
+/// Accepted crawl body used to derive the current feed state.
 #[derive(Debug, Clone, Builder, PartialEq, Eq)]
 pub struct FeedSource {
     pub feed_url: FeedUrl,
     pub crawl_job_id: CrawlJobId,
-    pub result_ref: CrawlResultRef,
     pub body_blob: BlobRef,
     pub seen_at: DateTime<Utc>,
 }
@@ -45,11 +44,20 @@ impl UpsertFeedOutcome {
     pub fn into_event(self, source: &FeedSource) -> Option<Event> {
         match self {
             Self::Discovered => Some(
-                FeedDiscoveredEvent::new(source.feed_url.clone(), source.crawl_job_id.clone())
-                    .into(),
+                FeedDiscoveredEvent::new(
+                    source.feed_url.clone(),
+                    source.crawl_job_id.clone(),
+                    source.body_blob,
+                )
+                .into(),
             ),
             Self::Changed => Some(
-                FeedChangedEvent::new(source.feed_url.clone(), source.crawl_job_id.clone()).into(),
+                FeedChangedEvent::new(
+                    source.feed_url.clone(),
+                    source.crawl_job_id.clone(),
+                    source.body_blob,
+                )
+                .into(),
             ),
             Self::Unchanged => None,
         }
