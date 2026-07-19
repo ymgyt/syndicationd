@@ -13,6 +13,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     }
 
     bind!(Layer::App, ["C-c"], CommandId::Quit, "Quit app");
+    bind!(Layer::App, ["S-r"], CommandId::ForceRedraw, "Redraw screen");
 
     bind!(Layer::Global, ["q"], CommandId::Quit, "Quit app");
     bind!(

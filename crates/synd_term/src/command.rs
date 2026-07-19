@@ -24,6 +24,7 @@ pub(crate) enum ShellCommand {
     MoveAuthenticationProvider(Direction),
     MoveTabSelection(Direction),
     RotateTheme,
+    ForceRedraw,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -96,6 +97,9 @@ impl Command {
 
     pub fn quit() -> Self {
         Command::Shell(ShellCommand::Quit)
+    }
+    pub fn force_redraw() -> Self {
+        Command::Shell(ShellCommand::ForceRedraw)
     }
     pub fn authenticate() -> Self {
         Command::Shell(ShellCommand::Authenticate)

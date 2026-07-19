@@ -11,6 +11,7 @@ pub enum CommandId {
     #[default]
     Nop,
     Quit,
+    ForceRedraw,
     RotateTheme,
     Authenticate,
     MoveAuthenticationProviderPrev,
@@ -70,6 +71,7 @@ impl CommandId {
         match self {
             Self::Nop => "nop",
             Self::Quit => "app.quit",
+            Self::ForceRedraw => "app.redraw",
             Self::RotateTheme => "theme.rotate",
             Self::Authenticate => "login.authenticate",
             Self::MoveAuthenticationProviderPrev => "login.provider.prev",
@@ -147,6 +149,7 @@ impl CommandId {
         match self {
             Self::Nop => Command::nop(),
             Self::Quit => Command::quit(),
+            Self::ForceRedraw => Command::force_redraw(),
             Self::RotateTheme => Command::rotate_theme(),
             Self::Authenticate => Command::authenticate(),
             Self::MoveAuthenticationProviderPrev => Command::move_up_authentication_provider(),
@@ -352,6 +355,12 @@ const COMMAND_SPECS: &[CommandSpec] = specs![
         typable: Some(":quit"),
         desc: "Quit app",
         layers: [App, Global],
+    },
+    ForceRedraw {
+        aliases: ["force_redraw"],
+        typable: Some(":redraw"),
+        desc: "Redraw the screen",
+        layers: [App],
     },
     RotateTheme {
         aliases: ["rotate_theme"],

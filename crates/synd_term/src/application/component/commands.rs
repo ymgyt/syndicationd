@@ -41,6 +41,7 @@ impl AppComponent {
                 self.shell.rotate_theme();
                 Vec::new()
             }
+            ShellCommand::ForceRedraw => vec![Operation::ForceRedrawTerminal],
         }
     }
 
