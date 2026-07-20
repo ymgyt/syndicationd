@@ -30,7 +30,7 @@ body = """
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | upper_first }}
     {% for commit in commits %}
-        - {{ commit.message | upper_first }} by [@{{ commit.remote.username}}](https://github.com/{{ commit.remote.username }}) ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/ymgyt/syndicationd/commit/{{ commit.id }}))
+        - {{ commit.message | upper_first }}{% if commit.remote.username %} by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }}){% else %} by {{ commit.author.name }}{% endif %} ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/ymgyt/syndicationd/commit/{{ commit.id }}))
     {%- endfor %}
 {% endfor %}
 https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/compare/{{ previous.version }}...{{ version }}
@@ -87,7 +87,7 @@ protect_breaking_commits = false
 # filter out the commits that are not matched by commit parsers
 filter_commits = false
 # regex for matching git tags
-tag_pattern = "synd-.*-v[0-9].*"
+tag_pattern = "^(synd-term-v[0-9].*|v[0-9].*)$"
 
 # regex for skipping tags
 skip_tags = "v0.1.0-beta.1"

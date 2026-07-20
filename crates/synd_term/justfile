@@ -1,19 +1,8 @@
 import '../.justfile'
 
-pkg := "term"
-
 # List recipe
 default:
     just --list
-
-# Generate CHANGELOG for given version release 
-changelog version:
-    @nu {{script_dir}}/changelog.nu {{pkg}} {{version}}    
-
-# Release crate
-[no-cd]
-release *flags:
-    cargo release --package synd-{{pkg}} -v {{flags}}
 
 # Reinstall synd-term
 [no-cd]
