@@ -25,7 +25,7 @@ synd-registry    = { path = "crates/synd_registry", version = "=0.4.0-rc.1" }
 synd-runtime     = { path = "crates/synd_runtime", version = "=0.4.0-rc.1" }
 synd-support     = { path = "crates/synd_support", version = "=0.4.0-rc.1" }
 synd-term        = { path = "crates/synd_term", version = "=0.4.0-rc.1" }
-synd-test        = { path = "crates/synd_test", version = "=0.4.0-rc.1" }
+synd-test        = { path = "crates/synd_test" }
 
 anyhow             = { version = "1", default-features = false, features = ["std"] }
 assert_cmd         = { version = "2.1.2" }
@@ -111,6 +111,7 @@ name = "synd"
 
 [workspace.metadata.release]
 allow-branch = ["main"]
+rate-limit.new-packages = 7
 shared-version = true
 tag-name = "v{{version}}"
 
