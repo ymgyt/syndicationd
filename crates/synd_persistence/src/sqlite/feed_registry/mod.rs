@@ -1,7 +1,10 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
 use sqlx::{Sqlite, Transaction};
-use synd_registry::{CommitTx, FeedRegistryDb, RegistryDbError, RegistryDbResult};
+use synd_registry::{
+    RegistryDbError, RegistryDbResult,
+    db::{CommitTx, FeedRegistryDb},
+};
 
 use self::error::{IntoDbResult, SqliteResult};
 use super::SqliteDatabase;

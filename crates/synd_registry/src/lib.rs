@@ -25,10 +25,6 @@ pub use command::{
 pub use config::{CrawlDispatchConfig, FeedRegistryConfig, FeedRegistryWorkerConfig};
 pub use crawl::request::{CrawlRequestReject, RequestCrawlOutcome};
 pub use crawl::worker::{CrawlWorkerFetchConfig, CrawlWorkerPoolConfig, CrawlWorkerQueueConfig};
-pub use db::{
-    BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, EntryStore, FeedRegistryDb, FeedStore,
-    SubscriptionStore, TimelineStore,
-};
 pub use error::{FeedRegistryError, RegistryDbError, RegistryDbResult};
 #[cfg(any(test, feature = "test"))]
 pub use in_memory::{InMemoryFeedRegistryDb, InMemoryRegistryTx};

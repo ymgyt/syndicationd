@@ -19,8 +19,8 @@ use crate::{
         worker::CrawlWorkerPool,
     },
     db::{
-        BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, EntryStore, FeedRegistryDb,
-        FeedStore, SubscriptionStore, TimelineStore,
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, EntryStore, FeedDb, FeedRegistryDb,
+        SubscriptionDb, TimelineDb,
     },
     entry::EntryProj,
     error::FeedRegistryError,
@@ -109,7 +109,7 @@ pub struct FeedRegistry<S> {
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: EventJournalAppend + SubscriptionStore,
+    for<'tx> S::Tx<'tx>: EventJournalAppend + SubscriptionDb,
 {
     pub(crate) fn builder(db: S, config: FeedRegistryConfig) -> FeedRegistryBuilder<S> {
         FeedRegistryBuilder::new(db, config)
@@ -145,7 +145,7 @@ where
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlTargetStore + EventJournalAppend,
+    for<'tx> S::Tx<'tx>: CrawlTargetDb + EventJournalAppend,
 {
     pub async fn request_crawl(
         &self,
@@ -162,13 +162,13 @@ where
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStore
-        + CrawlStateStore
-        + CrawlTargetStore
-        + FeedStore
+    for<'tx> S::Tx<'tx>: BlobDb
+        + CrawlStateDb
+        + CrawlTargetDb
+        + FeedDb
         + EntryStore
-        + SubscriptionStore
-        + TimelineStore
+        + SubscriptionDb
+        + TimelineDb
         + EventJournalAppend,
 {
     pub fn start(db: S, config: FeedRegistryConfig, ct: CancellationToken) -> (Self, WorkerSet) {
@@ -191,7 +191,7 @@ where
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: SubscriptionStore + TimelineStore,
+    for<'tx> S::Tx<'tx>: SubscriptionDb + TimelineDb,
 {
     pub async fn list_subscriptions(
         &self,
@@ -270,13 +270,13 @@ where
 
     fn spawn_all(self, api_events: ApiEventPublisher) -> WorkerSet
     where
-        for<'tx> S::Tx<'tx>: BlobStore
-            + CrawlStateStore
-            + CrawlTargetStore
-            + FeedStore
+        for<'tx> S::Tx<'tx>: BlobDb
+            + CrawlStateDb
+            + CrawlTargetDb
+            + FeedDb
             + EntryStore
-            + SubscriptionStore
-            + TimelineStore
+            + SubscriptionDb
+            + TimelineDb
             + EventJournal
             + EventJournalAppend
             + Send,
@@ -298,7 +298,7 @@ where
 
     fn spawn_crawl_target_projection(&self) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: CrawlTargetDb + SubscriptionDb + EventJournalAppend,
     {
         self.spawn_journal_worker(
             self.config.workers.crawl_target_projection_poll_interval,
@@ -308,7 +308,7 @@ where
 
     fn spawn_feed_projection(&self) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: BlobStore + FeedStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: BlobDb + FeedDb + EventJournalAppend,
     {
         self.spawn_journal_worker(
             self.config.workers.feed_projection_poll_interval,
@@ -318,7 +318,7 @@ where
 
     fn spawn_entry_projection(&self) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: BlobStore + EntryStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: BlobDb + EntryStore + EventJournalAppend,
     {
         self.spawn_journal_worker(
             self.config.workers.entry_projection_poll_interval,
@@ -328,7 +328,7 @@ where
 
     fn spawn_timeline_projection(&self) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: TimelineStore + EventJournalAppend,
+        for<'tx> S::Tx<'tx>: TimelineDb + EventJournalAppend,
     {
         self.spawn_journal_worker(
             self.config.workers.timeline_projection_poll_interval,
@@ -356,7 +356,7 @@ where
         inflight: InflightCrawls,
     ) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: CrawlTargetStore + Send,
+        for<'tx> S::Tx<'tx>: CrawlTargetDb + Send,
     {
         let dispatcher =
             CrawlDispatcher::new(dispatch_queue_writer, inflight, self.config.crawl_dispatch);
@@ -371,12 +371,8 @@ where
 
     fn spawn_crawl_worker_pool(&self, dispatch_queue_reader: DispatchQueueReader) -> WorkerHandle
     where
-        for<'tx> S::Tx<'tx>: BlobStore
-            + CrawlStateStore
-            + CrawlTargetStore
-            + EventJournal
-            + EventJournalAppend
-            + Send,
+        for<'tx> S::Tx<'tx>:
+            BlobDb + CrawlStateDb + CrawlTargetDb + EventJournal + EventJournalAppend + Send,
     {
         let fetcher = Arc::new(FeedService::new(
             self.config.crawl_worker_pool.fetch.user_agent,

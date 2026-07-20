@@ -12,8 +12,8 @@ use crate::{
         target_list::{CrawlTarget, CrawlTargetState, FeedSubscriptions, SubscriptionPolicy},
     },
     db::{
-        BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, EntryStore, FeedRegistryDb,
-        FeedStore, SubscriptionStore, TimelineStore,
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, EntryStore, FeedDb, FeedRegistryDb,
+        SubscriptionDb, TimelineDb,
     },
     entry::{EntryChanges, EntrySet},
     error::{RegistryDbError, RegistryDbResult},
@@ -183,7 +183,7 @@ impl EventJournal for InMemoryRegistryTx<'_> {
     }
 }
 
-impl SubscriptionStore for InMemoryRegistryTx<'_> {
+impl SubscriptionDb for InMemoryRegistryTx<'_> {
     async fn upsert_subscription(
         &mut self,
         subscription: &SubscriptionKey,
@@ -308,7 +308,7 @@ impl InMemoryState {
     }
 }
 
-impl CrawlTargetStore for InMemoryRegistryTx<'_> {
+impl CrawlTargetDb for InMemoryRegistryTx<'_> {
     async fn upsert_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
         let state = &mut self.state;
         state
@@ -374,7 +374,7 @@ impl CrawlTargetStore for InMemoryRegistryTx<'_> {
     }
 }
 
-impl BlobStore for InMemoryRegistryTx<'_> {
+impl BlobDb for InMemoryRegistryTx<'_> {
     async fn put_blob(&mut self, command: PutBlobCommand) -> RegistryDbResult<BlobRef> {
         let state = &mut self.state;
         state.next_blob_pk = state.next_blob_pk.saturating_add(1);
@@ -391,7 +391,7 @@ impl BlobStore for InMemoryRegistryTx<'_> {
     }
 }
 
-impl CrawlStateStore for InMemoryRegistryTx<'_> {
+impl CrawlStateDb for InMemoryRegistryTx<'_> {
     async fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,
@@ -418,7 +418,7 @@ impl CrawlStateStore for InMemoryRegistryTx<'_> {
     }
 }
 
-impl FeedStore for InMemoryRegistryTx<'_> {
+impl FeedDb for InMemoryRegistryTx<'_> {
     async fn upsert_feed(
         &mut self,
         _command: UpsertFeedCommand,
@@ -441,7 +441,7 @@ impl EntryStore for InMemoryRegistryTx<'_> {
     }
 }
 
-impl TimelineStore for InMemoryRegistryTx<'_> {
+impl TimelineDb for InMemoryRegistryTx<'_> {
     async fn list_timeline_entries(
         &mut self,
         _query: TimelineEntriesQuery,

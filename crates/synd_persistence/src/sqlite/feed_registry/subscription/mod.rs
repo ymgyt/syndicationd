@@ -5,8 +5,8 @@ use sqlx::{Sqlite, Transaction};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 use synd_registry::{
     FeedSubscriptionAttrs, RegistryDbResult, SubscriberId, Subscription, SubscriptionKey,
-    SubscriptionStore,
     crawl::target_list::{FeedSubscriptions, SubscriptionPolicy},
+    db::SubscriptionDb,
     query::{Subscriptions, SubscriptionsQuery},
 };
 
@@ -248,7 +248,7 @@ impl FeedSubscriptionRow {
     }
 }
 
-impl SubscriptionStore for SqliteRegistryTx<'_> {
+impl SubscriptionDb for SqliteRegistryTx<'_> {
     async fn upsert_subscription(
         &mut self,
         subscription: &SubscriptionKey,

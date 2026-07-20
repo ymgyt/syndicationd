@@ -32,7 +32,7 @@ pub trait FeedRegistryDb: Clone + Send + Sync + 'static {
 }
 
 /// Transactional operations over feed subscription state.
-pub trait SubscriptionStore {
+pub trait SubscriptionDb {
     /// Creates or updates the relation. `now` becomes `subscribed_at` on
     /// creation; editing an existing relation keeps the original value.
     fn upsert_subscription(
@@ -66,7 +66,7 @@ pub trait SubscriptionStore {
 }
 
 /// Transactional operations over crawl target state.
-pub trait CrawlTargetStore {
+pub trait CrawlTargetDb {
     /// Writes the target's declared state. A pending manual request on the
     /// row is preserved: it belongs to the request/completion lifecycle.
     fn upsert_target(
@@ -107,7 +107,7 @@ pub trait CrawlTargetStore {
 }
 
 /// Transactional operations over per-feed crawl observation state.
-pub trait CrawlStateStore {
+pub trait CrawlStateDb {
     fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,
@@ -120,7 +120,7 @@ pub trait CrawlStateStore {
 }
 
 /// Transactional generic blob-store operations.
-pub trait BlobStore {
+pub trait BlobDb {
     fn put_blob(
         &mut self,
         command: PutBlobCommand,
@@ -133,7 +133,7 @@ pub trait BlobStore {
 }
 
 /// Transactional operations for applying parsed feed state to the registry.
-pub trait FeedStore {
+pub trait FeedDb {
     fn upsert_feed(
         &mut self,
         command: UpsertFeedCommand,
@@ -155,7 +155,7 @@ pub trait EntryStore {
 }
 
 /// Transactional operations for reading and applying timeline membership.
-pub trait TimelineStore {
+pub trait TimelineDb {
     fn list_timeline_entries(
         &mut self,
         query: TimelineEntriesQuery,

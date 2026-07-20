@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use tracing::debug;
 
 use crate::{
-    db::{BlobStore, FeedRegistryDb, FeedStore},
+    db::{BlobDb, FeedDb, FeedRegistryDb},
     event::{
         CrawlJobFinishedEvent, Event, EventInput, EventType, Processor, ProcessorId,
         ProcessorResult, Projector, RegistryEvent,
@@ -77,7 +77,7 @@ impl Processor for FeedProj {
 impl<S> Projector<S> for FeedProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStore + FeedStore + Send,
+    for<'tx> S::Tx<'tx>: BlobDb + FeedDb + Send,
 {
     async fn project(
         &mut self,

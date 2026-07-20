@@ -1,7 +1,8 @@
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedStore, RegistryDbResult,
+    RegistryDbResult,
+    db::FeedDb,
     feed::{UpsertFeedCommand, UpsertFeedOutcome},
 };
 
@@ -122,7 +123,7 @@ struct PkRow {
     pk: i64,
 }
 
-impl FeedStore for super::SqliteRegistryTx<'_> {
+impl FeedDb for super::SqliteRegistryTx<'_> {
     async fn upsert_feed(
         &mut self,
         command: UpsertFeedCommand,

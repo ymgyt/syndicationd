@@ -15,7 +15,7 @@ use crate::{
         job::{CrawlJob, CrawlJobId, CrawlJobQueueLane, CrawlJobTrigger},
         state::{CrawlHealth, CrawlState, UpsertCrawlStateCommand},
     },
-    db::{BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, FeedRegistryDb},
+    db::{BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedRegistryDb},
     event::{
         CrawlJobFinishedEvent, EventJournal, EventJournalAppend, EventRecorder, EventWakePublisher,
         RecordedEvents, WorkerHandle, WorkerId, WorkerResult,
@@ -114,7 +114,7 @@ where
     S: FeedRegistryDb,
     F: FetchFeed + Clone + Send + Sync + 'static,
     for<'tx> S::Tx<'tx>:
-        BlobStore + CrawlStateStore + CrawlTargetStore + EventJournalAppend + EventJournal + Send,
+        BlobDb + CrawlStateDb + CrawlTargetDb + EventJournalAppend + EventJournal + Send,
 {
     pub(crate) fn spawn(self) -> WorkerHandle {
         WorkerHandle::new(WorkerId::CrawlWorkerPool, tokio::spawn(self.run()))
@@ -216,7 +216,7 @@ where
     S: FeedRegistryDb,
     F: FetchFeed + Send + Sync,
     for<'tx> S::Tx<'tx>:
-        BlobStore + CrawlStateStore + CrawlTargetStore + EventJournalAppend + EventJournal + Send,
+        BlobDb + CrawlStateDb + CrawlTargetDb + EventJournalAppend + EventJournal + Send,
 {
     #[tracing::instrument(
         name = "registry.crawl.worker.run",

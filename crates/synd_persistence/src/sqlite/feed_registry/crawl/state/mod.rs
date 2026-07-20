@@ -5,11 +5,12 @@ use synd_feed::{
     types::FeedUrl,
 };
 use synd_registry::{
-    CrawlStateStore, RegistryDbResult,
+    RegistryDbResult,
     crawl::state::{
         CrawlHealth, CrawlState, CrawlStateError, FailureStreak, LastCrawlResult,
         UpsertCrawlStateCommand,
     },
+    db::CrawlStateDb,
 };
 
 use super::super::{
@@ -170,7 +171,7 @@ fn encode_u64(value: u64, field: &'static str) -> SqliteResult<i64> {
         .map_err(|_| SqliteError::decode_message(format!("{field} exceeds SQLite INTEGER range")))
 }
 
-impl CrawlStateStore for SqliteRegistryTx<'_> {
+impl CrawlStateDb for SqliteRegistryTx<'_> {
     async fn load_crawl_state(
         &mut self,
         feed_url: &FeedUrl,

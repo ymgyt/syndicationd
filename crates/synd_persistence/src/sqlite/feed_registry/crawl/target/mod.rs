@@ -4,11 +4,12 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    CrawlTargetStore, RegistryDbResult,
+    RegistryDbResult,
     crawl::{
         due::CrawlDueInput,
         target_list::{CrawlTarget, CrawlTargetState},
     },
+    db::CrawlTargetDb,
 };
 
 use super::{
@@ -306,7 +307,7 @@ impl CrawlDueInputRow {
     }
 }
 
-impl CrawlTargetStore for SqliteRegistryTx<'_> {
+impl CrawlTargetDb for SqliteRegistryTx<'_> {
     async fn upsert_target(&mut self, target: &CrawlTarget) -> RegistryDbResult<()> {
         upsert(&mut self.tx, target).await.db()
     }

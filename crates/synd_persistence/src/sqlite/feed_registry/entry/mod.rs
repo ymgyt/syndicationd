@@ -2,7 +2,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::types::{EntryId, FeedUrl};
 use synd_registry::{
-    EntryStore, RegistryDbResult,
+    RegistryDbResult,
+    db::EntryStore,
     entry::{Entry, EntryChange, EntryChanges, EntryOrderKey, EntrySet},
 };
 

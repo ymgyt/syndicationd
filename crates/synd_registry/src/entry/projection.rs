@@ -6,7 +6,7 @@ use tracing::debug;
 
 use crate::{
     crawl::{blob::BlobRef, job::CrawlJobId},
-    db::{BlobStore, EntryStore, FeedRegistryDb},
+    db::{BlobDb, EntryStore, FeedRegistryDb},
     entry::{EntryAppearances, EntryChange, EntryChanges, EntryReconciliation},
     event::{
         EntryChangedEvent, EntryDiscoveredEvent, Event, EventInput, EventType, FeedChangedEvent,
@@ -103,7 +103,7 @@ impl Processor for EntryProj {
 impl<S> Projector<S> for EntryProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: BlobStore + EntryStore + Send,
+    for<'tx> S::Tx<'tx>: BlobDb + EntryStore + Send,
 {
     async fn project(
         &mut self,

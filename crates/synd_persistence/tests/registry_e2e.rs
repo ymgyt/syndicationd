@@ -10,8 +10,10 @@ use std::time::Duration;
 use synd_feed::types::FeedUrl;
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    CrawlStateStore, FeedRegistry, FeedRegistryConfig, FeedRegistryDb, FeedRegistryWorkerConfig,
-    SubscribeFeedCommand, SubscriberId, api::ApiEvent, crawl::state::CrawlState,
+    FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig, SubscribeFeedCommand, SubscriberId,
+    api::ApiEvent,
+    crawl::state::CrawlState,
+    db::{CrawlStateDb, FeedRegistryDb},
     query::TimelineEntriesQuery,
 };
 use tokio_util::sync::CancellationToken;

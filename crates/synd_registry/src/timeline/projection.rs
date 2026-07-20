@@ -3,7 +3,7 @@ use synd_feed::types::{EntryId, FeedUrl};
 use tracing::info;
 
 use crate::{
-    db::{FeedRegistryDb, TimelineStore},
+    db::{FeedRegistryDb, TimelineDb},
     event::{
         EntryChangedEvent, EntryDiscoveredEvent, Event, EventInput, EventType, FeedSubscribedEvent,
         FeedUnsubscribedEvent, InputBatch, Processor, ProcessorError, ProcessorId, ProcessorResult,
@@ -26,7 +26,7 @@ impl TimelineProjInput {
     /// timelines with the feed that caused the change.
     async fn apply<Tx>(self, tx: &mut Tx) -> ProcessorResult<Vec<(SubscriberId, FeedUrl)>>
     where
-        Tx: TimelineStore + Send,
+        Tx: TimelineDb + Send,
     {
         match self {
             Self::FeedSubscribed(event) => {
@@ -64,7 +64,7 @@ impl TimelineProjInput {
         content_changed: bool,
     ) -> ProcessorResult<Vec<(SubscriberId, FeedUrl)>>
     where
-        Tx: TimelineStore + Send,
+        Tx: TimelineDb + Send,
     {
         let subscribers = tx
             .apply_entry_to_timelines(&feed_url, entry_id, content_changed)
@@ -125,7 +125,7 @@ impl Processor for TimelineProj {
 impl<S> Projector<S> for TimelineProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: TimelineStore + Send,
+    for<'tx> S::Tx<'tx>: TimelineDb + Send,
 {
     async fn project(
         &mut self,

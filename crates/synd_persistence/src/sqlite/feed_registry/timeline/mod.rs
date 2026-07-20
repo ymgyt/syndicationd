@@ -4,7 +4,8 @@ use chrono::{DateTime, Utc};
 use sqlx::{QueryBuilder, Sqlite, Transaction};
 use synd_feed::types::{Annotated, Category, EntryId, FeedMeta, FeedUrl, Requirement};
 use synd_registry::{
-    RegistryDbResult, TimelineStore,
+    RegistryDbResult,
+    db::TimelineDb,
     entry::EntryAttrs,
     query::{
         TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntriesPage,
@@ -609,7 +610,7 @@ impl TimelineEntryRow {
     }
 }
 
-impl TimelineStore for super::SqliteRegistryTx<'_> {
+impl TimelineDb for super::SqliteRegistryTx<'_> {
     async fn list_timeline_entries(
         &mut self,
         query: TimelineEntriesQuery,

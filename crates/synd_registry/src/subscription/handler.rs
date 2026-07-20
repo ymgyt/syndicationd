@@ -9,7 +9,7 @@ use crate::{
         SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
     },
     crawl::policy::CrawlPolicy,
-    db::{CommitTx, FeedRegistryDb, SubscriptionStore},
+    db::{CommitTx, FeedRegistryDb, SubscriptionDb},
     error::{FeedRegistryError, RegistryDbError, RegistryDbResult},
     event::{EventRecorder, RecordedEvents, SubEvent},
     handler::{CommandHandler, Decider, HandledCommand, StateApplier},
@@ -44,7 +44,7 @@ impl SubState {
     /// Loads the current command-time state of one subscriber/feed relation.
     async fn load<Tx>(tx: &mut Tx, subscription: &SubscriptionKey) -> RegistryDbResult<Self>
     where
-        Tx: SubscriptionStore + Send,
+        Tx: SubscriptionDb + Send,
     {
         if tx
             .has_subscription(&subscription.subscriber_id, &subscription.feed_url)
@@ -69,7 +69,7 @@ impl SubStateApplier {
         now: DateTime<Utc>,
     ) -> RegistryDbResult<()>
     where
-        Tx: SubscriptionStore + Send,
+        Tx: SubscriptionDb + Send,
     {
         for event in events {
             self.apply(tx, event, now).await?;
@@ -80,7 +80,7 @@ impl SubStateApplier {
 
 impl<Tx> StateApplier<Tx> for SubStateApplier
 where
-    Tx: SubscriptionStore + Send,
+    Tx: SubscriptionDb + Send,
 {
     type Event = SubEvent;
 
@@ -159,7 +159,7 @@ impl SubCommandOutput for UnsubscribeFeedOutput {
 impl<S> SubHandler<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: SubscriptionStore,
+    for<'tx> S::Tx<'tx>: SubscriptionDb,
 {
     /// Runs one subscription command through the shared decide -> apply ->
     /// record -> commit flow.
@@ -195,7 +195,7 @@ where
 impl<S> CommandHandler<SubscribeFeedCommand> for SubHandler<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: SubscriptionStore,
+    for<'tx> S::Tx<'tx>: SubscriptionDb,
 {
     type Output = SubscribeFeedOutput;
     type Error = FeedRegistryError;
@@ -216,7 +216,7 @@ where
 impl<S> CommandHandler<UnsubscribeFeedCommand> for SubHandler<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: SubscriptionStore,
+    for<'tx> S::Tx<'tx>: SubscriptionDb,
 {
     type Output = UnsubscribeFeedOutput;
     type Error = FeedRegistryError;

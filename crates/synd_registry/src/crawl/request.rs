@@ -8,7 +8,7 @@ use tracing::info;
 use crate::{
     command::{RequestCrawlCommand, RequestCrawlOutput},
     crawl::due::CrawlDueInput,
-    db::{CommitTx, CrawlTargetStore, FeedRegistryDb},
+    db::{CommitTx, CrawlTargetDb, FeedRegistryDb},
     error::FeedRegistryError,
     event::{CrawlRequestedEvent, EventJournalAppend, EventRecorder, RecordedEvents},
     handler::{CommandHandler, HandledCommand},
@@ -89,7 +89,7 @@ impl<S> CrawlRequestHandler<S> {
 impl<S> CommandHandler<RequestCrawlCommand> for CrawlRequestHandler<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlTargetStore + EventJournalAppend,
+    for<'tx> S::Tx<'tx>: CrawlTargetDb + EventJournalAppend,
 {
     type Output = RequestCrawlOutput;
     type Error = FeedRegistryError;

@@ -7,7 +7,7 @@ use crate::{
         dispatch::{DispatchEntry, DispatchQueueWriter, InflightCrawls},
         due::{CrawlDue, CrawlDueDecision},
     },
-    db::{CommitTx, CrawlTargetStore, FeedRegistryDb},
+    db::{CommitTx, CrawlTargetDb, FeedRegistryDb},
     event::{
         CrawlJobFinishedEvent, CrawlRequestedEvent, CrawlTargetActivatedEvent,
         CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EventInterests, Reaction,
@@ -111,7 +111,7 @@ impl CrawlDispatcher {
 impl<S> Reconciler<S> for CrawlDispatcher
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlTargetStore + Send,
+    for<'tx> S::Tx<'tx>: CrawlTargetDb + Send,
 {
     fn id(&self) -> WorkerId {
         WorkerId::CrawlDispatcher

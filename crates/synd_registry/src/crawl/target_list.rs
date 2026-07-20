@@ -4,7 +4,7 @@ use tracing::{debug, info};
 
 use crate::{
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
-    db::{CrawlTargetStore, FeedRegistryDb, SubscriptionStore},
+    db::{CrawlTargetDb, FeedRegistryDb, SubscriptionDb},
     event::{
         CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent,
         Event, EventInput, EventType, FeedSubscribedEvent, FeedUnsubscribedEvent, Processor,
@@ -222,7 +222,7 @@ impl Processor for CrawlTargetProj {
 impl<S> Projector<S> for CrawlTargetProj
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: CrawlTargetStore + SubscriptionStore + Send,
+    for<'tx> S::Tx<'tx>: CrawlTargetDb + SubscriptionDb + Send,
 {
     async fn project(
         &mut self,

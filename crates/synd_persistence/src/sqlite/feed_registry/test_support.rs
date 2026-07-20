@@ -5,15 +5,17 @@ pub(crate) use sqlx::Row;
 pub(crate) use synd_feed::feed::service::FeedHttpStatus;
 pub(crate) use synd_feed::types::{EntryId, FeedUrl};
 pub(crate) use synd_registry::{
-    BlobStore, CommitTx, CrawlStateStore, CrawlTargetStore, FeedRegistryDb, FeedSubscriptionAttrs,
-    RegistryDbError, RegistryDbResult, SubscriberId, Subscription, SubscriptionKey,
-    SubscriptionStore, TimelineStore,
+    FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
+    SubscriptionKey,
     crawl::{
         blob::PutBlobCommand,
         job::CrawlJobId,
         policy::{CrawlPolicy, PollingInterval, PollingPolicy},
         state::CrawlStateErrorKind,
         target_list::{CrawlTargetProj, CrawlTargetProjInput, CrawlTargetState},
+    },
+    db::{
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedRegistryDb, SubscriptionDb, TimelineDb,
     },
     entry::{EntryProj, EntryProjInput},
     event::{

@@ -17,9 +17,9 @@ use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
 use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
-    CommitTx, FeedRegistry, FeedRegistryDb, FeedSubscriptionAttrs, SubscriberId, SubscriptionKey,
-    SubscriptionStore,
+    FeedRegistry, FeedSubscriptionAttrs, SubscriberId, SubscriptionKey,
     crawl::policy::{CrawlPolicy, PollingInterval},
+    db::{CommitTx, FeedRegistryDb, SubscriptionDb},
 };
 pub use synd_term::integration::{event_stream, new_test_terminal};
 use synd_term::{
