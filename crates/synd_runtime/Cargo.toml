@@ -10,16 +10,16 @@ repository.workspace = true
 description = "Runtime session and singleton daemon lifecycle for syndicationd"
 name        = "synd-runtime"
 readme      = "README.md"
-version     = "0.1.0"
+version.workspace = true
 
 [dependencies]
-synd-api = { path = "../synd_api", version = "0.2.6" }
-synd-client = { path = "../synd_client", version = "0.1.0" }
-synd-feed = { path = "../synd_feed", version = "0.3.5" }
-synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
-synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
-synd-registry = { path = "../synd_registry", version = "0.1.0" }
-synd-support = { path = "../synd_support", version = "0.1.0", features = ["humantime"] }
+synd-api         = { workspace = true }
+synd-client      = { workspace = true }
+synd-feed        = { workspace = true }
+synd-persistence = { workspace = true }
+synd-protocol    = { workspace = true }
+synd-registry    = { workspace = true }
+synd-support     = { workspace = true, features = ["humantime"] }
 
 rustix     = { version = "1.1.4", features = ["fs", "process"] }
 serde      = { workspace = true }

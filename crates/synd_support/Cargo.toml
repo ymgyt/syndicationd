@@ -10,7 +10,7 @@ repository.workspace = true
 description = "shared support utilities for syndicationd crates"
 name        = "synd-support"
 readme      = "README.md"
-version     = "0.1.0"
+version.workspace = true
 
 [dependencies]
 axum                               = { workspace = true, optional = true }

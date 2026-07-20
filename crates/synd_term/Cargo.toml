@@ -9,15 +9,15 @@ license.workspace     = true
 readme.workspace      = true
 repository.workspace  = true
 
-include = ["src/**/*", "gql/**/*", "CHANGELOG.md", "categories.toml"]
+include = ["src/**/*", "gql/**/*", "categories.toml"]
 name    = "synd-term"
-version = "0.3.2"
+version.workspace = true
 
 [dependencies]
-synd-auth = { path = "../synd_auth", version = "0.2.5" }
-synd-client = { path = "../synd_client", version = "0.1.0" }
-synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["fake", "jsonschema"] }
-synd-support = { path = "../synd_support", version = "0.1.0", features = ["humantime", "conf", "o11y"] }
+synd-auth    = { workspace = true }
+synd-client  = { workspace = true }
+synd-feed    = { workspace = true, features = ["fake", "jsonschema"] }
+synd-support = { workspace = true, features = ["humantime", "conf", "o11y"] }
 
 anyhow               = { workspace = true }
 chrono               = { workspace = true, features = ["std", "now", "serde", "clock"] }
@@ -53,7 +53,7 @@ url                  = { workspace = true }
 integration = ["dep:tokio-stream"]
 
 [dev-dependencies]
-synd-client = { path = "../synd_client", version = "0.1.0", features = ["fake"] }
+synd-client = { workspace = true, features = ["fake"] }
 
 criterion   = { workspace = true }
 fake        = { workspace = true }
@@ -69,17 +69,6 @@ required-features = ["integration"]
 
 [lints]
 workspace = true
-
-[package.metadata.release]
-pre-release-hook = ["just", "changelog", "{{version}}"]
-
-pre-release-replacements = [
-  { file = "CHANGELOG.md", search = "unreleased", replace = "v{{version}}", min = 0 },
-  { file = "CHANGELOG.md", search = "__release_date__", replace = "{{date}}", min = 0 },
-  { file = "README.md", search = "/synd-term-v.*/", replace = "/{{crate_name}}-v{{version}}/", min = 0 },
-  { file = "README.md", search = "/synd-term-v.*", replace = "/{{crate_name}}-v{{version}}", min = 0 },
-]
-tag-message = "chore: release {{crate_name}} version {{version}}"
 
 [package.metadata.dist]
 dist    = true

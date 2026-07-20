@@ -10,11 +10,11 @@ repository.workspace = true
 description = "Persistence adapters for syndicationd"
 name        = "synd-persistence"
 readme      = "README.md"
-version     = "0.1.0"
+version.workspace = true
 
 [dependencies]
-synd-feed     = { path = "../synd_feed", version = "0.3.5", features = ["sqlx"] }
-synd-registry = { path = "../synd_registry", version = "0.1.0" }
+synd-feed     = { workspace = true, features = ["sqlx"] }
+synd-registry = { workspace = true }
 
 chrono     = { workspace = true }
 serde      = { workspace = true }
@@ -27,8 +27,8 @@ zstd       = { workspace = true }
 
 [dev-dependencies]
 anyhow       = { workspace = true }
-synd-support = { path = "../synd_support", version = "0.1.0" }
-synd-test    = { path = "../synd_test", version = "0.1.0" }
+synd-support = { workspace = true }
+synd-test    = { workspace = true }
 tempfile   = { workspace = true }
 tokio      = { workspace = true, features = ["macros", "net", "rt", "time"] }
 tokio-util = { workspace = true }

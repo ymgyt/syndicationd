@@ -11,15 +11,15 @@ repository.workspace  = true
 
 include = ["src/**/*", "README.md"]
 name    = "synd"
-version = "0.1.0"
+version.workspace = true
 
 [dependencies]
-synd-client = { path = "../synd_client", version = "0.1.0" }
-synd-feed = { path = "../synd_feed", version = "0.3.5" }
-synd-persistence = { path = "../synd_persistence", version = "0.1.0" }
-synd-runtime = { path = "../synd_runtime", version = "0.1.0" }
-synd-support = { path = "../synd_support", version = "0.1.0", features = ["conf", "humantime", "o11y"] }
-synd-term = { path = "../synd_term", version = "0.3.2" }
+synd-client      = { workspace = true }
+synd-feed        = { workspace = true }
+synd-persistence = { workspace = true }
+synd-runtime     = { workspace = true }
+synd-support     = { workspace = true, features = ["conf", "humantime", "o11y"] }
+synd-term        = { workspace = true }
 
 anyhow             = { workspace = true }
 clap               = { workspace = true, features = ["derive", "string", "color", "suggestions", "wrap_help", "env", "std"] }
@@ -49,10 +49,10 @@ insta      = { workspace = true }
 mockall    = { workspace = true }
 octocrab   = { workspace = true, features = ["timeout", "tracing"] }
 ratatui    = { version = "0.30.0", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
-synd-api   = { path = "../synd_api", version = "0.2.6" }
-synd-auth  = { path = "../synd_auth", version = "0.2.5" }
-synd-registry = { path = "../synd_registry", version = "0.1.0" }
-synd-test  = { path = "../synd_test" }
+synd-api      = { workspace = true }
+synd-auth     = { workspace = true }
+synd-registry = { workspace = true }
+synd-test     = { workspace = true }
 tempfile   = { workspace = true }
 tokio      = { workspace = true, features = ["net"] }
 tokio-util = { workspace = true }

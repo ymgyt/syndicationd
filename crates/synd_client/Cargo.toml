@@ -10,12 +10,12 @@ repository.workspace = true
 description = "syndicationd API client"
 name        = "synd-client"
 readme      = "README.md"
-version     = "0.1.0"
+version.workspace = true
 
 [dependencies]
-synd-feed = { path = "../synd_feed", version = "0.3.5" }
-synd-protocol = { path = "../synd_protocol", version = "0.1.0" }
-synd-support = { path = "../synd_support", version = "0.1.0", features = ["o11y"] }
+synd-feed     = { workspace = true }
+synd-protocol = { workspace = true }
+synd-support  = { workspace = true, features = ["o11y"] }
 
 chrono            = { workspace = true, features = ["serde"] }
 fake              = { workspace = true, optional = true }
@@ -35,7 +35,7 @@ fake = ["dep:fake", "synd-feed/fake"]
 
 [dev-dependencies]
 fake = { workspace = true }
-synd-feed = { path = "../synd_feed", version = "0.3.5", features = ["fake"] }
+synd-feed = { workspace = true, features = ["fake"] }
 
 [lints]
 workspace = true

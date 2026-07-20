@@ -10,7 +10,7 @@ repository.workspace = true
 description = "Shared wire protocol contracts for syndicationd"
 name        = "synd-protocol"
 readme      = "README.md"
-version     = "0.1.0"
+version.workspace = true
 
 [dependencies]
 serde = { workspace = true }

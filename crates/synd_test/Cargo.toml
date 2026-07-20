@@ -9,10 +9,10 @@ repository.workspace  = true
 
 name    = "synd-test"
 publish = false
-version = "0.1.0"
+version.workspace = true
 
 [dependencies]
-synd-auth = { path = "../synd_auth" }
+synd-auth = { workspace = true }
 
 anyhow       = { workspace = true }
 axum         = { workspace = true, features = ["form", "query", "tokio", "http1", "json"] }

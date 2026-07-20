@@ -5451,7 +5451,7 @@ dependencies = [
 
 [[package]]
 name = "synd"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -5493,7 +5493,7 @@ dependencies = [
 
 [[package]]
 name = "synd-api"
-version = "0.2.6"
+version = "0.4.0-rc.1"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -5526,7 +5526,7 @@ dependencies = [
 
 [[package]]
 name = "synd-auth"
-version = "0.2.5"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5543,7 +5543,7 @@ dependencies = [
 
 [[package]]
 name = "synd-client"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "chrono",
  "fake",
@@ -5564,7 +5564,7 @@ dependencies = [
 
 [[package]]
 name = "synd-feed"
-version = "0.3.5"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -5588,7 +5588,7 @@ dependencies = [
 
 [[package]]
 name = "synd-persistence"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5610,7 +5610,7 @@ dependencies = [
 
 [[package]]
 name = "synd-protocol"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -5618,7 +5618,7 @@ dependencies = [
 
 [[package]]
 name = "synd-registry"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "bon",
@@ -5638,7 +5638,7 @@ dependencies = [
 
 [[package]]
 name = "synd-runtime"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "rustix 1.1.4",
  "serde",
@@ -5660,7 +5660,7 @@ dependencies = [
 
 [[package]]
 name = "synd-support"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "axum",
  "byte-unit",
@@ -5692,7 +5692,7 @@ dependencies = [
 
 [[package]]
 name = "synd-term"
-version = "0.3.2"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5736,7 +5736,7 @@ dependencies = [
 
 [[package]]
 name = "synd-test"
-version = "0.1.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "axum",

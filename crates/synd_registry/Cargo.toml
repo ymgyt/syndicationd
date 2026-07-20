@@ -10,11 +10,11 @@ repository.workspace = true
 description = "Feed lifecycle registry"
 name        = "synd-registry"
 readme      = "README.md"
-version     = "0.1.0"
+version.workspace = true
 
 [dependencies]
-synd-feed = { path = "../synd_feed", version = "0.3.5" }
-synd-support = { path = "../synd_support", version = "0.1.0" }
+synd-feed    = { workspace = true }
+synd-support = { workspace = true }
 
 bon         = { workspace = true }
 chrono      = { workspace = true, features = ["serde"] }
