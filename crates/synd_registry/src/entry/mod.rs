@@ -3,7 +3,10 @@ use std::collections::{HashMap, HashSet};
 use bon::Builder;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Entry as SyndFeedEntry, EntryId, Feed as SyndFeed, FeedType, FeedUrl};
+use synd_feed::types::{
+    Content as SyndFeedContent, Entry as SyndFeedEntry, EntryId, Feed as SyndFeed, FeedType,
+    FeedUrl, Text as SyndFeedText,
+};
 
 use crate::feed::FeedSource;
 
@@ -77,10 +80,16 @@ impl EntryAttrs {
     fn from_feed_entry(feed_type: FeedType, entry: &SyndFeedEntry) -> Self {
         let summary = entry
             .summary()
+            .map(SyndFeedText::content)
             .map(str::to_owned)
-            .or_else(|| entry.content().map(summary_fallback));
+            .or_else(|| {
+                entry
+                    .content()
+                    .and_then(SyndFeedContent::body)
+                    .map(summary_fallback)
+            });
         Self::builder()
-            .maybe_title(entry.title().map(str::to_owned))
+            .maybe_title(entry.title().map(SyndFeedText::content).map(str::to_owned))
             .maybe_summary(summary)
             .maybe_website_url(entry.website_url(feed_type).map(str::to_owned))
             .maybe_published_at(entry.published())
@@ -132,9 +141,12 @@ impl EntryAppearance {
     fn from_feed_entry(feed_type: FeedType, entry: &SyndFeedEntry) -> Self {
         let attrs = EntryAttrs::from_feed_entry(feed_type, entry);
         Self {
-            id: entry.id(),
+            id: entry.id().clone(),
             attrs,
-            content: entry.content().map(str::to_owned),
+            content: entry
+                .content()
+                .and_then(SyndFeedContent::body)
+                .map(str::to_owned),
         }
     }
 

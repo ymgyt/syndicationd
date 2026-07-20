@@ -5569,6 +5569,7 @@ dependencies = [
  "anyhow",
  "async-graphql",
  "async-trait",
+ "bon",
  "chrono",
  "fake",
  "feed-rs",

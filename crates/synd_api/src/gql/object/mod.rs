@@ -59,7 +59,7 @@ impl Entry {
     /// Entry title
     async fn title(&self) -> Option<&str> {
         match &self.body {
-            EntryBody::Feed(entry) => entry.title(),
+            EntryBody::Feed(entry) => entry.title().map(types::Text::content),
             EntryBody::Timeline(attrs) => attrs.title.as_deref(),
         }
     }
@@ -86,7 +86,10 @@ impl Entry {
     /// a content-derived fallback at observation, so no fallback happens here.
     async fn summary(&self) -> Option<&str> {
         match &self.body {
-            EntryBody::Feed(entry) => entry.summary().or(entry.content()),
+            EntryBody::Feed(entry) => entry
+                .summary()
+                .map(types::Text::content)
+                .or_else(|| entry.content().and_then(types::Content::body)),
             EntryBody::Timeline(attrs) => attrs.summary.as_deref(),
         }
     }
@@ -103,7 +106,7 @@ impl Entry {
 impl Entry {
     pub fn new(meta: Annotated<types::FeedMeta>, entry: types::Entry) -> Self {
         Self {
-            id: entry.id(),
+            id: entry.id().clone(),
             meta,
             body: EntryBody::Feed(Box::new(entry)),
         }

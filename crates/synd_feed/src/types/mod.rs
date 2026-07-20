@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use bon::Builder;
 use chrono::{DateTime, Utc};
 use feed_rs::model as feedrs;
 use serde::{Deserialize, Serialize};
@@ -23,13 +24,16 @@ mod entry_id;
 pub(crate) use entry_id::feed_rs_missing_id_marker;
 pub use entry_id::{EntryId, EntryIdError};
 
+mod content;
+pub use content::Content;
+
 mod entry;
 pub use entry::Entry;
 
 mod macros;
 
 /// Text content with its media type and optional source URI.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct Text {
     content: String,
@@ -65,7 +69,7 @@ impl From<feedrs::Text> for Text {
 }
 
 /// Person credited by a feed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct Person {
     name: String,
@@ -101,7 +105,7 @@ impl From<feedrs::Person> for Person {
 }
 
 /// Link relation declared by a feed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct Link {
     href: String,
@@ -273,26 +277,7 @@ impl FeedMeta {
 
     /// Returns the website URL represented by the feed links.
     pub fn website_url(&self) -> Option<&str> {
-        let mut links = self.links.iter();
-        match self.r#type() {
-            FeedType::Atom => links
-                .find(|link| link.rel() == Some("alternate"))
-                .map(Link::href),
-            FeedType::JSON => links
-                .find(|link| {
-                    !std::path::Path::new(link.href())
-                        .extension()
-                        .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
-                })
-                .map(Link::href),
-            FeedType::RSS0 => {
-                warn!("RSS0 is used! {:?}", self.links);
-                None
-            }
-            FeedType::RSS1 | FeedType::RSS2 => links
-                .find(|link| link.rel() != Some("self"))
-                .map(Link::href),
-        }
+        link::find_website_url(self.r#type(), &self.links)
     }
 
     /// Returns software metadata declared by the feed.
@@ -373,18 +358,12 @@ impl Feed {
     pub fn entries(&self) -> impl Iterator<Item = &Entry> {
         self.entries.iter()
     }
-
-    /// Return approximate Feed byte size
-    pub fn approximate_size(&self) -> usize {
-        self.entries().map(Entry::approximate_size).sum()
-    }
 }
 
 mod link {
-    use feed_rs::model::Link;
     use tracing::warn;
 
-    use crate::types::FeedType;
+    use crate::types::{FeedType, Link};
 
     pub fn find_website_url<'a>(
         feed_type: FeedType,
@@ -394,18 +373,18 @@ mod link {
         match feed_type {
             // Find rel == alternate link
             FeedType::Atom => links
-                .find(|link| link.rel.as_deref() == Some("alternate"))
-                .map(|link| link.href.as_str()),
+                .find(|link| link.rel() == Some("alternate"))
+                .map(Link::href),
 
             // how to detect homepage(website) url?
             // ignore .json extension link
             FeedType::JSON => links
                 .find(|link| {
-                    !std::path::Path::new(link.href.as_str())
+                    !std::path::Path::new(link.href())
                         .extension()
                         .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
                 })
-                .map(|link| link.href.as_str()),
+                .map(Link::href),
 
             FeedType::RSS0 => {
                 warn!("RSS0 is used! {:?}", links.collect::<Vec<_>>());
@@ -414,8 +393,8 @@ mod link {
 
             // Use the first link whose rel is not "self"
             FeedType::RSS1 | FeedType::RSS2 => links
-                .find(|link| link.rel.as_deref() != Some("self"))
-                .map(|link| link.href.as_str()),
+                .find(|link| link.rel() != Some("self"))
+                .map(Link::href),
         }
     }
 
@@ -426,22 +405,13 @@ mod link {
         #[test]
         fn rss_ignore_rel_self() {
             let links = vec![
-                Link {
-                    href: "https://syndicationd.ymgyt.io/".into(),
-                    title: None,
-                    rel: None,
-                    media_type: None,
-                    href_lang: None,
-                    length: None,
-                },
-                Link {
-                    href: "https://syndicationd.ymgyt.io/atom.xml".into(),
-                    title: None,
-                    rel: Some("self".into()),
-                    media_type: None,
-                    href_lang: None,
-                    length: None,
-                },
+                Link::builder()
+                    .href("https://syndicationd.ymgyt.io/".into())
+                    .build(),
+                Link::builder()
+                    .href("https://syndicationd.ymgyt.io/atom.xml".into())
+                    .rel("self".into())
+                    .build(),
             ];
 
             assert_eq!(
@@ -457,22 +427,14 @@ mod link {
         #[test]
         fn atom_use_rel_alternate() {
             let links = vec![
-                Link {
-                    href: "https://syndicationd.ymgyt.io/atom.xml".into(),
-                    title: None,
-                    rel: Some("self".into()),
-                    media_type: None,
-                    href_lang: None,
-                    length: None,
-                },
-                Link {
-                    href: "https://syndicationd.ymgyt.io/".into(),
-                    title: None,
-                    rel: Some("alternate".into()),
-                    media_type: None,
-                    href_lang: None,
-                    length: None,
-                },
+                Link::builder()
+                    .href("https://syndicationd.ymgyt.io/atom.xml".into())
+                    .rel("self".into())
+                    .build(),
+                Link::builder()
+                    .href("https://syndicationd.ymgyt.io/".into())
+                    .rel("alternate".into())
+                    .build(),
             ];
 
             assert_eq!(
@@ -484,22 +446,12 @@ mod link {
         #[test]
         fn json_ignore_json_ext() {
             let links = vec![
-                Link {
-                    href: "https://kubernetes.io/docs/reference/issues-security/official-cve-feed/index.json".into(),
-                    title: None,
-                    rel: None,
-                    media_type: None,
-                    href_lang: None,
-                    length: None,
-                },
-                Link {
-                    href: "https://kubernetes.io".into(),
-                    title: None,
-                    rel: None,
-                    media_type: None,
-                    href_lang: None,
-                    length: None,
-                },
+                Link::builder()
+                    .href("https://kubernetes.io/docs/reference/issues-security/official-cve-feed/index.json".into())
+                    .build(),
+                Link::builder()
+                    .href("https://kubernetes.io".into())
+                    .build(),
             ];
 
             assert_eq!(

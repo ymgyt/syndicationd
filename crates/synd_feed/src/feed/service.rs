@@ -612,7 +612,7 @@ mod tests {
         assert_eq!(feed.meta().updated(), Some(feed_updated));
         assert_eq!(entry.published(), Some(entry_published));
         assert_eq!(entry.updated(), Some(entry_published));
-        assert_synd_entry_id(entry.id_ref());
+        assert_synd_entry_id(entry.id());
         assert!(!entry.id().to_string().contains("https://example.com/entry"));
     }
 
@@ -639,7 +639,7 @@ mod tests {
             .unwrap();
 
         let entry = feed.entries().next().unwrap();
-        assert_synd_entry_id(entry.id_ref());
+        assert_synd_entry_id(entry.id());
         assert!(!entry.id().to_string().contains("tag:example.com"));
     }
 
@@ -666,7 +666,7 @@ mod tests {
             first.entries().next().unwrap().id(),
             second.entries().next().unwrap().id()
         );
-        assert_synd_entry_id(first.entries().next().unwrap().id_ref());
+        assert_synd_entry_id(first.entries().next().unwrap().id());
     }
 
     #[test]
@@ -695,8 +695,11 @@ mod tests {
 
         let entries = feed.entries().collect::<Vec<_>>();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].title(), Some("Kept entry"));
-        assert_synd_entry_id(entries[0].id_ref());
+        assert_eq!(
+            entries[0].title().map(crate::types::Text::content),
+            Some("Kept entry")
+        );
+        assert_synd_entry_id(entries[0].id());
     }
 
     #[test]
