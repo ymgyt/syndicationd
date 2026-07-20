@@ -19,7 +19,7 @@ pub(crate) use icon::icon;
 
 pub const UNKNOWN_SYMBOL: &str = "-";
 pub const TABLE_HIGHLIGHT_SYMBOL: &str = " ";
-pub const DEFAULT_REQUIREMNET: Requirement = Requirement::Should;
+pub const DEFAULT_REQUIREMENT: Requirement = Requirement::Should;
 
 pub fn default_category() -> &'static Category<'static> {
     static DEFAULT_CATEGORY: OnceLock<Category<'static>> = OnceLock::new();

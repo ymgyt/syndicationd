@@ -161,7 +161,7 @@ where
         for feed in input.feeds {
             interval.tick().await;
             let url = feed.url.clone();
-            let requirement = feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET);
+            let requirement = feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT);
             let category = feed
                 .category
                 .clone()

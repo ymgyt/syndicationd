@@ -81,7 +81,7 @@ pub struct Feed {
 
 impl Feed {
     pub fn requirement(&self) -> Requirement {
-        self.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET)
+        self.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT)
     }
 
     pub fn category(&self) -> &Category<'static> {
@@ -260,7 +260,7 @@ impl EntryExt for payload::Entry {
     }
 
     fn requirement(&self) -> Requirement {
-        self.feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMNET)
+        self.feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT)
     }
 
     fn category(&self) -> &Category<'static> {
