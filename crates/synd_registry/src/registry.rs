@@ -1,6 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use synd_feed::feed::service::FeedService;
+use synd_feed::types::{Feed, FeedUrl};
 use synd_support::time::{Clock, SystemClock};
 use tokio_util::sync::CancellationToken;
 
@@ -19,10 +20,9 @@ use crate::{
         worker::CrawlWorkerPool,
     },
     db::{
-        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, EntryStore, FeedDb, FeedRegistryDb,
-        SubscriptionDb, TimelineDb,
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedDb, FeedRegistryDb, SubscriptionDb,
+        TimelineDb,
     },
-    entry::EntryProj,
     error::FeedRegistryError,
     event::{
         EventJournal, EventJournalAppend, EventLoop, EventWakePublisher, JournalWorker,
@@ -166,7 +166,6 @@ where
         + CrawlStateDb
         + CrawlTargetDb
         + FeedDb
-        + EntryStore
         + SubscriptionDb
         + TimelineDb
         + EventJournalAppend,
@@ -191,7 +190,7 @@ where
 impl<S> FeedRegistry<S>
 where
     S: FeedRegistryDb,
-    for<'tx> S::Tx<'tx>: SubscriptionDb + TimelineDb,
+    for<'tx> S::Tx<'tx>: SubscriptionDb,
 {
     pub async fn list_subscriptions(
         &self,
@@ -202,7 +201,29 @@ where
         tx.commit().await?;
         Ok(page)
     }
+}
 
+impl<S> FeedRegistry<S>
+where
+    S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: FeedDb,
+{
+    pub async fn load_feeds(
+        &self,
+        feed_urls: &[FeedUrl],
+    ) -> Result<HashMap<FeedUrl, Feed>, FeedRegistryError> {
+        let mut tx = self.db.begin().await?;
+        let feeds = tx.load_feeds(feed_urls).await?;
+        tx.commit().await?;
+        Ok(feeds)
+    }
+}
+
+impl<S> FeedRegistry<S>
+where
+    S: FeedRegistryDb,
+    for<'tx> S::Tx<'tx>: TimelineDb,
+{
     pub async fn list_timeline_entries(
         &self,
         query: TimelineEntriesQuery,
@@ -274,7 +295,6 @@ where
             + CrawlStateDb
             + CrawlTargetDb
             + FeedDb
-            + EntryStore
             + SubscriptionDb
             + TimelineDb
             + EventJournal
@@ -290,7 +310,6 @@ where
             self.spawn_crawl_dispatcher(dispatch_queue_writer, inflight),
             self.spawn_crawl_worker_pool(dispatch_queue_reader),
             self.spawn_feed_projection(),
-            self.spawn_entry_projection(),
             self.spawn_timeline_projection(),
             self.spawn_api_event_publisher(api_events),
         ])
@@ -313,16 +332,6 @@ where
         self.spawn_journal_worker(
             self.config.workers.feed_projection_poll_interval,
             FeedProj::new(),
-        )
-    }
-
-    fn spawn_entry_projection(&self) -> WorkerHandle
-    where
-        for<'tx> S::Tx<'tx>: BlobDb + EntryStore + EventJournalAppend,
-    {
-        self.spawn_journal_worker(
-            self.config.workers.entry_projection_poll_interval,
-            EntryProj::new(),
         )
     }
 

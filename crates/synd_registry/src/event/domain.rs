@@ -39,12 +39,6 @@ pub enum Event {
     #[serde(rename = "crawl.job.finished")]
     #[strum_discriminants(strum(serialize = "crawl.job.finished"))]
     CrawlJobFinished(CrawlJobFinishedEvent),
-    #[serde(rename = "feed.discovered")]
-    #[strum_discriminants(strum(serialize = "feed.discovered"))]
-    FeedDiscovered(FeedDiscoveredEvent),
-    #[serde(rename = "feed.changed")]
-    #[strum_discriminants(strum(serialize = "feed.changed"))]
-    FeedChanged(FeedChangedEvent),
     #[serde(rename = "entry.discovered")]
     #[strum_discriminants(strum(serialize = "entry.discovered"))]
     EntryDiscovered(EntryDiscoveredEvent),
@@ -279,46 +273,6 @@ impl CrawlJobFinishedEvent {
     }
 }
 
-/// A feed became known to the registry for the first time.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FeedDiscoveredEvent {
-    pub feed_url: FeedUrl,
-    pub crawl_job_id: CrawlJobId,
-    /// The body the feed state was parsed from; input for entry projection.
-    pub body_blob: BlobRef,
-}
-
-impl FeedDiscoveredEvent {
-    /// Creates an event for a feed first observed by the registry.
-    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId, body_blob: BlobRef) -> Self {
-        Self {
-            feed_url,
-            crawl_job_id,
-            body_blob,
-        }
-    }
-}
-
-/// The current state of a known feed changed after a crawl.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FeedChangedEvent {
-    pub feed_url: FeedUrl,
-    pub crawl_job_id: CrawlJobId,
-    /// The body the feed state was parsed from; input for entry projection.
-    pub body_blob: BlobRef,
-}
-
-impl FeedChangedEvent {
-    /// Creates an event for a changed feed observed by a crawl job.
-    pub fn new(feed_url: FeedUrl, crawl_job_id: CrawlJobId, body_blob: BlobRef) -> Self {
-        Self {
-            feed_url,
-            crawl_job_id,
-            body_blob,
-        }
-    }
-}
-
 /// An entry became known to the registry for the first time.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntryDiscoveredEvent {
@@ -393,14 +347,6 @@ impl RegistryEvent for CrawlRequestedEvent {
 
 impl RegistryEvent for CrawlJobFinishedEvent {
     const TYPE: EventType = EventType::CrawlJobFinished;
-}
-
-impl RegistryEvent for FeedDiscoveredEvent {
-    const TYPE: EventType = EventType::FeedDiscovered;
-}
-
-impl RegistryEvent for FeedChangedEvent {
-    const TYPE: EventType = EventType::FeedChanged;
 }
 
 impl RegistryEvent for EntryDiscoveredEvent {

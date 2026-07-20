@@ -3,7 +3,7 @@ pub(crate) use std::time::Duration;
 pub(crate) use chrono::{DateTime, TimeZone, Utc};
 pub(crate) use sqlx::Row;
 pub(crate) use synd_feed::feed::service::FeedHttpStatus;
-pub(crate) use synd_feed::{entry::EntryId, types::FeedUrl};
+pub(crate) use synd_feed::types::FeedUrl;
 pub(crate) use synd_registry::{
     FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
     SubscriptionKey,
@@ -15,22 +15,18 @@ pub(crate) use synd_registry::{
         target_list::{CrawlTargetProj, CrawlTargetProjInput, CrawlTargetState},
     },
     db::{
-        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedRegistryDb, SubscriptionDb, TimelineDb,
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedDb, FeedRegistryDb, SubscriptionDb,
+        TimelineDb,
     },
-    entry::{EntryProj, EntryProjInput},
     event::{
         CrawlJobFinishedEvent, CrawlTargetActivatedEvent, CrawlTargetDeactivatedEvent,
-        CrawlTargetPolicyChangedEvent, EntryChangedEvent, EntryDiscoveredEvent, Event, EventCursor,
-        EventCursorPos, EventInterests, EventJournal, EventRecorder, FeedChangedEvent,
-        FeedDiscoveredEvent, FeedSubscribedEvent, FeedUnsubscribedEvent, InputBatch, ProcessorId,
-        Projector, RecordedEvents, RegistryEvent, SubEvent, SubscriptionChangedEvent,
-        TimelineChangedEvent,
+        CrawlTargetPolicyChangedEvent, EntryDiscoveredEvent, Event, EventCursor, EventCursorPos,
+        EventInterests, EventJournal, EventRecorder, FeedSubscribedEvent, FeedUnsubscribedEvent,
+        InputBatch, ProcessorId, Projector, RecordedEvents, RegistryEvent, SubEvent,
+        SubscriptionChangedEvent, TimelineChangedEvent,
     },
     feed::{FeedProj, FeedProjInput},
-    query::{
-        SubscriptionsQuery, TimelineChange, TimelineChangesQuery, TimelineEntriesPage,
-        TimelineEntriesQuery,
-    },
+    query::{SubscriptionsQuery, TimelineEntriesPage, TimelineEntriesQuery},
     timeline::{TimelineProj, TimelineProjInput},
 };
 pub(crate) use synd_support::time::Clock;
@@ -184,10 +180,6 @@ pub(crate) fn crawl_target_interests() -> EventInterests {
     ])
 }
 
-pub(crate) fn timeline_interests() -> EventInterests {
-    EventInterests::new([TimelineChangedEvent::TYPE])
-}
-
 pub(crate) async fn project_crawl_targets(
     db: &SqliteFeedRegistryDb,
     events: Vec<SubEvent>,
@@ -225,20 +217,6 @@ pub(crate) async fn read_crawl_target_events(
     Ok(events)
 }
 
-pub(crate) async fn read_timeline_events(db: &SqliteFeedRegistryDb) -> anyhow::Result<Vec<Event>> {
-    let mut tx = db.begin().await?;
-    let cursor = tx.load_cursor(ProcessorId::ApiEventPublisher).await?;
-    let batch = tx.read_after(&cursor, timeline_interests()).await?;
-    tx.commit().await?;
-
-    let events = batch
-        .into_events()
-        .into_iter()
-        .map(synd_registry::event::JournaledEvent::into_event)
-        .collect::<Vec<_>>();
-    Ok(events)
-}
-
 /// Registers the feed, stores the fetched body as a blob, and returns the
 /// `CrawlJobFinished` fact a crawl worker would have recorded.
 pub(crate) async fn record_fetched_crawl(
@@ -263,40 +241,15 @@ pub(crate) async fn record_fetched_crawl(
     Ok(event)
 }
 
-pub(crate) fn entry_proj_input(event: &CrawlJobFinishedEvent) -> EntryProjInput {
-    EntryProjInput::builder()
-        .feed_url(event.feed_url.clone())
-        .crawl_job_id(event.job_id.clone())
-        .body_blob(event.body_blob.expect("fetched crawl has a body"))
-        .occurred_at(test_occurred_at())
-        .build()
-}
-
 pub(crate) async fn project_feed(
     db: &SqliteFeedRegistryDb,
     event: CrawlJobFinishedEvent,
 ) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = FeedProj::new();
-    let input = FeedProjInput {
-        event,
-        occurred_at: test_occurred_at(),
-    };
+    let input = FeedProjInput::new(event, test_occurred_at());
     let events =
         <FeedProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, input).await?;
-    let recorded = record_generated_events(&mut tx, events).await?;
-    tx.commit().await?;
-    Ok(recorded)
-}
-
-pub(crate) async fn project_entries(
-    db: &SqliteFeedRegistryDb,
-    input: EntryProjInput,
-) -> anyhow::Result<RecordedEvents> {
-    let mut tx = db.begin().await?;
-    let mut proj = EntryProj::new();
-    let events =
-        <EntryProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, input).await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
@@ -306,54 +259,14 @@ pub(crate) async fn project_timeline(
     db: &SqliteFeedRegistryDb,
     input: TimelineProjInput,
 ) -> anyhow::Result<RecordedEvents> {
-    project_timeline_batch(db, vec![input]).await
-}
-
-pub(crate) async fn project_timeline_batch(
-    db: &SqliteFeedRegistryDb,
-    inputs: Vec<TimelineProjInput>,
-) -> anyhow::Result<RecordedEvents> {
     let mut tx = db.begin().await?;
     let mut proj = TimelineProj::new();
-    let events = <TimelineProj as Projector<SqliteFeedRegistryDb>>::project_batch(
-        &mut proj,
-        &mut tx,
-        InputBatch::new(inputs),
-    )
-    .await?;
+    let events =
+        <TimelineProj as Projector<SqliteFeedRegistryDb>>::project(&mut proj, &mut tx, input)
+            .await?;
     let recorded = record_generated_events(&mut tx, events).await?;
     tx.commit().await?;
     Ok(recorded)
-}
-
-pub(crate) async fn entry_current_row(db: &SqliteFeedRegistryDb) -> anyhow::Result<String> {
-    let mut tx = db.begin().await?;
-    let row = sqlx::query(
-        r#"
-            SELECT attrs_json
-            FROM entry
-            "#,
-    )
-    .fetch_one(&mut *tx.tx)
-    .await?;
-    let attrs_json = row.try_get::<String, _>("attrs_json")?;
-    tx.commit().await?;
-    Ok(attrs_json)
-}
-
-pub(crate) async fn current_entry_id(db: &SqliteFeedRegistryDb) -> anyhow::Result<EntryId> {
-    let mut tx = db.begin().await?;
-    let row = sqlx::query(
-        r#"
-            SELECT entry_id
-            FROM entry
-            "#,
-    )
-    .fetch_one(&mut *tx.tx)
-    .await?;
-    let entry_id = row.try_get::<String, _>("entry_id")?;
-    tx.commit().await?;
-    EntryId::parse(entry_id).map_err(Into::into)
 }
 
 pub(crate) async fn list_timeline_entries(
@@ -372,34 +285,11 @@ pub(crate) async fn list_timeline_entries(
     Ok(page)
 }
 
-pub(crate) fn rss_body(title: &str) -> Vec<u8> {
-    rss_body_with_entry(title, "first entry", "entry-1")
-}
-
 pub(crate) fn rss_body_with_entry(
     feed_title: &str,
     entry_title: &str,
     entry_guid: &str,
 ) -> Vec<u8> {
-    rss_body_with_entries(feed_title, &[(entry_title, entry_guid)])
-}
-
-pub(crate) fn rss_body_with_entries(feed_title: &str, entries: &[(&str, &str)]) -> Vec<u8> {
-    use std::fmt::Write;
-    let items = entries
-        .iter()
-        .fold(String::new(), |mut items, (entry_title, entry_guid)| {
-            let _ = write!(
-                items,
-                r#"    <item>
-      <title>{entry_title}</title>
-      <link>https://example.com/entry/{entry_guid}</link>
-      <guid>{entry_guid}</guid>
-    </item>
-"#
-            );
-            items
-        });
     format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0">
@@ -407,7 +297,12 @@ pub(crate) fn rss_body_with_entries(feed_title: &str, entries: &[(&str, &str)]) 
     <title>{feed_title}</title>
     <link>https://example.com/</link>
     <description>example feed</description>
-{items}  </channel>
+    <item>
+      <title>{entry_title}</title>
+      <link>https://example.com/entry/{entry_guid}</link>
+      <guid>{entry_guid}</guid>
+    </item>
+  </channel>
 </rss>"#
     )
     .into_bytes()

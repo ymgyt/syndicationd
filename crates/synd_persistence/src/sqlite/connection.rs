@@ -32,11 +32,11 @@ impl SqliteDatabase {
         sqlx::migrate!("./migrations")
             .run(&self.pool)
             .await
-            .map_err(RegistryDbError::internal)
+            .map_err(RegistryDbError::permanent)
     }
 
     pub async fn begin(&self) -> Result<Transaction<'_, Sqlite>, RegistryDbError> {
-        self.pool.begin().await.map_err(RegistryDbError::internal)
+        self.pool.begin().await.map_err(RegistryDbError::retryable)
     }
 
     async fn open_file(db_path: impl AsRef<Path>, mode: FileMode) -> Result<Self, RegistryDbError> {
@@ -63,7 +63,7 @@ impl SqliteDatabase {
             .max_connections(1)
             .connect_with(opts)
             .await
-            .map_err(RegistryDbError::internal)?;
+            .map_err(RegistryDbError::retryable)?;
 
         Ok(Self { pool })
     }

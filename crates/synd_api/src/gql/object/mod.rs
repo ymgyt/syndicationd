@@ -5,10 +5,10 @@ use async_graphql::{
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
 use synd_feed::{
-    entry::{Content, Entry as SyndFeedEntry, EntryId},
+    entry::{Content, Entry as SyndFeedEntry},
     types::{self, Annotated, Category, FeedType, FeedUrl, Requirement},
 };
-use synd_registry::{entry::EntryAttrs as RegistryEntryAttrs, query::TimelineEntry};
+use synd_registry::query::TimelineEntry;
 
 use crate::gql::scalar;
 
@@ -38,21 +38,15 @@ impl From<&types::Link> for Link {
 }
 
 pub(crate) struct Entry {
-    id: EntryId,
     meta: Annotated<types::FeedMeta>,
-    body: EntryBody,
-}
-
-pub(crate) enum EntryBody {
-    Feed(Box<SyndFeedEntry>),
-    Timeline(RegistryEntryAttrs),
+    entry: SyndFeedEntry,
 }
 
 #[Object]
 impl Entry {
     /// Entry id
     async fn id(&self) -> ID {
-        self.id.as_str().into()
+        self.entry.id().as_str().into()
     }
 
     /// Feed of this entry
@@ -61,70 +55,95 @@ impl Entry {
     }
     /// Entry title
     async fn title(&self) -> Option<&str> {
-        match &self.body {
-            EntryBody::Feed(entry) => entry.title().map(types::Text::content),
-            EntryBody::Timeline(attrs) => attrs.title.as_deref(),
-        }
+        self.entry.title().map(types::Text::content)
     }
 
     /// Time at which the entry was last modified
     async fn updated(&self) -> Option<scalar::Rfc3339Time> {
-        match &self.body {
-            EntryBody::Feed(entry) => entry.updated(),
-            EntryBody::Timeline(attrs) => attrs.updated_at,
-        }
-        .map(Into::into)
+        self.entry.updated().map(Into::into)
     }
 
     /// The time at which the entry published
     async fn published(&self) -> Option<scalar::Rfc3339Time> {
-        match &self.body {
-            EntryBody::Feed(entry) => entry.published(),
-            EntryBody::Timeline(attrs) => attrs.published_at,
-        }
-        .map(Into::into)
+        self.entry.published().map(Into::into)
     }
 
-    /// Entry summary. When the feed declares none, the registry materializes
-    /// a content-derived fallback at observation, so no fallback happens here.
+    /// Entry summary, falling back to the entry content body.
     async fn summary(&self) -> Option<&str> {
-        match &self.body {
-            EntryBody::Feed(entry) => entry
-                .summary()
-                .map(types::Text::content)
-                .or_else(|| entry.content().and_then(Content::body)),
-            EntryBody::Timeline(attrs) => attrs.summary.as_deref(),
-        }
+        self.entry
+            .summary()
+            .map(types::Text::content)
+            .or_else(|| self.entry.content().and_then(Content::body))
     }
 
     /// Link to websiteurl at which this entry is published
     async fn website_url(&self) -> Option<&str> {
-        match &self.body {
-            EntryBody::Feed(entry) => entry.website_url(self.meta.feed.r#type()),
-            EntryBody::Timeline(attrs) => attrs.website_url.as_deref(),
-        }
+        self.entry.website_url(self.meta.feed.r#type())
     }
 }
 
 impl Entry {
     pub fn new(meta: Annotated<types::FeedMeta>, entry: SyndFeedEntry) -> Self {
-        Self {
-            id: entry.id().clone(),
-            meta,
-            body: EntryBody::Feed(Box::new(entry)),
-        }
+        Self { meta, entry }
     }
 
-    pub fn from_timeline_entry(node: TimelineEntry) -> Self {
-        Self {
-            id: node.entry_id,
-            meta: node.feed_meta,
-            body: EntryBody::Timeline(node.attrs),
-        }
+    fn from_feed(feed: &Annotated<Arc<types::Feed>>, entry: &SyndFeedEntry) -> Self {
+        Self::new(feed.project(|feed| feed.meta().clone()), entry.clone())
+    }
+}
+
+impl From<TimelineEntry> for Entry {
+    fn from(node: TimelineEntry) -> Self {
+        Self::new(node.feed_meta, node.entry)
     }
 }
 
 pub struct Feed(Annotated<Arc<types::Feed>>);
+
+type FeedEntriesConnection =
+    Connection<usize, Entry, EmptyFields, EmptyFields, FeedEntryConnectionName, FeedEntryEdgeName>;
+
+/// One overfetched first page of a feed's entries.
+struct FeedEntryPage {
+    entries: Vec<Entry>,
+    has_next_page: bool,
+}
+
+impl FeedEntryPage {
+    fn read(feed: &Annotated<Arc<types::Feed>>, first: Option<i32>) -> Self {
+        let limit = usize::try_from(first.unwrap_or(5).max(0)).unwrap_or_default();
+        Self::from_overfetch(
+            feed.feed
+                .entries()
+                .map(|entry| Entry::from_feed(feed, entry))
+                .take(limit.saturating_add(1))
+                .collect(),
+            limit,
+        )
+    }
+
+    fn from_overfetch(mut entries: Vec<Entry>, limit: usize) -> Self {
+        let has_next_page = entries.len() > limit;
+        entries.truncate(limit);
+        Self {
+            entries,
+            has_next_page,
+        }
+    }
+}
+
+impl From<FeedEntryPage> for FeedEntriesConnection {
+    fn from(page: FeedEntryPage) -> Self {
+        let mut connection = Self::new(false, page.has_next_page);
+        connection.edges.extend(
+            page.entries
+                .into_iter()
+                .enumerate()
+                .map(|(index, entry)| Edge::new(index, entry)),
+        );
+        connection
+    }
+}
 
 #[Object]
 impl Feed {
@@ -158,38 +177,11 @@ impl Feed {
     }
 
     /// Feed entries
-    #[allow(clippy::cast_sign_loss)]
     async fn entries(
         &'_ self,
         #[graphql(default = 5)] first: Option<i32>,
-    ) -> Connection<
-        usize,
-        Entry,
-        EmptyFields,
-        EmptyFields,
-        FeedEntryConnectionName,
-        FeedEntryEdgeName,
-    > {
-        #[allow(clippy::cast_sign_loss)]
-        let first = first.unwrap_or(5).max(0) as usize;
-        let meta = self.0.project(|feed| feed.meta().clone());
-        let entries = self
-            .0
-            .feed
-            .entries()
-            .map(move |entry| Entry::new(meta.clone(), entry.clone()))
-            .take(first)
-            .collect::<Vec<_>>();
-
-        let mut c = Connection::new(false, entries.len() > first);
-        c.edges.extend(
-            entries
-                .into_iter()
-                .enumerate()
-                .map(|(idx, entry)| Edge::new(idx, entry)),
-        );
-
-        c
+    ) -> FeedEntriesConnection {
+        FeedEntryPage::read(&self.0, first).into()
     }
 
     /// Feed authors

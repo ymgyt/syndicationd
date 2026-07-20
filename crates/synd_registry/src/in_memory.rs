@@ -1,7 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};
-use synd_feed::{entry::EntryId, types::FeedUrl};
+use synd_feed::{
+    entry::{Entry, EntryId, SyndEntry},
+    types::{Feed, FeedMeta, FeedUrl},
+};
 use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{
@@ -12,16 +15,16 @@ use crate::{
         target_list::{CrawlTarget, CrawlTargetState, FeedSubscriptions, SubscriptionPolicy},
     },
     db::{
-        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, EntryStore, FeedDb, FeedRegistryDb,
-        SubscriptionDb, TimelineDb,
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedDb, FeedRegistryDb, SubscriptionDb,
+        TimelineDb,
     },
-    entry::{EntryChanges, EntrySet},
+    entry::Entries,
     error::{RegistryDbError, RegistryDbResult},
     event::{
         Event, EventCursor, EventCursorPos, EventInterests, EventJournal, EventJournalAppend,
         EventType, JournaledEvent, ProcessorId,
     },
-    feed::{UpsertFeedCommand, UpsertFeedOutcome},
+    feed::FeedUpdate,
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
         TimelineEntriesPage, TimelineEntriesQuery,
@@ -40,8 +43,93 @@ struct InMemoryState {
     manual_requests: HashMap<String, DateTime<Utc>>,
     crawl_states: HashMap<String, CrawlState>,
     timeline_catchup_counts: HashMap<String, u64>,
+    feeds: InMemoryFeeds,
     blobs: HashMap<i64, Vec<u8>>,
     next_blob_pk: i64,
+}
+
+/// Current feed state owned by the in-memory `FeedDb` adapter.
+#[derive(Debug, Clone, Default)]
+struct InMemoryFeeds {
+    meta: HashMap<FeedUrl, FeedMeta>,
+    entries: HashMap<EntryId, SyndEntry>,
+    membership: HashMap<FeedUrl, Vec<EntryId>>,
+}
+
+impl InMemoryFeeds {
+    fn load_entries(&self, entry_ids: &[EntryId]) -> Entries {
+        entry_ids
+            .iter()
+            .filter_map(|entry_id| self.entries.get(entry_id).cloned())
+            .collect()
+    }
+
+    fn apply(&mut self, update: &FeedUpdate) {
+        for change in update.entry_changes() {
+            let entry = change.entry().clone();
+            self.entries.insert(entry.entry().id().clone(), entry);
+        }
+        let feed_url = update.source().feed_url.clone();
+        self.meta.insert(feed_url.clone(), update.meta().clone());
+        self.membership
+            .insert(feed_url, update.membership().to_vec());
+    }
+
+    fn load(&self, feed_urls: &[FeedUrl]) -> RegistryDbResult<HashMap<FeedUrl, Feed>> {
+        feed_urls
+            .iter()
+            .map(|feed_url| {
+                self.load_feed(feed_url)
+                    .map(|feed| feed.map(|feed| (feed_url.clone(), feed)))
+            })
+            .filter_map(Result::transpose)
+            .collect()
+    }
+
+    fn load_feed(&self, feed_url: &FeedUrl) -> RegistryDbResult<Option<Feed>> {
+        let Some(meta) = self.meta.get(feed_url) else {
+            return Ok(None);
+        };
+        let membership = self.membership.get(feed_url).ok_or_else(|| {
+            RegistryDbError::invariant(format!("feed membership not found: {feed_url}"))
+        })?;
+        let entries = CurrentFeedEntries::load(membership, &self.entries)?;
+        Ok(Some(Feed::new(meta.clone(), entries.into_entries())))
+    }
+}
+
+/// Catalog entries selected by current membership in canonical feed order.
+struct CurrentFeedEntries(Vec<SyndEntry>);
+
+impl CurrentFeedEntries {
+    fn load(
+        membership: &[EntryId],
+        catalog: &HashMap<EntryId, SyndEntry>,
+    ) -> RegistryDbResult<Self> {
+        let mut entries = membership
+            .iter()
+            .map(|entry_id| {
+                catalog.get(entry_id).cloned().ok_or_else(|| {
+                    RegistryDbError::invariant(format!("feed entry not found: {entry_id}"))
+                })
+            })
+            .collect::<RegistryDbResult<Vec<_>>>()?;
+        entries.sort_by(|left, right| {
+            right
+                .order_key()
+                .as_datetime()
+                .cmp(&left.order_key().as_datetime())
+                .then_with(|| right.entry().id().cmp(left.entry().id()))
+        });
+        Ok(Self(entries))
+    }
+
+    fn into_entries(self) -> Vec<Entry> {
+        self.0
+            .into_iter()
+            .map(|entry| entry.entry().clone())
+            .collect()
+    }
 }
 
 /// Hashable subscription identity used by in-memory maps.
@@ -114,7 +202,7 @@ impl EventJournalAppend for InMemoryRegistryTx<'_> {
         let event_type = event.event_type();
         let state = &mut self.state;
         let position = i64::try_from(state.journal.len())
-            .map_err(|_| RegistryDbError::internal_message("event journal position overflow"))?
+            .map_err(|_| RegistryDbError::invariant("event journal position overflow"))?
             .saturating_add(1);
         state.journal.push(InMemoryJournalEntry {
             position,
@@ -385,9 +473,11 @@ impl BlobDb for InMemoryRegistryTx<'_> {
 
     async fn load_blob(&mut self, blob: BlobRef) -> RegistryDbResult<Vec<u8>> {
         let state = &self.state;
-        state.blobs.get(&blob.pk()).cloned().ok_or_else(|| {
-            RegistryDbError::internal_message(format!("blob not found: {}", blob.pk()))
-        })
+        state
+            .blobs
+            .get(&blob.pk())
+            .cloned()
+            .ok_or_else(|| RegistryDbError::invariant(format!("blob not found: {}", blob.pk())))
     }
 }
 
@@ -419,25 +509,20 @@ impl CrawlStateDb for InMemoryRegistryTx<'_> {
 }
 
 impl FeedDb for InMemoryRegistryTx<'_> {
-    async fn upsert_feed(
-        &mut self,
-        _command: UpsertFeedCommand,
-    ) -> RegistryDbResult<UpsertFeedOutcome> {
-        Ok(UpsertFeedOutcome::Unchanged)
-    }
-}
-
-impl EntryStore for InMemoryRegistryTx<'_> {
-    async fn load_entries(
-        &mut self,
-        feed_url: &FeedUrl,
-        _entry_ids: &[EntryId],
-    ) -> RegistryDbResult<EntrySet> {
-        Ok(EntrySet::empty(feed_url.clone()))
+    async fn load_entries(&mut self, entry_ids: &[EntryId]) -> RegistryDbResult<Entries> {
+        Ok(self.state.feeds.load_entries(entry_ids))
     }
 
-    async fn apply_entry_changes(&mut self, _changes: EntryChanges) -> RegistryDbResult<()> {
+    async fn apply_feed_update(&mut self, update: &FeedUpdate) -> RegistryDbResult<()> {
+        self.state.feeds.apply(update);
         Ok(())
+    }
+
+    async fn load_feeds(
+        &mut self,
+        feed_urls: &[FeedUrl],
+    ) -> RegistryDbResult<HashMap<FeedUrl, Feed>> {
+        self.state.feeds.load(feed_urls)
     }
 }
 
@@ -505,10 +590,10 @@ fn cursor_position(position: &EventCursorPos) -> RegistryDbResult<i64> {
         EventCursorPos::Initial => Ok(0),
         EventCursorPos::Position(position) => {
             let position = position.parse::<i64>().map_err(|err| {
-                RegistryDbError::internal_message(format!("invalid event cursor position: {err}"))
+                RegistryDbError::invariant(format!("invalid event cursor position: {err}"))
             })?;
             if position < 0 {
-                return Err(RegistryDbError::internal_message(format!(
+                return Err(RegistryDbError::invariant(format!(
                     "event cursor position must be non-negative: {position}"
                 )));
             }

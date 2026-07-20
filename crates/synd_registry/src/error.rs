@@ -9,21 +9,30 @@ pub type RegistryDbResult<T> = Result<T, RegistryDbError>;
 #[derive(Debug, Error)]
 pub enum RegistryDbError {
     #[error(transparent)]
-    Internal(#[from] Box<dyn StdError + Send + Sync>),
-    #[error("internal registry error: {0}")]
-    InternalMessage(String),
+    Retryable(Box<dyn StdError + Send + Sync>),
+    #[error(transparent)]
+    Permanent(Box<dyn StdError + Send + Sync>),
+    #[error("registry invariant violated: {0}")]
+    Invariant(String),
 }
 
 impl RegistryDbError {
-    pub fn internal<E>(err: E) -> Self
+    pub fn retryable<E>(err: E) -> Self
     where
         E: StdError + Send + Sync + 'static,
     {
-        Self::Internal(Box::new(err))
+        Self::Retryable(Box::new(err))
     }
 
-    pub fn internal_message(message: impl Into<String>) -> Self {
-        Self::InternalMessage(message.into())
+    pub fn permanent<E>(err: E) -> Self
+    where
+        E: StdError + Send + Sync + 'static,
+    {
+        Self::Permanent(Box::new(err))
+    }
+
+    pub fn invariant(message: impl Into<String>) -> Self {
+        Self::Invariant(message.into())
     }
 }
 

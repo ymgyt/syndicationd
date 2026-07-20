@@ -11,3 +11,6 @@ pub use entry::Entry;
 mod id;
 pub(crate) use id::feed_rs_missing_id_marker;
 pub use id::{EntryId, EntryIdError};
+
+mod synd;
+pub use synd::{EntryIdMismatch, EntryOrderKey, SyndEntry, SyndEntryDiff};

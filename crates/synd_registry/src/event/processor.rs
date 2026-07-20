@@ -9,6 +9,7 @@ use crate::{
     db::FeedRegistryDb,
     error::RegistryDbError,
     event::{Event, EventInterests, EventType},
+    feed::FeedUpdateError,
 };
 
 /// Result type returned by event processors.
@@ -64,6 +65,8 @@ pub enum ProcessorError {
     },
     #[error(transparent)]
     FeedParse(#[from] FeedParseError),
+    #[error(transparent)]
+    FeedUpdate(#[from] FeedUpdateError),
 }
 
 impl ProcessorError {
@@ -89,15 +92,24 @@ pub trait ClassifyError {
     fn classify(&self) -> FailureClass;
 }
 
+impl ClassifyError for RegistryDbError {
+    fn classify(&self) -> FailureClass {
+        match self {
+            Self::Retryable(_) => FailureClass::Retryable,
+            Self::Permanent(_) | Self::Invariant(_) => FailureClass::Permanent,
+        }
+    }
+}
+
 impl ClassifyError for ProcessorError {
     fn classify(&self) -> FailureClass {
         match self {
-            // Storage failures may be transient (lock contention, I/O); the
-            // input must not be lost, so the whole pass is retried.
-            Self::RegistryDb(_) => FailureClass::Retryable,
+            Self::RegistryDb(err) => err.classify(),
             // Deterministic failures of the input itself: retrying the same
             // event can never succeed.
-            Self::UnexpectedEvent { .. } | Self::FeedParse(_) => FailureClass::Permanent,
+            Self::UnexpectedEvent { .. } | Self::FeedParse(_) | Self::FeedUpdate(_) => {
+                FailureClass::Permanent
+            }
         }
     }
 }
@@ -107,7 +119,6 @@ impl ClassifyError for ProcessorError {
 pub enum ProcessorId {
     CrawlTargetProjection,
     FeedProjection,
-    EntryProjection,
     TimelineProjection,
     ApiEventPublisher,
 }
@@ -118,7 +129,6 @@ impl ProcessorId {
             Self::CrawlTargetProjection => "CrawlTargetProjection",
 
             Self::FeedProjection => "FeedProjection",
-            Self::EntryProjection => "EntryProjection",
             Self::TimelineProjection => "TimelineProjection",
             Self::ApiEventPublisher => "ApiEventPublisher",
         }
@@ -256,5 +266,31 @@ impl RecordedEvents {
 
     pub fn push(&mut self, event_type: EventType) {
         self.types.push(event_type);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use super::*;
+
+    #[test]
+    fn retryable_registry_error_remains_retryable_for_processor() {
+        let err = ProcessorError::from(RegistryDbError::retryable(io::Error::new(
+            io::ErrorKind::ConnectionReset,
+            "connection reset",
+        )));
+
+        assert_eq!(err.classify(), FailureClass::Retryable);
+    }
+
+    #[test]
+    fn permanent_registry_error_remains_permanent_for_processor() {
+        let err = ProcessorError::from(RegistryDbError::invariant(
+            "entry id does not match stored JSON",
+        ));
+
+        assert_eq!(err.classify(), FailureClass::Permanent);
     }
 }

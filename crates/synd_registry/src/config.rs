@@ -10,7 +10,6 @@ use crate::crawl::{
 pub struct FeedRegistryWorkerConfig {
     pub crawl_target_projection_poll_interval: Duration,
     pub feed_projection_poll_interval: Duration,
-    pub entry_projection_poll_interval: Duration,
     pub timeline_projection_poll_interval: Duration,
     pub api_event_publisher_poll_interval: Duration,
     pub crawl_dispatcher_poll_interval: Duration,
@@ -21,7 +20,6 @@ impl FeedRegistryWorkerConfig {
         Self {
             crawl_target_projection_poll_interval: poll_interval,
             feed_projection_poll_interval: poll_interval,
-            entry_projection_poll_interval: poll_interval,
             timeline_projection_poll_interval: poll_interval,
             api_event_publisher_poll_interval: poll_interval,
             crawl_dispatcher_poll_interval: poll_interval,

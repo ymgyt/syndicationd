@@ -1,15 +1,17 @@
+use std::{collections::HashMap, sync::Arc};
+
 use async_graphql::{
     Context, Enum, Object, Result, SimpleObject, Union,
-    connection::{Connection, Edge},
+    connection::{Connection, Edge, EmptyFields},
 };
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::{Annotated, Category, Feed, FeedUrl, Requirement};
 use synd_registry::{
     Subscription as RegistrySubscription,
     crawl::policy::{CrawlPolicy as RegistryCrawlPolicy, PollingPolicy as RegistryPollingPolicy},
     query::{
-        SubscriptionsQuery, TimelineChange as RegistryTimelineChange, TimelineChangesQuery,
-        TimelineEntriesPage, TimelineEntriesQuery, TimelineEntry as RegistryTimelineEntry,
-        TimelineEntryCursor,
+        Subscriptions, SubscriptionsQuery, TimelineChange as RegistryTimelineChange,
+        TimelineChangesQuery, TimelineEntriesPage, TimelineEntriesQuery,
+        TimelineEntry as RegistryTimelineEntry, TimelineEntryCursor,
     },
 };
 
@@ -86,12 +88,85 @@ impl SubscribedFeed {
     }
 }
 
-impl From<RegistrySubscription> for SubscribedFeed {
-    fn from(subscription: RegistrySubscription) -> Self {
+impl From<SubscribedFeed> for Edge<String, SubscribedFeed, EmptyFields> {
+    fn from(feed: SubscribedFeed) -> Self {
+        Self::new(feed.subscription.feed_url.to_string(), feed)
+    }
+}
+
+/// Complete feeds resolved for one subscriptions page.
+struct FeedBatch(HashMap<FeedUrl, Feed>);
+
+impl FeedBatch {
+    async fn load(cx: &Context<'_>, subscriptions: &Subscriptions) -> Result<Self> {
+        let feed_urls = subscriptions
+            .subscriptions
+            .iter()
+            .map(|subscription| subscription.feed_url.clone())
+            .collect::<Vec<_>>();
+        Ok(Self(registry(cx).load_feeds(&feed_urls).await?))
+    }
+
+    fn resolve(&mut self, subscription: RegistrySubscription) -> SubscribedFeed {
+        let feed = self.0.remove(&subscription.feed_url);
+        SubscribedFeed::resolve(subscription, feed)
+    }
+}
+
+type SubscribedFeedsConnection = Connection<String, SubscribedFeed>;
+
+/// GraphQL subscription nodes resolved against the latest observed feeds.
+struct SubscribedFeedsPage {
+    feeds: Vec<SubscribedFeed>,
+    has_next_page: bool,
+}
+
+impl SubscribedFeedsPage {
+    async fn load(cx: &Context<'_>, after: Option<String>, first: Option<i32>) -> Result<Self> {
+        let page = registry(cx)
+            .list_subscriptions(SubscriptionsQuery {
+                subscriber_id: subscriber_id(cx),
+                after,
+                first: usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0),
+            })
+            .await?;
+        let feeds = FeedBatch::load(cx, &page).await?;
+        Ok(Self::resolve(page, feeds))
+    }
+
+    fn resolve(page: Subscriptions, mut feeds: FeedBatch) -> Self {
         Self {
-            subscription,
-            feed: None,
+            feeds: page
+                .subscriptions
+                .into_iter()
+                .map(|subscription| feeds.resolve(subscription))
+                .collect(),
+            has_next_page: page.has_next_page,
         }
+    }
+}
+
+impl From<SubscribedFeedsPage> for SubscribedFeedsConnection {
+    fn from(page: SubscribedFeedsPage) -> Self {
+        let mut connection = Self::new(false, page.has_next_page);
+        connection
+            .edges
+            .extend(page.feeds.into_iter().map(Edge::from));
+        connection
+    }
+}
+
+impl SubscribedFeed {
+    fn resolve(subscription: RegistrySubscription, feed: Option<Feed>) -> Self {
+        let feed = feed.map(|feed| {
+            Annotated {
+                feed: Arc::new(feed),
+                requirement: subscription.requirement,
+                category: subscription.category.clone(),
+            }
+            .into()
+        });
+        Self { subscription, feed }
     }
 }
 
@@ -105,7 +180,7 @@ impl FeedRegistry {
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, SubscribedFeed>> {
-        subscriptions_connection(cx, after, first).await
+        Ok(SubscribedFeedsPage::load(cx, after, first).await?.into())
     }
 
     async fn timeline(&self) -> Timeline {
@@ -123,19 +198,8 @@ impl Timeline {
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, TimelineEntry, TimelineEntriesFields>> {
-        let page = timeline_entries_page(cx, after, first).await?;
-
-        let mut connection = Connection::with_additional_fields(
-            false,
-            page.has_next_page,
-            TimelineEntriesFields { seq: page.seq },
-        );
-        connection.edges.extend(page.nodes.into_iter().map(|node| {
-            let cursor = node.cursor.encode();
-            Edge::new(cursor, TimelineEntry::from(node))
-        }));
-
-        Ok(connection)
+        let request = TimelineEntriesRequest::from_graphql(cx, after.as_deref(), first)?;
+        Ok(request.load(cx).await?.into())
     }
 
     async fn changes(
@@ -171,9 +235,10 @@ struct TimelineEntry {
 
 impl From<RegistryTimelineEntry> for TimelineEntry {
     fn from(node: RegistryTimelineEntry) -> Self {
+        let order_time = node.cursor.order_time().into();
         Self {
-            order_time: node.cursor.order_time().into(),
-            entry: Entry::from_timeline_entry(node),
+            order_time,
+            entry: node.into(),
         }
     }
 }
@@ -183,6 +248,51 @@ impl From<RegistryTimelineEntry> for TimelineEntry {
 struct TimelineEntriesFields {
     /// Change seq this page reflects. Clients sync changes from here
     seq: i64,
+}
+
+type TimelineEntriesConnection = Connection<String, TimelineEntry, TimelineEntriesFields>;
+
+/// Registry timeline page at the GraphQL connection boundary.
+struct TimelineEntriesGraphqlPage(TimelineEntriesPage);
+
+impl From<TimelineEntriesGraphqlPage> for TimelineEntriesConnection {
+    fn from(page: TimelineEntriesGraphqlPage) -> Self {
+        let page = page.0;
+        let mut connection = Self::with_additional_fields(
+            false,
+            page.has_next_page,
+            TimelineEntriesFields { seq: page.seq },
+        );
+        connection.edges.extend(page.nodes.into_iter().map(|node| {
+            let cursor = node.cursor.encode();
+            Edge::new(cursor, TimelineEntry::from(node))
+        }));
+        connection
+    }
+}
+
+/// Validated GraphQL arguments for one timeline entries query.
+struct TimelineEntriesRequest(TimelineEntriesQuery);
+
+impl TimelineEntriesRequest {
+    fn from_graphql(cx: &Context<'_>, after: Option<&str>, first: Option<i32>) -> Result<Self> {
+        let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
+        let after = after
+            .map(TimelineEntryCursor::decode)
+            .transpose()
+            .map_err(|err| async_graphql::Error::new(err.to_string()))?;
+        Ok(Self(TimelineEntriesQuery {
+            subscriber_id: subscriber_id(cx),
+            after,
+            first,
+        }))
+    }
+
+    async fn load(self, cx: &Context<'_>) -> Result<TimelineEntriesGraphqlPage> {
+        Ok(TimelineEntriesGraphqlPage(
+            registry(cx).list_timeline_entries(self.0).await?,
+        ))
+    }
 }
 
 /// Page of timeline changes for incremental sync, ordered by seq.
@@ -230,51 +340,4 @@ impl Query {
     async fn feed_registry(&self) -> FeedRegistry {
         FeedRegistry
     }
-}
-
-async fn subscriptions_connection(
-    cx: &Context<'_>,
-    after: Option<String>,
-    first: Option<i32>,
-) -> Result<Connection<String, SubscribedFeed>> {
-    let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
-    let page = registry(cx)
-        .list_subscriptions(SubscriptionsQuery {
-            subscriber_id: subscriber_id(cx),
-            after,
-            first,
-        })
-        .await?;
-
-    let mut connection = Connection::new(false, page.has_next_page);
-    connection.edges.extend(
-        page.subscriptions
-            .into_iter()
-            .take(first)
-            .map(SubscribedFeed::from)
-            .map(|feed| Edge::new(feed.subscription.feed_url.to_string(), feed)),
-    );
-
-    Ok(connection)
-}
-
-async fn timeline_entries_page(
-    cx: &Context<'_>,
-    after: Option<String>,
-    first: Option<i32>,
-) -> Result<TimelineEntriesPage> {
-    let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
-    let after = after
-        .as_deref()
-        .map(TimelineEntryCursor::decode)
-        .transpose()
-        .map_err(|err| async_graphql::Error::new(err.to_string()))?;
-    let page = registry(cx)
-        .list_timeline_entries(TimelineEntriesQuery {
-            subscriber_id: subscriber_id(cx),
-            after,
-            first,
-        })
-        .await?;
-    Ok(page)
 }

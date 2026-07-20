@@ -233,14 +233,14 @@ where
 }
 
 fn unexpected_event_count(command_name: &'static str, event_count: usize) -> FeedRegistryError {
-    RegistryDbError::internal_message(format!(
+    RegistryDbError::invariant(format!(
         "subscription {command_name} produced unexpected event count: {event_count}"
     ))
     .into()
 }
 
 fn unexpected_event(command_name: &'static str, event: &SubEvent) -> FeedRegistryError {
-    RegistryDbError::internal_message(format!(
+    RegistryDbError::invariant(format!(
         "subscription {command_name} produced unexpected event type: {}",
         event.event_type()
     ))

@@ -3,8 +3,7 @@
 CREATE TABLE feed_snapshot (
     feed_pk      INTEGER PRIMARY KEY,
     meta_json    TEXT NOT NULL CHECK (json_valid(meta_json)),
-    -- Source body of this snapshot. Comparing references detects body
-    -- change, which gates entry projection.
+    -- Source body retained as provenance for the parsed snapshot.
     body_blob_pk INTEGER NOT NULL,
 
     FOREIGN KEY (feed_pk)      REFERENCES feed(pk),
@@ -16,14 +15,13 @@ CREATE TABLE feed_snapshot (
 CREATE TABLE entry (
     entry_id   TEXT PRIMARY KEY,
     feed_pk    INTEGER NOT NULL,
-    attrs_json TEXT NOT NULL CHECK (json_valid(attrs_json)),
-    -- Full content. Kept out of attrs_json so hot queries do not carry it.
-    content    TEXT,
+    entry_json TEXT NOT NULL CHECK (json_valid(entry_json)),
     -- Materialized EntryOrderKey: published, else updated, else first seen;
     -- fixed at discovery. First component of the canonical entry order
     -- (order_time DESC, entry_id DESC) shared by every view and cursor.
     order_time DATETIME NOT NULL,
 
+    UNIQUE (feed_pk, entry_id),
     FOREIGN KEY (feed_pk) REFERENCES feed(pk)
 );
 
@@ -31,3 +29,14 @@ CREATE TABLE entry (
 -- browsing, latest-entry lookups).
 CREATE INDEX entry_feed_order_idx
     ON entry(feed_pk, order_time DESC, entry_id DESC);
+
+-- Entries declared by the latest accepted body of each feed. Entry catalog
+-- rows remain after membership disappears because timelines retain history.
+CREATE TABLE feed_entry (
+    feed_pk  INTEGER NOT NULL,
+    entry_id TEXT NOT NULL,
+
+    PRIMARY KEY (feed_pk, entry_id),
+    FOREIGN KEY (feed_pk, entry_id)
+        REFERENCES entry(feed_pk, entry_id)
+);

@@ -10,9 +10,8 @@ pub use codec::{EncodedEvent, EventEncoding, EventEncodingError, EventEncodingRe
 pub use domain::{
     CrawlJobFinishedEvent, CrawlRequestedEvent, CrawlTargetActivatedEvent,
     CrawlTargetDeactivatedEvent, CrawlTargetPolicyChangedEvent, EntryChangedEvent,
-    EntryDiscoveredEvent, Event, EventInterests, EventType, FeedChangedEvent, FeedDiscoveredEvent,
-    FeedSubscribedEvent, FeedUnsubscribedEvent, RegistryEvent, SubEvent, SubscriptionChangedEvent,
-    TimelineChangedEvent,
+    EntryDiscoveredEvent, Event, EventInterests, EventType, FeedSubscribedEvent,
+    FeedUnsubscribedEvent, RegistryEvent, SubEvent, SubscriptionChangedEvent, TimelineChangedEvent,
 };
 pub use journal::{
     EventCursor, EventCursorPos, EventJournal, EventJournalAppend, EventReadBatch, JournaledEvent,

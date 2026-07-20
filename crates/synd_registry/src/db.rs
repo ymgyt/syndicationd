@@ -1,7 +1,10 @@
-use std::future::Future;
+use std::{collections::HashMap, future::Future};
 
 use chrono::{DateTime, Utc};
-use synd_feed::{entry::EntryId, types::FeedUrl};
+use synd_feed::{
+    entry::EntryId,
+    types::{Feed, FeedUrl},
+};
 
 use crate::{
     crawl::{
@@ -10,10 +13,10 @@ use crate::{
         state::{CrawlState, UpsertCrawlStateCommand},
         target_list::{CrawlTarget, FeedSubscriptions},
     },
-    entry::{EntryChanges, EntrySet},
+    entry::Entries,
     error::{RegistryDbError, RegistryDbResult},
     event::{EventJournal, EventJournalAppend},
-    feed::{UpsertFeedCommand, UpsertFeedOutcome},
+    feed::FeedUpdate,
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
         TimelineEntriesPage, TimelineEntriesQuery,
@@ -132,26 +135,22 @@ pub trait BlobDb {
     ) -> impl Future<Output = RegistryDbResult<Vec<u8>>> + Send;
 }
 
-/// Transactional operations for applying parsed feed state to the registry.
+/// Transactional operations over parsed current feed state.
 pub trait FeedDb {
-    fn upsert_feed(
-        &mut self,
-        command: UpsertFeedCommand,
-    ) -> impl Future<Output = RegistryDbResult<UpsertFeedOutcome>> + Send;
-}
-
-/// Transactional operations for applying reconciled entry state.
-pub trait EntryStore {
     fn load_entries(
         &mut self,
-        feed_url: &FeedUrl,
         entry_ids: &[EntryId],
-    ) -> impl Future<Output = RegistryDbResult<EntrySet>> + Send;
+    ) -> impl Future<Output = RegistryDbResult<Entries>> + Send;
 
-    fn apply_entry_changes(
+    fn apply_feed_update(
         &mut self,
-        changes: EntryChanges,
+        update: &FeedUpdate,
     ) -> impl Future<Output = RegistryDbResult<()>> + Send;
+
+    fn load_feeds(
+        &mut self,
+        feed_urls: &[FeedUrl],
+    ) -> impl Future<Output = RegistryDbResult<HashMap<FeedUrl, Feed>>> + Send;
 }
 
 /// Transactional operations for reading and applying timeline membership.

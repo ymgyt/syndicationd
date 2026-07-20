@@ -1,10 +1,11 @@
 use synd_feed::feed::service::{FeedFetchFailureKind, FeedParseErrorKind};
-use synd_registry::{
-    crawl::{
-        policy::CrawlPolicy,
-        state::{CrawlHttpErrorKind, CrawlStateErrorKind},
-    },
-    entry::EntryAttrs,
+use synd_feed::{
+    entry::{Entry, EntryId},
+    types::{FeedMeta, FeedUrl},
+};
+use synd_registry::crawl::{
+    policy::CrawlPolicy,
+    state::{CrawlHttpErrorKind, CrawlStateErrorKind},
 };
 
 use super::error::{SqliteError, SqliteResult};
@@ -17,12 +18,40 @@ pub(super) fn decode_crawl_policy_json(policy_json: &str) -> SqliteResult<CrawlP
     Ok(serde_json::from_str(policy_json)?)
 }
 
-pub(super) fn encode_entry_attrs_json(attrs: &EntryAttrs) -> SqliteResult<String> {
-    Ok(serde_json::to_string(attrs)?)
+pub(super) fn encode_entry_json(entry: &Entry) -> SqliteResult<String> {
+    Ok(serde_json::to_string(entry)?)
 }
 
-pub(super) fn decode_entry_attrs_json(attrs_json: &str) -> SqliteResult<EntryAttrs> {
-    Ok(serde_json::from_str(attrs_json)?)
+pub(super) fn decode_stored_entry(entry_id: &str, entry_json: &str) -> SqliteResult<Entry> {
+    let relational = EntryId::parse(entry_id).map_err(|err| {
+        SqliteError::decode_message(format!("invalid entry id {entry_id}: {err}"))
+    })?;
+    let entry = serde_json::from_str::<Entry>(entry_json)?;
+    if &relational != entry.id() {
+        return Err(SqliteError::EntryIdMismatch {
+            relational,
+            document: entry.id().clone(),
+        });
+    }
+    Ok(entry)
+}
+
+pub(super) fn encode_feed_meta_json(meta: &FeedMeta) -> SqliteResult<String> {
+    Ok(serde_json::to_string(meta)?)
+}
+
+pub(super) fn decode_stored_feed_meta(feed_url: &str, meta_json: &str) -> SqliteResult<FeedMeta> {
+    let relational = FeedUrl::parse(feed_url).map_err(|err| {
+        SqliteError::decode_message(format!("invalid feed URL {feed_url}: {err}"))
+    })?;
+    let meta = serde_json::from_str::<FeedMeta>(meta_json)?;
+    if &relational != meta.url() {
+        return Err(SqliteError::FeedUrlMismatch {
+            relational: Box::new(relational),
+            document: Box::new(meta.url().clone()),
+        });
+    }
+    Ok(meta)
 }
 
 pub(super) fn encode_crawl_state_error_kind(kind: CrawlStateErrorKind) -> String {

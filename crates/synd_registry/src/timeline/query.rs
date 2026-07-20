@@ -3,12 +3,12 @@ use std::fmt;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use synd_feed::{
-    entry::EntryId,
+    entry::{Entry, EntryId},
     types::{Annotated, FeedMeta},
 };
 use thiserror::Error;
 
-use crate::{entry::EntryAttrs, subscription::SubscriberId};
+use crate::subscription::SubscriberId;
 
 /// Query for timeline entries visible to one subscriber.
 #[derive(Debug, Clone)]
@@ -70,8 +70,7 @@ pub enum TimelineEntryCursorError {
 /// GraphQL/query node assembled for one timeline entry.
 #[derive(Debug, Clone)]
 pub struct TimelineEntry {
-    pub entry_id: EntryId,
-    pub attrs: EntryAttrs,
+    pub entry: Entry,
     pub feed_meta: Annotated<FeedMeta>,
     pub cursor: TimelineEntryCursor,
 }
