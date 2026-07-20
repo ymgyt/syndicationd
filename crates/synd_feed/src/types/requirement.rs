@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::types::macros::impl_sqlx_encode_decode;
+use crate::macros::impl_sqlx_encode_decode;
 
 /// `Requirement` expresses how important the feed is
 /// using an analogy to [RFC2119](https://datatracker.ietf.org/doc/html/rfc2119)

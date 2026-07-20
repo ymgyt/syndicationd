@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use sqlx::{QueryBuilder, Sqlite, Transaction};
-use synd_feed::types::{Annotated, Category, EntryId, FeedMeta, FeedUrl, Requirement};
+use synd_feed::{
+    entry::EntryId,
+    types::{Annotated, Category, FeedMeta, FeedUrl, Requirement},
+};
 use synd_registry::{
     RegistryDbResult,
     db::TimelineDb,

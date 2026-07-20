@@ -2,7 +2,10 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Annotated, EntryId, FeedMeta};
+use synd_feed::{
+    entry::EntryId,
+    types::{Annotated, FeedMeta},
+};
 use thiserror::Error;
 
 use crate::{entry::EntryAttrs, subscription::SubscriberId};
@@ -114,7 +117,7 @@ pub struct TimelineChangesPage {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use synd_feed::types::EntryId;
+    use synd_feed::entry::EntryId;
 
     use super::*;
 

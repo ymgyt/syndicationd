@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use derive_more::From;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use strum::{Display, EnumDiscriminants, EnumString, IntoStaticStr};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::{entry::EntryId, types::FeedUrl};
 
 use crate::{
     crawl::{blob::BlobRef, job::CrawlJobId, policy::CrawlPolicy},

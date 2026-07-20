@@ -6,6 +6,8 @@ use feed_rs::model as feedrs;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
+use crate::entry::Entry;
+
 pub type Time = DateTime<Utc>;
 
 mod requirement;
@@ -19,18 +21,6 @@ pub use url::FeedUrl;
 
 mod feed_type;
 pub use feed_type::FeedType;
-
-mod entry_id;
-pub(crate) use entry_id::feed_rs_missing_id_marker;
-pub use entry_id::{EntryId, EntryIdError};
-
-mod content;
-pub use content::Content;
-
-mod entry;
-pub use entry::Entry;
-
-mod macros;
 
 /// Text content with its media type and optional source URI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
@@ -367,7 +357,7 @@ impl Feed {
     }
 }
 
-mod link {
+pub(crate) mod link {
     use tracing::warn;
 
     use crate::types::{FeedType, Link};

@@ -4,7 +4,10 @@ use async_graphql::{
     ID, Object, SimpleObject,
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
-use synd_feed::types::{self, Annotated, Category, FeedType, FeedUrl, Requirement};
+use synd_feed::{
+    entry::{Content, Entry as SyndFeedEntry, EntryId},
+    types::{self, Annotated, Category, FeedType, FeedUrl, Requirement},
+};
 use synd_registry::{entry::EntryAttrs as RegistryEntryAttrs, query::TimelineEntry};
 
 use crate::gql::scalar;
@@ -35,13 +38,13 @@ impl From<&types::Link> for Link {
 }
 
 pub(crate) struct Entry {
-    id: types::EntryId,
+    id: EntryId,
     meta: Annotated<types::FeedMeta>,
     body: EntryBody,
 }
 
 pub(crate) enum EntryBody {
-    Feed(Box<types::Entry>),
+    Feed(Box<SyndFeedEntry>),
     Timeline(RegistryEntryAttrs),
 }
 
@@ -89,7 +92,7 @@ impl Entry {
             EntryBody::Feed(entry) => entry
                 .summary()
                 .map(types::Text::content)
-                .or_else(|| entry.content().and_then(types::Content::body)),
+                .or_else(|| entry.content().and_then(Content::body)),
             EntryBody::Timeline(attrs) => attrs.summary.as_deref(),
         }
     }
@@ -104,7 +107,7 @@ impl Entry {
 }
 
 impl Entry {
-    pub fn new(meta: Annotated<types::FeedMeta>, entry: types::Entry) -> Self {
+    pub fn new(meta: Annotated<types::FeedMeta>, entry: SyndFeedEntry) -> Self {
         Self {
             id: entry.id().clone(),
             meta,

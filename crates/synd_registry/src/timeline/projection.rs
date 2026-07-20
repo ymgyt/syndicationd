@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::{entry::EntryId, types::FeedUrl};
 use tracing::info;
 
 use crate::{

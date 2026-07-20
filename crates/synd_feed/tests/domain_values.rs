@@ -1,5 +1,6 @@
-use synd_feed::types::{
-    Content, Entry, EntryId, Feed, FeedMeta, FeedType, FeedUrl, Generator, Link, Person, Text,
+use synd_feed::{
+    entry::{Content, Entry, EntryId},
+    types::{Feed, FeedMeta, FeedType, FeedUrl, Generator, Link, Person, Text},
 };
 
 #[test]

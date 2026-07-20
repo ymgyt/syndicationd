@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::{entry::EntryId, types::FeedUrl};
 use synd_registry::{
     RegistryDbResult,
     db::EntryStore,

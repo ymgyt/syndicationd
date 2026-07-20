@@ -351,7 +351,7 @@ fn next_entries_first(
 #[cfg(test)]
 mod tests {
     use core::assert_matches;
-    use synd_feed::types::{EntryId, FeedUrl};
+    use synd_feed::{entry::EntryId, types::FeedUrl};
 
     use crate::{application::Features, config::Categories, ui::theme::Theme};
 

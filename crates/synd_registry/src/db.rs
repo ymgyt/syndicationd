@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use chrono::{DateTime, Utc};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::{entry::EntryId, types::FeedUrl};
 
 use crate::{
     crawl::{

@@ -4,7 +4,9 @@ use bon::Builder;
 use feed_rs::model as feedrs;
 use serde::{Deserialize, Serialize};
 
-use super::{Content, EntryId, EntryIdError, FeedType, FeedUrl, Link, Person, Text, Time, link};
+use crate::types::{FeedType, FeedUrl, Link, Person, Text, Time, link};
+
+use super::{Content, EntryId, EntryIdError};
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
@@ -58,7 +60,7 @@ impl Entry {
         link::find_website_url(feed_type, &self.links)
     }
 
-    pub(super) fn from_feed_rs(
+    pub(crate) fn from_feed_rs(
         feed_url: &FeedUrl,
         feed_type: FeedType,
         entry: feedrs::Entry,

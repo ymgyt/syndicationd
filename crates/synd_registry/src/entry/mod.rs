@@ -3,9 +3,9 @@ use std::collections::{HashMap, HashSet};
 use bon::Builder;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{
-    Content as SyndFeedContent, Entry as SyndFeedEntry, EntryId, Feed as SyndFeed, FeedType,
-    FeedUrl, Text as SyndFeedText,
+use synd_feed::{
+    entry::{Content as SyndFeedContent, Entry as SyndFeedEntry, EntryId},
+    types::{Feed as SyndFeed, FeedType, FeedUrl, Text as SyndFeedText},
 };
 
 use crate::feed::FeedSource;

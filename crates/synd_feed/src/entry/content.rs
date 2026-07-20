@@ -2,7 +2,7 @@ use bon::Builder;
 use feed_rs::model as feedrs;
 use serde::{Deserialize, Serialize};
 
-use super::Link;
+use crate::types::Link;
 
 /// Content declared inline by an entry or referenced as an external resource.
 #[allow(

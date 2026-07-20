@@ -5,7 +5,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use super::{FeedType, FeedUrl, macros::impl_sqlx_encode_decode};
+use crate::{
+    macros::impl_sqlx_encode_decode,
+    types::{FeedType, FeedUrl},
+};
 
 const PREFIX: &str = "synd:entry:v1:";
 const DIGEST_HEX_LEN: usize = 64;

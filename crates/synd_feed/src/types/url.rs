@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-use crate::types::macros::impl_sqlx_encode_decode;
+use crate::macros::impl_sqlx_encode_decode;
 
 #[derive(Error, Debug)]
 pub enum FeedUrlError {

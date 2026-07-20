@@ -1,5 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use synd_feed::types::{Category, EntryId, FeedType, FeedUrl, Requirement, Time};
+use synd_feed::{
+    entry::EntryId,
+    types::{Category, FeedType, FeedUrl, Requirement, Time},
+};
 
 /// Entry as it appears on one timeline: display position + content.
 #[derive(Debug, Clone, Deserialize)]

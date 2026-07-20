@@ -538,7 +538,7 @@ impl FeedService {
     fn build_parser(base_uri: impl AsRef<str>) -> Parser {
         feed_rs::parser::Builder::new()
             .base_uri(Some(base_uri))
-            .id_generator(|_, _, _| crate::types::feed_rs_missing_id_marker())
+            .id_generator(|_, _, _| crate::entry::feed_rs_missing_id_marker())
             .build()
     }
 }
@@ -715,7 +715,7 @@ mod tests {
         assert_matches!(err.kind, FeedParseErrorKind::InvalidFeed);
     }
 
-    fn assert_synd_entry_id(id: &crate::types::EntryId) {
+    fn assert_synd_entry_id(id: &crate::entry::EntryId) {
         let id = id.as_str();
         assert!(id.starts_with("synd:entry:v1:"), "{id}");
         assert_eq!(id.len(), "synd:entry:v1:".len() + 64);

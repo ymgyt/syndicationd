@@ -3,7 +3,7 @@ pub(crate) use std::time::Duration;
 pub(crate) use chrono::{DateTime, TimeZone, Utc};
 pub(crate) use sqlx::Row;
 pub(crate) use synd_feed::feed::service::FeedHttpStatus;
-pub(crate) use synd_feed::types::{EntryId, FeedUrl};
+pub(crate) use synd_feed::{entry::EntryId, types::FeedUrl};
 pub(crate) use synd_registry::{
     FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
     SubscriptionKey,

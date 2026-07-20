@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};
-use synd_feed::types::{EntryId, FeedUrl};
+use synd_feed::{entry::EntryId, types::FeedUrl};
 use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{
