@@ -56,7 +56,7 @@ as `synd`.
 Install from crates.io:
 
 ```sh
-cargo install synd-term --locked
+cargo install synd --locked
 ```
 
 Other package managers, installers, and pre-built binaries are also supported.
@@ -67,7 +67,7 @@ Other package managers, installers, and pre-built binaries are also supported.
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd/synd-term-v0.3.2
+nix profile install github:ymgyt/syndicationd#synd
 ```
 
 ### arch linux
@@ -79,31 +79,31 @@ pacman -S syndicationd
 ### brew
 
 ```sh
-brew install ymgyt/homebrew-syndicationd/synd-term
+brew install ymgyt/homebrew-syndicationd/synd
 ```
 
 ### shell
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2/synd-term-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/latest/download/synd-installer.sh | sh
 ```
 
 ### npm
 
 ```sh
-npm install @syndicationd/synd-term
+npm install @syndicationd/synd
 ```
 
 ### powershell
 
 ```sh
-powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/synd-term-v0.3.2/synd-term-installer.ps1 | iex"
+powershell -c "irm https://github.com/ymgyt/syndicationd/releases/latest/download/synd-installer.ps1 | iex"
 ```
 
 ### docker
 
 ```sh
-docker run -it ghcr.io/ymgyt/synd-term
+docker run -it ghcr.io/ymgyt/synd
 ```
 
 ### pre-built binaries
@@ -114,7 +114,7 @@ Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/s
 ### source
 
 ```sh
-cargo install --git https://github.com/ymgyt/syndicationd/ synd-term
+cargo install --git https://github.com/ymgyt/syndicationd/ synd
 ```
 
 Use the source install to try the current `main` branch behavior before the next release.

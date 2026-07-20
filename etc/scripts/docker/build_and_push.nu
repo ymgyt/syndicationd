@@ -2,9 +2,9 @@ def main [tag: string] {
   let image = if ($tag | str starts-with 'synd-api-v' ) {
     let version = ($tag | str replace 'synd-api-v' '')
     {derivation: 'synd-api-image',version: $version }
-  } else if ($tag | str starts-with 'synd-term-v' ) {
-    let version = ($tag | str replace 'synd-term-v' '')
-    {derivation: 'synd-term-image',version: $version }
+  } else if ($tag | str starts-with 'v' ) {
+    let version = ($tag | str replace 'v' '')
+    {derivation: 'synd-image',version: $version }
   } else {
     print $"Ignore tag: ($tag)"
     return

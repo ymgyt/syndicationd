@@ -41,6 +41,8 @@ let
     CARGO_PROFILE = "dev";
   };
 
+  workspaceCrate = craneLib.crateNameFromCargoToml { cargoToml = ../../Cargo.toml; };
+
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
   individualCrateArgs = commonArgs // {
@@ -53,23 +55,24 @@ let
   };
 
   # The synd crate owns the CLI binary; synd_term is a library crate
-  syndTerm = craneLib.buildPackage (
+  synd = craneLib.buildPackage (
     individualCrateArgs
     // (
       let
         crate = craneLib.crateNameFromCargoToml { cargoToml = ../../crates/synd/Cargo.toml; };
       in
       {
-        inherit (crate) pname version;
+        inherit (crate) pname;
+        inherit (workspaceCrate) version;
         cargoExtraArgs = "--package ${crate.pname}";
       }
     )
   );
-  syndTermImage = dockerTools.buildImage {
-    name = "synd-term";
+  syndImage = dockerTools.buildImage {
+    name = "synd";
     tag = "latest";
     config = {
-      Cmd = [ "${syndTerm}/bin/synd" ];
+      Cmd = [ "${synd}/bin/synd" ];
       Labels = dockerImageLabels;
     };
   };
@@ -81,7 +84,8 @@ let
         crate = craneLib.crateNameFromCargoToml { cargoToml = ../../crates/synd_api/Cargo.toml; };
       in
       {
-        inherit (crate) pname version;
+        inherit (crate) pname;
+        inherit (workspaceCrate) version;
         cargoExtraArgs = "--package ${crate.pname}";
       }
     )
@@ -137,8 +141,8 @@ in
   };
 
   packages = {
-    synd-term = syndTerm;
-    synd-term-image = syndTermImage;
+    inherit synd;
+    synd-image = syndImage;
     synd-api = syndApi;
     synd-api-image = syndApiImage;
     coverage = craneLib.cargoLlvmCov (

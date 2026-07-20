@@ -87,17 +87,21 @@
         };
 
         packages = {
-          default = self.packages."${system}".synd-term;
-          inherit (synd.packages) synd-term synd-api;
+          default = self.packages."${system}".synd;
+          inherit (synd.packages) synd synd-api;
         }
         // pkgs.lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          inherit (synd.packages) coverage synd-term-image synd-api-image;
+          inherit (synd.packages) coverage synd-image synd-api-image;
         };
 
-        apps.default = flake-utils.lib.mkApp {
-          drv = synd.packages.synd-term;
-          name = "synd";
-        };
+        apps.default =
+          flake-utils.lib.mkApp {
+            drv = synd.packages.synd;
+            name = "synd";
+          }
+          // {
+            meta.description = "terminal feed viewer";
+          };
 
         devShells.default = craneLib.devShell {
           # Inherit inputs from checks
