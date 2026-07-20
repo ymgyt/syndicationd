@@ -69,7 +69,3 @@ required-features = ["integration"]
 
 [lints]
 workspace = true
-
-[package.metadata.dist]
-dist    = true
-formula = "synd-term"

@@ -3,8 +3,9 @@ extend-exclude = [
   # Could not fix github api typo
   "crates/synd_api/src/client/github/schema.json",
   "crates/synd_term/src/client/github/schema.json",
-  # Ignore commit message typo
+  # Ignore changelogs built from commit messages
   "CHANGELOG.md",
+  "docs/CHANGELOG.org.md",
   # Ignore dependencies LICENSES
   "THIRDPARTY.toml",
   # Ignore snapshot

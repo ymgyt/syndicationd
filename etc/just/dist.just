@@ -7,8 +7,8 @@ init *flags:
 
 # Show cargo-dist plan
 [no-cd]
-plan version:
-    dist plan --tag=synd-term-{{version}} --output-format=json
+plan tag:
+    dist plan --tag={{tag}} --output-format=json
 
 # Generate github action release workflow
 [no-cd]
