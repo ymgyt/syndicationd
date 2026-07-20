@@ -162,7 +162,7 @@ impl From<feedrs::Link> for Link {
 }
 
 /// Software metadata declared by a feed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct Generator {
     content: String,
@@ -198,15 +198,17 @@ impl From<feedrs::Generator> for Generator {
 }
 
 /// Metadata declared at the feed level.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct FeedMeta {
     url: FeedUrl,
     feed_type: FeedType,
     title: Option<Text>,
     updated: Option<Time>,
+    #[builder(default)]
     authors: Vec<Person>,
     description: Option<Text>,
+    #[builder(default)]
     links: Vec<Link>,
     generator: Option<Generator>,
     published: Option<Time>,
@@ -305,6 +307,11 @@ pub struct Feed {
 }
 
 impl Feed {
+    /// Reconstructs a feed from its metadata and entries.
+    pub fn new(meta: FeedMeta, entries: Vec<Entry>) -> Self {
+        Self { meta, entries }
+    }
+
     pub(crate) fn from_feed_rs(url: FeedUrl, feed: feedrs::Feed) -> Self {
         let feed_rs::model::Feed {
             feed_type,
@@ -344,7 +351,7 @@ impl Feed {
             generator: generator.map(Into::into),
             published,
         };
-        Feed { meta, entries }
+        Self::new(meta, entries)
     }
 
     pub fn parts(self) -> (FeedMeta, Vec<Entry>) {
