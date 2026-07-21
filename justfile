@@ -19,10 +19,11 @@ mod oranda 'etc/just/oranda.just'
 mod graphql 'etc/just/graphql.just'
 mod license 'etc/just/license.just'
 
+# List recipe
+default:
+    just --list --list-submodules
+
 # Generate product changelog
 changelog target:
     nu "{{justfile_directory() / 'etc/scripts/changelog.nu'}}" "{{target}}"
 
-# List recipe
-default:
-    just --list --list-submodules
