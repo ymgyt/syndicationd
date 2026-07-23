@@ -1,4 +1,7 @@
-use std::{ops::ControlFlow, time::Duration};
+use std::{
+    ops::ControlFlow,
+    time::{Duration, Instant},
+};
 
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
@@ -11,7 +14,7 @@ use crate::auth::CredentialError;
 use crate::{
     auth::{Credential, Verified},
     config::Categories,
-    event::Event,
+    event::{Event, FeedsApiEvent},
     interact::Interact,
     operation::Operation,
     terminal::{Terminal, TerminalGuard},
@@ -77,6 +80,75 @@ pub struct Application {
     components: AppComponent,
     keymap: crate::keymap::Keymap,
     config: Config,
+    initial_load: InitialLoad,
+}
+
+struct InitialLoad {
+    started_at: Option<Instant>,
+    subscriptions_observed: bool,
+    entries_observed: bool,
+}
+
+#[derive(Clone, Copy)]
+enum InitialLoadPage {
+    Subscriptions,
+    Entries,
+}
+
+impl InitialLoadPage {
+    fn from_event(event: &FeedsApiEvent) -> Option<Self> {
+        match event {
+            FeedsApiEvent::SubscriptionFetched { .. } => Some(Self::Subscriptions),
+            FeedsApiEvent::EntriesFetched { .. } => Some(Self::Entries),
+            _ => None,
+        }
+    }
+}
+
+impl InitialLoad {
+    fn new() -> Self {
+        Self {
+            started_at: None,
+            subscriptions_observed: false,
+            entries_observed: false,
+        }
+    }
+
+    fn start(&mut self) {
+        self.started_at = Some(Instant::now());
+        self.subscriptions_observed = false;
+        self.entries_observed = false;
+    }
+
+    fn observe(&mut self, page: Option<InitialLoadPage>) {
+        match page {
+            Some(InitialLoadPage::Subscriptions) => {
+                self.subscriptions_observed = true;
+            }
+            Some(InitialLoadPage::Entries) => {
+                self.entries_observed = true;
+            }
+            _ => {}
+        }
+    }
+
+    fn take_completion(
+        &mut self,
+        subscriptions_pending: bool,
+        entries_pending: bool,
+    ) -> Option<Duration> {
+        if !self.subscriptions_observed
+            || !self.entries_observed
+            || subscriptions_pending
+            || entries_pending
+        {
+            return None;
+        }
+
+        self.started_at
+            .take()
+            .map(|started_at| started_at.elapsed())
+    }
 }
 
 impl Application {
@@ -130,6 +202,7 @@ impl Application {
             components,
             keymap: crate::keymap::Keymap::new(config.keymaps.clone()),
             config,
+            initial_load: InitialLoad::new(),
         }
     }
 
@@ -219,7 +292,13 @@ impl Application {
     }
 
     fn initial_fetch(&mut self) {
-        info!("Initial fetch");
+        self.initial_load.start();
+        info!(
+            subscriptions_page_size = self.config.feeds_per_pagination,
+            entries_limit = self.config.entries_limit,
+            github_enabled = self.config.features.enable_github_notification,
+            "Initial feed data load started"
+        );
         self.perform_operation(Operation::StartFeedEventSubscription);
         self.perform_operation(Operation::FetchSubscription {
             populate: Populate::Replace,
@@ -369,5 +448,24 @@ impl Application {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod initial_load_tests {
+    use super::*;
+
+    #[test]
+    fn completes_after_subscription_and_entry_requests_finish() {
+        let mut initial_load = InitialLoad::new();
+        initial_load.start();
+
+        initial_load.observe(Some(InitialLoadPage::Subscriptions));
+        assert!(initial_load.take_completion(true, true).is_none());
+
+        initial_load.observe(Some(InitialLoadPage::Entries));
+        assert!(initial_load.take_completion(true, false).is_none());
+        assert!(initial_load.take_completion(false, false).is_some());
+        assert!(initial_load.take_completion(false, false).is_none());
     }
 }

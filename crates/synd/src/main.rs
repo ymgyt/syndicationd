@@ -1,6 +1,7 @@
-use std::{io::IsTerminal as _, process::ExitCode};
+use std::{io::IsTerminal as _, process::ExitCode, time::Instant};
 
 use synd_support::fs::fsimpl::FileSystem;
+use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::config::ConfigResolver;
@@ -9,6 +10,52 @@ mod cli;
 mod config;
 mod release;
 mod runtime;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn command_name(command: &cli::Command) -> &'static str {
+    match command {
+        cli::Command::Term(_) => "term",
+        cli::Command::Clean(_) => "clean",
+        cli::Command::Daemon(_) => "daemon",
+        cli::Command::Doctor(_) => "doctor",
+        cli::Command::Feed(_) => "feed",
+        cli::Command::Config(_) => "config",
+    }
+}
+
+fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        let message = panic
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| panic.payload().downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("non-string panic payload");
+        let thread = std::thread::current();
+        let thread_name = thread.name().unwrap_or("unnamed");
+
+        if let Some(location) = panic.location() {
+            tracing::error!(
+                panic_message = message,
+                panic_file = location.file(),
+                panic_line = location.line(),
+                panic_column = location.column(),
+                thread = thread_name,
+                "Synd process panicked"
+            );
+        } else {
+            tracing::error!(
+                panic_message = message,
+                thread = thread_name,
+                "Synd process panicked"
+            );
+        }
+
+        previous(panic);
+    }));
+}
 
 fn init_tracing(
     config: &ConfigResolver,
@@ -114,13 +161,39 @@ async fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    install_panic_hook();
 
-    match command {
-        cli::Command::Term(term) => return term.run(config).await,
-        cli::Command::Clean(clean) => return clean.run(&config, &FileSystem::new()),
-        cli::Command::Daemon(daemon) => return daemon.run(config).await,
-        cli::Command::Doctor(doctor) => return doctor.run(config).await,
-        cli::Command::Feed(feed) => return feed.run(config).await,
-        cli::Command::Config(command) => return command.run(&config),
-    }
+    let command_name = command_name(&command);
+    let started_at = Instant::now();
+    info!(
+        command = command_name,
+        version = VERSION,
+        pid = std::process::id(),
+        os = std::env::consts::OS,
+        arch = std::env::consts::ARCH,
+        "Started synd process"
+    );
+
+    let exit_code = match command {
+        cli::Command::Term(term) => term.run(config).await,
+        cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
+        cli::Command::Daemon(daemon) => daemon.run(config).await,
+        cli::Command::Doctor(doctor) => doctor.run(config).await,
+        cli::Command::Feed(feed) => feed.run(config).await,
+        cli::Command::Config(command) => command.run(&config),
+    };
+
+    info!(
+        command = command_name,
+        pid = std::process::id(),
+        outcome = if exit_code == ExitCode::SUCCESS {
+            "success"
+        } else {
+            "failure"
+        },
+        uptime_ms = started_at.elapsed().as_millis(),
+        "Stopped synd process"
+    );
+
+    exit_code
 }

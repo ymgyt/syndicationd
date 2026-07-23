@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
-use crate::shutdown::Shutdown;
+use crate::shutdown::{Shutdown, ShutdownReason};
 
 /// Idle shutdown policy for daemon sessions.
 #[derive(Clone)]
@@ -33,7 +33,7 @@ impl SessionIdleShutdown {
                         idle_shutdown_grace_ms = grace.as_millis(),
                         "Daemon session idle grace elapsed"
                     );
-                    shutdown.shutdown();
+                    shutdown.shutdown_with_reason(ShutdownReason::Idle);
                 }
             }
         });

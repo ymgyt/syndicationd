@@ -36,7 +36,7 @@ impl<'a> SessionAcquisition<'a> {
         endpoint.trace("Resolved runtime session acquisition state");
 
         match endpoint {
-            Endpoint::Connected(connected) => self.open(connected).await,
+            Endpoint::Connected(connected) => self.open(connected, DaemonAction::Existing).await,
             Endpoint::Missing(missing) => self.start(missing).await,
             Endpoint::Stale(stale) => self.recover_stale(stale).await,
             Endpoint::Unavailable(unavailable) => unavailable.fail("runtime endpoint"),
@@ -45,8 +45,8 @@ impl<'a> SessionAcquisition<'a> {
         }
     }
 
-    async fn open(&self, connected: Connected) -> Result<Session> {
-        match connected.open(self.runtime.config()).await? {
+    async fn open(&self, connected: Connected, daemon_action: DaemonAction) -> Result<Session> {
+        match connected.open(self.runtime.config(), daemon_action).await? {
             SessionAttempt::Opened(session) => Ok(*session),
             SessionAttempt::Incompatible(incompatible) => self.recover(incompatible).await,
         }
@@ -84,16 +84,21 @@ impl<'a> SessionAcquisition<'a> {
         endpoint.trace("Resolved runtime session acquisition state after startup lock");
 
         match endpoint {
-            Endpoint::Connected(connected) => match connected.open(self.runtime.config()).await? {
-                SessionAttempt::Opened(session) => Ok(*session),
-                SessionAttempt::Incompatible(incompatible) => {
-                    self.replace(incompatible, held).await
+            Endpoint::Connected(connected) => {
+                match connected
+                    .open(self.runtime.config(), DaemonAction::Existing)
+                    .await?
+                {
+                    SessionAttempt::Opened(session) => Ok(*session),
+                    SessionAttempt::Incompatible(incompatible) => {
+                        self.replace(incompatible, held).await
+                    }
                 }
-            },
-            Endpoint::Missing(missing) => self.launch(missing, held).await,
+            }
+            Endpoint::Missing(missing) => self.launch(missing, held, DaemonAction::Launched).await,
             Endpoint::Stale(stale) => {
                 let missing = stale.cleanup(held)?;
-                self.launch(missing, held).await
+                self.launch(missing, held, DaemonAction::Recovered).await
             }
             Endpoint::Unavailable(unavailable) => unavailable.fail("runtime endpoint"),
             #[cfg(not(unix))]
@@ -103,7 +108,10 @@ impl<'a> SessionAcquisition<'a> {
 
     async fn after_busy(&self, busy: Busy) -> Result<Session> {
         let connected = busy.wait(self.runtime.config()).await?;
-        match connected.open(self.runtime.config()).await? {
+        match connected
+            .open(self.runtime.config(), DaemonAction::Waited)
+            .await?
+        {
             SessionAttempt::Opened(session) => Ok(*session),
             SessionAttempt::Incompatible(incompatible) => incompatible.fail(),
         }
@@ -116,12 +124,17 @@ impl<'a> SessionAcquisition<'a> {
             Stopped::Stale(stale) => stale.cleanup(held)?,
         };
 
-        self.launch(missing, held).await
+        self.launch(missing, held, DaemonAction::Replaced).await
     }
 
-    async fn launch(&self, missing: Missing, held: &Held) -> Result<Session> {
+    async fn launch(
+        &self,
+        missing: Missing,
+        held: &Held,
+        daemon_action: DaemonAction,
+    ) -> Result<Session> {
         let connected = missing.start(self.runtime.config(), held).await?;
-        match connected.open(self.runtime.config()).await? {
+        match connected.open(self.runtime.config(), daemon_action).await? {
             SessionAttempt::Opened(session) => Ok(*session),
             SessionAttempt::Incompatible(incompatible) => incompatible.fail(),
         }
@@ -206,8 +219,33 @@ struct Connected {
     placement: PlacementSpec,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum DaemonAction {
+    Existing,
+    Launched,
+    Recovered,
+    Replaced,
+    Waited,
+}
+
+impl DaemonAction {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Existing => "existing",
+            Self::Launched => "launched",
+            Self::Recovered => "recovered",
+            Self::Replaced => "replaced",
+            Self::Waited => "waited",
+        }
+    }
+}
+
 impl Connected {
-    async fn open(self, config: &RuntimeConfig) -> Result<SessionAttempt> {
+    async fn open(
+        self,
+        config: &RuntimeConfig,
+        daemon_action: DaemonAction,
+    ) -> Result<SessionAttempt> {
         let client = daemon_client(config, &self.placement)?;
         let required_capabilities = config.requirements().required_capabilities().clone();
         debug!(
@@ -220,12 +258,13 @@ impl Connected {
             .await
         {
             Ok(session) => {
-                debug!(
+                info!(
+                    daemon_action = daemon_action.as_str(),
                     runtime_endpoint = %self.placement.endpoint().path().display(),
                     session_id = %session.session_id(),
                     available_capabilities = %session.available_capabilities(),
                     lease_duration_ms = session.lease().duration().as_millis(),
-                    "Opened daemon session"
+                    "Runtime session acquired"
                 );
                 Ok(SessionAttempt::Opened(Box::new(Session::new(
                     client.clone(),
@@ -718,7 +757,9 @@ mod tests {
         placement::{PlacementRoot, PlacementSpec},
     };
 
-    use super::{Connected, Endpoint, Held, Incompatible, SessionAttempt, Stale, Stopped};
+    use super::{
+        Connected, DaemonAction, Endpoint, Held, Incompatible, SessionAttempt, Stale, Stopped,
+    };
 
     mod endpoint_state {
         use super::*;
@@ -803,7 +844,7 @@ mod tests {
             let attempt = Connected {
                 placement: placement.clone(),
             }
-            .open(&config)
+            .open(&config, DaemonAction::Existing)
             .await
             .unwrap();
 

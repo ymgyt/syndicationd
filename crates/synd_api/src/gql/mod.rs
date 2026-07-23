@@ -22,7 +22,7 @@ pub(crate) mod handler {
     use axum::{Extension, extract::WebSocketUpgrade, response::IntoResponse};
     use synd_support::o11y::audit_span;
     use tokio_metrics::TaskMonitor;
-    use tracing::Instrument;
+    use tracing::{Instrument, warn};
 
     use crate::{principal::Principal, serve::Context};
 
@@ -43,10 +43,26 @@ pub(crate) mod handler {
         Extension(principal): Extension<Principal>,
         req: GraphQLRequest,
     ) -> GraphQLResponse {
-        let req = req.into_inner().data(principal);
-        TaskMonitor::instrument(&gql_monitor, schema.execute(req).instrument(audit_span!()))
-            .await
-            .into()
+        let req = req.into_inner();
+        let operation = req
+            .operation_name
+            .as_deref()
+            .unwrap_or("anonymous")
+            .to_owned();
+        let req = req.data(principal);
+        let response =
+            TaskMonitor::instrument(&gql_monitor, schema.execute(req).instrument(audit_span!()))
+                .await;
+        if !response.errors.is_empty() {
+            warn!(
+                operation,
+                error_count = response.errors.len(),
+                errors = ?response.errors,
+                "GraphQL request completed with errors"
+            );
+        }
+
+        response.into()
     }
 
     pub(crate) async fn graphql_ws(

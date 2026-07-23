@@ -68,8 +68,12 @@ impl DriverRuntime {
         self.in_flight.inc_throbber_step();
     }
 
-    pub(super) fn remove_in_flight(&mut self, request_seq: RequestSequence) {
-        self.in_flight.remove(request_seq);
+    pub(super) fn remove_in_flight(&mut self, request_seq: RequestSequence) -> Option<RequestId> {
+        self.in_flight.remove(request_seq)
+    }
+
+    pub(super) fn has_in_flight(&self, request_id: RequestId) -> bool {
+        self.in_flight.contains(request_id)
     }
 
     pub(super) fn clear_idle_timer(&mut self) {

@@ -1,4 +1,4 @@
-use std::process::ExitCode;
+use std::{process::ExitCode, time::Instant};
 
 use anyhow::Context as _;
 use synd_runtime::Session;
@@ -28,6 +28,20 @@ impl TermCommand {
 
     pub async fn run(self, config: ConfigResolver) -> ExitCode {
         let log_file = config.log_file();
+        let dry_run = self.dry_run;
+        info!(
+            config_file = %config.config_file().display(),
+            log_file = %log_file.display(),
+            database = %config.sqlite_db().display(),
+            runtime_root = ?config.daemon_runtime_root(),
+            api_timeout_ms = config.api_timeout().as_millis(),
+            session_lease_ms = config.daemon_session_lease_duration().as_millis(),
+            idle_shutdown_grace_ms = config.daemon_session_idle_shutdown_grace().as_millis(),
+            entries_limit = config.feed_entries_limit(),
+            github_enabled = config.is_github_enable(),
+            dry_run,
+            "Resolved terminal configuration"
+        );
         let (app, session) = match build_app(config, self.dry_run).await {
             Ok(started) => started,
             Err(err) => {
@@ -41,7 +55,8 @@ impl TermCommand {
         let mut event_stream = terminal::event_stream();
         let release_check = release::ReleaseCheck::spawn();
 
-        info!("Running...");
+        let started_at = Instant::now();
+        info!(dry_run, "Terminal UI started");
         let result = app.run(&mut event_stream).await;
 
         if let Err(err) = session.close().await {
@@ -50,8 +65,20 @@ impl TermCommand {
 
         if let Err(err) = result {
             error!("{err:?}");
+            info!(
+                reason = "error",
+                outcome = "failure",
+                uptime_ms = started_at.elapsed().as_millis(),
+                "Terminal UI stopped"
+            );
             ExitCode::FAILURE
         } else {
+            info!(
+                reason = if dry_run { "dry_run" } else { "user_quit" },
+                outcome = "success",
+                uptime_ms = started_at.elapsed().as_millis(),
+                "Terminal UI stopped"
+            );
             release_check.print_notice_if_ready();
             ExitCode::SUCCESS
         }

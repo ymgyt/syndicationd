@@ -4,7 +4,10 @@ use std::{
     os::unix::{fs::FileTypeExt, net::UnixStream},
     path::Path,
 };
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 #[cfg(test)]
 use synd_api::session::DaemonSessionLeasePolicy;
@@ -66,6 +69,7 @@ impl Daemon {
 
     #[cfg(unix)]
     async fn serve_unix(self, placement: PlacementSpec) -> Result<()> {
+        let started_at = Instant::now();
         let _claim = DaemonClaimOwner::create(&placement)?;
         let bound_endpoint = DaemonEndpointBinder::new(placement.endpoint()).bind()?;
         let (listener, endpoint_cleanup) = bound_endpoint.into_parts();
@@ -77,19 +81,39 @@ impl Daemon {
                     "Failed to cleanup daemon endpoint during shutdown"
                 );
             }
-            info!("Gracefully shutdown synd-runtime daemon");
+            debug!("Running daemon shutdown callback");
         });
+        let shutdown_status = shutdown.clone();
+        let serve_options = self.config.serve_options();
+        let daemon_sessions = serve_options.daemon_sessions;
         let api_service = ApiService::from_database(
             self.config.database(),
             Authenticator::trusted_local(),
-            self.config.serve_options(),
+            serve_options,
             &shutdown,
         )
         .await?;
         let (dependency, _event_workers) = api_service.into_parts();
+        info!(
+            pid = std::process::id(),
+            runtime_root = %placement.root().path().display(),
+            runtime_instance_id = %placement.instance().id(),
+            database = %placement.instance().canonical_database_path().display(),
+            endpoint = %placement.endpoint().path().display(),
+            session_lease_ms = daemon_sessions.lease_policy().lease_duration().as_millis(),
+            idle_shutdown_grace_ms = daemon_sessions.idle_shutdown_grace().as_millis(),
+            "Daemon ready"
+        );
 
         // Keep event workers alive for the entire serve future.
         serve::serve_unix(listener, dependency, shutdown).await?;
+        info!(
+            reason = shutdown_status
+                .reason()
+                .map_or("unknown", synd_api::shutdown::ShutdownReason::as_str),
+            uptime_ms = started_at.elapsed().as_millis(),
+            "Daemon stopped"
+        );
 
         Ok(())
     }

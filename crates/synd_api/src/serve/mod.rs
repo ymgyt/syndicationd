@@ -15,7 +15,7 @@ use tower::{ServiceBuilder, limit::ConcurrencyLimitLayer, timeout::TimeoutLayer}
 use tower_http::{
     cors::CorsLayer, limit::RequestBodyLimitLayer, sensitive_headers::SetSensitiveHeadersLayer,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     Result, config,
@@ -122,7 +122,7 @@ pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutd
         .layer(Extension(sessions))
         .layer(Extension(shutdown));
 
-    info!("Serving on Unix socket...");
+    debug!("Serving on Unix socket");
 
     axum::serve(listener, router)
         .with_graceful_shutdown(async move {
@@ -130,7 +130,7 @@ pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutd
         })
         .await?;
 
-    info!("Shutdown complete");
+    debug!("Unix socket server shutdown complete");
 
     Ok(())
 }
@@ -196,7 +196,7 @@ mod control {
     use synd_protocol::daemon::DaemonStatusResponse;
 
     use crate::session::DaemonSessions;
-    use crate::shutdown::Shutdown;
+    use crate::shutdown::{Shutdown, ShutdownReason};
 
     pub(super) async fn status(
         Extension(sessions): Extension<DaemonSessions>,
@@ -205,7 +205,7 @@ mod control {
     }
 
     pub(super) async fn shutdown(Extension(shutdown): Extension<Shutdown>) -> StatusCode {
-        shutdown.shutdown();
+        shutdown.shutdown_with_reason(ShutdownReason::ApiRequest);
         StatusCode::ACCEPTED
     }
 }

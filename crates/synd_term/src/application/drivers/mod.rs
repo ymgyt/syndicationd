@@ -207,8 +207,15 @@ impl Drivers {
         self.runtime.reset_throbber();
     }
 
-    pub(super) fn remove_in_flight(&mut self, request_seq: super::RequestSequence) {
-        self.runtime.remove_in_flight(request_seq);
+    pub(super) fn remove_in_flight(
+        &mut self,
+        request_seq: super::RequestSequence,
+    ) -> Option<super::RequestId> {
+        self.runtime.remove_in_flight(request_seq)
+    }
+
+    pub(super) fn has_in_flight(&self, request_id: super::RequestId) -> bool {
+        self.runtime.has_in_flight(request_id)
     }
 
     pub(super) fn set_credential(&mut self, cred: Verified<Credential>) {

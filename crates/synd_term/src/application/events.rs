@@ -1,10 +1,10 @@
 use itertools::Itertools;
 use synd_client::SyndApiError;
-use tracing::{error, info_span, instrument, warn};
+use tracing::{error, info, info_span, instrument, warn};
 
 use crate::event::{ApiEvent, AuthApiEvent, Event};
 
-use super::{Application, RequestSequence};
+use super::{Application, InitialLoadPage, RequestSequence};
 
 impl Application {
     #[instrument(skip_all)]
@@ -58,28 +58,51 @@ impl Application {
                 self.perform_operation(operation);
             }
             Event::Error { message } => {
-                self.handle_error_message(message, None);
+                error!(error = %message, "Application operation failed");
+                self.show_error_message(message);
             }
             Event::SyndApiError { error, request_seq } => {
                 self.components.apply_synd_api_error(request_seq);
+                let operation = self.drivers.remove_in_flight(request_seq);
+                error!(
+                    request_seq,
+                    ?operation,
+                    error = ?error,
+                    "Synd API operation failed"
+                );
                 let message = Self::synd_api_error_message(error.as_ref());
-                self.handle_error_message(message, Some(request_seq));
+                self.show_error_message(message);
             }
             Event::OauthApiError { error, request_seq } => {
-                self.handle_error_message(error.to_string(), Some(request_seq));
+                let operation = self.drivers.remove_in_flight(request_seq);
+                error!(
+                    request_seq,
+                    ?operation,
+                    error = ?error,
+                    "OAuth API operation failed"
+                );
+                self.show_error_message(error.to_string());
             }
             Event::GithubApiError { error, request_seq } => {
-                self.handle_error_message(error.to_string(), Some(request_seq));
+                let operation = self.drivers.remove_in_flight(request_seq);
+                error!(
+                    request_seq,
+                    ?operation,
+                    error = ?error,
+                    "GitHub API operation failed"
+                );
+                self.show_error_message(error.to_string());
             }
         }
     }
 
     fn apply_api_event(&mut self, request_seq: RequestSequence, event: ApiEvent) {
-        self.drivers.remove_in_flight(request_seq);
+        let _ = self.drivers.remove_in_flight(request_seq);
 
         match event {
             ApiEvent::Auth(event) => self.apply_auth_api_event(event),
             ApiEvent::Feeds(event) => {
+                let initial_load_page = InitialLoadPage::from_event(&event);
                 let entries_first = self.next_entries_first(0);
                 let operations = self.components.apply_feeds_api_event(
                     request_seq,
@@ -88,7 +111,24 @@ impl Application {
                     entries_first,
                     self.config.entries_limit,
                 );
+                self.initial_load.observe(initial_load_page);
                 self.perform_operations(operations);
+                let subscriptions_pending = self
+                    .drivers
+                    .has_in_flight(super::RequestId::FetchSubscription);
+                let entries_pending = self.drivers.has_in_flight(super::RequestId::FetchEntries);
+                if let Some(duration) = self
+                    .initial_load
+                    .take_completion(subscriptions_pending, entries_pending)
+                {
+                    info!(
+                        subscriptions = self.components.feeds.subscription.loaded_count(),
+                        entries = self.components.feeds.entries.loaded_count(),
+                        timeline_seq = self.components.feeds.timeline_seq(),
+                        duration_ms = duration.as_millis(),
+                        "Initial feed data load completed"
+                    );
+                }
             }
             ApiEvent::GitHub(event) => {
                 let operations = self.components.apply_github_api_event(event);
@@ -114,17 +154,7 @@ impl Application {
         }
     }
 
-    pub(super) fn handle_error_message(
-        &mut self,
-        error_message: String,
-        request_seq: Option<RequestSequence>,
-    ) {
-        error!("{error_message}");
-
-        if let Some(request_seq) = request_seq {
-            self.drivers.remove_in_flight(request_seq);
-        }
-
+    fn show_error_message(&mut self, error_message: String) {
         self.components
             .shell
             .prompt

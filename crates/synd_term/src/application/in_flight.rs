@@ -11,7 +11,7 @@ use crate::types::github::{IssueId, NotificationId, PullRequestId};
 
 pub type RequestSequence = u64;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RequestId {
     DeviceFlowDeviceAuthorize,
     DeviceFlowPollAccessToken,
@@ -60,6 +60,12 @@ impl InFlight {
             .iter()
             .max_by_key(|(_, entry)| entry.start)
             .map(|(_, entry)| entry.request_id)
+    }
+
+    pub(crate) fn contains(&self, request_id: RequestId) -> bool {
+        self.in_flights
+            .values()
+            .any(|entry| entry.request_id == request_id)
     }
 
     pub async fn throbber_timer(&mut self) {
