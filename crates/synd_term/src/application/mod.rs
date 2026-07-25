@@ -6,8 +6,7 @@ use std::{
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
 use futures_util::{Stream, StreamExt};
 use ratatui::widgets::Widget;
-use synd_client::payload::FeedEvent;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 #[cfg(feature = "integration")]
 use crate::auth::CredentialError;
@@ -293,19 +292,13 @@ impl Application {
 
     fn initial_fetch(&mut self) {
         self.initial_load.start();
-        info!(
-            subscriptions_page_size = self.config.feeds_per_pagination,
-            entries_limit = self.config.entries_limit,
-            github_enabled = self.config.features.enable_github_notification,
-            "Initial feed data load started"
-        );
-        self.perform_operation(Operation::StartFeedEventSubscription);
-        self.perform_operation(Operation::FetchSubscription {
+        self.dispatch(Operation::WatchFeedEvents);
+        self.dispatch(Operation::FetchSubscription {
             populate: Populate::Replace,
             after: None,
             first: self.config.feeds_per_pagination,
         });
-        self.perform_operation(Operation::FetchEntries {
+        self.dispatch(Operation::FetchEntries {
             populate: Populate::Replace,
             after: None,
             first: self.next_entries_first(0),
@@ -313,7 +306,7 @@ impl Application {
         if self.config.features.enable_github_notification
             && let Some(operation) = self.components.github.fetch_next_notifications_if_needed()
         {
-            self.perform_operation(operation);
+            self.dispatch(operation);
         }
     }
 
@@ -334,43 +327,13 @@ impl Application {
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        enum PollResult {
-            Terminal(std::io::Result<CrosstermEvent>),
-            Job(anyhow::Result<Event>),
-            BackgroundJob(anyhow::Result<Event>),
-            FeedEvent(FeedEvent),
-            Throbber,
-            Idle,
-        }
-
         loop {
-            let result = {
-                let pollers = self.drivers.pollers();
-                tokio::select! {
-                    biased;
-
-                    Some(event) = input.next() => PollResult::Terminal(event),
-                    Some(event) = pollers.jobs.next() => PollResult::Job(event),
-                    Some(event) = pollers.background_jobs.next() => PollResult::BackgroundJob(event),
-                    Some(event) = pollers.feed_events.recv() => PollResult::FeedEvent(event),
-                    ()  = pollers.in_flight.throbber_timer() => PollResult::Throbber,
-                    () = &mut *pollers.idle_timer => PollResult::Idle,
-                }
-            };
-
             let keymap_layers = self.active_keymap_layers();
-            match result {
-                PollResult::Terminal(event) => self.handle_terminal_event(event),
-                PollResult::Job(event) | PollResult::BackgroundJob(event) => {
-                    self.apply_job_result(event);
-                }
-                PollResult::FeedEvent(event) => self.apply_event(Event::RegistryFeed { event }),
-                PollResult::Throbber => {
-                    self.apply_event(Event::RenderThrobber);
-                }
-                PollResult::Idle => {
-                    self.apply_event(Event::Idle);
-                }
+            tokio::select! {
+                biased;
+
+                Some(event) = input.next() => self.handle_terminal_event(event),
+                event = self.drivers.next_event() => self.apply_driver_event(event),
             }
 
             // Discard a pending key sequence when the keymap context changed
@@ -387,7 +350,7 @@ impl Application {
         }
     }
 
-    fn apply_job_result(&mut self, result: anyhow::Result<Event>) {
+    fn apply_driver_event(&mut self, result: anyhow::Result<Event>) {
         match result {
             Ok(event) => self.apply_event(event),
             Err(err) => self.apply_event(Event::Error {

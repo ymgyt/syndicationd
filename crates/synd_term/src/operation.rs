@@ -41,7 +41,7 @@ pub(crate) enum Operation {
     SyncTimeline {
         since: i64,
     },
-    StartFeedEventSubscription,
+    WatchFeedEvents,
     UnsubscribeFeed {
         url: FeedUrl,
     },

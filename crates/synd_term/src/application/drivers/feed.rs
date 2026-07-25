@@ -10,14 +10,30 @@ use crate::{
     event::{ApiEvent, Event, FeedsApiEvent},
 };
 
-use super::runtime::DriverRuntime;
+use super::{feed_events::FeedEventSubscription, runtime::DriverRuntime};
 
 /// Executes feed API requests.
 pub(super) struct FeedDriver {
-    pub(super) api: FeedApiRef,
+    api: FeedApiRef,
+    pub(super) events: FeedEventSubscription,
 }
 
 impl FeedDriver {
+    pub(super) fn new(api: FeedApiRef) -> Self {
+        Self {
+            api,
+            events: FeedEventSubscription::new(),
+        }
+    }
+
+    pub(super) fn watch_events(&mut self) {
+        self.events.start(self.api.clone());
+    }
+
+    pub(super) fn restart_events_if_running(&mut self) -> bool {
+        self.events.restart_if_running(self.api.clone())
+    }
+
     pub(super) fn subscribe_feed(
         &self,
         runtime: &mut DriverRuntime,

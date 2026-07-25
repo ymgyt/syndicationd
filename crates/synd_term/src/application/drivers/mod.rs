@@ -26,10 +26,9 @@ mod runtime;
 
 use auth::AuthDriver;
 use feed::FeedDriver;
-use feed_events::FeedEventSubscription;
 use github::GitHubDriver;
 use interaction::InteractionDriver;
-use runtime::{DriverPollers, DriverRuntime};
+use runtime::DriverRuntime;
 
 /// Executes side effects requested as `Operation`, owning the external-world
 /// handles and the machinery(job queues, timers, in-flight tracking) that
@@ -42,7 +41,6 @@ pub(super) struct Drivers {
     auth: AuthDriver,
     github: GitHubDriver,
     interaction: InteractionDriver,
-    feed_events: FeedEventSubscription,
     runtime: DriverRuntime,
 }
 
@@ -76,9 +74,7 @@ impl Drivers {
             terminal,
             cache,
             clock: clock.unwrap_or_else(|| Box::new(SystemClock)),
-            feed: FeedDriver {
-                api: feed_api.clone(),
-            },
+            feed: FeedDriver::new(feed_api.clone()),
             auth: AuthDriver {
                 authenticator: authenticator.unwrap_or_else(Authenticator::new),
                 api: feed_api,
@@ -87,7 +83,6 @@ impl Drivers {
                 client: github_client,
             },
             interaction: InteractionDriver { interactor },
-            feed_events: FeedEventSubscription::new(),
             runtime: DriverRuntime::new(throbber_timer_interval, idle_timer_interval),
         }
     }
@@ -145,8 +140,8 @@ impl Drivers {
                 self.feed.sync_timeline(&mut self.runtime, since);
                 Vec::new()
             }
-            Operation::StartFeedEventSubscription => {
-                self.feed_events.start(self.feed.api.clone());
+            Operation::WatchFeedEvents => {
+                self.feed.watch_events();
                 Vec::new()
             }
             Operation::UnsubscribeFeed { url } => {
@@ -193,13 +188,18 @@ impl Drivers {
         }
     }
 
-    pub(super) fn pollers(&mut self) -> DriverPollers<'_> {
-        DriverPollers {
-            jobs: &mut self.runtime.jobs,
-            background_jobs: &mut self.runtime.background_jobs,
-            feed_events: &mut self.feed_events,
-            in_flight: &mut self.runtime.in_flight,
-            idle_timer: &mut self.runtime.idle_timer,
+    pub(super) async fn next_event(&mut self) -> anyhow::Result<Event> {
+        let runtime = &mut self.runtime;
+        let feed_events = &mut self.feed.events;
+
+        tokio::select! {
+            biased;
+
+            Some(event) = runtime.jobs.next() => event,
+            Some(event) = runtime.background_jobs.next() => event,
+            Some(event) = feed_events.recv() => Ok(Event::RegistryFeed { event }),
+            () = runtime.in_flight.throbber_timer() => Ok(Event::RenderThrobber),
+            () = runtime.idle_timer.as_mut() => Ok(Event::Idle),
         }
     }
 
@@ -244,7 +244,7 @@ impl Drivers {
     }
 
     pub(super) fn restart_feed_events_if_running(&mut self) -> bool {
-        self.feed_events.restart_if_running(self.feed.api.clone())
+        self.feed.restart_events_if_running()
     }
 
     pub(super) fn clear_idle_timer(&mut self) {
@@ -256,7 +256,7 @@ impl Drivers {
     }
 
     pub(super) fn shutdown(&mut self) {
-        self.feed_events.stop();
+        self.feed.events.stop();
     }
 
     #[cfg(feature = "integration")]

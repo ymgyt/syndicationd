@@ -3,18 +3,18 @@ use crate::operation::Operation;
 use super::Application;
 
 impl Application {
-    pub(super) fn perform_operation(&mut self, operation: Operation) {
+    pub(super) fn dispatch(&mut self, operation: Operation) {
         for event in self.drivers.dispatch(operation) {
             self.apply_event(event);
         }
     }
 
-    pub(super) fn perform_operations<I>(&mut self, operations: I)
+    pub(super) fn dispatch_blk<I>(&mut self, operations: I)
     where
         I: IntoIterator<Item = Operation>,
     {
         for operation in operations {
-            self.perform_operation(operation);
+            self.dispatch(operation);
         }
     }
 }

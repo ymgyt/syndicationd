@@ -27,20 +27,20 @@ impl Application {
                 self.set_credential(credential);
                 if self.drivers.restart_feed_events_if_running() {
                     let operations = self.components.mark_timeline_dirty();
-                    self.perform_operations(operations);
+                    self.dispatch_blk(operations);
                 }
             }
             Event::FeedSubscriptionEditorClosed { input } => {
                 let operations = self
                     .components
                     .apply_feed_subscription_editor_closed(input.as_str());
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             Event::FeedEditionEditorClosed { input } => {
                 let operations = self
                     .components
                     .apply_feed_edition_editor_closed(input.as_str());
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             Event::EntryFetchStarted {
                 request_seq,
@@ -51,11 +51,11 @@ impl Application {
             }
             Event::RegistryFeed { event } => {
                 let operations = self.components.apply_feed_event(event);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             Event::TimelineSyncDebounced => {
                 let operation = self.components.feeds.timeline_sync_debounced();
-                self.perform_operation(operation);
+                self.dispatch(operation);
             }
             Event::Error { message } => {
                 error!(error = %message, "Application operation failed");
@@ -112,7 +112,7 @@ impl Application {
                     self.config.entries_limit,
                 );
                 self.initial_load.observe(initial_load_page);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
                 let subscriptions_pending = self
                     .drivers
                     .has_in_flight(super::RequestId::FetchSubscription);
@@ -132,7 +132,7 @@ impl Application {
             }
             ApiEvent::GitHub(event) => {
                 let operations = self.components.apply_github_api_event(event);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
         }
     }
@@ -146,7 +146,7 @@ impl Application {
                 let operations = self
                     .components
                     .apply_device_flow_authorization_received(provider, *device_authorization);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             AuthApiEvent::DeviceFlowCredentialReceived { credential } => {
                 self.complete_device_authorize_flow(credential);

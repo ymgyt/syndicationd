@@ -25,7 +25,7 @@ impl Application {
         let operations = self
             .components
             .apply_shell_command(command, self.config.feeds_per_pagination);
-        self.perform_operations(operations);
+        self.dispatch_blk(operations);
     }
 
     fn apply_feeds_command(&mut self, command: FeedsCommand) {
@@ -34,14 +34,14 @@ impl Application {
             self.config.feeds_per_pagination,
             self.next_entries_first(0),
         );
-        self.perform_operations(operations);
+        self.dispatch_blk(operations);
     }
 
     fn apply_filter_command(&mut self, command: FilterCommand) {
         match command {
             FilterCommand::MoveFilterRequirement(direction) => {
                 let operations = self.components.move_filter_requirement(direction);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             FilterCommand::ActivateCategoryFilterling => {
                 self.components.activate_category_filtering();
@@ -56,11 +56,11 @@ impl Application {
             }
             FilterCommand::PromptInsertChar(ch) => {
                 let operations = self.components.insert_prompt_char(ch);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             FilterCommand::PromptDeleteBackward => {
                 let operations = self.components.delete_prompt_backward();
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             FilterCommand::DeactivateFiltering => {
                 self.components.deactivate_filtering();
@@ -70,21 +70,21 @@ impl Application {
             }
             FilterCommand::ToggleFilterCategory { category, lane } => {
                 let operations = self.components.toggle_filter_category(&category, lane);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             FilterCommand::ActivateAllFilterCategories { lane } => {
                 let operations = self.components.activate_all_filter_categories(lane);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
             FilterCommand::DeactivateAllFilterCategories { lane } => {
                 let operations = self.components.deactivate_all_filter_categories(lane);
-                self.perform_operations(operations);
+                self.dispatch_blk(operations);
             }
         }
     }
 
     fn apply_github_command(&mut self, command: GitHubCommand) {
         let operations = self.components.apply_github_command(command);
-        self.perform_operations(operations);
+        self.dispatch_blk(operations);
     }
 }
