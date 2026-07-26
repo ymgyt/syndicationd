@@ -96,7 +96,6 @@ impl Application {
             interactor,
             clock,
             authentication_required,
-            dry_run,
         } = builder;
         let components = {
             let authentication = if authentication_required {
@@ -104,7 +103,7 @@ impl Application {
             } else {
                 AuthenticationState::NotRequired
             };
-            Components::new(&config.features, theme, categories, dry_run, authentication)
+            Components::new(&config.features, theme, categories, authentication)
         };
         let drivers = {
             let parts = DriverParts {

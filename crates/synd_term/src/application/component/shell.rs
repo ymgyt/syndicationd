@@ -175,13 +175,12 @@ impl ShellComponent {
         features: &Features,
         theme: Theme,
         categories: Categories,
-        state: State,
         authentication: AuthenticationState,
     ) -> Self {
         Self {
             theme,
             categories,
-            state,
+            state: State::new(),
             authentication,
             authentication_providers: vec![
                 AuthenticationProvider::Gh,

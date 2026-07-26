@@ -30,7 +30,6 @@ pub struct ApplicationBuilder<
     pub(super) gh_client: Option<GhClient>,
     pub(super) clock: Option<Box<dyn Clock>>,
     pub(super) authentication_required: bool,
-    pub(super) dry_run: bool,
 }
 
 impl Default for ApplicationBuilder {
@@ -47,7 +46,6 @@ impl Default for ApplicationBuilder {
             gh_client: None,
             clock: None,
             authentication_required: false,
-            dry_run: false,
         }
     }
 }
@@ -70,7 +68,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -93,7 +90,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -116,7 +112,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -136,7 +131,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -156,7 +150,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -176,7 +169,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -199,7 +191,6 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
             gh_client: self.gh_client,
             clock: self.clock,
             authentication_required: self.authentication_required,
-            dry_run: self.dry_run,
         }
     }
 }
@@ -236,11 +227,6 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
             authentication_required,
             ..self
         }
-    }
-
-    #[must_use]
-    pub fn dry_run(self, dry_run: bool) -> Self {
-        Self { dry_run, ..self }
     }
 }
 

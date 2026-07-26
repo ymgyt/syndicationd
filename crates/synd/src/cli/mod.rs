@@ -46,9 +46,6 @@ struct Args {
     /// Cache directory
     #[arg(long, env = config::env::CACHE_DIR)]
     cache_dir: Option<PathBuf>,
-    /// Exit before starting the terminal UI. Used by smoke tests to verify startup
-    #[arg(hide = true, long = "dry-run", hide_long_help = true)]
-    dry_run: bool,
     #[command(subcommand)]
     command: Option<Command>,
     #[command(flatten)]
@@ -169,7 +166,6 @@ pub fn parse() -> (ConfigResolverBuilder, Command) {
         config,
         log,
         cache_dir,
-        dry_run,
         command,
         api,
         daemon,
@@ -177,7 +173,7 @@ pub fn parse() -> (ConfigResolverBuilder, Command) {
         term,
     } = Args::parse();
 
-    let command = command.unwrap_or_else(|| Command::Term(TermCommand::new(dry_run)));
+    let command = command.unwrap_or(Command::Term(TermCommand));
     let builder = ConfigResolver::builder()
         .config_file(config)
         .log_file(log)

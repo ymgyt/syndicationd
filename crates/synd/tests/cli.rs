@@ -74,26 +74,3 @@ fn clean_command() {
         .assert()
         .success();
 }
-
-#[test]
-fn term_command() {
-    let cache_dir = temp_dir().keep();
-    let log_dir = temp_dir().keep();
-    let log_path = log_dir.join("synd.log");
-    let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
-    let dir = temp_dir().keep();
-    let sqlite_db = dir.join("synd.db").display().to_string();
-
-    // Nix does not allow creating the log file in the user directory.
-    cmd.args([
-        "--sqlite-db",
-        &sqlite_db,
-        "--dry-run",
-        "--cache-dir",
-        &cache_dir.display().to_string(),
-        "--log",
-        &log_path.display().to_string(),
-    ])
-    .assert()
-    .success();
-}

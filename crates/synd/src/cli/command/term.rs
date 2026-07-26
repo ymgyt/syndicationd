@@ -17,18 +17,11 @@ use crate::{config::ConfigResolver, release, runtime::FeedRuntime};
 /// This is the default command executed when `synd` is invoked without a subcommand;
 /// its options are defined on the top-level CLI(`cli::TermOptions`).
 #[derive(Debug)]
-pub struct TermCommand {
-    dry_run: bool,
-}
+pub struct TermCommand;
 
 impl TermCommand {
-    pub(crate) fn new(dry_run: bool) -> Self {
-        Self { dry_run }
-    }
-
     pub async fn run(self, config: ConfigResolver) -> ExitCode {
         let log_file = config.log_file();
-        let dry_run = self.dry_run;
         info!(
             config_file = %config.config_file().display(),
             log_file = %log_file.display(),
@@ -39,10 +32,9 @@ impl TermCommand {
             idle_shutdown_grace_ms = config.daemon_session_idle_shutdown_grace().as_millis(),
             entries_limit = config.feed_entries_limit(),
             gh_enabled = config.is_gh_enabled(),
-            dry_run,
             "Resolved terminal configuration"
         );
-        let (app, session) = match build_app(config, self.dry_run).await {
+        let (app, session) = match build_app(config).await {
             Ok(started) => started,
             Err(err) => {
                 error!("{err:?}");
@@ -55,7 +47,7 @@ impl TermCommand {
         let mut event_stream = terminal::event_stream();
         let release_check = release::ReleaseCheck::spawn();
 
-        info!(dry_run, "Terminal UI started");
+        info!("Terminal UI started");
         let result = app.run(&mut event_stream).await;
 
         if let Err(err) = session.close().await {
@@ -72,10 +64,7 @@ impl TermCommand {
     }
 }
 
-async fn build_app(
-    config: ConfigResolver,
-    dry_run: bool,
-) -> anyhow::Result<(Application, Session)> {
+async fn build_app(config: ConfigResolver) -> anyhow::Result<(Application, Session)> {
     let terminal = Terminal::new().context("Failed to construct terminal")?;
     let gh_client = {
         if config.is_gh_enabled() {
@@ -117,8 +106,7 @@ async fn build_app(
             .config(app_config)
             .cache(cache)
             .theme(theme)
-            .interactor(interactor)
-            .dry_run(dry_run);
+            .interactor(interactor);
         let builder = match gh_client {
             Some(gh_client) => builder.gh_client(gh_client),
             None => builder,
