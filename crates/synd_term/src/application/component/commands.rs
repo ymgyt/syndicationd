@@ -1,47 +1,80 @@
-use crate::{
-    command::{FeedsCommand, GitHubCommand, ShellCommand},
-    keymap,
-    operation::Operation,
-    ui::widgets::filter::FilterLane,
-};
 use synd_feed::types::Category;
 
-use super::{AppComponent, FeedsComponent};
+use crate::{
+    command::{FeedsCommand, FilterCommand, FilterTarget, GhCommand, ShellCommand},
+    keymap,
+    operation::{Operation, Operations},
+    ui::widgets::{filter::Filterer, tabs::Tab},
+};
 
-impl AppComponent {
+use super::{Components, FeedsComponent};
+
+/// Feed concern currently permitted to consume a direct command.
+enum FeedsCommandState {
+    Subscription,
+    Timeline,
+    UnsubscribePopup,
+    Unavailable,
+}
+
+/// GitHub concern currently permitted to consume a direct command.
+enum GhCommandState {
+    Notifications,
+    FilterPopup,
+    Unavailable,
+}
+
+/// Runtime keymap derived from the current filter state.
+pub(in crate::application) enum FilterKeymap {
+    Normal,
+    Category(keymap::LayerKeymap),
+    Search(keymap::LayerKeymap),
+}
+
+impl FilterKeymap {
+    pub(in crate::application) fn install(self, keymap: &mut keymap::Keymap) {
+        keymap.clear_layer_keymap(keymap::Layer::CategoryFilter);
+        keymap.clear_layer_keymap(keymap::Layer::SearchPrompt);
+        match self {
+            Self::Normal => {}
+            Self::Category(layer) | Self::Search(layer) => keymap.set_layer_keymap(layer),
+        }
+    }
+}
+
+impl Components {
     pub(in crate::application) fn apply_shell_command(
         &mut self,
         command: ShellCommand,
         feeds_first: i64,
-    ) -> Vec<Operation> {
+    ) -> Option<Operation> {
+        if matches!(command, ShellCommand::MoveTabSelection(_)) && !self.shell.permits_main_ui() {
+            return None;
+        }
+
         match command {
             ShellCommand::Quit => {
                 self.shell.quit();
-                Vec::new()
+                None
             }
-            ShellCommand::Authenticate => self.shell.authenticate().into_iter().collect(),
+            ShellCommand::Authenticate => self.shell.start_authentication(),
             ShellCommand::MoveAuthenticationProvider(direction) => {
                 self.shell.move_authentication_provider(direction);
-                Vec::new()
+                None
             }
             ShellCommand::MoveTabSelection(direction) => {
-                let tab = self.shell.move_tab_selection(direction);
-                match tab {
-                    crate::ui::widgets::tabs::Tab::Feeds if !self.feeds.has_subscription() => {
-                        vec![Operation::FetchSubscription {
-                            populate: crate::application::Populate::Replace,
-                            after: None,
-                            first: feeds_first,
-                        }]
+                match self.shell.move_tab_selection(direction) {
+                    Tab::Feeds if !self.feeds.has_subscription() => {
+                        Some(FeedsComponent::reload_subscription(feeds_first))
                     }
-                    _ => Vec::new(),
+                    _ => None,
                 }
             }
             ShellCommand::RotateTheme => {
                 self.shell.rotate_theme();
-                Vec::new()
+                None
             }
-            ShellCommand::ForceRedraw => vec![Operation::ForceRedrawTerminal],
+            ShellCommand::ForceRedraw => Some(Operation::ForceRedrawTerminal),
         }
     }
 
@@ -49,151 +82,242 @@ impl AppComponent {
         &mut self,
         command: FeedsCommand,
         feeds_first: i64,
-        entries_first: i64,
-    ) -> Vec<Operation> {
-        match command {
-            FeedsCommand::MoveSubscribedFeed(direction) => {
+    ) -> Operations {
+        match (self.feeds_command_state(), command) {
+            (FeedsCommandState::Subscription, FeedsCommand::MoveSubscribedFeed(direction)) => {
                 self.feeds.move_subscription(direction);
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::MoveSubscribedFeedFirst => {
+            (FeedsCommandState::Subscription, FeedsCommand::MoveSubscribedFeedFirst) => {
                 self.feeds.move_subscription_first();
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::MoveSubscribedFeedLast => {
+            (FeedsCommandState::Subscription, FeedsCommand::MoveSubscribedFeedLast) => {
                 self.feeds.move_subscription_last();
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::PromptFeedSubscription => vec![Operation::OpenFeedSubscriptionEditor],
-            FeedsCommand::PromptFeedEdition => {
-                self.feeds.edit_selected_feed().into_iter().collect()
+            (FeedsCommandState::Subscription, FeedsCommand::PromptFeedSubscription) => {
+                Operation::OpenFeedSubscriptionEditor.into()
             }
-            FeedsCommand::PromptFeedUnsubscription => {
+            (FeedsCommandState::Subscription, FeedsCommand::PromptFeedEdition) => {
+                self.feeds.edit_selected_feed().into()
+            }
+            (FeedsCommandState::Subscription, FeedsCommand::PromptFeedUnsubscription) => {
                 self.feeds.open_unsubscribe_popup();
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::SelectFeedUnsubscriptionPopup => {
+            (
+                FeedsCommandState::UnsubscribePopup,
+                FeedsCommand::MoveFeedUnsubscriptionPopupSelection(direction),
+            ) => {
+                self.feeds.move_unsubscribe_popup_selection(direction);
+                Operations::Nop
+            }
+            (FeedsCommandState::UnsubscribePopup, FeedsCommand::SelectFeedUnsubscriptionPopup) => {
                 let operation = self.feeds.selected_unsubscribe_operation();
                 self.feeds.close_unsubscribe_popup();
-                operation.into_iter().collect()
+                operation.into()
             }
-            FeedsCommand::CancelFeedUnsubscriptionPopup => {
+            (FeedsCommandState::UnsubscribePopup, FeedsCommand::CancelFeedUnsubscriptionPopup) => {
                 self.feeds.close_unsubscribe_popup();
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::MoveFeedUnsubscriptionPopupSelection(direction) => {
-                self.feeds.move_unsubscribe_popup_selection(direction);
-                Vec::new()
+            (FeedsCommandState::Subscription, FeedsCommand::ReloadSubscription) => {
+                FeedsComponent::reload_subscription(feeds_first).into()
             }
-            FeedsCommand::ReloadSubscription => {
-                vec![FeedsComponent::reload_subscription(feeds_first)]
+            (FeedsCommandState::Subscription, FeedsCommand::OpenFeed) => {
+                self.feeds.open_selected_feed().into()
             }
-            FeedsCommand::OpenFeed => self.feeds.open_selected_feed().into_iter().collect(),
-            FeedsCommand::ReloadEntries => {
-                vec![FeedsComponent::reload_entries(entries_first)]
+            (FeedsCommandState::Timeline, FeedsCommand::RefreshTimeline) => {
+                self.feeds.refresh_timeline().into()
             }
-            FeedsCommand::MoveEntry(direction) => {
+            (FeedsCommandState::Timeline, FeedsCommand::MoveEntry(direction)) => {
                 self.feeds.move_entry(direction);
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::MoveEntryFirst => {
+            (FeedsCommandState::Timeline, FeedsCommand::MoveEntryFirst) => {
                 self.feeds.move_entry_first();
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::MoveEntryLast => {
+            (FeedsCommandState::Timeline, FeedsCommand::MoveEntryLast) => {
                 self.feeds.move_entry_last();
-                Vec::new()
+                Operations::Nop
             }
-            FeedsCommand::OpenEntry => self.feeds.open_selected_entry().into_iter().collect(),
-            FeedsCommand::BrowseEntry => self.feeds.browse_selected_entry(),
+            (FeedsCommandState::Timeline, FeedsCommand::OpenEntry) => {
+                self.feeds.open_selected_entry().into()
+            }
+            (FeedsCommandState::Timeline, FeedsCommand::BrowseEntry) => {
+                self.feeds.browse_selected_entry()
+            }
+            _ => Operations::Nop,
         }
     }
 
-    pub(in crate::application) fn apply_github_command(
+    pub(in crate::application) fn apply_gh_command(&mut self, command: GhCommand) -> Operations {
+        match (self.gh_command_state(), command) {
+            (GhCommandState::Notifications, GhCommand::MoveNotification(direction)) => {
+                self.gh.move_notification(direction);
+                Operations::Nop
+            }
+            (GhCommandState::Notifications, GhCommand::MoveNotificationFirst) => {
+                self.gh.move_notification_first();
+                Operations::Nop
+            }
+            (GhCommandState::Notifications, GhCommand::MoveNotificationLast) => {
+                self.gh.move_notification_last();
+                Operations::Nop
+            }
+            (GhCommandState::Notifications, GhCommand::OpenNotification) => {
+                self.gh.open_selected_notification().into()
+            }
+            (GhCommandState::Notifications, GhCommand::OpenNotificationAndMarkAsDone) => {
+                self.gh.open_selected_notification_and_mark_as_done().into()
+            }
+            (GhCommandState::Notifications, GhCommand::ReloadNotifications) => {
+                self.gh.reload_notifications().into()
+            }
+            (GhCommandState::Notifications, GhCommand::MarkNotificationAsDone) => {
+                self.gh.mark_selected_notification_as_done().into()
+            }
+            (GhCommandState::Notifications, GhCommand::MarkAllNotificationsAsDone) => {
+                self.gh.mark_all_notifications_as_done().into()
+            }
+            (GhCommandState::Notifications, GhCommand::UnsubscribeThread) => {
+                self.gh.unsubscribe_selected_thread().into()
+            }
+            (GhCommandState::Notifications, GhCommand::OpenNotificationFilter) => {
+                self.gh.open_filter_popup();
+                Operations::Nop
+            }
+            (GhCommandState::FilterPopup, GhCommand::CloseNotificationFilter) => {
+                self.gh.close_filter_popup().into()
+            }
+            (GhCommandState::FilterPopup, GhCommand::ToggleNotificationFilter(option)) => {
+                self.gh.toggle_filter_option(&option);
+                Operations::Nop
+            }
+            _ => Operations::Nop,
+        }
+    }
+
+    pub(in crate::application) fn apply_filter_command(
         &mut self,
-        command: GitHubCommand,
-    ) -> Vec<Operation> {
+        command: FilterCommand,
+    ) -> Option<Operation> {
+        if self.gh.is_filter_popup_open() {
+            return None;
+        }
+
         match command {
-            GitHubCommand::MoveGhNotification(direction) => {
-                self.github.move_notification(direction);
-                Vec::new()
+            FilterCommand::MoveFilterRequirement(direction)
+                if self.shell.current_filter_target() == FilterTarget::Feeds =>
+            {
+                self.move_filter_requirement(direction)
             }
-            GitHubCommand::MoveGhNotificationFirst => {
-                self.github.move_notification_first();
-                Vec::new()
+            FilterCommand::ActivateCategoryFiltering => {
+                self.activate_category_filtering();
+                None
             }
-            GitHubCommand::MoveGhNotificationLast => {
-                self.github.move_notification_last();
-                Vec::new()
+            FilterCommand::ActivateSearchFiltering => {
+                self.activate_search_filtering();
+                None
             }
-            GitHubCommand::OpenGhNotification { with_mark_as_done } => {
-                self.github.open_selected_notification(with_mark_as_done)
+            FilterCommand::PromptInsertChar(ch) if self.shell.filter.is_search_active() => {
+                self.insert_prompt_char(ch)
             }
-            GitHubCommand::ReloadGhNotifications => vec![self.github.reload_notifications()],
-            GitHubCommand::MarkGhNotificationAsDone { all } => {
-                self.github.mark_notification_as_done(all)
+            FilterCommand::PromptDeleteBackward if self.shell.filter.is_search_active() => {
+                self.delete_prompt_backward()
             }
-            GitHubCommand::UnsubscribeGhThread => {
-                let mut operations = self
-                    .github
-                    .selected_thread()
-                    .map(|id| Operation::UnsubscribeGitHubThread { id })
-                    .into_iter()
-                    .collect::<Vec<_>>();
-                operations.extend(self.github.mark_notification_as_done(false));
-                operations
+            FilterCommand::DeactivateFiltering if self.shell.filter.is_filtering_active() => {
+                self.deactivate_filtering();
+                None
             }
-            GitHubCommand::OpenGhNotificationFilterPopup => {
-                self.github.open_filter_popup();
-                Vec::new()
+            FilterCommand::ToggleFilterCategory { category, target }
+                if self.shell.filter.category_filter_target() == Some(target) =>
+            {
+                self.toggle_filter_category(&category, target)
             }
-            GitHubCommand::CloseGhNotificationFilterPopup => {
-                let operation = self.github.close_filter_popup();
-                operation.into_iter().collect()
+            FilterCommand::ActivateAllFilterCategories { target }
+                if self.shell.filter.category_filter_target() == Some(target) =>
+            {
+                self.activate_all_filter_categories(target)
             }
-            GitHubCommand::UpdateGhnotificationFilterPopupOptions(updater) => {
-                self.github.update_filter_popup_options(&updater);
-                Vec::new()
+            FilterCommand::DeactivateAllFilterCategories { target }
+                if self.shell.filter.category_filter_target() == Some(target) =>
+            {
+                self.deactivate_all_filter_categories(target)
             }
+            FilterCommand::MoveFilterRequirement(_)
+            | FilterCommand::PromptInsertChar(_)
+            | FilterCommand::PromptDeleteBackward
+            | FilterCommand::DeactivateFiltering
+            | FilterCommand::ToggleFilterCategory { .. }
+            | FilterCommand::ActivateAllFilterCategories { .. }
+            | FilterCommand::DeactivateAllFilterCategories { .. } => None,
+        }
+    }
+
+    fn feeds_command_state(&self) -> FeedsCommandState {
+        if self.gh.is_filter_popup_open() {
+            FeedsCommandState::Unavailable
+        } else if self.feeds.is_unsubscribe_popup_open() {
+            FeedsCommandState::UnsubscribePopup
+        } else {
+            match self.shell.tabs.current() {
+                Tab::Feeds => FeedsCommandState::Subscription,
+                Tab::Entries => FeedsCommandState::Timeline,
+                Tab::Gh => FeedsCommandState::Unavailable,
+            }
+        }
+    }
+
+    fn gh_command_state(&self) -> GhCommandState {
+        if self.gh.is_filter_popup_open() {
+            GhCommandState::FilterPopup
+        } else if self.shell.tabs.current() == Tab::Gh {
+            GhCommandState::Notifications
+        } else {
+            GhCommandState::Unavailable
         }
     }
 
     pub(in crate::application) fn move_filter_requirement(
         &mut self,
         direction: crate::application::Direction,
-    ) -> Vec<Operation> {
+    ) -> Option<Operation> {
         let filterer = self.shell.move_filter_requirement(direction);
-        self.apply_filterer(filterer).into_iter().collect()
+        self.apply_filterer(filterer)
     }
 
     pub(in crate::application) fn activate_category_filtering(&mut self) {
-        self.shell.activate_category_filtering();
+        let target = self.shell.current_filter_target();
+        self.shell.filter.activate_category_filtering(target);
     }
 
-    pub(in crate::application) fn category_filter_keymap(&self) -> Option<keymap::LayerKeymap> {
-        self.shell.filter.category_filter_keymap()
+    pub(in crate::application) fn filter_keymap(&self) -> FilterKeymap {
+        if let Some(category) = self.shell.filter.category_filter_keymap() {
+            FilterKeymap::Category(category)
+        } else if self.shell.filter.is_search_active() {
+            FilterKeymap::Search(keymap::LayerKeymap::search_prompt())
+        } else {
+            FilterKeymap::Normal
+        }
     }
 
     pub(in crate::application) fn activate_search_filtering(&mut self) {
         self.shell.filter.activate_search_filtering();
     }
 
-    pub(in crate::application) fn prompt_changed(&mut self) -> Vec<Operation> {
-        if !self.shell.filter.is_search_active() {
-            return Vec::new();
-        }
-        let filterer = self.shell.active_filterer();
-        self.apply_filterer(filterer).into_iter().collect()
-    }
-
-    pub(in crate::application) fn insert_prompt_char(&mut self, ch: char) -> Vec<Operation> {
+    pub(in crate::application) fn insert_prompt_char(&mut self, ch: char) -> Option<Operation> {
         self.shell.filter.insert_prompt_char(ch);
-        self.prompt_changed()
+        let filterer = self.shell.active_filterer();
+        self.apply_filterer(filterer)
     }
 
-    pub(in crate::application) fn delete_prompt_backward(&mut self) -> Vec<Operation> {
+    pub(in crate::application) fn delete_prompt_backward(&mut self) -> Option<Operation> {
         self.shell.filter.delete_prompt_backward();
-        self.prompt_changed()
+        let filterer = self.shell.active_filterer();
+        self.apply_filterer(filterer)
     }
 
     pub(in crate::application) fn deactivate_filtering(&mut self) {
@@ -203,25 +327,40 @@ impl AppComponent {
     pub(in crate::application) fn toggle_filter_category(
         &mut self,
         category: &Category<'static>,
-        lane: FilterLane,
-    ) -> Vec<Operation> {
-        let filterer = self.shell.toggle_filter_category(category, lane);
-        self.apply_filterer(filterer).into_iter().collect()
+        target: FilterTarget,
+    ) -> Option<Operation> {
+        let filterer = self.shell.filter.toggle_category_state(category, target);
+        self.apply_filterer(filterer)
     }
 
     pub(in crate::application) fn activate_all_filter_categories(
         &mut self,
-        lane: FilterLane,
-    ) -> Vec<Operation> {
-        let filterer = self.shell.activate_all_filter_categories(lane);
-        self.apply_filterer(filterer).into_iter().collect()
+        target: FilterTarget,
+    ) -> Option<Operation> {
+        let filterer = self.shell.filter.activate_all_categories_state(target);
+        self.apply_filterer(filterer)
     }
 
     pub(in crate::application) fn deactivate_all_filter_categories(
         &mut self,
-        lane: FilterLane,
-    ) -> Vec<Operation> {
-        let filterer = self.shell.deactivate_all_filter_categories(lane);
-        self.apply_filterer(filterer).into_iter().collect()
+        target: FilterTarget,
+    ) -> Option<Operation> {
+        let filterer = self.shell.filter.deactivate_all_categories_state(target);
+        self.apply_filterer(filterer)
+    }
+
+    #[must_use]
+    fn apply_filterer(&mut self, filterer: Filterer) -> Option<Operation> {
+        match filterer {
+            Filterer::Feed(filterer) => {
+                self.feeds.entries.update_filterer(filterer.clone());
+                self.feeds.subscription.update_filterer(filterer);
+                None
+            }
+            Filterer::GhNotification(filterer) => {
+                self.gh.notifications.update_filterer(filterer);
+                self.gh.fetch_next_notifications_if_needed()
+            }
+        }
     }
 }

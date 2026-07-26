@@ -35,18 +35,16 @@ impl ThrobberState {
 
 #[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone)]
-pub struct Throbber<'a> {
-    label: Option<Span<'a>>,
+pub struct Throbber {
     style: Style,
     throbber_style: Style,
     throbber_set: throbber::Set,
     use_type: throbber::WhichUse,
 }
 
-impl Default for Throbber<'_> {
+impl Default for Throbber {
     fn default() -> Self {
         Self {
-            label: None,
             style: Style::default(),
             throbber_style: Style::default(),
             throbber_set: throbber::BRAILLE_EIGHT_DOUBLE,
@@ -55,16 +53,7 @@ impl Default for Throbber<'_> {
     }
 }
 
-impl<'a> Throbber<'a> {
-    #[must_use]
-    pub fn label<T>(mut self, label: T) -> Self
-    where
-        T: Into<Span<'a>>,
-    {
-        self.label = Some(label.into());
-        self
-    }
-
+impl Throbber {
     #[must_use]
     pub fn throbber_set(mut self, set: throbber::Set) -> Self {
         self.throbber_set = set;
@@ -79,7 +68,7 @@ impl<'a> Throbber<'a> {
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-impl StatefulWidget for Throbber<'_> {
+impl StatefulWidget for Throbber {
     type State = ThrobberState;
 
     /// Render specified index symbols.
@@ -104,20 +93,12 @@ impl StatefulWidget for Throbber<'_> {
             }
         };
         let symbol_span = Span::styled(format!("{symbol} "), self.throbber_style);
-        let (col, row) = buf.set_span(
+        buf.set_span(
             throbber_area.left(),
             throbber_area.top(),
             &symbol_span,
             symbol_span.width() as u16,
         );
-
-        // render a label.
-        if let Some(label) = self.label {
-            if throbber_area.right() <= col {
-                return;
-            }
-            buf.set_span(col, row, &label, label.width() as u16);
-        }
     }
 }
 

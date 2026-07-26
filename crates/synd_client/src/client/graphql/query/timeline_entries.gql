@@ -1,0 +1,30 @@
+query TimelineEntries($after: String, $first: Int!) {
+  output: feedRegistry {
+    timeline {
+      entries(after: $after, first: $first) {
+        nodes {
+          orderTime
+          entry {
+            id
+            title
+            published
+            updated
+            summary
+            websiteUrl
+            feed {
+              title
+              url
+              requirement
+              category
+            }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        seq
+      }
+    }
+  }
+}

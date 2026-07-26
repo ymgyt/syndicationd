@@ -7,26 +7,27 @@ use crate::{
 mod commands;
 mod events;
 mod feeds;
-mod github;
+mod gh;
 mod shell;
 
 pub(crate) use feeds::FeedsComponent;
-pub(crate) use github::GitHubComponent;
-pub(crate) use shell::ShellComponent;
+pub(crate) use gh::GhComponent;
+pub(crate) use shell::{ApiAccessTransition, AuthenticationState, ShellComponent};
 
 /// Top-level application state machine that coordinates child components.
-pub(crate) struct AppComponent {
+pub(crate) struct Components {
     pub(crate) shell: ShellComponent,
     pub(crate) feeds: FeedsComponent,
-    pub(crate) github: GitHubComponent,
+    pub(crate) gh: GhComponent,
 }
 
-impl AppComponent {
+impl Components {
     pub(super) fn new(
         features: &Features,
         theme: Theme,
         categories: Categories,
         dry_run: bool,
+        authentication: AuthenticationState,
     ) -> Self {
         let mut state = State::new();
         if dry_run {
@@ -34,9 +35,9 @@ impl AppComponent {
         }
 
         Self {
-            shell: ShellComponent::new(features, theme, categories, state),
+            shell: ShellComponent::new(features, theme, categories, state, authentication),
             feeds: FeedsComponent::new(),
-            github: GitHubComponent::new(),
+            gh: GhComponent::new(),
         }
     }
 

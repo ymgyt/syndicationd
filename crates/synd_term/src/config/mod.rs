@@ -7,8 +7,6 @@ pub mod client {
     pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
     pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-    /// Number of entries to fetch in one request
-    pub const DEFAULT_ENTRIES_PER_PAGINATION: i64 = 200;
     /// Number of feeds to fetch in one request
     pub const DEFAULT_FEEDS_PER_PAGINATION: i64 = 50;
 }
@@ -37,7 +35,7 @@ pub mod cache {
     pub const GH_NOTIFICATION_FILTER_OPTION_FILE: &str = "gh_notification_filter_options.json";
 }
 
-pub(crate) mod github {
+pub(crate) mod gh {
     use std::time::Duration;
 
     /// GitHub pagination rest api is 1 origin

@@ -6,20 +6,13 @@ pub(crate) enum Direction {
     Right,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub(crate) enum IndexOutOfRange {
-    Wrapping,
-    #[allow(dead_code)]
-    Saturating,
-}
-
 impl Direction {
     #[allow(
         clippy::cast_sign_loss,
         clippy::cast_possible_truncation,
         clippy::cast_possible_wrap
     )]
-    pub(crate) fn apply(self, index: usize, len: usize, out: IndexOutOfRange) -> usize {
+    pub(crate) fn apply(self, index: usize, len: usize) -> usize {
         if len == 0 {
             return 0;
         }
@@ -30,15 +23,9 @@ impl Direction {
 
         let index = index as i64;
         if index + diff < 0 {
-            match out {
-                IndexOutOfRange::Wrapping => len - 1,
-                IndexOutOfRange::Saturating => 0,
-            }
+            len - 1
         } else if index + diff >= len as i64 {
-            match out {
-                IndexOutOfRange::Wrapping => 0,
-                IndexOutOfRange::Saturating => len - 1,
-            }
+            0
         } else {
             (index + diff) as usize
         }
@@ -57,10 +44,9 @@ mod tests {
         fn apply(
             dir in direction_strategy(),
             index in 0..10_usize,
-            len in 0..10_usize,
-            out in index_out_of_range_strategy())
+            len in 0..10_usize)
         {
-            let apply = dir.apply(index, len,out) as i64;
+            let apply = dir.apply(index, len) as i64;
             let index = index as i64;
             let len = len as i64;
             assert!(
@@ -78,13 +64,6 @@ mod tests {
             Just(Direction::Down),
             Just(Direction::Left),
             Just(Direction::Right),
-        ]
-    }
-
-    fn index_out_of_range_strategy() -> impl Strategy<Value = IndexOutOfRange> {
-        prop_oneof![
-            Just(IndexOutOfRange::Wrapping),
-            Just(IndexOutOfRange::Saturating)
         ]
     }
 }

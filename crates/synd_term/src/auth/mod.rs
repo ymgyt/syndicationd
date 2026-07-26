@@ -19,16 +19,14 @@ use crate::{
 
 pub mod authenticator;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthenticationProvider {
-    Github,
+    Gh,
     Google,
 }
 
 #[derive(Debug, Error)]
 pub enum CredentialError {
-    #[error("google jwt expired")]
-    GoogleJwtExpired { refresh_token: String },
     #[error("google jwt email not verified")]
     GoogleJwtEmailNotVerified,
     #[error("decode jwt: {0}")]
@@ -44,9 +42,8 @@ pub enum CredentialError {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum Credential {
-    Github {
-        access_token: String,
-    },
+    #[serde(rename = "Github")]
+    Gh { access_token: String },
     Google {
         id_token: String,
         refresh_token: String,
@@ -65,7 +62,10 @@ impl fmt::Debug for Credential {
 #[cfg(feature = "integration")]
 pub(super) struct Expired<C = Credential>(pub(super) C);
 
-/// Represents verified state
+/// Credential obtained from a successful provider response or accepted by the
+/// provider-specific cache restoration policy.
+///
+/// This does not guarantee JWT signature verification or current API access.
 #[derive(Debug, Clone)]
 pub(super) struct Verified<C = Credential>(C);
 
@@ -114,7 +114,7 @@ impl Unverified<Credential> {
     ) -> Result<VerifyResult, CredentialError> {
         let credential = self.0;
         match &credential {
-            Credential::Github { .. } => Ok(VerifyResult::Verified(Verified(credential))),
+            Credential::Gh { .. } => Ok(VerifyResult::Verified(Verified(credential))),
             Credential::Google { id_token, .. } => {
                 let claims = jwt_service
                     .google

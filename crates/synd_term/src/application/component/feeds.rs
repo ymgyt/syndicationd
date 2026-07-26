@@ -1,25 +1,31 @@
-use std::collections::HashSet;
-
+use synd_client::payload;
 use synd_feed::types::FeedUrl;
 use tracing::warn;
 use url::Url;
 
 use crate::{
-    operation::Operation,
+    application::{Direction, Populate, input_parser::InputParser},
+    operation::{Operation, Operations},
     ui::widgets::{
         entries::EntriesWidget,
         subscription::{SubscriptionWidget, UnsubscribeSelection},
     },
 };
 
-use super::super::{Direction, Populate, RequestSequence, input_parser::InputParser};
+/// Timeline bootstrap and catch-up state.
+#[derive(Debug)]
+pub(crate) enum TimelineState {
+    Uninitialized,
+    FetchingWindow { base_seq: Option<i64> },
+    CatchingUp { seq: i64, dirty: bool },
+    Ready { seq: i64 },
+}
 
-/// Feed timeline, subscription, and sync state.
+/// Feed subscription and timeline application state.
 pub(crate) struct FeedsComponent {
     pub(crate) subscription: SubscriptionWidget,
     pub(crate) entries: EntriesWidget,
-    entry_fetches: EntryFetches,
-    timeline: TimelineSync,
+    timeline: TimelineState,
 }
 
 impl FeedsComponent {
@@ -27,8 +33,7 @@ impl FeedsComponent {
         Self {
             subscription: SubscriptionWidget::new(),
             entries: EntriesWidget::new(),
-            entry_fetches: EntryFetches::new(),
-            timeline: TimelineSync::new(),
+            timeline: TimelineState::Uninitialized,
         }
     }
 
@@ -53,10 +58,9 @@ impl FeedsComponent {
     }
 
     pub(in crate::application) fn open_unsubscribe_popup(&mut self) {
-        if self.subscription.selected_feed().is_none() {
-            return;
+        if self.subscription.selected_feed().is_some() {
+            self.subscription.toggle_unsubscribe_popup(true);
         }
-        self.subscription.toggle_unsubscribe_popup(true);
     }
 
     pub(in crate::application) fn is_unsubscribe_popup_open(&self) -> bool {
@@ -96,13 +100,7 @@ impl FeedsComponent {
 
     pub(in crate::application) fn open_selected_feed(&self) -> Option<Operation> {
         let feed_website_url = self.subscription.selected_feed()?.website_url.as_ref()?;
-        match Url::parse(feed_website_url) {
-            Ok(url) => Some(Operation::OpenBrowser { url }),
-            Err(err) => {
-                warn!("Try to open invalid feed url: {feed_website_url} {err}");
-                None
-            }
-        }
+        Self::parse_browser_url(feed_website_url, "feed")
     }
 
     pub(in crate::application) fn open_selected_entry(&self) -> Option<Operation> {
@@ -110,22 +108,31 @@ impl FeedsComponent {
             .map(|url| Operation::OpenBrowser { url })
     }
 
-    pub(in crate::application) fn browse_selected_entry(&self) -> Vec<Operation> {
+    pub(in crate::application) fn browse_selected_entry(&self) -> Operations {
         let Some(url) = self.selected_entry_url() else {
-            return Vec::new();
+            return Operations::Nop;
         };
-        vec![
+        [
             Operation::OpenTextBrowser { url },
             Operation::ForceRedrawTerminal,
         ]
+        .into()
     }
 
     fn selected_entry_url(&self) -> Option<Url> {
         let entry_website_url = self.entries.selected_entry_website_url()?;
-        match Url::parse(entry_website_url) {
+        Self::parse_url(entry_website_url, "entry")
+    }
+
+    fn parse_browser_url(value: &str, kind: &str) -> Option<Operation> {
+        Self::parse_url(value, kind).map(|url| Operation::OpenBrowser { url })
+    }
+
+    fn parse_url(value: &str, kind: &str) -> Option<Url> {
+        match Url::parse(value) {
             Ok(url) => Some(url),
-            Err(err) => {
-                warn!("Try to open/browse invalid entry url: {entry_website_url} {err}");
+            Err(error) => {
+                warn!(%error, url = value, "cannot open invalid {kind} URL");
                 None
             }
         }
@@ -144,11 +151,123 @@ impl FeedsComponent {
         }
     }
 
-    pub(in crate::application) fn reload_entries(first: i64) -> Operation {
-        Operation::FetchEntries {
-            populate: Populate::Replace,
-            after: None,
-            first,
+    /// Moves feed-backed state into its initial synchronization phase.
+    pub(in crate::application) fn bootstrap(
+        &mut self,
+        subscriptions_first: i64,
+        timeline_limit: usize,
+    ) -> impl Into<Operations> {
+        [
+            Operation::WatchFeedEvents,
+            Self::reload_subscription(subscriptions_first),
+            self.begin_timeline_bootstrap(timeline_limit),
+        ]
+    }
+
+    fn begin_timeline_bootstrap(&mut self, limit: usize) -> Operation {
+        assert!(
+            matches!(self.timeline, TimelineState::Uninitialized),
+            "timeline bootstrap started more than once"
+        );
+        self.timeline = TimelineState::FetchingWindow { base_seq: None };
+        Operation::FetchTimelineWindow { limit }
+    }
+
+    pub(in crate::application) fn refresh_timeline(&mut self) -> Option<Operation> {
+        match &mut self.timeline {
+            TimelineState::Uninitialized | TimelineState::FetchingWindow { .. } => None,
+            TimelineState::CatchingUp { dirty, .. } => {
+                *dirty = true;
+                None
+            }
+            TimelineState::Ready { seq } => {
+                let since = *seq;
+                self.timeline = TimelineState::CatchingUp {
+                    seq: since,
+                    dirty: false,
+                };
+                Some(Operation::CatchUpTimeline { since })
+            }
+        }
+    }
+
+    pub(in crate::application) fn apply_timeline_window_chunk(
+        &mut self,
+        entries: Vec<payload::TimelineEntry>,
+        base_seq: i64,
+        limit: usize,
+    ) {
+        let TimelineState::FetchingWindow {
+            base_seq: current_base,
+        } = &mut self.timeline
+        else {
+            panic!("timeline window chunk received outside window bootstrap");
+        };
+        let populate = if let Some(current) = current_base {
+            assert_eq!(
+                *current, base_seq,
+                "timeline window chunks used different base sequences"
+            );
+            Populate::Append
+        } else {
+            *current_base = Some(base_seq);
+            Populate::Replace
+        };
+        self.entries.update_timeline_chunk(populate, entries, limit);
+    }
+
+    pub(in crate::application) fn complete_timeline_window(
+        &mut self,
+        succeeded: bool,
+    ) -> Option<Operation> {
+        let TimelineState::FetchingWindow { base_seq } =
+            std::mem::replace(&mut self.timeline, TimelineState::Uninitialized)
+        else {
+            panic!("timeline window completed outside window bootstrap");
+        };
+        match base_seq {
+            Some(seq) => {
+                self.timeline = TimelineState::CatchingUp { seq, dirty: false };
+                Some(Operation::CatchUpTimeline { since: seq })
+            }
+            None if succeeded => {
+                panic!("successful timeline window completed without its first chunk")
+            }
+            None => None,
+        }
+    }
+
+    pub(in crate::application) fn apply_timeline_changes(
+        &mut self,
+        changes: Vec<payload::TimelineChange>,
+        seq: i64,
+        limit: usize,
+    ) {
+        let TimelineState::CatchingUp {
+            seq: current_seq, ..
+        } = &mut self.timeline
+        else {
+            panic!("timeline changes received outside catch-up");
+        };
+        self.entries.apply_changes(changes, limit);
+        *current_seq = seq;
+    }
+
+    pub(in crate::application) fn complete_timeline_catch_up(
+        &mut self,
+        succeeded: bool,
+    ) -> Option<Operation> {
+        let TimelineState::CatchingUp { seq, dirty } =
+            std::mem::replace(&mut self.timeline, TimelineState::Uninitialized)
+        else {
+            panic!("timeline catch-up completed outside catch-up");
+        };
+        if succeeded && dirty {
+            self.timeline = TimelineState::CatchingUp { seq, dirty: false };
+            Some(Operation::CatchUpTimeline { since: seq })
+        } else {
+            self.timeline = TimelineState::Ready { seq };
+            None
         }
     }
 
@@ -163,111 +282,12 @@ impl FeedsComponent {
     pub(in crate::application) fn move_entry_last(&mut self) {
         self.entries.move_last();
     }
-}
-
-/// In-flight entry fetches and the request barrier for the current entries view.
-struct EntryFetches {
-    latest_replace_started_at: Option<RequestSequence>,
-    active: HashSet<RequestSequence>,
-}
-
-impl EntryFetches {
-    fn new() -> Self {
-        Self {
-            latest_replace_started_at: None,
-            active: HashSet::new(),
-        }
-    }
-
-    fn start(&mut self, request_seq: RequestSequence, populate: Populate) {
-        self.active.insert(request_seq);
-        if populate == Populate::Replace {
-            self.latest_replace_started_at = Some(request_seq);
-        }
-    }
-
-    fn accept_response(&mut self, request_seq: RequestSequence) -> bool {
-        if !self.active.remove(&request_seq) {
-            return false;
-        }
-        self.latest_replace_started_at
-            .is_none_or(|barrier| request_seq >= barrier)
-    }
-
-    fn forget(&mut self, request_seq: RequestSequence) {
-        self.active.remove(&request_seq);
-    }
-}
-
-/// Cursor of the timeline change feed and its debounce state.
-struct TimelineSync {
-    /// Last change seq applied to the local timeline
-    seq: i64,
-    /// Whether a debounced sync is already scheduled
-    scheduled: bool,
-}
-
-impl TimelineSync {
-    fn new() -> Self {
-        Self {
-            seq: 0,
-            scheduled: false,
-        }
-    }
-
-    /// Coalesce change hints into one debounced sync.
-    fn mark_dirty(&mut self) -> Option<Operation> {
-        if self.scheduled {
-            return None;
-        }
-        self.scheduled = true;
-        Some(Operation::ScheduleTimelineSync)
-    }
-
-    fn debounce_elapsed(&mut self) -> Operation {
-        self.scheduled = false;
-        Operation::SyncTimeline { since: self.seq }
-    }
-}
-
-impl FeedsComponent {
-    pub(in crate::application) fn mark_timeline_dirty(&mut self) -> Option<Operation> {
-        self.timeline.mark_dirty()
-    }
-
-    pub(in crate::application) fn start_entry_fetch(
-        &mut self,
-        request_seq: RequestSequence,
-        populate: Populate,
-    ) {
-        self.entry_fetches.start(request_seq, populate);
-    }
-
-    pub(in crate::application) fn accept_entry_response(
-        &mut self,
-        request_seq: RequestSequence,
-    ) -> bool {
-        self.entry_fetches.accept_response(request_seq)
-    }
-
-    pub(in crate::application) fn forget_entry_fetch(&mut self, request_seq: RequestSequence) {
-        self.entry_fetches.forget(request_seq);
-    }
-
-    pub(in crate::application) fn timeline_sync_debounced(&mut self) -> Operation {
-        self.timeline.debounce_elapsed()
-    }
-
-    pub(in crate::application) fn timeline_seq(&self) -> i64 {
-        self.timeline.seq
-    }
-
-    pub(in crate::application) fn set_timeline_seq(&mut self, seq: i64) {
-        self.timeline.seq = seq;
-    }
 
     #[cfg(feature = "integration")]
-    pub(in crate::application) fn has_pending_short_background_work(&self) -> bool {
-        self.timeline.scheduled
+    pub(in crate::application) fn timeline_is_settled(&self) -> bool {
+        matches!(
+            self.timeline,
+            TimelineState::Uninitialized | TimelineState::Ready { .. }
+        )
     }
 }

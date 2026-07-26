@@ -13,7 +13,7 @@ macro_rules! icon {
     (discussion)        => { "" };
     (entry)             => { "󰯂" };
     (filter)            => { "󰈶" };
-    (github)            => { "󰊤" };
+    (gh)                => { "󰊤" };
     (google)            => { "󰊭" };
     (issueopen)         => { "" };
     (issuereopened)     => { "" };

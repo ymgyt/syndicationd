@@ -1,6 +1,12 @@
 use std::{fmt, str::FromStr};
 
-use crate::command::Command;
+use crate::{
+    application::Direction,
+    command::{
+        Command, FeedsCommand, FilterCommand, GhCommand, GhNotificationFilterOption, ShellCommand,
+    },
+    types::gh::{PullRequestState, Reason, RepoVisibility},
+};
 use serde::Deserialize;
 
 use super::{KeyBinding, KeymapError, Layer};
@@ -22,7 +28,7 @@ pub enum CommandId {
     MoveEntryNext,
     MoveEntryFirst,
     MoveEntryLast,
-    ReloadEntries,
+    RefreshTimeline,
     OpenEntry,
     BrowseEntry,
     MoveSubscribedFeedPrev,
@@ -43,27 +49,27 @@ pub enum CommandId {
     ActivateCategoryFiltering,
     ActivateSearchFiltering,
     DeactivateFiltering,
-    MoveGithubNotificationPrev,
-    MoveGithubNotificationNext,
-    MoveGithubNotificationFirst,
-    MoveGithubNotificationLast,
-    OpenGithubNotification,
-    OpenGithubNotificationWithDone,
-    ReloadGithubNotifications,
-    MarkGithubNotificationAsDone,
-    MarkGithubNotificationAsDoneAll,
-    UnsubscribeGithubThread,
-    OpenGithubNotificationFilterPopup,
-    CloseGithubNotificationFilterPopup,
-    ToggleGithubNotificationFilterPopupIncludeUnread,
-    ToggleGithubNotificationFilterPopupParticipating,
-    ToggleGithubNotificationFilterPopupVisibilityPublic,
-    ToggleGithubNotificationFilterPopupVisibilityPrivate,
-    ToggleGithubNotificationFilterPopupPullRequestOpen,
-    ToggleGithubNotificationFilterPopupPullRequestClosed,
-    ToggleGithubNotificationFilterPopupPullRequestMerged,
-    ToggleGithubNotificationFilterPopupReasonMentioned,
-    ToggleGithubNotificationFilterPopupReasonReviewRequested,
+    MoveGhNotificationPrev,
+    MoveGhNotificationNext,
+    MoveGhNotificationFirst,
+    MoveGhNotificationLast,
+    OpenGhNotification,
+    OpenGhNotificationAndMarkAsDone,
+    ReloadGhNotifications,
+    MarkGhNotificationAsDone,
+    MarkAllGhNotificationsAsDone,
+    UnsubscribeGhThread,
+    OpenGhNotificationFilter,
+    CloseGhNotificationFilter,
+    ToggleGhNotificationFilterUnreadOnly,
+    ToggleGhNotificationFilterParticipatingOnly,
+    ToggleGhNotificationFilterVisibilityPublic,
+    ToggleGhNotificationFilterVisibilityPrivate,
+    ToggleGhNotificationFilterPullRequestOpen,
+    ToggleGhNotificationFilterPullRequestClosed,
+    ToggleGhNotificationFilterPullRequestMerged,
+    ToggleGhNotificationFilterReasonMentioned,
+    ToggleGhNotificationFilterReasonReviewRequested,
 }
 
 impl CommandId {
@@ -82,7 +88,7 @@ impl CommandId {
             Self::MoveEntryNext => "entries.next",
             Self::MoveEntryFirst => "entries.first",
             Self::MoveEntryLast => "entries.last",
-            Self::ReloadEntries => "entries.reload",
+            Self::RefreshTimeline => "timeline.refresh",
             Self::OpenEntry => "entries.open",
             Self::BrowseEntry => "entries.browse",
             Self::MoveSubscribedFeedPrev => "feeds.prev",
@@ -103,128 +109,182 @@ impl CommandId {
             Self::ActivateCategoryFiltering => "filter.category",
             Self::ActivateSearchFiltering => "filter.search",
             Self::DeactivateFiltering => "filter.close",
-            Self::MoveGithubNotificationPrev => "github-notifications.prev",
-            Self::MoveGithubNotificationNext => "github-notifications.next",
-            Self::MoveGithubNotificationFirst => "github-notifications.first",
-            Self::MoveGithubNotificationLast => "github-notifications.last",
-            Self::OpenGithubNotification => "github-notifications.open",
-            Self::OpenGithubNotificationWithDone => "github-notifications.open-and-done",
-            Self::ReloadGithubNotifications => "github-notifications.reload",
-            Self::MarkGithubNotificationAsDone => "github-notifications.mark-done",
-            Self::MarkGithubNotificationAsDoneAll => "github-notifications.mark-all-done",
-            Self::UnsubscribeGithubThread => "github-notifications.unsubscribe-thread",
-            Self::OpenGithubNotificationFilterPopup => "github-notifications.filter.open",
-            Self::CloseGithubNotificationFilterPopup => "github-notifications.filter.close",
-            Self::ToggleGithubNotificationFilterPopupIncludeUnread => {
+            Self::MoveGhNotificationPrev => "github-notifications.prev",
+            Self::MoveGhNotificationNext => "github-notifications.next",
+            Self::MoveGhNotificationFirst => "github-notifications.first",
+            Self::MoveGhNotificationLast => "github-notifications.last",
+            Self::OpenGhNotification => "github-notifications.open",
+            Self::OpenGhNotificationAndMarkAsDone => "github-notifications.open-and-done",
+            Self::ReloadGhNotifications => "github-notifications.reload",
+            Self::MarkGhNotificationAsDone => "github-notifications.mark-done",
+            Self::MarkAllGhNotificationsAsDone => "github-notifications.mark-all-done",
+            Self::UnsubscribeGhThread => "github-notifications.unsubscribe-thread",
+            Self::OpenGhNotificationFilter => "github-notifications.filter.open",
+            Self::CloseGhNotificationFilter => "github-notifications.filter.close",
+            Self::ToggleGhNotificationFilterUnreadOnly => {
                 "github-notifications.filter.include-unread.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupParticipating => {
+            Self::ToggleGhNotificationFilterParticipatingOnly => {
                 "github-notifications.filter.participating.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupVisibilityPublic => {
+            Self::ToggleGhNotificationFilterVisibilityPublic => {
                 "github-notifications.filter.visibility-public.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupVisibilityPrivate => {
+            Self::ToggleGhNotificationFilterVisibilityPrivate => {
                 "github-notifications.filter.visibility-private.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupPullRequestOpen => {
+            Self::ToggleGhNotificationFilterPullRequestOpen => {
                 "github-notifications.filter.pr-open.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupPullRequestClosed => {
+            Self::ToggleGhNotificationFilterPullRequestClosed => {
                 "github-notifications.filter.pr-closed.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupPullRequestMerged => {
+            Self::ToggleGhNotificationFilterPullRequestMerged => {
                 "github-notifications.filter.pr-merged.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupReasonMentioned => {
+            Self::ToggleGhNotificationFilterReasonMentioned => {
                 "github-notifications.filter.reason-mentioned.toggle"
             }
-            Self::ToggleGithubNotificationFilterPopupReasonReviewRequested => {
+            Self::ToggleGhNotificationFilterReasonReviewRequested => {
                 "github-notifications.filter.reason-review-requested.toggle"
             }
         }
     }
+}
 
-    pub(super) fn build(self) -> Command {
-        match self {
-            Self::Nop => Command::nop(),
-            Self::Quit => Command::quit(),
-            Self::ForceRedraw => Command::force_redraw(),
-            Self::RotateTheme => Command::rotate_theme(),
-            Self::Authenticate => Command::authenticate(),
-            Self::MoveAuthenticationProviderPrev => Command::move_up_authentication_provider(),
-            Self::MoveAuthenticationProviderNext => Command::move_down_authentication_provider(),
-            Self::MoveTabPrev => Command::move_left_tab_selection(),
-            Self::MoveTabNext => Command::move_right_tab_selection(),
-            Self::MoveEntryPrev => Command::move_up_entry(),
-            Self::MoveEntryNext => Command::move_down_entry(),
-            Self::MoveEntryFirst => Command::move_entry_first(),
-            Self::MoveEntryLast => Command::move_entry_last(),
-            Self::ReloadEntries => Command::reload_entries(),
-            Self::OpenEntry => Command::open_entry(),
-            Self::BrowseEntry => Command::browse_entry(),
-            Self::MoveSubscribedFeedPrev => Command::move_up_subscribed_feed(),
-            Self::MoveSubscribedFeedNext => Command::move_down_subscribed_feed(),
-            Self::MoveSubscribedFeedFirst => Command::move_subscribed_feed_first(),
-            Self::MoveSubscribedFeedLast => Command::move_subscribed_feed_last(),
-            Self::PromptFeedSubscription => Command::prompt_feed_subscription(),
-            Self::PromptFeedEdition => Command::prompt_feed_edition(),
-            Self::PromptFeedUnsubscription => Command::prompt_feed_unsubscription(),
-            Self::ReloadSubscription => Command::reload_subscription(),
-            Self::OpenFeed => Command::open_feed(),
-            Self::MoveFeedUnsubscriptionPopupSelectionPrev => {
-                Command::move_feed_unsubscription_popup_selection_left()
+impl From<CommandId> for Command {
+    fn from(command: CommandId) -> Self {
+        match command {
+            CommandId::Nop => Command::Nop,
+            CommandId::Quit => Command::Shell(ShellCommand::Quit),
+            CommandId::ForceRedraw => Command::Shell(ShellCommand::ForceRedraw),
+            CommandId::RotateTheme => Command::Shell(ShellCommand::RotateTheme),
+            CommandId::Authenticate => Command::Shell(ShellCommand::Authenticate),
+            CommandId::MoveAuthenticationProviderPrev => {
+                Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Up))
             }
-            Self::MoveFeedUnsubscriptionPopupSelectionNext => {
-                Command::move_feed_unsubscription_popup_selection_right()
+            CommandId::MoveAuthenticationProviderNext => {
+                Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Down))
             }
-            Self::SelectFeedUnsubscriptionPopup => Command::select_feed_unsubscription_popup(),
-            Self::CancelFeedUnsubscriptionPopup => Command::cancel_feed_unsubscription_popup(),
-            Self::MoveFilterRequirementPrev => Command::move_filter_requirement_left(),
-            Self::MoveFilterRequirementNext => Command::move_filter_requirement_right(),
-            Self::ActivateCategoryFiltering => Command::activate_category_filtering(),
-            Self::ActivateSearchFiltering => Command::activate_search_filtering(),
-            Self::DeactivateFiltering => Command::deactivate_filtering(),
-            Self::MoveGithubNotificationPrev => Command::move_up_gh_notification(),
-            Self::MoveGithubNotificationNext => Command::move_down_gh_notification(),
-            Self::MoveGithubNotificationFirst => Command::move_gh_notification_first(),
-            Self::MoveGithubNotificationLast => Command::move_gh_notification_last(),
-            Self::OpenGithubNotification => Command::open_gh_notification(),
-            Self::OpenGithubNotificationWithDone => Command::open_gh_notification_with_done(),
-            Self::ReloadGithubNotifications => Command::reload_gh_notifications(),
-            Self::MarkGithubNotificationAsDone => Command::mark_gh_notification_as_done(),
-            Self::MarkGithubNotificationAsDoneAll => Command::mark_gh_notification_as_done_all(),
-            Self::UnsubscribeGithubThread => Command::unsubscribe_gh_thread(),
-            Self::OpenGithubNotificationFilterPopup => Command::open_gh_notification_filter_popup(),
-            Self::CloseGithubNotificationFilterPopup => {
-                Command::close_gh_notification_filter_popup()
+            CommandId::MoveTabPrev => {
+                Command::Shell(ShellCommand::MoveTabSelection(Direction::Left))
             }
-            Self::ToggleGithubNotificationFilterPopupIncludeUnread => {
-                Command::toggle_gh_notification_filter_popup_include_unread()
+            CommandId::MoveTabNext => {
+                Command::Shell(ShellCommand::MoveTabSelection(Direction::Right))
             }
-            Self::ToggleGithubNotificationFilterPopupParticipating => {
-                Command::toggle_gh_notification_filter_popup_participating()
+            CommandId::MoveEntryPrev => Command::Feeds(FeedsCommand::MoveEntry(Direction::Up)),
+            CommandId::MoveEntryNext => Command::Feeds(FeedsCommand::MoveEntry(Direction::Down)),
+            CommandId::MoveEntryFirst => Command::Feeds(FeedsCommand::MoveEntryFirst),
+            CommandId::MoveEntryLast => Command::Feeds(FeedsCommand::MoveEntryLast),
+            CommandId::RefreshTimeline => Command::Feeds(FeedsCommand::RefreshTimeline),
+            CommandId::OpenEntry => Command::Feeds(FeedsCommand::OpenEntry),
+            CommandId::BrowseEntry => Command::Feeds(FeedsCommand::BrowseEntry),
+            CommandId::MoveSubscribedFeedPrev => {
+                Command::Feeds(FeedsCommand::MoveSubscribedFeed(Direction::Up))
             }
-            Self::ToggleGithubNotificationFilterPopupVisibilityPublic => {
-                Command::toggle_gh_notification_filter_popup_visibility_public()
+            CommandId::MoveSubscribedFeedNext => {
+                Command::Feeds(FeedsCommand::MoveSubscribedFeed(Direction::Down))
             }
-            Self::ToggleGithubNotificationFilterPopupVisibilityPrivate => {
-                Command::toggle_gh_notification_filter_popup_visibility_private()
+            CommandId::MoveSubscribedFeedFirst => {
+                Command::Feeds(FeedsCommand::MoveSubscribedFeedFirst)
             }
-            Self::ToggleGithubNotificationFilterPopupPullRequestOpen => {
-                Command::toggle_gh_notification_filter_popup_pr_open()
+            CommandId::MoveSubscribedFeedLast => {
+                Command::Feeds(FeedsCommand::MoveSubscribedFeedLast)
             }
-            Self::ToggleGithubNotificationFilterPopupPullRequestClosed => {
-                Command::toggle_gh_notification_filter_popup_pr_closed()
+            CommandId::PromptFeedSubscription => {
+                Command::Feeds(FeedsCommand::PromptFeedSubscription)
             }
-            Self::ToggleGithubNotificationFilterPopupPullRequestMerged => {
-                Command::toggle_gh_notification_filter_popup_pr_merged()
+            CommandId::PromptFeedEdition => Command::Feeds(FeedsCommand::PromptFeedEdition),
+            CommandId::PromptFeedUnsubscription => {
+                Command::Feeds(FeedsCommand::PromptFeedUnsubscription)
             }
-            Self::ToggleGithubNotificationFilterPopupReasonMentioned => {
-                Command::toggle_gh_notification_filter_popup_reason_mentioned()
+            CommandId::ReloadSubscription => Command::Feeds(FeedsCommand::ReloadSubscription),
+            CommandId::OpenFeed => Command::Feeds(FeedsCommand::OpenFeed),
+            CommandId::MoveFeedUnsubscriptionPopupSelectionPrev => Command::Feeds(
+                FeedsCommand::MoveFeedUnsubscriptionPopupSelection(Direction::Left),
+            ),
+            CommandId::MoveFeedUnsubscriptionPopupSelectionNext => Command::Feeds(
+                FeedsCommand::MoveFeedUnsubscriptionPopupSelection(Direction::Right),
+            ),
+            CommandId::SelectFeedUnsubscriptionPopup => {
+                Command::Feeds(FeedsCommand::SelectFeedUnsubscriptionPopup)
             }
-            Self::ToggleGithubNotificationFilterPopupReasonReviewRequested => {
-                Command::toggle_gh_notification_filter_popup_reason_review()
+            CommandId::CancelFeedUnsubscriptionPopup => {
+                Command::Feeds(FeedsCommand::CancelFeedUnsubscriptionPopup)
+            }
+            CommandId::MoveFilterRequirementPrev => {
+                Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Left))
+            }
+            CommandId::MoveFilterRequirementNext => {
+                Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Right))
+            }
+            CommandId::ActivateCategoryFiltering => {
+                Command::Filter(FilterCommand::ActivateCategoryFiltering)
+            }
+            CommandId::ActivateSearchFiltering => {
+                Command::Filter(FilterCommand::ActivateSearchFiltering)
+            }
+            CommandId::DeactivateFiltering => Command::Filter(FilterCommand::DeactivateFiltering),
+            CommandId::MoveGhNotificationPrev => {
+                Command::Gh(GhCommand::MoveNotification(Direction::Up))
+            }
+            CommandId::MoveGhNotificationNext => {
+                Command::Gh(GhCommand::MoveNotification(Direction::Down))
+            }
+            CommandId::MoveGhNotificationFirst => Command::Gh(GhCommand::MoveNotificationFirst),
+            CommandId::MoveGhNotificationLast => Command::Gh(GhCommand::MoveNotificationLast),
+            CommandId::OpenGhNotification => Command::Gh(GhCommand::OpenNotification),
+            CommandId::OpenGhNotificationAndMarkAsDone => {
+                Command::Gh(GhCommand::OpenNotificationAndMarkAsDone)
+            }
+            CommandId::ReloadGhNotifications => Command::Gh(GhCommand::ReloadNotifications),
+            CommandId::MarkGhNotificationAsDone => Command::Gh(GhCommand::MarkNotificationAsDone),
+            CommandId::MarkAllGhNotificationsAsDone => {
+                Command::Gh(GhCommand::MarkAllNotificationsAsDone)
+            }
+            CommandId::UnsubscribeGhThread => Command::Gh(GhCommand::UnsubscribeThread),
+            CommandId::OpenGhNotificationFilter => Command::Gh(GhCommand::OpenNotificationFilter),
+            CommandId::CloseGhNotificationFilter => Command::Gh(GhCommand::CloseNotificationFilter),
+            CommandId::ToggleGhNotificationFilterUnreadOnly => Command::Gh(
+                GhCommand::ToggleNotificationFilter(GhNotificationFilterOption::UnreadOnly),
+            ),
+            CommandId::ToggleGhNotificationFilterParticipatingOnly => Command::Gh(
+                GhCommand::ToggleNotificationFilter(GhNotificationFilterOption::ParticipatingOnly),
+            ),
+            CommandId::ToggleGhNotificationFilterVisibilityPublic => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::Visibility(RepoVisibility::Public),
+                ))
+            }
+            CommandId::ToggleGhNotificationFilterVisibilityPrivate => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::Visibility(RepoVisibility::Private),
+                ))
+            }
+            CommandId::ToggleGhNotificationFilterPullRequestOpen => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::PullRequestState(PullRequestState::Open),
+                ))
+            }
+            CommandId::ToggleGhNotificationFilterPullRequestClosed => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::PullRequestState(PullRequestState::Closed),
+                ))
+            }
+            CommandId::ToggleGhNotificationFilterPullRequestMerged => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::PullRequestState(PullRequestState::Merged),
+                ))
+            }
+            CommandId::ToggleGhNotificationFilterReasonMentioned => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::Reason(Reason::Mention),
+                ))
+            }
+            CommandId::ToggleGhNotificationFilterReasonReviewRequested => {
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::Reason(Reason::ReviewRequested),
+                ))
             }
         }
     }
@@ -260,7 +320,6 @@ pub(crate) struct CommandSpec {
     /// Additional names accepted in config besides the canonical id.
     pub(crate) aliases: &'static [&'static str],
     pub(crate) typable: Option<&'static str>,
-    pub(crate) desc: &'static str,
     pub(crate) layers: &'static [Layer],
 }
 
@@ -324,7 +383,6 @@ macro_rules! specs {
             $id:ident {
                 aliases: [$($alias:literal),* $(,)?],
                 typable: $typable:expr,
-                desc: $desc:literal,
                 layers: [$($layer:ident),* $(,)?],
             }
         ),* $(,)?
@@ -335,7 +393,6 @@ macro_rules! specs {
                     id: CommandId::$id,
                     aliases: &[$($alias),*],
                     typable: $typable,
-                    desc: $desc,
                     layers: &[$(Layer::$layer),*],
                 },
             )*
@@ -347,331 +404,276 @@ const COMMAND_SPECS: &[CommandSpec] = specs![
     Nop {
         aliases: ["no_op"],
         typable: None,
-        desc: "Do nothing",
         layers: [],
     },
     Quit {
         aliases: ["quit"],
         typable: Some(":quit"),
-        desc: "Quit app",
         layers: [App, Global],
     },
     ForceRedraw {
         aliases: ["force_redraw"],
         typable: Some(":redraw"),
-        desc: "Redraw the screen",
         layers: [App],
     },
     RotateTheme {
         aliases: ["rotate_theme"],
         typable: None,
-        desc: "Rotate theme",
         layers: [Global],
     },
     Authenticate {
         aliases: ["authenticate"],
         typable: None,
-        desc: "Authenticate",
         layers: [Login],
     },
     MoveAuthenticationProviderPrev {
         aliases: ["move_up_authentication_provider"],
         typable: None,
-        desc: "Previous authentication provider",
         layers: [Login],
     },
     MoveAuthenticationProviderNext {
         aliases: ["move_down_authentication_provider"],
         typable: None,
-        desc: "Next authentication provider",
         layers: [Login],
     },
     MoveTabPrev {
         aliases: ["move_left_tab_selection"],
         typable: None,
-        desc: "Previous tab",
         layers: [Tabs],
     },
     MoveTabNext {
         aliases: ["move_right_tab_selection"],
         typable: None,
-        desc: "Next tab",
         layers: [Tabs],
     },
     MoveEntryPrev {
         aliases: ["move_up_entry"],
         typable: None,
-        desc: "Previous entry",
         layers: [Entries],
     },
     MoveEntryNext {
         aliases: ["move_down_entry"],
         typable: None,
-        desc: "Next entry",
         layers: [Entries],
     },
     MoveEntryFirst {
         aliases: ["move_entry_first"],
         typable: None,
-        desc: "Go to first entry",
         layers: [Entries],
     },
     MoveEntryLast {
         aliases: ["move_entry_last"],
         typable: None,
-        desc: "Go to last entry",
         layers: [Entries],
     },
-    ReloadEntries {
-        aliases: ["reload_entries"],
-        typable: Some(":reload-entries"),
-        desc: "Reload entries",
+    RefreshTimeline {
+        aliases: [],
+        typable: Some(":refresh-timeline"),
         layers: [Entries],
     },
     OpenEntry {
         aliases: ["open_entry"],
         typable: Some(":open-entry"),
-        desc: "Open entry",
         layers: [Entries],
     },
     BrowseEntry {
         aliases: ["browse_entry"],
         typable: None,
-        desc: "Browse entry",
         layers: [Entries],
     },
     MoveSubscribedFeedPrev {
         aliases: ["move_up_subscribed_feed"],
         typable: None,
-        desc: "Previous feed",
         layers: [Feeds],
     },
     MoveSubscribedFeedNext {
         aliases: ["move_down_subscribed_feed"],
         typable: None,
-        desc: "Next feed",
         layers: [Feeds],
     },
     MoveSubscribedFeedFirst {
         aliases: ["move_subscribed_feed_first"],
         typable: None,
-        desc: "Go to first feed",
         layers: [Feeds],
     },
     MoveSubscribedFeedLast {
         aliases: ["move_subscribed_feed_last"],
         typable: None,
-        desc: "Go to last feed",
         layers: [Feeds],
     },
     PromptFeedSubscription {
         aliases: ["prompt_feed_subscription"],
         typable: None,
-        desc: "Add feed subscription",
         layers: [Feeds],
     },
     PromptFeedEdition {
         aliases: ["prompt_feed_edition"],
         typable: None,
-        desc: "Edit feed subscription",
         layers: [Feeds],
     },
     PromptFeedUnsubscription {
         aliases: ["prompt_feed_unsubscription"],
         typable: None,
-        desc: "Delete feed subscription",
         layers: [Feeds],
     },
     ReloadSubscription {
         aliases: ["reload_subscription"],
         typable: Some(":reload-subscription"),
-        desc: "Reload subscriptions",
         layers: [Feeds],
     },
     OpenFeed {
         aliases: ["open_feed"],
         typable: None,
-        desc: "Open feed",
         layers: [Feeds],
     },
     MoveFeedUnsubscriptionPopupSelectionPrev {
         aliases: ["move_feed_unsubscription_popup_selection_left"],
         typable: None,
-        desc: "Previous popup selection",
         layers: [UnsubscribePopup],
     },
     MoveFeedUnsubscriptionPopupSelectionNext {
         aliases: ["move_feed_unsubscription_popup_selection_right"],
         typable: None,
-        desc: "Next popup selection",
         layers: [UnsubscribePopup],
     },
     SelectFeedUnsubscriptionPopup {
         aliases: ["select_feed_unsubscription_popup"],
         typable: None,
-        desc: "Select popup item",
         layers: [UnsubscribePopup],
     },
     CancelFeedUnsubscriptionPopup {
         aliases: ["cancel_feed_unsubscription_popup"],
         typable: None,
-        desc: "Cancel popup",
         layers: [UnsubscribePopup],
     },
     MoveFilterRequirementPrev {
         aliases: ["move_filter_requirement_left"],
         typable: None,
-        desc: "Previous requirement filter",
         layers: [Filter],
     },
     MoveFilterRequirementNext {
         aliases: ["move_filter_requirement_right"],
         typable: None,
-        desc: "Next requirement filter",
         layers: [Filter],
     },
     ActivateCategoryFiltering {
         aliases: ["activate_category_filtering"],
         typable: None,
-        desc: "Activate category filter",
         layers: [Filter],
     },
     ActivateSearchFiltering {
         aliases: ["activate_search_filtering"],
         typable: None,
-        desc: "Activate search filter",
         layers: [Filter],
     },
     DeactivateFiltering {
         aliases: ["deactivate_filtering"],
         typable: None,
-        desc: "Deactivate filter",
         layers: [Filter],
     },
-    MoveGithubNotificationPrev {
+    MoveGhNotificationPrev {
         aliases: ["move_up_gh_notification"],
         typable: None,
-        desc: "Previous GitHub notification",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    MoveGithubNotificationNext {
+    MoveGhNotificationNext {
         aliases: ["move_down_gh_notification"],
         typable: None,
-        desc: "Next GitHub notification",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    MoveGithubNotificationFirst {
+    MoveGhNotificationFirst {
         aliases: ["move_gh_notification_first"],
         typable: None,
-        desc: "Go to first GitHub notification",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    MoveGithubNotificationLast {
+    MoveGhNotificationLast {
         aliases: ["move_gh_notification_last"],
         typable: None,
-        desc: "Go to last GitHub notification",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    OpenGithubNotification {
+    OpenGhNotification {
         aliases: ["open_gh_notification"],
         typable: None,
-        desc: "Open GitHub notification",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    OpenGithubNotificationWithDone {
+    OpenGhNotificationAndMarkAsDone {
         aliases: ["open_gh_notification_with_done"],
         typable: None,
-        desc: "Open GitHub notification and mark as done",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    ReloadGithubNotifications {
+    ReloadGhNotifications {
         aliases: ["reload_gh_notifications"],
         typable: None,
-        desc: "Reload GitHub notifications",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    MarkGithubNotificationAsDone {
+    MarkGhNotificationAsDone {
         aliases: ["mark_gh_notification_as_done"],
         typable: None,
-        desc: "Mark GitHub notification as done",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    MarkGithubNotificationAsDoneAll {
+    MarkAllGhNotificationsAsDone {
         aliases: ["mark_gh_notification_as_done_all"],
         typable: None,
-        desc: "Mark all GitHub notifications as done",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    UnsubscribeGithubThread {
+    UnsubscribeGhThread {
         aliases: ["unsubscribe_gh_thread"],
         typable: None,
-        desc: "Unsubscribe GitHub thread",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    OpenGithubNotificationFilterPopup {
+    OpenGhNotificationFilter {
         aliases: ["open_gh_notification_filter_popup"],
         typable: None,
-        desc: "Open GitHub notification filter popup",
-        layers: [GithubNotifications],
+        layers: [GhNotifications],
     },
-    CloseGithubNotificationFilterPopup {
+    CloseGhNotificationFilter {
         aliases: ["close_gh_notification_filter_popup"],
         typable: None,
-        desc: "Close GitHub notification filter popup",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupIncludeUnread {
+    ToggleGhNotificationFilterUnreadOnly {
         aliases: ["toggle_gh_notification_filter_popup_include_unread"],
         typable: None,
-        desc: "Toggle unread filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupParticipating {
+    ToggleGhNotificationFilterParticipatingOnly {
         aliases: ["toggle_gh_notification_filter_popup_participating"],
         typable: None,
-        desc: "Toggle participating filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupVisibilityPublic {
+    ToggleGhNotificationFilterVisibilityPublic {
         aliases: ["toggle_gh_notification_filter_popup_visibility_public"],
         typable: None,
-        desc: "Toggle public repository filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupVisibilityPrivate {
+    ToggleGhNotificationFilterVisibilityPrivate {
         aliases: ["toggle_gh_notification_filter_popup_visibility_private"],
         typable: None,
-        desc: "Toggle private repository filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupPullRequestOpen {
+    ToggleGhNotificationFilterPullRequestOpen {
         aliases: ["toggle_gh_notification_filter_popup_pr_open"],
         typable: None,
-        desc: "Toggle open pull request filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupPullRequestClosed {
+    ToggleGhNotificationFilterPullRequestClosed {
         aliases: ["toggle_gh_notification_filter_popup_pr_closed"],
         typable: None,
-        desc: "Toggle closed pull request filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupPullRequestMerged {
+    ToggleGhNotificationFilterPullRequestMerged {
         aliases: ["toggle_gh_notification_filter_popup_pr_merged"],
         typable: None,
-        desc: "Toggle merged pull request filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupReasonMentioned {
+    ToggleGhNotificationFilterReasonMentioned {
         aliases: ["toggle_gh_notification_filter_popup_reason_mentioned"],
         typable: None,
-        desc: "Toggle mentioned reason filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
-    ToggleGithubNotificationFilterPopupReasonReviewRequested {
+    ToggleGhNotificationFilterReasonReviewRequested {
         aliases: ["toggle_gh_notification_filter_popup_reason_review"],
         typable: None,
-        desc: "Toggle review requested reason filter",
-        layers: [GithubNotificationFilterPopup],
+        layers: [GhNotificationFilterPopup],
     },
 ];

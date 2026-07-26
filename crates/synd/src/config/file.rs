@@ -64,7 +64,7 @@ pub struct BackendEntry {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GithubEntry {
+pub struct GhEntry {
     pub(super) enable: Option<bool>,
     pub(super) pat: Option<String>,
 }
@@ -86,7 +86,8 @@ pub struct ConfigFile {
     pub(super) api: Option<ApiEntry>,
     pub(super) daemon: Option<DaemonEntry>,
     pub(super) feed: Option<FeedEntry>,
-    pub(super) github: Option<GithubEntry>,
+    #[serde(rename = "github")]
+    pub(super) gh: Option<GhEntry>,
     pub(super) categories: Option<HashMap<String, CategoryConfig>>,
     pub(super) keys: Option<KeymapConfig>,
 }
@@ -139,10 +140,10 @@ pub static INIT_CONFIG: &str = r#"
 # browser = { command = "", args = [] }
 
 [github]
-# Enable github notification feature
+# Enable GitHub notification feature
 # enable = true
 
-# Github Personal access token(PAT) to browse notifications
+# GitHub personal access token(PAT) to browse notifications
 # pat = "ghp_xxxx"
 
 [keys.entries]

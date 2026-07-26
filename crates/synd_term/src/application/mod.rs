@@ -1,34 +1,25 @@
-use std::{
-    ops::ControlFlow,
-    time::{Duration, Instant},
-};
-
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, KeyEventKind};
-use futures_util::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt as _};
 use ratatui::widgets::Widget;
 use tracing::{debug, warn};
 
-#[cfg(feature = "integration")]
-use crate::auth::CredentialError;
 use crate::{
-    auth::{Credential, Verified},
     config::Categories,
-    event::{Event, FeedsApiEvent},
+    event::Event,
     interact::Interact,
-    operation::Operation,
+    operation::Operations,
     terminal::{Terminal, TerminalGuard},
-    ui::{
-        self,
-        theme::Theme,
-        widgets::{gh_notifications::GitHubNotificationsWidget, root::AppWidget},
-    },
+    ui::{self, theme::Theme, widgets::root::AppWidget},
 };
 
 mod direction;
-pub(crate) use direction::{Direction, IndexOutOfRange};
+pub(crate) use direction::Direction;
+
+mod request;
+pub(crate) use request::{RequestError, RequestId, RequestKind};
 
 mod in_flight;
-pub(crate) use in_flight::{InFlight, RequestId, RequestSequence};
+pub(crate) use in_flight::{InFlightRequests, InFlightStatus, RequestProgress};
 
 mod input_parser;
 mod keymap;
@@ -45,7 +36,7 @@ mod builder;
 pub use builder::ApplicationBuilder;
 
 pub mod outbound;
-pub use outbound::feed::{ClientFeedApi, FeedApi, FeedApiRef};
+pub use outbound::feed::{ClientFeedApi, FeedApi, FeedApiRef, FeedEventWatch};
 
 mod app_config;
 pub use app_config::{Config, Features};
@@ -53,19 +44,14 @@ pub use app_config::{Config, Features};
 mod state;
 pub(crate) use state::TerminalFocus;
 
-mod auth_flow;
 mod commands;
 pub(crate) mod component;
 mod drivers;
 mod events;
-mod feeds;
-mod idle;
 mod integration;
-mod operations;
-use component::AppComponent;
-use drivers::{DriverParts, Drivers};
 
-const TIMELINE_INVALIDATION_DEBOUNCE: Duration = Duration::from_secs(1);
+use component::{AuthenticationState, Components};
+use drivers::{DriverParts, Drivers};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Populate {
@@ -73,91 +59,20 @@ pub enum Populate {
     Replace,
 }
 
-/// Composition root that owns the event loop and connects components to drivers.
+/// Composition root that owns orchestration between state and external drivers.
 pub struct Application {
     drivers: Drivers,
-    components: AppComponent,
+    components: Components,
     keymap: crate::keymap::Keymap,
     config: Config,
-    initial_load: InitialLoad,
-}
-
-struct InitialLoad {
-    started_at: Option<Instant>,
-    subscriptions_observed: bool,
-    entries_observed: bool,
-}
-
-#[derive(Clone, Copy)]
-enum InitialLoadPage {
-    Subscriptions,
-    Entries,
-}
-
-impl InitialLoadPage {
-    fn from_event(event: &FeedsApiEvent) -> Option<Self> {
-        match event {
-            FeedsApiEvent::SubscriptionFetched { .. } => Some(Self::Subscriptions),
-            FeedsApiEvent::EntriesFetched { .. } => Some(Self::Entries),
-            _ => None,
-        }
-    }
-}
-
-impl InitialLoad {
-    fn new() -> Self {
-        Self {
-            started_at: None,
-            subscriptions_observed: false,
-            entries_observed: false,
-        }
-    }
-
-    fn start(&mut self) {
-        self.started_at = Some(Instant::now());
-        self.subscriptions_observed = false;
-        self.entries_observed = false;
-    }
-
-    fn observe(&mut self, page: Option<InitialLoadPage>) {
-        match page {
-            Some(InitialLoadPage::Subscriptions) => {
-                self.subscriptions_observed = true;
-            }
-            Some(InitialLoadPage::Entries) => {
-                self.entries_observed = true;
-            }
-            _ => {}
-        }
-    }
-
-    fn take_completion(
-        &mut self,
-        subscriptions_pending: bool,
-        entries_pending: bool,
-    ) -> Option<Duration> {
-        if !self.subscriptions_observed
-            || !self.entries_observed
-            || subscriptions_pending
-            || entries_pending
-        {
-            return None;
-        }
-
-        self.started_at
-            .take()
-            .map(|started_at| started_at.elapsed())
-    }
 }
 
 impl Application {
-    /// Construct `ApplicationBuilder`
+    /// Construct `ApplicationBuilder`.
     pub fn builder() -> ApplicationBuilder {
         ApplicationBuilder::default()
     }
 
-    /// Construct `Application` from builder.
-    /// Configure keymaps for terminal use
     fn new(
         builder: ApplicationBuilder<
             Terminal,
@@ -172,7 +87,7 @@ impl Application {
         let ApplicationBuilder {
             terminal,
             feed_api,
-            github_client,
+            gh_client,
             categories,
             cache,
             config,
@@ -180,255 +95,185 @@ impl Application {
             authenticator,
             interactor,
             clock,
+            authentication_required,
             dry_run,
         } = builder;
-
-        let components = AppComponent::new(&config.features, theme, categories, dry_run);
-        let drivers = Drivers::new(DriverParts {
-            terminal,
-            feed_api,
-            github_client,
-            cache,
-            authenticator,
-            interactor,
-            clock,
-            throbber_timer_interval: config.throbber_timer_interval,
-            idle_timer_interval: config.idle_timer_interval,
-        });
+        let components = {
+            let authentication = if authentication_required {
+                AuthenticationState::Required
+            } else {
+                AuthenticationState::NotRequired
+            };
+            Components::new(&config.features, theme, categories, dry_run, authentication)
+        };
+        let drivers = {
+            let parts = DriverParts {
+                terminal,
+                feed_api,
+                gh_client,
+                cache,
+                authenticator,
+                interactor,
+                clock,
+                throbber_timer_interval: config.throbber_timer_interval,
+                idle_timer_interval: config.idle_timer_interval,
+            };
+            Drivers::new(parts)
+        };
 
         Self {
             drivers,
             components,
             keymap: crate::keymap::Keymap::new(config.keymaps.clone()),
             config,
-            initial_load: InitialLoad::new(),
         }
+    }
+
+    fn render(&mut self) -> anyhow::Result<()> {
+        let components = &self.components;
+        self.drivers.render(|frame, now| {
+            let cx = ui::Context {
+                theme: &components.shell.theme,
+                in_flight: &components.shell.in_flight,
+                categories: &components.shell.categories,
+                focus: components.shell.focus(),
+                now,
+                tab: components.shell.tabs.current(),
+            };
+            let root = AppWidget::new(components, cx);
+            Widget::render(root, frame.area(), frame.buffer_mut());
+        })
+    }
+
+    pub(super) fn reset_idle_timer(&mut self) {
+        self.drivers
+            .reset_idle_timer(self.config.idle_timer_interval);
     }
 
     pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        let _guard = self.init_terminal()?;
-        self.restore_github_notification_filter_options();
-        self.start_session();
-        self.event_loop(input).await;
+        let _terminal = self.initialize()?;
+        let result = self.event_loop(input).await;
         self.shutdown();
+        result
+    }
+
+    fn initialize(&mut self) -> anyhow::Result<TerminalGuard> {
+        let terminal = self.drivers.terminal.init()?;
+        self.restore_persisted_state();
+        if matches!(
+            self.components.shell.authentication(),
+            AuthenticationState::NotRequired
+        ) {
+            let operations = self.bootstrap().into();
+            self.drivers.dispatch(operations);
+            self.reset_idle_timer();
+        }
+        Ok(terminal)
+    }
+
+    /// Starts the first remote synchronization after API access becomes available.
+    pub(super) fn bootstrap(&mut self) -> impl Into<Operations> {
+        let feeds: Operations = self
+            .components
+            .feeds
+            .bootstrap(self.config.feeds_per_pagination, self.config.entries_limit)
+            .into();
+        let gh: Operations = if self.config.features.enable_gh_notification {
+            self.components.gh.bootstrap().into()
+        } else {
+            Operations::Nop
+        };
+        [feeds, gh]
+    }
+
+    async fn event_loop<S>(&mut self, input: &mut S) -> anyhow::Result<()>
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        self.render()?;
+        self.process_until_quit(input).await
+    }
+
+    pub(super) async fn process_until_quit<S>(&mut self, input: &mut S) -> anyhow::Result<()>
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        loop {
+            self.process_next(input).await?;
+            if self.components.shell.take_should_quit() {
+                break;
+            }
+            self.render()?;
+        }
         Ok(())
     }
 
-    /// Enter the terminal UI screen. The returned guard restores the terminal
-    /// when dropped.
-    /// The startup probe(dry run) tolerates init failure because test
-    /// environments may not have a tty.
-    fn init_terminal(&mut self) -> anyhow::Result<Option<TerminalGuard>> {
-        match self.drivers.terminal.init() {
-            Ok(guard) => Ok(Some(guard)),
-            Err(err) => {
-                if self.components.shell.should_quit() {
-                    warn!("Failed to init terminal: {err}");
-                    Ok(None)
-                } else {
-                    Err(err.into())
-                }
+    async fn process_next<S>(&mut self, input: &mut S) -> anyhow::Result<()>
+    where
+        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
+    {
+        let operations = tokio::select! {
+            biased;
+
+            Some(event) = input.next() => self.apply_terminal_event(&event?),
+            Some(event) = self.drivers.next() => self.apply_event(event),
+        };
+        self.drivers.dispatch(operations);
+
+        let layers = self.active_keymap_layers();
+        self.keymap.sync_layers(&layers);
+        Ok(())
+    }
+
+    fn apply_terminal_event(&mut self, event: &CrosstermEvent) -> Operations {
+        match event {
+            CrosstermEvent::Resize(..) => self.apply_event(Event::TerminalResized),
+            CrosstermEvent::FocusGained => self.apply_event(Event::TerminalFocusGained),
+            CrosstermEvent::FocusLost => self.apply_event(Event::TerminalFocusLost),
+            CrosstermEvent::Key(KeyEvent {
+                kind: KeyEventKind::Release,
+                ..
+            }) => Operations::Nop,
+            CrosstermEvent::Key(key) => {
+                debug!("Handle key event: {key:?}");
+                self.components.shell.prompt.clear_error_message();
+                self.reset_idle_timer();
+                self.resolve_keymap(*key)
+                    .map_or(Operations::Nop, |command| self.apply_command(command))
             }
+            _ => Operations::Nop,
         }
     }
 
-    /// Begin the feed api session: fire the initial fetches and mark the
-    /// session authenticated.
-    /// Also used by integration tests to start the application without
-    /// initializing the terminal.
-    pub fn start_session(&mut self) {
-        self.initial_fetch();
-        self.components.shell.auth.authenticated();
-        self.reset_idle_timer();
+    fn restore_persisted_state(&mut self) {
+        if !self.config.features.enable_gh_notification {
+            return;
+        }
+        match self.drivers.cache.load_gh_notification_filter_options() {
+            Ok(options) => self.components.gh.restore_filter_options(options),
+            Err(error) => warn!("Load GitHub notification filter options: {error}"),
+        }
     }
 
     fn shutdown(&mut self) {
         self.drivers.shutdown();
-
-        if self.config.features.enable_github_notification {
-            let options = self.components.github.notifications.filter_options();
-            if let Err(err) = self
-                .drivers
-                .cache
-                .persist_gh_notification_filter_options(options)
-            {
-                warn!("Failed to persist github notification filter options: {err}");
-            }
-        }
+        self.persist_state();
     }
 
-    fn restore_github_notification_filter_options(&mut self) {
-        if !self.config.features.enable_github_notification {
+    fn persist_state(&self) {
+        if !self.config.features.enable_gh_notification {
             return;
         }
-
-        match self.drivers.cache.load_gh_notification_filter_options() {
-            Ok(options) => {
-                self.components.github.notifications =
-                    GitHubNotificationsWidget::with_filter_options(options);
-            }
-            Err(err) => {
-                warn!("Load github notification filter options: {err}");
-            }
-        }
-    }
-
-    #[cfg(feature = "integration")]
-    async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
-        self.drivers.restore_credential().await
-    }
-
-    fn handle_restored_credential(&mut self, cred: Verified<Credential>) {
-        self.set_credential(cred);
-        self.start_session();
-    }
-
-    fn set_credential(&mut self, cred: Verified<Credential>) {
-        self.drivers.set_credential(cred);
-    }
-
-    fn initial_fetch(&mut self) {
-        self.initial_load.start();
-        self.dispatch(Operation::WatchFeedEvents);
-        self.dispatch(Operation::FetchSubscription {
-            populate: Populate::Replace,
-            after: None,
-            first: self.config.feeds_per_pagination,
-        });
-        self.dispatch(Operation::FetchEntries {
-            populate: Populate::Replace,
-            after: None,
-            first: self.next_entries_first(0),
-        });
-        if self.config.features.enable_github_notification
-            && let Some(operation) = self.components.github.fetch_next_notifications_if_needed()
+        let options = self.components.gh.filter_options_snapshot();
+        if let Err(error) = self
+            .drivers
+            .cache
+            .persist_gh_notification_filter_options(options)
         {
-            self.dispatch(operation);
+            warn!("Failed to persist GitHub notification filter options: {error}");
         }
-    }
-
-    async fn event_loop<S>(&mut self, input: &mut S)
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        self.render();
-
-        loop {
-            if self.event_loop_until_idle(input).await.is_break() {
-                break;
-            }
-        }
-    }
-
-    pub async fn event_loop_until_idle<S>(&mut self, input: &mut S) -> ControlFlow<()>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        loop {
-            let keymap_layers = self.active_keymap_layers();
-            tokio::select! {
-                biased;
-
-                Some(event) = input.next() => self.handle_terminal_event(event),
-                event = self.drivers.next_event() => self.apply_driver_event(event),
-            }
-
-            // Discard a pending key sequence when the keymap context changed
-            if self.active_keymap_layers() != keymap_layers {
-                self.keymap.clear_pending();
-            }
-
-            if self.components.shell.should_quit() {
-                self.components.shell.clear_quit_request(); // for testing
-                break ControlFlow::Break(());
-            }
-
-            self.render();
-        }
-    }
-
-    fn apply_driver_event(&mut self, result: anyhow::Result<Event>) {
-        match result {
-            Ok(event) => self.apply_event(event),
-            Err(err) => self.apply_event(Event::Error {
-                message: err.to_string(),
-            }),
-        }
-    }
-
-    fn render(&mut self) {
-        let components = &self.components;
-        self.drivers
-            .render(|frame, in_flight, now| {
-                let cx = ui::Context {
-                    theme: &components.shell.theme,
-                    in_flight,
-                    categories: &components.shell.categories,
-                    focus: components.shell.focus(),
-                    now,
-                    tab: components.shell.tabs.current(),
-                };
-                let root = AppWidget::new(components, cx);
-                Widget::render(root, frame.area(), frame.buffer_mut());
-            })
-            .expect("Failed to render");
-    }
-
-    fn handle_terminal_event(&mut self, event: std::io::Result<CrosstermEvent>) {
-        let event = match event {
-            Ok(event) => event,
-            Err(err) => {
-                self.apply_event(Event::Error {
-                    message: format!("read terminal event failed: {err}"),
-                });
-                return;
-            }
-        };
-
-        match event {
-            CrosstermEvent::Resize(..) => self.apply_event(Event::TerminalResized),
-            CrosstermEvent::FocusGained => {
-                self.components.shell.focus_gained();
-            }
-            CrosstermEvent::FocusLost => {
-                self.components.shell.focus_lost();
-            }
-            CrosstermEvent::Key(KeyEvent {
-                kind: KeyEventKind::Release,
-                ..
-            }) => {}
-            CrosstermEvent::Key(key) => {
-                debug!("Handle key event: {key:?}");
-
-                // An error message stays visible until the next key input
-                self.components.shell.prompt.clear_error_message();
-                self.reset_idle_timer();
-
-                self.handle_keymap(key);
-            }
-            _ => {}
-        }
-    }
-}
-
-#[cfg(test)]
-mod initial_load_tests {
-    use super::*;
-
-    #[test]
-    fn completes_after_subscription_and_entry_requests_finish() {
-        let mut initial_load = InitialLoad::new();
-        initial_load.start();
-
-        initial_load.observe(Some(InitialLoadPage::Subscriptions));
-        assert!(initial_load.take_completion(true, true).is_none());
-
-        initial_load.observe(Some(InitialLoadPage::Entries));
-        assert!(initial_load.take_completion(true, false).is_none());
-        assert!(initial_load.take_completion(false, false).is_some());
-        assert!(initial_load.take_completion(false, false).is_none());
     }
 }

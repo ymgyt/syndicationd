@@ -5,7 +5,7 @@ use ratatui::{
 };
 
 use crate::{
-    application::{Direction, Features, IndexOutOfRange},
+    application::{Direction, Features},
     ui::{Context, icon},
 };
 
@@ -13,7 +13,7 @@ use crate::{
 pub enum Tab {
     Entries,
     Feeds,
-    GitHub,
+    Gh,
 }
 
 impl Tab {
@@ -21,7 +21,7 @@ impl Tab {
         match self {
             Tab::Entries => 7,
             Tab::Feeds => 5,
-            Tab::GitHub => 6,
+            Tab::Gh => 6,
         }
     }
 }
@@ -36,8 +36,8 @@ impl TabsWidget {
 
     pub fn new(features: &'_ Features) -> Self {
         let mut tabs = vec![Tab::Entries, Tab::Feeds];
-        if features.enable_github_notification {
-            tabs.insert(0, Tab::GitHub);
+        if features.enable_gh_notification {
+            tabs.insert(0, Tab::Gh);
         }
         Self { selected: 0, tabs }
     }
@@ -47,7 +47,7 @@ impl TabsWidget {
     }
 
     pub fn move_selection(&mut self, direction: Direction) -> Tab {
-        self.selected = direction.apply(self.selected, self.tabs.len(), IndexOutOfRange::Wrapping);
+        self.selected = direction.apply(self.selected, self.tabs.len());
         self.current()
     }
 
@@ -75,7 +75,7 @@ impl TabsWidget {
         TuiTabs::new(self.tabs.iter().map(|tab| match tab {
             Tab::Entries => concat!(icon!(entries), " Entries"),
             Tab::Feeds => concat!(icon!(feeds), " Feeds"),
-            Tab::GitHub => concat!(icon!(github), " GitHub"),
+            Tab::Gh => concat!(icon!(gh), " GitHub"),
         }))
         .style(cx.theme.tabs)
         .divider("")

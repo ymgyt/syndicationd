@@ -1,15 +1,17 @@
-use std::{collections::VecDeque, num::NonZero};
+use std::{
+    collections::VecDeque,
+    num::NonZero,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-use futures_util::{StreamExt as _, future::BoxFuture, stream::FuturesUnordered};
+use futures_util::{Stream, StreamExt as _, future::BoxFuture, stream::FuturesUnordered};
 use tracing::trace;
 
-use crate::event::Event;
-
-pub(crate) type JobFuture = BoxFuture<'static, anyhow::Result<Event>>;
-
+/// Polls a bounded set of jobs without terminating while temporarily empty.
 pub(crate) struct Jobs {
-    futures: FuturesUnordered<JobFuture>,
-    delay_queue: VecDeque<JobFuture>,
+    futures: FuturesUnordered<BoxFuture<'static, ()>>,
+    delay_queue: VecDeque<BoxFuture<'static, ()>>,
     concurrent_limit: NonZero<usize>,
 }
 
@@ -22,16 +24,9 @@ impl Jobs {
         }
     }
 
-    pub(crate) fn push(&mut self, job: JobFuture) {
+    pub(crate) fn push(&mut self, job: BoxFuture<'static, ()>) {
         self.delay_queue.push_back(job);
-
-        while self.concurrent_limit.get() > self.futures.len() {
-            let Some(job) = self.delay_queue.pop_front() else {
-                break;
-            };
-
-            self.futures.push(job);
-        }
+        self.admit_delayed();
 
         trace!(
             "Job delay_queue: {} futures: {}",
@@ -40,30 +35,45 @@ impl Jobs {
         );
     }
 
-    pub(crate) async fn next(&mut self) -> Option<anyhow::Result<Event>> {
-        debug_assert!(self.concurrent_limit.get() >= self.futures.len());
-
-        match self.futures.next().await {
-            Some(result) => {
-                if let Some(job) = self.delay_queue.pop_front() {
-                    self.futures.push(job);
-                }
-                Some(result)
-            }
-            None => None,
-        }
-    }
-
-    #[cfg(feature = "integration")]
     pub(crate) fn is_empty(&self) -> bool {
         self.futures.is_empty() && self.delay_queue.is_empty()
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.futures.clear();
+        self.delay_queue.clear();
+    }
+
+    fn admit_delayed(&mut self) {
+        while self.concurrent_limit.get() > self.futures.len() {
+            let Some(job) = self.delay_queue.pop_front() else {
+                break;
+            };
+
+            self.futures.push(job);
+        }
+    }
+}
+
+impl Stream for Jobs {
+    type Item = ();
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        debug_assert!(self.concurrent_limit.get() >= self.futures.len());
+
+        match self.futures.poll_next_unpin(cx) {
+            Poll::Ready(Some(())) => {
+                self.admit_delayed();
+                Poll::Ready(Some(()))
+            }
+            Poll::Ready(None) | Poll::Pending => Poll::Pending,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use core::assert_matches;
-    use futures_util::FutureExt as _;
+    use futures_util::{FutureExt as _, StreamExt as _};
 
     use super::*;
     use std::future;
@@ -73,7 +83,7 @@ mod tests {
         let mut job = Jobs::new(NonZero::new(2).unwrap());
 
         for _ in 0..3 {
-            job.push(future::ready(Ok(Event::Idle)).boxed());
+            job.push(future::ready(()).boxed());
         }
 
         assert_eq!(job.futures.len(), 2);
@@ -81,13 +91,14 @@ mod tests {
 
         let mut count = 0;
         loop {
-            if let Some(result) = job.next().await {
-                assert_matches!(result, Ok(Event::Idle));
+            if job.next().await.is_some() {
                 count += 1;
             }
             if count == 3 {
                 break;
             }
         }
+
+        assert!(job.next().now_or_never().is_none());
     }
 }

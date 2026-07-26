@@ -65,10 +65,6 @@ impl SubscriptionWidget {
         !self.feeds.is_empty()
     }
 
-    pub(crate) fn loaded_count(&self) -> usize {
-        self.feeds.unfiltered_len()
-    }
-
     pub(crate) fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
         self.feeds.iter().any(|feed| &feed.url == url)
     }

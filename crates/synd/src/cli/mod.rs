@@ -73,7 +73,7 @@ pub struct TermOptions {
     #[command(flatten)]
     pub feed: FeedOptions,
     #[command(flatten)]
-    pub github: GithubOptions,
+    pub gh: GhOptions,
 }
 
 #[derive(clap::Args, Debug)]
@@ -122,22 +122,24 @@ pub struct FeedOptions {
 
 #[derive(clap::Args, Debug)]
 #[command(next_help_heading = "GitHub options")]
-pub struct GithubOptions {
+pub struct GhOptions {
     /// Enable GitHub notification feature
     #[arg(
-        long,
+        long = "enable-github-notification",
         short = 'G',
         visible_alias = "enable-gh",
         env = config::env::ENABLE_GITHUB,
+        value_name = "ENABLE_GITHUB_NOTIFICATION",
     )]
-    pub enable_github_notification: Option<bool>,
+    pub enable_gh_notification: Option<bool>,
     /// GitHub personal access token to fetch notifications
     #[arg(
-        long,
+        long = "github-pat",
         env = config::env::GITHUB_PAT,
         hide_env_values = true,
+        value_name = "GITHUB_PAT",
     )]
-    pub github_pat: Option<String>,
+    pub gh_pat: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -184,7 +186,7 @@ pub fn parse() -> (ConfigResolverBuilder, Command) {
         .daemon_options(daemon)
         .backend_options(backend)
         .feed_options(term.feed)
-        .github_options(term.github)
+        .gh_options(term.gh)
         .palette(term.palette);
 
     (builder, command)

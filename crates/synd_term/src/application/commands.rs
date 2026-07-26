@@ -1,90 +1,31 @@
 use tracing::{info_span, instrument};
 
-use crate::{
-    command::{Command, FeedsCommand, FilterCommand, GitHubCommand, ShellCommand},
-    keymap,
-};
+use crate::{command::Command, operation::Operations};
 
 use super::Application;
 
 impl Application {
     #[instrument(skip_all)]
-    pub(super) fn apply_command(&mut self, command: Command) {
+    pub(super) fn apply_command(&mut self, command: Command) -> Operations {
         let _guard = info_span!("apply_command", %command).entered();
 
         match command {
-            Command::Nop => {}
-            Command::Shell(command) => self.apply_shell_command(command),
-            Command::Feeds(command) => self.apply_feeds_command(command),
-            Command::Filter(command) => self.apply_filter_command(command),
-            Command::GitHub(command) => self.apply_github_command(command),
-        }
-    }
-
-    fn apply_shell_command(&mut self, command: ShellCommand) {
-        let operations = self
-            .components
-            .apply_shell_command(command, self.config.feeds_per_pagination);
-        self.dispatch_blk(operations);
-    }
-
-    fn apply_feeds_command(&mut self, command: FeedsCommand) {
-        let operations = self.components.apply_feeds_command(
-            command,
-            self.config.feeds_per_pagination,
-            self.next_entries_first(0),
-        );
-        self.dispatch_blk(operations);
-    }
-
-    fn apply_filter_command(&mut self, command: FilterCommand) {
-        match command {
-            FilterCommand::MoveFilterRequirement(direction) => {
-                let operations = self.components.move_filter_requirement(direction);
-                self.dispatch_blk(operations);
+            Command::Shell(command) => self
+                .components
+                .apply_shell_command(command, self.config.feeds_per_pagination)
+                .into(),
+            Command::Feeds(command) if self.components.shell.permits_main_ui() => self
+                .components
+                .apply_feeds_command(command, self.config.feeds_per_pagination),
+            Command::Filter(command) if self.components.shell.permits_main_ui() => {
+                self.components.apply_filter_command(command).into()
             }
-            FilterCommand::ActivateCategoryFilterling => {
-                self.components.activate_category_filtering();
-                if let Some(layer_keymap) = self.components.category_filter_keymap() {
-                    self.keymap.set_layer_keymap(layer_keymap);
-                }
+            Command::Gh(command) if self.components.shell.permits_main_ui() => {
+                self.components.apply_gh_command(command)
             }
-            FilterCommand::ActivateSearchFiltering => {
-                self.components.activate_search_filtering();
-                self.keymap
-                    .set_layer_keymap(keymap::LayerKeymap::search_prompt());
-            }
-            FilterCommand::PromptInsertChar(ch) => {
-                let operations = self.components.insert_prompt_char(ch);
-                self.dispatch_blk(operations);
-            }
-            FilterCommand::PromptDeleteBackward => {
-                let operations = self.components.delete_prompt_backward();
-                self.dispatch_blk(operations);
-            }
-            FilterCommand::DeactivateFiltering => {
-                self.components.deactivate_filtering();
-                self.keymap
-                    .clear_layer_keymap(keymap::Layer::CategoryFilter);
-                self.keymap.clear_layer_keymap(keymap::Layer::SearchPrompt);
-            }
-            FilterCommand::ToggleFilterCategory { category, lane } => {
-                let operations = self.components.toggle_filter_category(&category, lane);
-                self.dispatch_blk(operations);
-            }
-            FilterCommand::ActivateAllFilterCategories { lane } => {
-                let operations = self.components.activate_all_filter_categories(lane);
-                self.dispatch_blk(operations);
-            }
-            FilterCommand::DeactivateAllFilterCategories { lane } => {
-                let operations = self.components.deactivate_all_filter_categories(lane);
-                self.dispatch_blk(operations);
+            Command::Nop | Command::Feeds(_) | Command::Filter(_) | Command::Gh(_) => {
+                Operations::Nop
             }
         }
-    }
-
-    fn apply_github_command(&mut self, command: GitHubCommand) {
-        let operations = self.components.apply_github_command(command);
-        self.dispatch_blk(operations);
     }
 }

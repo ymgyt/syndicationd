@@ -19,7 +19,7 @@ use synd_term::{
 };
 use tempfile::TempDir;
 
-mod established_session {
+mod bootstrapped_app {
     use super::*;
 
     #[tokio::test]
@@ -66,10 +66,15 @@ fn start_app() -> (TempDir, Application) {
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
         MockFeedApiResponse::Subscription(Ok(subscription())),
         MockFeedApiResponse::TimelineEntries(Ok(timeline_entries())),
+        MockFeedApiResponse::TimelineChanges(Ok(payload::TimelineChangesPayload {
+            changes: Vec::new(),
+            seq: 2,
+            has_more: false,
+        })),
     ]);
     let (cache_dir, mut app) = app(api);
 
-    app.start_session();
+    app.bootstrap_for_test();
 
     (cache_dir, app)
 }

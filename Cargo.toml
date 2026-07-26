@@ -49,6 +49,7 @@ futures-util       = { version = "0.3.32", default-features = false }
 graphql_client     = { version = "0.13.0", default-features = false }
 headers            = { version = "0.4.1" }
 http               = { version = "1.1" }
+indexmap           = { version = "2.13.0" }
 insta              = { version = "1.43" }
 itertools          = { version = "0.14", default-features = false, features = ["use_std"] }
 jsonwebtoken       = { version = "10.4.0", features = ["rust_crypto"] }
@@ -61,7 +62,7 @@ pprof              = { version = "0.14", features = ["flamegraph"] }
 proptest           = { version = "1.8.0" }
 rand               = { version = "0.10.1" }
 reqwest            = { version = "0.12.23", default-features = false, features = ["rustls-tls", "json"] }
-rustls             = { version = "0.23.40", features = ["ring"] }
+rustls             = { version = "0.23.40", default-features = false, features = ["ring", "std", "tls12"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1", features = ["derive"] }
 serde_json         = { version = "1.0.149" }
@@ -76,6 +77,7 @@ toml               = { version = "0.8.23" }
 tracing            = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.8" }
+webpki-roots       = { version = "0.26.11" }
 zstd               = { version = "0.13", default-features = false }
 
 [profile.release]

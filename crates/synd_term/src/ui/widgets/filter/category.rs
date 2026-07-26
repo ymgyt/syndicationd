@@ -6,7 +6,7 @@ use synd_feed::types::Category;
 use crate::{
     application::Populate,
     config::{Categories, Icon},
-    types::{self, EntryExt, github::Notification},
+    types::{self, EntryExt, gh::Notification},
     ui::{
         self,
         widgets::filter::{Composable, FilterResult, Filterable},

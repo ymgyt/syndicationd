@@ -1,68 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use synd_feed::{
-    entry::EntryId,
-    types::{Category, FeedType, FeedUrl, Requirement, Time},
-};
+use synd_feed::types::{Category, FeedType, FeedUrl, Requirement, Time};
 
-/// Entry as it appears on one timeline: display position + content.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TimelineEntry {
-    pub order_time: Time,
-    pub entry: Entry,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TimelineEntryConnection {
-    pub nodes: Vec<TimelineEntry>,
-    pub page_info: PageInfo,
-    /// Change seq this page reflects. The client syncs changes from here
-    pub seq: i64,
-}
-
-/// Page of timeline changes for incremental sync, ordered by seq.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TimelineChangesPayload {
-    pub changes: Vec<TimelineChange>,
-    /// Seq the client remembers after applying this page
-    pub seq: i64,
-    pub has_more: bool,
-}
-
-/// One timeline change, applied in seq order.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "__typename")]
-pub enum TimelineChange {
-    /// Insert or overwrite the entry at its `(order_time, entry.id)` position
-    #[serde(rename = "TimelineChangeUpsert", rename_all = "camelCase")]
-    Upsert { timeline_entry: Box<TimelineEntry> },
-    /// Remove the entry identified by `entry_id`
-    #[serde(rename = "TimelineChangeRemove", rename_all = "camelCase")]
-    Remove { entry_id: EntryId },
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Entry {
-    pub id: EntryId,
-    pub title: Option<String>,
-    pub published: Option<Time>,
-    pub updated: Option<Time>,
-    pub website_url: Option<String>,
-    pub summary: Option<String>,
-    pub feed: FeedMeta,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct FeedMeta {
-    pub title: Option<String>,
-    pub url: FeedUrl,
-    #[serde(default, with = "requirement_graphql")]
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
-}
+use super::PageInfo;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SubscriptionPayload {
@@ -78,17 +17,9 @@ pub struct FeedConnection {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub struct PageInfo {
-    pub has_next_page: bool,
-    pub end_cursor: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SubscribedFeed {
     pub url: FeedUrl,
-    #[serde(default, with = "requirement_graphql")]
+    #[serde(default, with = "super::requirement")]
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     pub crawl_policy: CrawlPolicy,
@@ -102,47 +33,49 @@ pub struct CrawlPolicy {
     pub polling: PollingPolicy,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 #[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub struct PollingPolicy {
-    pub kind: PollingPolicyKind,
-    pub interval_seconds: Option<i64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
-pub enum PollingPolicyKind {
+pub enum PollingPolicy {
     Manual,
-    Interval,
-    Other(String),
+    Interval {
+        seconds: PollingIntervalSeconds,
+    },
+    Other {
+        kind: String,
+        interval_seconds: Option<i64>,
+    },
 }
 
-impl<'de> Deserialize<'de> for PollingPolicyKind {
+impl<'de> Deserialize<'de> for PollingPolicy {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let value = String::deserialize(deserializer)?;
-        Ok(match value.as_str() {
-            "MANUAL" => Self::Manual,
-            "INTERVAL" => Self::Interval,
-            _ => Self::Other(value),
-        })
+        let wire = PollingPolicyWire::deserialize(deserializer)?;
+        match (wire.kind.as_str(), wire.interval_seconds) {
+            ("MANUAL", None) => Ok(Self::Manual),
+            ("MANUAL", Some(_)) => Err(serde::de::Error::custom(
+                "MANUAL polling policy must omit intervalSeconds",
+            )),
+            ("INTERVAL", Some(seconds)) => Ok(Self::Interval {
+                seconds: seconds.try_into().map_err(serde::de::Error::custom)?,
+            }),
+            ("INTERVAL", None) => Err(serde::de::Error::custom(
+                "INTERVAL polling policy requires intervalSeconds",
+            )),
+            (_, interval_seconds) => Ok(Self::Other {
+                kind: wire.kind,
+                interval_seconds,
+            }),
+        }
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "__typename")]
-pub enum FeedEvent {
-    TimelineChanged(TimelineChangeEvent),
-}
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TimelineChangeEvent {
-    pub changed_at: String,
-    pub affected_feeds: Option<Vec<FeedUrl>>,
+struct PollingPolicyWire {
+    kind: String,
+    interval_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -170,15 +103,21 @@ pub enum GraphqlFeedType {
     Other(String),
 }
 
-impl GraphqlFeedType {
-    pub fn into_feed_type(self) -> Option<FeedType> {
-        match self {
-            Self::Atom => Some(FeedType::Atom),
-            Self::Json => Some(FeedType::JSON),
-            Self::Rss0 => Some(FeedType::RSS0),
-            Self::Rss1 => Some(FeedType::RSS1),
-            Self::Rss2 => Some(FeedType::RSS2),
-            Self::Other(_) => None,
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("unsupported GraphQL feed type: {0}")]
+pub struct UnsupportedFeedType(pub String);
+
+impl TryFrom<GraphqlFeedType> for FeedType {
+    type Error = UnsupportedFeedType;
+
+    fn try_from(value: GraphqlFeedType) -> Result<Self, Self::Error> {
+        match value {
+            GraphqlFeedType::Atom => Ok(Self::Atom),
+            GraphqlFeedType::Json => Ok(Self::JSON),
+            GraphqlFeedType::Rss0 => Ok(Self::RSS0),
+            GraphqlFeedType::Rss1 => Ok(Self::RSS1),
+            GraphqlFeedType::Rss2 => Ok(Self::RSS2),
+            GraphqlFeedType::Other(value) => Err(UnsupportedFeedType(value)),
         }
     }
 }
@@ -240,7 +179,7 @@ pub struct EntryMeta {
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeFeedInput {
     pub url: FeedUrl,
-    #[serde(default, with = "requirement_graphql")]
+    #[serde(default, with = "super::requirement")]
     pub requirement: Option<Requirement>,
     pub category: Option<Category<'static>>,
     pub crawl_policy: Option<CrawlPolicyInput>,
@@ -252,16 +191,67 @@ pub struct CrawlPolicyInput {
     pub polling: PollingPolicyInput,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PollingPolicyInput {
-    pub kind: PollingPolicyInputKind,
-    pub interval_seconds: Option<i64>,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PollingPolicyInput {
+    Manual,
+    Interval { seconds: PollingIntervalSeconds },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
+pub struct PollingIntervalSeconds(i64);
+
+impl PollingIntervalSeconds {
+    pub fn get(self) -> i64 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("polling interval must be greater than zero")]
+pub struct InvalidPollingInterval;
+
+impl TryFrom<i64> for PollingIntervalSeconds {
+    type Error = InvalidPollingInterval;
+
+    fn try_from(seconds: i64) -> Result<Self, Self::Error> {
+        if seconds > 0 {
+            Ok(Self(seconds))
+        } else {
+            Err(InvalidPollingInterval)
+        }
+    }
+}
+
+impl Serialize for PollingPolicyInput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let wire = match self {
+            Self::Manual => PollingPolicyInputWire {
+                kind: PollingPolicyInputKind::Manual,
+                interval_seconds: None,
+            },
+            Self::Interval { seconds } => PollingPolicyInputWire {
+                kind: PollingPolicyInputKind::Interval,
+                interval_seconds: Some(seconds.get()),
+            },
+        };
+        wire.serialize(serializer)
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PollingPolicyInputWire {
+    kind: PollingPolicyInputKind,
+    interval_seconds: Option<i64>,
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum PollingPolicyInputKind {
+enum PollingPolicyInputKind {
     Manual,
     Interval,
 }
@@ -351,65 +341,5 @@ impl<'de> Deserialize<'de> for ResponseCode {
             "INTERNAL_ERROR" => Self::InternalError,
             _ => Self::Other(value),
         })
-    }
-}
-
-mod requirement_graphql {
-    use serde::{Deserialize, Deserializer, Serializer, de};
-    use synd_feed::types::Requirement;
-
-    const VARIANTS: &[&str] = &["MUST", "SHOULD", "MAY"];
-
-    #[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-    pub(super) fn serialize<S>(
-        value: &Option<Requirement>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match value {
-            Some(Requirement::Must) => serializer.serialize_some("MUST"),
-            Some(Requirement::Should) => serializer.serialize_some("SHOULD"),
-            Some(Requirement::May) => serializer.serialize_some("MAY"),
-            None => serializer.serialize_none(),
-        }
-    }
-
-    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Option<Requirement>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let Some(value) = Option::<String>::deserialize(deserializer)? else {
-            return Ok(None);
-        };
-
-        match value.as_str() {
-            "MUST" => Ok(Some(Requirement::Must)),
-            "SHOULD" => Ok(Some(Requirement::Should)),
-            "MAY" => Ok(Some(Requirement::May)),
-            value => Err(de::Error::unknown_variant(value, VARIANTS)),
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use core::assert_matches;
-
-    use super::FeedEvent;
-
-    #[test]
-    fn decodes_timeline_changed_feed_event() {
-        let event: FeedEvent = serde_json::from_value(serde_json::json!({
-            "__typename": "TimelineChanged",
-            "changedAt": "2026-06-13T00:00:00Z",
-            "affectedFeeds": ["https://example.com/feed.xml"]
-        }))
-        .unwrap();
-
-        let FeedEvent::TimelineChanged(event) = event;
-        assert_eq!(event.changed_at, "2026-06-13T00:00:00Z");
-        assert_matches!(event.affected_feeds, Some(feeds) if feeds.len() == 1);
     }
 }

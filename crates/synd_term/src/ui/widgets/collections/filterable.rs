@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, ops::ControlFlow};
 
 use crate::{
-    application::{Direction, IndexOutOfRange, Populate},
+    application::{Direction, Populate},
     ui::widgets::filter::{FilterResult, Filterable},
 };
 
@@ -50,11 +50,8 @@ impl<T, F> FilterableVec<T, F> {
     }
 
     pub(crate) fn move_selection(&mut self, direction: Direction) {
-        self.selected_item_index = direction.apply(
-            self.selected_item_index,
-            self.effective_items.len(),
-            IndexOutOfRange::Wrapping,
-        );
+        self.selected_item_index =
+            direction.apply(self.selected_item_index, self.effective_items.len());
     }
     pub(crate) fn move_first(&mut self) {
         self.selected_item_index = 0;
@@ -74,10 +71,6 @@ impl<T, F> FilterableVec<T, F> {
 
     pub(crate) fn as_unfiltered_slice(&self) -> &[T] {
         self.items.as_slice()
-    }
-
-    pub(crate) fn unfiltered_len(&self) -> usize {
-        self.items.len()
     }
 
     pub(crate) fn filter(&self) -> &F {

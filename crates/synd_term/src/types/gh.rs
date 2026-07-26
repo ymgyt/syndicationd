@@ -1,6 +1,5 @@
 use std::{fmt::Display, ops::Deref, str::FromStr};
 
-use either::Either;
 use octocrab::models::{self, activity::Subject};
 use ratatui::{
     style::{Color, Stylize},
@@ -12,7 +11,7 @@ use tracing::warn;
 use url::Url;
 
 use crate::{
-    client::github::{issue_query, pull_request_query},
+    client::gh::{issue_query, pull_request_query},
     config::Categories,
     types::Time,
     ui::{self, icon},
@@ -78,8 +77,30 @@ pub(crate) struct NotificationContext<ID> {
     pub(crate) repository_key: RepositoryKey,
 }
 
-pub(crate) type IssueOrPullRequest =
-    Either<NotificationContext<IssueId>, NotificationContext<PullRequestId>>;
+/// One notification subject whose full details still need to be fetched.
+pub(crate) enum NotificationDetail {
+    Issue(NotificationContext<IssueId>),
+    PullRequest(NotificationContext<PullRequestId>),
+}
+
+/// Ordered detail-fetch targets derived from one notification page.
+#[derive(Default)]
+pub(crate) struct NotificationDetails(Vec<NotificationDetail>);
+
+impl FromIterator<NotificationDetail> for NotificationDetails {
+    fn from_iter<T: IntoIterator<Item = NotificationDetail>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl IntoIterator for NotificationDetails {
+    type Item = NotificationDetail;
+    type IntoIter = std::vec::IntoIter<NotificationDetail>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SubjectType {
@@ -116,8 +137,6 @@ pub(crate) struct Notification {
     pub(crate) id: NotificationId,
     pub(crate) thread_id: Option<ThreadId>,
     pub(crate) reason: Reason,
-    #[allow(unused)]
-    pub(crate) unread: bool,
     pub(crate) updated_at: Time,
     pub(crate) last_read_at: Option<Time>,
     pub(crate) repository: Repository,
@@ -134,7 +153,6 @@ impl From<models::activity::Notification> for Notification {
             repository,
             subject,
             reason,
-            unread,
             updated_at,
             last_read_at,
             url,
@@ -202,7 +220,6 @@ impl From<models::activity::Notification> for Notification {
             id,
             thread_id,
             reason,
-            unread,
             updated_at,
             last_read_at,
             repository,
@@ -325,18 +342,20 @@ impl Notification {
         }
     }
 
-    pub(crate) fn context(&self) -> Option<IssueOrPullRequest> {
+    pub(crate) fn detail(&self) -> Option<NotificationDetail> {
         match self.subject_type()? {
-            SubjectType::Issue => Some(Either::Left(NotificationContext {
+            SubjectType::Issue => Some(NotificationDetail::Issue(NotificationContext {
                 id: self.issue_id()?,
                 notification_id: self.id,
                 repository_key: self.repository_key().clone(),
             })),
-            SubjectType::PullRequest => Some(Either::Right(NotificationContext {
-                id: self.pull_request_id()?,
-                notification_id: self.id,
-                repository_key: self.repository_key().clone(),
-            })),
+            SubjectType::PullRequest => {
+                Some(NotificationDetail::PullRequest(NotificationContext {
+                    id: self.pull_request_id()?,
+                    notification_id: self.id,
+                    repository_key: self.repository_key().clone(),
+                }))
+            }
             // Currently ignore ci, release, discussion
             _ => None,
         }

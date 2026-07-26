@@ -1,0 +1,9 @@
+subscription FeedEvents {
+  feedEvents {
+    __typename
+    ... on TimelineChanged {
+      changedAt
+      affectedFeeds
+    }
+  }
+}

@@ -12,7 +12,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    cli::{self, ApiOptions, BackendOptions, DaemonOptions, FeedOptions, GithubOptions},
+    cli::{self, ApiOptions, BackendOptions, DaemonOptions, FeedOptions, GhOptions},
     config::{
         self,
         file::{ConfigFile, ConfigFileError},
@@ -42,8 +42,8 @@ pub struct ConfigResolver {
     feed_entries_limit: Entry<usize>,
     feed_browser_command: Entry<PathBuf>,
     feed_browser_args: Entry<Vec<String>>,
-    github_enable: Entry<bool>,
-    github_pat: Entry<String>,
+    gh_enabled: Entry<bool>,
+    gh_pat: Entry<String>,
     palette: Entry<Palette>,
     categories: Categories,
     keymaps: CompiledKeymaps,
@@ -98,12 +98,12 @@ impl ConfigResolver {
         self.feed_browser_args.resolve_ref().clone()
     }
 
-    pub fn is_github_enable(&self) -> bool {
-        self.github_enable.resolve()
+    pub fn is_gh_enabled(&self) -> bool {
+        self.gh_enabled.resolve()
     }
 
-    pub fn github_pat(&self) -> String {
-        self.github_pat.resolve_ref().clone()
+    pub fn gh_pat(&self) -> String {
+        self.gh_pat.resolve_ref().clone()
     }
 
     pub fn palette(&self) -> Palette {
@@ -122,9 +122,9 @@ impl ConfigResolver {
 impl ConfigResolver {
     /// performs validation based on the relationshsips between the various settings.
     fn validate(self) -> Result<Self, ConfigResolverBuildError> {
-        if self.github_enable.resolve() && self.github_pat.resolve_ref().is_empty() {
+        if self.gh_enabled.resolve() && self.gh_pat.resolve_ref().is_empty() {
             return Err(ConfigResolverBuildError::ValidateConfigFile(
-                "github pat is required for github feature".into(),
+                "GitHub PAT is required for GitHub feature".into(),
             ));
         }
         Ok(self)
@@ -152,7 +152,7 @@ pub struct ConfigResolverBuilder<FS = fsimpl::FileSystem> {
     daemon_flags: Option<DaemonOptions>,
     backend_flags: Option<BackendOptions>,
     feed_flags: Option<FeedOptions>,
-    github_flags: Option<GithubOptions>,
+    gh_flags: Option<GhOptions>,
     palette_flag: Option<cli::Palette>,
     fs: FS,
 }
@@ -215,9 +215,9 @@ impl ConfigResolverBuilder {
     }
 
     #[must_use]
-    pub fn github_options(self, github_options: GithubOptions) -> Self {
+    pub fn gh_options(self, gh_options: GhOptions) -> Self {
         Self {
-            github_flags: Some(github_options),
+            gh_flags: Some(gh_options),
             ..self
         }
     }
@@ -255,10 +255,10 @@ impl ConfigResolverBuilder {
                     browser,
                     browser_args,
                 }),
-            github_flags:
-                Some(GithubOptions {
-                    enable_github_notification,
-                    github_pat,
+            gh_flags:
+                Some(GhOptions {
+                    enable_gh_notification,
+                    gh_pat,
                 }),
             log_file_flag,
             cache_dir_flag,
@@ -336,22 +336,22 @@ impl ConfigResolverBuilder {
                 )
                 .with_flag(browser_args),
 
-            github_enable: Entry::with_default(false)
+            gh_enabled: Entry::with_default(false)
                 .with_file(
                     config_file
                         .as_mut()
-                        .and_then(|c| c.github.as_mut())
+                        .and_then(|c| c.gh.as_mut())
                         .and_then(|gh| gh.enable.take()),
                 )
-                .with_flag(enable_github_notification),
-            github_pat: Entry::with_default(String::new())
+                .with_flag(enable_gh_notification),
+            gh_pat: Entry::with_default(String::new())
                 .with_file(
                     config_file
                         .as_mut()
-                        .and_then(|c| c.github.as_mut())
+                        .and_then(|c| c.gh.as_mut())
                         .and_then(|gh| gh.pat.take()),
                 )
-                .with_flag(github_pat),
+                .with_flag(gh_pat),
             palette: Entry::with_default(config::theme::DEFAULT_PALETTE.into())
                 .with_file(
                     config_file

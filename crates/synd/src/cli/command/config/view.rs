@@ -55,7 +55,8 @@ struct ConfigViewOutput {
     api: ApiOutput,
     daemon: DaemonOutput,
     feed: FeedOutput,
-    github: GithubOutput,
+    #[serde(rename = "github")]
+    gh: GhOutput,
     theme: ThemeOutput,
 }
 
@@ -104,7 +105,7 @@ struct BrowserOutput {
 }
 
 #[derive(Debug, Serialize)]
-struct GithubOutput {
+struct GhOutput {
     enabled: bool,
     pat_configured: bool,
 }
@@ -155,9 +156,9 @@ impl ConfigViewOutput {
                     args: config.feed_browser_args(),
                 },
             },
-            github: GithubOutput {
-                enabled: config.is_github_enable(),
-                pat_configured: !config.github_pat().is_empty(),
+            gh: GhOutput {
+                enabled: config.is_gh_enabled(),
+                pat_configured: !config.gh_pat().is_empty(),
             },
             theme: ThemeOutput {
                 name: config.palette().name(),
@@ -199,7 +200,7 @@ impl ConfigViewOutput {
         writeln!(
             writer,
             "     GitHub: {}",
-            if self.github.enabled {
+            if self.gh.enabled {
                 "enabled"
             } else {
                 "disabled"
@@ -208,7 +209,7 @@ impl ConfigViewOutput {
         writeln!(
             writer,
             " GitHub PAT: {}",
-            if self.github.pat_configured {
+            if self.gh.pat_configured {
                 "set"
             } else {
                 "not set"

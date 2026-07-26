@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Rect},
     text::{Line, Span},
@@ -7,7 +5,7 @@ use ratatui::{
 };
 
 use crate::{
-    application::RequestId,
+    application::{InFlightStatus, RequestProgress},
     ui::{
         Context, icon,
         widgets::throbber::{
@@ -37,18 +35,61 @@ impl StatusLineWidget {
     pub fn clear_error_message(&mut self) {
         self.error_message = None;
     }
-}
 
-impl StatusLineWidget {
     pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
-        match self.error_message.as_ref() {
-            Some(error_message) => Self::render_error(area, buf, cx, error_message),
-            None => Self::render_prompt(area, buf, cx, tab),
+        if let Some(error_message) = self.error_message.as_ref() {
+            Self::render_error(area, buf, cx, error_message);
+        } else if let Some(status) = cx.in_flight.status() {
+            Self::render_in_flight(area, buf, cx, &status);
+        } else {
+            Self::render_key_hints(area, buf, cx, tab);
         }
     }
 
+    fn render_in_flight(
+        area: Rect,
+        buf: &mut Buffer,
+        cx: &Context<'_>,
+        status: &InFlightStatus<'_>,
+    ) {
+        let suffix = match status.other_count() {
+            0 => String::new(),
+            count => format!(" (+{count})"),
+        };
+        let label = match status.progress() {
+            Some(RequestProgress::TimelineWindow { loaded, target }) => {
+                format!("{} {loaded}/{target}", status.kind().label())
+            }
+            None => status.kind().label().into_owned(),
+        };
+        let suffix_width = u16::try_from(suffix.chars().count()).unwrap_or(u16::MAX);
+        let [spinner_area, label_area, suffix_area] = Layout::horizontal([
+            Constraint::Length(2),
+            Constraint::Fill(1),
+            Constraint::Length(suffix_width),
+        ])
+        .areas(area);
+
+        let mut throbber_state = ThrobberState::default();
+        throbber_state.calc_step(status.throbber_step());
+        StatefulWidget::render(
+            Throbber::default()
+                .throbber_set(throbber::BRAILLE_EIGHT_DOUBLE)
+                .use_type(WhichUse::Spin),
+            spinner_area,
+            buf,
+            &mut throbber_state,
+        );
+        Paragraph::new(label)
+            .style(cx.theme.prompt.background)
+            .render(label_area, buf);
+        Paragraph::new(suffix)
+            .style(cx.theme.prompt.background)
+            .render(suffix_area, buf);
+    }
+
     #[allow(clippy::cast_possible_truncation)]
-    fn render_prompt(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
+    fn render_key_hints(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
         let pre_keys = &[
             ("Tab", "󰹳"),
             ("j/k", "󰹹"),
@@ -57,7 +98,7 @@ impl StatusLineWidget {
             ("c", icon!(category)),
             ("/", icon!(search)),
         ][..];
-        let suf_keys = &[("r", "󰑓"), ("q", "")][..];
+        let suffix_keys = &[("r", "󰑓"), ("q", "")][..];
         let per_tab_keys = match tab {
             Some(Tab::Feeds) => pre_keys
                 .iter()
@@ -68,7 +109,7 @@ impl StatusLineWidget {
                     ("e", ""),
                     ("d", "󰼡"),
                 ])
-                .chain(suf_keys),
+                .chain(suffix_keys),
             Some(Tab::Entries) => pre_keys
                 .iter()
                 .chain(&[
@@ -76,8 +117,8 @@ impl StatusLineWidget {
                     ("Ent", icon!(open)),
                     ("Sp", icon!(browse)),
                 ])
-                .chain(suf_keys),
-            Some(Tab::GitHub) => pre_keys
+                .chain(suffix_keys),
+            Some(Tab::Gh) => pre_keys
                 .iter()
                 .chain(&[
                     ("f", icon!(filter)),
@@ -85,67 +126,15 @@ impl StatusLineWidget {
                     ("d", icon!(check)),
                     ("u", ""),
                 ])
-                .chain(suf_keys),
-            // Imply login
+                .chain(suffix_keys),
             None => [("j/k", "󰹹")][..]
                 .iter()
                 .chain(&[("Ent", "󰏌")])
                 .chain(&[("q", "")][..]),
         };
-
         let spans = per_tab_keys
-            .flat_map(|(key, desc)| {
-                let desc = Span::styled(format!("{key}:{desc}  "), cx.theme.prompt.key_desc);
-                [desc]
-            })
+            .map(|(key, desc)| Span::styled(format!("{key}:{desc}  "), cx.theme.prompt.key_desc))
             .collect::<Vec<_>>();
-
-        let area = {
-            if let Some(in_flight) = cx.in_flight.recent_in_flight() {
-                let label = match in_flight {
-                    RequestId::DeviceFlowDeviceAuthorize => {
-                        Cow::Borrowed("Request device authorization")
-                    }
-                    RequestId::DeviceFlowPollAccessToken => Cow::Borrowed("Polling..."),
-                    RequestId::FetchEntries => Cow::Borrowed("Fetch entries..."),
-                    RequestId::SyncTimeline => Cow::Borrowed("Sync timeline..."),
-                    RequestId::FetchSubscription => Cow::Borrowed("Fetch subscription..."),
-                    RequestId::FetchGithubNotifications { page } => {
-                        Cow::Owned(format!("Fetch github notifications(page: {page})..."))
-                    }
-                    RequestId::FetchGithubIssue { id } => {
-                        Cow::Owned(format!("Fetch github issue(#{id})..."))
-                    }
-                    RequestId::FetchGithubPullRequest { id } => {
-                        Cow::Owned(format!("Fetch github pull request(#{id})..."))
-                    }
-                    RequestId::SubscribeFeed => Cow::Borrowed("Subscribe feed..."),
-                    RequestId::UnsubscribeFeed => Cow::Borrowed("Unsubscribe feed..."),
-                    RequestId::MarkGithubNotificationAsDone { id } => {
-                        Cow::Owned(format!("Mark notification({id}) as done..."))
-                    }
-                    RequestId::UnsubscribeGithubThread => Cow::Borrowed("Unsubscribe thread..."),
-                };
-                let horizontal = Layout::horizontal([
-                    Constraint::Length(label.len() as u16 + 1),
-                    Constraint::Fill(1),
-                ]);
-                let [in_flight_area, area] = horizontal.areas(area);
-
-                let mut throbber_state = ThrobberState::default();
-                throbber_state.calc_step(cx.in_flight.throbber_step());
-
-                let throbber = Throbber::default()
-                    .label(label)
-                    .throbber_set(throbber::BRAILLE_EIGHT_DOUBLE)
-                    .use_type(WhichUse::Spin);
-
-                throbber.render(in_flight_area, buf, &mut throbber_state);
-                area
-            } else {
-                area
-            }
-        };
 
         Paragraph::new(Line::from(spans))
             .alignment(Alignment::Center)
@@ -154,8 +143,7 @@ impl StatusLineWidget {
     }
 
     fn render_error(area: Rect, buf: &mut Buffer, cx: &Context<'_>, error_message: &str) {
-        let line = Line::from(error_message);
-        Paragraph::new(line)
+        Paragraph::new(Line::from(error_message))
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true })
             .style(cx.theme.error.message)

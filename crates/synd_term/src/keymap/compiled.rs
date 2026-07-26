@@ -9,7 +9,6 @@ use super::{
 #[derive(Clone, Debug)]
 pub struct CompiledKeymaps {
     layers: HashMap<Layer, KeyTrie>,
-    bindings: HashMap<Layer, Vec<KeyBinding>>,
 }
 
 impl CompiledKeymaps {
@@ -18,7 +17,6 @@ impl CompiledKeymaps {
         registry: &CommandRegistry,
     ) -> Result<Self, KeymapError> {
         let mut layers = HashMap::with_capacity(config.bindings.len());
-        let mut compiled_bindings = HashMap::with_capacity(config.bindings.len());
 
         for (layer, bindings) in config.bindings {
             let mut seen = HashSet::with_capacity(bindings.len());
@@ -34,13 +32,9 @@ impl CompiledKeymaps {
                 trie.insert(&ActionBinding::from(binding.clone()))?;
             }
             layers.insert(layer, trie);
-            compiled_bindings.insert(layer, bindings);
         }
 
-        Ok(Self {
-            layers,
-            bindings: compiled_bindings,
-        })
+        Ok(Self { layers })
     }
 
     pub fn default_keymaps() -> Self {
@@ -51,13 +45,6 @@ impl CompiledKeymaps {
         let mut config = default_keymap_config();
         config.merge(user_config);
         Self::compile(config, &CommandRegistry)
-    }
-
-    pub(crate) fn bindings(&self, layer: Layer) -> &[KeyBinding] {
-        self.bindings
-            .get(&layer)
-            .map(Vec::as_slice)
-            .unwrap_or_default()
     }
 
     pub(super) fn trie(&self, layer: Layer) -> Option<&KeyTrie> {

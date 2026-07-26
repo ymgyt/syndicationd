@@ -20,7 +20,7 @@ mod test {
         use super::*;
 
         #[tokio::test(flavor = "multi_thread")]
-        async fn github_device_flow() -> anyhow::Result<()> {
+        async fn gh_device_flow() -> anyhow::Result<()> {
             helper::init_tracing();
 
             let mut application = TestCase::default().init_app().await?;
@@ -89,7 +89,7 @@ mod test {
                 config: test_config(),
                 ..Default::default()
             }
-            .with_credential(Credential::Github {
+            .with_credential(Credential::Gh {
                 access_token: synd_test::GITHUB_INVALID_TOKEN.to_owned(),
             });
 
@@ -98,7 +98,7 @@ mod test {
             application.wait_until_jobs_completed(&mut events).await;
 
             let screen = Screen::new(application.buffer());
-            assert!(screen.contains_text("Syndicationd"));
+            assert!(screen.contains_text("Login"));
             assert!(screen.contains_text("unauthorized. local feed API session is invalid"));
 
             Ok(())

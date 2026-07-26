@@ -166,7 +166,7 @@ mod tests {
     fn persist_then_load_credential() {
         let tmp = temp_dir();
         let cache = Cache::new(tmp);
-        let cred = Credential::Github {
+        let cred = Credential::Gh {
             access_token: "rust is fun".into(),
         };
         assert!(cache.persist_credential(&cred).is_ok());
@@ -180,7 +180,7 @@ mod tests {
         let cache = Cache::new("/dev/null");
         assert!(
             cache
-                .persist_credential(Credential::Github {
+                .persist_credential(Credential::Gh {
                     access_token: "dummy".into(),
                 })
                 .is_err()

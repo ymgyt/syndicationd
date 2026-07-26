@@ -1,6 +1,6 @@
 use std::ops::Add;
 use synd_auth::{
-    device_flow::{DeviceAuthorizationResponse, DeviceFlow, provider},
+    device_flow::{DeviceAccessTokenResponse, DeviceAuthorizationResponse, DeviceFlow, provider},
     jwt,
 };
 
@@ -12,7 +12,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct DeviceFlows {
-    pub github: DeviceFlow<provider::Github>,
+    pub gh: DeviceFlow<provider::Github>,
     pub google: DeviceFlow<provider::Google>,
 }
 
@@ -66,7 +66,7 @@ impl Authenticator {
     pub fn new() -> Self {
         Self {
             device_flows: DeviceFlows {
-                github: DeviceFlow::new(provider::Github::default()),
+                gh: DeviceFlow::new(provider::Github::default()),
                 google: DeviceFlow::new(provider::Google::default()),
             },
             jwt_service: JwtService::new(),
@@ -94,9 +94,7 @@ impl Authenticator {
         provider: AuthenticationProvider,
     ) -> anyhow::Result<DeviceAuthorizationResponse> {
         match provider {
-            AuthenticationProvider::Github => {
-                self.device_flows.github.device_authorize_request().await
-            }
+            AuthenticationProvider::Gh => self.device_flows.gh.device_authorize_request().await,
 
             AuthenticationProvider::Google => {
                 self.device_flows.google.device_authorize_request().await
@@ -111,14 +109,14 @@ impl Authenticator {
         response: DeviceAuthorizationResponse,
     ) -> anyhow::Result<Verified<Credential>> {
         match provider {
-            AuthenticationProvider::Github => {
+            AuthenticationProvider::Gh => {
                 let token_response = self
                     .device_flows
-                    .github
+                    .gh
                     .poll_device_access_token(response.device_code, response.interval)
                     .await?;
 
-                Ok(Verified(Credential::Github {
+                Ok(Verified(Credential::Gh {
                     access_token: token_response.access_token,
                 }))
             }
@@ -129,23 +127,51 @@ impl Authenticator {
                     .poll_device_access_token(response.device_code, response.interval)
                     .await?;
 
-                let id_token = token_response.id_token.expect("id token not found");
-                let expired_at = self
-                    .jwt_service
-                    .google
-                    .decode_id_token_insecure(&id_token, false)
-                    .ok()
-                    .map_or(now.add(config::credential::FALLBACK_EXPIRE), |claims| {
-                        claims.expired_at()
-                    });
-                Ok(Verified(Credential::Google {
-                    id_token,
-                    refresh_token: token_response
-                        .refresh_token
-                        .expect("refresh token not found"),
-                    expired_at,
-                }))
+                let tokens = GoogleDeviceFlowTokens::try_from(token_response)?;
+                Ok(tokens.into_credential(&self.jwt_service, now))
             }
         }
+    }
+}
+
+/// Google device-flow response proven to contain both OIDC tokens.
+struct GoogleDeviceFlowTokens {
+    id_token: String,
+    refresh_token: String,
+}
+
+impl GoogleDeviceFlowTokens {
+    fn into_credential(self, jwt_service: &JwtService, now: Time) -> Verified<Credential> {
+        let expired_at = jwt_service
+            .google
+            .decode_id_token_insecure(&self.id_token, false)
+            .ok()
+            .map_or(now.add(config::credential::FALLBACK_EXPIRE), |claims| {
+                claims.expired_at()
+            });
+
+        Verified(Credential::Google {
+            id_token: self.id_token,
+            refresh_token: self.refresh_token,
+            expired_at,
+        })
+    }
+}
+
+impl TryFrom<DeviceAccessTokenResponse> for GoogleDeviceFlowTokens {
+    type Error = anyhow::Error;
+
+    fn try_from(response: DeviceAccessTokenResponse) -> Result<Self, Self::Error> {
+        let id_token = response
+            .id_token
+            .ok_or_else(|| anyhow::anyhow!("Google device flow response has no ID token"))?;
+        let refresh_token = response
+            .refresh_token
+            .ok_or_else(|| anyhow::anyhow!("Google device flow response has no refresh token"))?;
+
+        Ok(Self {
+            id_token,
+            refresh_token,
+        })
     }
 }

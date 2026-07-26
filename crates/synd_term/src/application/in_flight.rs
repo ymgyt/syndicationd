@@ -1,125 +1,194 @@
-use std::{
-    collections::HashMap,
-    pin::Pin,
-    sync::atomic::{AtomicU64, Ordering},
-    time::Duration,
-};
+use indexmap::IndexMap;
 
-use tokio::time::{Instant, Sleep};
+use crate::event::{AuthEvent, FeedRequestEvent, GhEvent};
 
-use crate::types::github::{IssueId, NotificationId, PullRequestId};
+use super::{RequestId, RequestKind};
 
-pub type RequestSequence = u64;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RequestId {
-    DeviceFlowDeviceAuthorize,
-    DeviceFlowPollAccessToken,
-    FetchEntries,
-    SyncTimeline,
-    FetchSubscription,
-    FetchGithubNotifications { page: u8 },
-    FetchGithubIssue { id: IssueId },
-    FetchGithubPullRequest { id: PullRequestId },
-    SubscribeFeed,
-    UnsubscribeFeed,
-    MarkGithubNotificationAsDone { id: NotificationId },
-    UnsubscribeGithubThread,
-}
-
-/// Manage in flight requests state
-pub struct InFlight {
-    next_request_sequence: AtomicU64,
-    in_flights: HashMap<RequestSequence, InFlightEntry>,
-    throbber_timer: Pin<Box<Sleep>>,
+/// Application-owned request display state in request emission order.
+pub(crate) struct InFlightRequests {
+    requests: IndexMap<RequestId, InFlightRequest>,
     throbber_step: i8,
-    throbber_timer_interval: Duration,
 }
 
-impl InFlight {
-    pub fn new() -> Self {
+/// Application-visible state of one registered request.
+pub(crate) struct InFlightRequest {
+    kind: RequestKind,
+    progress: Option<RequestProgress>,
+}
+
+/// Determinate progress available for selected request kinds.
+pub(crate) enum RequestProgress {
+    TimelineWindow { loaded: usize, target: usize },
+}
+
+/// The request selected for the global status line.
+pub(crate) struct InFlightStatus<'a> {
+    request: &'a InFlightRequest,
+    throbber_step: i8,
+    other_count: usize,
+}
+
+impl InFlightRequests {
+    pub(crate) fn new() -> Self {
         Self {
-            next_request_sequence: AtomicU64::new(0),
-            in_flights: HashMap::new(),
-            throbber_timer: Box::pin(tokio::time::sleep(Duration::from_hours(24))),
+            requests: IndexMap::new(),
             throbber_step: 0,
-            throbber_timer_interval: Duration::from_millis(250),
         }
     }
 
-    #[must_use]
-    pub fn with_throbber_timer_interval(self, interval: Duration) -> Self {
-        Self {
-            throbber_timer_interval: interval,
-            ..self
+    pub(crate) fn register(&mut self, request_id: RequestId, kind: RequestKind) {
+        let progress = match &kind {
+            RequestKind::FetchTimelineWindow { limit } => Some(RequestProgress::TimelineWindow {
+                loaded: 0,
+                target: *limit,
+            }),
+            _ => None,
+        };
+        let previous = self
+            .requests
+            .insert(request_id, InFlightRequest { kind, progress });
+        assert!(previous.is_none(), "driver emitted a duplicate request id");
+        if self.requests.len() == 1 {
+            self.throbber_step = 0;
         }
     }
 
-    pub(crate) fn recent_in_flight(&self) -> Option<RequestId> {
-        self.in_flights
-            .iter()
-            .max_by_key(|(_, entry)| entry.start)
-            .map(|(_, entry)| entry.request_id)
+    pub(crate) fn correlate_auth_event(&self, request_id: RequestId, event: &AuthEvent) {
+        match (self.kind(request_id), event) {
+            (
+                RequestKind::StartDeviceFlow { provider: expected },
+                AuthEvent::DeviceFlowAuthorizationReceived { provider, .. },
+            ) => assert_eq!(
+                expected, provider,
+                "device authorization provider did not match its request"
+            ),
+            (
+                RequestKind::PollDeviceFlowAccessToken { .. },
+                AuthEvent::DeviceFlowCredentialReceived { .. },
+            ) => {}
+            _ => panic!("authentication event did not match its request"),
+        }
     }
 
-    pub(crate) fn contains(&self, request_id: RequestId) -> bool {
-        self.in_flights
+    pub(crate) fn correlate_feed_event(&mut self, request_id: RequestId, event: &FeedRequestEvent) {
+        let request = self
+            .requests
+            .get_mut(&request_id)
+            .expect("driver emitted a request event for an unknown request");
+        match (&request.kind, event) {
+            (
+                RequestKind::SubscribeFeed { url: expected },
+                FeedRequestEvent::FeedSubscribed { url },
+            ) => assert_eq!(expected, url, "subscribed feed did not match its request"),
+            (
+                RequestKind::UnsubscribeFeed { url: expected },
+                FeedRequestEvent::FeedUnsubscribed { url },
+            ) => assert_eq!(expected, url, "unsubscribed feed did not match its request"),
+            (RequestKind::FetchSubscription, FeedRequestEvent::SubscriptionFetched { .. })
+            | (
+                RequestKind::CatchUpTimeline { .. },
+                FeedRequestEvent::TimelineChangesFetched { .. },
+            ) => {}
+            (
+                RequestKind::FetchTimelineWindow { .. },
+                FeedRequestEvent::TimelineWindowChunkFetched { entries, .. },
+            ) => request.add_timeline_window_chunk(entries.len()),
+            _ => panic!("feed event did not match its request"),
+        }
+    }
+
+    pub(crate) fn correlate_gh_event(&self, request_id: RequestId, event: &GhEvent) {
+        match (self.kind(request_id), event) {
+            (RequestKind::FetchGhNotifications { .. }, GhEvent::NotificationsFetched { .. })
+            | (RequestKind::FetchGhIssue { .. }, GhEvent::IssueFetched { .. })
+            | (RequestKind::FetchGhPullRequest { .. }, GhEvent::PullRequestFetched { .. }) => {}
+            (
+                RequestKind::MarkGhNotificationAsDone { id: expected },
+                GhEvent::NotificationMarkedAsDone { notification_id },
+            ) => assert_eq!(
+                expected, notification_id,
+                "completed GitHub notification did not match its request"
+            ),
+            _ => panic!("GitHub event did not match its request"),
+        }
+    }
+
+    pub(crate) fn complete(&mut self, request_id: RequestId) -> InFlightRequest {
+        let request = self
+            .requests
+            .shift_remove(&request_id)
+            .expect("driver completed an unknown request");
+        if self.requests.is_empty() {
+            self.throbber_step = 0;
+        }
+        request
+    }
+
+    pub(crate) fn tick(&mut self) {
+        if !self.requests.is_empty() {
+            self.throbber_step = self.throbber_step.wrapping_add(1);
+        }
+    }
+
+    pub(crate) fn status(&self) -> Option<InFlightStatus<'_>> {
+        let request = self
+            .requests
             .values()
-            .any(|entry| entry.request_id == request_id)
+            .rev()
+            .find(|request| request.progress.is_some())
+            .or_else(|| self.requests.last().map(|(_, request)| request))?;
+        Some(InFlightStatus {
+            request,
+            throbber_step: self.throbber_step,
+            other_count: self.requests.len() - 1,
+        })
     }
 
-    pub async fn throbber_timer(&mut self) {
-        self.throbber_timer.as_mut().await;
+    #[cfg(feature = "integration")]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.requests.is_empty()
     }
 
-    pub fn reset_throbber_timer(&mut self) {
-        self.throbber_timer
-            .as_mut()
-            .reset(Instant::now() + self.throbber_timer_interval);
+    fn kind(&self, request_id: RequestId) -> &RequestKind {
+        &self
+            .requests
+            .get(&request_id)
+            .expect("driver emitted a request event for an unknown request")
+            .kind
+    }
+}
+
+impl InFlightRequest {
+    fn add_timeline_window_chunk(&mut self, loaded: usize) {
+        let Some(RequestProgress::TimelineWindow {
+            loaded: current,
+            target,
+        }) = self.progress.as_mut()
+        else {
+            panic!("driver emitted a timeline chunk for a non-window request");
+        };
+        *current = current.saturating_add(loaded).min(*target);
     }
 
-    pub fn inc_throbber_step(&mut self) {
-        self.throbber_step = self.throbber_step.wrapping_add(1);
+    pub(crate) fn into_kind(self) -> RequestKind {
+        self.kind
+    }
+}
+
+impl InFlightStatus<'_> {
+    pub(crate) fn kind(&self) -> &RequestKind {
+        &self.request.kind
     }
 
-    pub fn throbber_step(&self) -> i8 {
+    pub(crate) fn progress(&self) -> Option<&RequestProgress> {
+        self.request.progress.as_ref()
+    }
+
+    pub(crate) fn throbber_step(&self) -> i8 {
         self.throbber_step
     }
 
-    pub(crate) fn add(&mut self, request_id: RequestId) -> RequestSequence {
-        let seq = self.next_request_sequence();
-        self.in_flights.insert(
-            seq,
-            InFlightEntry {
-                start: Instant::now(),
-                request_id,
-            },
-        );
-
-        self.reset_throbber_timer();
-
-        seq
+    pub(crate) fn other_count(&self) -> usize {
+        self.other_count
     }
-
-    pub(crate) fn remove(&mut self, seq: RequestSequence) -> Option<RequestId> {
-        let req_id = self.in_flights.remove(&seq).map(|entry| entry.request_id);
-
-        if self.in_flights.is_empty() {
-            self.throbber_timer
-                .as_mut()
-                .reset(Instant::now() + Duration::from_hours(24));
-        }
-
-        req_id
-    }
-
-    fn next_request_sequence(&self) -> RequestSequence {
-        self.next_request_sequence.fetch_add(1, Ordering::Relaxed)
-    }
-}
-
-struct InFlightEntry {
-    // request started at(approximate)
-    start: Instant,
-    request_id: RequestId,
 }

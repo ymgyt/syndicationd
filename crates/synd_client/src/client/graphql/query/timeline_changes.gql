@@ -1,0 +1,35 @@
+query TimelineChanges($since: Int!, $first: Int!) {
+  output: feedRegistry {
+    timeline {
+      changes(since: $since, first: $first) {
+        changes {
+          __typename
+          ... on TimelineChangeUpsert {
+            timelineEntry {
+              orderTime
+              entry {
+                id
+                title
+                published
+                updated
+                summary
+                websiteUrl
+                feed {
+                  title
+                  url
+                  requirement
+                  category
+                }
+              }
+            }
+          }
+          ... on TimelineChangeRemove {
+            entryId
+          }
+        }
+        seq
+        hasMore
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@ use synd_client::payload;
 
 use crate::{
     matcher::Matcher,
-    types::{self, github::Notification},
+    types::{self, gh::Notification},
     ui::widgets::filter::{FilterResult, Filterable},
 };
 

@@ -13,13 +13,14 @@ use synd_feed::types::{Category, Requirement};
 
 use crate::{
     application::{Direction, Populate},
-    client::github::{FetchNotificationInclude, FetchNotificationParticipating},
+    client::gh::{FetchNotificationInclude, FetchNotificationParticipating},
+    command::FilterTarget,
     config::Categories,
     keymap,
     matcher::Matcher,
     types::{
         EntryExt, RequirementExt,
-        github::{PullRequestState, Reason, RepoVisibility},
+        gh::{PullRequestState, Reason, RepoVisibility},
     },
     ui::{
         Context, icon,
@@ -28,10 +29,9 @@ use crate::{
             filter::{
                 category::{CategoriesState, FilterCategoryState},
                 feed::RequirementFilterer,
-                github::GhNotificationHandler,
+                gh::GhNotificationHandler,
             },
             gh_notifications::GhNotificationFilterOptions,
-            tabs::Tab,
         },
     },
 };
@@ -39,7 +39,7 @@ use crate::{
 mod feed;
 pub(crate) use feed::{FeedFilterer, FeedHandler};
 
-mod github;
+mod gh;
 
 mod category;
 pub(crate) use category::CategoryFilterer;
@@ -49,21 +49,6 @@ pub(crate) use composed::{Composable, ComposedFilterer};
 
 mod matcher;
 pub(crate) use matcher::MatcherFilterer;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FilterLane {
-    Feed,
-    GhNotification,
-}
-
-impl From<Tab> for FilterLane {
-    fn from(tab: Tab) -> Self {
-        match tab {
-            Tab::Entries | Tab::Feeds => FilterLane::Feed,
-            Tab::GitHub => FilterLane::GhNotification,
-        }
-    }
-}
 
 pub(crate) type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
 
@@ -96,7 +81,7 @@ pub(crate) struct FilterWidget {
 #[derive(Debug, PartialEq, Eq)]
 enum State {
     Normal,
-    CategoryFiltering(FilterLane),
+    CategoryFiltering(FilterTarget),
     SearchFiltering,
 }
 
@@ -120,16 +105,27 @@ impl FilterWidget {
     }
 
     pub fn is_category_filtering_active(&self) -> bool {
-        matches!(self.state, State::CategoryFiltering(_))
+        self.category_filter_target().is_some()
+    }
+
+    pub(crate) fn category_filter_target(&self) -> Option<FilterTarget> {
+        match self.state {
+            State::CategoryFiltering(target) => Some(target),
+            State::Normal | State::SearchFiltering => None,
+        }
+    }
+
+    pub(crate) fn is_filtering_active(&self) -> bool {
+        self.state != State::Normal
     }
 
     pub(crate) fn category_filter_keymap(&self) -> Option<keymap::LayerKeymap> {
-        let State::CategoryFiltering(lane) = self.state else {
+        let State::CategoryFiltering(target) = self.state else {
             return None;
         };
 
         let mut keymap = keymap::LayerKeymap::builder(keymap::Layer::CategoryFilter);
-        for (category, state) in &self.categories_state_from_lane(lane).state {
+        for (category, state) in &self.categories_state(target).state {
             if state.label == ' ' {
                 continue;
             }
@@ -137,7 +133,7 @@ impl FilterWidget {
                 .bind_key(
                     keymap::KeyStroke::from_char(state.label),
                     keymap::KeymapAction::Filter(keymap::FilterAction::ToggleCategory {
-                        lane,
+                        target,
                         category: category.clone(),
                     }),
                     Some(format!("Toggle {category} category")),
@@ -147,7 +143,9 @@ impl FilterWidget {
         keymap
             .bind(
                 ["+"],
-                keymap::KeymapAction::Filter(keymap::FilterAction::ActivateAllCategories { lane }),
+                keymap::KeymapAction::Filter(keymap::FilterAction::ActivateAllCategories {
+                    target,
+                }),
                 Some("Activate all categories"),
             )
             .expect("valid category filter key binding");
@@ -155,7 +153,7 @@ impl FilterWidget {
             .bind(
                 ["-"],
                 keymap::KeymapAction::Filter(keymap::FilterAction::DeactivateAllCategories {
-                    lane,
+                    target,
                 }),
                 Some("Deactivate all categories"),
             )
@@ -164,21 +162,21 @@ impl FilterWidget {
         Some(keymap.build().expect("valid category filter keymap"))
     }
 
-    pub fn activate_category_filtering(&mut self, lane: FilterLane) {
-        self.state = State::CategoryFiltering(lane);
+    pub fn activate_category_filtering(&mut self, target: FilterTarget) {
+        self.state = State::CategoryFiltering(target);
     }
 
-    fn categories_state_from_lane(&self, lane: FilterLane) -> &CategoriesState {
-        match lane {
-            FilterLane::Feed => &self.feed.categories_state,
-            FilterLane::GhNotification => &self.gh_notification.categories_state,
+    fn categories_state(&self, target: FilterTarget) -> &CategoriesState {
+        match target {
+            FilterTarget::Feeds => &self.feed.categories_state,
+            FilterTarget::GhNotifications => &self.gh_notification.categories_state,
         }
     }
 
-    fn categories_state_from_lane_mut(&mut self, lane: FilterLane) -> &mut CategoriesState {
-        match lane {
-            FilterLane::Feed => &mut self.feed.categories_state,
-            FilterLane::GhNotification => &mut self.gh_notification.categories_state,
+    fn categories_state_mut(&mut self, target: FilterTarget) -> &mut CategoriesState {
+        match target {
+            FilterTarget::Feeds => &mut self.feed.categories_state,
+            FilterTarget::GhNotifications => &mut self.gh_notification.categories_state,
         }
     }
 
@@ -221,44 +219,42 @@ impl FilterWidget {
     pub fn toggle_category_state(
         &mut self,
         category: &Category<'static>,
-        lane: FilterLane,
+        target: FilterTarget,
     ) -> Filterer {
-        if let Some(category_state) = self
-            .categories_state_from_lane_mut(lane)
-            .state
-            .get_mut(category)
-        {
+        if let Some(category_state) = self.categories_state_mut(target).state.get_mut(category) {
             category_state.state = category_state.state.toggle();
         }
 
-        self.filterer(lane)
+        self.filterer(target)
     }
 
     #[must_use]
-    pub fn activate_all_categories_state(&mut self, lane: FilterLane) -> Filterer {
-        self.categories_state_from_lane_mut(lane)
+    pub fn activate_all_categories_state(&mut self, target: FilterTarget) -> Filterer {
+        self.categories_state_mut(target)
             .state
             .iter_mut()
             .for_each(|(_, state)| state.state = FilterCategoryState::Active);
 
-        self.filterer(lane)
+        self.filterer(target)
     }
 
     #[must_use]
-    pub fn deactivate_all_categories_state(&mut self, lane: FilterLane) -> Filterer {
-        self.categories_state_from_lane_mut(lane)
+    pub fn deactivate_all_categories_state(&mut self, target: FilterTarget) -> Filterer {
+        self.categories_state_mut(target)
             .state
             .iter_mut()
             .for_each(|(_, state)| state.state = FilterCategoryState::Inactive);
 
-        self.filterer(lane)
+        self.filterer(target)
     }
 
     #[must_use]
-    pub(crate) fn filterer(&self, lane: FilterLane) -> Filterer {
-        match lane {
-            FilterLane::Feed => Filterer::Feed(self.feed_filterer()),
-            FilterLane::GhNotification => Filterer::GhNotification(self.gh_notification_filterer()),
+    pub(crate) fn filterer(&self, target: FilterTarget) -> Filterer {
+        match target {
+            FilterTarget::Feeds => Filterer::Feed(self.feed_filterer()),
+            FilterTarget::GhNotifications => {
+                Filterer::GhNotification(self.gh_notification_filterer())
+            }
         }
     }
 
@@ -325,6 +321,7 @@ impl FilterWidget {
 pub(super) struct FilterContext<'a> {
     pub(super) ui: &'a Context<'a>,
     pub(super) gh_options: &'a GhNotificationFilterOptions,
+    pub(super) target: FilterTarget,
 }
 
 impl FilterWidget {
@@ -340,30 +337,23 @@ impl FilterWidget {
         let vertical = Layout::vertical([Constraint::Length(2), Constraint::Length(1)]);
         let [filter_area, search_area] = vertical.areas(area);
 
-        let lane = cx.ui.tab.into();
-        self.render_filter(filter_area, buf, cx, lane);
-        self.render_search(search_area, buf, cx.ui, lane);
+        self.render_filter(filter_area, buf, cx);
+        self.render_search(search_area, buf, cx.ui, cx.target);
     }
 
     #[allow(unstable_name_collisions)]
-    fn render_filter(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        cx: &FilterContext<'_>,
-        lane: FilterLane,
-    ) {
+    fn render_filter(&self, area: Rect, buf: &mut Buffer, cx: &FilterContext<'_>) {
         let mut spans = vec![Span::from(concat!(icon!(filter), " Filter")).dim()];
 
-        match lane {
-            FilterLane::Feed => {
+        match cx.target {
+            FilterTarget::Feeds => {
                 let mut r = self.feed.requirement.label(&cx.ui.theme.requirement);
                 if r.content == "MAY" {
                     r = r.dim();
                 }
                 spans.extend([Span::from("    "), r, Span::from("  ")]);
             }
-            FilterLane::GhNotification => {
+            FilterTarget::GhNotifications => {
                 let options = cx.gh_options;
                 let mut unread = Span::from("Unread");
                 if options.include == FetchNotificationInclude::All {
@@ -431,12 +421,12 @@ impl FilterWidget {
 
         status_line.render(status_area, buf);
 
-        let (categories, categories_state) = match lane {
-            FilterLane::Feed => (
+        let (categories, categories_state) = match cx.target {
+            FilterTarget::Feeds => (
                 &self.feed.categories_state.categories,
                 &self.feed.categories_state.state,
             ),
-            FilterLane::GhNotification => (
+            FilterTarget::GhNotifications => (
                 &self.gh_notification.categories_state.categories,
                 &self.gh_notification.categories_state.state,
             ),
@@ -444,7 +434,8 @@ impl FilterWidget {
 
         let mut spans = vec![];
 
-        let is_active = matches!(self.state, State::CategoryFiltering(active) if active == lane);
+        let is_active =
+            matches!(self.state, State::CategoryFiltering(active) if active == cx.target);
         for c in categories {
             let state = categories_state
                 .get(c)
@@ -478,7 +469,7 @@ impl FilterWidget {
         Line::from(spans).render(categories_area, buf);
     }
 
-    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>, lane: FilterLane) {
+    fn render_search(&self, area: Rect, buf: &mut Buffer, _cx: &Context<'_>, target: FilterTarget) {
         let mut spans = vec![];
         let mut label = Span::from(concat!(icon!(search), " Search"));
         if self.state != State::SearchFiltering {
@@ -486,9 +477,9 @@ impl FilterWidget {
         }
         spans.push(label);
         {
-            let padding = match lane {
-                FilterLane::Feed => "   ",
-                FilterLane::GhNotification => " ",
+            let padding = match target {
+                FilterTarget::Feeds => "   ",
+                FilterTarget::GhNotifications => " ",
             };
             spans.push(Span::from(padding));
         }

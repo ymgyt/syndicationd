@@ -1,0 +1,7 @@
+mutation SubscribeFeed($input: SubscribeFeedInput!) {
+  subscribeFeed(input: $input) {
+    status { code }
+    url
+    disposition
+  }
+}

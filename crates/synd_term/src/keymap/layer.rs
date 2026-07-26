@@ -15,8 +15,8 @@ pub enum Layer {
     CategoryFilter,
     SearchPrompt,
     UnsubscribePopup,
-    GithubNotifications,
-    GithubNotificationFilterPopup,
+    GhNotifications,
+    GhNotificationFilterPopup,
 }
 
 impl Layer {
@@ -32,8 +32,8 @@ impl Layer {
             Self::CategoryFilter => "category-filter",
             Self::SearchPrompt => "search-prompt",
             Self::UnsubscribePopup => "unsubscribe-popup",
-            Self::GithubNotifications => "github-notifications",
-            Self::GithubNotificationFilterPopup => "github-notification-filter-popup",
+            Self::GhNotifications => "github-notifications",
+            Self::GhNotificationFilterPopup => "github-notification-filter-popup",
         }
     }
 }
@@ -59,8 +59,8 @@ impl FromStr for Layer {
             "category-filter" => Ok(Self::CategoryFilter),
             "search-prompt" => Ok(Self::SearchPrompt),
             "unsubscribe-popup" => Ok(Self::UnsubscribePopup),
-            "github-notifications" => Ok(Self::GithubNotifications),
-            "github-notification-filter-popup" => Ok(Self::GithubNotificationFilterPopup),
+            "github-notifications" => Ok(Self::GhNotifications),
+            "github-notification-filter-popup" => Ok(Self::GhNotificationFilterPopup),
             unknown => Err(crate::keymap::KeymapError::UnknownLayer(unknown.to_owned())),
         }
     }

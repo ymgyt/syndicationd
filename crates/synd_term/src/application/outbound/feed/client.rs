@@ -1,11 +1,12 @@
 use std::sync::RwLock;
 
 use futures_util::{FutureExt as _, future::BoxFuture};
-use synd_client::{ApiCredential, Client, SyndApiError, payload};
+use synd_client::{
+    ApiCredential, Client, FeedEventWatch as ClientFeedEventWatch, SyndApiError, payload,
+};
 use synd_feed::types::FeedUrl;
-use tokio::sync::mpsc;
 
-use super::FeedApi;
+use super::{FeedApi, FeedEventWatch};
 
 /// Production `FeedApi` adapter backed by `synd_client::Client`.
 pub struct ClientFeedApi {
@@ -24,6 +25,12 @@ impl ClientFeedApi {
             .read()
             .expect("feed API client lock must not be poisoned")
             .clone()
+    }
+}
+
+impl FeedEventWatch for ClientFeedEventWatch {
+    fn next_event(&mut self) -> BoxFuture<'_, Result<payload::FeedEvent, SyndApiError>> {
+        async move { ClientFeedEventWatch::next_event(self).await }.boxed()
     }
 }
 
@@ -75,11 +82,16 @@ impl FeedApi for ClientFeedApi {
         async move { client.fetch_timeline_changes(since, first).await }.boxed()
     }
 
-    fn run_feed_events(
+    fn watch_feed_events(
         &self,
-        events: mpsc::UnboundedSender<payload::FeedEvent>,
-    ) -> BoxFuture<'static, Result<(), SyndApiError>> {
+    ) -> BoxFuture<'static, Result<Box<dyn FeedEventWatch>, SyndApiError>> {
         let client = self.client();
-        async move { client.run_feed_events(events).await }.boxed()
+        async move {
+            client
+                .watch_feed_events()
+                .await
+                .map(|watch| Box::new(watch) as Box<dyn FeedEventWatch>)
+        }
+        .boxed()
     }
 }

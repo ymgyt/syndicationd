@@ -6,14 +6,16 @@ use tracing::{debug, error, instrument};
 
 use crate::{
     config,
-    types::github::{
+    types::gh::{
         IssueContext, IssueId, Notification, NotificationContext, NotificationId,
         PullRequestContext, PullRequestId, RepositoryKey, ThreadId,
     },
 };
 
 #[derive(Debug, Error)]
-pub enum GithubError {
+pub enum GhError {
+    #[error("GitHub client is not configured")]
+    NotConfigured,
     #[error("invalid credential. please make sure a valid PAT is set")]
     BadCredential,
     // https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=2022-11-28#about-secondary-rate-limits
@@ -21,47 +23,47 @@ pub enum GithubError {
     SecondaryRateLimit,
     #[error("not found: {0}")]
     NotFound(String),
-    #[error("graphql: {0:?}")]
+    #[error("GraphQL: {0:?}")]
     Graphql(Vec<graphql_client::Error>),
-    #[error("unexpected github graphql response")]
+    #[error("unexpected GitHub GraphQL response")]
     UnexpectedResponse,
-    #[error("github api error: {0}")]
+    #[error("GitHub API error: {0}")]
     Api(Box<octocrab::Error>),
 }
 
-impl From<octocrab::Error> for GithubError {
+impl From<octocrab::Error> for GhError {
     fn from(err: octocrab::Error) -> Self {
         match &err {
             octocrab::Error::GitHub { source, .. } => match source.status_code.as_u16() {
-                401 => GithubError::BadCredential,
+                401 => GhError::BadCredential,
                 403 if source.message.contains("secondary rate limit") => {
-                    GithubError::SecondaryRateLimit
+                    GhError::SecondaryRateLimit
                 }
-                _ => GithubError::Api(Box::new(err)),
+                _ => GhError::Api(Box::new(err)),
             },
-            _ => GithubError::Api(Box::new(err)),
+            _ => GhError::Api(Box::new(err)),
         }
     }
 }
 
-impl From<Vec<graphql_client::Error>> for GithubError {
+impl From<Vec<graphql_client::Error>> for GhError {
     fn from(err: Vec<graphql_client::Error>) -> Self {
-        GithubError::Graphql(err)
+        GhError::Graphql(err)
     }
 }
 
 #[derive(Clone)]
-pub struct GithubClient {
+pub struct GhClient {
     client: Octocrab,
 }
 
-impl GithubClient {
-    pub fn new(pat: impl Into<String>) -> Result<Self, GithubError> {
+impl GhClient {
+    pub fn new(pat: impl Into<String>) -> Result<Self, GhError> {
         let pat = pat.into();
         if pat.is_empty() {
-            return Err(GithubError::BadCredential);
+            return Err(GhError::BadCredential);
         }
-        let timeout = Some(config::github::CLIENT_TIMEOUT);
+        let timeout = Some(config::gh::CLIENT_TIMEOUT);
         let octo = Octocrab::builder()
             .personal_token(pat)
             .set_connect_timeout(timeout)
@@ -77,16 +79,16 @@ impl GithubClient {
         Self { client }
     }
 
-    pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> Result<(), GithubError> {
+    pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> Result<(), GhError> {
         self.client
             .activity()
             .notifications()
             .mark_as_read(id)
             .await
-            .map_err(GithubError::from)
+            .map_err(GhError::from)
     }
 
-    pub(crate) async fn unsubscribe_thread(&self, id: ThreadId) -> Result<(), GithubError> {
+    pub(crate) async fn unsubscribe_thread(&self, id: ThreadId) -> Result<(), GhError> {
         // The reasons for not using the `set_thread_subscription` method of `NotificationHandler` are twofold:
         // 1. Since the API require the PUT method, but it is implemented using GET, it results in a "Not found" error.
         // 2. During the deserialization of the `ThreadSubscription` response type, an empty string is assigned to the reason, causing an error when deserializing the `Reason` enum.
@@ -133,7 +135,7 @@ pub(crate) struct FetchNotificationsParams {
     pub(crate) participating: FetchNotificationParticipating,
 }
 
-impl GithubClient {
+impl GhClient {
     #[instrument(skip(self))]
     pub(crate) async fn fetch_notifications(
         &self,
@@ -142,7 +144,7 @@ impl GithubClient {
             include,
             participating,
         }: FetchNotificationsParams,
-    ) -> Result<Vec<Notification>, GithubError> {
+    ) -> Result<Vec<Notification>, GhError> {
         let mut page = self
             .client
             .activity()
@@ -151,7 +153,7 @@ impl GithubClient {
             .participating(participating == FetchNotificationParticipating::OnlyParticipating)
             .all(include == FetchNotificationInclude::All)
             .page(page) // 1 Origin
-            .per_page(config::github::NOTIFICATION_PER_PAGE)
+            .per_page(config::gh::NOTIFICATION_PER_PAGE)
             .send()
             .await?;
         let notifications: Vec<_> = page
@@ -161,7 +163,7 @@ impl GithubClient {
             .collect();
 
         debug!(
-            "Fetch {} github notifications: {page:?}",
+            "Fetch {} GitHub notifications: {page:?}",
             notifications.len()
         );
 
@@ -178,7 +180,7 @@ impl GithubClient {
 )]
 pub(crate) struct IssueQuery;
 
-impl GithubClient {
+impl GhClient {
     pub(crate) async fn fetch_issue(
         &self,
         NotificationContext {
@@ -186,7 +188,7 @@ impl GithubClient {
             repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<IssueId>,
-    ) -> Result<IssueContext, GithubError> {
+    ) -> Result<IssueContext, GhError> {
         let response: octocrab::Result<issue_query::ResponseData> = self
             .client
             .graphql(&IssueQuery::build_query(issue_query::Variables {
@@ -198,10 +200,10 @@ impl GithubClient {
 
         match response {
             Ok(data) => IssueContext::try_from(data).map_err(|error| {
-                error!(%error, "failed to decode github issue response");
+                error!(%error, "failed to decode GitHub issue response");
                 err::handle_decode_error(error)
             }),
-            Err(error) => Err(GithubError::from(error)),
+            Err(error) => Err(GhError::from(error)),
         }
     }
 }
@@ -215,7 +217,7 @@ impl GithubClient {
 )]
 pub(crate) struct PullRequestQuery;
 
-impl GithubClient {
+impl GhClient {
     pub(crate) async fn fetch_pull_request(
         &self,
         NotificationContext {
@@ -223,7 +225,7 @@ impl GithubClient {
             repository_key: RepositoryKey { name, owner },
             ..
         }: NotificationContext<PullRequestId>,
-    ) -> Result<PullRequestContext, GithubError> {
+    ) -> Result<PullRequestContext, GhError> {
         let response: octocrab::Result<pull_request_query::ResponseData> = self
             .client
             .graphql(&PullRequestQuery::build_query(
@@ -237,27 +239,27 @@ impl GithubClient {
 
         match response {
             Ok(data) => PullRequestContext::try_from(data).map_err(|error| {
-                error!(%error, "failed to decode github pull request response");
+                error!(%error, "failed to decode GitHub pull request response");
                 err::handle_decode_error(error)
             }),
-            Err(error) => Err(GithubError::from(error)),
+            Err(error) => Err(GhError::from(error)),
         }
     }
 }
 
 mod err {
-    use crate::{client::github::GithubError, types::github::SubjectContextDecodeError};
+    use crate::{client::gh::GhError, types::gh::SubjectContextDecodeError};
 
-    pub(super) fn handle_decode_error(error: SubjectContextDecodeError) -> GithubError {
+    pub(super) fn handle_decode_error(error: SubjectContextDecodeError) -> GhError {
         match error {
             SubjectContextDecodeError::Repository => {
-                GithubError::NotFound("repository not found in graphql response".to_owned())
+                GhError::NotFound("repository not found in GraphQL response".to_owned())
             }
             SubjectContextDecodeError::Issue => {
-                GithubError::NotFound("issue not found in graphql response".to_owned())
+                GhError::NotFound("issue not found in GraphQL response".to_owned())
             }
             SubjectContextDecodeError::PullRequest => {
-                GithubError::NotFound("pull request not found in graphql response".to_owned())
+                GhError::NotFound("pull request not found in GraphQL response".to_owned())
             }
         }
     }

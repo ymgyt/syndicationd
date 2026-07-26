@@ -97,7 +97,7 @@ struct ServiceAddrs {
 
 impl TestCase {
     pub fn already_logined(self) -> Self {
-        let cred = Credential::Github {
+        let cred = Credential::Gh {
             access_token: "dummy_gh_token".into(),
         };
         self.with_credential(cred)
@@ -143,11 +143,12 @@ impl TestCase {
             let terminal = new_test_terminal(term_col, term_row);
             let client = Client::new(
                 endpoint,
-                ClientOptions::new(Duration::from_secs(10), "synd-integration-test"),
+                ClientOptions::new(Duration::from_secs(10), "synd-integration-test")
+                    .danger_accept_invalid_certs(true),
             )
             .unwrap();
             let device_flows = DeviceFlows {
-                github: DeviceFlow::new(
+                gh: DeviceFlow::new(
                     provider::Github::new("dummy")
                         .with_device_authorization_endpoint(
                             Url::parse(&format!(
@@ -218,6 +219,7 @@ impl TestCase {
                 .cache(cache)
                 .theme(Theme::default())
                 .authenticator(authenticator)
+                .authentication_required(true)
                 .interactor(interactor)
                 .build();
 
@@ -349,9 +351,9 @@ pub async fn serve_api(
     );
 
     {
-        let github_endpoint: &'static str =
+        let gh_endpoint: &'static str =
             format!("http://{oauth_provider_addr}/github/graphql").leak();
-        let github_client = GithubClient::new()?.with_endpoint(github_endpoint);
+        let gh_client = GithubClient::new()?.with_endpoint(gh_endpoint);
         let google_jwt =
             jwt::google::JwtService::new("dummy_google_client_id", "dummy_google_client_secret")
                 .with_pem_endpoint(
@@ -363,7 +365,7 @@ pub async fn serve_api(
 
         dep.authenticator = dep
             .authenticator
-            .with_github_client(github_client)
+            .with_github_client(gh_client)
             .with_google_jwt(google_jwt);
     }
 

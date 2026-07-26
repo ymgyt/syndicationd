@@ -62,6 +62,7 @@ pub(crate) struct Keymap {
     static_keymaps: CompiledKeymaps,
     dynamic_keymaps: HashMap<Layer, LayerKeymap>,
     pending: Vec<KeyStroke>,
+    pending_layers: Option<LayerStack>,
 }
 
 impl Keymap {
@@ -70,6 +71,7 @@ impl Keymap {
             static_keymaps,
             dynamic_keymaps: HashMap::new(),
             pending: Vec::new(),
+            pending_layers: None,
         }
     }
 
@@ -77,8 +79,19 @@ impl Keymap {
         Self::new(CompiledKeymaps::default_keymaps())
     }
 
-    pub(crate) fn clear_pending(&mut self) {
+    fn clear_pending(&mut self) {
         self.pending.clear();
+        self.pending_layers = None;
+    }
+
+    pub(crate) fn sync_layers(&mut self, layers: &LayerStack) {
+        if self
+            .pending_layers
+            .as_ref()
+            .is_some_and(|pending| pending != layers)
+        {
+            self.clear_pending();
+        }
     }
 
     pub(crate) fn set_layer_keymap(&mut self, keymap: LayerKeymap) {
@@ -90,6 +103,7 @@ impl Keymap {
     }
 
     pub(crate) fn resolve(&mut self, layers: &LayerStack, key: KeyEvent) -> KeymapResult {
+        self.sync_layers(layers);
         self.resolve_stroke(layers, KeyStroke::from(key))
     }
 
@@ -108,6 +122,7 @@ impl Keymap {
                 TrieSearch::Matched(binding) => return matched(binding),
                 TrieSearch::Pending(candidates) => {
                     self.pending.push(key);
+                    self.pending_layers = Some(layers.clone());
                     return KeymapResult::Pending {
                         keys: self.pending.clone(),
                         candidates,
@@ -125,14 +140,14 @@ impl Keymap {
             .iter_high_to_low()
             .find(|layer| matches!(self.search(*layer, &[first]), TrieSearch::Pending(_)))
         else {
-            let keys = std::mem::take(&mut self.pending);
+            let keys = self.take_pending();
             return KeymapResult::Cancelled { keys };
         };
 
         self.pending.push(key);
         match self.search(layer, &self.pending) {
             TrieSearch::Matched(binding) => {
-                self.pending.clear();
+                self.clear_pending();
                 matched(binding)
             }
             TrieSearch::Pending(candidates) => KeymapResult::Pending {
@@ -140,10 +155,15 @@ impl Keymap {
                 candidates,
             },
             TrieSearch::NotFound => {
-                let keys = std::mem::take(&mut self.pending);
+                let keys = self.take_pending();
                 KeymapResult::Cancelled { keys }
             }
         }
+    }
+
+    fn take_pending(&mut self) -> Vec<KeyStroke> {
+        self.pending_layers = None;
+        std::mem::take(&mut self.pending)
     }
 
     fn search(&self, layer: Layer, keys: &[KeyStroke]) -> TrieSearch {

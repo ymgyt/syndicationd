@@ -4,20 +4,20 @@ use ratatui::{
 };
 
 use crate::{
-    application::component::AppComponent,
+    application::component::Components,
     ui::{
         Context,
-        widgets::{filter::FilterContext, tabs::Tab},
+        widgets::{authentication::AuthWidget, filter::FilterContext, tabs::Tab},
     },
 };
 
 pub struct AppWidget<'a> {
-    components: &'a AppComponent,
+    components: &'a Components,
     cx: Context<'a>,
 }
 
 impl<'a> AppWidget<'a> {
-    pub fn new(components: &'a AppComponent, cx: Context<'a>) -> Self {
+    pub fn new(components: &'a Components, cx: Context<'a>) -> Self {
         Self { components, cx }
     }
 
@@ -25,7 +25,7 @@ impl<'a> AppWidget<'a> {
         let cx = &self.cx;
         let shell = &self.components.shell;
         let feeds = &self.components.feeds;
-        let github = &self.components.github;
+        let gh = &self.components.gh;
 
         let layout = Layout::vertical([
             Constraint::Length(1),
@@ -41,14 +41,15 @@ impl<'a> AppWidget<'a> {
             buf,
             &FilterContext {
                 ui: cx,
-                gh_options: github.notifications.filter_options(),
+                gh_options: gh.notifications.filter_options(),
+                target: shell.current_filter_target(),
             },
         );
 
         match cx.tab {
             Tab::Feeds => feeds.subscription.render(content_area, buf, cx),
             Tab::Entries => feeds.entries.render(content_area, buf, cx),
-            Tab::GitHub => github.notifications.render(content_area, buf, cx),
+            Tab::Gh => gh.notifications.render(content_area, buf, cx),
         }
 
         shell
@@ -59,20 +60,20 @@ impl<'a> AppWidget<'a> {
 
 impl Widget for AppWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Background
         Block::new().style(self.cx.theme.base).render(area, buf);
 
-        if self.components.shell.auth.should_render() {
-            let [auth_area, prompt_area] =
-                Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
+        match AuthWidget::from_shell(&self.components.shell, self.cx.theme) {
+            Some(auth) => {
+                let [auth_area, prompt_area] =
+                    Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
 
-            self.components.shell.auth.render(auth_area, buf, &self.cx);
-            self.components
-                .shell
-                .prompt
-                .render(prompt_area, buf, &self.cx, None);
-        } else {
-            self.render_browse(area, buf);
+                auth.render(auth_area, buf);
+                self.components
+                    .shell
+                    .prompt
+                    .render(prompt_area, buf, &self.cx, None);
+            }
+            None => self.render_browse(area, buf),
         }
     }
 }

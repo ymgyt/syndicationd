@@ -1,9 +1,6 @@
 use synd_feed::types::Category;
 
-use crate::{
-    command::{Command, FilterCommand},
-    ui::widgets::filter::FilterLane,
-};
+use crate::command::{Command, FilterCommand, FilterTarget};
 
 use super::CommandId;
 
@@ -18,7 +15,7 @@ pub(crate) enum KeymapAction {
 impl KeymapAction {
     pub(crate) fn build_command(&self) -> Command {
         match self {
-            Self::Command(command) => command.build(),
+            Self::Command(command) => Command::from(*command),
             Self::Prompt(action) => Command::Filter(action.clone().into()),
             Self::Filter(action) => Command::Filter(action.clone().into()),
         }
@@ -51,14 +48,14 @@ impl From<PromptAction> for FilterCommand {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum FilterAction {
     ToggleCategory {
-        lane: FilterLane,
+        target: FilterTarget,
         category: Category<'static>,
     },
     ActivateAllCategories {
-        lane: FilterLane,
+        target: FilterTarget,
     },
     DeactivateAllCategories {
-        lane: FilterLane,
+        target: FilterTarget,
     },
 }
 
@@ -71,14 +68,14 @@ impl From<FilterAction> for KeymapAction {
 impl From<FilterAction> for FilterCommand {
     fn from(action: FilterAction) -> Self {
         match action {
-            FilterAction::ToggleCategory { lane, category } => {
-                Self::ToggleFilterCategory { lane, category }
+            FilterAction::ToggleCategory { target, category } => {
+                Self::ToggleFilterCategory { target, category }
             }
-            FilterAction::ActivateAllCategories { lane } => {
-                Self::ActivateAllFilterCategories { lane }
+            FilterAction::ActivateAllCategories { target } => {
+                Self::ActivateAllFilterCategories { target }
             }
-            FilterAction::DeactivateAllCategories { lane } => {
-                Self::DeactivateAllFilterCategories { lane }
+            FilterAction::DeactivateAllCategories { target } => {
+                Self::DeactivateAllFilterCategories { target }
             }
         }
     }

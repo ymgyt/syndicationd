@@ -72,8 +72,8 @@ ConfigFile {
             ),
         },
     ),
-    github: Some(
-        GithubEntry {
+    gh: Some(
+        GhEntry {
             enable: Some(
                 true,
             ),

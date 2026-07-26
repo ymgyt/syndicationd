@@ -3,9 +3,8 @@ use std::{collections::VecDeque, future, sync::Mutex};
 use futures_util::{FutureExt as _, future::BoxFuture};
 use synd_client::{ApiCredential, SyndApiError, payload};
 use synd_feed::types::FeedUrl;
-use tokio::sync::mpsc;
 
-use super::FeedApi;
+use super::{FeedApi, FeedEventWatch};
 
 pub enum MockFeedApiResponse {
     Subscription(Result<payload::SubscriptionPayload, SyndApiError>),
@@ -19,6 +18,19 @@ pub enum MockFeedApiResponse {
 /// In-memory `FeedApi` implementation for terminal workflow tests.
 pub struct MockFeedApi {
     responses: Mutex<VecDeque<MockFeedApiResponse>>,
+}
+
+struct MockFeedEventWatch {
+    events: VecDeque<payload::FeedEvent>,
+}
+
+impl FeedEventWatch for MockFeedEventWatch {
+    fn next_event(&mut self) -> BoxFuture<'_, Result<payload::FeedEvent, SyndApiError>> {
+        match self.events.pop_front() {
+            Some(event) => future::ready(Ok(event)).boxed(),
+            None => future::pending().boxed(),
+        }
+    }
 }
 
 impl MockFeedApi {
@@ -136,21 +148,16 @@ impl FeedApi for MockFeedApi {
         future::ready(result).boxed()
     }
 
-    fn run_feed_events(
+    fn watch_feed_events(
         &self,
-        events: mpsc::UnboundedSender<payload::FeedEvent>,
-    ) -> BoxFuture<'static, Result<(), SyndApiError>> {
+    ) -> BoxFuture<'static, Result<Box<dyn FeedEventWatch>, SyndApiError>> {
         let result = match self
             .pop_response(|response| matches!(response, MockFeedApiResponse::FeedEvents(_)))
         {
-            Ok(MockFeedApiResponse::FeedEvents(Ok(feed_events))) => {
-                for event in feed_events {
-                    if events.send(event).is_err() {
-                        break;
-                    }
-                }
-                Ok(())
-            }
+            Ok(MockFeedApiResponse::FeedEvents(Ok(events))) => Ok(Box::new(MockFeedEventWatch {
+                events: events.into(),
+            })
+                as Box<dyn FeedEventWatch>),
             Ok(MockFeedApiResponse::FeedEvents(Err(err))) | Err(err) => Err(err),
             Ok(_) => Err(Self::mismatch()),
         };

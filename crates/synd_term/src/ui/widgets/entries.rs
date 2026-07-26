@@ -31,17 +31,13 @@ impl EntriesWidget {
         }
     }
 
-    pub(crate) fn loaded_count(&self) -> usize {
-        self.entries.unfiltered_len()
-    }
-
-    pub(crate) fn update_entries_with_limit(
+    pub(crate) fn update_timeline_chunk(
         &mut self,
         populate: Populate,
-        payload: payload::TimelineEntryConnection,
+        entries: Vec<payload::TimelineEntry>,
         limit: usize,
     ) {
-        self.entries.update(populate, payload.nodes);
+        self.entries.update(populate, entries);
         self.entries.truncate(limit);
     }
 

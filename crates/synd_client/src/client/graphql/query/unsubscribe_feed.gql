@@ -1,0 +1,7 @@
+mutation UnsubscribeFeed($input: UnsubscribeFeedInput!) {
+  unsubscribeFeed(input: $input) {
+    status { code }
+    url
+    disposition
+  }
+}

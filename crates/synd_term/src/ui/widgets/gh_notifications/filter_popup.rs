@@ -7,16 +7,14 @@ use ratatui::{
 };
 
 use crate::{
-    client::github::{FetchNotificationInclude, FetchNotificationParticipating},
-    types::github::{Notification, PullRequestState, Reason, RepoVisibility, SubjectContext},
+    client::gh::{FetchNotificationInclude, FetchNotificationParticipating},
+    command::GhNotificationFilterOption,
+    types::gh::{Notification, PullRequestState, Reason, RepoVisibility, SubjectContext},
     ui::{
         Context, icon,
         widgets::{
             filter::{FilterResult, Filterable},
-            gh_notifications::{
-                GhNotificationFilterOptions, GhNotificationFilterOptionsState,
-                GhNotificationFilterUpdater,
-            },
+            gh_notifications::{GhNotificationFilterOptions, GhNotificationFilterOptionsState},
         },
     },
 };
@@ -92,51 +90,16 @@ impl FilterPopup {
         }
     }
 
-    pub(super) fn update_options(
+    pub(super) fn toggle_option(
         &mut self,
-        new: &GhNotificationFilterUpdater,
+        option: &GhNotificationFilterOption,
         current: &GhNotificationFilterOptions,
     ) {
         let mut pending = self
             .pending_options
             .take()
             .unwrap_or_else(|| current.clone());
-
-        if new.toggle_include {
-            pending.include = match pending.include {
-                FetchNotificationInclude::OnlyUnread => FetchNotificationInclude::All,
-                FetchNotificationInclude::All => FetchNotificationInclude::OnlyUnread,
-            };
-        }
-        if new.toggle_participating {
-            pending.participating = match pending.participating {
-                FetchNotificationParticipating::OnlyParticipating => {
-                    FetchNotificationParticipating::All
-                }
-                FetchNotificationParticipating::All => {
-                    FetchNotificationParticipating::OnlyParticipating
-                }
-            };
-        }
-        if new.toggle_visilibty_public {
-            pending.visibility = match pending.visibility {
-                Some(RepoVisibility::Public) => None,
-                Some(RepoVisibility::Private) | None => Some(RepoVisibility::Public),
-            };
-        }
-        if new.toggle_visilibty_private {
-            pending.visibility = match pending.visibility {
-                Some(RepoVisibility::Private) => None,
-                Some(RepoVisibility::Public) | None => Some(RepoVisibility::Private),
-            };
-        }
-        if let Some(pr_state) = new.toggle_pull_request_condition {
-            pending.toggle_pull_request_condition(pr_state);
-        }
-        if let Some(reason) = new.toggle_reason.as_ref() {
-            pending.toggle_reason(reason);
-        }
-
+        pending.toggle(option);
         self.pending_options = Some(pending);
     }
 }

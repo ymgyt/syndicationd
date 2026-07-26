@@ -113,7 +113,7 @@ mod feed {
     };
     use nom_language::error::{VerboseError, VerboseErrorKind};
     use synd_client::payload::{
-        CrawlPolicyInput, PollingPolicyInput, PollingPolicyInputKind, SubscribeFeedInput,
+        CrawlPolicyInput, PollingIntervalSeconds, PollingPolicyInput, SubscribeFeedInput,
     };
     use synd_feed::types::{Category, FeedUrl, Requirement};
     use tracing::{Level, event};
@@ -210,10 +210,7 @@ mod feed {
             return Ok((
                 remain,
                 CrawlPolicyInput {
-                    polling: PollingPolicyInput {
-                        kind: PollingPolicyInputKind::Manual,
-                        interval_seconds: None,
-                    },
+                    polling: PollingPolicyInput::Manual,
                 },
             ));
         }
@@ -231,17 +228,13 @@ mod feed {
             return Err(invalid_crawl_policy(s));
         }
         let seconds = i64::try_from(duration.as_secs()).unwrap_or(i64::MAX);
-        if seconds == 0 {
-            return Err(invalid_crawl_policy(s));
-        }
+        let seconds =
+            PollingIntervalSeconds::try_from(seconds).map_err(|_| invalid_crawl_policy(s))?;
 
         Ok((
             remain,
             CrawlPolicyInput {
-                polling: PollingPolicyInput {
-                    kind: PollingPolicyInputKind::Interval,
-                    interval_seconds: Some(seconds),
-                },
+                polling: PollingPolicyInput::Interval { seconds },
             },
         ))
     }
@@ -302,10 +295,7 @@ mod feed {
                         requirement: Some(Requirement::Must),
                         category: Some(Category::new("rust").unwrap()),
                         crawl_policy: Some(CrawlPolicyInput {
-                            polling: PollingPolicyInput {
-                                kind: PollingPolicyInputKind::Manual,
-                                interval_seconds: None,
-                            },
+                            polling: PollingPolicyInput::Manual,
                         }),
                     }
                 ))
@@ -323,9 +313,8 @@ mod feed {
                         requirement: Some(Requirement::Must),
                         category: Some(Category::new("rust").unwrap()),
                         crawl_policy: Some(CrawlPolicyInput {
-                            polling: PollingPolicyInput {
-                                kind: PollingPolicyInputKind::Interval,
-                                interval_seconds: Some(1800),
+                            polling: PollingPolicyInput::Interval {
+                                seconds: PollingIntervalSeconds::try_from(1800).unwrap(),
                             },
                         }),
                     }

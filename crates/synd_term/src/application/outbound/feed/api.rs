@@ -3,9 +3,13 @@ use std::sync::Arc;
 use futures_util::future::BoxFuture;
 use synd_client::{ApiCredential, SyndApiError, payload};
 use synd_feed::types::FeedUrl;
-use tokio::sync::mpsc;
 
 pub type FeedApiRef = Arc<dyn FeedApi>;
+
+/// Active feed-event watch returned by a `FeedApi`.
+pub trait FeedEventWatch: Send {
+    fn next_event(&mut self) -> BoxFuture<'_, Result<payload::FeedEvent, SyndApiError>>;
+}
 
 /// Outbound feed capability required by the terminal application workflow.
 pub trait FeedApi: Send + Sync + 'static {
@@ -36,8 +40,7 @@ pub trait FeedApi: Send + Sync + 'static {
         first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineChangesPayload, SyndApiError>>;
 
-    fn run_feed_events(
+    fn watch_feed_events(
         &self,
-        events: mpsc::UnboundedSender<payload::FeedEvent>,
-    ) -> BoxFuture<'static, Result<(), SyndApiError>>;
+    ) -> BoxFuture<'static, Result<Box<dyn FeedEventWatch>, SyndApiError>>;
 }

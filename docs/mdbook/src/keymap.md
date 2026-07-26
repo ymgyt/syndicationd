@@ -59,6 +59,7 @@ dynamic bindings are managed by the application for now.
 | ---                                                    | ---                                |
 | `no_op`                                                | any layer                          |
 | `app.quit`                                             | `app`, `global`                    |
+| `app.redraw`                                           | `app`                              |
 | `theme.rotate`                                         | `global`                           |
 | `login.authenticate`                                   | `login`                            |
 | `login.provider.prev`                                  | `login`                            |
@@ -69,7 +70,7 @@ dynamic bindings are managed by the application for now.
 | `entries.next`                                         | `entries`                          |
 | `entries.first`                                        | `entries`                          |
 | `entries.last`                                         | `entries`                          |
-| `entries.reload`                                       | `entries`                          |
+| `timeline.refresh`                                     | `entries`                          |
 | `entries.open`                                         | `entries`                          |
 | `entries.browse`                                       | `entries`                          |
 | `feeds.prev`                                           | `feeds`                            |
@@ -79,7 +80,6 @@ dynamic bindings are managed by the application for now.
 | `feeds.subscribe`                                      | `feeds`                            |
 | `feeds.edit`                                           | `feeds`                            |
 | `feeds.unsubscribe`                                    | `feeds`                            |
-| `feeds.refresh-selected`                               | `feeds`                            |
 | `feeds.reload`                                         | `feeds`                            |
 | `feeds.open`                                           | `feeds`                            |
 | `feeds.unsubscribe-popup.prev`                         | `unsubscribe-popup`                |
@@ -126,7 +126,7 @@ dynamic bindings are managed by the application for now.
 | `a`     | Add feed subscription on the Feeds tab         |
 | `e`     | Edit subscribed feed on the Feeds tab          |
 | `d`     | Delete subscribed feed on the Feeds tab        |
-| `r`     | Reload entries/feeds                           |
+| `r`     | Refresh timeline/feeds                         |
 | `h/l`   | Change requirement filter                      |
 | `c`     | Activate category filter (`Esc` to deactivate) |
 | `+`     | Activate all categories on category filter     |

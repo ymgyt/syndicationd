@@ -2,28 +2,35 @@ use core::assert_matches;
 
 use crate::{
     application::Direction,
-    command::{Command, FeedsCommand, ShellCommand},
-    ui::widgets::filter::FilterLane,
+    command::{Command, FeedsCommand, FilterTarget, ShellCommand},
 };
 use synd_feed::types::Category;
 
 use super::{default::default_keymap_config, *};
 
 #[test]
-fn command_registry_resolves_canonical_alias_and_typable_names() {
+fn command_registry_uses_only_timeline_refresh_names() {
     let registry = CommandRegistry;
 
     assert_eq!(
-        registry.command_id("entries.reload").unwrap(),
-        CommandId::ReloadEntries
+        registry.command_id("timeline.refresh").unwrap(),
+        CommandId::RefreshTimeline
     );
     assert_eq!(
-        registry.command_id("reload_entries").unwrap(),
-        CommandId::ReloadEntries
+        registry.command_id(":refresh-timeline").unwrap(),
+        CommandId::RefreshTimeline
     );
-    assert_eq!(
-        registry.command_id(":reload-entries").unwrap(),
-        CommandId::ReloadEntries
+    assert_matches!(
+        registry.command_id("entries.reload"),
+        Err(KeymapError::UnknownCommand(_))
+    );
+    assert_matches!(
+        registry.command_id("reload_entries"),
+        Err(KeymapError::UnknownCommand(_))
+    );
+    assert_matches!(
+        registry.command_id(":reload-entries"),
+        Err(KeymapError::UnknownCommand(_))
     );
 }
 
@@ -177,7 +184,7 @@ fn dynamic_category_filter_layer_resolves_runtime_category_actions() {
         .bind_key(
             KeyStroke::from_char('r'),
             KeymapAction::Filter(FilterAction::ToggleCategory {
-                lane: FilterLane::Feed,
+                target: FilterTarget::Feeds,
                 category: rust.clone(),
             }),
             Some("Toggle rust category".to_owned()),
@@ -193,7 +200,7 @@ fn dynamic_category_filter_layer_resolves_runtime_category_actions() {
     assert_eq!(
         matched_action(&result),
         Some(&KeymapAction::Filter(FilterAction::ToggleCategory {
-            lane: FilterLane::Feed,
+            target: FilterTarget::Feeds,
             category: rust,
         }))
     );

@@ -8,7 +8,6 @@ use super::{
 pub(crate) struct LayerKeymap {
     layer: Layer,
     trie: KeyTrie,
-    bindings: Vec<ActionBinding>,
     input_chars: bool,
 }
 
@@ -97,7 +96,6 @@ impl LayerKeymapBuilder {
         Ok(LayerKeymap {
             layer: self.layer,
             trie,
-            bindings: self.bindings,
             input_chars: self.input_chars,
         })
     }

@@ -3,6 +3,7 @@ use std::process::ExitCode;
 use clap::Args;
 use schemars::JsonSchema;
 use serde::Serialize;
+use synd_client::payload::PageInfo;
 use synd_term::types::ExportedFeed;
 
 use crate::{
@@ -58,10 +59,10 @@ impl ExportCommand {
                 let page_info = response.feeds.page_info;
                 exported_feeds.extend(response.feeds.nodes.into_iter().map(ExportedFeed::from));
 
-                if !page_info.has_next_page {
-                    break;
+                match page_info {
+                    PageInfo::Complete { .. } => break,
+                    PageInfo::More { next_cursor } => after = Some(next_cursor),
                 }
-                after = page_info.end_cursor;
             }
 
             let output = Export {

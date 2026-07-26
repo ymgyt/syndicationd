@@ -89,8 +89,8 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     bind!(
         Layer::Entries,
         ["r"],
-        CommandId::ReloadEntries,
-        "Reload entries"
+        CommandId::RefreshTimeline,
+        "Refresh timeline"
     );
     bind!(
         Layer::Entries,
@@ -265,148 +265,148 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     );
 
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["k"],
-        CommandId::MoveGithubNotificationPrev,
+        CommandId::MoveGhNotificationPrev,
         "Previous GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["up"],
-        CommandId::MoveGithubNotificationPrev,
+        CommandId::MoveGhNotificationPrev,
         "Previous GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["j"],
-        CommandId::MoveGithubNotificationNext,
+        CommandId::MoveGhNotificationNext,
         "Next GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["down"],
-        CommandId::MoveGithubNotificationNext,
+        CommandId::MoveGhNotificationNext,
         "Next GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["enter"],
-        CommandId::OpenGithubNotification,
+        CommandId::OpenGhNotification,
         "Open GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["A-enter"],
-        CommandId::OpenGithubNotificationWithDone,
+        CommandId::OpenGhNotificationAndMarkAsDone,
         "Open GitHub notification and mark as done"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["r"],
-        CommandId::ReloadGithubNotifications,
+        CommandId::ReloadGhNotifications,
         "Reload GitHub notifications"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["d"],
-        CommandId::MarkGithubNotificationAsDone,
+        CommandId::MarkGhNotificationAsDone,
         "Mark GitHub notification as done"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["S-d"],
-        CommandId::MarkGithubNotificationAsDoneAll,
+        CommandId::MarkAllGhNotificationsAsDone,
         "Mark all GitHub notifications as done"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["u"],
-        CommandId::UnsubscribeGithubThread,
+        CommandId::UnsubscribeGhThread,
         "Unsubscribe GitHub thread"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["g", "g"],
-        CommandId::MoveGithubNotificationFirst,
+        CommandId::MoveGhNotificationFirst,
         "Go to first GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["g", "e"],
-        CommandId::MoveGithubNotificationLast,
+        CommandId::MoveGhNotificationLast,
         "Go to last GitHub notification"
     );
     bind!(
-        Layer::GithubNotifications,
+        Layer::GhNotifications,
         ["f"],
-        CommandId::OpenGithubNotificationFilterPopup,
+        CommandId::OpenGhNotificationFilter,
         "Open GitHub notification filter popup"
     );
 
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["u", "n"],
-        CommandId::ToggleGithubNotificationFilterPopupIncludeUnread,
+        CommandId::ToggleGhNotificationFilterUnreadOnly,
         "Toggle unread filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["c", "l"],
-        CommandId::ToggleGithubNotificationFilterPopupPullRequestClosed,
+        CommandId::ToggleGhNotificationFilterPullRequestClosed,
         "Toggle closed pull request filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["p", "a"],
-        CommandId::ToggleGithubNotificationFilterPopupParticipating,
+        CommandId::ToggleGhNotificationFilterParticipatingOnly,
         "Toggle participating filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["p", "u"],
-        CommandId::ToggleGithubNotificationFilterPopupVisibilityPublic,
+        CommandId::ToggleGhNotificationFilterVisibilityPublic,
         "Toggle public repository filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["p", "r"],
-        CommandId::ToggleGithubNotificationFilterPopupVisibilityPrivate,
+        CommandId::ToggleGhNotificationFilterVisibilityPrivate,
         "Toggle private repository filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["o", "p"],
-        CommandId::ToggleGithubNotificationFilterPopupPullRequestOpen,
+        CommandId::ToggleGhNotificationFilterPullRequestOpen,
         "Toggle open pull request filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["m", "e"],
-        CommandId::ToggleGithubNotificationFilterPopupReasonMentioned,
+        CommandId::ToggleGhNotificationFilterReasonMentioned,
         "Toggle mentioned reason filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["m", "r"],
-        CommandId::ToggleGithubNotificationFilterPopupPullRequestMerged,
+        CommandId::ToggleGhNotificationFilterPullRequestMerged,
         "Toggle merged pull request filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["r", "e"],
-        CommandId::ToggleGithubNotificationFilterPopupReasonReviewRequested,
+        CommandId::ToggleGhNotificationFilterReasonReviewRequested,
         "Toggle review requested reason filter"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["esc"],
-        CommandId::CloseGithubNotificationFilterPopup,
+        CommandId::CloseGhNotificationFilter,
         "Close GitHub notification filter popup"
     );
     bind!(
-        Layer::GithubNotificationFilterPopup,
+        Layer::GhNotificationFilterPopup,
         ["enter"],
-        CommandId::CloseGithubNotificationFilterPopup,
+        CommandId::CloseGhNotificationFilter,
         "Close GitHub notification filter popup"
     );
 

@@ -14,14 +14,15 @@ use tracing::debug;
 
 use crate::{
     application::{Direction, Populate},
-    client::github::{
+    client::gh::{
         FetchNotificationInclude, FetchNotificationParticipating, FetchNotificationsParams,
     },
+    command::GhNotificationFilterOption,
     config::{self, Categories},
     types::{
         TimeExt,
-        github::{
-            Comment, IssueContext, IssueOrPullRequest, Notification, NotificationId,
+        gh::{
+            Comment, IssueContext, Notification, NotificationDetails, NotificationId,
             PullRequestContext, PullRequestState, Reason, RepoVisibility, SubjectContext,
             SubjectType,
         },
@@ -40,6 +41,10 @@ use crate::{
 
 mod filter_popup;
 use filter_popup::{FilterPopup, OptionFilterer};
+
+mod notification_page;
+pub(crate) use notification_page::NotificationPageUpdate;
+use notification_page::NotificationPageUpdateState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum GhNotificationFilterOptionsState {
@@ -69,6 +74,34 @@ impl Default for GhNotificationFilterOptions {
 }
 
 impl GhNotificationFilterOptions {
+    fn toggle(&mut self, option: &GhNotificationFilterOption) {
+        match option {
+            GhNotificationFilterOption::UnreadOnly => {
+                self.include = match self.include {
+                    FetchNotificationInclude::OnlyUnread => FetchNotificationInclude::All,
+                    FetchNotificationInclude::All => FetchNotificationInclude::OnlyUnread,
+                };
+            }
+            GhNotificationFilterOption::ParticipatingOnly => {
+                self.participating = match self.participating {
+                    FetchNotificationParticipating::OnlyParticipating => {
+                        FetchNotificationParticipating::All
+                    }
+                    FetchNotificationParticipating::All => {
+                        FetchNotificationParticipating::OnlyParticipating
+                    }
+                };
+            }
+            GhNotificationFilterOption::Visibility(visibility) => {
+                self.visibility = (self.visibility != Some(*visibility)).then_some(*visibility);
+            }
+            GhNotificationFilterOption::PullRequestState(state) => {
+                self.toggle_pull_request_condition(*state);
+            }
+            GhNotificationFilterOption::Reason(reason) => self.toggle_reason(reason),
+        }
+    }
+
     fn toggle_pull_request_condition(&mut self, pr_state: PullRequestState) {
         if let Some(idx) = self
             .pull_request_conditions
@@ -90,21 +123,10 @@ impl GhNotificationFilterOptions {
     }
 }
 
-#[allow(clippy::struct_excessive_bools, clippy::struct_field_names)]
-#[derive(Debug, Clone, Default)]
-pub(crate) struct GhNotificationFilterUpdater {
-    pub(crate) toggle_include: bool,
-    pub(crate) toggle_participating: bool,
-    pub(crate) toggle_visilibty_public: bool,
-    pub(crate) toggle_visilibty_private: bool,
-    pub(crate) toggle_pull_request_condition: Option<PullRequestState>,
-    pub(crate) toggle_reason: Option<Reason>,
-}
-
 type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
 
 #[allow(clippy::struct_field_names)]
-pub(crate) struct GitHubNotificationsWidget {
+pub(crate) struct GhNotificationsWidget {
     max_repository_name: usize,
     notifications:
         FilterableVec<Notification, ComposedFilterer<CategoryAndMatcherFilterer, OptionFilterer>>,
@@ -114,7 +136,7 @@ pub(crate) struct GitHubNotificationsWidget {
     filter_popup: FilterPopup,
 }
 
-impl GitHubNotificationsWidget {
+impl GhNotificationsWidget {
     pub(crate) fn new() -> Self {
         Self::with_filter_options(GhNotificationFilterOptions::default())
     }
@@ -126,8 +148,8 @@ impl GitHubNotificationsWidget {
         Self {
             notifications: FilterableVec::from_filter(filterer),
             max_repository_name: 0,
-            limit: config::github::NOTIFICATION_PER_PAGE as usize,
-            next_page: Some(config::github::INITIAL_PAGE_NUM),
+            limit: config::gh::NOTIFICATION_PER_PAGE as usize,
+            next_page: Some(config::gh::INITIAL_PAGE_NUM),
             filter_popup: FilterPopup::new(),
         }
     }
@@ -136,9 +158,9 @@ impl GitHubNotificationsWidget {
         self.notifications.filter().right().options()
     }
 
-    pub(crate) fn update_filter_options(&mut self, updater: &GhNotificationFilterUpdater) {
+    pub(crate) fn toggle_filter_option(&mut self, option: &GhNotificationFilterOption) {
         let current = self.filter_options().clone();
-        self.filter_popup.update_options(updater, &current);
+        self.filter_popup.toggle_option(option, &current);
     }
 
     pub(crate) fn update_filterer(&mut self, filterer: CategoryAndMatcherFilterer) {
@@ -149,34 +171,27 @@ impl GitHubNotificationsWidget {
     pub(crate) fn update_notifications(
         &mut self,
         populate: Populate,
-        notifications: Vec<Notification>,
-    ) -> Vec<IssueOrPullRequest> {
-        if notifications.is_empty() {
-            self.next_page = None;
-            return Vec::new();
+        update: NotificationPageUpdate,
+    ) -> NotificationDetails {
+        match update.into_state() {
+            NotificationPageUpdateState::Exhausted => {
+                self.next_page = None;
+                NotificationDetails::default()
+            }
+            NotificationPageUpdateState::Fetched {
+                notifications,
+                detail_targets,
+                repository_name_width,
+            } => {
+                self.next_page = match populate {
+                    Populate::Replace => Some(config::gh::INITIAL_PAGE_NUM + 1),
+                    Populate::Append => self.next_page.map(|next| next.saturating_add(1)),
+                };
+                self.max_repository_name = self.max_repository_name.max(repository_name_width);
+                self.notifications.update(populate, notifications);
+                detail_targets
+            }
         }
-
-        match populate {
-            Populate::Replace => self.next_page = Some(config::github::INITIAL_PAGE_NUM + 1),
-            Populate::Append => self.next_page = self.next_page.map(|next| next.saturating_add(1)),
-        }
-        let contexts = notifications
-            .iter()
-            .filter_map(Notification::context)
-            .collect();
-
-        self.max_repository_name = self.max_repository_name.max(
-            notifications
-                .iter()
-                .map(|n| n.repository.name.as_str().len())
-                .max()
-                .unwrap_or(0)
-                .min(30),
-        );
-
-        self.notifications.update(populate, notifications);
-
-        contexts
     }
 
     pub(crate) fn fetch_next_if_needed(&self) -> Option<FetchNotificationsParams> {
@@ -200,8 +215,8 @@ impl GitHubNotificationsWidget {
     }
 
     pub(crate) fn reload(&mut self) -> FetchNotificationsParams {
-        self.next_page = Some(config::github::INITIAL_PAGE_NUM);
-        self.next_fetch_params(config::github::INITIAL_PAGE_NUM)
+        self.next_page = Some(config::gh::INITIAL_PAGE_NUM);
+        self.next_fetch_params(config::gh::INITIAL_PAGE_NUM)
     }
 
     fn next_fetch_params(&self, page: u8) -> FetchNotificationsParams {
@@ -307,7 +322,7 @@ impl GitHubNotificationsWidget {
     }
 }
 
-impl GitHubNotificationsWidget {
+impl GhNotificationsWidget {
     pub(crate) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
         let vertical = Layout::vertical([Constraint::Fill(2), Constraint::Fill(1)]);
         let [notifications_area, detail_area] = vertical.areas(area);

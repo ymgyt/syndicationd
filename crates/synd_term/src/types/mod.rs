@@ -14,7 +14,7 @@ pub use synd_client::payload::{EntryMeta, Link, PageInfo};
 mod requirement_ext;
 pub use requirement_ext::RequirementExt;
 
-pub(crate) mod github;
+pub(crate) mod gh;
 
 pub trait EntryMetaExt {
     fn summary_text(&self, width: usize) -> Option<String>;
@@ -50,13 +50,12 @@ trait PollingPolicyExt {
 
 impl PollingPolicyExt for payload::PollingPolicy {
     fn prompt_value(&self) -> Option<String> {
-        match self.kind {
-            payload::PollingPolicyKind::Manual => Some("manual".to_owned()),
-            payload::PollingPolicyKind::Interval => self
-                .interval_seconds
-                .filter(|seconds| *seconds > 0)
-                .map(|seconds| format!("interval:{seconds}s")),
-            payload::PollingPolicyKind::Other(_) => None,
+        match self {
+            payload::PollingPolicy::Manual => Some("manual".to_owned()),
+            payload::PollingPolicy::Interval { seconds } => {
+                Some(format!("interval:{}s", seconds.get()))
+            }
+            payload::PollingPolicy::Other { .. } => None,
         }
     }
 }
@@ -122,7 +121,7 @@ impl From<payload::SubscribedFeed> for Feed {
         Self {
             feed_type: details
                 .as_ref()
-                .and_then(|details| details.feed_type.clone().into_feed_type()),
+                .and_then(|details| FeedType::try_from(details.feed_type.clone()).ok()),
             title: details.as_ref().and_then(|details| details.title.clone()),
             url,
             updated: details.as_ref().and_then(|details| details.updated),
@@ -184,39 +183,57 @@ pub enum ExportedPollingPolicyKind {
     Interval,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ExportedPollingPolicyError {
+    #[error("intervalSeconds must be omitted for a MANUAL polling policy")]
+    UnexpectedInterval,
+    #[error("intervalSeconds is required for an INTERVAL polling policy")]
+    MissingInterval,
+    #[error(transparent)]
+    InvalidInterval(#[from] payload::InvalidPollingInterval),
+}
+
 impl ExportedCrawlPolicy {
     fn from_api(value: &payload::CrawlPolicy) -> Option<Self> {
-        match &value.polling.kind {
-            payload::PollingPolicyKind::Manual => Some(Self {
+        match &value.polling {
+            payload::PollingPolicy::Manual => Some(Self {
                 polling: ExportedPollingPolicy {
                     kind: ExportedPollingPolicyKind::Manual,
                     interval_seconds: None,
                 },
             }),
-            payload::PollingPolicyKind::Interval => Some(Self {
+            payload::PollingPolicy::Interval { seconds } => Some(Self {
                 polling: ExportedPollingPolicy {
                     kind: ExportedPollingPolicyKind::Interval,
-                    interval_seconds: value.polling.interval_seconds,
+                    interval_seconds: Some(seconds.get()),
                 },
             }),
-            payload::PollingPolicyKind::Other(_) => None,
+            payload::PollingPolicy::Other { .. } => None,
         }
     }
 }
 
-impl From<ExportedCrawlPolicy> for payload::CrawlPolicyInput {
-    fn from(value: ExportedCrawlPolicy) -> Self {
-        Self {
-            polling: payload::PollingPolicyInput {
-                kind: match value.polling.kind {
-                    ExportedPollingPolicyKind::Manual => payload::PollingPolicyInputKind::Manual,
-                    ExportedPollingPolicyKind::Interval => {
-                        payload::PollingPolicyInputKind::Interval
-                    }
-                },
-                interval_seconds: value.polling.interval_seconds,
-            },
-        }
+impl TryFrom<ExportedCrawlPolicy> for payload::CrawlPolicyInput {
+    type Error = ExportedPollingPolicyError;
+
+    fn try_from(value: ExportedCrawlPolicy) -> Result<Self, Self::Error> {
+        let polling = match value.polling.kind {
+            ExportedPollingPolicyKind::Manual if value.polling.interval_seconds.is_none() => {
+                payload::PollingPolicyInput::Manual
+            }
+            ExportedPollingPolicyKind::Manual => {
+                return Err(ExportedPollingPolicyError::UnexpectedInterval);
+            }
+            ExportedPollingPolicyKind::Interval => {
+                let seconds = value
+                    .polling
+                    .interval_seconds
+                    .ok_or(ExportedPollingPolicyError::MissingInterval)?
+                    .try_into()?;
+                payload::PollingPolicyInput::Interval { seconds }
+            }
+        };
+        Ok(Self { polling })
     }
 }
 
@@ -233,14 +250,16 @@ impl From<payload::SubscribedFeed> for ExportedFeed {
     }
 }
 
-impl From<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
-    fn from(feed: ExportedFeed) -> Self {
-        Self {
+impl TryFrom<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
+    type Error = ExportedPollingPolicyError;
+
+    fn try_from(feed: ExportedFeed) -> Result<Self, Self::Error> {
+        Ok(Self {
             url: feed.url,
             requirement: feed.requirement,
             category: feed.category,
-            crawl_policy: feed.crawl_policy.map(Into::into),
-        }
+            crawl_policy: feed.crawl_policy.map(TryInto::try_into).transpose()?,
+        })
     }
 }
 

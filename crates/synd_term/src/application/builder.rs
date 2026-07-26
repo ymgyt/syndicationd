@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    application::outbound::github::GithubClient,
+    application::outbound::gh::GhClient,
     application::{Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef},
     config::Categories,
     interact::Interact,
@@ -27,8 +27,9 @@ pub struct ApplicationBuilder<
     pub(super) interactor: Interactor,
 
     pub(super) authenticator: Option<Authenticator>,
-    pub(super) github_client: Option<GithubClient>,
+    pub(super) gh_client: Option<GhClient>,
     pub(super) clock: Option<Box<dyn Clock>>,
+    pub(super) authentication_required: bool,
     pub(super) dry_run: bool,
 }
 
@@ -43,8 +44,9 @@ impl Default for ApplicationBuilder {
             theme: (),
             interactor: (),
             authenticator: None,
-            github_client: None,
+            gh_client: None,
             clock: None,
+            authentication_required: false,
             dry_run: false,
         }
     }
@@ -65,8 +67,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
             theme: self.theme,
             interactor: self.interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -87,8 +90,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
             theme: self.theme,
             interactor: self.interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -109,8 +113,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
             theme: self.theme,
             interactor: self.interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -128,8 +133,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
             theme: self.theme,
             interactor: self.interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -147,8 +153,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
             theme: self.theme,
             interactor: self.interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -166,8 +173,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
             theme,
             interactor: self.interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -188,8 +196,9 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
             theme: self.theme,
             interactor,
             authenticator: self.authenticator,
-            github_client: self.github_client,
+            gh_client: self.gh_client,
             clock: self.clock,
+            authentication_required: self.authentication_required,
             dry_run: self.dry_run,
         }
     }
@@ -205,9 +214,9 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
     }
 
     #[must_use]
-    pub fn github_client(self, github_client: GithubClient) -> Self {
+    pub fn gh_client(self, gh_client: GhClient) -> Self {
         Self {
-            github_client: Some(github_client),
+            gh_client: Some(gh_client),
             ..self
         }
     }
@@ -216,6 +225,15 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
     pub fn clock(self, clock: Box<dyn Clock>) -> Self {
         Self {
             clock: Some(clock),
+            ..self
+        }
+    }
+
+    /// Selects whether the constructed feed transport requires interactive authentication.
+    #[must_use]
+    pub fn authentication_required(self, authentication_required: bool) -> Self {
+        Self {
+            authentication_required,
             ..self
         }
     }

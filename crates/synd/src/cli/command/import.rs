@@ -10,7 +10,7 @@ use either::Either;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_client::{
-    Client, SubscribeFeedError, SyndApiError,
+    Client, SyndApiError,
     payload::{SubscribeFeedInput, SubscribeFeedPayload},
 };
 use synd_term::{types::ExportedFeed, ui};
@@ -166,7 +166,13 @@ where
                 .category
                 .clone()
                 .unwrap_or_else(|| ui::default_category().clone());
-            let input = SubscribeFeedInput::from(feed);
+            let input = match SubscribeFeedInput::try_from(feed) {
+                Ok(input) => input,
+                Err(error) => {
+                    writeln!(&mut out, "ERROR {url} {error}")?;
+                    continue;
+                }
+            };
             match client.subscribe_feed(input).await {
                 Ok(_) => {
                     writeln!(
@@ -174,12 +180,6 @@ where
                         "OK    {requirement:<6} {category:<max_category_width$} {url}",
                     )?;
                     ok = ok.saturating_add(1);
-                }
-                Err(SyndApiError::SubscribeFeed(SubscribeFeedError::FeedUnavailable {
-                    feed_url,
-                    message,
-                })) => {
-                    writeln!(&mut out, "ERROR {feed_url} {message}")?;
                 }
                 Err(err) => {
                     writeln!(&mut out, "ERROR {url} {err}")?;
@@ -269,12 +269,11 @@ mod tests {
                     url: url_ok2.clone(),
                     disposition: synd_client::payload::SubscribeDisposition::Subscribed,
                 }),
-                "https://err_unavailable.ymgyt.io/feed.xml" => Err(SyndApiError::SubscribeFeed(
-                    SubscribeFeedError::FeedUnavailable {
-                        feed_url: url_unavailable.clone(),
-                        message: "server return 500 error".into(),
-                    },
-                )),
+                "https://err_unavailable.ymgyt.io/feed.xml" => {
+                    Err(SyndApiError::UnexpectedResponse {
+                        context: "server returned 500 error",
+                    })
+                }
                 _ => panic!(),
             }
         });
