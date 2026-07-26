@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use synd_support::o11y::opentelemetry::extension::{BaggageExt as _, OpenTelemetrySpanExt as _};
 use tower_http::trace::HttpMakeClassifier;
 use tracing::{Level, Span};
 use tracing::{debug, field, info, span, warn};
@@ -12,7 +13,6 @@ pub struct MakeSpan;
 impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
     #[expect(clippy::redundant_closure_for_method_calls)]
     fn make_span(&mut self, request: &axum::http::Request<B>) -> Span {
-        use synd_support::o11y::opentelemetry::extension::*;
         let cx = synd_support::o11y::opentelemetry::http::extract(request.headers());
 
         let request_id = cx

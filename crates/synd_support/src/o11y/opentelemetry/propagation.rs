@@ -2,7 +2,7 @@ use opentelemetry::propagation::TextMapCompositePropagator;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 
 pub mod http {
-    use crate::o11y::opentelemetry::extension::*;
+    use crate::o11y::opentelemetry::extension::BaggageExt as _;
     use opentelemetry_http::{HeaderExtractor, HeaderInjector};
 
     /// Inject current opentelemetry context into given headers

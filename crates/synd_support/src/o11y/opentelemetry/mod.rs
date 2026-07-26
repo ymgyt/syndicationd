@@ -10,6 +10,6 @@ mod guard;
 pub use guard::OpenTelemetryGuard;
 
 pub mod extension {
-    pub use opentelemetry::baggage::BaggageExt as _;
-    pub use tracing_opentelemetry::OpenTelemetrySpanExt as _;
+    pub use opentelemetry::baggage::BaggageExt;
+    pub use tracing_opentelemetry::OpenTelemetrySpanExt;
 }
