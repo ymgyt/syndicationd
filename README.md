@@ -67,7 +67,7 @@ Other package managers, installers, and pre-built binaries are also supported.
 ### nix
 
 ```sh
-nix profile install github:ymgyt/syndicationd#synd
+nix profile add github:ymgyt/syndicationd#synd
 ```
 
 ### arch linux
