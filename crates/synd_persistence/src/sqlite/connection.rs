@@ -5,9 +5,11 @@ use std::{
 
 use sqlx::{
     Sqlite, SqlitePool, Transaction,
+    migrate::MigrateError as SqlxMigrateError,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
 use synd_registry::RegistryDbError;
+use thiserror::Error;
 use tracing::{debug, info};
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -16,6 +18,13 @@ const SQLITE_MAX_CONNECTIONS: u32 = 1;
 #[derive(Clone)]
 pub struct SqliteDatabase {
     pool: SqlitePool,
+}
+
+/// Error returned while migrating a `SQLite` database.
+#[derive(Debug, Error)]
+pub enum MigrationError {
+    #[error(transparent)]
+    Sqlx(#[from] SqlxMigrateError),
 }
 
 #[derive(Clone, Copy)]
@@ -33,7 +42,7 @@ impl SqliteDatabase {
         Self::open_file(db_path, FileMode::CreateIfMissing).await
     }
 
-    pub async fn migrate(&self) -> Result<(), RegistryDbError> {
+    pub async fn migrate(&self) -> Result<(), MigrationError> {
         let migrator = sqlx::migrate!("./migrations");
         let schema_version = migrator
             .migrations
@@ -41,10 +50,7 @@ impl SqliteDatabase {
             .map_or(0, |migration| migration.version);
         let started_at = Instant::now();
         debug!(schema_version, "Running SQLite migrations");
-        migrator
-            .run(&self.pool)
-            .await
-            .map_err(RegistryDbError::permanent)?;
+        migrator.run(&self.pool).await?;
         info!(
             schema_version,
             duration_ms = started_at.elapsed().as_millis(),

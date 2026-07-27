@@ -5,8 +5,7 @@ pub(crate) use sqlx::Row;
 pub(crate) use synd_feed::feed::service::FeedHttpStatus;
 pub(crate) use synd_feed::types::FeedUrl;
 pub(crate) use synd_registry::{
-    FeedSubscriptionAttrs, RegistryDbError, RegistryDbResult, SubscriberId, Subscription,
-    SubscriptionKey,
+    FeedSubscriptionAttrs, RegistryDbResult, SubscriberId, Subscription, SubscriptionKey,
     crawl::{
         blob::PutBlobCommand,
         job::CrawlJobId,
@@ -36,7 +35,7 @@ use super::{error::IntoDbResult, feed};
 pub(crate) use super::{SqliteFeedRegistryDb, SqliteRegistryTx};
 pub(crate) use crate::sqlite::SqliteDatabase;
 
-pub(crate) async fn migrated_db() -> Result<SqliteFeedRegistryDb, RegistryDbError> {
+pub(crate) async fn migrated_db() -> anyhow::Result<SqliteFeedRegistryDb> {
     let db = SqliteDatabase::in_memory().await?;
     db.migrate().await?;
     Ok(SqliteFeedRegistryDb::new(db))

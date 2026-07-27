@@ -17,6 +17,9 @@ pub enum Error {
     RegistryDb(#[from] synd_registry::RegistryDbError),
 
     #[error(transparent)]
+    Migration(#[from] synd_persistence::sqlite::MigrationError),
+
+    #[error(transparent)]
     Api(Box<synd_client::SyndApiError>),
 
     #[error(transparent)]
