@@ -12,19 +12,19 @@ keywords    = ["feed", "rss", "atom", "tui"]
 license     = "MIT OR Apache-2.0"
 readme      = "README.md"
 repository  = "https://github.com/ymgyt/syndicationd"
-version     = "0.4.0-rc.1"
+version     = "0.4.0"
 
 [workspace.dependencies]
-synd-api         = { path = "crates/synd_api", version = "=0.4.0-rc.1" }
-synd-auth        = { path = "crates/synd_auth", version = "=0.4.0-rc.1" }
-synd-client      = { path = "crates/synd_client", version = "=0.4.0-rc.1" }
-synd-feed        = { path = "crates/synd_feed", version = "=0.4.0-rc.1" }
-synd-persistence = { path = "crates/synd_persistence", version = "=0.4.0-rc.1" }
-synd-protocol    = { path = "crates/synd_protocol", version = "=0.4.0-rc.1" }
-synd-registry    = { path = "crates/synd_registry", version = "=0.4.0-rc.1" }
-synd-runtime     = { path = "crates/synd_runtime", version = "=0.4.0-rc.1" }
-synd-support     = { path = "crates/synd_support", version = "=0.4.0-rc.1" }
-synd-term        = { path = "crates/synd_term", version = "=0.4.0-rc.1" }
+synd-api         = { path = "crates/synd_api", version = "=0.4.0" }
+synd-auth        = { path = "crates/synd_auth", version = "=0.4.0" }
+synd-client      = { path = "crates/synd_client", version = "=0.4.0" }
+synd-feed        = { path = "crates/synd_feed", version = "=0.4.0" }
+synd-persistence = { path = "crates/synd_persistence", version = "=0.4.0" }
+synd-protocol    = { path = "crates/synd_protocol", version = "=0.4.0" }
+synd-registry    = { path = "crates/synd_registry", version = "=0.4.0" }
+synd-runtime     = { path = "crates/synd_runtime", version = "=0.4.0" }
+synd-support     = { path = "crates/synd_support", version = "=0.4.0" }
+synd-term        = { path = "crates/synd_term", version = "=0.4.0" }
 synd-test        = { path = "crates/synd_test" }
 
 anyhow             = { version = "1", default-features = false, features = ["std"] }
