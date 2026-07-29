@@ -39,13 +39,10 @@ Subscriptions, entries, and reading state are stored in SQLite by default.
 
 ## Installation
 
-> [!WARNING]
-> `v0.4.0-rc.1` is a pre-release.
-
 Install from crates.io:
 
 ```sh
-cargo install synd --version 0.4.0-rc.1 --locked
+cargo install synd --version 0.4.0 --locked
 ```
 
 <details>
@@ -54,31 +51,43 @@ cargo install synd --version 0.4.0-rc.1 --locked
 ### nix
 
 ```sh
-nix profile add github:ymgyt/syndicationd/v0.4.0-rc.1#synd
+nix profile add github:ymgyt/syndicationd/v0.4.0#synd
+```
+
+### homebrew
+
+```sh
+brew install ymgyt/syndicationd/synd
 ```
 
 ### shell
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/v0.4.0-rc.1/synd-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/v0.4.0/synd-installer.sh | sh
+```
+
+### npm
+
+```sh
+npm install @syndicationd/synd@0.4.0
 ```
 
 ### powershell
 
 ```sh
-powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/v0.4.0-rc.1/synd-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/ymgyt/syndicationd/releases/download/v0.4.0/synd-installer.ps1 | iex"
 ```
 
 ### docker
 
 ```sh
-docker run --rm -it ghcr.io/ymgyt/synd:0.4.0-rc.1
+docker run --rm -it ghcr.io/ymgyt/synd:0.4.0
 ```
 
 ### pre-built binaries
 
 Pre-built binaries are available in the
-[`v0.4.0-rc.1` GitHub release](https://github.com/ymgyt/syndicationd/releases/tag/v0.4.0-rc.1).
+[`v0.4.0` GitHub release](https://github.com/ymgyt/syndicationd/releases/tag/v0.4.0).
 
 ### source
 

@@ -27,9 +27,9 @@
 		"artifacts": {
 				"package_managers": {
 					"additional": {
-						"nix": "nix profile add github:ymgyt/syndicationd/v0.4.0-rc.1#synd",
-						"cargo": "cargo install synd --version 0.4.0-rc.1 --locked",
-						"docker": "docker run --rm -it ghcr.io/ymgyt/synd:0.4.0-rc.1"
+						"nix": "nix profile add github:ymgyt/syndicationd/v0.4.0#synd",
+						"cargo": "cargo install synd --version 0.4.0 --locked",
+						"docker": "docker run --rm -it ghcr.io/ymgyt/synd:0.4.0"
 					}
 				}
 		}
