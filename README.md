@@ -43,73 +43,55 @@ as `synd`.
   - [Import and Export Feeds](#import-and-export-feeds)
   - [Clean](#remove-cache-and-logs)
 - [Configuration](#configuration)
+- [Diagnostics](#diagnostics)
 - [Documentation](#documentation)
-- [Advanced](#advanced)
 - [Development](#development)
 - [Project Goals](#project-goals)
 - [Feed Tips](#feed-tips)
 - [License](#license)
 
-
 ## Installation
+
+> [!WARNING]
+> `v0.4.0-rc.1` is a pre-release.
 
 Install from crates.io:
 
 ```sh
-cargo install synd --locked
+cargo install synd --version 0.4.0-rc.1 --locked
 ```
 
-Other package managers, installers, and pre-built binaries are also supported.
-
 <details>
-<summary>Show all installation methods</summary>
+<summary>Other installation methods</summary>
 
 ### nix
 
 ```sh
-nix profile add github:ymgyt/syndicationd#synd
-```
-
-### arch linux
-
-```sh
-pacman -S syndicationd
-```
-
-### brew
-
-```sh
-brew install ymgyt/homebrew-syndicationd/synd
+nix profile add github:ymgyt/syndicationd/v0.4.0-rc.1#synd
 ```
 
 ### shell
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/latest/download/synd-installer.sh | sh
-```
-
-### npm
-
-```sh
-npm install @syndicationd/synd
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ymgyt/syndicationd/releases/download/v0.4.0-rc.1/synd-installer.sh | sh
 ```
 
 ### powershell
 
 ```sh
-powershell -c "irm https://github.com/ymgyt/syndicationd/releases/latest/download/synd-installer.ps1 | iex"
+powershell -c "irm https://github.com/ymgyt/syndicationd/releases/download/v0.4.0-rc.1/synd-installer.ps1 | iex"
 ```
 
 ### docker
 
 ```sh
-docker run -it ghcr.io/ymgyt/synd
+docker run --rm -it ghcr.io/ymgyt/synd:0.4.0-rc.1
 ```
 
 ### pre-built binaries
 
-Pre-built binaries are available in [GitHub releases](https://github.com/ymgyt/syndicationd/releases).
-
+Pre-built binaries are available in the
+[`v0.4.0-rc.1` GitHub release](https://github.com/ymgyt/syndicationd/releases/tag/v0.4.0-rc.1).
 
 ### source
 
@@ -146,12 +128,6 @@ to open it with the configured text browser command.
 
 Run `synd --help` to see the full command and option list.
 
-`synd` lets you:
-
-* subscribe to RSS/Atom feeds
-* open entries in your web browser or a text browser
-* filter feeds and entries by priority, category, and keyword
-
 ### Keymap
 
 Basic keys:
@@ -163,8 +139,9 @@ Basic keys:
 * `/`: search entries
 * `q`: quit
 
-See [docs/mdbook/src/keymap.md](./docs/mdbook/src/keymap.md) for the full
-keymap and custom key binding syntax.
+See the
+[keymap documentation](https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/keymap.md)
+for the full keymap and custom key binding syntax.
 
 ### Subscribe Feed
 
@@ -194,8 +171,9 @@ It can be one of:
 
 `Category` represents the category of the feed. You can specify any value.
 The values that `synd` recognizes as categories are defined in
-[`categories.toml`](./categories.toml). Default values and additional
-categories can be added from the configuration file.
+[`categories.toml`](https://github.com/ymgyt/syndicationd/blob/main/categories.toml).
+Default values and additional categories can be added from the configuration
+file.
 
 ### Edit or Unsubscribe Feed
 
@@ -235,14 +213,14 @@ The command is executed as `$SYND_BROWSER $SYND_BROWSER_ARGS <entry url>`.
 
 Export subscriptions as JSON and import the same format:
 
-```console
+```sh
 synd feed export > feeds.json
 synd feed import feeds.json
 ```
 
 Print the JSON schema when needed:
 
-```console
+```sh
 synd feed export --print-schema
 synd feed import --print-schema
 ```
@@ -266,26 +244,50 @@ handled separately from cache/log cleanup.
 
 Configuration can be set with flags, environment variables, or a config file.
 
-See [docs/mdbook/src/configuration.md](./docs/mdbook/src/configuration.md) for
-config file locations, available settings, and keymap customization.
+`synd config init` prints a configuration template to stdout. Redirect it to a
+file to use it as a starting point:
+
+```sh
+synd config init > config.toml
+```
+
+`synd config view` shows the resolved configuration after command-line flags,
+environment variables, the configuration file, and defaults have been applied:
+
+```sh
+synd config view
+synd config view -o json
+```
+
+See the
+[configuration documentation](https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/configuration.md)
+for config file locations, available settings, and keymap customization.
+
+## Diagnostics
+
+`synd doctor` checks the paths and runtime state used by the resolved
+configuration. This includes the configuration, cache, log, and SQLite paths,
+as well as the local daemon placement and status.
+
+```sh
+synd doctor
+synd doctor -o json
+```
+
+Checks are reported as `PASS`, `WARN`, or `FAIL`. The command exits with status
+1 when any check fails.
 
 ## Documentation
 
-* [Configuration](./docs/mdbook/src/configuration.md)
-* [Keymap](./docs/mdbook/src/keymap.md)
-* [GitHub Notifications](./docs/github-notifications.md)
-
-## Advanced
-
-### GitHub Notifications
-
-GitHub notification support is optional and separate from the feed reader
-workflow. See [docs/github-notifications.md](./docs/github-notifications.md)
-for setup, keymap, and token scope details.
+* [Configuration](https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/configuration.md)
+* [Keymap](https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/keymap.md)
+* [GitHub Notifications](https://github.com/ymgyt/syndicationd/blob/main/docs/github-notifications.md)
 
 ## Development
 
-Please refer to [CONTRIBUTING.md](/CONTRIBUTING.md) to get started with development.
+See
+[CONTRIBUTING.md](https://github.com/ymgyt/syndicationd/blob/main/CONTRIBUTING.md)
+to get started with development.
 
 ## Project Goals
 
@@ -314,4 +316,7 @@ A few sources expose useful feeds:
 
 ## License
 
-This project is available under the terms of either the [Apache 2.0 license](./LICENSE-APACHE) or the [MIT license](./LICENSE-MIT).
+This project is available under the terms of either the
+[Apache 2.0 license](https://github.com/ymgyt/syndicationd/blob/main/LICENSE-APACHE)
+or the
+[MIT license](https://github.com/ymgyt/syndicationd/blob/main/LICENSE-MIT).

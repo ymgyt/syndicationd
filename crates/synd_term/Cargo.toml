@@ -1,15 +1,15 @@
 [package]
 authors.workspace     = true
 categories.workspace  = true
-description.workspace = true
+description           = "Terminal application library for syndicationd"
 edition.workspace     = true
 homepage.workspace    = true
 keywords.workspace    = true
 license.workspace     = true
-readme.workspace      = true
+readme                = "README.md"
 repository.workspace  = true
 
-include = ["src/**/*", "gql/**/*", "categories.toml"]
+include = ["src/**/*", "gql/**/*", "categories.toml", "README.md"]
 name    = "synd-term"
 version.workspace = true
 

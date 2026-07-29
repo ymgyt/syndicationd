@@ -1,3 +1,1 @@
-# synd
-
-Binary composition root for syndicationd.
+../../README.md

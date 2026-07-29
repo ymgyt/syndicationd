@@ -25,14 +25,13 @@
 			"path": "../../docs/mdbook"
 		},
 		"artifacts": {
-			"package_managers": {
-				"additional": {
-					"nix": "nix profile add github:ymgyt/syndicationd#synd",
-					"pacman": "pacman -S syndicationd",
-					"cargo": "cargo install synd --locked",
-					"docker": "docker run -it ghcr.io/ymgyt/synd"
+				"package_managers": {
+					"additional": {
+						"nix": "nix profile add github:ymgyt/syndicationd/v0.4.0-rc.1#synd",
+						"cargo": "cargo install synd --version 0.4.0-rc.1 --locked",
+						"docker": "docker run --rm -it ghcr.io/ymgyt/synd:0.4.0-rc.1"
+					}
 				}
-			}
 		}
 	}
 }

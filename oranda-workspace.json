@@ -4,7 +4,7 @@
     "members": [
       {
         "slug": "synd",
-        "path": "./crates/synd_term"
+        "path": "./crates/synd"
       },
       {
         "slug": "synd-api",
