@@ -5,13 +5,12 @@ use tokio_metrics::{RuntimeMetrics, RuntimeMonitor, TaskMetrics, TaskMonitor};
 use tokio_util::sync::CancellationToken;
 
 struct Metrics {
-    runtime_total_polls_count: u64,
-    runtime_busy_duration_secs: f64,
-    gql_mean_poll_duration_secs: f64,
-    gql_mean_slow_poll_duration_secs: f64,
-    gql_mean_first_poll_delay_secs: f64,
-    gql_mean_scheduled_duration_secs: f64,
-    gql_mean_idle_duration_secs: f64,
+    runtime_busy_duration: f64,
+    gql_mean_poll_duration: f64,
+    gql_mean_slow_poll_duration: f64,
+    gql_mean_first_poll_delay: f64,
+    gql_mean_scheduled_duration: f64,
+    gql_mean_idle_duration: f64,
 }
 
 pub struct Monitors {
@@ -36,42 +35,35 @@ impl Monitors {
 
         for (runtime_metrics, gql_metrics) in intervals {
             let Metrics {
-                runtime_total_polls_count,
-                runtime_busy_duration_secs,
-                gql_mean_poll_duration_secs,
-                gql_mean_slow_poll_duration_secs,
-                gql_mean_first_poll_delay_secs,
-                gql_mean_scheduled_duration_secs,
-                gql_mean_idle_duration_secs,
+                runtime_busy_duration,
+                gql_mean_poll_duration,
+                gql_mean_slow_poll_duration,
+                gql_mean_first_poll_delay,
+                gql_mean_scheduled_duration,
+                gql_mean_idle_duration,
             } = Self::collect_metrics(&runtime_metrics, &gql_metrics);
 
             // Runtime metrics
-            metric!(monotonic_counter.runtime.poll = runtime_total_polls_count);
-            metric!(monotonic_counter.runtime.busy_duration = runtime_busy_duration_secs);
+            metric!(monotonic_counter.runtime.busy_duration = runtime_busy_duration);
 
             // Tasks poll metrics
-            metric!(
-                monotonic_counter.task.graphql.mean_poll_duration = gql_mean_poll_duration_secs
-            );
+            metric!(monotonic_counter.task.graphql.mean_poll_duration = gql_mean_poll_duration);
             metric!(
                 monotonic_counter.task.graphql.mean_slow_poll_duration =
-                    gql_mean_slow_poll_duration_secs
+                    gql_mean_slow_poll_duration
             );
 
             // Tasks schedule metrics
             metric!(
-                monotonic_counter.task.graphql.mean_first_poll_delay =
-                    gql_mean_first_poll_delay_secs,
+                monotonic_counter.task.graphql.mean_first_poll_delay = gql_mean_first_poll_delay,
             );
             metric!(
                 monotonic_counter.task.graphql.mean_scheduled_duration =
-                    gql_mean_scheduled_duration_secs,
+                    gql_mean_scheduled_duration,
             );
 
             // Tasks idle metrics
-            metric!(
-                monotonic_counter.task.graphql.mean_idle_duration = gql_mean_idle_duration_secs,
-            );
+            metric!(monotonic_counter.task.graphql.mean_idle_duration = gql_mean_idle_duration);
 
             tokio::select! {
                 biased;
@@ -84,13 +76,12 @@ impl Monitors {
 
     fn collect_metrics(runtime_metrics: &RuntimeMetrics, gql_metrics: &TaskMetrics) -> Metrics {
         Metrics {
-            runtime_total_polls_count: runtime_metrics.total_polls_count,
-            runtime_busy_duration_secs: runtime_metrics.total_busy_duration.as_secs_f64(),
-            gql_mean_poll_duration_secs: gql_metrics.mean_poll_duration().as_secs_f64(),
-            gql_mean_slow_poll_duration_secs: gql_metrics.mean_slow_poll_duration().as_secs_f64(),
-            gql_mean_first_poll_delay_secs: gql_metrics.mean_first_poll_delay().as_secs_f64(),
-            gql_mean_scheduled_duration_secs: gql_metrics.mean_scheduled_duration().as_secs_f64(),
-            gql_mean_idle_duration_secs: gql_metrics.mean_idle_duration().as_secs_f64(),
+            runtime_busy_duration: runtime_metrics.total_busy_duration.as_secs_f64(),
+            gql_mean_poll_duration: gql_metrics.mean_poll_duration().as_secs_f64(),
+            gql_mean_slow_poll_duration: gql_metrics.mean_slow_poll_duration().as_secs_f64(),
+            gql_mean_first_poll_delay: gql_metrics.mean_first_poll_delay().as_secs_f64(),
+            gql_mean_scheduled_duration: gql_metrics.mean_scheduled_duration().as_secs_f64(),
+            gql_mean_idle_duration: gql_metrics.mean_idle_duration().as_secs_f64(),
         }
     }
 }

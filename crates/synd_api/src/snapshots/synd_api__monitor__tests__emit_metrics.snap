@@ -2,7 +2,6 @@
 source: crates/synd_api/src/monitor.rs
 description: metrics which monitor emits
 ---
-- monotonic_counter.runtime.poll
 - monotonic_counter.runtime.busy_duration
 - monotonic_counter.task.graphql.mean_poll_duration
 - monotonic_counter.task.graphql.mean_slow_poll_duration

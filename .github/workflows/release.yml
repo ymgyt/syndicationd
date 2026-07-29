@@ -127,9 +127,6 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-      - name: "Enable tokio unstable cfg"
-        run: "echo 'RUSTFLAGS=--cfg tokio_unstable' >> \"$GITHUB_ENV\""
-        shell: "bash"
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest

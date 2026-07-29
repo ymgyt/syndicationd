@@ -7,8 +7,6 @@ members = ["cargo:."]
 cargo-dist-version = "0.32.0"
 # CI backends to support
 ci = "github"
-# Build setup steps injected before `dist build` in generated GitHub Actions jobs.
-github-build-setup = "../dist/release-build-setup.yml"
 # The installers to generate for each app
 installers = ["shell", "powershell", "npm", "homebrew"]
 # A GitHub repo to push Homebrew formulas to

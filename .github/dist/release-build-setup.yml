@@ -1,3 +1,0 @@
-- name: Enable tokio unstable cfg
-  shell: bash
-  run: echo 'RUSTFLAGS=--cfg tokio_unstable' >> "$GITHUB_ENV"
