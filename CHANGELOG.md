@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.4.0-rc.1] - 2026-07-29
+## [v0.4.0] - 2026-07-29
 
 ### 📡 Features
 
@@ -69,6 +69,7 @@ All notable changes to this project will be documented in this file.
 - Drop cursor position query from force redraw by [@ymgyt](https://github.com/ymgyt) ([c1bbb0a8](https://github.com/ymgyt/syndicationd/commit/c1bbb0a87766301cf3061f1d32ccd52ef10cdc4f))
 - Correct default requirement constant typo by [@ymgyt](https://github.com/ymgyt) ([4356e0d3](https://github.com/ymgyt/syndicationd/commit/4356e0d3abab0717c868dcd37e81e4f82645c4e3))
 - Align distribution names with synd by [@ymgyt](https://github.com/ymgyt) ([89356bba](https://github.com/ymgyt/syndicationd/commit/89356bbaa48e7244d14424e7330eecf73ecb6fd5))
+- Remove tokio unstable dependency by ymgyt ([c805f476](https://github.com/ymgyt/syndicationd/commit/c805f476f4144b489b7844cf8075acb610f43d9f))
 
 ### Infra
 
@@ -135,7 +136,7 @@ All notable changes to this project will be documented in this file.
 - Reorder recipe by [@ymgyt](https://github.com/ymgyt) ([049feed5](https://github.com/ymgyt/syndicationd/commit/049feed5d26e4522af1ccb0ec405add13183d24f))
 - Remove x86_64-apple-darwin from dist target by [@ymgyt](https://github.com/ymgyt) ([a9285b67](https://github.com/ymgyt/syndicationd/commit/a9285b6797ae9a53619d647ae1d4845df9258423))
 - Use profile add command by [@ymgyt](https://github.com/ymgyt) ([fcb710e0](https://github.com/ymgyt/syndicationd/commit/fcb710e0889d1ebbd12d3e0e5f7ffe5dcd68cab6))
-- Update yanked spin dependencies by ymgyt ([0f6319ab](https://github.com/ymgyt/syndicationd/commit/0f6319ab086957dd54e58cf47c9b77e389532eee))
+- Update yanked spin dependencies by [@ymgyt](https://github.com/ymgyt) ([0f6319ab](https://github.com/ymgyt/syndicationd/commit/0f6319ab086957dd54e58cf47c9b77e389532eee))
 
 ### 📚 Documentation
 
@@ -148,7 +149,8 @@ All notable changes to this project will be documented in this file.
 - Update README by [@ymgyt](https://github.com/ymgyt) ([1aa9edf2](https://github.com/ymgyt/syndicationd/commit/1aa9edf2ecd59876c64beab26db498c224f9e774))
 - Update app topology by [@ymgyt](https://github.com/ymgyt) ([c0c96857](https://github.com/ymgyt/syndicationd/commit/c0c96857714ff4bcea9a852346006ed0c54cbf72))
 - Prepare synd README for v0.4.0-rc.1 by [@ymgyt](https://github.com/ymgyt) ([d08c2698](https://github.com/ymgyt/syndicationd/commit/d08c2698228f8ff59a88d6dce0966491e501c930))
-- Streamline README by ymgyt ([64e028e9](https://github.com/ymgyt/syndicationd/commit/64e028e91a25a4dcf1e93ab95d3eaa73c7813259))
+- Streamline README by [@ymgyt](https://github.com/ymgyt) ([64e028e9](https://github.com/ymgyt/syndicationd/commit/64e028e91a25a4dcf1e93ab95d3eaa73c7813259))
+- Prepare synd README for v0.4.0 by ymgyt ([05c8b366](https://github.com/ymgyt/syndicationd/commit/05c8b366f3ce50ad49bc50a69341cae2b406a671))
 
 ### 🔧 Testing
 
@@ -235,7 +237,7 @@ All notable changes to this project will be documented in this file.
 - Remove dry-run startup probe by [@ymgyt](https://github.com/ymgyt) ([d75c7849](https://github.com/ymgyt/syndicationd/commit/d75c7849d72c38ceca05462c1d85bcf6eae43f9d))
 - Separate migration errors by [@ymgyt](https://github.com/ymgyt) ([0d05a68d](https://github.com/ymgyt/syndicationd/commit/0d05a68d72bc213c4dfdfdbc136750710c5c8e20))
 
-https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.2...v0.4.0-rc.1
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.2...v0.4.0
 
 
 ## [synd-term-v0.3.2] - 2025-01-25

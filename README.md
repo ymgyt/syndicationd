@@ -4,14 +4,14 @@
 
 </div>
 
-`synd` is a terminal feed reader for RSS and Atom.
-
 [![CI][workflow-ci-badge]][workflow-ci-url]
 [![Release][workflow-release-badge]][workflow-release-url]
 [![Audit][workflow-audit-badge]][workflow-audit-url]
 [![Coverage][coverage-badge]][coverage-url]
 
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
+
+`synd` is a terminal feed reader for RSS and Atom.
 
 It lets you subscribe to feeds, browse entries, filter them by priority,
 category, and keyword, and open entries in your browser.
