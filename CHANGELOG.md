@@ -135,6 +135,7 @@ All notable changes to this project will be documented in this file.
 - Reorder recipe by [@ymgyt](https://github.com/ymgyt) ([049feed5](https://github.com/ymgyt/syndicationd/commit/049feed5d26e4522af1ccb0ec405add13183d24f))
 - Remove x86_64-apple-darwin from dist target by [@ymgyt](https://github.com/ymgyt) ([a9285b67](https://github.com/ymgyt/syndicationd/commit/a9285b6797ae9a53619d647ae1d4845df9258423))
 - Use profile add command by [@ymgyt](https://github.com/ymgyt) ([fcb710e0](https://github.com/ymgyt/syndicationd/commit/fcb710e0889d1ebbd12d3e0e5f7ffe5dcd68cab6))
+- Update yanked spin dependencies by ymgyt ([0f6319ab](https://github.com/ymgyt/syndicationd/commit/0f6319ab086957dd54e58cf47c9b77e389532eee))
 
 ### 📚 Documentation
 
@@ -147,6 +148,7 @@ All notable changes to this project will be documented in this file.
 - Update README by [@ymgyt](https://github.com/ymgyt) ([1aa9edf2](https://github.com/ymgyt/syndicationd/commit/1aa9edf2ecd59876c64beab26db498c224f9e774))
 - Update app topology by [@ymgyt](https://github.com/ymgyt) ([c0c96857](https://github.com/ymgyt/syndicationd/commit/c0c96857714ff4bcea9a852346006ed0c54cbf72))
 - Prepare synd README for v0.4.0-rc.1 by [@ymgyt](https://github.com/ymgyt) ([d08c2698](https://github.com/ymgyt/syndicationd/commit/d08c2698228f8ff59a88d6dce0966491e501c930))
+- Streamline README by ymgyt ([64e028e9](https://github.com/ymgyt/syndicationd/commit/64e028e91a25a4dcf1e93ab95d3eaa73c7813259))
 
 ### 🔧 Testing
 
