@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.4.0-rc.1] - 2026-07-20
+## [v0.4.0-rc.1] - 2026-07-29
 
 ### 📡 Features
 
@@ -48,6 +48,8 @@ All notable changes to this project will be documented in this file.
 - Sync timeline incrementally by seq changes by [@ymgyt](https://github.com/ymgyt) ([c662d634](https://github.com/ymgyt/syndicationd/commit/c662d634646d46a7b4198cdf62f718403eb74598))
 - Redraw screen with R key by [@ymgyt](https://github.com/ymgyt) ([612d9cff](https://github.com/ymgyt/syndicationd/commit/612d9cffa40e4ff7013644fe652c324ecf591599))
 - Expose feed construction by [@ymgyt](https://github.com/ymgyt) ([bf411702](https://github.com/ymgyt/syndicationd/commit/bf4117026c020e61ea06a107589c412ee7e4ecb2))
+- Project complete feed state by [@ymgyt](https://github.com/ymgyt) ([d6f0f6aa](https://github.com/ymgyt/syndicationd/commit/d6f0f6aa512eeb3741801e3c4359d8f46afaa31c))
+- Add diagnostic lifecycle logging by [@ymgyt](https://github.com/ymgyt) ([5bb4a35b](https://github.com/ymgyt/syndicationd/commit/5bb4a35bcddb78ecbd433d8a28daa872899875ee))
 
 ### 🐛 Bug Fixes
 
@@ -65,7 +67,8 @@ All notable changes to this project will be documented in this file.
 - Give every timeline change a unique seq by [@ymgyt](https://github.com/ymgyt) ([95863902](https://github.com/ymgyt/syndicationd/commit/95863902e59e4ba38fc51d09f2789217dfcd3316))
 - Normalize shifted chars in keystroke identity by [@ymgyt](https://github.com/ymgyt) ([70f131c0](https://github.com/ymgyt/syndicationd/commit/70f131c06b69406ef2fc42a092c5d40590554f39))
 - Drop cursor position query from force redraw by [@ymgyt](https://github.com/ymgyt) ([c1bbb0a8](https://github.com/ymgyt/syndicationd/commit/c1bbb0a87766301cf3061f1d32ccd52ef10cdc4f))
-- Correct default requirement constant typo by ymgyt ([4356e0d3](https://github.com/ymgyt/syndicationd/commit/4356e0d3abab0717c868dcd37e81e4f82645c4e3))
+- Correct default requirement constant typo by [@ymgyt](https://github.com/ymgyt) ([4356e0d3](https://github.com/ymgyt/syndicationd/commit/4356e0d3abab0717c868dcd37e81e4f82645c4e3))
+- Align distribution names with synd by [@ymgyt](https://github.com/ymgyt) ([89356bba](https://github.com/ymgyt/syndicationd/commit/89356bbaa48e7244d14424e7330eecf73ecb6fd5))
 
 ### Infra
 
@@ -125,6 +128,13 @@ All notable changes to this project will be documented in this file.
 - Remove stale task by [@ymgyt](https://github.com/ymgyt) ([5bcd90c4](https://github.com/ymgyt/syndicationd/commit/5bcd90c49aa3f127c7db34d5849b966be37690ae))
 - Fmt by [@ymgyt](https://github.com/ymgyt) ([a19d3002](https://github.com/ymgyt/syndicationd/commit/a19d30021b62533d4c9c970779ca5985b8fc58a4))
 - Update rust to 1.97.1 by [@ymgyt](https://github.com/ymgyt) ([9d247ba8](https://github.com/ymgyt/syndicationd/commit/9d247ba85a9ab1ee8356ca785c9dd57eeb31da5f))
+- Unify workspace versions by [@ymgyt](https://github.com/ymgyt) ([b99d1b59](https://github.com/ymgyt/syndicationd/commit/b99d1b5989cc7e18c0b4b2487e38d645a048c66b))
+- Unify changelog generation by [@ymgyt](https://github.com/ymgyt) ([8b19d0e9](https://github.com/ymgyt/syndicationd/commit/8b19d0e9420a6ee5c8e1316b3eb7bbd3e1b1ce31))
+- Prepare workspace publication by [@ymgyt](https://github.com/ymgyt) ([0928afe5](https://github.com/ymgyt/syndicationd/commit/0928afe5722dc82cb2a458cd197e76c1457d18fc))
+- Update binary distribution by [@ymgyt](https://github.com/ymgyt) ([8747c2e1](https://github.com/ymgyt/syndicationd/commit/8747c2e117c6fe007d8c3e22cfcdb8800b7c37d0))
+- Reorder recipe by [@ymgyt](https://github.com/ymgyt) ([049feed5](https://github.com/ymgyt/syndicationd/commit/049feed5d26e4522af1ccb0ec405add13183d24f))
+- Remove x86_64-apple-darwin from dist target by [@ymgyt](https://github.com/ymgyt) ([a9285b67](https://github.com/ymgyt/syndicationd/commit/a9285b6797ae9a53619d647ae1d4845df9258423))
+- Use profile add command by [@ymgyt](https://github.com/ymgyt) ([fcb710e0](https://github.com/ymgyt/syndicationd/commit/fcb710e0889d1ebbd12d3e0e5f7ffe5dcd68cab6))
 
 ### 📚 Documentation
 
@@ -136,6 +146,7 @@ All notable changes to this project will be documented in this file.
 - Update user documentation by [@ymgyt](https://github.com/ymgyt) ([4b2e4a49](https://github.com/ymgyt/syndicationd/commit/4b2e4a49c9a392d223ec86adcda57c4aae903a98))
 - Update README by [@ymgyt](https://github.com/ymgyt) ([1aa9edf2](https://github.com/ymgyt/syndicationd/commit/1aa9edf2ecd59876c64beab26db498c224f9e774))
 - Update app topology by [@ymgyt](https://github.com/ymgyt) ([c0c96857](https://github.com/ymgyt/syndicationd/commit/c0c96857714ff4bcea9a852346006ed0c54cbf72))
+- Prepare synd README for v0.4.0-rc.1 by [@ymgyt](https://github.com/ymgyt) ([d08c2698](https://github.com/ymgyt/syndicationd/commit/d08c2698228f8ff59a88d6dce0966491e501c930))
 
 ### 🔧 Testing
 
@@ -213,8 +224,14 @@ All notable changes to this project will be documented in this file.
 - Redesign schema as declared and observed state by [@ymgyt](https://github.com/ymgyt) ([dc830b4d](https://github.com/ymgyt/syndicationd/commit/dc830b4de61d1666c019d90ba2c812cbbb274139))
 - Remove feed view sync machinery by [@ymgyt](https://github.com/ymgyt) ([8d8ad33d](https://github.com/ymgyt/syndicationd/commit/8d8ad33dbacb4349eda404468b7dc957fef302d7))
 - Own parsed entry model by [@ymgyt](https://github.com/ymgyt) ([d10bccdd](https://github.com/ymgyt/syndicationd/commit/d10bccdd3d06cb1178dc64a219a6f728b6140ede))
-- Rename database capability traits by ymgyt ([9892f7d3](https://github.com/ymgyt/syndicationd/commit/9892f7d33d0b4d21eeada43cdaa8b981fde3e38d))
-- Make entry a first-class module by ymgyt ([2d1350c6](https://github.com/ymgyt/syndicationd/commit/2d1350c62b932ec3cf0e3646887ddb99dce73187))
+- Rename database capability traits by [@ymgyt](https://github.com/ymgyt) ([9892f7d3](https://github.com/ymgyt/syndicationd/commit/9892f7d33d0b4d21eeada43cdaa8b981fde3e38d))
+- Make entry a first-class module by [@ymgyt](https://github.com/ymgyt) ([2d1350c6](https://github.com/ymgyt/syndicationd/commit/2d1350c62b932ec3cf0e3646887ddb99dce73187))
+- Remove terminal stop logging by [@ymgyt](https://github.com/ymgyt) ([33bc54ca](https://github.com/ymgyt/syndicationd/commit/33bc54cafcb39a019f80ea81889f0aa0e7de0788))
+- Clarify driver operation and event flow by [@ymgyt](https://github.com/ymgyt) ([3cdd35b9](https://github.com/ymgyt/syndicationd/commit/3cdd35b92d17696e7d25c8971ed7fb9e077b0e97))
+- Expose OpenTelemetry extension traits by [@ymgyt](https://github.com/ymgyt) ([f9baac20](https://github.com/ymgyt/syndicationd/commit/f9baac20f65805962e9eb8ecf9839ec00b757e80))
+- Redesign terminal application and client boundaries by [@ymgyt](https://github.com/ymgyt) ([54b4018b](https://github.com/ymgyt/syndicationd/commit/54b4018b5f77612836443eba7813f7d92a1e8f5f))
+- Remove dry-run startup probe by [@ymgyt](https://github.com/ymgyt) ([d75c7849](https://github.com/ymgyt/syndicationd/commit/d75c7849d72c38ceca05462c1d85bcf6eae43f9d))
+- Separate migration errors by [@ymgyt](https://github.com/ymgyt) ([0d05a68d](https://github.com/ymgyt/syndicationd/commit/0d05a68d72bc213c4dfdfdbc136750710c5c8e20))
 
 https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.2...v0.4.0-rc.1
 
