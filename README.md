@@ -4,31 +4,19 @@
 
 </div>
 
+`synd` is a terminal feed reader for RSS and Atom.
+
 [![CI][workflow-ci-badge]][workflow-ci-url]
 [![Release][workflow-release-badge]][workflow-release-url]
 [![Audit][workflow-audit-badge]][workflow-audit-url]
-
 [![Coverage][coverage-badge]][coverage-url]
 
-[workflow-ci-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/ci.yaml?style=for-the-badge&logo=github&label=CI
-[workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
-[workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
-[workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
-[workflow-audit-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/audit.yaml?style=for-the-badge&logo=github&label=Audit
-[workflow-audit-url]: https://github.com/ymgyt/syndicationd/actions/workflows/audit.yaml
-[coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov&color=brightgreen
-[coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
-
-`synd` is a terminal feed reader for RSS and Atom.
 
 It lets you subscribe to feeds, browse entries, filter them by priority,
 category, and keyword, and open entries in your browser.
 
 Subscriptions, entries, and reading state are stored in SQLite by default.
-
-This repository is named `syndicationd`. The terminal application is installed
-as `synd`.
 
 **Table of Contents:**
 
@@ -47,7 +35,6 @@ as `synd`.
 - [Documentation](#documentation)
 - [Development](#development)
 - [Project Goals](#project-goals)
-- [Feed Tips](#feed-tips)
 - [License](#license)
 
 ## Installation
@@ -300,23 +287,18 @@ to get started with development.
 * **Long-term maintenance**.
   Prefer simple designs and stable dependencies so the project can be maintained for years.
 
-## Feed Tips
-
-A few sources expose useful feeds:
-
-* Add [`openrss.org/`](https://openrss.org/) to the beginning of the URL to get its RSS feed. for example, for `https://example.ymgyt.io`, it would be `https://openrss.org/example.ymgyt.io`
-
-* You can retrieve various updates as feeds on GitHub.
-  * To obtain releases of a repository, specify `releases.atom`. for example, to obtain releases of syndicationd, specify `https://github.com/ymgyt/syndicationd/releases.atom`
-  * For tags, it's `https://github.com/ymgyt/syndicationd/tag.atom`
-
-* crates.io has introduced a couple of experimental [RSS feeds](https://blog.rust-lang.org/2024/07/29/crates-io-development-update.html#rss-feeds)
-
-* Adding `.rss` to the end of a Reddit URL allows you to retrieve the feed. for example, for `https://www.reddit.com/r/HelixEditor/`, it would be `https://www.reddit.com/r/HelixEditor.rss`
-
 ## License
 
 This project is available under the terms of either the
 [Apache 2.0 license](https://github.com/ymgyt/syndicationd/blob/main/LICENSE-APACHE)
 or the
 [MIT license](https://github.com/ymgyt/syndicationd/blob/main/LICENSE-MIT).
+
+[workflow-ci-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/ci.yaml?style=for-the-badge&logo=github&label=CI
+[workflow-ci-url]: https://github.com/ymgyt/syndicationd/actions/workflows/ci.yaml
+[workflow-release-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/release.yml?style=for-the-badge&logo=github&label=Release
+[workflow-release-url]: https://github.com/ymgyt/syndicationd/actions/workflows/release.yml
+[workflow-audit-badge]: https://img.shields.io/github/actions/workflow/status/ymgyt/syndicationd/audit.yaml?style=for-the-badge&logo=github&label=Audit
+[workflow-audit-url]: https://github.com/ymgyt/syndicationd/actions/workflows/audit.yaml
+[coverage-badge]: https://img.shields.io/codecov/c/github/ymgyt/syndicationd?token=W1A93WSPEE&style=for-the-badge&logo=codecov&color=brightgreen
+[coverage-url]: https://app.codecov.io/github/ymgyt/syndicationd
