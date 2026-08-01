@@ -73,7 +73,7 @@ tempfile           = { version = "3.27.0" }
 thiserror          = { version = "2.0.19" }
 tokio              = { version = "1.52.1", default-features = false }
 tokio-util         = { version = "0.7.19" }
-toml               = { version = "0.8.23" }
+toml               = { version = "0.9.12" }
 tracing            = { version = "0.1.44" }
 tracing-subscriber = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.8" }
