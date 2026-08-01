@@ -40,7 +40,7 @@ chrono             = { version = "0.4.45", default-features = false }
 clap               = { version = "4.6.5", default-features = false }
 criterion          = { version = "0.8.2", features = ["async_tokio"] }
 derive_more        = { version = "2.1.1", default-features = false, features = ["from"] }
-either             = { version = "1.15.0" }
+either             = { version = "1.17.0" }
 fake               = { version = "5.1.0", features = ["derive", "chrono"] }
 fdlimit            = { version = "0.3.0", default-features = false }
 feed-rs            = { version = "2.4.0", default-features = false }
