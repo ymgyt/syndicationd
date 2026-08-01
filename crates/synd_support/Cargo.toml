@@ -14,7 +14,7 @@ version.workspace = true
 
 [dependencies]
 axum                               = { workspace = true, optional = true }
-byte-unit                          = { version = "5.1.6", optional = true, features = ["serde"] }
+byte-unit                          = { version = "5.2.5", optional = true, features = ["serde"] }
 chrono                             = { workspace = true, features = ["now"] }
 directories                        = "6.0.0"
 http                               = { workspace = true, optional = true }
@@ -62,7 +62,7 @@ insta               = { workspace = true, features = ["yaml", "redactions"] }
 opentelemetry-proto = { version = "0.32.0", features = ["gen-tonic", "trace", "metrics", "logs", "with-serde"] }
 serde_json          = { workspace = true }
 tokio               = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
-tonic               = { version = "0.14.5", features = ["transport"] }
+tonic               = { version = "0.14.6", features = ["transport"] }
 
 [lints]
 workspace = true
