@@ -18,7 +18,7 @@ byte-unit                          = { version = "5.2.5", optional = true, featu
 chrono                             = { workspace = true, features = ["now"] }
 directories                        = "6.0.0"
 http                               = { workspace = true, optional = true }
-humantime                          = { version = "2.2.0", optional = true }
+humantime                          = { version = "2.4.0", optional = true }
 mockall                            = { workspace = true, optional = true }
 opentelemetry                      = { version = "0.32.0", optional = true }
 opentelemetry-appender-tracing     = { version = "0.32.0", optional = true, default-features = false }
