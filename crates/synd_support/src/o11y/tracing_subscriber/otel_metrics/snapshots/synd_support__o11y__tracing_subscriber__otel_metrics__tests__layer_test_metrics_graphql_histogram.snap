@@ -17,7 +17,7 @@ resourceMetrics:
             stringValue: opentelemetry
         - key: telemetry.sdk.version
           value:
-            stringValue: 0.32.0
+            stringValue: 0.32.1
       droppedAttributesCount: 0
       entityRefs: []
     scopeMetrics:
