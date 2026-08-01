@@ -58,7 +58,7 @@ mockall            = { version = "0.15.0" }
 moka               = { version = "0.12.15", features = ["future"] }
 nom                = { version = "8.0.0", default-features = false, features = ["std"] }
 octocrab           = { version = "0.54.1", features = ["rustls-webpki-tokio"] }
-pprof              = { version = "0.14", features = ["flamegraph"] }
+pprof              = { version = "0.15.0", features = ["flamegraph"] }
 proptest           = { version = "1.11.0" }
 rand               = { version = "0.10.2" }
 reqwest            = { version = "0.12.23", default-features = false, features = ["rustls-tls", "json"] }
