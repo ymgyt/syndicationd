@@ -5727,7 +5727,7 @@ dependencies = [
  "html2text",
  "indexmap",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "nom 8.0.0",
  "nom-language",
  "nucleo",
