@@ -37,14 +37,14 @@ open                 = "5.3.2"
 ratatui              = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
 schemars             = { workspace = true, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
-serde_json           = "1.0.149"
+serde_json           = "1.0.151"
 thiserror            = { workspace = true }
 tokio                = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
-tokio-stream         = { version = "0.1.18", optional = true }
+tokio-stream         = { version = "0.1.19", optional = true }
 toml                 = { workspace = true }
 tracing              = { workspace = true }
-tui-widgets          = { version = "0.7.2", default-features = false, features = ["big-text"] }
-unicode-segmentation = "1.12.0"
+tui-widgets          = { version = "0.7.10", default-features = false, features = ["big-text"] }
+unicode-segmentation = "1.13.3"
 url                  = { workspace = true }
 
 [features]

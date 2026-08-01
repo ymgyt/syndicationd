@@ -32,7 +32,7 @@ thiserror          = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 toml               = { workspace = true }
 tracing            = { workspace = true }
-tracing-appender   = "0.2.3"
+tracing-appender   = "0.2.5"
 tracing-subscriber = { workspace = true }
 update-informer    = { version = "1.3.0", default-features = false, features = ["crates", "reqwest", "rustls-tls"] }
 
@@ -48,7 +48,7 @@ futures-util = { workspace = true }
 insta      = { workspace = true }
 mockall    = { workspace = true }
 octocrab   = { workspace = true, features = ["timeout", "tracing"] }
-ratatui    = { version = "0.30.0", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
+ratatui    = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
 synd-api      = { workspace = true }
 synd-auth     = { workspace = true }
 synd-registry = { workspace = true }

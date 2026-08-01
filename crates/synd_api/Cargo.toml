@@ -29,11 +29,11 @@ feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
-pin-project        = "1.1.11"
+pin-project        = "1.1.13"
 reqwest            = { workspace = true }
 serde              = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
-tokio-metrics      = { version = "0.5.0", default-features = false, features = ["rt"] }
+tokio-metrics      = { version = "0.5.1", default-features = false, features = ["rt"] }
 tokio-util         = { workspace = true }
 tower              = { version = "0.5.3", default-features = false, features = ["limit", "timeout"] }
 tower-http         = { version = "0.6.8", default-features = false, features = ["trace", "sensitive-headers", "cors", "limit"] }
