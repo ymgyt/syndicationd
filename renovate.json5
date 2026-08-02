@@ -6,6 +6,7 @@
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
   "enabledManagers": ["cargo", "github-actions"],
+  "automerge": true,
   "reviewersFromCodeOwners": true,
   "reviewersSampleSize": 1,
   "prConcurrentLimit": 10,
@@ -23,12 +24,17 @@
       "addLabels": ["dependencies/github_actions"]
     },
     {
-      // Keep Dependabot's rust-patch group behavior and let Renovate merge it
-      // after required checks pass.
       "groupName": "rust-patch",
       "matchManagers": ["cargo"],
-      "matchUpdateTypes": ["patch"],
-      "automerge": true
+      "matchUpdateTypes": ["patch"]
+    },
+    {
+      // Group SemVer-stable minor updates while keeping pre-1.0 minor updates
+      // separate because they can contain breaking changes.
+      "groupName": "rust-stable-minor",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor"],
+      "matchCurrentVersion": "!/^0/"
     },
     {
       "groupName": "opentelemetry",
