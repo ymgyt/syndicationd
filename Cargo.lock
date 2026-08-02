@@ -2824,6 +2824,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "11.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "881733cbc631fc9e472e24447ce32a64bedf2da498d6d8570b08edc87de71f65"
+dependencies = [
+ "base64",
+ "ed25519-dalek",
+ "getrandom 0.2.17",
+ "hmac",
+ "js-sys",
+ "p256",
+ "p384",
+ "pem",
+ "rand 0.8.6",
+ "rsa",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "signature",
+ "simple_asn1",
+ "zeroize",
+]
+
+[[package]]
 name = "kasuari"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3363,7 +3387,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-timeout",
  "hyper-util",
- "jsonwebtoken",
+ "jsonwebtoken 10.4.0",
  "percent-encoding",
  "pin-project",
  "rustls",
@@ -5614,7 +5638,7 @@ dependencies = [
  "chrono",
  "http",
  "http-serde-ext",
- "jsonwebtoken",
+ "jsonwebtoken 11.0.0",
  "reqwest",
  "serde",
  "serde_json",
@@ -5824,7 +5848,7 @@ dependencies = [
  "axum",
  "chrono",
  "headers",
- "jsonwebtoken",
+ "jsonwebtoken 11.0.0",
  "serde",
  "serde_json",
  "synd-auth",
