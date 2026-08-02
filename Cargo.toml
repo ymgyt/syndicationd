@@ -66,7 +66,7 @@ rustls             = { version = "0.23.43", default-features = false, features =
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1.0.229", features = ["derive"] }
 serde_json         = { version = "1.0.151" }
-sha2               = { version = "0.10" }
+sha2               = { version = "0.11.0" }
 sqlx               = { version = "0.8.6", default-features = false }
 strum              = { version = "0.28.0", features = ["derive"] }
 tempfile           = { version = "3.27.0" }
