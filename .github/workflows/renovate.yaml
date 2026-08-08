@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24.16.0
+          node-version: 24.19.0
       - name: Validate Renovate configuration
         run: |
           npx --yes --package renovate@43.150.0 -c "renovate --version"
