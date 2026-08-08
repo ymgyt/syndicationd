@@ -61,7 +61,7 @@ octocrab           = { version = "0.54.1", features = ["rustls-webpki-tokio"] }
 pprof              = { version = "0.15.0", features = ["flamegraph"] }
 proptest           = { version = "1.11.0" }
 rand               = { version = "0.10.2" }
-reqwest            = { version = "0.12.23", default-features = false, features = ["rustls-tls", "json"] }
+reqwest            = { version = "0.13.4", default-features = false, features = ["rustls-tls", "json"] }
 rustls             = { version = "0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
 schemars           = { version = "0.8.21", default-features = false, features = ["derive"] }
 serde              = { version = "1.0.229", features = ["derive"] }
