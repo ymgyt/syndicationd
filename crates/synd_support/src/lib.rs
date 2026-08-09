@@ -1,8 +1,6 @@
 //! Shared support utilities for syndicationd crates.
 #![warn(rustdoc::broken_intra_doc_links)]
 
-#[cfg(feature = "byte")]
-pub mod byte;
 #[cfg(feature = "conf")]
 pub mod conf;
 pub mod dirs;
