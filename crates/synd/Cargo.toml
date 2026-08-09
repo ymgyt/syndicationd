@@ -43,19 +43,15 @@ integration = ["synd-term/integration"]
 assert_cmd = { workspace = true }
 chrono     = { workspace = true }
 crossterm  = "0.29.0"
-fake       = { workspace = true }
 futures-util = { workspace = true }
 insta      = { workspace = true }
 mockall    = { workspace = true }
-octocrab   = { workspace = true, features = ["timeout", "tracing"] }
-ratatui    = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
 synd-api      = { workspace = true }
 synd-auth     = { workspace = true }
 synd-registry = { workspace = true }
 synd-test     = { workspace = true }
 tempfile   = { workspace = true }
 tokio      = { workspace = true, features = ["net"] }
-tokio-util = { workspace = true }
 url        = { workspace = true }
 
 [lints]

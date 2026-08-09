@@ -25,7 +25,6 @@ async-graphql-axum = { version = "7.2.1" }
 axum               = { workspace = true, features = ["json"] }
 axum-server        = { workspace = true }
 chrono             = { workspace = true }
-feed-rs            = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
 moka               = { workspace = true, features = ["future"] }

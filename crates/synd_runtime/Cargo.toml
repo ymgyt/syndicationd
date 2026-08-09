@@ -15,7 +15,6 @@ version.workspace = true
 [dependencies]
 synd-api         = { workspace = true }
 synd-client      = { workspace = true }
-synd-feed        = { workspace = true }
 synd-persistence = { workspace = true }
 synd-protocol    = { workspace = true }
 synd-registry    = { workspace = true }

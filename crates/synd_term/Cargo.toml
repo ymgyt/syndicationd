@@ -56,7 +56,6 @@ synd-client = { workspace = true, features = ["fake"] }
 
 criterion   = { workspace = true }
 fake        = { workspace = true }
-insta       = { workspace = true }
 pprof       = { workspace = true }
 proptest    = { workspace = true }
 tempfile    = { workspace = true }
