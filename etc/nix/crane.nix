@@ -3,6 +3,7 @@
   craneLib,
   lib,
   stdenv,
+  cacert,
   libiconv,
   dockerTools,
   darwin,
@@ -39,6 +40,7 @@ let
     version = "1";
     buildInputs = [ ] ++ lib.optionals stdenv.isDarwin darwinDeps;
     CARGO_PROFILE = "dev";
+    SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
   };
 
   workspaceCrate = craneLib.crateNameFromCargoToml { cargoToml = ../../Cargo.toml; };
@@ -71,6 +73,7 @@ let
   syndImage = dockerTools.buildImage {
     name = "synd";
     tag = "latest";
+    copyToRoot = dockerTools.caCertificates;
     config = {
       Cmd = [ "${synd}/bin/synd" ];
       Labels = dockerImageLabels;
@@ -93,6 +96,7 @@ let
   syndApiImage = dockerTools.buildImage {
     name = "synd-api";
     tag = "latest";
+    copyToRoot = dockerTools.caCertificates;
     config = {
       Cmd = [ "${syndApi}/bin/synd-api" ];
       Labels = dockerImageLabels;
