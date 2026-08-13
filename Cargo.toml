@@ -41,7 +41,7 @@ derive_more        = { version = "2.1.1", default-features = false, features = [
 either             = { version = "1.17.0" }
 fake               = { version = "5.1.0", features = ["derive", "chrono"] }
 feed-rs            = { version = "2.4.0", default-features = false }
-futures-util       = { version = "0.3.33", default-features = false }
+futures-util       = { version = "0.3.34", default-features = false }
 graphql_client     = { version = "0.16.0", default-features = false }
 headers            = { version = "0.4.1" }
 http               = { version = "1.5.0" }
@@ -50,7 +50,7 @@ insta              = { version = "1.48.0" }
 itertools          = { version = "0.15.0", default-features = false, features = ["use_std"] }
 jsonwebtoken       = { version = "11.0.0", features = ["rust_crypto"] }
 mockall            = { version = "0.15.0" }
-moka               = { version = "0.12.15", features = ["future"] }
+moka               = { version = "0.12.16", features = ["future"] }
 nom                = { version = "8.0.0", default-features = false, features = ["std"] }
 octocrab           = { version = "0.54.1", features = ["rustls-webpki-tokio"] }
 pprof              = { version = "0.15.0", features = ["flamegraph"] }
