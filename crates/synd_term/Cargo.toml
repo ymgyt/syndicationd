@@ -33,7 +33,7 @@ nom                  = { workspace = true }
 nom-language         = "0.1.0"
 nucleo               = "0.5.0"
 octocrab             = { workspace = true, features = ["timeout", "tracing"] }
-open                 = "5.4.1"
+open                 = "5.4.2"
 ratatui              = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color", "layout-cache"] }
 schemars             = { workspace = true, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
@@ -43,7 +43,7 @@ tokio                = { workspace = true, features = ["macros", "net", "rt-mult
 tokio-stream         = { version = "0.1.19", optional = true }
 toml                 = { workspace = true }
 tracing              = { workspace = true }
-tui-widgets          = { version = "0.7.10", default-features = false, features = ["big-text"] }
+tui-widgets          = { version = "0.7.11", default-features = false, features = ["big-text"] }
 unicode-segmentation = "1.13.3"
 url                  = { workspace = true }
 
