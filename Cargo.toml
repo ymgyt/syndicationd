@@ -33,7 +33,7 @@ async-graphql      = { version = "7.2.1" }
 async-trait        = { version = "0.1.92", default-features = false }
 axum               = { version = "0.8.9", default-features = false }
 axum-server        = { version = "0.8.0", features = ["tls-rustls"] }
-bon                = { version = "3.9.3" }
+bon                = { version = "3.10.0" }
 chrono             = { version = "0.4.45", default-features = false }
 clap               = { version = "4.6.6", default-features = false }
 criterion          = { version = "0.8.2", features = ["async_tokio"] }
