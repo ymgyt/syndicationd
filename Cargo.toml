@@ -33,7 +33,7 @@ async-graphql      = { version = "7.2.1" }
 async-trait        = { version = "0.1.92", default-features = false }
 axum               = { version = "0.8.9", default-features = false }
 axum-server        = { version = "0.8.0", features = ["tls-rustls"] }
-bon                = { version = "3.10.0" }
+bon                = { version = "3.10.1" }
 chrono             = { version = "0.4.45", default-features = false }
 clap               = { version = "4.6.6", default-features = false }
 criterion          = { version = "0.8.2", features = ["async_tokio"] }
@@ -56,8 +56,8 @@ octocrab           = { version = "0.54.1", features = ["rustls-webpki-tokio"] }
 pprof              = { version = "0.15.0", features = ["flamegraph"] }
 proptest           = { version = "1.11.0" }
 rand               = { version = "0.10.2" }
-reqwest            = { version = "0.13.4", default-features = false, features = ["rustls", "json"] }
-rustls             = { version = "0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
+reqwest            = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
+rustls             = { version = "0.23.44", default-features = false, features = ["ring", "std", "tls12"] }
 schemars           = { version = "1.2.2", default-features = false, features = ["derive"] }
 serde              = { version = "1.0.229", features = ["derive"] }
 serde_json         = { version = "1.0.151" }
