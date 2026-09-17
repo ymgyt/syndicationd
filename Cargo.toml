@@ -48,7 +48,7 @@ http               = { version = "1.5.0" }
 indexmap           = { version = "2.14.2" }
 insta              = { version = "1.48.0" }
 itertools          = { version = "0.15.0", default-features = false, features = ["use_std"] }
-jsonwebtoken       = { version = "11.0.0", features = ["rust_crypto"] }
+jsonwebtoken       = { version = "11.1.0", features = ["rust_crypto"] }
 mockall            = { version = "0.15.0" }
 moka               = { version = "0.12.16", features = ["future"] }
 nom                = { version = "8.0.0", default-features = false, features = ["std"] }
