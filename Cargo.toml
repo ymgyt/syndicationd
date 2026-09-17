@@ -35,7 +35,7 @@ axum               = { version = "0.8.9", default-features = false }
 axum-server        = { version = "0.8.0", features = ["tls-rustls"] }
 bon                = { version = "3.10.1" }
 chrono             = { version = "0.4.45", default-features = false }
-clap               = { version = "4.6.6", default-features = false }
+clap               = { version = "4.6.7", default-features = false }
 criterion          = { version = "0.8.2", features = ["async_tokio"] }
 derive_more        = { version = "2.1.1", default-features = false, features = ["from"] }
 either             = { version = "1.18.0" }
@@ -52,12 +52,12 @@ jsonwebtoken       = { version = "11.1.0", features = ["rust_crypto"] }
 mockall            = { version = "0.15.0" }
 moka               = { version = "0.12.16", features = ["future"] }
 nom                = { version = "8.0.0", default-features = false, features = ["std"] }
-octocrab           = { version = "0.54.1", features = ["rustls-webpki-tokio"] }
+octocrab           = { version = "0.54.2", features = ["rustls-webpki-tokio"] }
 pprof              = { version = "0.15.0", features = ["flamegraph"] }
 proptest           = { version = "1.11.0" }
 rand               = { version = "0.10.2" }
 reqwest            = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
-rustls             = { version = "0.23.44", default-features = false, features = ["ring", "std", "tls12"] }
+rustls             = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
 schemars           = { version = "1.2.2", default-features = false, features = ["derive"] }
 serde              = { version = "1.0.229", features = ["derive"] }
 serde_json         = { version = "1.0.151" }
