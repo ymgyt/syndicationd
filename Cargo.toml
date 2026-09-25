@@ -43,7 +43,7 @@ fake               = { version = "5.1.0", features = ["derive", "chrono"] }
 feed-rs            = { version = "2.4.0", default-features = false }
 futures-util       = { version = "0.3.34", default-features = false }
 graphql_client     = { version = "0.16.0", default-features = false }
-headers            = { version = "0.4.1" }
+headers            = { version = "0.4.2" }
 http               = { version = "1.5.0" }
 indexmap           = { version = "2.14.2" }
 insta              = { version = "1.48.0" }
@@ -65,7 +65,7 @@ sha2               = { version = "0.11.0" }
 sqlx               = { version = "0.8.6", default-features = false }
 strum              = { version = "0.28.0", features = ["derive"] }
 tempfile           = { version = "3.27.0" }
-thiserror          = { version = "2.0.20" }
+thiserror          = { version = "2.0.21" }
 tokio              = { version = "1.53.1", default-features = false }
 tokio-util         = { version = "0.7.19" }
 toml               = { version = "1.1.6" }
