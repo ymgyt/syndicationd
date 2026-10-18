@@ -26,7 +26,7 @@ crossterm            = { version = "0.29.0", features = ["event-stream"] }
 edit                 = "0.1.5"
 futures-util         = { workspace = true }
 graphql_client       = { workspace = true, features = ["graphql_query_derive"] }
-html2text            = { version = "0.17.3" }
+html2text            = { version = "0.17.4" }
 indexmap             = { workspace = true }
 itertools            = { workspace = true }
 nom                  = { workspace = true }
