@@ -72,7 +72,7 @@ toml               = { version = "1.1.8" }
 tracing            = { version = "0.1.44" }
 tracing-subscriber = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 url                = { version = "2.5.8" }
-webpki-roots       = { version = "1.0.9" }
+webpki-roots       = { version = "1.0.10" }
 zstd               = { version = "0.14.3", default-features = false }
 
 [profile.release]
