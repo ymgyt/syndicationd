@@ -58,7 +58,7 @@ insta               = { workspace = true, features = ["yaml", "redactions"] }
 opentelemetry-proto = { version = "0.32.0", features = ["gen-tonic", "trace", "metrics", "logs", "with-serde"] }
 serde_json          = { workspace = true }
 tokio               = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
-tonic               = { version = "0.14.8", features = ["transport"] }
+tonic               = { version = "0.14.9", features = ["transport"] }
 
 [lints]
 workspace = true
