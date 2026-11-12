@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" id="oranda" class="dark axo">
+  <head>
+    <title>synd-api</title>
+    
+      <meta property="og:url" content="https://docs.syndicationd.ymgyt.io/synd-term/" />
+    
+    
+      <link rel="icon" href="/synd-api/favicon.ico" />
+    
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+      <meta name="description" content="syndicationd backend api" />
+      <meta property="og:description" content="syndicationd backend api" />
+    
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="synd-api" />
+    
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta property="og:image" content="https://blog.ymgyt.io/images/emoji/crab.png" />
+    
+    
+      <meta property="og:image:alt" content="synd" />
+    
+    
+      <meta name="twitter:creator" content="@YAmaguchixt" />
+      <meta name="twitter:site" content="@YAmaguchixt" />
+    
+    <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
+    <link rel="stylesheet" href="/synd-api/oranda-v0.6.1.css" />
+    
+    
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-body">
+        
+          <div class="repo_banner">
+            <a href="https://github.com/ymgyt/syndicationd">
+              <div class="github-icon" aria-hidden="true"></div>
+              Check out our GitHub!
+            </a>
+          </div>
+        
+
+        <main>
+          <header>
+            
+            <h1 class="title">synd-api</h1>
+            
+  <nav class="nav">
+    <ul>
+      <li><a href="/synd-api/">Home</a></li>
+
+      
+
+      
+
+      
+
+      
+
+      
+        <li><a href="/synd-api/changelog/">Changelog</a></li>
+      
+    </ul>
+  </nav>
+
+          </header>
+
+          
+
+
+    <h1>synd-api</h1>
+<p>syndicationd API service library</p>
+<h2>Responsibility</h2>
+<p><code>synd-api</code> is the transport boundary for syndicationd. It owns HTTP serving,
+GraphQL schema wiring, authentication, request limits, shutdown, and
+observability. Feed lifecycle behavior is delegated to <code>synd-registry</code>, and
+SQLite storage adapters are provided by <code>synd-persistence</code>.</p>
+<p>This crate is a library. The local daemon process is started through
+<code>synd daemon serve</code>.</p>
+<h2>OpenTelemetry</h2>
+<p>synd-api is instrumented with OpenTelemetry.</p>
+<h3>Traces</h3>
+<p>graphql request traces is exported</p>
+<h3>Metrics</h3>
+<p>Following metrics are exported</p>
+<table>
+<thead>
+<tr>
+<th>Metrics</th>
+<th>Meter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>http.server.request</code></td>
+<td>Counter</td>
+<td>http request traffic per status code</td>
+</tr>
+<tr>
+<td><code>graphql.duration</code></td>
+<td>Histogram</td>
+<td>graphql latency</td>
+</tr>
+<tr>
+<td><code>registry.reconcile</code></td>
+<td>Counter</td>
+<td>feed registry reconciliation attempts</td>
+</tr>
+</tbody>
+</table>
+<h2>Features</h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>introspection</code></td>
+<td>Enable graphql introspection</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>opentelemetry-stdout</code></td>
+<td>Enable opentelemetry stdout exporter</td>
+<td>false</td>
+</tr>
+</tbody>
+</table>
+
+
+
+        </main>
+      </div>
+
+      <footer>
+        
+          <a href="https://github.com/ymgyt/syndicationd"><div class="github-icon" aria-hidden="true"></div></a>
+        
+        <span>
+          synd-api, MIT OR Apache-2.0
+        </span>
+      </footer>
+    </div>
+
+    
+    
+
+    
+
+
+  </body>
+</html>
