@@ -35,7 +35,7 @@ axum               = { version = "0.8.9", default-features = false }
 axum-server        = { version = "0.9.2", features = ["tls-rustls"] }
 bon                = { version = "3.10.3" }
 chrono             = { version = "0.4.45", default-features = false }
-clap               = { version = "4.6.7", default-features = false }
+clap               = { version = "4.6.8", default-features = false }
 criterion          = { version = "0.8.2", features = ["async_tokio"] }
 derive_more        = { version = "2.1.1", default-features = false, features = ["from"] }
 either             = { version = "1.19.0" }
@@ -55,7 +55,7 @@ nom                = { version = "8.0.0", default-features = false, features = [
 octocrab           = { version = "0.54.9", features = ["rustls-webpki-tokio"] }
 pprof              = { version = "0.15.0", features = ["flamegraph"] }
 proptest           = { version = "1.12.0" }
-rand               = { version = "0.10.3" }
+rand               = { version = "0.10.4" }
 reqwest            = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
 rustls             = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 schemars           = { version = "1.2.3", default-features = false, features = ["derive"] }
