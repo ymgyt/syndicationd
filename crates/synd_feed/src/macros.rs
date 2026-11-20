@@ -8,7 +8,7 @@ macro_rules! impl_sqlx_encode_decode {
         }
 
         #[cfg(feature = "sqlx")]
-        impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for $ty {
+        impl sqlx::Encode<'_, sqlx::Sqlite> for $ty {
             fn encode_by_ref(
                 &self,
                 buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,

@@ -91,7 +91,7 @@ impl sqlx::Type<sqlx::Sqlite> for Category<'static> {
 }
 
 #[cfg(feature = "sqlx")]
-impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Category<'static> {
+impl sqlx::Encode<'_, sqlx::Sqlite> for Category<'static> {
     fn encode_by_ref(
         &self,
         buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,
