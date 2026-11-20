@@ -123,6 +123,19 @@ Use the scope without the `synd` prefix from the crate name.
 For example, when making changes to `synd_term`, the commit message should be `feat(term): add new feature`.
 The commit will be used to generate the CHANGELOG for each crate.
 
+When an AI coding agent writes or materially changes the patch, add an
+`Assisted-by: <agent>:<model-id>` trailer at the end of the commit message.
+Put a blank line before the trailer block. Use the actual model ID when it is
+known. If the agent is known but its model is unavailable, record the agent
+name alone. Use one trailer per distinct agent and model that contributed.
+Carry these trailers over to the final commit when squashing.
+
+```text
+fix(term): restore focus after closing a dialog
+
+Assisted-by: Codex:gpt-6.2-sol
+```
+
 ## For Maintainers
 
 For information about CI, refer to [ci.md](/docs/ci.md).
