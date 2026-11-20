@@ -28,7 +28,7 @@ chrono             = { workspace = true }
 futures-util       = { workspace = true }
 graphql_client     = { workspace = true }
 moka               = { workspace = true, features = ["future"] }
-pin-project        = "1.1.13"
+pin-project        = "1.2.0"
 reqwest            = { workspace = true }
 serde              = { workspace = true }
 tokio              = { workspace = true, features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
