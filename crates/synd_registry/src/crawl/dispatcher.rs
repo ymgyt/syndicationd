@@ -244,7 +244,7 @@ mod tests {
             4,
         );
 
-        assert!(plan.claim.is_empty());
+        assert_eq!(plan.claim.as_slice(), &[]);
         assert_eq!(plan.next_due_at, Some(early));
         assert_eq!(
             plan.wake_after(now(), Duration::from_secs(1)),

@@ -186,7 +186,7 @@ impl Application {
         match error {
             SyndApiError::Unauthorized { url } => format!(
                 "{} unauthorized. local feed API session is invalid",
-                url.as_ref().map(ToString::to_string).unwrap_or_default(),
+                url.as_ref().map_or_default(ToString::to_string),
             ),
             SyndApiError::BuildRequest(error) => {
                 format!("build request failed: {error} this is a BUG")
@@ -197,7 +197,7 @@ impl Application {
             }
             SyndApiError::HttpStatus { status, url } => format!(
                 "HTTP status client error ({status}) for url ({})",
-                url.as_ref().map(ToString::to_string).unwrap_or_default()
+                url.as_ref().map_or_default(ToString::to_string)
             ),
             SyndApiError::Graphql { errors } => errors.iter().map(ToString::to_string).join(", "),
             SyndApiError::OpenSession(error) => format!("session open rejected: {error:?}"),

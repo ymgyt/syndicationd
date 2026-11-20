@@ -103,6 +103,10 @@ impl Authenticator {
     }
 
     /// Authenticate from given token
+    #[allow(
+        clippy::result_unit_err,
+        reason = "authentication failures carry no details"
+    )]
     #[instrument(skip_all)]
     pub async fn authenticate<S>(&self, token: S) -> Result<Principal, ()>
     where

@@ -88,8 +88,7 @@ impl<'a> InputParser<'a> {
         let crawl_policy = feed
             .crawl_policy
             .prompt_value()
-            .map(|policy| format!(" {policy}"))
-            .unwrap_or_default();
+            .map_or_default(|policy| format!(" {policy}"));
 
         format!(
             "{}\n{requirement} {category} {feed_url}{crawl_policy}",
@@ -365,7 +364,7 @@ mod feed {
             let err = parse("MUST rust https://example.ymgyt.io/atom.xml manual extra")
                 .unwrap_err()
                 .errors;
-            assert!(!err.is_empty());
+            assert_ne!(err.as_slice(), &[]);
         }
     }
 }

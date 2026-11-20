@@ -127,8 +127,7 @@ impl From<payload::SubscribedFeed> for Feed {
             updated: details.as_ref().and_then(|details| details.updated),
             links: details
                 .as_ref()
-                .map(|details| details.links.nodes.clone())
-                .unwrap_or_default(),
+                .map_or_default(|details| details.links.nodes.clone()),
             website_url: details
                 .as_ref()
                 .and_then(|details| details.website_url.clone()),
@@ -140,12 +139,10 @@ impl From<payload::SubscribedFeed> for Feed {
                 .and_then(|details| details.generator.clone()),
             entries: details
                 .as_ref()
-                .map(|details| details.entries.nodes.clone())
-                .unwrap_or_default(),
+                .map_or_default(|details| details.entries.nodes.clone()),
             authors: details
                 .as_ref()
-                .map(|details| details.authors.nodes.clone())
-                .unwrap_or_default(),
+                .map_or_default(|details| details.authors.nodes.clone()),
             crawl_policy,
             requirement,
             category,

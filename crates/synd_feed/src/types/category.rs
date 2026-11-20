@@ -148,6 +148,6 @@ mod tests {
         use fake::Fake;
 
         let c: Category = fake::Faker.fake();
-        assert!(!c.as_str().is_empty());
+        assert_ne!(c.as_str(), "");
     }
 }

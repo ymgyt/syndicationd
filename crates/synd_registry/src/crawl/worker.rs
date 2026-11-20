@@ -282,8 +282,7 @@ where
     ) -> WorkerResult<(CrawlCompletionSummary, RecordedEvents)> {
         let previous_conditional = previous_state
             .as_ref()
-            .map(|state| state.conditional.clone())
-            .unwrap_or_default();
+            .map_or_default(|state| state.conditional.clone());
         let completion =
             CrawlCompletion::classify(outcome, job.started_at, finished_at, &previous_conditional);
         let health = CrawlHealth::for_last_result(&completion.last, previous_state.as_ref());
@@ -359,9 +358,7 @@ impl CrawlJob {
     /// Builds the conditional fetch request for this job from the previous
     /// crawl state.
     fn fetch_request(&self, previous_state: Option<&CrawlState>) -> FeedFetchRequest {
-        let conditional = previous_state
-            .map(|state| state.conditional.clone())
-            .unwrap_or_default();
+        let conditional = previous_state.map_or_default(|state| state.conditional.clone());
         FeedFetchRequest::new(self.feed_url.clone()).with_conditional(conditional)
     }
 }

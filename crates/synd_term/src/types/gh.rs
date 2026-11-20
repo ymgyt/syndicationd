@@ -559,7 +559,7 @@ impl TryFrom<issue_query::ResponseData> for IssueContext {
             .into_iter()
             .find_map(|node| {
                 node.map(|node| Comment {
-                    author: node.author.map(|author| author.login).unwrap_or_default(),
+                    author: node.author.map_or_default(|author| author.login),
                     body: node.body_text,
                 })
             });
@@ -641,7 +641,7 @@ impl TryFrom<pull_request_query::ResponseData> for PullRequestContext {
             .into_iter()
             .find_map(|node| {
                 node.map(|node| Comment {
-                    author: node.author.map(|author| author.login).unwrap_or_default(),
+                    author: node.author.map_or_default(|author| author.login),
                     body: node.body_text,
                 })
             });

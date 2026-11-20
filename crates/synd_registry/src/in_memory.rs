@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unused_async_trait_impl,
+    reason = "in-memory transactions implement the same async traits as the persistent backend"
+)]
+
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};

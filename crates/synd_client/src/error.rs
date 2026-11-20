@@ -22,7 +22,7 @@ pub enum SyndApiError {
     SendRequest(reqwest::Error),
     #[error(transparent)]
     DecodeResponse(reqwest::Error),
-    #[error("HTTP status client error ({status}) for url ({url})", url = url.as_ref().map(ToString::to_string).unwrap_or_default())]
+    #[error("HTTP status client error ({status}) for url ({url})", url = url.as_ref().map_or_default(ToString::to_string))]
     HttpStatus {
         status: StatusCode,
         url: Option<Url>,

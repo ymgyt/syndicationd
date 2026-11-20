@@ -17,7 +17,7 @@ async fn uncommitted_subscription_is_rolled_back() -> anyhow::Result<()> {
         })
         .await?;
 
-    assert!(page.subscriptions.is_empty());
+    assert_eq!(page.subscriptions.as_slice(), &[]);
     Ok(())
 }
 

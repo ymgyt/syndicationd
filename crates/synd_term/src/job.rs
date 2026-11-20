@@ -73,7 +73,7 @@ impl Stream for Jobs {
 
 #[cfg(test)]
 mod tests {
-    use futures_util::{FutureExt as _, StreamExt as _};
+    use futures_util::FutureExt as _;
 
     use super::*;
     use std::future;

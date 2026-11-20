@@ -465,10 +465,7 @@ impl GhNotificationsWidget {
                     Some(SubjectType::Issue) => {
                         format!(
                             "#{}",
-                            notification
-                                .issue_id()
-                                .map(|id| id.to_string())
-                                .unwrap_or_default()
+                            notification.issue_id().map_or_default(|id| id.to_string())
                         )
                     }
                     Some(SubjectType::PullRequest) => {
@@ -476,8 +473,7 @@ impl GhNotificationsWidget {
                             "#{}",
                             notification
                                 .pull_request_id()
-                                .map(|id| id.to_string())
-                                .unwrap_or_default()
+                                .map_or_default(|id| id.to_string())
                         )
                     }
                     Some(SubjectType::Ci) => "ci".to_owned(),
