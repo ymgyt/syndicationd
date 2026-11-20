@@ -351,6 +351,7 @@ mod tests {
             id: FEED_RS_MISSING_ID_MARKER.to_owned(),
             links: vec![feedrs::Link {
                 href: "https://example.com/audio.mp3".to_owned(),
+                target: None,
                 rel: None,
                 media_type: Some("audio/mpeg".to_owned()),
                 href_lang: None,
@@ -441,6 +442,7 @@ mod tests {
     fn link_with_rel(href: &str, rel: Option<&str>) -> feedrs::Link {
         feedrs::Link {
             href: href.to_owned(),
+            target: None,
             rel: rel.map(ToOwned::to_owned),
             media_type: None,
             href_lang: None,

@@ -63,6 +63,7 @@ mod tests {
             length: Some(17),
             src: Some(feedrs::Link {
                 href: "https://example.com/entry".into(),
+                target: None,
                 rel: Some("alternate".into()),
                 media_type: Some("text/html".into()),
                 href_lang: Some("en".into()),

@@ -130,6 +130,7 @@ mod tests {
             }),
             links: vec![feedrs::Link {
                 href: "https://example.com/entry".into(),
+                target: None,
                 rel: Some("alternate".into()),
                 media_type: Some("text/html".into()),
                 href_lang: None,
