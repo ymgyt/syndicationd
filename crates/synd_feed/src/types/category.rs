@@ -94,7 +94,7 @@ impl sqlx::Type<sqlx::Sqlite> for Category<'static> {
 impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Category<'static> {
     fn encode_by_ref(
         &self,
-        buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+        buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,
     ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
         self.to_string().encode_by_ref(buf)
     }

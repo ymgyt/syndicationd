@@ -11,7 +11,7 @@ macro_rules! impl_sqlx_encode_decode {
         impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for $ty {
             fn encode_by_ref(
                 &self,
-                buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+                buf: &mut <sqlx::Sqlite as sqlx::Database>::ArgumentBuffer,
             ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
                 self.to_string().encode_by_ref(buf)
             }

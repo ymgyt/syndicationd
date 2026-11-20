@@ -72,7 +72,28 @@ async fn load(
     row.map(CrawlTargetRow::into_target).transpose()
 }
 
-const DUE_INPUT_SELECT: &str = r#"
+const LOAD_DUE_INPUT_SQL: &str = r#"
+SELECT
+    f.url AS feed_url,
+    ct.effective_policy_json AS effective_policy_json,
+    ct.manual_requested_at AS manual_requested_at,
+    cs.last_started_at,
+    cs.last_finished_at,
+    cs.last_http_status,
+    cs.last_error_kind,
+    cs.failure_streak,
+    cs.retry_after,
+    cs.etag,
+    cs.last_modified
+FROM crawl_target AS ct
+INNER JOIN feed AS f
+    ON f.pk = ct.feed_pk
+LEFT JOIN crawl_state AS cs
+    ON cs.feed_pk = ct.feed_pk
+WHERE ct.state = 'active' AND f.url = ?
+"#;
+
+const LIST_DUE_INPUTS_SQL: &str = r#"
 SELECT
     f.url AS feed_url,
     ct.effective_policy_json AS effective_policy_json,
@@ -91,14 +112,14 @@ INNER JOIN feed AS f
 LEFT JOIN crawl_state AS cs
     ON cs.feed_pk = ct.feed_pk
 WHERE ct.state = 'active'
+ORDER BY f.url
 "#;
 
 async fn load_due_input(
     tx: &mut Transaction<'_, Sqlite>,
     feed_url: &FeedUrl,
 ) -> SqliteResult<Option<CrawlDueInput>> {
-    let sql = format!("{DUE_INPUT_SELECT} AND f.url = ?");
-    let row = sqlx::query_as::<_, CrawlDueInputRow>(&sql)
+    let row = sqlx::query_as::<_, CrawlDueInputRow>(LOAD_DUE_INPUT_SQL)
         .bind(feed_url.as_str())
         .fetch_optional(&mut **tx)
         .await?;
@@ -107,8 +128,7 @@ async fn load_due_input(
 }
 
 async fn list_due_inputs(tx: &mut Transaction<'_, Sqlite>) -> SqliteResult<Vec<CrawlDueInput>> {
-    let sql = format!("{DUE_INPUT_SELECT} ORDER BY f.url");
-    let rows = sqlx::query_as::<_, CrawlDueInputRow>(&sql)
+    let rows = sqlx::query_as::<_, CrawlDueInputRow>(LIST_DUE_INPUTS_SQL)
         .fetch_all(&mut **tx)
         .await?;
 

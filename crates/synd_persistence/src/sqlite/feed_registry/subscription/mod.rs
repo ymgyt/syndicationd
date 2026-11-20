@@ -17,15 +17,6 @@ use super::{
     pagination::PageLimit,
 };
 
-const SUBSCRIPTION_SELECT_COLUMNS: &str = r#"
-s.subscriber_id AS subscriber_id,
-f.url AS feed_url,
-s.requirement AS requirement,
-s.category AS category,
-s.crawl_policy_json AS crawl_policy_json,
-s.subscribed_at AS subscribed_at
-"#;
-
 async fn upsert(
     tx: &mut Transaction<'_, Sqlite>,
     subscription: &SubscriptionKey,
@@ -120,40 +111,50 @@ async fn list(
 ) -> SqliteResult<Subscriptions> {
     let page_limit = PageLimit::new(query.first);
     let rows = if let Some(after) = query.after {
-        let sql = format!(
+        sqlx::query_as::<_, SubscriptionRow>(
             r#"
-                SELECT {SUBSCRIPTION_SELECT_COLUMNS}
+                SELECT
+                    s.subscriber_id AS subscriber_id,
+                    f.url AS feed_url,
+                    s.requirement AS requirement,
+                    s.category AS category,
+                    s.crawl_policy_json AS crawl_policy_json,
+                    s.subscribed_at AS subscribed_at
                 FROM feed_subscription AS s
                 INNER JOIN feed AS f
                     ON f.pk = s.feed_pk
                 WHERE s.subscriber_id = ? AND f.url > ?
                 ORDER BY f.url
                 LIMIT ?
-                "#
-        );
-        sqlx::query_as::<_, SubscriptionRow>(&sql)
-            .bind(query.subscriber_id.as_str())
-            .bind(after)
-            .bind(page_limit.sql_limit())
-            .fetch_all(&mut **tx)
-            .await
+                "#,
+        )
+        .bind(query.subscriber_id.as_str())
+        .bind(after)
+        .bind(page_limit.sql_limit())
+        .fetch_all(&mut **tx)
+        .await
     } else {
-        let sql = format!(
+        sqlx::query_as::<_, SubscriptionRow>(
             r#"
-                SELECT {SUBSCRIPTION_SELECT_COLUMNS}
+                SELECT
+                    s.subscriber_id AS subscriber_id,
+                    f.url AS feed_url,
+                    s.requirement AS requirement,
+                    s.category AS category,
+                    s.crawl_policy_json AS crawl_policy_json,
+                    s.subscribed_at AS subscribed_at
                 FROM feed_subscription AS s
                 INNER JOIN feed AS f
                     ON f.pk = s.feed_pk
                 WHERE s.subscriber_id = ?
                 ORDER BY f.url
                 LIMIT ?
-                "#
-        );
-        sqlx::query_as::<_, SubscriptionRow>(&sql)
-            .bind(query.subscriber_id.as_str())
-            .bind(page_limit.sql_limit())
-            .fetch_all(&mut **tx)
-            .await
+                "#,
+        )
+        .bind(query.subscriber_id.as_str())
+        .bind(page_limit.sql_limit())
+        .fetch_all(&mut **tx)
+        .await
     }?;
 
     let mut nodes = rows
