@@ -12,6 +12,27 @@ pub mod otel_log;
 pub mod otel_metrics;
 pub mod otel_trace;
 
+#[cfg(test)]
+#[track_caller]
+fn normalize_sdk_version(
+    resource: &mut Option<opentelemetry_proto::tonic::resource::v1::Resource>,
+) {
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
+
+    let resource = resource.as_mut().expect("missing exported resource");
+    let version = resource
+        .attributes
+        .iter_mut()
+        .find(|attribute| attribute.key == "telemetry.sdk.version")
+        .and_then(|attribute| attribute.value.as_mut())
+        .and_then(|value| value.value.as_mut());
+    let Some(Value::StringValue(version)) = version else {
+        panic!("missing string value for telemetry.sdk.version");
+    };
+    assert!(!version.trim().is_empty(), "empty telemetry.sdk.version");
+    *version = "[SDK_VERSION]".into();
+}
+
 /// Return a composed layer that exports traces, metrics, and logs of opentelemetry.
 /// The exported telemetry will be accompanied by a `Resource`.
 pub fn opentelemetry_layer<S>(

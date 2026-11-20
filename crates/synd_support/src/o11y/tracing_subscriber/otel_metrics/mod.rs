@@ -176,7 +176,8 @@ mod tests {
         let req = rx.recv().await.unwrap().into_inner();
         assert_eq!(req.resource_metrics.len(), 1);
 
-        let metric1 = req.resource_metrics[0].clone();
+        let mut metric1 = req.resource_metrics[0].clone();
+        super::super::normalize_sdk_version(&mut metric1.resource);
         insta::with_settings!({
             description => " metric 1 resource",
         }, {
@@ -209,7 +210,10 @@ mod tests {
             f2();
         });
         provider.force_flush().unwrap();
-        let req = rx.recv().await.unwrap().into_inner();
+        let mut req = rx.recv().await.unwrap().into_inner();
+        for metrics in &mut req.resource_metrics {
+            super::super::normalize_sdk_version(&mut metrics.resource);
+        }
         insta::with_settings!({
             description => "graphql duration histogram metrics",
         }, {

@@ -128,8 +128,9 @@ mod tests {
             f1();
         });
 
-        let req = rx.recv().await.unwrap().into_inner();
+        let mut req = rx.recv().await.unwrap().into_inner();
         assert_eq!(req.resource_spans.len(), 1);
+        super::super::normalize_sdk_version(&mut req.resource_spans[0].resource);
 
         let resource_span = req.resource_spans[0].clone();
         insta::with_settings!({

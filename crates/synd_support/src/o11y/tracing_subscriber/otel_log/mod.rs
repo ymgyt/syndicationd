@@ -94,7 +94,8 @@ mod tests {
         let req = rx.recv().await.unwrap().into_inner();
         assert_eq!(req.resource_logs.len(), 1);
 
-        let log1 = req.resource_logs[0].clone();
+        let mut log1 = req.resource_logs[0].clone();
+        super::super::normalize_sdk_version(&mut log1.resource);
         insta::with_settings!({
             description => " log 1 resource",
         }, {
