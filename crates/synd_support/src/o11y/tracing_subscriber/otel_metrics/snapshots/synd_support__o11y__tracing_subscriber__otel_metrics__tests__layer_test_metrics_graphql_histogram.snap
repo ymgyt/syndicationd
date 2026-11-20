@@ -41,7 +41,7 @@ resourceMetrics:
                   timeUnixNano: "[UNIX_TIMESTAMP]"
                   exemplars: []
                   flags: 0
-                  asInt: 1
+                  asInt: "1"
               aggregationTemporality: 2
               isMonotonic: true
           - name: graphql.duration
