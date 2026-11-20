@@ -595,6 +595,7 @@ mod tests {
                             <title>Entry</title>
                             <link>https://example.com/entry</link>
                             <description>Entry body</description>
+                            <author>alice@example.com</author>
                             <pubDate>Tue, 02 Jan 2024 03:04:05 +0000</pubDate>
                             <guid>https://example.com/entry</guid>
                         </item>
@@ -612,6 +613,11 @@ mod tests {
         assert_eq!(feed.meta().updated(), Some(feed_updated));
         assert_eq!(entry.published(), Some(entry_published));
         assert_eq!(entry.updated(), Some(entry_published));
+        let [author] = entry.authors() else {
+            panic!("expected one author");
+        };
+        assert_eq!(author.name(), None);
+        assert_eq!(author.email(), Some("alice@example.com"));
         assert_synd_entry_id(entry.id());
         assert!(!entry.id().to_string().contains("https://example.com/entry"));
     }

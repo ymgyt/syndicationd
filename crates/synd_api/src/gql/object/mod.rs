@@ -184,7 +184,7 @@ impl Feed {
         FeedEntryPage::read(&self.0, first).into()
     }
 
-    /// Feed authors
+    /// Feed author names
     async fn authors(&self) -> Connection<usize, String> {
         let mut c = Connection::new(false, false);
         c.edges.extend(
@@ -194,7 +194,9 @@ impl Feed {
                 .authors()
                 .iter()
                 .enumerate()
-                .map(|(idx, author)| Edge::new(idx, author.name().to_owned())),
+                .filter_map(|(idx, author)| {
+                    author.name().map(|name| Edge::new(idx, name.to_owned()))
+                }),
         );
 
         c

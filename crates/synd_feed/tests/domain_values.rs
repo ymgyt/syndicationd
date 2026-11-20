@@ -52,7 +52,7 @@ fn domain_values_are_publicly_constructible() {
     let feed = Feed::new(meta, vec![entry.clone()]);
 
     assert_eq!(title.content(), "Entry title");
-    assert_eq!(author.name(), "Author");
+    assert_eq!(author.name(), Some("Author"));
     assert_eq!(link.href(), "https://example.com/entry");
 
     assert_eq!(entry.website_url(FeedType::Atom), Some(link.href()));
@@ -62,4 +62,17 @@ fn domain_values_are_publicly_constructible() {
     let json = serde_json::to_string(&entry).unwrap();
     let decoded = serde_json::from_str::<Entry>(&json).unwrap();
     assert_eq!(decoded, entry);
+}
+
+#[test]
+fn reads_legacy_author_without_a_name() {
+    let author: Person =
+        serde_json::from_str(r#"{"name":"","email":"author@example.com"}"#).unwrap();
+
+    assert_eq!(author.name(), None);
+    assert_eq!(author.email(), Some("author@example.com"));
+
+    let json = serde_json::to_value(&author).unwrap();
+    assert_eq!(json.get("name"), Some(&serde_json::Value::Null));
+    assert_eq!(serde_json::from_value::<Person>(json).unwrap(), author);
 }

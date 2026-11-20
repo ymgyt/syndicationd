@@ -117,9 +117,10 @@ mod tests {
             }),
             updated: Some(updated),
             authors: vec![feedrs::Person {
-                name: "Author".into(),
+                name: Some("Author".into()),
                 uri: Some("https://example.com/author".into()),
                 email: Some("author@example.com".into()),
+                role: None,
             }],
             content: Some(feedrs::Content {
                 body: Some("Entry body".into()),
@@ -153,7 +154,7 @@ mod tests {
 
         assert_eq!(entry.title().map(Text::content), Some("Entry title"));
         assert_eq!(entry.updated(), Some(updated));
-        assert_eq!(entry.authors()[0].name(), "Author");
+        assert_eq!(entry.authors()[0].name(), Some("Author"));
         assert_eq!(entry.content().and_then(Content::body), Some("Entry body"));
         assert_eq!(entry.links()[0].href(), "https://example.com/entry");
         assert_eq!(entry.summary().map(Text::content), Some("Entry summary"));

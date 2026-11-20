@@ -62,15 +62,16 @@ impl From<feedrs::Text> for Text {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct Person {
-    name: String,
+    #[serde(default, deserialize_with = "deserialize_person_name")]
+    name: Option<String>,
     uri: Option<String>,
     email: Option<String>,
 }
 
 impl Person {
-    /// Returns the human-readable person name.
-    pub fn name(&self) -> &str {
-        &self.name
+    /// Returns the human-readable person name when available.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
     /// Returns the associated profile or homepage URI.
@@ -87,11 +88,20 @@ impl Person {
 impl From<feedrs::Person> for Person {
     fn from(value: feedrs::Person) -> Self {
         Self {
-            name: value.name,
+            name: value.name.filter(|name| !name.trim().is_empty()),
             uri: value.uri,
             email: value.email,
         }
     }
+}
+
+fn deserialize_person_name<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let name = Option::<String>::deserialize(deserializer)?;
+    // Older feed snapshots stored missing names as empty strings.
+    Ok(name.filter(|name| !name.trim().is_empty()))
 }
 
 /// Link relation declared by a feed.
