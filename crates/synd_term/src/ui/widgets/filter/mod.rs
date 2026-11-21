@@ -8,7 +8,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Padding, Widget},
 };
-use synd_client::payload;
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
@@ -19,7 +18,7 @@ use crate::{
     keymap,
     matcher::Matcher,
     types::{
-        EntryExt, RequirementExt,
+        RequirementExt,
         gh::{PullRequestState, Reason, RepoVisibility},
     },
     ui::{
@@ -52,6 +51,33 @@ pub(crate) use matcher::MatcherFilterer;
 
 pub(crate) type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
 
+/// The selected categories and search text when the filter changed.
+#[derive(Debug)]
+pub(crate) struct FilterCriteria {
+    categories: CategoryFilterer,
+    query: String,
+}
+
+impl FilterCriteria {
+    pub(crate) fn filterer(&self, matcher: &mut Matcher) -> CategoryAndMatcherFilterer {
+        matcher.update_needle(&self.query);
+        self.categories
+            .clone()
+            .and_then(MatcherFilterer::new(matcher.clone()))
+    }
+
+    pub(crate) fn feed_filterer(
+        &self,
+        requirement: Requirement,
+        matcher: &mut Matcher,
+    ) -> FeedFilterer {
+        matcher.update_needle(&self.query);
+        RequirementFilterer::new(requirement)
+            .and_then(self.categories.clone())
+            .and_then(MatcherFilterer::new(matcher.clone()))
+    }
+}
+
 pub(crate) trait Filterable<T> {
     fn filter(&self, item: &T) -> FilterResult;
 }
@@ -64,12 +90,12 @@ pub(crate) enum FilterResult {
 
 #[derive(Debug)]
 pub(crate) struct FilterWidget {
+    categories: Rc<Categories>,
     state: State,
     feed: FeedHandler,
     gh_notification: GhNotificationHandler,
 
     prompt: Rc<RefCell<Prompt>>,
-    matcher: Matcher,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -80,13 +106,13 @@ enum State {
 }
 
 impl FilterWidget {
-    pub fn new() -> Self {
+    pub fn new(categories: Rc<Categories>) -> Self {
         Self {
+            categories,
             state: State::Normal,
             prompt: Rc::new(RefCell::new(Prompt::new())),
             feed: FeedHandler::new(),
             gh_notification: GhNotificationHandler::new(),
-            matcher: Matcher::new(),
         }
     }
 
@@ -115,7 +141,9 @@ impl FilterWidget {
         };
 
         let mut keymap = keymap::LayerKeymap::builder(keymap::Layer::CategoryFilter);
-        for (category, state) in &self.categories_state(target).state {
+        let categories = self.categories_state(target);
+        for category in &categories.categories {
+            let state = &categories.state[category];
             if state.label == ' ' {
                 continue;
             }
@@ -232,62 +260,37 @@ impl FilterWidget {
         changed
     }
 
-    pub(crate) fn feed_filterer(&self) -> FeedFilterer {
-        RequirementFilterer::new(self.feed.requirement)
-            .and_then(Self::category_filterer(&self.feed.categories_state))
-            .and_then(self.matcher_filterer())
+    pub(crate) fn changed(&self, target: FilterTarget) -> crate::event::Event {
+        let criteria = FilterCriteria {
+            categories: CategoryFilterer::new(
+                self.categories_state(target)
+                    .state
+                    .iter()
+                    .map(|(category, state)| (category.clone(), state.state))
+                    .collect(),
+            ),
+            query: self.prompt.borrow().line().to_owned(),
+        };
+        match target {
+            FilterTarget::Feeds => crate::event::Event::FeedFilterChanged {
+                requirement: self.feed.requirement,
+                criteria,
+            },
+            FilterTarget::GhNotifications => crate::event::Event::GhFilterChanged(criteria),
+        }
     }
 
-    #[must_use]
-    pub(crate) fn gh_notification_filterer(&self) -> CategoryAndMatcherFilterer {
-        Self::category_filterer(&self.gh_notification.categories_state)
-            .and_then(self.matcher_filterer())
-    }
-
-    #[must_use]
-    fn category_filterer(categories: &CategoriesState) -> CategoryFilterer {
-        CategoryFilterer::new(
-            categories
-                .state
-                .iter()
-                .map(|(c, state)| (c.clone(), state.state))
-                .collect(),
-        )
-    }
-
-    #[must_use]
-    fn matcher_filterer(&self) -> MatcherFilterer {
-        let mut matcher = self.matcher.clone();
-        matcher.update_needle(self.prompt.borrow().line());
-        MatcherFilterer::new(matcher)
-    }
-
-    pub fn update_categories<'a>(
+    pub(crate) fn update_categories(
         &mut self,
-        config: &Categories,
+        target: FilterTarget,
         populate: Populate,
-        entries: impl IntoIterator<Item = &'a payload::Entry>,
+        categories: &[Category<'static>],
     ) {
-        self.feed.categories_state.update(
-            config,
-            populate,
-            entries.into_iter().map(EntryExt::category).cloned(),
-        );
-    }
-
-    pub fn update_gh_notification_categories(
-        &mut self,
-        config: &Categories,
-        populate: Populate,
-        categories: impl IntoIterator<Item = Category<'static>>,
-    ) {
-        self.gh_notification
-            .categories_state
-            .update(config, populate, categories);
-    }
-
-    pub(crate) fn clear_gh_notifications_categories(&mut self) {
-        self.gh_notification.categories_state.clear();
+        let state = match target {
+            FilterTarget::Feeds => &mut self.feed.categories_state,
+            FilterTarget::GhNotifications => &mut self.gh_notification.categories_state,
+        };
+        state.update(&self.categories, populate, categories.iter().cloned());
     }
 }
 

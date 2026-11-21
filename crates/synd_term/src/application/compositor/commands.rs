@@ -1,102 +1,37 @@
-use tracing::{info_span, instrument};
-
-use crate::{command::Command, event::Event, operation::Operations};
+use tracing::instrument;
 
 use super::Compositor;
-use crate::application::ComponentId;
-
-/// Events from a state transition are applied before dispatching its operations.
-#[must_use]
-pub(in crate::application) struct Effects {
-    events: Vec<Event>,
-    operations: Operations,
-    commands: Vec<Command>,
-}
-
-impl Effects {
-    pub(in crate::application) const NONE: Self = Self {
-        events: Vec::new(),
-        operations: Operations::Nop,
-        commands: Vec::new(),
-    };
-
-    pub(in crate::application) fn with_command(mut self, command: Command) -> Self {
-        self.commands.push(command);
-        self
-    }
-
-    pub(in crate::application) fn operations(operations: impl Into<Operations>) -> Self {
-        Self {
-            operations: operations.into(),
-            ..Self::NONE
-        }
-    }
-}
-
-impl From<Event> for Effects {
-    fn from(event: Event) -> Self {
-        Self {
-            events: vec![event],
-            ..Self::NONE
-        }
-    }
-}
+use crate::{application::effects::ComponentEffects, command::Command, operation::Operations};
 
 impl Compositor {
-    #[instrument(skip_all)]
     pub(super) fn apply_command(&mut self, command: Command) -> Operations {
-        let _guard = info_span!("apply_command", %command).entered();
-
-        let effects = match command {
-            Command::Open(id) => {
-                self.overlay.open(self.components.shell.tabs.current(), id);
-                Effects::NONE
-            }
-            Command::Close(id) => {
-                self.overlay.close(self.components.shell.tabs.current(), id);
-                Effects::NONE
-            }
-            Command::Shell(command) => self.components.shell.apply_command(command),
-            Command::Feeds(command) => self
-                .components
-                .feeds
-                .apply_command(command, self.feeds_per_pagination),
-            Command::Filter(command) => self.components.shell.apply_filter_command(command),
-            Command::Gh(command) => self.components.gh.apply_command(command),
-            Command::List { to, command } => {
-                match to {
-                    ComponentId::Entries => self.components.feeds.entries.apply_list(command),
-                    ComponentId::Feeds => self.components.feeds.subscription.apply_list(command),
-                    ComponentId::GhNotifications => {
-                        self.components.gh.notifications.apply_list(command);
-                    }
-                    _ => unreachable!("list command addressed to {to:?}"),
-                }
-                Effects::NONE
-            }
-            Command::Nop => Effects::NONE,
-        };
-        let operations = self.apply_effects(effects);
+        let operations = self.dispatch_command(command);
         self.sync_keymap();
         operations
     }
 
-    fn apply_effects(&mut self, effects: Effects) -> Operations {
-        if effects.events.is_empty() && effects.commands.is_empty() {
-            return effects.operations;
+    #[instrument(name = "apply_command", skip_all, fields(%command))]
+    fn dispatch_command(&mut self, command: Command) -> Operations {
+        let Some(mut reply) = self.components.apply_command(command) else {
+            return Operations::Nop;
+        };
+        let mut replies = self.notify(&std::mem::take(&mut reply.effects.events));
+        replies.push(reply);
+        self.run(replies)
+    }
+
+    pub(super) fn run(&mut self, replies: Vec<ComponentEffects>) -> Operations {
+        let mut operations = Vec::new();
+        for ComponentEffects { sender, effects } in replies {
+            operations.push(effects.operations);
+            for command in effects.commands {
+                match command {
+                    Command::Open => self.overlay.open(sender),
+                    Command::Close => self.overlay.close(sender),
+                    command => operations.push(self.dispatch_command(command)),
+                }
+            }
         }
-        let mut operations: Vec<_> = effects
-            .events
-            .into_iter()
-            .map(|event| self.apply_event(event))
-            .collect();
-        operations.push(effects.operations);
-        operations.extend(
-            effects
-                .commands
-                .into_iter()
-                .map(|command| self.apply_command(command)),
-        );
         operations.into()
     }
 }

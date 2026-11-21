@@ -20,9 +20,17 @@ impl LayerKeymap {
         self.layer
     }
 
+    pub(super) fn trie(&self) -> &KeyTrie {
+        &self.trie
+    }
+
+    pub(super) fn takes_text(&self, key: KeyStroke) -> bool {
+        self.input_chars && key.as_char().is_some()
+    }
+
     pub(super) fn search(&self, keys: &[KeyStroke]) -> TrieSearch {
-        if self.input_chars
-            && keys.len() == 1
+        if keys.len() == 1
+            && self.takes_text(keys[0])
             && let Some(ch) = keys[0].as_char()
         {
             return TrieSearch::Matched(CompiledBinding {

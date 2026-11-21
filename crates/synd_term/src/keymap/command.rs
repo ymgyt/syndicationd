@@ -3,8 +3,8 @@ use std::{fmt, str::FromStr};
 use crate::{
     application::{ComponentId, Direction},
     command::{
-        Command, FeedsCommand, FilterCommand, GhCommand, GhNotificationFilterOption, ListCommand,
-        ShellCommand,
+        Command, FeedsCommand, FilterCommand, GhCommand, GhFilterCommand,
+        GhNotificationFilterOption, ListCommand, ShellCommand, UnsubscribeCommand,
     },
     types::gh::{PullRequestState, Reason, RepoVisibility},
 };
@@ -215,17 +215,15 @@ impl CommandId {
             }
             Self::ReloadSubscription => Command::Feeds(FeedsCommand::ReloadSubscription),
             Self::OpenFeed => Command::Feeds(FeedsCommand::OpenFeed),
-            Self::MoveFeedUnsubscriptionPopupSelectionPrev => Command::Feeds(
-                FeedsCommand::MoveFeedUnsubscriptionPopupSelection(Direction::Left),
-            ),
-            Self::MoveFeedUnsubscriptionPopupSelectionNext => Command::Feeds(
-                FeedsCommand::MoveFeedUnsubscriptionPopupSelection(Direction::Right),
-            ),
+            Self::MoveFeedUnsubscriptionPopupSelectionPrev
+            | Self::MoveFeedUnsubscriptionPopupSelectionNext => {
+                Command::UnsubscribePopup(UnsubscribeCommand::ToggleSelection)
+            }
             Self::SelectFeedUnsubscriptionPopup => {
-                Command::Feeds(FeedsCommand::SelectFeedUnsubscriptionPopup)
+                Command::UnsubscribePopup(UnsubscribeCommand::Select)
             }
             Self::CancelFeedUnsubscriptionPopup => {
-                Command::Feeds(FeedsCommand::CancelFeedUnsubscriptionPopup)
+                Command::UnsubscribePopup(UnsubscribeCommand::Cancel)
             }
             Self::MoveFilterRequirementPrev => {
                 Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Left))
@@ -250,8 +248,8 @@ impl CommandId {
                 Command::Gh(GhCommand::MarkAllNotificationsAsDone)
             }
             Self::UnsubscribeGhThread => Command::Gh(GhCommand::UnsubscribeThread),
-            Self::OpenGhNotificationFilter => Command::Gh(GhCommand::OpenNotificationFilter),
-            Self::CloseGhNotificationFilter => Command::Gh(GhCommand::CloseNotificationFilter),
+            Self::OpenGhNotificationFilter => Command::GhFilterPopup(GhFilterCommand::Open),
+            Self::CloseGhNotificationFilter => Command::GhFilterPopup(GhFilterCommand::Close),
             Self::ToggleGhNotificationFilterUnreadOnly => Command::Gh(
                 GhCommand::ToggleNotificationFilter(GhNotificationFilterOption::UnreadOnly),
             ),

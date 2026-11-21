@@ -12,10 +12,10 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         };
     }
 
-    bind!(Layer::App, ["C-c"], CommandId::Quit, "Quit app");
-    bind!(Layer::App, ["S-r"], CommandId::ForceRedraw, "Redraw screen");
+    bind!(Layer::App, ["C-c"], CommandId::Quit, "Quit");
+    bind!(Layer::App, ["S-r"], CommandId::ForceRedraw, "Redraw");
 
-    bind!(Layer::Global, ["q"], CommandId::Quit, "Quit app");
+    bind!(Layer::Global, ["q"], CommandId::Quit, "Quit");
     bind!(
         Layer::Global,
         ["S-t"],
@@ -33,43 +33,33 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         Layer::Login,
         ["k"],
         CommandId::MoveAuthenticationProviderPrev,
-        "Previous authentication provider"
+        "Prev provider"
     );
     bind!(
         Layer::Login,
         ["up"],
         CommandId::MoveAuthenticationProviderPrev,
-        "Previous authentication provider"
+        "Prev provider"
     );
     bind!(
         Layer::Login,
         ["j"],
         CommandId::MoveAuthenticationProviderNext,
-        "Next authentication provider"
+        "Next provider"
     );
     bind!(
         Layer::Login,
         ["down"],
         CommandId::MoveAuthenticationProviderNext,
-        "Next authentication provider"
+        "Next provider"
     );
 
-    bind!(Layer::List, ["k"], CommandId::ListPrev, "Previous item");
-    bind!(Layer::List, ["up"], CommandId::ListPrev, "Previous item");
-    bind!(Layer::List, ["j"], CommandId::ListNext, "Next item");
-    bind!(Layer::List, ["down"], CommandId::ListNext, "Next item");
-    bind!(
-        Layer::List,
-        ["g", "g"],
-        CommandId::ListFirst,
-        "Go to first item"
-    );
-    bind!(
-        Layer::List,
-        ["g", "e"],
-        CommandId::ListLast,
-        "Go to last item"
-    );
+    bind!(Layer::List, ["k"], CommandId::ListPrev, "Prev");
+    bind!(Layer::List, ["up"], CommandId::ListPrev, "Prev");
+    bind!(Layer::List, ["j"], CommandId::ListNext, "Next");
+    bind!(Layer::List, ["down"], CommandId::ListNext, "Next");
+    bind!(Layer::List, ["g", "g"], CommandId::ListFirst, "First");
+    bind!(Layer::List, ["g", "e"], CommandId::ListLast, "Last");
 
     bind!(Layer::Tabs, ["tab"], CommandId::MoveTabNext, "Next tab");
     bind!(
@@ -79,177 +69,147 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         "Previous tab"
     );
 
-    bind!(
-        Layer::Entries,
-        ["r"],
-        CommandId::RefreshTimeline,
-        "Refresh timeline"
-    );
-    bind!(
-        Layer::Entries,
-        ["enter"],
-        CommandId::OpenEntry,
-        "Open entry with web browser"
-    );
-    bind!(
-        Layer::Entries,
-        ["space"],
-        CommandId::BrowseEntry,
-        "Browse entry with text browser"
-    );
+    bind!(Layer::Entries, ["r"], CommandId::RefreshTimeline, "Refresh");
+    bind!(Layer::Entries, ["enter"], CommandId::OpenEntry, "Open");
+    bind!(Layer::Entries, ["space"], CommandId::BrowseEntry, "Browse");
 
     bind!(
         Layer::Feeds,
         ["a"],
         CommandId::PromptFeedSubscription,
-        "Add feed subscription"
+        "Subscribe"
     );
-    bind!(
-        Layer::Feeds,
-        ["e"],
-        CommandId::PromptFeedEdition,
-        "Edit feed subscription"
-    );
+    bind!(Layer::Feeds, ["e"], CommandId::PromptFeedEdition, "Edit");
     bind!(
         Layer::Feeds,
         ["d"],
         CommandId::PromptFeedUnsubscription,
-        "Delete feed subscription"
+        "Unsubscribe"
     );
-    bind!(
-        Layer::Feeds,
-        ["r"],
-        CommandId::ReloadSubscription,
-        "Reload subscriptions"
-    );
-    bind!(
-        Layer::Feeds,
-        ["enter"],
-        CommandId::OpenFeed,
-        "Open selected feed"
-    );
+    bind!(Layer::Feeds, ["r"], CommandId::ReloadSubscription, "Reload");
+    bind!(Layer::Feeds, ["enter"], CommandId::OpenFeed, "Open");
 
     bind!(
         Layer::Filter,
         ["h"],
         CommandId::MoveFilterRequirementPrev,
-        "Previous requirement filter"
+        "Requirement −"
     );
     bind!(
         Layer::Filter,
         ["left"],
         CommandId::MoveFilterRequirementPrev,
-        "Previous requirement filter"
+        "Requirement −"
     );
     bind!(
         Layer::Filter,
         ["l"],
         CommandId::MoveFilterRequirementNext,
-        "Next requirement filter"
+        "Requirement +"
     );
     bind!(
         Layer::Filter,
         ["right"],
         CommandId::MoveFilterRequirementNext,
-        "Next requirement filter"
+        "Requirement +"
     );
     bind!(
         Layer::Filter,
         ["c"],
         CommandId::ActivateCategoryFiltering,
-        "Activate category filter"
+        "Categories"
     );
     bind!(
         Layer::Filter,
         ["/"],
         CommandId::ActivateSearchFiltering,
-        "Activate search filter"
+        "Search"
     );
     bind!(
         Layer::Filter,
         ["esc"],
         CommandId::DeactivateFiltering,
-        "Deactivate filter"
+        "Close filter"
     );
 
     bind!(
         Layer::UnsubscribePopup,
         ["h"],
         CommandId::MoveFeedUnsubscriptionPopupSelectionPrev,
-        "Previous popup selection"
+        "Choice"
     );
     bind!(
         Layer::UnsubscribePopup,
         ["left"],
         CommandId::MoveFeedUnsubscriptionPopupSelectionPrev,
-        "Previous popup selection"
+        "Choice"
     );
     bind!(
         Layer::UnsubscribePopup,
         ["l"],
         CommandId::MoveFeedUnsubscriptionPopupSelectionNext,
-        "Next popup selection"
+        "Choice"
     );
     bind!(
         Layer::UnsubscribePopup,
         ["right"],
         CommandId::MoveFeedUnsubscriptionPopupSelectionNext,
-        "Next popup selection"
+        "Choice"
     );
     bind!(
         Layer::UnsubscribePopup,
         ["enter"],
         CommandId::SelectFeedUnsubscriptionPopup,
-        "Select popup item"
+        "Confirm"
     );
     bind!(
         Layer::UnsubscribePopup,
         ["esc"],
         CommandId::CancelFeedUnsubscriptionPopup,
-        "Cancel popup"
+        "Cancel"
     );
 
     bind!(
         Layer::GhNotifications,
         ["enter"],
         CommandId::OpenGhNotification,
-        "Open GitHub notification"
+        "Open"
     );
     bind!(
         Layer::GhNotifications,
         ["A-enter"],
         CommandId::OpenGhNotificationAndMarkAsDone,
-        "Open GitHub notification and mark as done"
+        "Open & finish"
     );
     bind!(
         Layer::GhNotifications,
         ["r"],
         CommandId::ReloadGhNotifications,
-        "Reload GitHub notifications"
+        "Reload"
     );
     bind!(
         Layer::GhNotifications,
         ["d"],
         CommandId::MarkGhNotificationAsDone,
-        "Mark GitHub notification as done"
+        "Done"
     );
     bind!(
         Layer::GhNotifications,
         ["S-d"],
         CommandId::MarkAllGhNotificationsAsDone,
-        "Mark all GitHub notifications as done"
+        "Finish all"
     );
     bind!(
         Layer::GhNotifications,
         ["u"],
         CommandId::UnsubscribeGhThread,
-        "Unsubscribe GitHub thread"
+        "Unsubscribe"
     );
     bind!(
         Layer::GhNotifications,
         ["f"],
         CommandId::OpenGhNotificationFilter,
-        "Open GitHub notification filter popup"
+        "Filters"
     );
 
     bind!(
@@ -310,13 +270,13 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         Layer::GhNotificationFilterPopup,
         ["esc"],
         CommandId::CloseGhNotificationFilter,
-        "Close GitHub notification filter popup"
+        "Apply filters"
     );
     bind!(
         Layer::GhNotificationFilterPopup,
         ["enter"],
         CommandId::CloseGhNotificationFilter,
-        "Close GitHub notification filter popup"
+        "Apply filters"
     );
 
     config

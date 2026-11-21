@@ -6,16 +6,15 @@ use ratatui::{
 
 use crate::{
     application::{InFlightStatus, RequestProgress},
+    keymap::KeyHint,
     ui::{
-        Context, icon,
+        Context,
         widgets::throbber::{
             Throbber, ThrobberState,
             throbber::{self, WhichUse},
         },
     },
 };
-
-use super::tabs::Tab;
 
 pub struct StatusLineWidget {
     error_message: Option<String>,
@@ -36,13 +35,19 @@ impl StatusLineWidget {
         self.error_message = None;
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
+    pub fn render(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        cx: &Context<'_>,
+        hints: impl FnOnce() -> Vec<KeyHint>,
+    ) {
         if let Some(error_message) = self.error_message.as_ref() {
             Self::render_error(area, buf, cx, error_message);
         } else if let Some(status) = cx.in_flight.status() {
             Self::render_in_flight(area, buf, cx, &status);
         } else {
-            Self::render_key_hints(area, buf, cx, tab);
+            Self::render_key_hints(area, buf, cx, hints());
         }
     }
 
@@ -88,54 +93,27 @@ impl StatusLineWidget {
             .render(suffix_area, buf);
     }
 
-    #[allow(clippy::cast_possible_truncation)]
-    fn render_key_hints(area: Rect, buf: &mut Buffer, cx: &Context<'_>, tab: Option<Tab>) {
-        let pre_keys = &[
-            ("Tab", "󰹳"),
-            ("j/k", "󰹹"),
-            ("gg", "󱞧"),
-            ("ge", "󱞥"),
-            ("c", icon!(category)),
-            ("/", icon!(search)),
-        ][..];
-        let suffix_keys = &[("r", "󰑓"), ("q", "")][..];
-        let per_tab_keys = match tab {
-            Some(Tab::Feeds) => pre_keys
-                .iter()
-                .chain(&[
-                    ("h/l", icon!(requirement)),
-                    ("Ent", icon!(open)),
-                    ("a", "󰑫"),
-                    ("e", ""),
-                    ("d", "󰼡"),
-                ])
-                .chain(suffix_keys),
-            Some(Tab::Entries) => pre_keys
-                .iter()
-                .chain(&[
-                    ("h/l", icon!(requirement)),
-                    ("Ent", icon!(open)),
-                    ("Sp", icon!(browse)),
-                ])
-                .chain(suffix_keys),
-            Some(Tab::Gh) => pre_keys
-                .iter()
-                .chain(&[
-                    ("f", icon!(filter)),
-                    ("Ent", icon!(open)),
-                    ("d", icon!(check)),
-                    ("u", ""),
-                ])
-                .chain(suffix_keys),
-            None => [("j/k", "󰹹")][..]
-                .iter()
-                .chain(&[("Ent", "󰏌")])
-                .chain(&[("q", "")][..]),
-        };
-        let spans = per_tab_keys
-            .map(|(key, desc)| Span::styled(format!("{key}:{desc}  "), cx.theme.prompt.key_desc))
-            .collect::<Vec<_>>();
-
+    fn render_key_hints(area: Rect, buf: &mut Buffer, cx: &Context<'_>, hints: Vec<KeyHint>) {
+        // Aliases share a label so that the available width also fits other actions.
+        let mut by_label = indexmap::IndexMap::<String, Vec<String>>::new();
+        for hint in hints {
+            by_label
+                .entry(hint.description)
+                .or_default()
+                .push(hint.keys);
+        }
+        let mut spans = Vec::new();
+        let mut width = 0;
+        for (description, keys) in by_label {
+            let span = Span::styled(
+                format!("{}:{description}  ", keys.join("/")),
+                cx.theme.prompt.key_desc,
+            );
+            if width + span.width() <= usize::from(area.width) {
+                width += span.width();
+                spans.push(span);
+            }
+        }
         Paragraph::new(Line::from(spans))
             .alignment(Alignment::Center)
             .style(cx.theme.prompt.background)

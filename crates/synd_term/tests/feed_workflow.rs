@@ -39,7 +39,7 @@ mod bootstrapped_app {
 
         tx.send_multi([key!(tab), key!('d')]);
         app.wait_until_jobs_completed(&mut input).await;
-        assert!(Screen::new(app.buffer()).contains_text("Unsubscribe"));
+        assert!(Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
 
         tx.send_multi([key!(tab), key!('j')]);
         app.wait_until_jobs_completed(&mut input).await;
@@ -47,10 +47,10 @@ mod bootstrapped_app {
 
         tx.send(key!(tab));
         app.wait_until_jobs_completed(&mut input).await;
-        assert!(Screen::new(app.buffer()).contains_text("Unsubscribe"));
+        assert!(Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
         tx.send(key!(esc));
         app.wait_until_jobs_completed(&mut input).await;
-        assert!(!Screen::new(app.buffer()).contains_text("Unsubscribe"));
+        assert!(!Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
     }
 
     #[tokio::test]
@@ -85,6 +85,25 @@ mod bootstrapped_app {
         tx.send_multi([key!('/'), key!(backspace)]);
         app.wait_until_jobs_completed(&mut input).await;
         assert!(Screen::new(app.buffer()).contains_text("Entry 1/2"));
+    }
+
+    #[tokio::test]
+    async fn category_hints_are_ready_when_the_filter_opens() {
+        let (_cache_dir, mut app) = start_app();
+        let (tx, mut input) = event_stream();
+        app.wait_until_jobs_completed(&mut input).await;
+        tx.send(key!('c'));
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(
+            Screen::new(app.buffer())
+                .lines()
+                .last()
+                .unwrap()
+                .contains("a:Toggle rust category")
+        );
+        tx.send(key!('a'));
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Entry -/-"));
     }
 
     #[tokio::test]

@@ -141,8 +141,20 @@ impl fmt::Display for KeyStroke {
 }
 
 fn parse_key_stroke(value: &str) -> Result<KeyStroke, String> {
-    let mut tokens = value.split('-').collect::<Vec<_>>();
-    let code = match tokens.pop().ok_or_else(|| "no token".to_owned())? {
+    let mut key = value;
+    let mut modifiers = KeyModifiers::NONE;
+    while key.len() > 1
+        && let Some((modifier, rest)) = key.split_once('-')
+    {
+        modifiers.insert(match modifier {
+            "C" => KeyModifiers::CONTROL,
+            "S" => KeyModifiers::SHIFT,
+            "A" => KeyModifiers::ALT,
+            undefined => return Err(format!("`{undefined}` modifier is not implemented yet")),
+        });
+        key = rest;
+    }
+    let code = match key {
         "backspace" => KeyCode::Backspace,
         "enter" => KeyCode::Enter,
         "tab" => KeyCode::Tab,
@@ -157,16 +169,6 @@ fn parse_key_stroke(value: &str) -> Result<KeyStroke, String> {
         undefined => return Err(format!("`{undefined}` is not implemented yet")),
     };
 
-    let mut modifiers = KeyModifiers::NONE;
-    for token in tokens {
-        let modifier = match token {
-            "C" => KeyModifiers::CONTROL,
-            "S" => KeyModifiers::SHIFT,
-            "A" => KeyModifiers::ALT,
-            undefined => return Err(format!("`{undefined}` modifier is not implemented yet")),
-        };
-        modifiers.insert(modifier);
-    }
     if code == KeyCode::BackTab {
         modifiers.insert(KeyModifiers::SHIFT);
     }

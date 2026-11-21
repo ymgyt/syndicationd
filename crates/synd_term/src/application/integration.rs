@@ -8,34 +8,35 @@ use super::Application;
 
 impl Application {
     pub fn buffer(&self) -> &Buffer {
-        self.drivers.buffer()
+        self.terminal.buffer()
     }
 
     pub fn bootstrap_for_test(&mut self) {
-        let operations = self.ui.bootstrap();
-        self.drivers.dispatch(operations);
+        let operations = self
+            .compositor
+            .apply_event(&crate::event::Event::ApiAccessReady);
+        self.drivers.dispatch(operations, &mut self.terminal);
     }
 
     pub async fn wait_until_jobs_completed<S>(&mut self, input: &mut S)
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        self.render().expect("render test terminal");
-        loop {
-            let settled = self.drivers.request_jobs_is_empty()
-                && !self.ui.is_busy()
-                && self.ui.components.feeds.timeline_is_settled();
+        while !self.compositor.should_quit() {
+            self.render().expect("render test terminal");
             tokio::select! {
                 biased;
-                result = self.process_next(input) => {
-                    if result.expect("process test event").is_break() {
-                        assert!(settled, "TUI exited with unfinished requests");
-                        break;
-                    }
-                }
-                () = std::future::ready(()), if settled => break,
+                result = self.process_next(input) => result.expect("process test event"),
+                () = std::future::ready(()), if self.jobs_completed() => return,
             }
         }
+        assert!(self.jobs_completed(), "TUI exited with unfinished requests");
+    }
+
+    fn jobs_completed(&self) -> bool {
+        self.drivers.request_jobs_is_empty()
+            && !self.compositor.is_busy()
+            && self.compositor.components.feeds.timeline_is_settled()
     }
 
     pub async fn run_until<S>(
@@ -46,20 +47,25 @@ impl Application {
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        self.render()?;
-        while !shown(self.buffer()) {
+        loop {
+            self.render()?;
+            if shown(self.buffer()) {
+                return Ok(());
+            }
+            self.process_next(input).await?;
             anyhow::ensure!(
-                self.process_next(input).await?.is_continue(),
+                !self.compositor.should_quit(),
                 "TUI exited before the expected screen"
             );
         }
-        Ok(())
     }
 
     pub async fn reload_cache(&mut self) -> anyhow::Result<()> {
         let credential = self.drivers.restore_credential().await?;
-        self.drivers
-            .dispatch(Operation::SetCredential { credential }.into());
+        self.drivers.dispatch(
+            Operation::SetCredential { credential }.into(),
+            &mut self.terminal,
+        );
         Ok(())
     }
 }

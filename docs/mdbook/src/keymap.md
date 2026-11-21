@@ -26,7 +26,9 @@ User keymaps are merged onto the default keymaps:
 * a binding with a new `on` is added to that layer
 * `command = "no_op"` disables that key sequence in that layer
 
-`desc` is optional description metadata for the binding.
+The status line shows the keys available in the active layers, using `desc`
+as the label. A custom binding without `desc` uses its command name. While
+a key sequence is pending, the status line shows its possible continuations.
 
 Commands are validated against the layer. For example, `entries.next` is valid
 in the `entries` layer, but not in the `feeds` layer.

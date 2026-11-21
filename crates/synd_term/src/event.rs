@@ -1,8 +1,10 @@
 use std::fmt::{self, Display};
 
+use crate::ui::widgets::{filter::FilterCriteria, tabs::Tab};
 use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_client::{SyndApiError, payload};
 use synd_feed::types::FeedUrl;
+use synd_feed::types::{Category, Requirement};
 use url::Url;
 
 use crate::{
@@ -13,7 +15,7 @@ use crate::{
 };
 
 /// Successful authentication fact produced by a registered request.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum AuthEvent {
     DeviceFlowAuthorizationReceived {
         provider: AuthenticationProvider,
@@ -92,17 +94,28 @@ pub(crate) enum OperationError {
 }
 
 /// Fact that already happened and can update application state.
-#[derive(Debug)]
+#[derive(Debug, strum::EnumDiscriminants)]
+#[strum_discriminants(name(EventKind), derive(Hash))]
 pub(crate) enum Event {
-    TabChanged(crate::ui::widgets::tabs::Tab),
-    FilterChanged(crate::command::FilterTarget),
-
+    TabChanged(Tab),
+    FeedFilterChanged {
+        requirement: Requirement,
+        criteria: FilterCriteria,
+    },
+    GhFilterChanged(FilterCriteria),
+    FeedCategoriesChanged(Vec<Category<'static>>),
+    GhCategoriesChanged {
+        populate: Populate,
+        categories: Vec<Category<'static>>,
+    },
+    ApiAccessReady,
     RequestEmitted {
         request_id: RequestId,
         kind: RequestKind,
     },
     RequestCompleted {
         request_id: RequestId,
+        kind: RequestKind,
         result: Result<(), RequestError>,
     },
 
@@ -139,7 +152,11 @@ pub(crate) enum Event {
 impl Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FilterChanged(target) => write!(f, "FilterChanged({target:?})"),
+            Self::FeedFilterChanged { .. } => f.write_str("FeedFilterChanged"),
+            Self::GhFilterChanged(_) => f.write_str("GhFilterChanged"),
+            Self::FeedCategoriesChanged(_) => f.write_str("FeedCategoriesChanged"),
+            Self::GhCategoriesChanged { .. } => f.write_str("GhCategoriesChanged"),
+            Self::ApiAccessReady => f.write_str("ApiAccessReady"),
             Self::TabChanged(tab) => write!(f, "TabChanged({tab:?})"),
             Self::RequestEmitted { request_id, kind } => {
                 write!(f, "RequestEmitted({request_id:?}, {kind:?})")
@@ -147,10 +164,12 @@ impl Display for Event {
             Self::RequestCompleted {
                 request_id,
                 result: Ok(()),
+                ..
             } => write!(f, "RequestCompleted({request_id:?}, Ok)"),
             Self::RequestCompleted {
                 request_id,
                 result: Err(_),
+                ..
             } => write!(f, "RequestCompleted({request_id:?}, Err)"),
             Self::Auth { request_id, event } => {
                 write!(f, "Auth({request_id:?}, {})", event.name())

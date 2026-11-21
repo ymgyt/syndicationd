@@ -119,22 +119,30 @@ impl Keymap {
     }
 
     fn resolve_first_key(&mut self, layers: &LayerStack, key: KeyStroke) -> KeymapResult {
-        let keys = [key];
-        for layer in layers.iter_high_to_low() {
-            match self.search(layer, &keys) {
-                TrieSearch::Matched(binding) => return layers.matched(layer, binding.action),
-                TrieSearch::Pending(candidates) => {
-                    self.pending.push(key);
-                    self.pending_layers = Some(layers.clone());
-                    return KeymapResult::Pending {
-                        keys: self.pending.clone(),
-                        candidates,
-                    };
+        let Some(layer) = self.first_layer(layers, key) else {
+            return KeymapResult::NotFound;
+        };
+        match self.search(layer, &[key]) {
+            TrieSearch::Matched(binding) => layers.matched(layer, binding.action),
+            TrieSearch::Pending(candidates) => {
+                self.pending.push(key);
+                self.pending_layers = Some(layers.clone());
+                KeymapResult::Pending {
+                    keys: self.pending.clone(),
+                    candidates,
                 }
-                TrieSearch::NotFound => {}
             }
+            TrieSearch::NotFound => unreachable!("the layer owns this key"),
         }
-        KeymapResult::NotFound
+    }
+
+    /// The first stroke selects the trie for the entire sequence, including
+    /// covered layers whose bindings consume the key as a no-op.
+    fn first_layer(&self, layers: &LayerStack, key: KeyStroke) -> Option<Layer> {
+        layers.iter_high_to_low().find(|&layer| {
+            self.takes_text(layer, key)
+                || self.trie(layer).is_some_and(|trie| trie.takes_first(key))
+        })
     }
 
     fn resolve_pending_key(&mut self, layers: &LayerStack, key: KeyStroke) -> KeymapResult {
@@ -169,6 +177,59 @@ impl Keymap {
         std::mem::take(&mut self.pending)
     }
 
+    /// Bindings reachable from the current input prefix, in layer priority order.
+    pub(crate) fn hints(&self, layers: &LayerStack) -> Vec<KeyHint> {
+        let mut hints = Vec::new();
+        let mut path = Vec::new();
+        for &(layer, covered) in layers.layers.iter().rev() {
+            if covered {
+                continue;
+            }
+            let Some(trie) = self.trie(layer) else {
+                continue;
+            };
+            trie.visit_bindings(&mut path, &mut |keys, binding| {
+                let first = keys[0];
+                if !keys.starts_with(&self.pending)
+                    || self.takes_text(layer, first)
+                    || self.first_layer(layers, first) != Some(layer)
+                    || binding.action == KeymapAction::Command(CommandId::Nop)
+                {
+                    return;
+                }
+                let description = binding.desc.as_deref().or(match &binding.action {
+                    KeymapAction::Command(command) => Some(command.as_str()),
+                    _ => None,
+                });
+                if let Some(description) = description {
+                    let keys = keys[self.pending.len()..]
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    hints.push(KeyHint {
+                        keys,
+                        description: description.to_owned(),
+                    });
+                }
+            });
+        }
+        hints
+    }
+
+    fn trie(&self, layer: Layer) -> Option<&super::compiled::KeyTrie> {
+        self.dynamic_keymaps
+            .get(&layer)
+            .map(LayerKeymap::trie)
+            .or_else(|| self.static_keymaps.trie(layer))
+    }
+
+    fn takes_text(&self, layer: Layer, key: KeyStroke) -> bool {
+        self.dynamic_keymaps
+            .get(&layer)
+            .is_some_and(|keymap| keymap.takes_text(key))
+    }
+
     fn search(&self, layer: Layer, keys: &[KeyStroke]) -> TrieSearch {
         if let Some(keymap) = self.dynamic_keymaps.get(&layer) {
             return keymap.search(keys);
@@ -183,6 +244,11 @@ impl Default for Keymap {
     fn default() -> Self {
         Self::default_keymaps()
     }
+}
+
+pub(crate) struct KeyHint {
+    pub(crate) keys: String,
+    pub(crate) description: String,
 }
 
 /// Outcome of resolving one key event through the current keymap state.

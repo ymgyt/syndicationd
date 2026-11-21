@@ -20,7 +20,7 @@ pub use layer::Layer;
 
 pub(crate) use compiled::KeymapCandidate;
 pub(crate) use key::{KeyBinding, KeyStroke};
-pub(crate) use resolver::{Keymap, KeymapResult, LayerStack};
+pub(crate) use resolver::{KeyHint, Keymap, KeymapResult, LayerStack};
 pub(crate) use runtime::LayerKeymap;
 
 #[cfg(test)]

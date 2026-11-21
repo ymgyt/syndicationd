@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use synd_feed::types::Category;
+use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
     application::{ComponentId, Direction},
@@ -10,8 +10,12 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
     Nop,
-    Open(ComponentId),
-    Close(ComponentId),
+    /// Show the component that returned this command.
+    Open,
+    /// Hide the component that returned this command.
+    Close,
+    UnsubscribePopup(UnsubscribeCommand),
+    GhFilterPopup(GhFilterCommand),
     List {
         to: ComponentId,
         command: ListCommand,
@@ -30,8 +34,9 @@ pub(crate) enum ListCommand {
     Last,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum ShellCommand {
+    ShowError(String),
     Quit,
     Authenticate,
     MoveAuthenticationProvider(Direction),
@@ -45,15 +50,32 @@ pub(crate) enum FeedsCommand {
     PromptFeedSubscription,
     PromptFeedEdition,
     PromptFeedUnsubscription,
-    MoveFeedUnsubscriptionPopupSelection(Direction),
-    SelectFeedUnsubscriptionPopup,
-    CancelFeedUnsubscriptionPopup,
     ReloadSubscription,
     OpenFeed,
 
     RefreshTimeline,
     OpenEntry,
     BrowseEntry,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct UnsubscribeTarget {
+    pub(crate) url: FeedUrl,
+    pub(crate) title: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum UnsubscribeCommand {
+    Open(UnsubscribeTarget),
+    ToggleSelection,
+    Select,
+    Cancel,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum GhFilterCommand {
+    Open,
+    Close,
 }
 
 #[derive(Debug, Clone)]
@@ -102,8 +124,7 @@ pub(crate) enum GhCommand {
     MarkAllNotificationsAsDone,
     UnsubscribeThread,
 
-    OpenNotificationFilter,
-    CloseNotificationFilter,
+    ApplyNotificationFilter,
     ToggleNotificationFilter(GhNotificationFilterOption),
 }
 

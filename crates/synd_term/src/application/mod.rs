@@ -1,19 +1,16 @@
 use crossterm::event::Event as CrosstermEvent;
 use futures_util::{Stream, StreamExt as _};
-use std::{ops::ControlFlow, pin::Pin, time::Duration};
-use tokio::time::{self, Instant, Sleep};
 use tracing::warn;
 
 use crate::{
-    config::Categories,
-    interact::Interact,
-    operation::Operations,
-    terminal::{Terminal, TerminalGuard},
-    ui::theme::Theme,
+    config::Categories, event::Event, interact::Interact, terminal::Terminal, ui::theme::Theme,
 };
 
 mod direction;
+mod effects;
+mod throbber;
 pub(crate) use direction::Direction;
+use throbber::Throbber;
 
 mod request;
 pub(crate) use request::{RequestError, RequestId, RequestKind};
@@ -40,8 +37,7 @@ pub use outbound::feed::{ClientFeedApi, FeedApi, FeedApiRef, FeedEventWatch};
 mod app_config;
 pub use app_config::{Config, Features};
 
-mod state;
-pub(crate) use state::TerminalFocus;
+pub(crate) use compositor::TerminalFocus;
 
 pub(crate) mod component;
 mod compositor;
@@ -62,10 +58,10 @@ pub enum Populate {
 
 /// Composition root that owns orchestration between state and external drivers.
 pub struct Application {
+    terminal: Terminal,
     drivers: Drivers,
-    ui: Compositor,
-    throbber: Pin<Box<Sleep>>,
-    throbber_interval: Duration,
+    compositor: Compositor,
+    throbber: Throbber,
 }
 
 impl Application {
@@ -103,10 +99,9 @@ impl Application {
         } else {
             AuthenticationState::NotRequired
         };
-        let throbber_interval = config.throbber_timer_interval;
-        let ui = Compositor::new(config, theme, categories, authentication);
+        let throbber = Throbber::new(config.throbber_timer_interval);
+        let compositor = Compositor::new(config, theme, categories, authentication);
         let drivers = Drivers::new(DriverParts {
-            terminal,
             feed_api,
             gh_client,
             cache,
@@ -116,100 +111,90 @@ impl Application {
         });
 
         Self {
+            terminal,
             drivers,
-            ui,
-            throbber: Box::pin(time::sleep(throbber_interval)),
-            throbber_interval,
+            compositor,
+            throbber,
         }
     }
 
     fn render(&mut self) -> anyhow::Result<()> {
-        self.drivers.render(|frame, now| self.ui.render(frame, now))
+        let now = self.drivers.clock.now();
+        self.terminal
+            .render(|frame| self.compositor.render(frame, now))
     }
 
     pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        let _terminal = self.initialize()?;
-        let result = self.event_loop(input).await;
-        self.shutdown();
-        result
-    }
-
-    fn initialize(&mut self) -> anyhow::Result<TerminalGuard> {
-        let terminal = self.drivers.terminal.init()?;
-        self.restore_persisted_state();
+        let _terminal = self.terminal.init()?;
+        self.restore_gh_filter();
         if matches!(
-            self.ui.components.shell.authentication(),
+            self.compositor.components.shell.authentication(),
             AuthenticationState::NotRequired
         ) {
-            let operations = self.ui.bootstrap();
-            self.drivers.dispatch(operations);
+            let operations = self.compositor.apply_event(&Event::ApiAccessReady);
+            self.drivers.dispatch(operations, &mut self.terminal);
         }
-        Ok(terminal)
+        let result = self.event_loop(input).await;
+        self.drivers.shutdown();
+        self.persist_gh_filter();
+        result
     }
 
     async fn event_loop<S>(&mut self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        self.render()?;
-        while self.process_next(input).await?.is_continue() {}
+        while !self.compositor.should_quit() {
+            self.render()?;
+            self.process_next(input).await?;
+        }
         Ok(())
     }
 
-    async fn process_next<S>(&mut self, input: &mut S) -> anyhow::Result<ControlFlow<()>>
+    async fn process_next<S>(&mut self, input: &mut S) -> anyhow::Result<()>
     where
         S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
     {
-        let busy = self.ui.is_busy();
-        let operations = tokio::select! {
+        tokio::select! {
             biased;
             event = input.next() => match event {
-                Some(event) => self.ui.apply_terminal_event(&event?),
-                None => return Ok(ControlFlow::Break(())),
+                Some(event) => {
+                    let operations = self.compositor.apply_terminal_event(&event?);
+                    self.drivers.dispatch(operations, &mut self.terminal);
+                }
+                None => self.compositor.quit(),
             },
-            Some(event) = self.drivers.next() => self.ui.apply_event(event),
-            () = self.throbber.as_mut(), if busy => {
-                self.ui.components.shell.in_flight.tick();
-                self.throbber.as_mut().reset(Instant::now() + self.throbber_interval);
-                Operations::Nop
+            Some(event) = self.drivers.next() => {
+                let operations = self.compositor.apply_event(&event);
+                self.drivers.dispatch(operations, &mut self.terminal);
             }
-        };
-        if !busy && self.ui.is_busy() {
-            self.throbber
-                .as_mut()
-                .reset(Instant::now() + self.throbber_interval);
+            () = self.throbber.tick(), if self.compositor.is_busy() => self.compositor.tick(),
         }
-        self.drivers.dispatch(operations);
-        if self.ui.components.shell.should_quit() {
-            return Ok(ControlFlow::Break(()));
-        }
-        self.render()?;
-        Ok(ControlFlow::Continue(()))
+        Ok(())
     }
 
-    fn restore_persisted_state(&mut self) {
-        if !self.ui.features.enable_gh_notification {
+    fn restore_gh_filter(&mut self) {
+        if !self.compositor.components.gh.enabled {
             return;
         }
         match self.drivers.cache.load_gh_notification_filter_options() {
-            Ok(options) => self.ui.components.gh.restore_filter_options(options),
+            Ok(options) => self
+                .compositor
+                .components
+                .gh
+                .restore_filter_options(options),
             Err(error) => warn!("Load GitHub notification filter options: {error}"),
         }
     }
 
-    fn shutdown(&mut self) {
-        self.drivers.shutdown();
-        self.persist_state();
-    }
-
-    fn persist_state(&self) {
-        if !self.ui.features.enable_gh_notification {
+    fn persist_gh_filter(&self) {
+        if !self.compositor.components.gh.enabled {
             return;
         }
-        let options = self.ui.components.gh.filter_options_snapshot();
+        let options = self.compositor.components.gh.filter_options_snapshot();
         if let Err(error) = self
             .drivers
             .cache

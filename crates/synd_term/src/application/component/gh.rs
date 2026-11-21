@@ -1,19 +1,29 @@
+use super::{Component, RenderContext};
 use crate::{
-    application::{ComponentId, Populate, RequestKind, compositor::Effects},
+    application::{Populate, RequestKind, effects::Effects},
     client::gh::FetchNotificationsParams,
-    command::{Command, GhCommand, GhNotificationFilterOption},
+    command::{GhCommand, GhNotificationFilterOption},
     operation::{Operation, Operations},
     types::gh::{Notification, NotificationDetails, ThreadId},
-    ui::widgets::filter::CategoryAndMatcherFilterer,
     ui::widgets::gh_notifications::{
         GhNotificationFilterOptions, GhNotificationsWidget, NotificationPageUpdate,
     },
 };
+use crate::{
+    config::Categories,
+    event::{Event, EventKind, GhEvent},
+    keymap::Layer,
+};
+use ratatui::buffer::Buffer;
+use std::rc::Rc;
 
 /// GitHub notification state machine.
 pub(crate) struct GhComponent {
+    pub(in crate::application) enabled: bool,
+    categories: Rc<Categories>,
     generation: u64,
     page_pending: bool,
+    matcher: crate::matcher::Matcher,
     pub(crate) notifications: GhNotificationsWidget,
 }
 
@@ -28,13 +38,7 @@ impl GhComponent {
             GhCommand::MarkNotificationAsDone => self.mark_selected_notification_as_done().into(),
             GhCommand::MarkAllNotificationsAsDone => self.mark_all_notifications_as_done().into(),
             GhCommand::UnsubscribeThread => self.unsubscribe_selected_thread().into(),
-            GhCommand::OpenNotificationFilter => {
-                return Effects::NONE.with_command(Command::Open(ComponentId::GhFilterPopup));
-            }
-            GhCommand::CloseNotificationFilter => {
-                return Effects::operations(self.close_filter_popup())
-                    .with_command(Command::Close(ComponentId::GhFilterPopup));
-            }
+            GhCommand::ApplyNotificationFilter => self.close_filter_popup().into(),
             GhCommand::ToggleNotificationFilter(option) => {
                 self.toggle_filter_option(&option);
                 Operations::Nop
@@ -43,8 +47,11 @@ impl GhComponent {
         Effects::operations(operations)
     }
 
-    pub(super) fn new() -> Self {
+    pub(super) fn new(enabled: bool, categories: Rc<Categories>) -> Self {
         Self {
+            enabled,
+            categories,
+            matcher: crate::matcher::Matcher::new(),
             notifications: GhNotificationsWidget::new(),
             generation: 0,
             page_pending: false,
@@ -60,10 +67,6 @@ impl GhComponent {
 
     pub(in crate::application) fn filter_options_snapshot(&self) -> GhNotificationFilterOptions {
         self.notifications.filter_options().clone()
-    }
-
-    pub(in crate::application) fn bootstrap(&mut self) -> Operation {
-        self.reload_notifications()
     }
 
     pub(in crate::application) fn reload_notifications(&mut self) -> Operation {
@@ -150,15 +153,7 @@ impl GhComponent {
         self.notifications.toggle_filter_option(option);
     }
 
-    pub(in crate::application) fn apply_filter(
-        &mut self,
-        filter: CategoryAndMatcherFilterer,
-    ) -> Option<Operation> {
-        self.notifications.update_filterer(filter);
-        self.fetch_next_notifications_if_needed()
-    }
-
-    fn fetch_next_notifications_if_needed(&mut self) -> Option<Operation> {
+    pub(super) fn fetch_next_notifications_if_needed(&mut self) -> Option<Operation> {
         if self.page_pending {
             return None;
         }
@@ -196,5 +191,92 @@ impl GhComponent {
 
     pub(in crate::application) fn page_failed(&mut self) {
         self.page_pending = false;
+    }
+}
+
+impl Component for GhComponent {
+    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+        self.notifications.render(cx.frame.content, buf, &cx.ui);
+    }
+
+    fn key_layers(&self) -> &[Layer] {
+        &[Layer::List, Layer::GhNotifications]
+    }
+    fn subscriptions(&self) -> &'static [EventKind] {
+        &[
+            EventKind::ApiAccessReady,
+            EventKind::GhFilterChanged,
+            EventKind::Gh,
+            EventKind::RequestCompleted,
+        ]
+    }
+
+    fn apply_event(&mut self, event: &Event) -> Effects {
+        match event {
+            Event::ApiAccessReady if self.enabled => {
+                Effects::operations(self.reload_notifications())
+            }
+            Event::GhFilterChanged(criteria) => {
+                self.notifications
+                    .update_filterer(criteria.filterer(&mut self.matcher));
+                Effects::operations(self.fetch_next_notifications_if_needed())
+            }
+            Event::RequestCompleted {
+                kind: RequestKind::FetchGhNotifications { .. },
+                result: Err(_),
+                ..
+            } => {
+                self.page_failed();
+                Effects::NONE
+            }
+            Event::Gh { event, .. } => self.apply_gh_event(event),
+            _ => Effects::NONE,
+        }
+    }
+}
+
+impl GhComponent {
+    fn apply_gh_event(&mut self, event: &GhEvent) -> Effects {
+        let notification = match event {
+            GhEvent::NotificationsFetched {
+                notifications,
+                populate,
+            } => {
+                let details = self.apply_notifications(*populate, notifications.clone());
+                let mut effects = Effects::operations(self.fetch_notification_details(details));
+                if *populate == Populate::Replace {
+                    effects.events.push(Event::GhCategoriesChanged {
+                        populate: Populate::Replace,
+                        categories: Vec::new(),
+                    });
+                }
+                return effects;
+            }
+            GhEvent::IssueFetched {
+                notification_id,
+                issue,
+            } => self
+                .notifications
+                .update_issue(*notification_id, issue.clone(), &self.categories),
+            GhEvent::PullRequestFetched {
+                notification_id,
+                pull_request,
+            } => self.notifications.update_pull_request(
+                *notification_id,
+                pull_request.clone(),
+                &self.categories,
+            ),
+            GhEvent::NotificationMarkedAsDone { notification_id } => {
+                self.notifications.marked_as_done(*notification_id);
+                return Effects::NONE;
+            }
+        };
+        notification.map_or(Effects::NONE, |n| {
+            Event::GhCategoriesChanged {
+                populate: Populate::Append,
+                categories: n.categories().cloned().collect(),
+            }
+            .into()
+        })
     }
 }

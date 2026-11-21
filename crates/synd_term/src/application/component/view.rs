@@ -1,54 +1,29 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    widgets::{Block, Widget},
 };
 
-use super::{AuthenticationState, Components, ShellComponent};
+use super::Component;
+use super::{AuthenticationState, ShellComponent};
 use crate::{
-    application::ComponentId,
-    keymap::{Layer, LayerStack},
+    keymap::{Keymap, Layer, LayerStack},
     ui::{
         Context,
         widgets::{
             authentication,
             entries::EntriesWidget,
-            filter::{FilterContext, FilterWidget},
-            gh_notifications::{FilterPopup, GhNotificationFilterOptions, GhNotificationsWidget},
-            subscription::{SubscriptionWidget, UnsubscribePopup},
+            gh_notifications::{FilterPopup, GhNotificationFilterOptions},
             tabs::{Tab, TabsWidget},
         },
     },
 };
 
-pub(in crate::application) trait Component {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>);
-    fn key_layers(&self) -> &[Layer];
-    fn mask_lower_layers(&self, _layers: &mut LayerStack) {}
-}
-
-impl Components {
-    pub(in crate::application) fn get(&self, id: ComponentId) -> &dyn Component {
-        match id {
-            ComponentId::Shell => &self.shell,
-            ComponentId::Tabs => &self.shell.tabs,
-            ComponentId::Login => self.shell.authentication(),
-            ComponentId::Filter => &self.shell.filter,
-            ComponentId::Entries => &self.feeds.entries,
-            ComponentId::Feeds => &self.feeds.subscription,
-            ComponentId::GhNotifications => &self.gh.notifications,
-            ComponentId::UnsubscribePopup => &self.feeds.subscription.unsubscribe_popup,
-            ComponentId::GhFilterPopup => &self.gh.notifications.filter_popup,
-        }
-    }
-}
-
 pub(in crate::application) struct FrameLayout {
-    area: Rect,
+    pub(super) area: Rect,
     tabs: Rect,
-    filter: Rect,
-    content: Rect,
-    status: Rect,
+    pub(super) filter: Rect,
+    pub(super) content: Rect,
+    pub(super) status: Rect,
 }
 
 impl FrameLayout {
@@ -73,23 +48,11 @@ impl FrameLayout {
 
 pub(in crate::application) struct RenderContext<'a> {
     pub(in crate::application) ui: Context<'a>,
+    pub(in crate::application) keymap: &'a Keymap,
+    pub(in crate::application) layers: LayerStack,
     pub(in crate::application) frame: FrameLayout,
     pub(in crate::application) shell: &'a ShellComponent,
     pub(in crate::application) gh_options: &'a GhNotificationFilterOptions,
-}
-
-impl Component for ShellComponent {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        Block::new()
-            .style(cx.ui.theme.base)
-            .render(cx.frame.area, buf);
-        self.prompt
-            .render(cx.frame.status, buf, &cx.ui, self.visible_tab());
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        &[Layer::App, Layer::Global]
-    }
 }
 
 impl Component for AuthenticationState {
@@ -139,64 +102,6 @@ impl Component for EntriesWidget {
 
     fn key_layers(&self) -> &[Layer] {
         &[Layer::List, Layer::Entries]
-    }
-}
-
-impl Component for SubscriptionWidget {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        self.render(cx.frame.content, buf, &cx.ui);
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        &[Layer::List, Layer::Feeds]
-    }
-}
-
-impl Component for GhNotificationsWidget {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        self.render(cx.frame.content, buf, &cx.ui);
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        &[Layer::List, Layer::GhNotifications]
-    }
-}
-
-impl Component for FilterWidget {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        self.render(
-            cx.frame.filter,
-            buf,
-            &FilterContext {
-                ui: &cx.ui,
-                gh_options: cx.gh_options,
-                target: cx.shell.current_filter_target(),
-            },
-        );
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        if self.is_category_filtering_active() {
-            &[Layer::Filter, Layer::CategoryFilter]
-        } else if self.is_search_active() {
-            &[Layer::Filter, Layer::SearchPrompt]
-        } else {
-            &[Layer::Filter]
-        }
-    }
-}
-
-impl Component for UnsubscribePopup {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        self.render(cx.frame.content, buf, &cx.ui);
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        &[Layer::UnsubscribePopup]
-    }
-
-    fn mask_lower_layers(&self, layers: &mut LayerStack) {
-        layers.cover(&[Layer::List, Layer::Feeds]);
     }
 }
 

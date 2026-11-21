@@ -1,13 +1,13 @@
 use super::*;
 use crate::{
-    application::{Populate, RequestId, RequestKind},
+    application::{Features, Populate, RequestId, RequestKind},
     event::{Event, GhEvent},
     key,
     operation::Operation,
     types::gh::Notification,
 };
 
-fn ui(config: Config) -> Compositor {
+fn new_compositor(config: Config) -> Compositor {
     Compositor::new(
         config,
         Theme::default(),
@@ -18,12 +18,12 @@ fn ui(config: Config) -> Compositor {
 
 #[test]
 fn entering_feeds_requests_the_configured_page_size() {
-    let mut ui = ui(Config {
+    let mut compositor = new_compositor(Config {
         feeds_per_pagination: 17,
         ..Config::default()
     });
     assert!(matches!(
-        ui.apply_terminal_event(&key!(tab)),
+        compositor.apply_terminal_event(&key!(tab)),
         Operations::One(Operation::FetchSubscription {
             populate: Populate::Replace,
             after: None,
@@ -46,7 +46,7 @@ fn shared_list_binding_follows_the_visible_list_and_yields_to_the_popup() {
     "#,
     )
     .unwrap();
-    let mut ui = ui(Config {
+    let mut compositor = new_compositor(Config {
         features: Features {
             enable_gh_notification: true,
         },
@@ -59,16 +59,18 @@ fn shared_list_binding_follows_the_visible_list_and_yields_to_the_popup() {
         ComponentId::Entries,
         ComponentId::Feeds,
     ] {
-        assert!(matches!(ui.resolve_keymap(key.into()), Some(Command::List {
+        assert!(
+            matches!(compositor.resolve_keymap(key.into()), Some(Command::List {
             to, command: ListCommand::Last,
-        }) if to == owner));
-        let _ = ui.apply_terminal_event(&key!(tab));
+        }) if to == owner)
+        );
+        let _ = compositor.apply_terminal_event(&key!(tab));
     }
-    let _ = ui.apply_terminal_event(&key!('f'));
-    assert!(ui.resolve_keymap(key.into()).is_none());
-    let _ = ui.apply_terminal_event(&key!(esc));
+    let _ = compositor.apply_terminal_event(&key!('f'));
+    assert!(compositor.resolve_keymap(key.into()).is_none());
+    let _ = compositor.apply_terminal_event(&key!(esc));
     assert!(matches!(
-        ui.resolve_keymap(key.into()),
+        compositor.resolve_keymap(key.into()),
         Some(Command::List {
             to: ComponentId::GhNotifications,
             command: ListCommand::Last,
@@ -88,7 +90,13 @@ fn notification(id: u64) -> Notification {
     })).unwrap().into()
 }
 
-fn start_page(ui: &mut Compositor, id: RequestId, operation: Operations) -> Populate {
+struct PageRequest {
+    id: RequestId,
+    kind: RequestKind,
+    populate: Populate,
+}
+
+fn start_page(compositor: &mut Compositor, id: RequestId, operation: Operations) -> PageRequest {
     let Operations::One(Operation::FetchGhNotifications {
         generation,
         populate,
@@ -97,35 +105,36 @@ fn start_page(ui: &mut Compositor, id: RequestId, operation: Operations) -> Popu
     else {
         panic!("expected one GitHub page request, got {operation:?}");
     };
+    let kind = RequestKind::FetchGhNotifications {
+        generation,
+        page: params.page,
+    };
     assert!(matches!(
-        ui.apply_event(Event::RequestEmitted {
+        compositor.apply_event(&Event::RequestEmitted {
             request_id: id,
-            kind: RequestKind::FetchGhNotifications {
-                generation,
-                page: params.page
-            }
+            kind: kind.clone()
         }),
         Operations::Nop
     ));
-    populate
+    PageRequest { id, kind, populate }
 }
 
 fn deliver_page(
-    ui: &mut Compositor,
-    id: RequestId,
-    populate: Populate,
+    compositor: &mut Compositor,
+    page: PageRequest,
     notification_id: u64,
 ) -> Operations {
-    let operations = ui.apply_event(Event::Gh {
-        request_id: id,
+    let operations = compositor.apply_event(&Event::Gh {
+        request_id: page.id,
         event: GhEvent::NotificationsFetched {
-            populate,
+            populate: page.populate,
             notifications: vec![notification(notification_id)],
         },
     });
     assert!(matches!(
-        ui.apply_event(Event::RequestCompleted {
-            request_id: id,
+        compositor.apply_event(&Event::RequestCompleted {
+            request_id: page.id,
+            kind: page.kind,
             result: Ok(())
         }),
         Operations::Nop
@@ -135,7 +144,7 @@ fn deliver_page(
 
 #[test]
 fn previous_lists_next_page_arriving_after_reload_is_ignored() {
-    let mut ui = ui(Config {
+    let mut compositor = new_compositor(Config {
         features: Features {
             enable_gh_notification: true,
         },
@@ -145,51 +154,51 @@ fn previous_lists_next_page_arriving_after_reload_is_ignored() {
     let old_page = RequestId::new(2);
     let refreshed = RequestId::new(3);
 
-    let fetch = ui.apply_terminal_event(&key!('r'));
-    let populate = start_page(&mut ui, first, fetch);
-    let fetch = deliver_page(&mut ui, first, populate, 1);
-    let append = start_page(&mut ui, old_page, fetch);
-    assert_eq!(append, Populate::Append);
+    let fetch = compositor.apply_terminal_event(&key!('r'));
+    let first_page = start_page(&mut compositor, first, fetch);
+    let fetch = deliver_page(&mut compositor, first_page, 1);
+    let append = start_page(&mut compositor, old_page, fetch);
+    assert_eq!(append.populate, Populate::Append);
 
-    let fetch = ui.apply_terminal_event(&key!('r'));
-    let replace = start_page(&mut ui, refreshed, fetch);
-    assert_eq!(replace, Populate::Replace);
-    let next = deliver_page(&mut ui, refreshed, replace, 2);
+    let fetch = compositor.apply_terminal_event(&key!('r'));
+    let replace = start_page(&mut compositor, refreshed, fetch);
+    assert_eq!(replace.populate, Populate::Replace);
+    let next = deliver_page(&mut compositor, replace, 2);
     assert!(
         matches!(next, Operations::One(Operation::FetchGhNotifications { params, .. }) if params.page == 2)
     );
 
     assert!(matches!(
-        deliver_page(&mut ui, old_page, append, 3),
+        deliver_page(&mut compositor, append, 3),
         Operations::Nop
     ));
-    let list = &ui.components.gh.notifications;
+    let list = &compositor.components.gh.notifications;
     assert_eq!(list.notification_ids(), vec![2u64.into()]);
     assert_eq!(list.fetch_next_if_needed().unwrap().page, 2);
 }
 
 #[test]
 fn github_search_fetches_more_only_when_the_filter_changes() {
-    let mut ui = ui(Config {
+    let mut compositor = new_compositor(Config {
         features: Features {
             enable_gh_notification: true,
         },
         ..Config::default()
     });
     assert!(matches!(
-        ui.apply_terminal_event(&key!('/')),
+        compositor.apply_terminal_event(&key!('/')),
         Operations::Nop
     ));
     assert!(matches!(
-        ui.apply_terminal_event(&key!(backspace)),
+        compositor.apply_terminal_event(&key!(backspace)),
         Operations::Nop
     ));
     assert!(matches!(
-        ui.apply_terminal_event(&key!('x')),
+        compositor.apply_terminal_event(&key!('x')),
         Operations::One(Operation::FetchGhNotifications { .. })
     ));
     assert!(matches!(
-        ui.apply_terminal_event(&key!('y')),
+        compositor.apply_terminal_event(&key!('y')),
         Operations::Nop
     ));
 }
@@ -199,28 +208,118 @@ fn github_filter_is_only_drawn_and_dismissed_on_its_tab() {
     use crate::test_support::screen::Screen;
     use ratatui::{Terminal, backend::TestBackend};
 
-    let mut ui = ui(Config {
+    let mut compositor = new_compositor(Config {
         features: Features {
             enable_gh_notification: true,
         },
         ..Config::default()
     });
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
-    let mut popup_visible = |ui: &Compositor| {
+    let mut popup_visible = |compositor: &Compositor| {
         let frame = terminal
-            .draw(|frame| ui.render(frame, DateTime::UNIX_EPOCH))
+            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
             .unwrap();
         Screen::new(frame.buffer).contains_text("─Filter─")
     };
 
-    let _ = ui.apply_terminal_event(&key!('f'));
-    assert!(popup_visible(&ui));
-    let _ = ui.apply_terminal_event(&key!(tab));
-    assert!(!popup_visible(&ui));
-    let _ = ui.apply_terminal_event(&key!(esc));
-    let _ = ui.apply_terminal_event(&key!(tab));
-    let _ = ui.apply_terminal_event(&key!(tab));
-    assert!(popup_visible(&ui));
-    let _ = ui.apply_terminal_event(&key!(esc));
-    assert!(!popup_visible(&ui));
+    let _ = compositor.apply_terminal_event(&key!('f'));
+    assert!(popup_visible(&compositor));
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    assert!(!popup_visible(&compositor));
+    let _ = compositor.apply_terminal_event(&key!(esc));
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    assert!(popup_visible(&compositor));
+    let _ = compositor.apply_terminal_event(&key!(esc));
+    assert!(!popup_visible(&compositor));
+}
+
+#[test]
+fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
+    use crate::event::{FeedRequestEvent, FeedsEvent};
+
+    fn replace_feed(compositor: &mut Compositor, id: u64, url: &str) {
+        let request_id = RequestId::new(id);
+        let subscription = serde_json::from_value(serde_json::json!({
+            "feeds": {
+                "nodes": [{ "url": url, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
+                "pageInfo": { "hasNextPage": false, "endCursor": null }
+            }
+        }))
+        .unwrap();
+        let _ = compositor.apply_event(&Event::RequestEmitted {
+            request_id,
+            kind: RequestKind::FetchSubscription,
+        });
+        let _ = compositor.apply_event(&Event::Feeds(FeedsEvent::Request {
+            request_id,
+            event: FeedRequestEvent::SubscriptionFetched {
+                populate: Populate::Replace,
+                subscription,
+            },
+        }));
+        let _ = compositor.apply_event(&Event::RequestCompleted {
+            request_id,
+            kind: RequestKind::FetchSubscription,
+            result: Ok(()),
+        });
+    }
+
+    let mut compositor = new_compositor(Config::default());
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    replace_feed(&mut compositor, 1, "https://example.com/first");
+    let _ = compositor.apply_terminal_event(&key!('d'));
+    replace_feed(&mut compositor, 2, "https://example.com/second");
+    assert!(matches!(compositor.apply_terminal_event(&key!(enter)),
+        Operations::One(Operation::UnsubscribeFeed { url }) if url.as_str() == "https://example.com/first"
+    ));
+
+    let _ = compositor.apply_terminal_event(&key!('d'));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!(esc)),
+        Operations::Nop
+    ));
+    let _ = compositor.apply_terminal_event(&key!('d'));
+    let _ = compositor.apply_terminal_event(&key!('l'));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!(enter)),
+        Operations::Nop
+    ));
+}
+
+#[test]
+fn status_hints_follow_remaps_and_search_input() {
+    use crate::{keymap::CompiledKeymaps, test_support::screen::Screen};
+    use ratatui::{Terminal, backend::TestBackend};
+    let bindings = toml::from_str(
+        r#"
+        [filter]
+        keymap = [
+            { on = "/", command = "nop" },
+            { on = "x", command = "filter.search", desc = "Find stories" }
+        ]
+    "#,
+    )
+    .unwrap();
+    let mut compositor = new_compositor(Config {
+        keymaps: CompiledKeymaps::default_with_user_config(bindings).unwrap(),
+        ..Config::default()
+    });
+    let mut terminal = Terminal::new(TestBackend::new(240, 20)).unwrap();
+    let mut status = |compositor: &Compositor| {
+        let frame = terminal
+            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
+            .unwrap();
+        Screen::new(frame.buffer).lines().pop().unwrap()
+    };
+
+    let normal = status(&compositor);
+    assert!(normal.contains("x:Find stories"));
+    assert!(!normal.contains("/:Search"));
+    let _ = compositor.apply_terminal_event(&key!('x'));
+    let editing = status(&compositor);
+    assert!(editing.contains("backspace:"));
+    assert!(!editing.contains("x:Find stories"));
+    let _ = compositor.apply_terminal_event(&key!(esc));
+    assert_eq!(status(&compositor), normal);
 }

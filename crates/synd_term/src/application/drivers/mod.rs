@@ -4,9 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use chrono::{DateTime, Utc};
 use futures_util::{FutureExt as _, Stream};
-use ratatui::Frame;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "integration")]
@@ -42,9 +40,8 @@ use request::{JobFuture, RequestContext, RequestFuture};
 
 /// Owns external ports, request execution, and long-lived event sources.
 pub(super) struct Drivers {
-    pub(super) terminal: Terminal,
     pub(super) cache: Cache,
-    clock: Box<dyn Clock>,
+    pub(super) clock: Box<dyn Clock>,
     feed: FeedDriver,
     auth: AuthDriver,
     gh: GhDriver,
@@ -56,7 +53,6 @@ pub(super) struct Drivers {
 }
 
 pub(super) struct DriverParts {
-    pub(super) terminal: Terminal,
     pub(super) feed_api: FeedApiRef,
     pub(super) gh_client: Option<GhClient>,
     pub(super) cache: Cache,
@@ -68,7 +64,6 @@ pub(super) struct DriverParts {
 impl Drivers {
     pub(super) fn new(parts: DriverParts) -> Self {
         let DriverParts {
-            terminal,
             feed_api,
             gh_client,
             cache,
@@ -93,7 +88,6 @@ impl Drivers {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
 
         Self {
-            terminal,
             cache,
             clock,
             feed,
@@ -108,19 +102,19 @@ impl Drivers {
     }
 
     /// Starts ordered external side effects requested by one state transition.
-    pub(super) fn dispatch(&mut self, operations: Operations) {
+    pub(super) fn dispatch(&mut self, operations: Operations, terminal: &mut Terminal) {
         match operations {
             Operations::Nop => {}
-            Operations::One(operation) => self.dispatch_operation(operation),
+            Operations::One(operation) => self.dispatch_operation(operation, terminal),
             Operations::Many(operations) => {
                 for operation in operations {
-                    self.dispatch_operation(operation);
+                    self.dispatch_operation(operation, terminal);
                 }
             }
         }
     }
 
-    fn dispatch_operation(&mut self, operation: Operation) {
+    fn dispatch_operation(&mut self, operation: Operation, terminal: &mut Terminal) {
         match operation {
             Operation::StartDeviceFlow { provider } => {
                 let make_request = self.auth.start_device_flow(provider);
@@ -140,12 +134,12 @@ impl Drivers {
                 );
             }
             Operation::OpenFeedSubscriptionEditor => {
-                let event = TerminalInteraction::new(&self.interaction, &mut self.terminal)
+                let event = TerminalInteraction::new(&self.interaction, terminal)
                     .open_feed_subscription_editor();
                 self.queue_event(event);
             }
             Operation::OpenFeedEditionEditor { prompt } => {
-                let event = TerminalInteraction::new(&self.interaction, &mut self.terminal)
+                let event = TerminalInteraction::new(&self.interaction, terminal)
                     .open_feed_edition_editor(prompt.as_str());
                 self.queue_event(event);
             }
@@ -230,7 +224,7 @@ impl Drivers {
                     self.queue_event(event);
                 }
             }
-            Operation::ForceRedrawTerminal => self.terminal.force_redraw(),
+            Operation::ForceRedrawTerminal => terminal.force_redraw(),
             Operation::PersistCredential { credential } => {
                 self.persist_credential(&credential);
             }
@@ -246,15 +240,22 @@ impl Drivers {
         let context = RequestContext::new(request_id, self.event_tx.clone());
         let request = make_request(context);
         let completion_tx = self.event_tx.clone();
+        self.queue_event(Event::RequestEmitted {
+            request_id,
+            kind: kind.clone(),
+        });
         let job: JobFuture = async move {
             let result = request.await;
             completion_tx
-                .send(Event::RequestCompleted { request_id, result })
+                .send(Event::RequestCompleted {
+                    request_id,
+                    kind,
+                    result,
+                })
                 .expect("Drivers owns the event receiver");
         }
         .boxed();
         self.request_jobs.push(job);
-        self.queue_event(Event::RequestEmitted { request_id, kind });
     }
 
     fn persist_credential(&self, credential: &Verified<Credential>) {
@@ -303,23 +304,10 @@ impl Drivers {
         restore.restore().await
     }
 
-    pub(super) fn render<F>(&mut self, render: F) -> anyhow::Result<()>
-    where
-        F: FnOnce(&mut Frame, DateTime<Utc>),
-    {
-        let now = self.clock.now();
-        self.terminal.render(|frame| render(frame, now))
-    }
-
     pub(super) fn shutdown(&mut self) {
         self.request_jobs.clear();
         self.auth.stop();
         self.feed.watcher.stop();
-    }
-
-    #[cfg(feature = "integration")]
-    pub(super) fn buffer(&self) -> &ratatui::buffer::Buffer {
-        self.terminal.buffer()
     }
 
     #[cfg(feature = "integration")]

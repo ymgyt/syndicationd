@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet, hash_map::Entry};
+use indexmap::{IndexMap, map::Entry};
+use std::collections::{HashMap, HashSet};
 
 use super::{
     CommandRegistry, KeyBinding, KeySequence, KeyStroke, KeymapAction, KeymapConfig, KeymapError,
@@ -75,10 +76,29 @@ impl Default for CompiledKeymaps {
 #[derive(Clone, Debug, Default)]
 pub(super) struct KeyTrie {
     binding: Option<CompiledBinding>,
-    children: HashMap<KeyStroke, KeyTrie>,
+    children: IndexMap<KeyStroke, KeyTrie>,
 }
 
 impl KeyTrie {
+    pub(super) fn takes_first(&self, key: KeyStroke) -> bool {
+        self.children.contains_key(&key)
+    }
+
+    pub(super) fn visit_bindings(
+        &self,
+        keys: &mut Vec<KeyStroke>,
+        visit: &mut impl FnMut(&[KeyStroke], &CompiledBinding),
+    ) {
+        if let Some(binding) = &self.binding {
+            visit(keys, binding);
+        }
+        for (key, child) in &self.children {
+            keys.push(*key);
+            child.visit_bindings(keys, visit);
+            keys.pop();
+        }
+    }
+
     fn inherit(&mut self, shared: &Self) {
         if self.binding.is_some() {
             return;

@@ -120,11 +120,6 @@ impl CategoriesState {
                 self.state.get_mut(category).unwrap().label = *label;
             });
     }
-
-    pub(super) fn clear(&mut self) {
-        self.categories.clear();
-        self.state.clear();
-    }
 }
 
 #[derive(Default, Clone, Debug)]

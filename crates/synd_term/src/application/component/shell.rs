@@ -1,14 +1,23 @@
+use super::{Component, RenderContext};
+use crate::{
+    command::{Command, FeedsCommand},
+    event::EventKind,
+    keymap::Layer,
+};
+use itertools::Itertools;
+use ratatui::{
+    buffer::Buffer,
+    widgets::{Block, Widget},
+};
+use synd_client::SyndApiError;
+use tracing::{error, warn};
 use url::Url;
 
 use crate::{
-    application::compositor::Effects,
-    application::{
-        Direction, Features, InFlightRequests, RequestError, RequestKind, TerminalFocus,
-        state::State,
-    },
+    application::effects::Effects,
+    application::{Direction, Features, RequestError, RequestKind},
     auth::AuthenticationProvider,
     command::{FilterTarget, ShellCommand},
-    config::Categories,
     event::{AuthEvent, Event, OperationError},
     operation::Operation,
     ui::{
@@ -160,12 +169,10 @@ impl AuthenticationState {
 /// Global terminal interaction and status state shared across domain components.
 pub(crate) struct ShellComponent {
     pub(in crate::application) theme: Theme,
-    pub(in crate::application) categories: Categories,
-    state: State,
-    authentication: AuthenticationState,
+    pub(in crate::application) should_quit: bool,
+    pub(super) authentication: AuthenticationState,
     authentication_providers: Vec<AuthenticationProvider>,
     selected_authentication_provider: usize,
-    pub(crate) in_flight: InFlightRequests,
     pub(crate) tabs: TabsWidget,
     pub(crate) filter: FilterWidget,
     pub(crate) prompt: StatusLineWidget,
@@ -174,23 +181,21 @@ pub(crate) struct ShellComponent {
 impl ShellComponent {
     pub(super) fn new(
         features: &Features,
+        filter: FilterWidget,
         theme: Theme,
-        categories: Categories,
         authentication: AuthenticationState,
     ) -> Self {
         Self {
             theme,
-            categories,
-            state: State::new(),
+            should_quit: false,
             authentication,
             authentication_providers: vec![
                 AuthenticationProvider::Gh,
                 AuthenticationProvider::Google,
             ],
             selected_authentication_provider: 0,
-            in_flight: InFlightRequests::new(),
             tabs: TabsWidget::new(features),
-            filter: FilterWidget::new(),
+            filter,
             prompt: StatusLineWidget::new(),
         }
     }
@@ -249,26 +254,6 @@ impl ShellComponent {
         self.authentication.operation_failed(error);
     }
 
-    pub(in crate::application) fn quit(&mut self) {
-        self.state.should_quit = true;
-    }
-
-    pub(in crate::application) fn should_quit(&self) -> bool {
-        self.state.should_quit
-    }
-
-    pub(in crate::application) fn focus(&self) -> TerminalFocus {
-        self.state.focus()
-    }
-
-    pub(in crate::application) fn focus_gained(&mut self) {
-        self.state.focus_gained();
-    }
-
-    pub(in crate::application) fn focus_lost(&mut self) {
-        self.state.focus_lost();
-    }
-
     pub(in crate::application) fn move_authentication_provider(&mut self, direction: Direction) {
         if !matches!(self.authentication, AuthenticationState::Required) {
             return;
@@ -281,7 +266,8 @@ impl ShellComponent {
 
     pub(in crate::application) fn apply_command(&mut self, command: ShellCommand) -> Effects {
         match command {
-            ShellCommand::Quit => self.quit(),
+            ShellCommand::ShowError(message) => self.prompt.set_error_message(message),
+            ShellCommand::Quit => self.should_quit = true,
             ShellCommand::Authenticate => return Effects::operations(self.start_authentication()),
             ShellCommand::MoveAuthenticationProvider(direction) => {
                 self.move_authentication_provider(direction);
@@ -317,5 +303,123 @@ impl ShellComponent {
             _ => Palette::ferra(),
         };
         self.theme = Theme::with_palette(palette);
+    }
+}
+
+impl ShellComponent {
+    pub(super) fn request_error_message(error: &RequestError) -> String {
+        match error {
+            RequestError::SyndApi(error) => Self::synd_api_error_message(error),
+            RequestError::Authentication(error) => error.to_string(),
+            RequestError::Gh(error) => error.to_string(),
+        }
+    }
+
+    pub(super) fn operation_error_message(error: &OperationError) -> String {
+        match error {
+            OperationError::OpenFeedSubscriptionEditor(error)
+            | OperationError::OpenFeedEditionEditor(error) => error.to_string(),
+            OperationError::OpenBrowser(error) => format!("open browser: {error}"),
+            OperationError::OpenTextBrowser(error) => format!("open text browser: {error}"),
+            OperationError::PersistCredential(error) => error.to_string(),
+            OperationError::SetCredential(error) => Self::synd_api_error_message(error),
+        }
+    }
+
+    fn synd_api_error_message(error: &SyndApiError) -> String {
+        match error {
+            SyndApiError::Unauthorized { url } => format!(
+                "{} unauthorized. local feed API session is invalid",
+                url.as_ref().map_or_default(ToString::to_string),
+            ),
+            SyndApiError::BuildRequest(error) => {
+                format!("build request failed: {error} this is a BUG")
+            }
+            SyndApiError::SendRequest(error) => format!("request failed: {error}"),
+            SyndApiError::DecodeResponse(error) => {
+                format!("decode response failed: {error}")
+            }
+            SyndApiError::HttpStatus { status, url } => format!(
+                "HTTP status client error ({status}) for url ({})",
+                url.as_ref().map_or_default(ToString::to_string)
+            ),
+            SyndApiError::Graphql { errors } => errors.iter().map(ToString::to_string).join(", "),
+            SyndApiError::OpenSession(error) => format!("session open rejected: {error:?}"),
+            SyndApiError::RenewSession(error) => format!("session renew rejected: {error:?}"),
+            SyndApiError::CloseSession(error) => format!("session close rejected: {error:?}"),
+            _ => error.to_string(),
+        }
+    }
+}
+
+impl Component for ShellComponent {
+    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+        Block::new()
+            .style(cx.ui.theme.base)
+            .render(cx.frame.area, buf);
+        self.prompt
+            .render(cx.frame.status, buf, &cx.ui, || cx.keymap.hints(&cx.layers));
+    }
+
+    fn key_layers(&self) -> &[Layer] {
+        &[Layer::App, Layer::Global]
+    }
+    fn subscriptions(&self) -> &'static [EventKind] {
+        &[
+            EventKind::RequestCompleted,
+            EventKind::Auth,
+            EventKind::ApiCredentialConfigured,
+            EventKind::CredentialRefreshed,
+            EventKind::CredentialRefreshFailed,
+            EventKind::OperationFailed,
+        ]
+    }
+
+    fn apply_event(&mut self, event: &Event) -> Effects {
+        match event {
+            Event::RequestCompleted {
+                kind,
+                result: Err(error),
+                ..
+            } => {
+                self.apply_request_failure(kind, error);
+                let message = Self::request_error_message(error);
+                error!(?kind, %message, "request failed");
+                self.prompt.set_error_message(message);
+            }
+            Event::Auth { event, .. } => {
+                return Effects::operations(self.apply_auth_event(event.clone()));
+            }
+            Event::ApiCredentialConfigured => {
+                return match self.api_credential_configured() {
+                    ApiAccessTransition::Established => Event::ApiAccessReady.into(),
+                    ApiAccessTransition::Reconfigured => {
+                        Command::Feeds(FeedsCommand::RefreshTimeline).into()
+                    }
+                };
+            }
+            Event::CredentialRefreshed { credential } => {
+                return Effects::operations([
+                    Operation::PersistCredential {
+                        credential: credential.clone(),
+                    },
+                    Operation::SetCredential {
+                        credential: credential.clone(),
+                    },
+                ]);
+            }
+            Event::CredentialRefreshFailed { error } => {
+                warn!(%error, "credential refresh failed");
+                self.prompt.set_error_message(error.to_string());
+            }
+            Event::OperationFailed { error } => {
+                self.apply_operation_failure(error);
+                let message = Self::operation_error_message(error);
+                error!(%message, "application operation failed");
+                self.prompt.set_error_message(message);
+            }
+            _ => {}
+        }
+        Effects::NONE
     }
 }

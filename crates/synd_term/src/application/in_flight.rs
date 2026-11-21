@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use crate::event::{AuthEvent, FeedRequestEvent, GhEvent};
+use crate::event::{AuthEvent, Event, FeedRequestEvent, FeedsEvent, GhEvent};
 
 use super::{RequestId, RequestKind};
 
@@ -11,7 +11,7 @@ pub(crate) struct InFlightRequests {
 }
 
 /// Application-visible state of one registered request.
-pub(crate) struct InFlightRequest {
+struct InFlightRequest {
     kind: RequestKind,
     progress: Option<RequestProgress>,
 }
@@ -36,7 +36,33 @@ impl InFlightRequests {
         }
     }
 
-    pub(crate) fn register(&mut self, request_id: RequestId, kind: RequestKind) {
+    /// Tracks request progress and identifies results subject to the GitHub generation check.
+    pub(super) fn observe<'a>(&'a mut self, event: &'a Event) -> Option<&'a RequestKind> {
+        match event {
+            Event::RequestEmitted { request_id, kind } => self.register(*request_id, kind.clone()),
+            Event::RequestCompleted {
+                request_id, kind, ..
+            } => {
+                assert_eq!(
+                    &self.complete(*request_id),
+                    kind,
+                    "driver completed a different request kind"
+                );
+                return Some(kind);
+            }
+            Event::Auth { request_id, event } => self.correlate_auth_event(*request_id, event),
+            Event::Feeds(FeedsEvent::Request { request_id, event }) => {
+                self.correlate_feed_event(*request_id, event);
+            }
+            Event::Gh { request_id, event } => {
+                return Some(self.correlate_gh_event(*request_id, event));
+            }
+            _ => {}
+        }
+        None
+    }
+
+    fn register(&mut self, request_id: RequestId, kind: RequestKind) {
         let progress = match &kind {
             RequestKind::FetchTimelineWindow { limit } => Some(RequestProgress::TimelineWindow {
                 loaded: 0,
@@ -53,7 +79,7 @@ impl InFlightRequests {
         }
     }
 
-    pub(crate) fn correlate_auth_event(&self, request_id: RequestId, event: &AuthEvent) {
+    fn correlate_auth_event(&self, request_id: RequestId, event: &AuthEvent) {
         match (self.kind(request_id), event) {
             (
                 RequestKind::StartDeviceFlow { provider: expected },
@@ -70,7 +96,7 @@ impl InFlightRequests {
         }
     }
 
-    pub(crate) fn correlate_feed_event(&mut self, request_id: RequestId, event: &FeedRequestEvent) {
+    fn correlate_feed_event(&mut self, request_id: RequestId, event: &FeedRequestEvent) {
         let request = self
             .requests
             .get_mut(&request_id)
@@ -97,11 +123,7 @@ impl InFlightRequests {
         }
     }
 
-    pub(crate) fn correlate_gh_event(
-        &self,
-        request_id: RequestId,
-        event: &GhEvent,
-    ) -> &RequestKind {
+    fn correlate_gh_event(&self, request_id: RequestId, event: &GhEvent) -> &RequestKind {
         let kind = self.kind(request_id);
         match (kind, event) {
             (RequestKind::FetchGhNotifications { .. }, GhEvent::NotificationsFetched { .. })
@@ -119,21 +141,15 @@ impl InFlightRequests {
         kind
     }
 
-    pub(crate) fn complete(&mut self, request_id: RequestId) -> InFlightRequest {
-        let request = self
-            .requests
+    fn complete(&mut self, request_id: RequestId) -> RequestKind {
+        self.requests
             .shift_remove(&request_id)
-            .expect("driver completed an unknown request");
-        if self.requests.is_empty() {
-            self.throbber_step = 0;
-        }
-        request
+            .expect("driver completed an unknown request")
+            .kind
     }
 
     pub(crate) fn tick(&mut self) {
-        if !self.requests.is_empty() {
-            self.throbber_step = self.throbber_step.wrapping_add(1);
-        }
+        self.throbber_step = self.throbber_step.wrapping_add(1);
     }
 
     pub(crate) fn status(&self) -> Option<InFlightStatus<'_>> {
@@ -173,10 +189,6 @@ impl InFlightRequest {
             panic!("driver emitted a timeline chunk for a non-window request");
         };
         *current = current.saturating_add(loaded).min(*target);
-    }
-
-    pub(crate) fn into_kind(self) -> RequestKind {
-        self.kind
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::ui::widgets::tabs::Tab;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum::EnumIter)]
 pub(crate) enum ComponentId {
     Shell,
     Login,
@@ -37,12 +37,17 @@ impl Overlay {
         )
     }
 
-    pub(super) fn open(&mut self, tab: Tab, id: ComponentId) {
-        self.close(tab, id);
-        self.popups.push((tab, id));
+    pub(super) fn open(&mut self, sender: ComponentId) {
+        let tab = match sender {
+            ComponentId::UnsubscribePopup => Tab::Feeds,
+            ComponentId::GhFilterPopup => Tab::Gh,
+            _ => unreachable!("cannot open non-popup component: {sender:?}"),
+        };
+        self.close(sender);
+        self.popups.push((tab, sender));
     }
 
-    pub(super) fn close(&mut self, tab: Tab, id: ComponentId) {
-        self.popups.retain(|entry| *entry != (tab, id));
+    pub(super) fn close(&mut self, sender: ComponentId) {
+        self.popups.retain(|&(_, popup)| popup != sender);
     }
 }

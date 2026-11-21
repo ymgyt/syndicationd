@@ -20,7 +20,7 @@ impl RequestId {
 }
 
 /// Safe application-visible description of one logical external request.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RequestKind {
     StartDeviceFlow { provider: AuthenticationProvider },
     PollDeviceFlowAccessToken { provider: AuthenticationProvider },

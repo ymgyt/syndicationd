@@ -10,7 +10,7 @@ use crate::{
 use super::Compositor;
 
 impl Compositor {
-    fn key_layers(&self) -> LayerStack {
+    pub(super) fn key_layers(&self) -> LayerStack {
         let mut layers = LayerStack::default();
         for id in self.overlay.visible(self.components.shell.visible_tab()) {
             let component = self.components.get(id);
@@ -21,6 +21,9 @@ impl Compositor {
     }
 
     pub(super) fn sync_keymap(&mut self) {
+        self.components
+            .shell
+            .install_filter_keymap(&mut self.keymap);
         self.keymap.sync_layers(&self.key_layers());
     }
 
@@ -33,9 +36,6 @@ impl Compositor {
     }
 
     pub(super) fn resolve_keymap(&mut self, key: KeyEvent) -> Option<Command> {
-        self.components
-            .shell
-            .install_filter_keymap(&mut self.keymap);
         match self.keymap.resolve(&self.key_layers(), key) {
             KeymapResult::Matched { layer, action } => {
                 Some(action.build_command(self.owner(layer)))

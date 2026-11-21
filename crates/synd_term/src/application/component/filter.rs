@@ -1,9 +1,15 @@
+use super::{Component, RenderContext};
 use crate::{
-    application::compositor::Effects,
+    application::Populate,
+    event::{Event, EventKind},
+    ui::widgets::filter::{FilterContext, FilterWidget},
+};
+use crate::{
+    application::effects::Effects,
     command::{FilterCommand, FilterTarget},
-    event::Event,
     keymap::{Keymap, Layer, LayerKeymap},
 };
+use ratatui::buffer::Buffer;
 
 use super::ShellComponent;
 
@@ -54,7 +60,7 @@ impl ShellComponent {
             _ => return Effects::NONE,
         };
         if changed {
-            Event::FilterChanged(target).into()
+            self.filter.changed(target).into()
         } else {
             Effects::NONE
         }
@@ -68,5 +74,49 @@ impl ShellComponent {
         } else if self.filter.is_search_active() {
             keymap.set_layer_keymap(LayerKeymap::search_prompt());
         }
+    }
+}
+
+impl Component for FilterWidget {
+    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+        self.render(
+            cx.frame.filter,
+            buf,
+            &FilterContext {
+                ui: &cx.ui,
+                gh_options: cx.gh_options,
+                target: cx.shell.current_filter_target(),
+            },
+        );
+    }
+
+    fn key_layers(&self) -> &[Layer] {
+        if self.is_category_filtering_active() {
+            &[Layer::Filter, Layer::CategoryFilter]
+        } else if self.is_search_active() {
+            &[Layer::Filter, Layer::SearchPrompt]
+        } else {
+            &[Layer::Filter]
+        }
+    }
+    fn subscriptions(&self) -> &'static [EventKind] {
+        &[
+            EventKind::FeedCategoriesChanged,
+            EventKind::GhCategoriesChanged,
+        ]
+    }
+
+    fn apply_event(&mut self, event: &Event) -> Effects {
+        match event {
+            Event::FeedCategoriesChanged(categories) => {
+                self.update_categories(FilterTarget::Feeds, Populate::Replace, categories);
+            }
+            Event::GhCategoriesChanged {
+                populate,
+                categories,
+            } => self.update_categories(FilterTarget::GhNotifications, *populate, categories),
+            _ => {}
+        }
+        Effects::NONE
     }
 }
