@@ -4,8 +4,9 @@ use serde_json::json;
 use synd_client::payload;
 use synd_term::{
     application::{
-        Application, Cache, Config,
+        Application, Cache, Config, Features,
         outbound::feed::{MockFeedApi, MockFeedApiResponse},
+        outbound::gh::GhClient,
     },
     config::Categories,
     integration::{
@@ -21,11 +22,62 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn entering_feeds_requests_the_missing_subscription() {
     let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
-    let (_cache_dir, mut app) = app(api);
+    let (_cache_dir, mut app) = app(api, None);
     let (tx, mut input) = event_stream();
     tx.send(key!(tab));
     app.wait_until_jobs_completed(&mut input).await;
     assert!(Screen::new(app.buffer()).contains_text("Feed 1/1"));
+}
+
+#[tokio::test]
+async fn feeds_load_while_github_requests_wait_for_a_slot() {
+    use std::{convert::Infallible, time::Duration};
+    use tokio::sync::{mpsc, oneshot};
+
+    let (started, mut requests) = mpsc::unbounded_channel();
+    let service = tower::service_fn(move |_| {
+        let (respond, response) = oneshot::channel::<()>();
+        started.send(respond).unwrap();
+        async move {
+            response.await.unwrap();
+            Ok::<_, Infallible>(http::Response::new(octocrab::OctoBody::from("[]")))
+        }
+    });
+    let octocrab = octocrab::OctocrabBuilder::new_empty()
+        .with_service(service)
+        .with_auth(octocrab::AuthState::None)
+        .build()
+        .unwrap();
+    let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
+    let (_cache_dir, mut app) = app(api, Some(GhClient::with(octocrab)));
+    let (tx, mut input) = event_stream();
+    tx.send_multi((0..91).map(|_| key!('r')));
+
+    tokio::time::timeout(Duration::from_secs(10), async {
+        let (feed, mut running) = tokio::join!(
+            app.run_until(&mut input, |buf| Screen::new(buf).contains_text("Feed 1/1")),
+            async {
+                let mut running = Vec::new();
+                for _ in 0..90 {
+                    running.push(requests.recv().await.unwrap());
+                }
+                tx.send_multi([key!(tab), key!(tab)]);
+                running
+            }
+        );
+        feed.unwrap();
+        assert!(matches!(requests.try_recv(), Err(mpsc::error::TryRecvError::Empty)));
+
+        running.pop().unwrap().send(()).unwrap();
+        tokio::join!(app.wait_until_jobs_completed(&mut input), async {
+            requests.recv().await.unwrap().send(()).unwrap();
+            for request in running {
+                request.send(()).unwrap();
+            }
+        });
+    })
+    .await
+    .expect("Feeds must load with all GitHub slots held, and freeing one slot must start the waiting request");
 }
 
 mod bootstrapped_app {
@@ -160,25 +212,33 @@ fn start_app() -> (TempDir, Application) {
             has_more: false,
         })),
     ]);
-    let (cache_dir, mut app) = app(api);
+    let (cache_dir, mut app) = app(api, None);
 
     app.bootstrap_for_test();
 
     (cache_dir, app)
 }
 
-fn app(feed_api: MockFeedApi) -> (TempDir, Application) {
+fn app(feed_api: MockFeedApi, github: Option<GhClient>) -> (TempDir, Application) {
     let cache_dir = tempfile::tempdir().expect("temp cache dir");
     let terminal = new_test_terminal(120, 30);
-    let app = Application::builder()
+    let builder = Application::builder()
         .terminal(terminal)
         .feed_api(feed_api)
         .categories(Categories::default_toml())
-        .config(Config::default())
+        .config(Config {
+            features: Features {
+                enable_gh_notification: github.is_some(),
+            },
+            ..Config::default()
+        })
         .cache(Cache::new(cache_dir.path().to_path_buf()))
         .theme(Theme::default())
-        .interactor(Box::new(MockInteractor::new()))
-        .build();
+        .interactor(Box::new(MockInteractor::new()));
+    let app = match github {
+        Some(client) => builder.gh_client(client).build(),
+        None => builder.build(),
+    };
 
     (cache_dir, app)
 }

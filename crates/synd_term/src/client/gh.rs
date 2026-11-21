@@ -1,7 +1,10 @@
+use std::{future::Future, sync::Arc};
+
 use graphql_client::GraphQLQuery;
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::sync::Semaphore;
 use tracing::{debug, error, instrument};
 
 use crate::{
@@ -55,7 +58,11 @@ impl From<Vec<graphql_client::Error>> for GhError {
 #[derive(Clone)]
 pub struct GhClient {
     client: Octocrab,
+    request_slots: Arc<Semaphore>,
 }
+
+// Leave headroom below GitHub's secondary limit for concurrent REST and GraphQL requests.
+const MAX_CONCURRENT_REQUESTS: usize = 90;
 
 impl GhClient {
     pub fn new(pat: impl Into<String>) -> Result<Self, GhError> {
@@ -76,16 +83,27 @@ impl GhClient {
 
     #[must_use]
     pub fn with(client: Octocrab) -> Self {
-        Self { client }
+        Self {
+            client,
+            request_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
+        }
+    }
+
+    async fn request<T>(
+        &self,
+        request: impl Future<Output = octocrab::Result<T>>,
+    ) -> Result<T, GhError> {
+        let _permit = self
+            .request_slots
+            .acquire()
+            .await
+            .expect("GitHub request semaphore remains open");
+        Ok(request.await?)
     }
 
     pub(crate) async fn mark_thread_as_done(&self, id: NotificationId) -> Result<(), GhError> {
-        self.client
-            .activity()
-            .notifications()
-            .mark_as_read(id)
+        self.request(self.client.activity().notifications().mark_as_read(id))
             .await
-            .map_err(GhError::from)
     }
 
     pub(crate) async fn unsubscribe_thread(&self, id: ThreadId) -> Result<(), GhError> {
@@ -107,8 +125,7 @@ impl GhClient {
         let route = format!("/notifications/threads/{thread}/subscription");
         let body = Inner { ignored };
 
-        self.client
-            .put::<Response, _, _>(route, Some(&body))
+        self.request(self.client.put::<Response, _, _>(route, Some(&body)))
             .await?;
         Ok(())
     }
@@ -146,15 +163,19 @@ impl GhClient {
         }: FetchNotificationsParams,
     ) -> Result<Vec<Notification>, GhError> {
         let mut page = self
-            .client
-            .activity()
-            .notifications()
-            .list()
-            .participating(participating == FetchNotificationParticipating::OnlyParticipating)
-            .all(include == FetchNotificationInclude::All)
-            .page(page) // 1 Origin
-            .per_page(config::gh::NOTIFICATION_PER_PAGE)
-            .send()
+            .request(
+                self.client
+                    .activity()
+                    .notifications()
+                    .list()
+                    .participating(
+                        participating == FetchNotificationParticipating::OnlyParticipating,
+                    )
+                    .all(include == FetchNotificationInclude::All)
+                    .page(page) // 1 Origin
+                    .per_page(config::gh::NOTIFICATION_PER_PAGE)
+                    .send(),
+            )
             .await?;
         let notifications: Vec<_> = page
             .take_items()
@@ -189,22 +210,17 @@ impl GhClient {
             ..
         }: NotificationContext<IssueId>,
     ) -> Result<IssueContext, GhError> {
-        let response: octocrab::Result<issue_query::ResponseData> = self
-            .client
-            .graphql(&IssueQuery::build_query(issue_query::Variables {
-                repository_owner: owner,
-                repository_name: name,
-                issue_number: id.into_inner(),
-            }))
-            .await;
+        let query = IssueQuery::build_query(issue_query::Variables {
+            repository_owner: owner,
+            repository_name: name,
+            issue_number: id.into_inner(),
+        });
+        let response: issue_query::ResponseData = self.request(self.client.graphql(&query)).await?;
 
-        match response {
-            Ok(data) => IssueContext::try_from(data).map_err(|error| {
-                error!(%error, "failed to decode GitHub issue response");
-                err::handle_decode_error(error)
-            }),
-            Err(error) => Err(GhError::from(error)),
-        }
+        IssueContext::try_from(response).map_err(|error| {
+            error!(%error, "failed to decode GitHub issue response");
+            err::handle_decode_error(error)
+        })
     }
 }
 
@@ -226,24 +242,18 @@ impl GhClient {
             ..
         }: NotificationContext<PullRequestId>,
     ) -> Result<PullRequestContext, GhError> {
-        let response: octocrab::Result<pull_request_query::ResponseData> = self
-            .client
-            .graphql(&PullRequestQuery::build_query(
-                pull_request_query::Variables {
-                    repository_owner: owner,
-                    repository_name: name,
-                    pull_request_number: id.into_inner(),
-                },
-            ))
-            .await;
+        let query = PullRequestQuery::build_query(pull_request_query::Variables {
+            repository_owner: owner,
+            repository_name: name,
+            pull_request_number: id.into_inner(),
+        });
+        let response: pull_request_query::ResponseData =
+            self.request(self.client.graphql(&query)).await?;
 
-        match response {
-            Ok(data) => PullRequestContext::try_from(data).map_err(|error| {
-                error!(%error, "failed to decode GitHub pull request response");
-                err::handle_decode_error(error)
-            }),
-            Err(error) => Err(GhError::from(error)),
-        }
+        PullRequestContext::try_from(response).map_err(|error| {
+            error!(%error, "failed to decode GitHub pull request response");
+            err::handle_decode_error(error)
+        })
     }
 }
 

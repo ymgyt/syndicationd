@@ -1,10 +1,9 @@
 use std::{
-    num::NonZero,
     pin::Pin,
     task::{Context, Poll},
 };
 
-use futures_util::{FutureExt as _, Stream};
+use futures_util::{FutureExt as _, Stream, stream::FuturesUnordered};
 use tokio::sync::mpsc;
 
 #[cfg(feature = "integration")]
@@ -17,12 +16,9 @@ use crate::{
     auth::{Credential, Verified},
     event::{Event, FeedsEvent, OperationError},
     interact::Interact,
-    job::Jobs,
     operation::{Operation, Operations},
     terminal::Terminal,
 };
-
-const REQUEST_JOB_CONCURRENCY: usize = 90;
 
 mod auth;
 mod feed;
@@ -45,7 +41,7 @@ pub(super) struct Drivers {
     auth: AuthDriver,
     gh: GhDriver,
     interaction: InteractionDriver,
-    request_jobs: Jobs,
+    request_jobs: FuturesUnordered<JobFuture>,
     next_request_id: u64,
     event_tx: mpsc::UnboundedSender<Event>,
     event_rx: mpsc::UnboundedReceiver<Event>,
@@ -82,8 +78,6 @@ impl Drivers {
         let gh = GhDriver::new(gh_client);
         let interaction = InteractionDriver::new(interactor);
         let clock = clock.unwrap_or_else(|| Box::new(SystemClock));
-        // The GitHub secondary rate limit is 100 concurrent requests.
-        let request_jobs = Jobs::new(NonZero::new(REQUEST_JOB_CONCURRENCY).unwrap());
         let (event_tx, event_rx) = mpsc::unbounded_channel();
 
         Self {
@@ -93,7 +87,7 @@ impl Drivers {
             auth,
             gh,
             interaction,
-            request_jobs,
+            request_jobs: FuturesUnordered::new(),
             next_request_id: 0,
             event_tx,
             event_rx,

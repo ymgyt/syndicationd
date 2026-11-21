@@ -57,9 +57,11 @@ synd-client = { workspace = true, features = ["fake"] }
 
 criterion   = { workspace = true }
 fake        = { workspace = true }
+http        = { workspace = true }
 pprof       = { workspace = true }
 proptest    = { workspace = true }
 tempfile    = { workspace = true }
+tower       = { version = "0.5.3", features = ["util"] }
 
 [[bench]]
 harness = false
