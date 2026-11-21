@@ -20,7 +20,6 @@ use crate::{
     job::Jobs,
     operation::{Operation, Operations},
     terminal::Terminal,
-    types::gh::NotificationDetail,
 };
 
 const REQUEST_JOB_CONCURRENCY: usize = 90;
@@ -117,21 +116,21 @@ impl Drivers {
     fn dispatch_operation(&mut self, operation: Operation, terminal: &mut Terminal) {
         match operation {
             Operation::StartDeviceFlow { provider } => {
-                let make_request = self.auth.start_device_flow(provider);
-                self.register_request(RequestKind::StartDeviceFlow { provider }, make_request);
+                self.register_request(|drivers, cx| drivers.auth.start_device_flow(cx, provider));
             }
             Operation::PollDeviceFlowAccessToken {
                 provider,
                 device_authorization,
             } => {
                 let now = self.clock.now();
-                let make_request =
-                    self.auth
-                        .poll_device_flow_access_token(now, provider, *device_authorization);
-                self.register_request(
-                    RequestKind::PollDeviceFlowAccessToken { provider },
-                    make_request,
-                );
+                self.register_request(|drivers, cx| {
+                    drivers.auth.poll_device_flow_access_token(
+                        cx,
+                        now,
+                        provider,
+                        *device_authorization,
+                    )
+                });
             }
             Operation::OpenFeedSubscriptionEditor => {
                 let event = TerminalInteraction::new(&self.interaction, terminal)
@@ -144,32 +143,28 @@ impl Drivers {
                 self.queue_event(event);
             }
             Operation::SubscribeFeed { input } => {
-                let kind = RequestKind::SubscribeFeed {
-                    url: input.url.clone(),
-                };
-                let make_request = self.feed.subscribe_feed(input);
-                self.register_request(kind, make_request);
+                self.register_request(|drivers, cx| drivers.feed.subscribe_feed(cx, input));
             }
             Operation::UnsubscribeFeed { url } => {
-                let kind = RequestKind::UnsubscribeFeed { url: url.clone() };
-                let make_request = self.feed.unsubscribe_feed(url);
-                self.register_request(kind, make_request);
+                self.register_request(|drivers, cx| drivers.feed.unsubscribe_feed(cx, url));
             }
             Operation::FetchSubscription {
+                generation,
                 populate,
                 after,
                 first,
             } => {
-                let make_request = self.feed.fetch_subscription(populate, after, first);
-                self.register_request(RequestKind::FetchSubscription, make_request);
+                self.register_request(|drivers, cx| {
+                    drivers
+                        .feed
+                        .fetch_subscription(cx, generation, populate, after, first)
+                });
             }
             Operation::FetchTimelineWindow { limit } => {
-                let make_request = self.feed.fetch_timeline_window(limit);
-                self.register_request(RequestKind::FetchTimelineWindow { limit }, make_request);
+                self.register_request(|drivers, cx| drivers.feed.fetch_timeline_window(cx, limit));
             }
             Operation::CatchUpTimeline { since } => {
-                let make_request = self.feed.catch_up_timeline(since);
-                self.register_request(RequestKind::CatchUpTimeline { since }, make_request);
+                self.register_request(|drivers, cx| drivers.feed.catch_up_timeline(cx, since));
             }
             Operation::WatchFeedEvents => self.feed.watch_events(),
             Operation::FetchGhNotifications {
@@ -177,42 +172,22 @@ impl Drivers {
                 populate,
                 params,
             } => {
-                let kind = RequestKind::FetchGhNotifications {
-                    generation,
-                    page: params.page,
-                };
-                let make_request = self.gh.fetch_notifications(populate, params);
-                self.register_request(kind, make_request);
+                self.register_request(|drivers, cx| {
+                    drivers
+                        .gh
+                        .fetch_notifications(cx, generation, populate, params)
+                });
             }
-            Operation::FetchGhDetail {
-                generation,
-                detail: NotificationDetail::Issue(context),
-            } => {
-                let kind = RequestKind::FetchGhIssue {
-                    generation,
-                    id: context.id,
-                };
-                let make_request = self.gh.fetch_issue(context);
-                self.register_request(kind, make_request);
-            }
-            Operation::FetchGhDetail {
-                generation,
-                detail: NotificationDetail::PullRequest(context),
-            } => {
-                let kind = RequestKind::FetchGhPullRequest {
-                    generation,
-                    id: context.id,
-                };
-                let make_request = self.gh.fetch_pull_request(context);
-                self.register_request(kind, make_request);
+            Operation::FetchGhDetail { generation, detail } => {
+                self.register_request(|drivers, cx| {
+                    drivers.gh.fetch_detail(cx, generation, detail)
+                });
             }
             Operation::MarkGhNotificationAsDone { id } => {
-                let make_request = self.gh.mark_notification_as_done(id);
-                self.register_request(RequestKind::MarkGhNotificationAsDone { id }, make_request);
+                self.register_request(|drivers, cx| drivers.gh.mark_notification_as_done(cx, id));
             }
             Operation::UnsubscribeGhThread { id } => {
-                let make_request = self.gh.unsubscribe_thread(id);
-                self.register_request(RequestKind::UnsubscribeGhThread { id }, make_request);
+                self.register_request(|drivers, cx| drivers.gh.unsubscribe_thread(cx, id));
             }
             Operation::OpenBrowser { url } => {
                 if let Some(event) = self.interaction.open_browser(url) {
@@ -232,13 +207,13 @@ impl Drivers {
         }
     }
 
-    fn register_request<F>(&mut self, kind: RequestKind, make_request: F)
+    fn register_request<F>(&mut self, make_request: F)
     where
-        F: FnOnce(RequestContext) -> RequestFuture,
+        F: FnOnce(&Self, RequestContext) -> (RequestKind, RequestFuture),
     {
         let request_id = self.assign_request_id();
-        let context = RequestContext::new(request_id, kind.clone(), self.event_tx.clone());
-        let request = make_request(context);
+        let context = RequestContext::new(request_id, self.event_tx.clone());
+        let (kind, request) = make_request(self, context);
         let completion_tx = self.event_tx.clone();
         self.queue_event(Event::RequestEmitted {
             request_id,

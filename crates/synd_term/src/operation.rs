@@ -4,7 +4,7 @@ use synd_feed::types::FeedUrl;
 use url::Url;
 
 use crate::{
-    application::Populate,
+    application::{Generation, Populate},
     auth::{AuthenticationProvider, Credential, Verified},
     client::gh::FetchNotificationsParams,
     types::gh::{NotificationDetail, NotificationId, ThreadId},
@@ -93,6 +93,7 @@ pub(crate) enum Operation {
         url: FeedUrl,
     },
     FetchSubscription {
+        generation: Generation,
         populate: Populate,
         after: Option<String>,
         first: i64,
@@ -106,12 +107,12 @@ pub(crate) enum Operation {
     WatchFeedEvents,
 
     FetchGhNotifications {
-        generation: u64,
+        generation: Generation,
         populate: Populate,
         params: FetchNotificationsParams,
     },
     FetchGhDetail {
-        generation: u64,
+        generation: Generation,
         detail: NotificationDetail,
     },
     MarkGhNotificationAsDone {

@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    application::{Features, Populate, RequestId, RequestKind},
+    application::{Features, Generation, Populate, RequestId, RequestKind},
     event::{Event, GhEvent},
     key,
     operation::Operation,
@@ -110,7 +110,8 @@ fn entering_feeds_requests_the_configured_page_size() {
         Operations::One(Operation::FetchSubscription {
             populate: Populate::Replace,
             after: None,
-            first: 17
+            first: 17,
+            ..
         })
     ));
 }
@@ -177,6 +178,7 @@ struct PageRequest {
     id: RequestId,
     kind: RequestKind,
     populate: Populate,
+    generation: Generation,
 }
 
 fn start_page(compositor: &mut Compositor, id: RequestId, operation: Operations) -> PageRequest {
@@ -199,7 +201,12 @@ fn start_page(compositor: &mut Compositor, id: RequestId, operation: Operations)
         }),
         Operations::Nop
     ));
-    PageRequest { id, kind, populate }
+    PageRequest {
+        id,
+        kind,
+        populate,
+        generation,
+    }
 }
 
 fn deliver_page(
@@ -209,8 +216,8 @@ fn deliver_page(
 ) -> Operations {
     let operations = compositor.apply_event(&Event::Gh {
         request_id: page.id,
-        generation: page.kind.gh_generation(),
         event: GhEvent::NotificationsFetched {
+            generation: page.generation,
             populate: page.populate,
             notifications: vec![notification(notification_id)],
         },
@@ -367,42 +374,159 @@ fn github_filter_is_only_drawn_and_dismissed_on_its_tab() {
     assert!(!popup_visible(&compositor));
 }
 
-#[test]
-fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
+fn deliver_subscription_page(
+    compositor: &mut Compositor,
+    id: u64,
+    fetch: &Operations,
+    url: &str,
+    next_cursor: Option<&str>,
+) -> Operations {
     use crate::event::{FeedRequestEvent, FeedsEvent};
 
-    fn replace_feed(compositor: &mut Compositor, id: u64, url: &str) {
-        let request_id = RequestId::new(id);
-        let subscription = serde_json::from_value(serde_json::json!({
-            "feeds": {
-                "nodes": [{ "url": url, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
-                "pageInfo": { "hasNextPage": false, "endCursor": null }
-            }
-        }))
-        .unwrap();
-        let _ = compositor.apply_event(&Event::RequestEmitted {
-            request_id,
-            kind: RequestKind::FetchSubscription,
-        });
-        let _ = compositor.apply_event(&Event::Feeds(FeedsEvent::Request {
-            request_id,
-            event: FeedRequestEvent::SubscriptionFetched {
-                populate: Populate::Replace,
-                subscription,
-            },
-        }));
-        let _ = compositor.apply_event(&Event::RequestCompleted {
-            request_id,
-            kind: RequestKind::FetchSubscription,
-            result: Ok(()),
-        });
+    let Operations::One(Operation::FetchSubscription {
+        generation,
+        populate,
+        ..
+    }) = fetch
+    else {
+        panic!("expected a subscription page request, got {fetch:?}");
+    };
+    let request_id = RequestId::new(id);
+    let subscription = serde_json::from_value(serde_json::json!({
+        "feeds": {
+            "nodes": [{ "url": url, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
+            "pageInfo": { "hasNextPage": next_cursor.is_some(), "endCursor": next_cursor }
+        }
+    }))
+    .unwrap();
+    let kind = RequestKind::FetchSubscription {
+        generation: *generation,
+    };
+    let _ = compositor.apply_event(&Event::RequestEmitted {
+        request_id,
+        kind: kind.clone(),
+    });
+    let next = compositor.apply_event(&Event::Feeds(FeedsEvent::Request {
+        request_id,
+        event: FeedRequestEvent::SubscriptionFetched {
+            generation: *generation,
+            populate: *populate,
+            subscription,
+        },
+    }));
+    let _ = compositor.apply_event(&Event::RequestCompleted {
+        request_id,
+        kind,
+        result: Ok(()),
+    });
+    next
+}
+
+#[test]
+fn reloading_subscriptions_discards_old_pages_and_their_cursors() {
+    for pending_append in [false, true] {
+        let mut compositor = new_compositor(Config::default());
+        let first = compositor.apply_terminal_event(&key!(tab));
+        let old = if pending_append {
+            deliver_subscription_page(
+                &mut compositor,
+                1,
+                &first,
+                "https://example.com/first",
+                Some("next"),
+            )
+        } else {
+            first
+        };
+
+        let refresh = compositor.apply_terminal_event(&key!('r'));
+        let current = "https://example.com/current";
+        let obsolete = "https://example.com/obsolete";
+        let next =
+            deliver_subscription_page(&mut compositor, 2, &refresh, current, Some("current-next"));
+        assert!(
+            matches!(&next, Operations::One(Operation::FetchSubscription {
+            after: Some(cursor), populate: Populate::Append, ..
+        }) if cursor == "current-next")
+        );
+        assert!(matches!(
+            deliver_subscription_page(&mut compositor, 3, &old, obsolete, Some("obsolete-next")),
+            Operations::Nop
+        ));
+        let last = "https://example.com/last";
+        let _ = deliver_subscription_page(&mut compositor, 4, &next, last, None);
+        let feeds = &compositor.components.feeds;
+        assert!(feeds.is_already_subscribed(&current.try_into().unwrap()));
+        assert!(feeds.is_already_subscribed(&last.try_into().unwrap()));
+        assert!(!feeds.is_already_subscribed(&obsolete.try_into().unwrap()));
     }
+}
+
+#[test]
+fn only_the_current_subscription_failure_reaches_the_status_line() {
+    use crate::{application::RequestError, test_support::screen::Screen};
+    use ratatui::{Terminal, backend::TestBackend};
 
     let mut compositor = new_compositor(Config::default());
-    let _ = compositor.apply_terminal_event(&key!(tab));
-    replace_feed(&mut compositor, 1, "https://example.com/first");
+    let mut start = |id, key| {
+        let Operations::One(Operation::FetchSubscription { generation, .. }) =
+            compositor.apply_terminal_event(&key)
+        else {
+            panic!("expected a subscription fetch")
+        };
+        let request_id = RequestId::new(id);
+        let kind = RequestKind::FetchSubscription { generation };
+        let _ = compositor.apply_event(&Event::RequestEmitted {
+            request_id,
+            kind: kind.clone(),
+        });
+        Event::RequestCompleted {
+            request_id,
+            kind,
+            result: Err(RequestError::SyndApi(
+                synd_client::SyndApiError::UnexpectedResponse {
+                    context: "page failed",
+                },
+            )),
+        }
+    };
+    let old = start(1, key!(tab));
+    let current = start(2, key!('r'));
+    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+    let mut status = |compositor: &Compositor| {
+        let frame = terminal
+            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
+            .unwrap();
+        Screen::new(frame.buffer).lines().pop().unwrap()
+    };
+    let _ = compositor.apply_event(&old);
+    assert!(compositor.is_busy());
+    assert!(!status(&compositor).contains("page failed"));
+    let _ = compositor.apply_event(&current);
+    assert!(!compositor.is_busy());
+    assert!(status(&compositor).contains("page failed"));
+}
+
+#[test]
+fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
+    let mut compositor = new_compositor(Config::default());
+    let first = compositor.apply_terminal_event(&key!(tab));
+    let _ = deliver_subscription_page(
+        &mut compositor,
+        1,
+        &first,
+        "https://example.com/first",
+        None,
+    );
     let _ = compositor.apply_terminal_event(&key!('d'));
-    replace_feed(&mut compositor, 2, "https://example.com/second");
+    let refresh = compositor.components.feeds.reload_subscription().into();
+    let _ = deliver_subscription_page(
+        &mut compositor,
+        2,
+        &refresh,
+        "https://example.com/second",
+        None,
+    );
     assert!(matches!(compositor.apply_terminal_event(&key!(enter)),
         Operations::One(Operation::UnsubscribeFeed { url }) if url.as_str() == "https://example.com/first"
     ));

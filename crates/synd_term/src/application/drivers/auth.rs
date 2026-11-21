@@ -13,7 +13,7 @@ use tracing::{debug, info};
 use url::Url;
 
 use crate::{
-    application::{Authenticator, FeedApiRef, JwtService, RequestError},
+    application::{Authenticator, FeedApiRef, JwtService, RequestError, RequestKind},
     auth::{AuthenticationProvider, Credential, Verified},
     config,
     event::{AuthEvent, Event},
@@ -52,11 +52,13 @@ impl AuthDriver {
 
     pub(super) fn start_device_flow(
         &self,
+        context: RequestContext,
         provider: AuthenticationProvider,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let authenticator = self.authenticator.clone();
 
-        move |context| {
+        (
+            RequestKind::StartDeviceFlow { provider },
             async move {
                 info!("Start authenticate");
                 let device_authorization = authenticator
@@ -66,32 +68,40 @@ impl AuthDriver {
                 let authorization = ValidatedDeviceAuthorization::try_from(device_authorization)
                     .map_err(RequestError::Authentication)?;
 
-                context.emit_auth(authorization.into_event(provider));
+                context.emit(|request_id| Event::Auth {
+                    request_id,
+                    event: authorization.into_event(provider),
+                });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     pub(super) fn poll_device_flow_access_token(
         &self,
+        context: RequestContext,
         now: DateTime<Utc>,
         provider: AuthenticationProvider,
         device_authorization: DeviceAuthorizationResponse,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let authenticator = self.authenticator.clone();
 
-        move |context| {
+        (
+            RequestKind::PollDeviceFlowAccessToken { provider },
             async move {
                 let credential = authenticator
                     .poll_device_flow_access_token(now, provider, device_authorization)
                     .await
                     .map_err(RequestError::Authentication)?;
-                context.emit_auth(AuthEvent::DeviceFlowCredentialReceived { credential });
+                context.emit(|request_id| Event::Auth {
+                    request_id,
+                    event: AuthEvent::DeviceFlowCredentialReceived { credential },
+                });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     pub(super) fn stop(&mut self) {

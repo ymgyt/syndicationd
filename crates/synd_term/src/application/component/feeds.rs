@@ -10,8 +10,8 @@ use url::Url;
 use super::{Component, RenderContext};
 use crate::{
     application::{
-        Config, Populate, RequestError, RequestKind, effects::Effects, input_parser::InputParser,
-        request::synd_api_error_message,
+        Config, Generation, Populate, RequestError, RequestKind, effects::Effects,
+        input_parser::InputParser, request::synd_api_error_message,
     },
     command::{Command, FeedsCommand, ShellCommand, UnsubscribeCommand, UnsubscribeTarget},
     config::Categories,
@@ -37,6 +37,7 @@ pub(crate) struct FeedsComponent {
     matcher: crate::matcher::Matcher,
     pub(crate) entries: EntriesWidget,
     timeline: TimelineState,
+    subscription_generation: Generation,
     page_size: i64,
     entries_limit: usize,
     categories: Rc<Categories>,
@@ -69,6 +70,7 @@ impl FeedsComponent {
 
     pub(super) fn new(config: &Config, categories: Rc<Categories>) -> Self {
         Self {
+            subscription_generation: Generation::default(),
             page_size: config.feeds_per_pagination,
             entries_limit: config.entries_limit,
             categories,
@@ -136,8 +138,10 @@ impl FeedsComponent {
         self.entries.remove_unsubscribed_entries(url);
     }
 
-    pub(in crate::application) fn reload_subscription(&self) -> Operation {
+    pub(in crate::application) fn reload_subscription(&mut self) -> Operation {
+        self.subscription_generation.advance();
         Operation::FetchSubscription {
+            generation: self.subscription_generation,
             populate: Populate::Replace,
             after: None,
             first: self.page_size,
@@ -316,6 +320,11 @@ impl Component for FeedsComponent {
             }
             Event::RequestCompleted { kind, result, .. } => {
                 let follow_up = match kind {
+                    RequestKind::FetchSubscription { generation }
+                        if *generation != self.subscription_generation =>
+                    {
+                        return Effects::NONE;
+                    }
                     RequestKind::FetchTimelineWindow { .. } => {
                         self.complete_timeline_window(result.is_ok())
                     }
@@ -364,12 +373,17 @@ impl FeedsComponent {
                 return Effects::operations(self.reload_subscription());
             }
             FeedRequestEvent::SubscriptionFetched {
+                generation,
                 populate,
                 subscription,
             } => {
+                if *generation != self.subscription_generation {
+                    return Effects::NONE;
+                }
                 let next = match &subscription.feeds.page_info {
                     payload::PageInfo::Complete { .. } => None,
                     payload::PageInfo::More { next_cursor } => Some(Operation::FetchSubscription {
+                        generation: *generation,
                         populate: Populate::Append,
                         after: Some(next_cursor.clone()),
                         first: subscription.feeds.nodes.len().try_into().unwrap_or(0),

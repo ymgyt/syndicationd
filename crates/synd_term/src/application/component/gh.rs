@@ -1,6 +1,6 @@
 use super::{Component, RenderContext};
 use crate::{
-    application::{Populate, RequestError, RequestKind, effects::Effects},
+    application::{Generation, Populate, RequestError, RequestKind, effects::Effects},
     client::gh::FetchNotificationsParams,
     command::{Command, GhCommand, GhNotificationFilterOption},
     operation::{Operation, Operations},
@@ -21,7 +21,7 @@ use std::rc::Rc;
 pub(crate) struct GhComponent {
     pub(in crate::application) enabled: bool,
     categories: Rc<Categories>,
-    generation: u64,
+    generation: Generation,
     page_pending: bool,
     matcher: crate::matcher::Matcher,
     pub(crate) notifications: GhNotificationsWidget,
@@ -53,7 +53,7 @@ impl GhComponent {
             categories,
             matcher: crate::matcher::Matcher::new(),
             notifications: GhNotificationsWidget::new(),
-            generation: 0,
+            generation: Generation::default(),
             page_pending: false,
         }
     }
@@ -162,7 +162,7 @@ impl GhComponent {
     }
 
     fn start_list(&mut self, params: FetchNotificationsParams) -> Operation {
-        self.generation += 1;
+        self.generation.advance();
         self.fetch_page(params)
     }
 
@@ -178,10 +178,6 @@ impl GhComponent {
             populate,
             params,
         }
-    }
-
-    fn accepts_generation(&self, generation: Option<u64>) -> bool {
-        generation.is_none_or(|generation| generation == self.generation)
     }
 }
 
@@ -216,15 +212,19 @@ impl Component for GhComponent {
                 kind,
                 result: Err(RequestError::Gh(error)),
                 ..
-            } if self.accepts_generation(kind.gh_generation()) => {
+            } => {
+                if matches!(kind, RequestKind::FetchGhNotifications { generation, .. }
+                    | RequestKind::FetchGhIssue { generation, .. }
+                    | RequestKind::FetchGhPullRequest { generation, .. } if *generation != self.generation)
+                {
+                    return Effects::NONE;
+                }
                 if matches!(kind, RequestKind::FetchGhNotifications { .. }) {
                     self.page_pending = false;
                 }
                 Command::show_request_error(kind, error.to_string()).into()
             }
-            Event::Gh {
-                generation, event, ..
-            } if self.accepts_generation(*generation) => self.apply_gh_event(event),
+            Event::Gh { event, .. } => self.apply_gh_event(event),
             _ => Effects::NONE,
         }
     }
@@ -232,10 +232,17 @@ impl Component for GhComponent {
 
 impl GhComponent {
     fn apply_gh_event(&mut self, event: &GhEvent) -> Effects {
+        if matches!(event, GhEvent::NotificationsFetched { generation, .. }
+            | GhEvent::IssueFetched { generation, .. }
+            | GhEvent::PullRequestFetched { generation, .. } if *generation != self.generation)
+        {
+            return Effects::NONE;
+        }
         let notification = match event {
             GhEvent::NotificationsFetched {
                 notifications,
                 populate,
+                ..
             } => {
                 let details = self.apply_notifications(*populate, notifications.clone());
                 let mut effects = Effects::operations(self.fetch_notification_details(details));
@@ -250,12 +257,14 @@ impl GhComponent {
             GhEvent::IssueFetched {
                 notification_id,
                 issue,
+                ..
             } => self
                 .notifications
                 .update_issue(*notification_id, issue.clone(), &self.categories),
             GhEvent::PullRequestFetched {
                 notification_id,
                 pull_request,
+                ..
             } => self.notifications.update_pull_request(
                 *notification_id,
                 pull_request.clone(),

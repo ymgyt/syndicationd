@@ -2,12 +2,14 @@ use futures_util::FutureExt as _;
 
 use crate::{
     application::{
-        Populate, RequestError,
+        Generation, Populate, RequestError, RequestKind,
         outbound::gh::{GhClient, GhError},
     },
     client::gh::FetchNotificationsParams,
-    event::GhEvent,
-    types::gh::{IssueId, NotificationContext, NotificationId, PullRequestId, ThreadId},
+    event::{Event, GhEvent},
+    types::gh::{
+        IssueId, NotificationContext, NotificationDetail, NotificationId, PullRequestId, ThreadId,
+    },
 };
 
 use super::request::{RequestContext, RequestFuture};
@@ -26,12 +28,18 @@ impl GhDriver {
 
     pub(super) fn fetch_notifications(
         &self,
+        context: RequestContext,
+        generation: Generation,
         populate: Populate,
         params: FetchNotificationsParams,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let client = self.client.clone();
 
-        move |context| {
+        (
+            RequestKind::FetchGhNotifications {
+                generation,
+                page: params.page,
+            },
             async move {
                 let notifications = client
                     .resolve()
@@ -39,23 +47,45 @@ impl GhDriver {
                     .fetch_notifications(params)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit_gh(GhEvent::NotificationsFetched {
-                    populate,
-                    notifications,
+                context.emit(|request_id| Event::Gh {
+                    request_id,
+                    event: GhEvent::NotificationsFetched {
+                        generation,
+                        populate,
+                        notifications,
+                    },
                 });
                 Ok(())
             }
-            .boxed()
+            .boxed(),
+        )
+    }
+
+    pub(super) fn fetch_detail(
+        &self,
+        context: RequestContext,
+        generation: Generation,
+        detail: NotificationDetail,
+    ) -> (RequestKind, RequestFuture) {
+        match detail {
+            NotificationDetail::Issue(issue) => self.fetch_issue(context, generation, issue),
+            NotificationDetail::PullRequest(pr) => self.fetch_pull_request(context, generation, pr),
         }
     }
 
-    pub(super) fn fetch_issue(
+    fn fetch_issue(
         &self,
+        context: RequestContext,
+        generation: Generation,
         issue: NotificationContext<IssueId>,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let client = self.client.clone();
 
-        move |context| {
+        (
+            RequestKind::FetchGhIssue {
+                generation,
+                id: issue.id,
+            },
             async move {
                 let notification_id = issue.notification_id;
                 let issue = client
@@ -64,23 +94,33 @@ impl GhDriver {
                     .fetch_issue(issue)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit_gh(GhEvent::IssueFetched {
-                    notification_id,
-                    issue,
+                context.emit(|request_id| Event::Gh {
+                    request_id,
+                    event: GhEvent::IssueFetched {
+                        generation,
+                        notification_id,
+                        issue,
+                    },
                 });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
-    pub(super) fn fetch_pull_request(
+    fn fetch_pull_request(
         &self,
+        context: RequestContext,
+        generation: Generation,
         pull_request: NotificationContext<PullRequestId>,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let client = self.client.clone();
 
-        move |context| {
+        (
+            RequestKind::FetchGhPullRequest {
+                generation,
+                id: pull_request.id,
+            },
             async move {
                 let notification_id = pull_request.notification_id;
                 let pull_request = client
@@ -89,23 +129,29 @@ impl GhDriver {
                     .fetch_pull_request(pull_request)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit_gh(GhEvent::PullRequestFetched {
-                    notification_id,
-                    pull_request,
+                context.emit(|request_id| Event::Gh {
+                    request_id,
+                    event: GhEvent::PullRequestFetched {
+                        generation,
+                        notification_id,
+                        pull_request,
+                    },
                 });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     pub(super) fn mark_notification_as_done(
         &self,
+        context: RequestContext,
         id: NotificationId,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let client = self.client.clone();
 
-        move |context| {
+        (
+            RequestKind::MarkGhNotificationAsDone { id },
             async move {
                 client
                     .resolve()
@@ -113,22 +159,27 @@ impl GhDriver {
                     .mark_thread_as_done(id)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit_gh(GhEvent::NotificationMarkedAsDone {
-                    notification_id: id,
+                context.emit(|request_id| Event::Gh {
+                    request_id,
+                    event: GhEvent::NotificationMarkedAsDone {
+                        notification_id: id,
+                    },
                 });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     pub(super) fn unsubscribe_thread(
         &self,
+        _context: RequestContext,
         id: ThreadId,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let client = self.client.clone();
 
-        move |_context| {
+        (
+            RequestKind::UnsubscribeGhThread { id },
             async move {
                 client
                     .resolve()
@@ -137,8 +188,8 @@ impl GhDriver {
                     .await
                     .map_err(RequestError::Gh)
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 }
 

@@ -20,41 +20,68 @@ impl RequestId {
     }
 }
 
+/// Identifies the pages and details belonging to one reload of a list.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Generation(u64);
+
+impl Generation {
+    pub(super) fn advance(&mut self) {
+        self.0 = self.0.checked_add(1).expect("list generation exhausted");
+    }
+}
+
 /// Safe application-visible description of one logical external request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RequestKind {
-    StartDeviceFlow { provider: AuthenticationProvider },
-    PollDeviceFlowAccessToken { provider: AuthenticationProvider },
-    SubscribeFeed { url: FeedUrl },
-    UnsubscribeFeed { url: FeedUrl },
-    FetchSubscription,
-    FetchTimelineWindow { limit: usize },
-    CatchUpTimeline { since: i64 },
-    FetchGhNotifications { generation: u64, page: u8 },
-    FetchGhIssue { generation: u64, id: IssueId },
-    FetchGhPullRequest { generation: u64, id: PullRequestId },
-    MarkGhNotificationAsDone { id: NotificationId },
-    UnsubscribeGhThread { id: ThreadId },
+    StartDeviceFlow {
+        provider: AuthenticationProvider,
+    },
+    PollDeviceFlowAccessToken {
+        provider: AuthenticationProvider,
+    },
+    SubscribeFeed {
+        url: FeedUrl,
+    },
+    UnsubscribeFeed {
+        url: FeedUrl,
+    },
+    FetchSubscription {
+        generation: Generation,
+    },
+    FetchTimelineWindow {
+        limit: usize,
+    },
+    CatchUpTimeline {
+        since: i64,
+    },
+    FetchGhNotifications {
+        generation: Generation,
+        page: u8,
+    },
+    FetchGhIssue {
+        generation: Generation,
+        id: IssueId,
+    },
+    FetchGhPullRequest {
+        generation: Generation,
+        id: PullRequestId,
+    },
+    MarkGhNotificationAsDone {
+        id: NotificationId,
+    },
+    UnsubscribeGhThread {
+        id: ThreadId,
+    },
 }
 
 impl RequestKind {
-    /// The notification list a GitHub read was issued for. Mutations apply across reloads.
-    pub(super) fn gh_generation(&self) -> Option<u64> {
-        match self {
-            Self::FetchGhNotifications { generation, .. }
-            | Self::FetchGhIssue { generation, .. }
-            | Self::FetchGhPullRequest { generation, .. } => Some(*generation),
-            _ => None,
-        }
-    }
-
     pub(crate) fn label(&self) -> Cow<'static, str> {
         match self {
             Self::StartDeviceFlow { .. } => Cow::Borrowed("Request device authorization"),
             Self::PollDeviceFlowAccessToken { .. } => Cow::Borrowed("Poll device access token"),
             Self::SubscribeFeed { url } => Cow::Owned(format!("Subscribe feed {url}")),
             Self::UnsubscribeFeed { url } => Cow::Owned(format!("Unsubscribe feed {url}")),
-            Self::FetchSubscription => Cow::Borrowed("Fetch subscriptions"),
+            Self::FetchSubscription { .. } => Cow::Borrowed("Fetch subscriptions"),
             Self::FetchTimelineWindow { .. } => Cow::Borrowed("Fetch timeline"),
             Self::CatchUpTimeline { since } => {
                 Cow::Owned(format!("Catch up timeline from {since}"))

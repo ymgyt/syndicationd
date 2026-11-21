@@ -8,7 +8,7 @@ use synd_feed::types::{Category, Requirement};
 use url::Url;
 
 use crate::{
-    application::{PersistCacheError, Populate, RequestError, RequestId, RequestKind},
+    application::{Generation, PersistCacheError, Populate, RequestError, RequestId, RequestKind},
     auth::{AuthenticationProvider, Credential, CredentialError, Verified},
     interact::{OpenBrowserError, OpenEditorError},
     types::gh::{IssueContext, Notification, NotificationId, PullRequestContext},
@@ -49,6 +49,7 @@ pub(crate) enum FeedRequestEvent {
         url: FeedUrl,
     },
     SubscriptionFetched {
+        generation: Generation,
         populate: Populate,
         subscription: payload::SubscriptionPayload,
     },
@@ -66,14 +67,17 @@ pub(crate) enum FeedRequestEvent {
 #[derive(Debug)]
 pub(crate) enum GhEvent {
     NotificationsFetched {
+        generation: Generation,
         populate: Populate,
         notifications: Vec<Notification>,
     },
     IssueFetched {
+        generation: Generation,
         notification_id: NotificationId,
         issue: IssueContext,
     },
     PullRequestFetched {
+        generation: Generation,
         notification_id: NotificationId,
         pull_request: PullRequestContext,
     },
@@ -128,7 +132,6 @@ pub(crate) enum Event {
     Feeds(FeedsEvent),
     Gh {
         request_id: RequestId,
-        generation: Option<u64>,
         event: GhEvent,
     },
 

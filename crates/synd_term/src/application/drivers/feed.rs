@@ -4,8 +4,8 @@ use synd_feed::types::FeedUrl;
 use tracing::debug;
 
 use crate::{
-    application::{FeedApiRef, Populate, RequestError},
-    event::FeedRequestEvent,
+    application::{FeedApiRef, Generation, Populate, RequestError, RequestKind},
+    event::{Event, FeedRequestEvent, FeedsEvent},
 };
 
 use super::{
@@ -40,92 +40,113 @@ impl FeedDriver {
 
     pub(super) fn subscribe_feed(
         &self,
+        context: RequestContext,
         input: payload::SubscribeFeedInput,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
-        move |context| {
+        (
+            RequestKind::SubscribeFeed {
+                url: input.url.clone(),
+            },
             async move {
                 let url = input.url.clone();
                 api.subscribe_feed(input)
                     .await
                     .map_err(RequestError::SyndApi)?;
-                context.emit_feeds(FeedRequestEvent::FeedSubscribed { url });
+                emit_feed_event(&context, FeedRequestEvent::FeedSubscribed { url });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     pub(super) fn unsubscribe_feed(
         &self,
+        context: RequestContext,
         url: FeedUrl,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
-        move |context| {
+        (
+            RequestKind::UnsubscribeFeed { url: url.clone() },
             async move {
                 api.unsubscribe_feed(url.clone())
                     .await
                     .map_err(RequestError::SyndApi)?;
-                context.emit_feeds(FeedRequestEvent::FeedUnsubscribed { url });
+                emit_feed_event(&context, FeedRequestEvent::FeedUnsubscribed { url });
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     pub(super) fn fetch_subscription(
         &self,
+        context: RequestContext,
+        generation: Generation,
         populate: Populate,
         after: Option<String>,
         first: i64,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
-        move |context| {
+        (
+            RequestKind::FetchSubscription { generation },
             async move {
                 let subscription = api
                     .fetch_subscription(after, Some(first))
                     .await
                     .map_err(RequestError::SyndApi)?;
-                context.emit_feeds(FeedRequestEvent::SubscriptionFetched {
-                    populate,
-                    subscription,
-                });
+                emit_feed_event(
+                    &context,
+                    FeedRequestEvent::SubscriptionFetched {
+                        generation,
+                        populate,
+                        subscription,
+                    },
+                );
                 Ok(())
             }
-            .boxed()
-        }
+            .boxed(),
+        )
     }
 
     /// Fetches one bounded timeline window while keeping cursor pagination private.
     pub(super) fn fetch_timeline_window(
         &self,
+        context: RequestContext,
         limit: usize,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
-        move |context| {
+        (
+            RequestKind::FetchTimelineWindow { limit },
             TimelineWindowRequest::new(api, context, limit)
                 .run()
-                .boxed()
-        }
+                .boxed(),
+        )
     }
 
     /// Fetches and coalesces all timeline changes after `since`.
     pub(super) fn catch_up_timeline(
         &self,
+        context: RequestContext,
         since: i64,
-    ) -> impl FnOnce(RequestContext) -> RequestFuture + use<> {
+    ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
-        move |context| {
+        (
+            RequestKind::CatchUpTimeline { since },
             TimelineCatchUpRequest::new(api, context, since)
                 .run()
-                .boxed()
-        }
+                .boxed(),
+        )
     }
+}
+
+fn emit_feed_event(context: &RequestContext, event: FeedRequestEvent) {
+    context.emit(|request_id| Event::Feeds(FeedsEvent::Request { request_id, event }));
 }
 
 /// Owns cursor and base-sequence invariants for one bounded timeline request.
@@ -171,16 +192,16 @@ impl TimelineWindowRequest {
     fn apply(&mut self, advance: TimelineWindowAdvance) -> Result<PageFlow, RequestError> {
         match advance {
             TimelineWindowAdvance::Complete { chunk } => {
-                self.context.emit_feeds(chunk.into());
+                emit_feed_event(&self.context, chunk.into());
                 Ok(PageFlow::Complete)
             }
             TimelineWindowAdvance::More { next_state, chunk } => {
                 self.state = next_state;
-                self.context.emit_feeds(chunk.into());
+                emit_feed_event(&self.context, chunk.into());
                 Ok(PageFlow::More)
             }
             TimelineWindowAdvance::Failed { chunk, error } => {
-                self.context.emit_feeds(chunk.into());
+                emit_feed_event(&self.context, chunk.into());
                 Err(RequestError::SyndApi(error))
             }
         }
@@ -315,7 +336,7 @@ impl TimelineCatchUpRequest {
             let advance = TimelineCatchUpAdvance::from(page);
             let flow = self.state.apply(advance);
             if flow.is_complete() {
-                self.context.emit_feeds(self.state.into());
+                emit_feed_event(&self.context, self.state.into());
                 return Ok(());
             }
         }

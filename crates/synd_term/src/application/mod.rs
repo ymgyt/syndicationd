@@ -13,7 +13,7 @@ pub(crate) use direction::Direction;
 use throbber::Throbber;
 
 mod request;
-pub(crate) use request::{RequestError, RequestId, RequestKind};
+pub(crate) use request::{Generation, RequestError, RequestId, RequestKind};
 
 mod in_flight;
 pub(crate) use in_flight::{InFlightRequests, InFlightStatus, RequestProgress};
