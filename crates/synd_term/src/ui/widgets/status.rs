@@ -35,16 +35,17 @@ impl StatusLineWidget {
         self.error_message = None;
     }
 
-    pub fn render(
+    pub(crate) fn render(
         &self,
         area: Rect,
         buf: &mut Buffer,
         cx: &Context<'_>,
+        in_flight: Option<InFlightStatus<'_>>,
         hints: impl FnOnce() -> Vec<KeyHint>,
     ) {
         if let Some(error_message) = self.error_message.as_ref() {
             Self::render_error(area, buf, cx, error_message);
-        } else if let Some(status) = cx.in_flight.status() {
+        } else if let Some(status) = in_flight {
             Self::render_in_flight(area, buf, cx, &status);
         } else {
             Self::render_key_hints(area, buf, cx, hints());

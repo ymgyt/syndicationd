@@ -4,7 +4,7 @@ use crate::{
     application::{ComponentId, Direction},
     command::{
         Command, FeedsCommand, FilterCommand, GhCommand, GhFilterCommand,
-        GhNotificationFilterOption, ListCommand, ShellCommand, UnsubscribeCommand,
+        GhNotificationFilterOption, ListCommand, LoginCommand, ShellCommand, UnsubscribeCommand,
     },
     types::gh::{PullRequestState, Reason, RepoVisibility},
 };
@@ -196,15 +196,15 @@ impl CommandId {
             Self::Quit => Command::Shell(ShellCommand::Quit),
             Self::ForceRedraw => Command::Shell(ShellCommand::ForceRedraw),
             Self::RotateTheme => Command::Shell(ShellCommand::RotateTheme),
-            Self::Authenticate => Command::Shell(ShellCommand::Authenticate),
+            Self::Authenticate => Command::Login(LoginCommand::Authenticate),
             Self::MoveAuthenticationProviderPrev => {
-                Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Up))
+                Command::Login(LoginCommand::MoveProvider(Direction::Up))
             }
             Self::MoveAuthenticationProviderNext => {
-                Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Down))
+                Command::Login(LoginCommand::MoveProvider(Direction::Down))
             }
-            Self::MoveTabPrev => Command::Shell(ShellCommand::MoveTabSelection(Direction::Left)),
-            Self::MoveTabNext => Command::Shell(ShellCommand::MoveTabSelection(Direction::Right)),
+            Self::MoveTabPrev => Command::MoveTab(Direction::Left),
+            Self::MoveTabNext => Command::MoveTab(Direction::Right),
             Self::RefreshTimeline => Command::Feeds(FeedsCommand::RefreshTimeline),
             Self::OpenEntry => Command::Feeds(FeedsCommand::OpenEntry),
             Self::BrowseEntry => Command::Feeds(FeedsCommand::BrowseEntry),

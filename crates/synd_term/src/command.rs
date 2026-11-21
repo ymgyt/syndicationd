@@ -21,6 +21,8 @@ pub(crate) enum Command {
         command: ListCommand,
     },
     Shell(ShellCommand),
+    Login(LoginCommand),
+    MoveTab(Direction),
     Feeds(FeedsCommand),
     Filter(FilterCommand),
     Gh(GhCommand),
@@ -38,11 +40,14 @@ pub(crate) enum ListCommand {
 pub(crate) enum ShellCommand {
     ShowError(String),
     Quit,
-    Authenticate,
-    MoveAuthenticationProvider(Direction),
-    MoveTabSelection(Direction),
     RotateTheme,
     ForceRedraw,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum LoginCommand {
+    Authenticate,
+    MoveProvider(Direction),
 }
 
 #[derive(Debug, Clone, Copy)]

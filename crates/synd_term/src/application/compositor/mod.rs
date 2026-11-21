@@ -15,8 +15,8 @@ use crate::{
 };
 
 use super::{
-    Config, InFlightRequests,
-    component::{AuthenticationState, Components, FrameLayout, RenderContext},
+    Config,
+    component::{Components, FrameLayout, RenderContext},
     overlay::Overlay,
 };
 
@@ -37,7 +37,6 @@ pub(super) struct Compositor {
     overlay: Overlay,
     keymap: Keymap,
     focus: TerminalFocus,
-    in_flight: InFlightRequests,
 }
 
 impl Compositor {
@@ -45,10 +44,10 @@ impl Compositor {
         config: Config,
         theme: Theme,
         categories: Categories,
-        authentication: AuthenticationState,
+        authentication_required: bool,
     ) -> Self {
         let categories = Rc::new(categories);
-        let components = Components::new(&config, &categories, theme, authentication);
+        let components = Components::new(&config, &categories, theme, authentication_required);
         let mut subscribers = HashMap::<_, Vec<_>>::new();
         for id in ComponentId::iter() {
             for &kind in components.get(id).subscriptions() {
@@ -62,7 +61,6 @@ impl Compositor {
             overlay: Overlay::default(),
             keymap: Keymap::new(config.keymaps),
             focus: TerminalFocus::Gained,
-            in_flight: InFlightRequests::new(),
         }
     }
 
@@ -75,29 +73,28 @@ impl Compositor {
     }
 
     pub(super) fn tick(&mut self) {
-        self.in_flight.tick();
+        self.components.shell.tick();
     }
 
     pub(super) fn is_busy(&self) -> bool {
-        !self.in_flight.is_empty()
+        self.components.shell.is_busy()
     }
 
     pub(super) fn render(&self, frame: &mut Frame, now: DateTime<Utc>) {
         let components = &self.components;
         let cx = ui::Context {
             theme: &components.shell.theme,
-            in_flight: &self.in_flight,
             categories: &self.categories,
             focus: self.focus,
             now,
         };
-        let tab = components.shell.visible_tab();
+        let tab = components.visible_tab();
         let cx = RenderContext {
             ui: cx,
             keymap: &self.keymap,
             layers: self.key_layers(),
             frame: FrameLayout::new(frame.area(), tab),
-            shell: &components.shell,
+            filter_target: components.tabs.current().filter_target(),
             gh_options: components.gh.notifications.filter_options(),
         };
         for id in self.overlay.visible(tab) {
@@ -111,7 +108,7 @@ impl Compositor {
             CrosstermEvent::FocusLost => self.focus = TerminalFocus::Lost,
             CrosstermEvent::Key(key) if key.kind != KeyEventKind::Release => {
                 debug!("Handle key event: {key:?}");
-                self.components.shell.prompt.clear_error_message();
+                self.components.shell.dismiss_error();
                 return self
                     .resolve_keymap(*key)
                     .map_or(Operations::Nop, |command| self.apply_command(command));

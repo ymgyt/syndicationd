@@ -4,13 +4,14 @@ use ratatui::{
 };
 
 use super::Component;
-use super::{AuthenticationState, ShellComponent};
 use crate::{
+    application::{Direction, effects::Effects},
+    command::FilterTarget,
+    event::Event,
     keymap::{Keymap, Layer, LayerStack},
     ui::{
         Context,
         widgets::{
-            authentication,
             entries::EntriesWidget,
             gh_notifications::{FilterPopup, GhNotificationFilterOptions},
             tabs::{Tab, TabsWidget},
@@ -51,37 +52,19 @@ pub(in crate::application) struct RenderContext<'a> {
     pub(in crate::application) keymap: &'a Keymap,
     pub(in crate::application) layers: LayerStack,
     pub(in crate::application) frame: FrameLayout,
-    pub(in crate::application) shell: &'a ShellComponent,
+    pub(in crate::application) filter_target: FilterTarget,
     pub(in crate::application) gh_options: &'a GhNotificationFilterOptions,
 }
 
-impl Component for AuthenticationState {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        match self {
-            Self::Required | Self::RequestingDeviceFlow { .. } => authentication::render_login(
-                cx.frame.content,
-                buf,
-                cx.ui.theme,
-                cx.shell.authentication_providers(),
-                cx.shell.selected_authentication_provider_index(),
-            ),
-            Self::DeviceFlow {
-                verification_url,
-                user_code,
-                ..
-            } => authentication::render_device_flow(
-                cx.frame.content,
-                buf,
-                cx.ui.theme,
-                verification_url.as_str(),
-                user_code,
-            ),
-            Self::NotRequired | Self::Authenticated => {}
+impl TabsWidget {
+    pub(super) fn move_tab(&mut self, direction: Direction) -> Effects {
+        let previous = self.current();
+        let tab = self.move_selection(direction);
+        if tab == previous {
+            Effects::NONE
+        } else {
+            Event::TabChanged(tab).into()
         }
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        &[Layer::Login]
     }
 }
 

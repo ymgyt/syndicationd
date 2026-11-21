@@ -1,10 +1,8 @@
 use indexmap::IndexMap;
 
-use crate::event::{AuthEvent, Event, FeedRequestEvent, FeedsEvent, GhEvent};
-
 use super::{RequestId, RequestKind};
 
-/// Application-owned request display state in request emission order.
+/// Requests shown on the status line in request emission order.
 pub(crate) struct InFlightRequests {
     requests: IndexMap<RequestId, InFlightRequest>,
     throbber_step: i8,
@@ -36,33 +34,7 @@ impl InFlightRequests {
         }
     }
 
-    /// Tracks request progress and identifies results subject to the GitHub generation check.
-    pub(super) fn observe<'a>(&'a mut self, event: &'a Event) -> Option<&'a RequestKind> {
-        match event {
-            Event::RequestEmitted { request_id, kind } => self.register(*request_id, kind.clone()),
-            Event::RequestCompleted {
-                request_id, kind, ..
-            } => {
-                assert_eq!(
-                    &self.complete(*request_id),
-                    kind,
-                    "driver completed a different request kind"
-                );
-                return Some(kind);
-            }
-            Event::Auth { request_id, event } => self.correlate_auth_event(*request_id, event),
-            Event::Feeds(FeedsEvent::Request { request_id, event }) => {
-                self.correlate_feed_event(*request_id, event);
-            }
-            Event::Gh { request_id, event } => {
-                return Some(self.correlate_gh_event(*request_id, event));
-            }
-            _ => {}
-        }
-        None
-    }
-
-    fn register(&mut self, request_id: RequestId, kind: RequestKind) {
+    pub(super) fn register(&mut self, request_id: RequestId, kind: RequestKind) {
         let progress = match &kind {
             RequestKind::FetchTimelineWindow { limit } => Some(RequestProgress::TimelineWindow {
                 loaded: 0,
@@ -79,69 +51,14 @@ impl InFlightRequests {
         }
     }
 
-    fn correlate_auth_event(&self, request_id: RequestId, event: &AuthEvent) {
-        match (self.kind(request_id), event) {
-            (
-                RequestKind::StartDeviceFlow { provider: expected },
-                AuthEvent::DeviceFlowAuthorizationReceived { provider, .. },
-            ) => assert_eq!(
-                expected, provider,
-                "device authorization provider did not match its request"
-            ),
-            (
-                RequestKind::PollDeviceFlowAccessToken { .. },
-                AuthEvent::DeviceFlowCredentialReceived { .. },
-            ) => {}
-            _ => panic!("authentication event did not match its request"),
-        }
-    }
-
-    fn correlate_feed_event(&mut self, request_id: RequestId, event: &FeedRequestEvent) {
-        let request = self
-            .requests
+    pub(super) fn advance_timeline_window(&mut self, request_id: RequestId, loaded: usize) {
+        self.requests
             .get_mut(&request_id)
-            .expect("driver emitted a request event for an unknown request");
-        match (&request.kind, event) {
-            (
-                RequestKind::SubscribeFeed { url: expected },
-                FeedRequestEvent::FeedSubscribed { url },
-            ) => assert_eq!(expected, url, "subscribed feed did not match its request"),
-            (
-                RequestKind::UnsubscribeFeed { url: expected },
-                FeedRequestEvent::FeedUnsubscribed { url },
-            ) => assert_eq!(expected, url, "unsubscribed feed did not match its request"),
-            (RequestKind::FetchSubscription, FeedRequestEvent::SubscriptionFetched { .. })
-            | (
-                RequestKind::CatchUpTimeline { .. },
-                FeedRequestEvent::TimelineChangesFetched { .. },
-            ) => {}
-            (
-                RequestKind::FetchTimelineWindow { .. },
-                FeedRequestEvent::TimelineWindowChunkFetched { entries, .. },
-            ) => request.add_timeline_window_chunk(entries.len()),
-            _ => panic!("feed event did not match its request"),
-        }
+            .expect("driver emitted progress for an unknown request")
+            .add_timeline_window_chunk(loaded);
     }
 
-    fn correlate_gh_event(&self, request_id: RequestId, event: &GhEvent) -> &RequestKind {
-        let kind = self.kind(request_id);
-        match (kind, event) {
-            (RequestKind::FetchGhNotifications { .. }, GhEvent::NotificationsFetched { .. })
-            | (RequestKind::FetchGhIssue { .. }, GhEvent::IssueFetched { .. })
-            | (RequestKind::FetchGhPullRequest { .. }, GhEvent::PullRequestFetched { .. }) => {}
-            (
-                RequestKind::MarkGhNotificationAsDone { id: expected },
-                GhEvent::NotificationMarkedAsDone { notification_id },
-            ) => assert_eq!(
-                expected, notification_id,
-                "completed GitHub notification did not match its request"
-            ),
-            _ => panic!("GitHub event did not match its request"),
-        }
-        kind
-    }
-
-    fn complete(&mut self, request_id: RequestId) -> RequestKind {
+    pub(super) fn complete(&mut self, request_id: RequestId) -> RequestKind {
         self.requests
             .shift_remove(&request_id)
             .expect("driver completed an unknown request")
@@ -168,14 +85,6 @@ impl InFlightRequests {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.requests.is_empty()
-    }
-
-    fn kind(&self, request_id: RequestId) -> &RequestKind {
-        &self
-            .requests
-            .get(&request_id)
-            .expect("driver emitted a request event for an unknown request")
-            .kind
     }
 }
 

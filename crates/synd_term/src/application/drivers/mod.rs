@@ -237,7 +237,7 @@ impl Drivers {
         F: FnOnce(RequestContext) -> RequestFuture,
     {
         let request_id = self.assign_request_id();
-        let context = RequestContext::new(request_id, self.event_tx.clone());
+        let context = RequestContext::new(request_id, kind.clone(), self.event_tx.clone());
         let request = make_request(context);
         let completion_tx = self.event_tx.clone();
         self.queue_event(Event::RequestEmitted {

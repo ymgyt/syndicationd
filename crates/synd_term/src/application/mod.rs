@@ -46,7 +46,6 @@ pub(crate) use overlay::ComponentId;
 mod drivers;
 #[cfg(feature = "integration")]
 mod integration;
-use component::AuthenticationState;
 use compositor::Compositor;
 use drivers::{DriverParts, Drivers};
 
@@ -94,13 +93,8 @@ impl Application {
             clock,
             authentication_required,
         } = builder;
-        let authentication = if authentication_required {
-            AuthenticationState::Required
-        } else {
-            AuthenticationState::NotRequired
-        };
         let throbber = Throbber::new(config.throbber_timer_interval);
-        let compositor = Compositor::new(config, theme, categories, authentication);
+        let compositor = Compositor::new(config, theme, categories, authentication_required);
         let drivers = Drivers::new(DriverParts {
             feed_api,
             gh_client,
@@ -130,10 +124,7 @@ impl Application {
     {
         let _terminal = self.terminal.init()?;
         self.restore_gh_filter();
-        if matches!(
-            self.compositor.components.shell.authentication(),
-            AuthenticationState::NotRequired
-        ) {
+        if self.compositor.components.login.has_api_access() {
             let operations = self.compositor.apply_event(&Event::ApiAccessReady);
             self.drivers.dispatch(operations, &mut self.terminal);
         }

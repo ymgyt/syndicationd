@@ -54,6 +54,25 @@ mod bootstrapped_app {
     }
 
     #[tokio::test]
+    async fn status_shows_loaded_timeline_entries_before_completion() {
+        let (_cache_dir, mut app) = start_app();
+        let (_tx, mut input) = event_stream();
+        let progress = format!("Fetch timeline 2/{}", Config::default().entries_limit);
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            app.run_until(&mut input, |buffer| {
+                Screen::new(buffer).contains_text(&progress)
+            }),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(!Screen::new(app.buffer()).contains_text(&progress));
+    }
+
+    #[tokio::test]
     async fn initial_view() {
         let (_cache_dir, mut app) = start_app();
 

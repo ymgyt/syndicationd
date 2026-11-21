@@ -4,7 +4,7 @@ use ratatui::style::{Color, Modifier};
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
-    application::{InFlightRequests, TerminalFocus},
+    application::TerminalFocus,
     config::{Categories, Icon, IconColor},
     types::Time,
     ui::theme::Theme,
@@ -37,7 +37,6 @@ pub fn default_icon() -> &'static Icon {
 
 pub struct Context<'a> {
     pub theme: &'a Theme,
-    pub(crate) in_flight: &'a InFlightRequests,
     pub categories: &'a Categories,
     pub(crate) now: Time,
     pub(crate) focus: TerminalFocus,

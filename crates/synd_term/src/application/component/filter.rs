@@ -1,66 +1,73 @@
 use super::{Component, RenderContext};
 use crate::{
-    application::Populate,
-    event::{Event, EventKind},
-    ui::widgets::filter::{FilterContext, FilterWidget},
-};
-use crate::{
-    application::effects::Effects,
+    application::{Populate, effects::Effects},
     command::{FilterCommand, FilterTarget},
+    event::{Event, EventKind},
     keymap::{Keymap, Layer, LayerKeymap},
+    ui::widgets::{
+        filter::{FilterContext, FilterWidget},
+        tabs::Tab,
+    },
 };
 use ratatui::buffer::Buffer;
 
-use super::ShellComponent;
+impl Tab {
+    pub(in crate::application) fn filter_target(self) -> FilterTarget {
+        match self {
+            Self::Feeds | Self::Entries => FilterTarget::Feeds,
+            Self::Gh => FilterTarget::GhNotifications,
+        }
+    }
+}
 
-impl ShellComponent {
-    pub(in crate::application) fn apply_filter_command(
+impl FilterWidget {
+    pub(super) fn apply_command(
         &mut self,
         command: FilterCommand,
+        current: FilterTarget,
     ) -> Effects {
-        let current = self.current_filter_target();
         let (target, changed) = match command {
             FilterCommand::MoveFilterRequirement(direction) if current == FilterTarget::Feeds => {
-                (current, self.filter.move_requirement(direction))
+                (current, self.move_requirement(direction))
             }
             FilterCommand::ActivateCategoryFiltering => {
-                self.filter.activate_category_filtering(current);
+                self.activate_category_filtering(current);
                 return Effects::NONE;
             }
             FilterCommand::ActivateSearchFiltering => {
-                self.filter.activate_search_filtering();
+                self.activate_search_filtering();
                 return Effects::NONE;
             }
             FilterCommand::DeactivateFiltering => {
-                self.filter.deactivate_filtering();
+                self.deactivate_filtering();
                 return Effects::NONE;
             }
-            FilterCommand::PromptInsertChar(ch) if self.filter.is_search_active() => {
-                self.filter.insert_prompt_char(ch);
+            FilterCommand::PromptInsertChar(ch) if self.is_search_active() => {
+                self.insert_prompt_char(ch);
                 (current, true)
             }
-            FilterCommand::PromptDeleteBackward if self.filter.is_search_active() => {
-                (current, self.filter.delete_prompt_backward())
+            FilterCommand::PromptDeleteBackward if self.is_search_active() => {
+                (current, self.delete_prompt_backward())
             }
             FilterCommand::ToggleFilterCategory { category, target }
-                if self.filter.category_filter_target() == Some(target) =>
+                if self.category_filter_target() == Some(target) =>
             {
-                (target, self.filter.toggle_category_state(&category, target))
+                (target, self.toggle_category_state(&category, target))
             }
             FilterCommand::ActivateAllFilterCategories { target }
-                if self.filter.category_filter_target() == Some(target) =>
+                if self.category_filter_target() == Some(target) =>
             {
-                (target, self.filter.set_all_categories_active(target, true))
+                (target, self.set_all_categories_active(target, true))
             }
             FilterCommand::DeactivateAllFilterCategories { target }
-                if self.filter.category_filter_target() == Some(target) =>
+                if self.category_filter_target() == Some(target) =>
             {
-                (target, self.filter.set_all_categories_active(target, false))
+                (target, self.set_all_categories_active(target, false))
             }
             _ => return Effects::NONE,
         };
         if changed {
-            self.filter.changed(target).into()
+            self.changed(target).into()
         } else {
             Effects::NONE
         }
@@ -69,9 +76,9 @@ impl ShellComponent {
     pub(in crate::application) fn install_filter_keymap(&self, keymap: &mut Keymap) {
         keymap.clear_layer_keymap(Layer::CategoryFilter);
         keymap.clear_layer_keymap(Layer::SearchPrompt);
-        if let Some(categories) = self.filter.category_filter_keymap() {
+        if let Some(categories) = self.category_filter_keymap() {
             keymap.set_layer_keymap(categories);
-        } else if self.filter.is_search_active() {
+        } else if self.is_search_active() {
             keymap.set_layer_keymap(LayerKeymap::search_prompt());
         }
     }
@@ -85,7 +92,7 @@ impl Component for FilterWidget {
             &FilterContext {
                 ui: &cx.ui,
                 gh_options: cx.gh_options,
-                target: cx.shell.current_filter_target(),
+                target: cx.filter_target,
             },
         );
     }

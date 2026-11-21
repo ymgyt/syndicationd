@@ -18,13 +18,6 @@ impl Compositor {
     pub(super) fn notify(&mut self, events: &[Event]) -> Vec<ComponentEffects> {
         let mut replies = Vec::new();
         for event in events {
-            if self
-                .in_flight
-                .observe(event)
-                .is_some_and(|kind| self.components.gh.is_stale(kind))
-            {
-                continue;
-            }
             let subscribers = self
                 .subscribers
                 .get(&EventKind::from(event))

@@ -109,6 +109,8 @@ pub(crate) enum Event {
         categories: Vec<Category<'static>>,
     },
     ApiAccessReady,
+    /// A replacement credential is now in use for an already authenticated API.
+    ApiAccessRefreshed,
     RequestEmitted {
         request_id: RequestId,
         kind: RequestKind,
@@ -126,6 +128,7 @@ pub(crate) enum Event {
     Feeds(FeedsEvent),
     Gh {
         request_id: RequestId,
+        generation: Option<u64>,
         event: GhEvent,
     },
 
@@ -156,6 +159,7 @@ impl Display for Event {
             Self::GhFilterChanged(_) => f.write_str("GhFilterChanged"),
             Self::FeedCategoriesChanged(_) => f.write_str("FeedCategoriesChanged"),
             Self::GhCategoriesChanged { .. } => f.write_str("GhCategoriesChanged"),
+            Self::ApiAccessRefreshed => f.write_str("ApiAccessRefreshed"),
             Self::ApiAccessReady => f.write_str("ApiAccessReady"),
             Self::TabChanged(tab) => write!(f, "TabChanged({tab:?})"),
             Self::RequestEmitted { request_id, kind } => {
@@ -178,7 +182,9 @@ impl Display for Event {
                 write!(f, "Feeds::Request({request_id:?}, {})", event.name())
             }
             Self::Feeds(FeedsEvent::Push { .. }) => f.write_str("Feeds::Push"),
-            Self::Gh { request_id, event } => {
+            Self::Gh {
+                request_id, event, ..
+            } => {
                 write!(f, "Gh({request_id:?}, {})", event.name())
             }
             Self::FeedSubscriptionEditorClosed { .. } => {

@@ -12,7 +12,7 @@ use super::Compositor;
 impl Compositor {
     pub(super) fn key_layers(&self) -> LayerStack {
         let mut layers = LayerStack::default();
-        for id in self.overlay.visible(self.components.shell.visible_tab()) {
+        for id in self.overlay.visible(self.components.visible_tab()) {
             let component = self.components.get(id);
             component.mask_lower_layers(&mut layers);
             layers.extend(component.key_layers());
@@ -22,14 +22,14 @@ impl Compositor {
 
     pub(super) fn sync_keymap(&mut self) {
         self.components
-            .shell
+            .filter
             .install_filter_keymap(&mut self.keymap);
         self.keymap.sync_layers(&self.key_layers());
     }
 
     fn owner(&self, layer: Layer) -> ComponentId {
         self.overlay
-            .visible(self.components.shell.visible_tab())
+            .visible(self.components.visible_tab())
             .rev()
             .find(|id| self.components.get(*id).key_layers().contains(&layer))
             .expect("matched layer has a visible owner")

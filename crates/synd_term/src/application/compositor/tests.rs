@@ -8,12 +8,95 @@ use crate::{
 };
 
 fn new_compositor(config: Config) -> Compositor {
-    Compositor::new(
-        config,
+    Compositor::new(config, Theme::default(), Categories::default_toml(), false)
+}
+
+#[test]
+fn failed_login_shows_the_error_and_allows_retry_with_the_selected_provider() {
+    use crate::{
+        application::RequestError, auth::AuthenticationProvider, test_support::screen::Screen,
+    };
+    use ratatui::{Terminal, backend::TestBackend};
+
+    let mut compositor = Compositor::new(
+        Config::default(),
         Theme::default(),
         Categories::default_toml(),
-        AuthenticationState::NotRequired,
-    )
+        true,
+    );
+    let _ = compositor.apply_terminal_event(&key!('j'));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!(enter)),
+        Operations::One(Operation::StartDeviceFlow {
+            provider: AuthenticationProvider::Google
+        })
+    ));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!(enter)),
+        Operations::Nop
+    ));
+
+    let request_id = RequestId::new(1);
+    let kind = RequestKind::StartDeviceFlow {
+        provider: AuthenticationProvider::Google,
+    };
+    let _ = compositor.apply_event(&Event::RequestEmitted {
+        request_id,
+        kind: kind.clone(),
+    });
+    let _ = compositor.apply_event(&Event::RequestCompleted {
+        request_id,
+        kind,
+        result: Err(RequestError::Authentication(anyhow::anyhow!(
+            "authorization unavailable"
+        ))),
+    });
+
+    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+    let frame = terminal
+        .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
+        .unwrap();
+    assert!(Screen::new(frame.buffer).contains_text("authorization unavailable"));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!(enter)),
+        Operations::One(Operation::StartDeviceFlow {
+            provider: AuthenticationProvider::Google
+        })
+    ));
+}
+
+#[test]
+fn replacing_a_credential_catches_up_the_existing_timeline() {
+    let mut compositor = Compositor::new(
+        Config::default(),
+        Theme::default(),
+        Categories::default_toml(),
+        true,
+    );
+    let Operations::Many(initial) = compositor.apply_event(&Event::ApiCredentialConfigured) else {
+        panic!("first credential should start feed synchronization");
+    };
+    assert!(matches!(
+        initial.as_slice(),
+        [
+            Operation::WatchFeedEvents,
+            Operation::FetchSubscription { .. },
+            Operation::FetchTimelineWindow { .. },
+        ]
+    ));
+
+    let feeds = &mut compositor.components.feeds;
+    feeds.apply_timeline_window_chunk(Vec::new(), 42);
+    assert!(matches!(
+        feeds.complete_timeline_window(true),
+        Some(Operation::CatchUpTimeline { since: 42 })
+    ));
+    assert!(feeds.complete_timeline_catch_up(true).is_none());
+
+    assert!(matches!(
+        compositor.apply_event(&Event::ApiCredentialConfigured),
+        Operations::One(Operation::CatchUpTimeline { since: 42 })
+    ));
 }
 
 #[test]
@@ -126,6 +209,7 @@ fn deliver_page(
 ) -> Operations {
     let operations = compositor.apply_event(&Event::Gh {
         request_id: page.id,
+        generation: page.kind.gh_generation(),
         event: GhEvent::NotificationsFetched {
             populate: page.populate,
             notifications: vec![notification(notification_id)],
@@ -175,6 +259,55 @@ fn previous_lists_next_page_arriving_after_reload_is_ignored() {
     let list = &compositor.components.gh.notifications;
     assert_eq!(list.notification_ids(), vec![2u64.into()]);
     assert_eq!(list.fetch_next_if_needed().unwrap().page, 2);
+}
+
+#[test]
+fn failed_page_from_previous_list_finishes_without_disturbing_the_current_fetch() {
+    use crate::{application::RequestError, client::gh::GhError, test_support::screen::Screen};
+    use ratatui::{Terminal, backend::TestBackend};
+
+    let mut compositor = new_compositor(Config {
+        features: Features {
+            enable_gh_notification: true,
+        },
+        ..Config::default()
+    });
+    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+    let mut status = |compositor: &Compositor| {
+        let frame = terminal
+            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
+            .unwrap();
+        Screen::new(frame.buffer).lines().pop().unwrap()
+    };
+    let failure = |page: PageRequest| Event::RequestCompleted {
+        request_id: page.id,
+        kind: page.kind,
+        result: Err(RequestError::Gh(GhError::SecondaryRateLimit)),
+    };
+
+    let fetch = compositor.apply_terminal_event(&key!('r'));
+    let old = start_page(&mut compositor, RequestId::new(1), fetch);
+    let fetch = compositor.apply_terminal_event(&key!('r'));
+    let current = start_page(&mut compositor, RequestId::new(2), fetch);
+    assert!(status(&compositor).contains("(+1)"));
+
+    let _ = compositor.apply_event(&failure(old));
+    let remaining = status(&compositor);
+    assert!(remaining.contains("Fetch GitHub notifications page 1"));
+    assert!(!remaining.contains("(+1)"));
+    let _ = compositor.apply_terminal_event(&key!('/'));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!('x')),
+        Operations::Nop
+    ));
+
+    let _ = compositor.apply_event(&failure(current));
+    assert!(!compositor.is_busy());
+    assert!(status(&compositor).contains("secondary rate limits exceeded"));
+    assert!(matches!(
+        compositor.apply_terminal_event(&key!('y')),
+        Operations::One(Operation::FetchGhNotifications { .. })
+    ));
 }
 
 #[test]

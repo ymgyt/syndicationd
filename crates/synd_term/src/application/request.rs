@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use itertools::Itertools;
 use synd_client::SyndApiError;
 use synd_feed::types::FeedUrl;
 
@@ -37,6 +38,16 @@ pub(crate) enum RequestKind {
 }
 
 impl RequestKind {
+    /// The notification list a GitHub read was issued for. Mutations apply across reloads.
+    pub(super) fn gh_generation(&self) -> Option<u64> {
+        match self {
+            Self::FetchGhNotifications { generation, .. }
+            | Self::FetchGhIssue { generation, .. }
+            | Self::FetchGhPullRequest { generation, .. } => Some(*generation),
+            _ => None,
+        }
+    }
+
     pub(crate) fn label(&self) -> Cow<'static, str> {
         match self {
             Self::StartDeviceFlow { .. } => Cow::Borrowed("Request device authorization"),
@@ -71,4 +82,29 @@ pub(crate) enum RequestError {
     SyndApi(SyndApiError),
     Authentication(anyhow::Error),
     Gh(GhError),
+}
+
+pub(super) fn synd_api_error_message(error: &SyndApiError) -> String {
+    match error {
+        SyndApiError::Unauthorized { url } => format!(
+            "{} unauthorized. local feed API session is invalid",
+            url.as_ref().map_or_default(ToString::to_string),
+        ),
+        SyndApiError::BuildRequest(error) => {
+            format!("build request failed: {error} this is a BUG")
+        }
+        SyndApiError::SendRequest(error) => format!("request failed: {error}"),
+        SyndApiError::DecodeResponse(error) => {
+            format!("decode response failed: {error}")
+        }
+        SyndApiError::HttpStatus { status, url } => format!(
+            "HTTP status client error ({status}) for url ({})",
+            url.as_ref().map_or_default(ToString::to_string)
+        ),
+        SyndApiError::Graphql { errors } => errors.iter().map(ToString::to_string).join(", "),
+        SyndApiError::OpenSession(error) => format!("session open rejected: {error:?}"),
+        SyndApiError::RenewSession(error) => format!("session renew rejected: {error:?}"),
+        SyndApiError::CloseSession(error) => format!("session close rejected: {error:?}"),
+        _ => error.to_string(),
+    }
 }

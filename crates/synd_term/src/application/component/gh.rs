@@ -1,8 +1,8 @@
 use super::{Component, RenderContext};
 use crate::{
-    application::{Populate, RequestKind, effects::Effects},
+    application::{Populate, RequestError, RequestKind, effects::Effects},
     client::gh::FetchNotificationsParams,
-    command::{GhCommand, GhNotificationFilterOption},
+    command::{Command, GhCommand, GhNotificationFilterOption},
     operation::{Operation, Operations},
     types::gh::{Notification, NotificationDetails, ThreadId},
     ui::widgets::gh_notifications::{
@@ -180,17 +180,8 @@ impl GhComponent {
         }
     }
 
-    pub(in crate::application) fn is_stale(&self, kind: &RequestKind) -> bool {
-        match kind {
-            RequestKind::FetchGhNotifications { generation, .. }
-            | RequestKind::FetchGhIssue { generation, .. }
-            | RequestKind::FetchGhPullRequest { generation, .. } => *generation != self.generation,
-            _ => false,
-        }
-    }
-
-    pub(in crate::application) fn page_failed(&mut self) {
-        self.page_pending = false;
+    fn accepts_generation(&self, generation: Option<u64>) -> bool {
+        generation.is_none_or(|generation| generation == self.generation)
     }
 }
 
@@ -222,14 +213,18 @@ impl Component for GhComponent {
                 Effects::operations(self.fetch_next_notifications_if_needed())
             }
             Event::RequestCompleted {
-                kind: RequestKind::FetchGhNotifications { .. },
-                result: Err(_),
+                kind,
+                result: Err(RequestError::Gh(error)),
                 ..
-            } => {
-                self.page_failed();
-                Effects::NONE
+            } if self.accepts_generation(kind.gh_generation()) => {
+                if matches!(kind, RequestKind::FetchGhNotifications { .. }) {
+                    self.page_pending = false;
+                }
+                Command::show_request_error(kind, error.to_string()).into()
             }
-            Event::Gh { event, .. } => self.apply_gh_event(event),
+            Event::Gh {
+                generation, event, ..
+            } if self.accepts_generation(*generation) => self.apply_gh_event(event),
             _ => Effects::NONE,
         }
     }

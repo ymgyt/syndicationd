@@ -9,7 +9,10 @@ use url::Url;
 
 use super::{Component, RenderContext};
 use crate::{
-    application::{Config, Populate, RequestKind, effects::Effects, input_parser::InputParser},
+    application::{
+        Config, Populate, RequestError, RequestKind, effects::Effects, input_parser::InputParser,
+        request::synd_api_error_message,
+    },
     command::{Command, FeedsCommand, ShellCommand, UnsubscribeCommand, UnsubscribeTarget},
     config::Categories,
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
@@ -278,6 +281,7 @@ impl Component for FeedsComponent {
     fn subscriptions(&self) -> &'static [EventKind] {
         &[
             EventKind::ApiAccessReady,
+            EventKind::ApiAccessRefreshed,
             EventKind::TabChanged,
             EventKind::FeedFilterChanged,
             EventKind::Feeds,
@@ -290,6 +294,7 @@ impl Component for FeedsComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::ApiAccessReady => Effects::operations(self.bootstrap()),
+            Event::ApiAccessRefreshed => Effects::operations(self.refresh_timeline()),
             Event::TabChanged(Tab::Feeds) if !self.subscription.has_subscription() => {
                 Effects::operations(self.reload_subscription())
             }
@@ -309,16 +314,26 @@ impl Component for FeedsComponent {
                 debug!(changed_at = %event.changed_at, affected_feeds = ?event.affected_feeds, "timeline changed");
                 Effects::operations(self.refresh_timeline())
             }
-            Event::RequestCompleted {
-                kind: RequestKind::FetchTimelineWindow { .. },
-                result,
-                ..
-            } => Effects::operations(self.complete_timeline_window(result.is_ok())),
-            Event::RequestCompleted {
-                kind: RequestKind::CatchUpTimeline { .. },
-                result,
-                ..
-            } => Effects::operations(self.complete_timeline_catch_up(result.is_ok())),
+            Event::RequestCompleted { kind, result, .. } => {
+                let follow_up = match kind {
+                    RequestKind::FetchTimelineWindow { .. } => {
+                        self.complete_timeline_window(result.is_ok())
+                    }
+                    RequestKind::CatchUpTimeline { .. } => {
+                        self.complete_timeline_catch_up(result.is_ok())
+                    }
+                    _ => None,
+                };
+                let effects = Effects::operations(follow_up);
+                if let Err(RequestError::SyndApi(error)) = result {
+                    effects.with_command(Command::show_request_error(
+                        kind,
+                        synd_api_error_message(error),
+                    ))
+                } else {
+                    effects
+                }
+            }
             Event::FeedSubscriptionEditorClosed { input }
             | Event::FeedEditionEditorClosed { input } => {
                 match InputParser::new(input).parse_feed_subscription(&self.categories) {
