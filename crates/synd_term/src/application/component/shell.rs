@@ -1,19 +1,20 @@
 use url::Url;
 
 use crate::{
+    application::compositor::Effects,
     application::{
         Direction, Features, InFlightRequests, RequestError, RequestKind, TerminalFocus,
         state::State,
     },
     auth::AuthenticationProvider,
-    command::FilterTarget,
+    command::{FilterTarget, ShellCommand},
     config::Categories,
-    event::{AuthEvent, OperationError},
+    event::{AuthEvent, Event, OperationError},
     operation::Operation,
     ui::{
         theme::{Palette, Theme},
         widgets::{
-            filter::{FilterWidget, Filterer},
+            filter::FilterWidget,
             status::StatusLineWidget,
             tabs::{Tab, TabsWidget},
         },
@@ -194,15 +195,17 @@ impl ShellComponent {
         }
     }
 
-    pub(crate) fn authentication(&self) -> &AuthenticationState {
-        &self.authentication
+    pub(in crate::application) fn visible_tab(&self) -> Option<Tab> {
+        match self.authentication() {
+            AuthenticationState::NotRequired | AuthenticationState::Authenticated => {
+                Some(self.tabs.current())
+            }
+            _ => None,
+        }
     }
 
-    pub(in crate::application) fn permits_main_ui(&self) -> bool {
-        matches!(
-            self.authentication,
-            AuthenticationState::NotRequired | AuthenticationState::Authenticated
-        )
+    pub(crate) fn authentication(&self) -> &AuthenticationState {
+        &self.authentication
     }
 
     pub(crate) fn authentication_providers(&self) -> &[AuthenticationProvider] {
@@ -250,8 +253,8 @@ impl ShellComponent {
         self.state.should_quit = true;
     }
 
-    pub(in crate::application) fn take_should_quit(&mut self) -> bool {
-        std::mem::take(&mut self.state.should_quit)
+    pub(in crate::application) fn should_quit(&self) -> bool {
+        self.state.should_quit
     }
 
     pub(in crate::application) fn focus(&self) -> TerminalFocus {
@@ -276,19 +279,26 @@ impl ShellComponent {
         );
     }
 
-    pub(in crate::application) fn move_tab_selection(&mut self, direction: Direction) -> Tab {
-        self.tabs.move_selection(direction)
-    }
-
-    pub(in crate::application) fn move_filter_requirement(
-        &mut self,
-        direction: Direction,
-    ) -> Filterer {
-        self.filter.move_requirement(direction)
-    }
-
-    pub(in crate::application) fn active_filterer(&self) -> Filterer {
-        self.filter.filterer(self.current_filter_target())
+    pub(in crate::application) fn apply_command(&mut self, command: ShellCommand) -> Effects {
+        match command {
+            ShellCommand::Quit => self.quit(),
+            ShellCommand::Authenticate => return Effects::operations(self.start_authentication()),
+            ShellCommand::MoveAuthenticationProvider(direction) => {
+                self.move_authentication_provider(direction);
+            }
+            ShellCommand::MoveTabSelection(direction) => {
+                let previous = self.tabs.current();
+                let tab = self.tabs.move_selection(direction);
+                if tab != previous {
+                    return Event::TabChanged(tab).into();
+                }
+            }
+            ShellCommand::RotateTheme => self.rotate_theme(),
+            ShellCommand::ForceRedraw => {
+                return Effects::operations(Operation::ForceRedrawTerminal);
+            }
+        }
+        Effects::NONE
     }
 
     pub(crate) fn current_filter_target(&self) -> FilterTarget {

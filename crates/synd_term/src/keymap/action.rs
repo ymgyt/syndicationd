@@ -1,5 +1,6 @@
 use synd_feed::types::Category;
 
+use crate::application::ComponentId;
 use crate::command::{Command, FilterCommand, FilterTarget};
 
 use super::CommandId;
@@ -13,9 +14,9 @@ pub(crate) enum KeymapAction {
 }
 
 impl KeymapAction {
-    pub(crate) fn build_command(&self) -> Command {
+    pub(crate) fn build_command(&self, owner: ComponentId) -> Command {
         match self {
-            Self::Command(command) => Command::from(*command),
+            Self::Command(command) => command.command(owner),
             Self::Prompt(action) => Command::Filter(action.clone().into()),
             Self::Filter(action) => Command::Filter(action.clone().into()),
         }

@@ -4,11 +4,13 @@ use tracing::warn;
 use url::Url;
 
 use crate::{
-    application::{Direction, Populate, input_parser::InputParser},
+    application::{
+        ComponentId, Direction, Populate, compositor::Effects, input_parser::InputParser,
+    },
+    command::{Command, FeedsCommand},
     operation::{Operation, Operations},
     ui::widgets::{
-        entries::EntriesWidget,
-        subscription::{SubscriptionWidget, UnsubscribeSelection},
+        entries::EntriesWidget, filter::FeedFilterer, subscription::SubscriptionWidget, tabs::Tab,
     },
 };
 
@@ -29,6 +31,44 @@ pub(crate) struct FeedsComponent {
 }
 
 impl FeedsComponent {
+    pub(in crate::application) fn apply_command(
+        &mut self,
+        command: FeedsCommand,
+        feeds_first: i64,
+    ) -> Effects {
+        let operations = match command {
+            FeedsCommand::PromptFeedSubscription => Operation::OpenFeedSubscriptionEditor.into(),
+            FeedsCommand::PromptFeedEdition => self.edit_selected_feed().into(),
+            FeedsCommand::PromptFeedUnsubscription => {
+                return if self.subscription.open_unsubscribe_popup() {
+                    Effects::NONE.with_command(Command::Open(ComponentId::UnsubscribePopup))
+                } else {
+                    Effects::NONE
+                };
+            }
+            FeedsCommand::MoveFeedUnsubscriptionPopupSelection(direction) => {
+                self.move_unsubscribe_popup_selection(direction);
+                Operations::Nop
+            }
+            FeedsCommand::SelectFeedUnsubscriptionPopup => {
+                let operation = self.selected_unsubscribe_operation();
+                self.subscription.close_unsubscribe_popup();
+                return Effects::operations(operation)
+                    .with_command(Command::Close(ComponentId::UnsubscribePopup));
+            }
+            FeedsCommand::CancelFeedUnsubscriptionPopup => {
+                self.subscription.close_unsubscribe_popup();
+                return Effects::NONE.with_command(Command::Close(ComponentId::UnsubscribePopup));
+            }
+            FeedsCommand::ReloadSubscription => Self::reload_subscription(feeds_first).into(),
+            FeedsCommand::OpenFeed => self.open_selected_feed().into(),
+            FeedsCommand::RefreshTimeline => self.refresh_timeline().into(),
+            FeedsCommand::OpenEntry => self.open_selected_entry().into(),
+            FeedsCommand::BrowseEntry => self.browse_selected_entry(),
+        };
+        Effects::operations(operations)
+    }
+
     pub(super) fn new() -> Self {
         Self {
             subscription: SubscriptionWidget::new(),
@@ -37,34 +77,22 @@ impl FeedsComponent {
         }
     }
 
-    pub(in crate::application) fn move_subscription(&mut self, direction: Direction) {
-        self.subscription.move_selection(direction);
+    pub(in crate::application) fn apply_filter(&mut self, filter: FeedFilterer) {
+        self.entries.update_filterer(filter.clone());
+        self.subscription.update_filterer(filter);
     }
 
-    pub(in crate::application) fn has_subscription(&self) -> bool {
-        self.subscription.has_subscription()
+    pub(in crate::application) fn tab_changed(
+        &self,
+        tab: Tab,
+        feeds_first: i64,
+    ) -> Option<Operation> {
+        (tab == Tab::Feeds && !self.subscription.has_subscription())
+            .then(|| Self::reload_subscription(feeds_first))
     }
 
     pub(in crate::application) fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
         self.subscription.is_already_subscribed(url)
-    }
-
-    pub(in crate::application) fn move_subscription_first(&mut self) {
-        self.subscription.move_first();
-    }
-
-    pub(in crate::application) fn move_subscription_last(&mut self) {
-        self.subscription.move_last();
-    }
-
-    pub(in crate::application) fn open_unsubscribe_popup(&mut self) {
-        if self.subscription.selected_feed().is_some() {
-            self.subscription.toggle_unsubscribe_popup(true);
-        }
-    }
-
-    pub(in crate::application) fn is_unsubscribe_popup_open(&self) -> bool {
-        self.subscription.unsubscribe_popup_selection().1.is_some()
     }
 
     pub(in crate::application) fn move_unsubscribe_popup_selection(
@@ -76,18 +104,10 @@ impl FeedsComponent {
     }
 
     pub(in crate::application) fn selected_unsubscribe_operation(&self) -> Option<Operation> {
-        let (UnsubscribeSelection::Yes, Some(feed)) =
-            self.subscription.unsubscribe_popup_selection()
-        else {
-            return None;
-        };
+        let feed = self.subscription.confirmed_unsubscribe_target()?;
         Some(Operation::UnsubscribeFeed {
             url: feed.url.clone(),
         })
-    }
-
-    pub(in crate::application) fn close_unsubscribe_popup(&mut self) {
-        self.subscription.toggle_unsubscribe_popup(false);
     }
 
     pub(in crate::application) fn edit_selected_feed(&self) -> Option<Operation> {
@@ -269,18 +289,6 @@ impl FeedsComponent {
             self.timeline = TimelineState::Ready { seq };
             None
         }
-    }
-
-    pub(in crate::application) fn move_entry(&mut self, direction: Direction) {
-        self.entries.move_selection(direction);
-    }
-
-    pub(in crate::application) fn move_entry_first(&mut self) {
-        self.entries.move_first();
-    }
-
-    pub(in crate::application) fn move_entry_last(&mut self) {
-        self.entries.move_last();
     }
 
     #[cfg(feature = "integration")]

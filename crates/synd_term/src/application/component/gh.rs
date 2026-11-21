@@ -1,9 +1,10 @@
 use crate::{
-    application::{Direction, Populate},
+    application::{ComponentId, Populate, RequestKind, compositor::Effects},
     client::gh::FetchNotificationsParams,
-    command::GhNotificationFilterOption,
+    command::{Command, GhCommand, GhNotificationFilterOption},
     operation::{Operation, Operations},
     types::gh::{Notification, NotificationDetails, ThreadId},
+    ui::widgets::filter::CategoryAndMatcherFilterer,
     ui::widgets::gh_notifications::{
         GhNotificationFilterOptions, GhNotificationsWidget, NotificationPageUpdate,
     },
@@ -11,13 +12,42 @@ use crate::{
 
 /// GitHub notification state machine.
 pub(crate) struct GhComponent {
+    generation: u64,
+    page_pending: bool,
     pub(crate) notifications: GhNotificationsWidget,
 }
 
 impl GhComponent {
+    pub(in crate::application) fn apply_command(&mut self, command: GhCommand) -> Effects {
+        let operations = match command {
+            GhCommand::OpenNotification => self.open_selected_notification().into(),
+            GhCommand::OpenNotificationAndMarkAsDone => {
+                self.open_selected_notification_and_mark_as_done().into()
+            }
+            GhCommand::ReloadNotifications => self.reload_notifications().into(),
+            GhCommand::MarkNotificationAsDone => self.mark_selected_notification_as_done().into(),
+            GhCommand::MarkAllNotificationsAsDone => self.mark_all_notifications_as_done().into(),
+            GhCommand::UnsubscribeThread => self.unsubscribe_selected_thread().into(),
+            GhCommand::OpenNotificationFilter => {
+                return Effects::NONE.with_command(Command::Open(ComponentId::GhFilterPopup));
+            }
+            GhCommand::CloseNotificationFilter => {
+                return Effects::operations(self.close_filter_popup())
+                    .with_command(Command::Close(ComponentId::GhFilterPopup));
+            }
+            GhCommand::ToggleNotificationFilter(option) => {
+                self.toggle_filter_option(&option);
+                Operations::Nop
+            }
+        };
+        Effects::operations(operations)
+    }
+
     pub(super) fn new() -> Self {
         Self {
             notifications: GhNotificationsWidget::new(),
+            generation: 0,
+            page_pending: false,
         }
     }
 
@@ -37,10 +67,8 @@ impl GhComponent {
     }
 
     pub(in crate::application) fn reload_notifications(&mut self) -> Operation {
-        Operation::FetchGhNotifications {
-            populate: Populate::Replace,
-            params: self.notifications.reload(),
-        }
+        let params = self.notifications.reload();
+        self.start_list(params)
     }
 
     pub(in crate::application) fn apply_notifications(
@@ -48,31 +76,21 @@ impl GhComponent {
         populate: Populate,
         notifications: Vec<Notification>,
     ) -> NotificationDetails {
+        self.page_pending = false;
         self.notifications
             .update_notifications(populate, NotificationPageUpdate::from(notifications))
     }
 
     pub(in crate::application) fn fetch_notification_details(
-        &self,
+        &mut self,
         details: NotificationDetails,
     ) -> impl Into<Operations> {
+        let generation = self.generation;
         details
             .into_iter()
-            .map(Operation::from)
+            .map(|detail| Operation::FetchGhDetail { generation, detail })
             .chain(self.fetch_next_notifications_if_needed())
             .collect::<Vec<_>>()
-    }
-
-    pub(in crate::application) fn move_notification(&mut self, direction: Direction) {
-        self.notifications.move_selection(direction);
-    }
-
-    pub(in crate::application) fn move_notification_first(&mut self) {
-        self.notifications.move_first();
-    }
-
-    pub(in crate::application) fn move_notification_last(&mut self) {
-        self.notifications.move_last();
     }
 
     pub(in crate::application) fn mark_selected_notification_as_done(&self) -> Option<Operation> {
@@ -119,18 +137,10 @@ impl GhComponent {
             .map(|url| Operation::OpenBrowser { url })
     }
 
-    pub(in crate::application) fn open_filter_popup(&mut self) {
-        self.notifications.open_filter_popup();
-    }
-
     pub(in crate::application) fn close_filter_popup(&mut self) -> Option<Operation> {
         self.notifications
             .close_filter_popup()
-            .map(|params| Self::fetch_notifications(Populate::Replace, params))
-    }
-
-    pub(in crate::application) fn is_filter_popup_open(&self) -> bool {
-        self.notifications.is_filter_popup_open()
+            .map(|params| self.start_list(params))
     }
 
     pub(in crate::application) fn toggle_filter_option(
@@ -140,13 +150,51 @@ impl GhComponent {
         self.notifications.toggle_filter_option(option);
     }
 
-    pub(in crate::application) fn fetch_next_notifications_if_needed(&self) -> Option<Operation> {
-        self.notifications
-            .fetch_next_if_needed()
-            .map(|params| Self::fetch_notifications(Populate::Append, params))
+    pub(in crate::application) fn apply_filter(
+        &mut self,
+        filter: CategoryAndMatcherFilterer,
+    ) -> Option<Operation> {
+        self.notifications.update_filterer(filter);
+        self.fetch_next_notifications_if_needed()
     }
 
-    fn fetch_notifications(populate: Populate, params: FetchNotificationsParams) -> Operation {
-        Operation::FetchGhNotifications { populate, params }
+    fn fetch_next_notifications_if_needed(&mut self) -> Option<Operation> {
+        if self.page_pending {
+            return None;
+        }
+        let params = self.notifications.fetch_next_if_needed()?;
+        Some(self.fetch_page(params))
+    }
+
+    fn start_list(&mut self, params: FetchNotificationsParams) -> Operation {
+        self.generation += 1;
+        self.fetch_page(params)
+    }
+
+    fn fetch_page(&mut self, params: FetchNotificationsParams) -> Operation {
+        self.page_pending = true;
+        let populate = if params.page == crate::config::gh::INITIAL_PAGE_NUM {
+            Populate::Replace
+        } else {
+            Populate::Append
+        };
+        Operation::FetchGhNotifications {
+            generation: self.generation,
+            populate,
+            params,
+        }
+    }
+
+    pub(in crate::application) fn is_stale(&self, kind: &RequestKind) -> bool {
+        match kind {
+            RequestKind::FetchGhNotifications { generation, .. }
+            | RequestKind::FetchGhIssue { generation, .. }
+            | RequestKind::FetchGhPullRequest { generation, .. } => *generation != self.generation,
+            _ => false,
+        }
+    }
+
+    pub(in crate::application) fn page_failed(&mut self) {
+        self.page_pending = false;
     }
 }

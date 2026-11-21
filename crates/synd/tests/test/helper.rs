@@ -47,10 +47,6 @@ pub struct TestCase {
     pub subscriptions: Vec<SubscriptionSeed>,
 }
 
-pub fn test_config() -> Config {
-    Config::default().with_idle_timer_interval(Duration::from_secs(1))
-}
-
 #[derive(Clone)]
 pub struct SubscriptionSeed {
     pub feed_url: FeedUrl,
@@ -80,7 +76,7 @@ impl Default for TestCase {
         Self {
             sqlite_root_dir: synd_test::temp_dir().keep(),
             terminal_col_row: (120, 30),
-            config: test_config(),
+            config: Config::default(),
             cache_dir: temp_dir().keep(),
 
             login_credential: None,

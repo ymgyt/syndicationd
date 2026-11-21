@@ -13,11 +13,12 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
-    application::{Direction, Populate},
+    application::Populate,
     client::gh::{
         FetchNotificationInclude, FetchNotificationParticipating, FetchNotificationsParams,
     },
     command::GhNotificationFilterOption,
+    command::ListCommand,
     config::{self, Categories},
     types::{
         TimeExt,
@@ -33,14 +34,15 @@ use crate::{
         icon,
         widgets::{
             collections::FilterableVec,
-            filter::{CategoryFilterer, ComposedFilterer, MatcherFilterer},
+            filter::{CategoryAndMatcherFilterer, ComposedFilterer},
         },
         widgets::{scrollbar::Scrollbar, table::Table},
     },
 };
 
 mod filter_popup;
-use filter_popup::{FilterPopup, OptionFilterer};
+pub(crate) use filter_popup::FilterPopup;
+use filter_popup::OptionFilterer;
 
 mod notification_page;
 pub(crate) use notification_page::NotificationPageUpdate;
@@ -123,8 +125,6 @@ impl GhNotificationFilterOptions {
     }
 }
 
-type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
-
 #[allow(clippy::struct_field_names)]
 pub(crate) struct GhNotificationsWidget {
     max_repository_name: usize,
@@ -133,7 +133,7 @@ pub(crate) struct GhNotificationsWidget {
 
     limit: usize,
     next_page: Option<u8>,
-    filter_popup: FilterPopup,
+    pub(crate) filter_popup: FilterPopup,
 }
 
 impl GhNotificationsWidget {
@@ -176,6 +176,9 @@ impl GhNotificationsWidget {
         match update.into_state() {
             NotificationPageUpdateState::Exhausted => {
                 self.next_page = None;
+                if populate == Populate::Replace {
+                    self.notifications.update(populate, Vec::new());
+                }
                 NotificationDetails::default()
             }
             NotificationPageUpdateState::Fetched {
@@ -277,29 +280,12 @@ impl GhNotificationsWidget {
         self.notifications.retain(|n| n.id != id);
     }
 
-    pub(crate) fn move_selection(&mut self, direction: Direction) {
-        self.notifications.move_selection(direction);
-    }
-
-    pub(crate) fn move_first(&mut self) {
-        self.notifications.move_first();
-    }
-
-    pub(crate) fn move_last(&mut self) {
-        self.notifications.move_last();
-    }
-
-    pub(crate) fn open_filter_popup(&mut self) {
-        self.filter_popup.is_active = true;
-    }
-
-    pub(crate) fn is_filter_popup_open(&self) -> bool {
-        self.filter_popup.is_active
+    pub(crate) fn apply_list(&mut self, command: ListCommand) {
+        self.notifications.apply_list(command);
     }
 
     #[must_use]
     pub(crate) fn close_filter_popup(&mut self) -> Option<FetchNotificationsParams> {
-        self.filter_popup.is_active = false;
         match self.filter_popup.commit() {
             GhNotificationFilterOptionsState::Changed(new_options) => {
                 (&new_options != self.filter_options()).then(|| {
@@ -329,10 +315,6 @@ impl GhNotificationsWidget {
 
         self.render_notifications(notifications_area, buf, cx);
         self.render_detail(detail_area, buf, cx);
-
-        if self.filter_popup.is_active {
-            self.render_filter_popup(area, buf, cx);
-        }
     }
 
     fn render_notifications(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -615,8 +597,16 @@ impl GhNotificationsWidget {
                 .render(comment_area, buf);
         }
     }
+}
 
-    fn render_filter_popup(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+impl FilterPopup {
+    pub(crate) fn render_popup(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        cx: &Context<'_>,
+        options: &GhNotificationFilterOptions,
+    ) {
         let area = {
             let vertical = Layout::vertical([
                 Constraint::Fill(1),
@@ -629,8 +619,7 @@ impl GhNotificationsWidget {
             area.reset(buf);
             area
         };
-        self.filter_popup
-            .render(area, buf, cx, self.filter_options());
+        self.render(area, buf, cx, options);
     }
 }
 

@@ -97,8 +97,13 @@ impl InFlightRequests {
         }
     }
 
-    pub(crate) fn correlate_gh_event(&self, request_id: RequestId, event: &GhEvent) {
-        match (self.kind(request_id), event) {
+    pub(crate) fn correlate_gh_event(
+        &self,
+        request_id: RequestId,
+        event: &GhEvent,
+    ) -> &RequestKind {
+        let kind = self.kind(request_id);
+        match (kind, event) {
             (RequestKind::FetchGhNotifications { .. }, GhEvent::NotificationsFetched { .. })
             | (RequestKind::FetchGhIssue { .. }, GhEvent::IssueFetched { .. })
             | (RequestKind::FetchGhPullRequest { .. }, GhEvent::PullRequestFetched { .. }) => {}
@@ -111,6 +116,7 @@ impl InFlightRequests {
             ),
             _ => panic!("GitHub event did not match its request"),
         }
+        kind
     }
 
     pub(crate) fn complete(&mut self, request_id: RequestId) -> InFlightRequest {
@@ -144,7 +150,6 @@ impl InFlightRequests {
         })
     }
 
-    #[cfg(feature = "integration")]
     pub(crate) fn is_empty(&self) -> bool {
         self.requests.is_empty()
     }

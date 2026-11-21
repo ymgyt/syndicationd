@@ -4,55 +4,58 @@ use crossterm::event::KeyEvent;
 
 use super::{
     CommandId, CompiledKeymaps, KeyStroke, KeymapAction, KeymapCandidate, Layer, LayerKeymap,
-    compiled::CompiledBinding, compiled::TrieSearch,
+    compiled::TrieSearch,
 };
 
-const MAX_LAYER_STACK_LEN: usize = 8;
-
 /// Active keymap layers ordered from low to high priority.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct LayerStack {
-    layers: [Layer; MAX_LAYER_STACK_LEN],
-    len: usize,
+    layers: Vec<(Layer, bool)>,
 }
 
 impl LayerStack {
-    pub(crate) fn empty() -> Self {
-        Self {
-            layers: [Layer::App; MAX_LAYER_STACK_LEN],
-            len: 0,
+    pub(crate) fn extend(&mut self, layers: &[Layer]) {
+        self.layers.retain(|(layer, _)| !layers.contains(layer));
+        self.layers
+            .extend(layers.iter().map(|&layer| (layer, false)));
+    }
+
+    pub(crate) fn cover(&mut self, layers: &[Layer]) {
+        for (layer, covered) in &mut self.layers {
+            if layers.contains(layer) {
+                *covered = true;
+            }
         }
     }
 
-    pub(crate) fn new(layers: impl IntoIterator<Item = Layer>) -> Self {
-        let mut stack = Self::empty();
-        for layer in layers {
-            stack.push(layer);
+    pub(crate) fn truncate_after(&mut self, layer: Layer) {
+        if let Some(index) = self.layers.iter().rposition(|(active, _)| *active == layer) {
+            self.layers.truncate(index + 1);
         }
-        stack
     }
 
-    pub(crate) fn push(&mut self, layer: Layer) {
-        assert!(
-            self.len < MAX_LAYER_STACK_LEN,
-            "keymap layer stack capacity exceeded"
-        );
-        self.layers[self.len] = layer;
-        self.len += 1;
-    }
-
-    fn as_slice(&self) -> &[Layer] {
-        &self.layers[..self.len]
+    fn matched(&self, layer: Layer, action: KeymapAction) -> KeymapResult {
+        let covered = self.layers.contains(&(layer, true));
+        KeymapResult::Matched {
+            layer,
+            action: if covered {
+                CommandId::Nop.into()
+            } else {
+                action
+            },
+        }
     }
 
     fn iter_high_to_low(&self) -> impl Iterator<Item = Layer> + '_ {
-        self.as_slice().iter().rev().copied()
+        self.layers.iter().rev().map(|(layer, _)| *layer)
     }
 }
 
 impl<const N: usize> From<[Layer; N]> for LayerStack {
     fn from(layers: [Layer; N]) -> Self {
-        Self::new(layers)
+        let mut stack = Self::default();
+        stack.extend(&layers);
+        stack
     }
 }
 
@@ -119,7 +122,7 @@ impl Keymap {
         let keys = [key];
         for layer in layers.iter_high_to_low() {
             match self.search(layer, &keys) {
-                TrieSearch::Matched(binding) => return matched(binding),
+                TrieSearch::Matched(binding) => return layers.matched(layer, binding.action),
                 TrieSearch::Pending(candidates) => {
                     self.pending.push(key);
                     self.pending_layers = Some(layers.clone());
@@ -148,7 +151,7 @@ impl Keymap {
         match self.search(layer, &self.pending) {
             TrieSearch::Matched(binding) => {
                 self.clear_pending();
-                matched(binding)
+                layers.matched(layer, binding.action)
             }
             TrieSearch::Pending(candidates) => KeymapResult::Pending {
                 keys: self.pending.clone(),
@@ -182,14 +185,13 @@ impl Default for Keymap {
     }
 }
 
-fn matched(binding: CompiledBinding) -> KeymapResult {
-    KeymapResult::Matched(binding.action)
-}
-
 /// Outcome of resolving one key event through the current keymap state.
 #[derive(Debug)]
 pub(crate) enum KeymapResult {
-    Matched(KeymapAction),
+    Matched {
+        layer: Layer,
+        action: KeymapAction,
+    },
     Pending {
         keys: Vec<KeyStroke>,
         candidates: Vec<KeymapCandidate>,
@@ -198,10 +200,4 @@ pub(crate) enum KeymapResult {
     Cancelled {
         keys: Vec<KeyStroke>,
     },
-}
-
-impl From<CommandId> for KeymapResult {
-    fn from(command: CommandId) -> Self {
-        Self::Matched(KeymapAction::from(command))
-    }
 }

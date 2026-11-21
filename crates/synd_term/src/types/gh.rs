@@ -78,6 +78,7 @@ pub(crate) struct NotificationContext<ID> {
 }
 
 /// One notification subject whose full details still need to be fetched.
+#[derive(Debug)]
 pub(crate) enum NotificationDetail {
     Issue(NotificationContext<IssueId>),
     PullRequest(NotificationContext<PullRequestId>),

@@ -6,7 +6,7 @@ mod test {
     use synd_term::{auth::Credential, key, test_support::screen::Screen};
 
     mod helper;
-    use crate::test::helper::{SubscriptionSeed, TestCase, test_config};
+    use crate::test::helper::{SubscriptionSeed, TestCase};
 
     static INIT: Once = Once::new();
 
@@ -28,7 +28,13 @@ mod test {
 
             application.wait_until_jobs_completed(&mut events).await;
             tx.send(key!(enter));
-            let _ = application.event_loop_until_idle(&mut events).await;
+            tokio::time::timeout(
+                Duration::from_secs(10),
+                application.run_until(&mut events, |buffer| {
+                    Screen::new(buffer).contains_text("UC123456")
+                }),
+            )
+            .await??;
 
             let screen = Screen::new(application.buffer());
             assert!(screen.contains_text("Login"));
@@ -86,7 +92,6 @@ mod test {
 
             let test_case = TestCase {
                 terminal_col_row: (120, 30),
-                config: test_config(),
                 ..Default::default()
             }
             .with_credential(Credential::Gh {

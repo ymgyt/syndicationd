@@ -52,12 +52,6 @@ pub(crate) use matcher::MatcherFilterer;
 
 pub(crate) type CategoryAndMatcherFilterer = ComposedFilterer<CategoryFilterer, MatcherFilterer>;
 
-#[derive(Clone, Debug)]
-pub(crate) enum Filterer {
-    Feed(FeedFilterer),
-    GhNotification(CategoryAndMatcherFilterer),
-}
-
 pub(crate) trait Filterable<T> {
     fn filter(&self, item: &T) -> FilterResult;
 }
@@ -113,10 +107,6 @@ impl FilterWidget {
             State::CategoryFiltering(target) => Some(target),
             State::Normal | State::SearchFiltering => None,
         }
-    }
-
-    pub(crate) fn is_filtering_active(&self) -> bool {
-        self.state != State::Normal
     }
 
     pub(crate) fn category_filter_keymap(&self) -> Option<keymap::LayerKeymap> {
@@ -188,12 +178,12 @@ impl FilterWidget {
         self.prompt.borrow_mut().insert_char(ch);
     }
 
-    pub(crate) fn delete_prompt_backward(&mut self) {
-        self.prompt.borrow_mut().delete_backward();
+    pub(crate) fn delete_prompt_backward(&mut self) -> bool {
+        self.prompt.borrow_mut().delete_backward()
     }
 
     #[must_use]
-    pub fn move_requirement(&mut self, direction: Direction) -> Filterer {
+    pub fn move_requirement(&mut self, direction: Direction) -> bool {
         self.feed.requirement = match direction {
             Direction::Left => {
                 if self.feed.requirement == Requirement::Must {
@@ -209,10 +199,10 @@ impl FilterWidget {
                     self.feed.requirement.down()
                 }
             }
-            _ => self.feed.requirement,
+            _ => return false,
         };
 
-        Filterer::Feed(self.feed_filterer())
+        true
     }
 
     #[must_use]
@@ -220,53 +210,36 @@ impl FilterWidget {
         &mut self,
         category: &Category<'static>,
         target: FilterTarget,
-    ) -> Filterer {
-        if let Some(category_state) = self.categories_state_mut(target).state.get_mut(category) {
-            category_state.state = category_state.state.toggle();
+    ) -> bool {
+        let Some(category) = self.categories_state_mut(target).state.get_mut(category) else {
+            return false;
+        };
+        category.state = category.state.toggle();
+        true
+    }
+
+    pub(crate) fn set_all_categories_active(&mut self, target: FilterTarget, active: bool) -> bool {
+        let state = if active {
+            FilterCategoryState::Active
+        } else {
+            FilterCategoryState::Inactive
+        };
+        let mut changed = false;
+        for category in self.categories_state_mut(target).state.values_mut() {
+            changed |= category.state != state;
+            category.state = state;
         }
-
-        self.filterer(target)
+        changed
     }
 
-    #[must_use]
-    pub fn activate_all_categories_state(&mut self, target: FilterTarget) -> Filterer {
-        self.categories_state_mut(target)
-            .state
-            .iter_mut()
-            .for_each(|(_, state)| state.state = FilterCategoryState::Active);
-
-        self.filterer(target)
-    }
-
-    #[must_use]
-    pub fn deactivate_all_categories_state(&mut self, target: FilterTarget) -> Filterer {
-        self.categories_state_mut(target)
-            .state
-            .iter_mut()
-            .for_each(|(_, state)| state.state = FilterCategoryState::Inactive);
-
-        self.filterer(target)
-    }
-
-    #[must_use]
-    pub(crate) fn filterer(&self, target: FilterTarget) -> Filterer {
-        match target {
-            FilterTarget::Feeds => Filterer::Feed(self.feed_filterer()),
-            FilterTarget::GhNotifications => {
-                Filterer::GhNotification(self.gh_notification_filterer())
-            }
-        }
-    }
-
-    #[must_use]
-    fn feed_filterer(&self) -> FeedFilterer {
+    pub(crate) fn feed_filterer(&self) -> FeedFilterer {
         RequirementFilterer::new(self.feed.requirement)
             .and_then(Self::category_filterer(&self.feed.categories_state))
             .and_then(self.matcher_filterer())
     }
 
     #[must_use]
-    fn gh_notification_filterer(&self) -> CategoryAndMatcherFilterer {
+    pub(crate) fn gh_notification_filterer(&self) -> CategoryAndMatcherFilterer {
         Self::category_filterer(&self.gh_notification.categories_state)
             .and_then(self.matcher_filterer())
     }
@@ -318,14 +291,14 @@ impl FilterWidget {
     }
 }
 
-pub(super) struct FilterContext<'a> {
-    pub(super) ui: &'a Context<'a>,
-    pub(super) gh_options: &'a GhNotificationFilterOptions,
-    pub(super) target: FilterTarget,
+pub(crate) struct FilterContext<'a> {
+    pub(crate) ui: &'a Context<'a>,
+    pub(crate) gh_options: &'a GhNotificationFilterOptions,
+    pub(crate) target: FilterTarget,
 }
 
 impl FilterWidget {
-    pub(super) fn render(&self, area: Rect, buf: &mut Buffer, cx: &FilterContext<'_>) {
+    pub(crate) fn render(&self, area: Rect, buf: &mut Buffer, cx: &FilterContext<'_>) {
         let area = Block::new()
             .padding(Padding {
                 left: 2,

@@ -1,9 +1,11 @@
 use crate::{application::Features, config::Categories, ui::theme::Theme};
 
-mod commands;
 mod events;
 mod feeds;
+mod filter;
 mod gh;
+mod view;
+pub(super) use view::{FrameLayout, RenderContext};
 mod shell;
 
 pub(crate) use feeds::FeedsComponent;
@@ -29,9 +31,5 @@ impl Components {
             feeds: FeedsComponent::new(),
             gh: GhComponent::new(),
         }
-    }
-
-    pub(in crate::application) fn is_feed_unsubscription_popup_open(&self) -> bool {
-        self.feeds.is_unsubscribe_popup_open()
     }
 }

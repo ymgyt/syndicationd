@@ -3,7 +3,6 @@ pub(crate) mod entries;
 pub(crate) mod filter;
 pub(crate) mod gh_notifications;
 pub(crate) mod prompt;
-pub(crate) mod root;
 pub(crate) mod scrollbar;
 pub(crate) mod status;
 pub(crate) mod subscription;

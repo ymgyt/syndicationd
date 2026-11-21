@@ -94,11 +94,8 @@ pub(crate) enum OperationError {
 /// Fact that already happened and can update application state.
 #[derive(Debug)]
 pub(crate) enum Event {
-    TerminalResized,
-    TerminalFocusGained,
-    TerminalFocusLost,
-    ThrobberTick,
-    Idle,
+    TabChanged(crate::ui::widgets::tabs::Tab),
+    FilterChanged(crate::command::FilterTarget),
 
     RequestEmitted {
         request_id: RequestId,
@@ -142,11 +139,8 @@ pub(crate) enum Event {
 impl Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TerminalResized => f.write_str("TerminalResized"),
-            Self::TerminalFocusGained => f.write_str("TerminalFocusGained"),
-            Self::TerminalFocusLost => f.write_str("TerminalFocusLost"),
-            Self::ThrobberTick => f.write_str("ThrobberTick"),
-            Self::Idle => f.write_str("Idle"),
+            Self::FilterChanged(target) => write!(f, "FilterChanged({target:?})"),
+            Self::TabChanged(tab) => write!(f, "TabChanged({tab:?})"),
             Self::RequestEmitted { request_id, kind } => {
                 write!(f, "RequestEmitted({request_id:?}, {kind:?})")
             }

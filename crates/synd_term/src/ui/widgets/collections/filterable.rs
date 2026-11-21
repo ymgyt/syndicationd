@@ -2,6 +2,7 @@ use std::{cmp::Ordering, ops::ControlFlow};
 
 use crate::{
     application::{Direction, Populate},
+    command::ListCommand,
     ui::widgets::filter::{FilterResult, Filterable},
 };
 
@@ -49,18 +50,14 @@ impl<T, F> FilterableVec<T, F> {
         self.effective_items.is_empty()
     }
 
-    pub(crate) fn move_selection(&mut self, direction: Direction) {
-        self.selected_item_index =
-            direction.apply(self.selected_item_index, self.effective_items.len());
-    }
-    pub(crate) fn move_first(&mut self) {
-        self.selected_item_index = 0;
-    }
-
-    pub(crate) fn move_last(&mut self) {
-        if !self.effective_items.is_empty() {
-            self.selected_item_index = self.effective_items.len() - 1;
-        }
+    pub(crate) fn apply_list(&mut self, command: ListCommand) {
+        let len = self.effective_items.len();
+        self.selected_item_index = match command {
+            ListCommand::Previous => Direction::Up.apply(self.selected_item_index, len),
+            ListCommand::Next => Direction::Down.apply(self.selected_item_index, len),
+            ListCommand::First => 0,
+            ListCommand::Last => len.saturating_sub(1),
+        };
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &T> {
@@ -205,7 +202,7 @@ mod tests {
         let mut items = FilterableVec::from_filter(UseAll);
         items.update(Populate::Replace, vec![1, 2, 3]);
 
-        items.move_last();
+        items.apply_list(ListCommand::Last);
 
         assert_eq!(items.selected(), Some(&3));
         assert_eq!(items.selected_index(), 2);
@@ -216,7 +213,7 @@ mod tests {
         let mut items = FilterableVec::from_filter(RejectAll);
         items.update(Populate::Replace, vec![1, 2, 3]);
 
-        items.move_last();
+        items.apply_list(ListCommand::Last);
 
         assert_eq!(items.selected(), None);
         assert_eq!(items.selected_index(), 0);

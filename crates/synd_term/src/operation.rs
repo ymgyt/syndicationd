@@ -7,9 +7,7 @@ use crate::{
     application::Populate,
     auth::{AuthenticationProvider, Credential, Verified},
     client::gh::FetchNotificationsParams,
-    types::gh::{
-        IssueId, NotificationContext, NotificationDetail, NotificationId, PullRequestId, ThreadId,
-    },
+    types::gh::{NotificationDetail, NotificationId, ThreadId},
 };
 
 /// Ordered side effects requested by one application state transition.
@@ -72,15 +70,6 @@ impl<const N: usize> From<[Operations; N]> for Operations {
     }
 }
 
-impl From<NotificationDetail> for Operation {
-    fn from(detail: NotificationDetail) -> Self {
-        match detail {
-            NotificationDetail::Issue(context) => Self::FetchGhIssue { context },
-            NotificationDetail::PullRequest(context) => Self::FetchGhPullRequest { context },
-        }
-    }
-}
-
 /// External side-effect request emitted by application state transitions.
 #[derive(Debug)]
 pub(crate) enum Operation {
@@ -117,14 +106,13 @@ pub(crate) enum Operation {
     WatchFeedEvents,
 
     FetchGhNotifications {
+        generation: u64,
         populate: Populate,
         params: FetchNotificationsParams,
     },
-    FetchGhIssue {
-        context: NotificationContext<IssueId>,
-    },
-    FetchGhPullRequest {
-        context: NotificationContext<PullRequestId>,
+    FetchGhDetail {
+        generation: u64,
+        detail: NotificationDetail,
     },
     MarkGhNotificationAsDone {
         id: NotificationId,

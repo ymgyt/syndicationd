@@ -29,9 +29,9 @@ pub(crate) enum RequestKind {
     FetchSubscription,
     FetchTimelineWindow { limit: usize },
     CatchUpTimeline { since: i64 },
-    FetchGhNotifications { page: u8 },
-    FetchGhIssue { id: IssueId },
-    FetchGhPullRequest { id: PullRequestId },
+    FetchGhNotifications { generation: u64, page: u8 },
+    FetchGhIssue { generation: u64, id: IssueId },
+    FetchGhPullRequest { generation: u64, id: PullRequestId },
     MarkGhNotificationAsDone { id: NotificationId },
     UnsubscribeGhThread { id: ThreadId },
 }
@@ -48,11 +48,11 @@ impl RequestKind {
             Self::CatchUpTimeline { since } => {
                 Cow::Owned(format!("Catch up timeline from {since}"))
             }
-            Self::FetchGhNotifications { page } => {
+            Self::FetchGhNotifications { page, .. } => {
                 Cow::Owned(format!("Fetch GitHub notifications page {page}"))
             }
-            Self::FetchGhIssue { id } => Cow::Owned(format!("Fetch GitHub issue #{id}")),
-            Self::FetchGhPullRequest { id } => {
+            Self::FetchGhIssue { id, .. } => Cow::Owned(format!("Fetch GitHub issue #{id}")),
+            Self::FetchGhPullRequest { id, .. } => {
                 Cow::Owned(format!("Fetch GitHub pull request #{id}"))
             }
             Self::MarkGhNotificationAsDone { id } => {

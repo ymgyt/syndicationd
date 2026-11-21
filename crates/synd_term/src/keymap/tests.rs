@@ -1,9 +1,6 @@
 use core::assert_matches;
 
-use crate::{
-    application::Direction,
-    command::{Command, FeedsCommand, FilterTarget, ShellCommand},
-};
+use crate::command::FilterTarget;
 use synd_feed::types::Category;
 
 use super::{default::default_keymap_config, *};
@@ -37,35 +34,61 @@ fn command_registry_uses_only_timeline_refresh_names() {
 #[test]
 fn default_keymap_matches_single_key_binding() {
     let mut keymap = Keymap::default_keymaps();
-    let layers = LayerStack::from([Layer::App, Layer::Global, Layer::Entries]);
+    let layers = LayerStack::from([Layer::App, Layer::Global, Layer::List, Layer::Entries]);
 
     let result = keymap.resolve(&layers, key("j"));
 
-    assert_eq!(
-        matched_action(&result),
-        Some(&KeymapAction::Command(CommandId::MoveEntryNext))
-    );
     assert_matches!(
-        result_to_command(&result),
-        Some(Command::Feeds(FeedsCommand::MoveEntry(Direction::Down)))
+        result,
+        KeymapResult::Matched {
+            layer: Layer::List,
+            action: KeymapAction::Command(CommandId::ListNext),
+        }
     );
 }
 
 #[test]
-fn resolver_keeps_sequence_on_highest_priority_first_key_layer() {
-    let mut keymap = Keymap::default_keymaps();
-    let layers = LayerStack::from([Layer::Feeds, Layer::Entries]);
+fn covered_list_consumes_its_bindings_without_running_them() {
+    let mut config = default_keymap_config();
+    config
+        .add(Layer::Feeds, ["q"], CommandId::OpenFeed, None)
+        .unwrap();
+    let mut keymap = Keymap::new(CompiledKeymaps::compile(config, &CommandRegistry).unwrap());
+    let mut layers = LayerStack::from([Layer::Global, Layer::List, Layer::Feeds]);
+    layers.cover(&[Layer::List, Layer::Feeds]);
+    layers.extend(&[Layer::UnsubscribePopup]);
 
+    assert_matches!(
+        matched_action(&keymap.resolve(&layers, key("q"))),
+        Some(KeymapAction::Command(CommandId::Nop))
+    );
     assert_matches!(
         keymap.resolve(&layers, key("g")),
         KeymapResult::Pending { .. }
     );
-    let result = keymap.resolve(&layers, key("e"));
-
-    assert_eq!(
-        matched_action(&result),
-        Some(&KeymapAction::Command(CommandId::MoveEntryLast))
+    assert_matches!(
+        matched_action(&keymap.resolve(&layers, key("e"))),
+        Some(KeymapAction::Command(CommandId::Nop))
     );
+}
+
+#[test]
+fn view_override_keeps_other_list_bindings_with_the_same_prefix() {
+    let mut user = KeymapConfig::new();
+    user.add(Layer::Entries, ["g", "g"], CommandId::OpenEntry, None)
+        .unwrap();
+    let mut keymap = Keymap::new(CompiledKeymaps::default_with_user_config(user).unwrap());
+    let layers = LayerStack::from([Layer::List, Layer::Entries]);
+    for (last_key, expected) in [("g", CommandId::OpenEntry), ("e", CommandId::ListLast)] {
+        assert_matches!(
+            keymap.resolve(&layers, key("g")),
+            KeymapResult::Pending { .. }
+        );
+        assert_eq!(
+            matched_action(&keymap.resolve(&layers, key(last_key))),
+            Some(&expected.into())
+        );
+    }
 }
 
 #[test]
@@ -77,11 +100,14 @@ fn user_override_can_disable_default_binding_with_no_op() {
     config.merge(user);
 
     let mut keymap = Keymap::new(CompiledKeymaps::compile(config, &CommandRegistry).unwrap());
-    let layers = LayerStack::from([Layer::Entries]);
+    let layers = LayerStack::from([Layer::List, Layer::Entries]);
 
     let result = keymap.resolve(&layers, key("j"));
 
-    assert_matches!(result_to_command(&result), Some(Command::Nop));
+    assert_matches!(
+        matched_action(&result),
+        Some(KeymapAction::Command(CommandId::Nop))
+    );
 }
 
 #[test]
@@ -98,11 +124,14 @@ keymap = [
     )
     .unwrap();
     let mut keymap = Keymap::new(CompiledKeymaps::default_with_user_config(user).unwrap());
-    let layers = LayerStack::from([Layer::Entries]);
+    let layers = LayerStack::from([Layer::List, Layer::Entries]);
 
     let result = keymap.resolve(&layers, key("up"));
 
-    assert_matches!(result_to_command(&result), Some(Command::Nop));
+    assert_matches!(
+        matched_action(&result),
+        Some(KeymapAction::Command(CommandId::Nop))
+    );
 
     let result = keymap.resolve(&layers, key("g"));
     assert_matches!(result, KeymapResult::Pending { .. });
@@ -143,8 +172,8 @@ fn app_layer_can_override_global_layer() {
     let result = keymap.resolve(&layers, key("C-c"));
 
     assert_matches!(
-        result_to_command(&result),
-        Some(Command::Shell(ShellCommand::Quit))
+        matched_action(&result),
+        Some(KeymapAction::Command(CommandId::Quit))
     );
 }
 
@@ -209,7 +238,7 @@ fn dynamic_category_filter_layer_resolves_runtime_category_actions() {
 #[test]
 fn shifted_letter_from_terminal_matches_s_notation_binding() {
     let mut keymap = Keymap::default_keymaps();
-    let layers = LayerStack::from([Layer::App, Layer::Global, Layer::Entries]);
+    let layers = LayerStack::from([Layer::App, Layer::Global, Layer::List, Layer::Entries]);
 
     // Terminals report Shift+t as an uppercase char + SHIFT
     let event = crossterm::event::KeyEvent::new(
@@ -234,18 +263,9 @@ fn shifted_letter_from_terminal_matches_s_notation_binding() {
     );
 }
 
-fn result_to_command(result: &KeymapResult) -> Option<Command> {
-    match result {
-        KeymapResult::Matched(action) => Some(action.build_command()),
-        KeymapResult::Pending { .. } | KeymapResult::NotFound | KeymapResult::Cancelled { .. } => {
-            None
-        }
-    }
-}
-
 fn matched_action(result: &KeymapResult) -> Option<&KeymapAction> {
     match result {
-        KeymapResult::Matched(action) => Some(action),
+        KeymapResult::Matched { action, .. } => Some(action),
         KeymapResult::Pending { .. } | KeymapResult::NotFound | KeymapResult::Cancelled { .. } => {
             None
         }

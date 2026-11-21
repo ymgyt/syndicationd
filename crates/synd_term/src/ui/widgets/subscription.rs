@@ -15,6 +15,7 @@ use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::{Direction, Populate},
+    command::ListCommand,
     types::{self, EntryMeta, EntryMetaExt, Feed, RequirementExt, TimeExt},
     ui::{
         self, Context,
@@ -27,11 +28,11 @@ use crate::{
 pub struct SubscriptionWidget {
     feeds: FilterableVec<types::Feed, FeedFilterer>,
 
-    unsubscribe_popup: UnsubscribePopup,
+    pub(crate) unsubscribe_popup: UnsubscribePopup,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum UnsubscribeSelection {
+enum UnsubscribeSelection {
     Yes,
     No,
 }
@@ -45,7 +46,7 @@ impl UnsubscribeSelection {
     }
 }
 
-struct UnsubscribePopup {
+pub(crate) struct UnsubscribePopup {
     selection: UnsubscribeSelection,
     selected_feed: Option<types::Feed>,
 }
@@ -73,21 +74,24 @@ impl SubscriptionWidget {
         self.feeds.selected()
     }
 
-    pub(crate) fn toggle_unsubscribe_popup(&mut self, show: bool) {
-        if show {
-            self.unsubscribe_popup.selected_feed = self.selected_feed().cloned();
-        } else {
-            self.unsubscribe_popup.selected_feed = None;
-        }
+    pub(crate) fn open_unsubscribe_popup(&mut self) -> bool {
+        self.unsubscribe_popup.selected_feed = self.selected_feed().cloned();
+        self.unsubscribe_popup.selected_feed.is_some()
     }
 
-    pub(crate) fn unsubscribe_popup_selection(
-        &self,
-    ) -> (UnsubscribeSelection, Option<&types::Feed>) {
-        (
-            self.unsubscribe_popup.selection,
-            self.unsubscribe_popup.selected_feed.as_ref(),
-        )
+    pub(crate) fn close_unsubscribe_popup(&mut self) {
+        self.unsubscribe_popup.selected_feed = None;
+    }
+
+    pub(crate) fn unsubscribe_target(&self) -> Option<&types::Feed> {
+        self.unsubscribe_popup.selected_feed.as_ref()
+    }
+
+    pub(crate) fn confirmed_unsubscribe_target(&self) -> Option<&types::Feed> {
+        match self.unsubscribe_popup.selection {
+            UnsubscribeSelection::Yes => self.unsubscribe_target(),
+            UnsubscribeSelection::No => None,
+        }
     }
 
     pub(crate) fn update_subscription(
@@ -112,16 +116,8 @@ impl SubscriptionWidget {
         self.feeds.retain(|feed| &feed.url != url);
     }
 
-    pub(crate) fn move_selection(&mut self, direction: Direction) {
-        self.feeds.move_selection(direction);
-    }
-
-    pub(crate) fn move_first(&mut self) {
-        self.feeds.move_first();
-    }
-
-    pub(crate) fn move_last(&mut self) {
-        self.feeds.move_last();
+    pub(crate) fn apply_list(&mut self, command: ListCommand) {
+        self.feeds.apply_list(command);
     }
 
     pub(crate) fn move_unsubscribe_popup_selection(&mut self, direction: Direction) {
@@ -138,10 +134,6 @@ impl SubscriptionWidget {
 
         self.render_feeds(feeds_area, buf, cx);
         self.render_feed_detail(feed_detail_area, buf, cx);
-
-        if let Some(feed) = self.unsubscribe_popup.selected_feed.as_ref() {
-            self.render_unsubscribe_popup(area, buf, cx, feed);
-        }
     }
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
@@ -367,14 +359,13 @@ impl SubscriptionWidget {
 
         Widget::render(table, entries_area, buf);
     }
+}
 
-    fn render_unsubscribe_popup(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        cx: &Context<'_>,
-        feed: &types::Feed,
-    ) {
+impl UnsubscribePopup {
+    pub(crate) fn render(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
+        let Some(feed) = self.selected_feed.as_ref() else {
+            return;
+        };
         let area = {
             let area = RectExt::centered(area, 60, 60);
             let vertical = Layout::vertical([
@@ -443,7 +434,7 @@ impl SubscriptionWidget {
             .style(cx.theme.tabs)
             .divider("")
             .padding("  ", "  ")
-            .select(match self.unsubscribe_popup.selection {
+            .select(match self.selection {
                 UnsubscribeSelection::Yes => 0,
                 UnsubscribeSelection::No => 1,
             })
@@ -477,7 +468,7 @@ mod tests {
             ],
         );
 
-        subscription.move_last();
+        subscription.apply_list(ListCommand::Last);
 
         assert_eq!(subscription.feeds.selected_index(), 2);
         assert_eq!(

@@ -35,6 +35,7 @@ impl Jobs {
         );
     }
 
+    #[cfg(feature = "integration")]
     pub(crate) fn is_empty(&self) -> bool {
         self.futures.is_empty() && self.delay_queue.is_empty()
     }

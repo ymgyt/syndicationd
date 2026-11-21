@@ -35,6 +35,9 @@ Key names use the same notation as the default keymap, including `enter`,
 `space`, `tab`, `backtab`, `esc`, arrow keys, `C-c` for Control-C, `S-t` for
 Shift-T, and `A-enter` for Alt-Enter.
 
+Use `[keys.list]` to bind a movement key for entries, feeds, and GitHub
+notifications together. A binding in an individual tab takes precedence.
+
 Configurable layers:
 
 | Layer                                | Context                          |
@@ -43,6 +46,7 @@ Configurable layers:
 | `global`                             | Always active normal keys        |
 | `login`                              | Authentication screen            |
 | `tabs`                               | Tab navigation                   |
+| `list`                               | Navigation in the active list    |
 | `entries`                            | Entries tab                      |
 | `feeds`                              | Feeds tab                        |
 | `filter`                             | Entry/feed filter controls       |
@@ -66,6 +70,7 @@ dynamic bindings are managed by the application for now.
 | `login.provider.next`                                  | `login`                            |
 | `tabs.prev`                                            | `tabs`                             |
 | `tabs.next`                                            | `tabs`                             |
+| `list.prev`, `list.next`, `list.first`, `list.last`     | `list`, `entries`, `feeds`, `github-notifications` |
 | `entries.prev`                                         | `entries`                          |
 | `entries.next`                                         | `entries`                          |
 | `entries.first`                                        | `entries`                          |

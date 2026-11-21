@@ -1,7 +1,5 @@
 #![cfg(feature = "integration")]
 
-use std::time::Duration;
-
 use serde_json::json;
 use synd_client::payload;
 use synd_term::{
@@ -14,13 +12,46 @@ use synd_term::{
         event_stream, focus_gained_event, focus_lost_event, new_test_terminal, resize_event,
     },
     interact::mock::MockInteractor,
+    key,
     test_support::screen::Screen,
     ui::theme::Theme,
 };
 use tempfile::TempDir;
 
+#[tokio::test]
+async fn entering_feeds_requests_the_missing_subscription() {
+    let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
+    let (_cache_dir, mut app) = app(api);
+    let (tx, mut input) = event_stream();
+    tx.send(key!(tab));
+    app.wait_until_jobs_completed(&mut input).await;
+    assert!(Screen::new(app.buffer()).contains_text("Feed 1/1"));
+}
+
 mod bootstrapped_app {
     use super::*;
+
+    #[tokio::test]
+    async fn unsubscribe_popup_only_receives_keys_on_its_tab() {
+        let (_cache_dir, mut app) = start_app();
+        let (tx, mut input) = event_stream();
+        app.wait_until_jobs_completed(&mut input).await;
+
+        tx.send_multi([key!(tab), key!('d')]);
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Unsubscribe"));
+
+        tx.send_multi([key!(tab), key!('j')]);
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Entry 2/2"));
+
+        tx.send(key!(tab));
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Unsubscribe"));
+        tx.send(key!(esc));
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(!Screen::new(app.buffer()).contains_text("Unsubscribe"));
+    }
 
     #[tokio::test]
     async fn initial_view() {
@@ -35,6 +66,25 @@ mod bootstrapped_app {
         assert!(screen.contains_text("Rust feed architecture"));
         assert!(screen.contains_text("Async GraphQL testing"));
         assert!(screen.contains_text("Engineering Notes"));
+    }
+
+    #[tokio::test]
+    async fn search_applies_to_both_feed_views() {
+        let (_cache_dir, mut app) = start_app();
+        let (tx, mut input) = event_stream();
+        app.wait_until_jobs_completed(&mut input).await;
+
+        tx.send_multi([key!(tab), key!('/'), key!('z'), key!(esc)]);
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Feed -/-"));
+
+        tx.send(key!(tab));
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Entry -/-"));
+
+        tx.send_multi([key!('/'), key!(backspace)]);
+        app.wait_until_jobs_completed(&mut input).await;
+        assert!(Screen::new(app.buffer()).contains_text("Entry 1/2"));
     }
 
     #[tokio::test]
@@ -86,7 +136,7 @@ fn app(feed_api: MockFeedApi) -> (TempDir, Application) {
         .terminal(terminal)
         .feed_api(feed_api)
         .categories(Categories::default_toml())
-        .config(Config::default().with_idle_timer_interval(Duration::from_millis(10)))
+        .config(Config::default())
         .cache(Cache::new(cache_dir.path().to_path_buf()))
         .theme(Theme::default())
         .interactor(Box::new(MockInteractor::new()))

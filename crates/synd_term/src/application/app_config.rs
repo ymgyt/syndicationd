@@ -9,7 +9,6 @@ pub struct Features {
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub idle_timer_interval: Duration,
     pub throbber_timer_interval: Duration,
     pub entries_limit: usize,
     pub feeds_per_pagination: i64,
@@ -20,22 +19,11 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            idle_timer_interval: Duration::from_secs(250),
             throbber_timer_interval: Duration::from_millis(250),
             entries_limit: config::feed::DEFAULT_ENTRIES_LIMIT,
             feeds_per_pagination: config::client::DEFAULT_FEEDS_PER_PAGINATION,
             features: Features::default(),
             keymaps: CompiledKeymaps::default_keymaps(),
-        }
-    }
-}
-
-impl Config {
-    #[must_use]
-    pub fn with_idle_timer_interval(self, idle_timer_interval: Duration) -> Self {
-        Self {
-            idle_timer_interval,
-            ..self
         }
     }
 }

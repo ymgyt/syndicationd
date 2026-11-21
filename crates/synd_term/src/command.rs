@@ -2,18 +2,32 @@ use std::fmt::Display;
 use synd_feed::types::Category;
 
 use crate::{
-    application::Direction,
+    application::{ComponentId, Direction},
     types::gh::{PullRequestState, Reason, RepoVisibility},
 };
 
-/// User intent interpreted by the current application state.
+/// An action requested by a key binding or a component.
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
     Nop,
+    Open(ComponentId),
+    Close(ComponentId),
+    List {
+        to: ComponentId,
+        command: ListCommand,
+    },
     Shell(ShellCommand),
     Feeds(FeedsCommand),
     Filter(FilterCommand),
     Gh(GhCommand),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ListCommand {
+    Previous,
+    Next,
+    First,
+    Last,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -28,9 +42,6 @@ pub(crate) enum ShellCommand {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum FeedsCommand {
-    MoveSubscribedFeed(Direction),
-    MoveSubscribedFeedFirst,
-    MoveSubscribedFeedLast,
     PromptFeedSubscription,
     PromptFeedEdition,
     PromptFeedUnsubscription,
@@ -41,9 +52,6 @@ pub(crate) enum FeedsCommand {
     OpenFeed,
 
     RefreshTimeline,
-    MoveEntry(Direction),
-    MoveEntryFirst,
-    MoveEntryLast,
     OpenEntry,
     BrowseEntry,
 }
@@ -87,10 +95,6 @@ pub(crate) enum GhNotificationFilterOption {
 
 #[derive(Debug, Clone)]
 pub(crate) enum GhCommand {
-    MoveNotification(Direction),
-    MoveNotificationFirst,
-    MoveNotificationLast,
-
     OpenNotification,
     OpenNotificationAndMarkAsDone,
     ReloadNotifications,

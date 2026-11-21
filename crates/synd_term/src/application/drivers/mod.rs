@@ -1,18 +1,13 @@
 use std::{
-    future::Future,
     num::NonZero,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use chrono::{DateTime, Utc};
 use futures_util::{FutureExt as _, Stream};
 use ratatui::Frame;
-use tokio::{
-    sync::mpsc,
-    time::{Instant, Sleep},
-};
+use tokio::sync::mpsc;
 
 #[cfg(feature = "integration")]
 use crate::auth::CredentialError;
@@ -27,10 +22,10 @@ use crate::{
     job::Jobs,
     operation::{Operation, Operations},
     terminal::Terminal,
+    types::gh::NotificationDetail,
 };
 
 const REQUEST_JOB_CONCURRENCY: usize = 90;
-const DISARMED_TIMER_DURATION: Duration = Duration::from_hours(24 * 365 * 30);
 
 mod auth;
 mod feed;
@@ -58,9 +53,6 @@ pub(super) struct Drivers {
     next_request_id: u64,
     event_tx: mpsc::UnboundedSender<Event>,
     event_rx: mpsc::UnboundedReceiver<Event>,
-    throbber_timer: Pin<Box<Sleep>>,
-    throbber_timer_interval: Duration,
-    idle_timer: Pin<Box<Sleep>>,
 }
 
 pub(super) struct DriverParts {
@@ -71,8 +63,6 @@ pub(super) struct DriverParts {
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Box<dyn Interact>,
     pub(super) clock: Option<Box<dyn Clock>>,
-    pub(super) throbber_timer_interval: Duration,
-    pub(super) idle_timer_interval: Duration,
 }
 
 impl Drivers {
@@ -85,8 +75,6 @@ impl Drivers {
             authenticator,
             interactor,
             clock,
-            throbber_timer_interval,
-            idle_timer_interval,
         } = parts;
         let feed = {
             let api = feed_api.clone();
@@ -103,8 +91,6 @@ impl Drivers {
         // The GitHub secondary rate limit is 100 concurrent requests.
         let request_jobs = Jobs::new(NonZero::new(REQUEST_JOB_CONCURRENCY).unwrap());
         let (event_tx, event_rx) = mpsc::unbounded_channel();
-        let throbber_timer = Box::pin(tokio::time::sleep(DISARMED_TIMER_DURATION));
-        let idle_timer = Box::pin(tokio::time::sleep(idle_timer_interval));
 
         Self {
             terminal,
@@ -118,9 +104,6 @@ impl Drivers {
             next_request_id: 0,
             event_tx,
             event_rx,
-            throbber_timer,
-            throbber_timer_interval,
-            idle_timer,
         }
     }
 
@@ -195,18 +178,37 @@ impl Drivers {
                 self.register_request(RequestKind::CatchUpTimeline { since }, make_request);
             }
             Operation::WatchFeedEvents => self.feed.watch_events(),
-            Operation::FetchGhNotifications { populate, params } => {
-                let kind = RequestKind::FetchGhNotifications { page: params.page };
+            Operation::FetchGhNotifications {
+                generation,
+                populate,
+                params,
+            } => {
+                let kind = RequestKind::FetchGhNotifications {
+                    generation,
+                    page: params.page,
+                };
                 let make_request = self.gh.fetch_notifications(populate, params);
                 self.register_request(kind, make_request);
             }
-            Operation::FetchGhIssue { context } => {
-                let kind = RequestKind::FetchGhIssue { id: context.id };
+            Operation::FetchGhDetail {
+                generation,
+                detail: NotificationDetail::Issue(context),
+            } => {
+                let kind = RequestKind::FetchGhIssue {
+                    generation,
+                    id: context.id,
+                };
                 let make_request = self.gh.fetch_issue(context);
                 self.register_request(kind, make_request);
             }
-            Operation::FetchGhPullRequest { context } => {
-                let kind = RequestKind::FetchGhPullRequest { id: context.id };
+            Operation::FetchGhDetail {
+                generation,
+                detail: NotificationDetail::PullRequest(context),
+            } => {
+                let kind = RequestKind::FetchGhPullRequest {
+                    generation,
+                    id: context.id,
+                };
                 let make_request = self.gh.fetch_pull_request(context);
                 self.register_request(kind, make_request);
             }
@@ -251,12 +253,7 @@ impl Drivers {
                 .expect("Drivers owns the event receiver");
         }
         .boxed();
-        let should_arm_throbber = self.request_jobs.is_empty();
-
         self.request_jobs.push(job);
-        if should_arm_throbber {
-            self.reset_throbber_timer();
-        }
         self.queue_event(Event::RequestEmitted { request_id, kind });
     }
 
@@ -295,22 +292,6 @@ impl Drivers {
         }
     }
 
-    fn reset_throbber_timer(&mut self) {
-        self.throbber_timer
-            .as_mut()
-            .reset(Instant::now() + self.throbber_timer_interval);
-    }
-
-    fn disarm_throbber_timer(&mut self) {
-        Self::disarm_timer(self.throbber_timer.as_mut());
-    }
-
-    fn disarm_timer(mut timer: Pin<&mut Sleep>) {
-        timer
-            .as_mut()
-            .reset(Instant::now() + DISARMED_TIMER_DURATION);
-    }
-
     #[cfg(feature = "integration")]
     pub(super) async fn restore_credential(&self) -> Result<Verified<Credential>, CredentialError> {
         let restore = crate::auth::Restore {
@@ -330,20 +311,10 @@ impl Drivers {
         self.terminal.render(|frame| render(frame, now))
     }
 
-    pub(super) fn clear_idle_timer(&mut self) {
-        Self::disarm_timer(self.idle_timer.as_mut());
-    }
-
-    pub(super) fn reset_idle_timer(&mut self, interval: Duration) {
-        self.idle_timer.as_mut().reset(Instant::now() + interval);
-    }
-
     pub(super) fn shutdown(&mut self) {
         self.request_jobs.clear();
         self.auth.stop();
         self.feed.watcher.stop();
-        self.disarm_throbber_timer();
-        self.clear_idle_timer();
     }
 
     #[cfg(feature = "integration")]
@@ -357,13 +328,6 @@ impl Drivers {
     }
 }
 
-/// Polls driver-owned event sources in this priority order: queued events,
-/// request jobs, feed events, authentication, throbber, then idle.
-///
-/// A request job yields `()` but can enqueue events while it is polled. The
-/// second `event_rx` poll exposes those events before lower-priority sources.
-/// Polling every remaining source gives it a chance to register `cx.waker()`
-/// before returning `Pending`.
 impl Stream for Drivers {
     type Item = Event;
 
@@ -374,11 +338,8 @@ impl Stream for Drivers {
             return Poll::Ready(Some(event));
         }
 
-        if let Poll::Ready(Some(())) = Pin::new(&mut this.request_jobs).poll_next(cx)
-            && this.request_jobs.is_empty()
-        {
-            this.disarm_throbber_timer();
-        }
+        // Polling a job can enqueue its result.
+        let _ = Pin::new(&mut this.request_jobs).poll_next(cx);
 
         if let Poll::Ready(Some(event)) = this.event_rx.poll_recv(cx) {
             return Poll::Ready(Some(event));
@@ -390,16 +351,6 @@ impl Stream for Drivers {
 
         if let Poll::Ready(Some(event)) = Pin::new(&mut this.auth).poll_next(cx) {
             return Poll::Ready(Some(event));
-        }
-
-        if !this.request_jobs.is_empty() && this.throbber_timer.as_mut().poll(cx).is_ready() {
-            this.reset_throbber_timer();
-            return Poll::Ready(Some(Event::ThrobberTick));
-        }
-
-        if this.idle_timer.as_mut().poll(cx).is_ready() {
-            Self::disarm_timer(this.idle_timer.as_mut());
-            return Poll::Ready(Some(Event::Idle));
         }
 
         Poll::Pending

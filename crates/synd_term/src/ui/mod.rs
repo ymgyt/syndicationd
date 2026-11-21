@@ -7,7 +7,7 @@ use crate::{
     application::{InFlightRequests, TerminalFocus},
     config::{Categories, Icon, IconColor},
     types::Time,
-    ui::{theme::Theme, widgets::tabs::Tab},
+    ui::theme::Theme,
 };
 
 pub mod extension;
@@ -41,7 +41,6 @@ pub struct Context<'a> {
     pub categories: &'a Categories,
     pub(crate) now: Time,
     pub(crate) focus: TerminalFocus,
-    pub(crate) tab: Tab,
 }
 
 impl Context<'_> {

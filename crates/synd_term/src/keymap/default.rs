@@ -54,6 +54,23 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         "Next authentication provider"
     );
 
+    bind!(Layer::List, ["k"], CommandId::ListPrev, "Previous item");
+    bind!(Layer::List, ["up"], CommandId::ListPrev, "Previous item");
+    bind!(Layer::List, ["j"], CommandId::ListNext, "Next item");
+    bind!(Layer::List, ["down"], CommandId::ListNext, "Next item");
+    bind!(
+        Layer::List,
+        ["g", "g"],
+        CommandId::ListFirst,
+        "Go to first item"
+    );
+    bind!(
+        Layer::List,
+        ["g", "e"],
+        CommandId::ListLast,
+        "Go to last item"
+    );
+
     bind!(Layer::Tabs, ["tab"], CommandId::MoveTabNext, "Next tab");
     bind!(
         Layer::Tabs,
@@ -62,30 +79,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         "Previous tab"
     );
 
-    bind!(
-        Layer::Entries,
-        ["k"],
-        CommandId::MoveEntryPrev,
-        "Previous entry"
-    );
-    bind!(
-        Layer::Entries,
-        ["up"],
-        CommandId::MoveEntryPrev,
-        "Previous entry"
-    );
-    bind!(
-        Layer::Entries,
-        ["j"],
-        CommandId::MoveEntryNext,
-        "Next entry"
-    );
-    bind!(
-        Layer::Entries,
-        ["down"],
-        CommandId::MoveEntryNext,
-        "Next entry"
-    );
     bind!(
         Layer::Entries,
         ["r"],
@@ -103,18 +96,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         ["space"],
         CommandId::BrowseEntry,
         "Browse entry with text browser"
-    );
-    bind!(
-        Layer::Entries,
-        ["g", "g"],
-        CommandId::MoveEntryFirst,
-        "Go to first entry"
-    );
-    bind!(
-        Layer::Entries,
-        ["g", "e"],
-        CommandId::MoveEntryLast,
-        "Go to last entry"
     );
 
     bind!(
@@ -137,30 +118,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     );
     bind!(
         Layer::Feeds,
-        ["k"],
-        CommandId::MoveSubscribedFeedPrev,
-        "Previous feed"
-    );
-    bind!(
-        Layer::Feeds,
-        ["up"],
-        CommandId::MoveSubscribedFeedPrev,
-        "Previous feed"
-    );
-    bind!(
-        Layer::Feeds,
-        ["j"],
-        CommandId::MoveSubscribedFeedNext,
-        "Next feed"
-    );
-    bind!(
-        Layer::Feeds,
-        ["down"],
-        CommandId::MoveSubscribedFeedNext,
-        "Next feed"
-    );
-    bind!(
-        Layer::Feeds,
         ["r"],
         CommandId::ReloadSubscription,
         "Reload subscriptions"
@@ -170,18 +127,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         ["enter"],
         CommandId::OpenFeed,
         "Open selected feed"
-    );
-    bind!(
-        Layer::Feeds,
-        ["g", "g"],
-        CommandId::MoveSubscribedFeedFirst,
-        "Go to first feed"
-    );
-    bind!(
-        Layer::Feeds,
-        ["g", "e"],
-        CommandId::MoveSubscribedFeedLast,
-        "Go to last feed"
     );
 
     bind!(
@@ -266,30 +211,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
 
     bind!(
         Layer::GhNotifications,
-        ["k"],
-        CommandId::MoveGhNotificationPrev,
-        "Previous GitHub notification"
-    );
-    bind!(
-        Layer::GhNotifications,
-        ["up"],
-        CommandId::MoveGhNotificationPrev,
-        "Previous GitHub notification"
-    );
-    bind!(
-        Layer::GhNotifications,
-        ["j"],
-        CommandId::MoveGhNotificationNext,
-        "Next GitHub notification"
-    );
-    bind!(
-        Layer::GhNotifications,
-        ["down"],
-        CommandId::MoveGhNotificationNext,
-        "Next GitHub notification"
-    );
-    bind!(
-        Layer::GhNotifications,
         ["enter"],
         CommandId::OpenGhNotification,
         "Open GitHub notification"
@@ -323,18 +244,6 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         ["u"],
         CommandId::UnsubscribeGhThread,
         "Unsubscribe GitHub thread"
-    );
-    bind!(
-        Layer::GhNotifications,
-        ["g", "g"],
-        CommandId::MoveGhNotificationFirst,
-        "Go to first GitHub notification"
-    );
-    bind!(
-        Layer::GhNotifications,
-        ["g", "e"],
-        CommandId::MoveGhNotificationLast,
-        "Go to last GitHub notification"
     );
     bind!(
         Layer::GhNotifications,

@@ -38,10 +38,14 @@ impl Prompt {
         }
     }
 
-    pub(crate) fn delete_backward(&mut self) {
+    pub(crate) fn delete_backward(&mut self) -> bool {
         let pos = self.move_cursor(Move::BackwardChar(1));
+        if pos == self.cursor {
+            return false;
+        }
         self.line.replace_range(pos..self.cursor, "");
         self.cursor = pos;
+        true
     }
 }
 

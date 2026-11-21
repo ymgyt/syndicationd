@@ -3,34 +3,33 @@ use synd_client::SyndApiError;
 use tracing::{error, info_span, instrument, warn};
 
 use crate::{
+    command::FilterTarget,
     event::{Event, FeedRequestEvent, FeedsEvent, OperationError},
     operation::{Operation, Operations},
 };
 
-use super::{Application, RequestError, RequestId, RequestKind, component::ApiAccessTransition};
+use super::Compositor;
+use crate::application::{RequestError, RequestId, RequestKind, component::ApiAccessTransition};
 
-impl Application {
+impl Compositor {
     #[instrument(skip_all)]
-    pub(super) fn apply_event(&mut self, event: Event) -> Operations {
+    pub(in crate::application) fn apply_event(&mut self, event: Event) -> Operations {
         let _guard = info_span!("apply_event", %event).entered();
 
-        match event {
-            Event::TerminalResized => Operations::Nop,
-            Event::TerminalFocusGained => {
-                self.components.shell.focus_gained();
+        let operations = match event {
+            Event::TabChanged(tab) => self
+                .components
+                .feeds
+                .tab_changed(tab, self.feeds_per_pagination)
+                .into(),
+            Event::FilterChanged(FilterTarget::Feeds) => {
+                let filter = self.components.shell.filter.feed_filterer();
+                self.components.feeds.apply_filter(filter);
                 Operations::Nop
             }
-            Event::TerminalFocusLost => {
-                self.components.shell.focus_lost();
-                Operations::Nop
-            }
-            Event::ThrobberTick => {
-                self.components.shell.in_flight.tick();
-                Operations::Nop
-            }
-            Event::Idle => {
-                self.apply_idle();
-                Operations::Nop
+            Event::FilterChanged(FilterTarget::GhNotifications) => {
+                let filter = self.components.shell.filter.gh_notification_filterer();
+                self.components.gh.apply_filter(filter).into()
             }
             Event::RequestEmitted { request_id, kind } => {
                 self.components.shell.in_flight.register(request_id, kind);
@@ -53,11 +52,16 @@ impl Application {
                 self.components.apply_feed_push(event).into()
             }
             Event::Gh { request_id, event } => {
-                self.components
+                let kind = self
+                    .components
                     .shell
                     .in_flight
                     .correlate_gh_event(request_id, &event);
-                self.components.apply_gh_event(event)
+                if self.components.gh.is_stale(kind) {
+                    Operations::Nop
+                } else {
+                    self.components.apply_gh_event(event)
+                }
             }
             Event::FeedSubscriptionEditorClosed { input } => self
                 .components
@@ -84,12 +88,9 @@ impl Application {
                 self.apply_operation_failure(&error);
                 Operations::Nop
             }
-        }
-    }
-
-    fn apply_idle(&mut self) {
-        #[cfg(feature = "integration")]
-        self.components.shell.quit();
+        };
+        self.sync_keymap();
+        operations
     }
 
     fn apply_feed_request_event(
@@ -103,8 +104,8 @@ impl Application {
             .correlate_feed_event(request_id, &event);
         self.components.apply_feed_request_event(
             event,
-            self.config.feeds_per_pagination,
-            self.config.entries_limit,
+            self.feeds_per_pagination,
+            self.entries_limit,
         )
     }
 
@@ -119,9 +120,15 @@ impl Application {
             .in_flight
             .complete(request_id)
             .into_kind();
+        if self.components.gh.is_stale(&kind) {
+            return None;
+        }
         let succeeded = match result {
             Ok(()) => true,
             Err(error) => {
+                if matches!(kind, RequestKind::FetchGhNotifications { .. }) {
+                    self.components.gh.page_failed();
+                }
                 self.apply_request_failure(&kind, &error);
                 false
             }
@@ -147,7 +154,7 @@ impl Application {
 
     fn apply_api_credential_configured(&mut self) -> Operations {
         match self.components.shell.api_credential_configured() {
-            ApiAccessTransition::Established => self.bootstrap().into(),
+            ApiAccessTransition::Established => self.bootstrap(),
             ApiAccessTransition::Reconfigured => self.components.feeds.refresh_timeline().into(),
         }
     }

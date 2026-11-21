@@ -1,9 +1,10 @@
 use std::{fmt, str::FromStr};
 
 use crate::{
-    application::Direction,
+    application::{ComponentId, Direction},
     command::{
-        Command, FeedsCommand, FilterCommand, GhCommand, GhNotificationFilterOption, ShellCommand,
+        Command, FeedsCommand, FilterCommand, GhCommand, GhNotificationFilterOption, ListCommand,
+        ShellCommand,
     },
     types::gh::{PullRequestState, Reason, RepoVisibility},
 };
@@ -24,6 +25,10 @@ pub enum CommandId {
     MoveAuthenticationProviderNext,
     MoveTabPrev,
     MoveTabNext,
+    ListPrev,
+    ListNext,
+    ListFirst,
+    ListLast,
     MoveEntryPrev,
     MoveEntryNext,
     MoveEntryFirst,
@@ -84,6 +89,10 @@ impl CommandId {
             Self::MoveAuthenticationProviderNext => "login.provider.next",
             Self::MoveTabPrev => "tabs.prev",
             Self::MoveTabNext => "tabs.next",
+            Self::ListPrev => "list.prev",
+            Self::ListNext => "list.next",
+            Self::ListFirst => "list.first",
+            Self::ListLast => "list.last",
             Self::MoveEntryPrev => "entries.prev",
             Self::MoveEntryNext => "entries.next",
             Self::MoveEntryFirst => "entries.first",
@@ -152,136 +161,134 @@ impl CommandId {
     }
 }
 
-impl From<CommandId> for Command {
-    fn from(command: CommandId) -> Self {
-        match command {
-            CommandId::Nop => Command::Nop,
-            CommandId::Quit => Command::Shell(ShellCommand::Quit),
-            CommandId::ForceRedraw => Command::Shell(ShellCommand::ForceRedraw),
-            CommandId::RotateTheme => Command::Shell(ShellCommand::RotateTheme),
-            CommandId::Authenticate => Command::Shell(ShellCommand::Authenticate),
-            CommandId::MoveAuthenticationProviderPrev => {
+impl CommandId {
+    pub(super) fn command(self, owner: ComponentId) -> Command {
+        match self {
+            Self::ListPrev
+            | Self::MoveEntryPrev
+            | Self::MoveSubscribedFeedPrev
+            | Self::MoveGhNotificationPrev => Command::List {
+                to: owner,
+                command: ListCommand::Previous,
+            },
+            Self::ListNext
+            | Self::MoveEntryNext
+            | Self::MoveSubscribedFeedNext
+            | Self::MoveGhNotificationNext => Command::List {
+                to: owner,
+                command: ListCommand::Next,
+            },
+            Self::ListFirst
+            | Self::MoveEntryFirst
+            | Self::MoveSubscribedFeedFirst
+            | Self::MoveGhNotificationFirst => Command::List {
+                to: owner,
+                command: ListCommand::First,
+            },
+            Self::ListLast
+            | Self::MoveEntryLast
+            | Self::MoveSubscribedFeedLast
+            | Self::MoveGhNotificationLast => Command::List {
+                to: owner,
+                command: ListCommand::Last,
+            },
+            Self::Nop => Command::Nop,
+            Self::Quit => Command::Shell(ShellCommand::Quit),
+            Self::ForceRedraw => Command::Shell(ShellCommand::ForceRedraw),
+            Self::RotateTheme => Command::Shell(ShellCommand::RotateTheme),
+            Self::Authenticate => Command::Shell(ShellCommand::Authenticate),
+            Self::MoveAuthenticationProviderPrev => {
                 Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Up))
             }
-            CommandId::MoveAuthenticationProviderNext => {
+            Self::MoveAuthenticationProviderNext => {
                 Command::Shell(ShellCommand::MoveAuthenticationProvider(Direction::Down))
             }
-            CommandId::MoveTabPrev => {
-                Command::Shell(ShellCommand::MoveTabSelection(Direction::Left))
-            }
-            CommandId::MoveTabNext => {
-                Command::Shell(ShellCommand::MoveTabSelection(Direction::Right))
-            }
-            CommandId::MoveEntryPrev => Command::Feeds(FeedsCommand::MoveEntry(Direction::Up)),
-            CommandId::MoveEntryNext => Command::Feeds(FeedsCommand::MoveEntry(Direction::Down)),
-            CommandId::MoveEntryFirst => Command::Feeds(FeedsCommand::MoveEntryFirst),
-            CommandId::MoveEntryLast => Command::Feeds(FeedsCommand::MoveEntryLast),
-            CommandId::RefreshTimeline => Command::Feeds(FeedsCommand::RefreshTimeline),
-            CommandId::OpenEntry => Command::Feeds(FeedsCommand::OpenEntry),
-            CommandId::BrowseEntry => Command::Feeds(FeedsCommand::BrowseEntry),
-            CommandId::MoveSubscribedFeedPrev => {
-                Command::Feeds(FeedsCommand::MoveSubscribedFeed(Direction::Up))
-            }
-            CommandId::MoveSubscribedFeedNext => {
-                Command::Feeds(FeedsCommand::MoveSubscribedFeed(Direction::Down))
-            }
-            CommandId::MoveSubscribedFeedFirst => {
-                Command::Feeds(FeedsCommand::MoveSubscribedFeedFirst)
-            }
-            CommandId::MoveSubscribedFeedLast => {
-                Command::Feeds(FeedsCommand::MoveSubscribedFeedLast)
-            }
-            CommandId::PromptFeedSubscription => {
-                Command::Feeds(FeedsCommand::PromptFeedSubscription)
-            }
-            CommandId::PromptFeedEdition => Command::Feeds(FeedsCommand::PromptFeedEdition),
-            CommandId::PromptFeedUnsubscription => {
+            Self::MoveTabPrev => Command::Shell(ShellCommand::MoveTabSelection(Direction::Left)),
+            Self::MoveTabNext => Command::Shell(ShellCommand::MoveTabSelection(Direction::Right)),
+            Self::RefreshTimeline => Command::Feeds(FeedsCommand::RefreshTimeline),
+            Self::OpenEntry => Command::Feeds(FeedsCommand::OpenEntry),
+            Self::BrowseEntry => Command::Feeds(FeedsCommand::BrowseEntry),
+            Self::PromptFeedSubscription => Command::Feeds(FeedsCommand::PromptFeedSubscription),
+            Self::PromptFeedEdition => Command::Feeds(FeedsCommand::PromptFeedEdition),
+            Self::PromptFeedUnsubscription => {
                 Command::Feeds(FeedsCommand::PromptFeedUnsubscription)
             }
-            CommandId::ReloadSubscription => Command::Feeds(FeedsCommand::ReloadSubscription),
-            CommandId::OpenFeed => Command::Feeds(FeedsCommand::OpenFeed),
-            CommandId::MoveFeedUnsubscriptionPopupSelectionPrev => Command::Feeds(
+            Self::ReloadSubscription => Command::Feeds(FeedsCommand::ReloadSubscription),
+            Self::OpenFeed => Command::Feeds(FeedsCommand::OpenFeed),
+            Self::MoveFeedUnsubscriptionPopupSelectionPrev => Command::Feeds(
                 FeedsCommand::MoveFeedUnsubscriptionPopupSelection(Direction::Left),
             ),
-            CommandId::MoveFeedUnsubscriptionPopupSelectionNext => Command::Feeds(
+            Self::MoveFeedUnsubscriptionPopupSelectionNext => Command::Feeds(
                 FeedsCommand::MoveFeedUnsubscriptionPopupSelection(Direction::Right),
             ),
-            CommandId::SelectFeedUnsubscriptionPopup => {
+            Self::SelectFeedUnsubscriptionPopup => {
                 Command::Feeds(FeedsCommand::SelectFeedUnsubscriptionPopup)
             }
-            CommandId::CancelFeedUnsubscriptionPopup => {
+            Self::CancelFeedUnsubscriptionPopup => {
                 Command::Feeds(FeedsCommand::CancelFeedUnsubscriptionPopup)
             }
-            CommandId::MoveFilterRequirementPrev => {
+            Self::MoveFilterRequirementPrev => {
                 Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Left))
             }
-            CommandId::MoveFilterRequirementNext => {
+            Self::MoveFilterRequirementNext => {
                 Command::Filter(FilterCommand::MoveFilterRequirement(Direction::Right))
             }
-            CommandId::ActivateCategoryFiltering => {
+            Self::ActivateCategoryFiltering => {
                 Command::Filter(FilterCommand::ActivateCategoryFiltering)
             }
-            CommandId::ActivateSearchFiltering => {
+            Self::ActivateSearchFiltering => {
                 Command::Filter(FilterCommand::ActivateSearchFiltering)
             }
-            CommandId::DeactivateFiltering => Command::Filter(FilterCommand::DeactivateFiltering),
-            CommandId::MoveGhNotificationPrev => {
-                Command::Gh(GhCommand::MoveNotification(Direction::Up))
-            }
-            CommandId::MoveGhNotificationNext => {
-                Command::Gh(GhCommand::MoveNotification(Direction::Down))
-            }
-            CommandId::MoveGhNotificationFirst => Command::Gh(GhCommand::MoveNotificationFirst),
-            CommandId::MoveGhNotificationLast => Command::Gh(GhCommand::MoveNotificationLast),
-            CommandId::OpenGhNotification => Command::Gh(GhCommand::OpenNotification),
-            CommandId::OpenGhNotificationAndMarkAsDone => {
+            Self::DeactivateFiltering => Command::Filter(FilterCommand::DeactivateFiltering),
+            Self::OpenGhNotification => Command::Gh(GhCommand::OpenNotification),
+            Self::OpenGhNotificationAndMarkAsDone => {
                 Command::Gh(GhCommand::OpenNotificationAndMarkAsDone)
             }
-            CommandId::ReloadGhNotifications => Command::Gh(GhCommand::ReloadNotifications),
-            CommandId::MarkGhNotificationAsDone => Command::Gh(GhCommand::MarkNotificationAsDone),
-            CommandId::MarkAllGhNotificationsAsDone => {
+            Self::ReloadGhNotifications => Command::Gh(GhCommand::ReloadNotifications),
+            Self::MarkGhNotificationAsDone => Command::Gh(GhCommand::MarkNotificationAsDone),
+            Self::MarkAllGhNotificationsAsDone => {
                 Command::Gh(GhCommand::MarkAllNotificationsAsDone)
             }
-            CommandId::UnsubscribeGhThread => Command::Gh(GhCommand::UnsubscribeThread),
-            CommandId::OpenGhNotificationFilter => Command::Gh(GhCommand::OpenNotificationFilter),
-            CommandId::CloseGhNotificationFilter => Command::Gh(GhCommand::CloseNotificationFilter),
-            CommandId::ToggleGhNotificationFilterUnreadOnly => Command::Gh(
+            Self::UnsubscribeGhThread => Command::Gh(GhCommand::UnsubscribeThread),
+            Self::OpenGhNotificationFilter => Command::Gh(GhCommand::OpenNotificationFilter),
+            Self::CloseGhNotificationFilter => Command::Gh(GhCommand::CloseNotificationFilter),
+            Self::ToggleGhNotificationFilterUnreadOnly => Command::Gh(
                 GhCommand::ToggleNotificationFilter(GhNotificationFilterOption::UnreadOnly),
             ),
-            CommandId::ToggleGhNotificationFilterParticipatingOnly => Command::Gh(
+            Self::ToggleGhNotificationFilterParticipatingOnly => Command::Gh(
                 GhCommand::ToggleNotificationFilter(GhNotificationFilterOption::ParticipatingOnly),
             ),
-            CommandId::ToggleGhNotificationFilterVisibilityPublic => {
+            Self::ToggleGhNotificationFilterVisibilityPublic => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::Visibility(RepoVisibility::Public),
                 ))
             }
-            CommandId::ToggleGhNotificationFilterVisibilityPrivate => {
+            Self::ToggleGhNotificationFilterVisibilityPrivate => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::Visibility(RepoVisibility::Private),
                 ))
             }
-            CommandId::ToggleGhNotificationFilterPullRequestOpen => {
+            Self::ToggleGhNotificationFilterPullRequestOpen => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::PullRequestState(PullRequestState::Open),
                 ))
             }
-            CommandId::ToggleGhNotificationFilterPullRequestClosed => {
+            Self::ToggleGhNotificationFilterPullRequestClosed => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::PullRequestState(PullRequestState::Closed),
                 ))
             }
-            CommandId::ToggleGhNotificationFilterPullRequestMerged => {
+            Self::ToggleGhNotificationFilterPullRequestMerged => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::PullRequestState(PullRequestState::Merged),
                 ))
             }
-            CommandId::ToggleGhNotificationFilterReasonMentioned => {
+            Self::ToggleGhNotificationFilterReasonMentioned => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::Reason(Reason::Mention),
                 ))
             }
-            CommandId::ToggleGhNotificationFilterReasonReviewRequested => {
+            Self::ToggleGhNotificationFilterReasonReviewRequested => {
                 Command::Gh(GhCommand::ToggleNotificationFilter(
                     GhNotificationFilterOption::Reason(Reason::ReviewRequested),
                 ))
@@ -445,6 +452,26 @@ const COMMAND_SPECS: &[CommandSpec] = specs![
         aliases: ["move_right_tab_selection"],
         typable: None,
         layers: [Tabs],
+    },
+    ListPrev {
+        aliases: [],
+        typable: None,
+        layers: [List, Entries, Feeds, GhNotifications],
+    },
+    ListNext {
+        aliases: [],
+        typable: None,
+        layers: [List, Entries, Feeds, GhNotifications],
+    },
+    ListFirst {
+        aliases: [],
+        typable: None,
+        layers: [List, Entries, Feeds, GhNotifications],
+    },
+    ListLast {
+        aliases: [],
+        typable: None,
+        layers: [List, Entries, Feeds, GhNotifications],
     },
     MoveEntryPrev {
         aliases: ["move_up_entry"],

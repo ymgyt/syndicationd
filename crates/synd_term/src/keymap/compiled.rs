@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use super::{
     CommandRegistry, KeyBinding, KeySequence, KeyStroke, KeymapAction, KeymapConfig, KeymapError,
@@ -34,6 +34,19 @@ impl CompiledKeymaps {
             layers.insert(layer, trie);
         }
 
+        if let Some(list) = layers.remove(&Layer::List) {
+            for layer in [Layer::Entries, Layer::Feeds, Layer::GhNotifications] {
+                if let Some(local) = layers.get_mut(&layer) {
+                    // Once a local prefix matches, the resolver stays in its trie.
+                    for (key, branch) in &mut local.children {
+                        if let Some(shared) = list.children.get(key) {
+                            branch.inherit(shared);
+                        }
+                    }
+                }
+            }
+            layers.insert(Layer::List, list);
+        }
         Ok(Self { layers })
     }
 
@@ -66,6 +79,22 @@ pub(super) struct KeyTrie {
 }
 
 impl KeyTrie {
+    fn inherit(&mut self, shared: &Self) {
+        if self.binding.is_some() {
+            return;
+        }
+        for (key, child) in &shared.children {
+            match self.children.entry(*key) {
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().inherit(child);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(child.clone());
+                }
+            }
+        }
+    }
+
     pub(super) fn insert(&mut self, binding: &ActionBinding) -> Result<(), KeymapError> {
         let mut node = self;
         let mut prefix = Vec::with_capacity(binding.on.as_slice().len());

@@ -70,15 +70,13 @@ impl Filterable<Notification> for OptionFilterer {
     }
 }
 
-pub(super) struct FilterPopup {
-    pub(super) is_active: bool,
+pub(crate) struct FilterPopup {
     pending_options: Option<GhNotificationFilterOptions>,
 }
 
 impl FilterPopup {
     pub(super) fn new() -> Self {
         Self {
-            is_active: false,
             pending_options: None,
         }
     }

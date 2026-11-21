@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use synd_client::payload;
 
 use crate::{
-    application::{Direction, Populate},
+    application::Populate,
+    command::ListCommand,
     types::{EntryExt, RequirementExt, TimeExt},
     ui::{
         self, Context, icon,
@@ -74,16 +75,8 @@ impl EntriesWidget {
         self.entries.retain(|entry| &entry.entry.feed.url != url);
     }
 
-    pub(crate) fn move_selection(&mut self, direction: Direction) {
-        self.entries.move_selection(direction);
-    }
-
-    pub(crate) fn move_first(&mut self) {
-        self.entries.move_first();
-    }
-
-    pub(crate) fn move_last(&mut self) {
-        self.entries.move_last();
+    pub(crate) fn apply_list(&mut self, command: ListCommand) {
+        self.entries.apply_list(command);
     }
 
     pub(crate) fn entries(&self) -> impl Iterator<Item = &payload::Entry> {
