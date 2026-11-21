@@ -1,7 +1,6 @@
-use std::{io::IsTerminal as _, process::ExitCode, time::Instant};
+use std::{io::IsTerminal as _, process::ExitCode};
 
 use synd_support::fs::fsimpl::FileSystem;
-use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::config::ConfigResolver;
@@ -10,19 +9,6 @@ mod cli;
 mod config;
 mod release;
 mod runtime;
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-fn command_name(command: &cli::Command) -> &'static str {
-    match command {
-        cli::Command::Term(_) => "term",
-        cli::Command::Clean(_) => "clean",
-        cli::Command::Daemon(_) => "daemon",
-        cli::Command::Doctor(_) => "doctor",
-        cli::Command::Feed(_) => "feed",
-        cli::Command::Config(_) => "config",
-    }
-}
 
 fn install_panic_hook() {
     let previous = std::panic::take_hook();
@@ -163,37 +149,12 @@ async fn main() -> ExitCode {
     };
     install_panic_hook();
 
-    let command_name = command_name(&command);
-    let started_at = Instant::now();
-    info!(
-        command = command_name,
-        version = VERSION,
-        pid = std::process::id(),
-        os = std::env::consts::OS,
-        arch = std::env::consts::ARCH,
-        "Started synd process"
-    );
-
-    let exit_code = match command {
+    match command {
         cli::Command::Term(term) => term.run(config).await,
         cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
         cli::Command::Daemon(daemon) => daemon.run(config).await,
         cli::Command::Doctor(doctor) => doctor.run(config).await,
         cli::Command::Feed(feed) => feed.run(config).await,
         cli::Command::Config(command) => command.run(&config),
-    };
-
-    info!(
-        command = command_name,
-        pid = std::process::id(),
-        outcome = if exit_code == ExitCode::SUCCESS {
-            "success"
-        } else {
-            "failure"
-        },
-        uptime_ms = started_at.elapsed().as_millis(),
-        "Stopped synd process"
-    );
-
-    exit_code
+    }
 }
