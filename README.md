@@ -98,12 +98,26 @@ loaded, select an entry and press `Enter` to open it in your web browser.
 
 ## CLI
 
-| Command | What it does |
-| --- | --- |
-| `synd feed subscribe --url <url>` | Subscribe to a feed. |
-| `synd feed export > feeds.json` | Save subscriptions as JSON. Restore them with `synd feed import feeds.json`. |
-| `synd config view -o json` | Print the effective configuration as JSON. |
-| `synd doctor` | Check local paths and the status of the daemon. |
+Subscribe to This Week in Rust with the same category and priority as in the Quick Start.
+
+```sh
+synd feed subscribe --url https://this-week-in-rust.org/atom.xml --category rust --requirement must
+```
+
+Save your subscriptions to a JSON file.
+
+```sh
+synd feed export > feeds.json
+```
+
+Import the subscriptions from that file.
+
+```sh
+synd feed import feeds.json
+```
+
+`synd config view -o json` prints the effective configuration as JSON.
+`synd doctor` checks local paths and reports the status of the daemon.
 
 Run `synd --help` to explore the other commands. For settings and configuration file
 locations, see the [configuration guide][configuration].
@@ -116,10 +130,17 @@ locations, see the [configuration guide][configuration].
 With `synd` installed, your agent can use the `synd` skill to manage feed
 subscriptions.
 
-| Tool | Command |
-| --- | --- |
-| [skills](https://github.com/vercel-labs/skills) | `npx skills add -g ymgyt/syndicationd` |
-| [APM](https://github.com/microsoft/apm) | `apm install -g ymgyt/syndicationd` |
+### [skills](https://github.com/vercel-labs/skills)
+
+```sh
+npx skills add -g ymgyt/syndicationd
+```
+
+### [APM](https://github.com/microsoft/apm)
+
+```sh
+apm install -g ymgyt/syndicationd
+```
 
 ## Development
 
