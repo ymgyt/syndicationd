@@ -40,6 +40,16 @@ impl KeyStroke {
         Self::new(KeyCode::Char(ch), KeyModifiers::NONE)
     }
 
+    pub(super) fn help_label(self) -> String {
+        match (self.modifiers, self.code) {
+            (KeyModifiers::NONE, KeyCode::Enter) => "Ent".into(),
+            (KeyModifiers::NONE, KeyCode::Char(' ')) => "Sp".into(),
+            (KeyModifiers::NONE, KeyCode::Tab) => "Tab".into(),
+            (KeyModifiers::SHIFT, KeyCode::BackTab) => "S-Tab".into(),
+            _ => self.to_string(),
+        }
+    }
+
     pub(crate) fn as_char(self) -> Option<char> {
         if self
             .modifiers

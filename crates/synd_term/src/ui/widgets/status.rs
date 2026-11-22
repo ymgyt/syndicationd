@@ -6,7 +6,7 @@ use ratatui::{
 
 use crate::{
     application::{InFlightStatus, RequestProgress},
-    keymap::KeyHint,
+    keymap::{Keymap, LayerStack},
     ui::{
         Context,
         widgets::throbber::{
@@ -15,6 +15,8 @@ use crate::{
         },
     },
 };
+
+mod key_help;
 
 pub struct StatusLineWidget {
     error_message: Option<String>,
@@ -41,14 +43,15 @@ impl StatusLineWidget {
         buf: &mut Buffer,
         cx: &Context<'_>,
         in_flight: Option<InFlightStatus<'_>>,
-        hints: impl FnOnce() -> Vec<KeyHint>,
+        keymap: &Keymap,
+        layers: &LayerStack,
     ) {
         if let Some(error_message) = self.error_message.as_ref() {
             Self::render_error(area, buf, cx, error_message);
         } else if let Some(status) = in_flight {
             Self::render_in_flight(area, buf, cx, &status);
         } else {
-            Self::render_key_hints(area, buf, cx, hints());
+            Self::render_key_hints(area, buf, cx, key_help::entries(keymap, layers));
         }
     }
 
@@ -94,28 +97,21 @@ impl StatusLineWidget {
             .render(suffix_area, buf);
     }
 
-    fn render_key_hints(area: Rect, buf: &mut Buffer, cx: &Context<'_>, hints: Vec<KeyHint>) {
-        // Aliases share a label so that the available width also fits other actions.
-        let mut by_label = indexmap::IndexMap::<String, Vec<String>>::new();
-        for hint in hints {
-            by_label
-                .entry(hint.description)
-                .or_default()
-                .push(hint.keys);
-        }
-        let mut spans = Vec::new();
+    fn render_key_hints(area: Rect, buf: &mut Buffer, cx: &Context<'_>, hints: Vec<String>) {
+        let mut line = Line::default();
         let mut width = 0;
-        for (description, keys) in by_label {
-            let span = Span::styled(
-                format!("{}:{description}  ", keys.join("/")),
-                cx.theme.prompt.key_desc,
-            );
-            if width + span.width() <= usize::from(area.width) {
-                width += span.width();
-                spans.push(span);
+        for hint in hints {
+            let span = Span::styled(hint, cx.theme.prompt.key_desc);
+            let gap = if line.spans.is_empty() { 0 } else { 2 };
+            if width + gap + span.width() <= usize::from(area.width) {
+                if gap != 0 {
+                    line.push_span("  ");
+                }
+                width += gap + span.width();
+                line.push_span(span);
             }
         }
-        Paragraph::new(Line::from(spans))
+        Paragraph::new(line)
             .alignment(Alignment::Center)
             .style(cx.theme.prompt.background)
             .render(area, buf);

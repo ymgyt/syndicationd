@@ -545,11 +545,66 @@ fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
 }
 
 #[test]
+fn status_line_shows_the_main_actions_for_each_list() {
+    use crate::test_support::screen::Screen;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    let mut compositor = new_compositor(Config {
+        features: Features {
+            enable_gh_notification: true,
+        },
+        ..Config::default()
+    });
+    let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+    let mut status = |compositor: &Compositor| {
+        let frame = terminal
+            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
+            .unwrap();
+        Screen::new(frame.buffer)
+            .lines()
+            .pop()
+            .unwrap()
+            .trim()
+            .to_owned()
+    };
+    assert_eq!(
+        status(&compositor),
+        "Tab:󰹳  j/k:󰹹  Ent:󰏌  d:  f:󰈶  /:  q:"
+    );
+    let _ = compositor.apply_terminal_event(&key!('f'));
+    assert!(status(&compositor).starts_with("esc:Apply filters"));
+    let _ = compositor.apply_terminal_event(&key!(esc));
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    let entries = status(&compositor);
+    assert_eq!(entries, "Tab:󰹳  j/k:󰹹  Ent:󰏌  Sp:󰏋  /:  q:");
+    let _ = compositor.apply_terminal_event(&key!('g'));
+    assert_eq!(status(&compositor), "g:First  e:Last");
+    let _ = compositor.apply_terminal_event(&key!('e'));
+    assert_eq!(status(&compositor), entries);
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    assert_eq!(
+        status(&compositor),
+        "Tab:󰹳  j/k:󰹹  Ent:󰏌  a:󰑫  e:  d:󰼡  /:  q:"
+    );
+}
+
+#[test]
 fn status_hints_follow_remaps_and_search_input() {
     use crate::{keymap::CompiledKeymaps, test_support::screen::Screen};
     use ratatui::{Terminal, backend::TestBackend};
     let bindings = toml::from_str(
         r#"
+        [entries]
+        keymap = [
+            { on = "enter", command = "nop" },
+            { on = "space", command = "entries.open" },
+            { on = ["z", "b"], command = "entries.browse" }
+        ]
+        [list]
+        keymap = [
+            { on = "j", command = "nop" },
+            { on = "n", command = "list.next" }
+        ]
         [filter]
         keymap = [
             { on = "/", command = "nop" },
@@ -571,12 +626,17 @@ fn status_hints_follow_remaps_and_search_input() {
     };
 
     let normal = status(&compositor);
+    assert!(normal.contains("n/k:󰹹"));
+    assert!(normal.contains("Sp:󰏌  z b:󰏋"));
+    assert!(!normal.contains("Ent:"));
     assert!(normal.contains("x:Find stories"));
     assert!(!normal.contains("/:Search"));
     let _ = compositor.apply_terminal_event(&key!('x'));
     let editing = status(&compositor);
-    assert!(editing.contains("backspace:"));
-    assert!(!editing.contains("x:Find stories"));
+    assert_eq!(
+        editing.trim(),
+        "esc:Close filter  backspace:Delete previous character"
+    );
     let _ = compositor.apply_terminal_event(&key!(esc));
     assert_eq!(status(&compositor), normal);
 }

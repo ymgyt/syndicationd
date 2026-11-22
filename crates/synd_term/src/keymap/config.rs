@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use indexmap::IndexMap;
 use serde::Deserialize;
 
 use super::{CommandId, KeyBinding, KeySequence, KeymapError, Layer};
@@ -32,13 +33,14 @@ impl KeymapConfig {
 
     pub(crate) fn merge(&mut self, other: Self) {
         for (layer, bindings) in other.bindings {
-            let dst = self.bindings.entry(layer).or_default();
-            for binding in bindings {
-                match dst.iter().position(|b| b.on == binding.on) {
-                    Some(idx) => dst[idx] = binding,
-                    None => dst.push(binding),
-                }
-            }
+            // Visit configured keys before built-in aliases when choosing a hint.
+            let overrides: IndexMap<_, _> = bindings
+                .into_iter()
+                .map(|binding| (binding.on.clone(), binding))
+                .collect();
+            let defaults = self.bindings.entry(layer).or_default();
+            defaults.retain(|binding| !overrides.contains_key(&binding.on));
+            defaults.splice(..0, overrides.into_values());
         }
     }
 }

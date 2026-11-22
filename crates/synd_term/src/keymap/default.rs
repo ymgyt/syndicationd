@@ -5,17 +5,22 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     let mut config = KeymapConfig::new();
 
     macro_rules! bind {
-        ($layer:expr, [$($key:literal),+], $command:expr, $desc:literal) => {
+        ($layer:expr, $keys:expr, $command:expr) => {
             config
-                .add($layer, [$($key),+], $command, Some($desc))
+                .add($layer, $keys, $command, None)
+                .expect("valid default keymap binding");
+        };
+        ($layer:expr, $keys:expr, $command:expr, $desc:literal) => {
+            config
+                .add($layer, $keys, $command, Some($desc))
                 .expect("valid default keymap binding");
         };
     }
 
-    bind!(Layer::App, ["C-c"], CommandId::Quit, "Quit");
+    bind!(Layer::App, ["C-c"], CommandId::Quit);
     bind!(Layer::App, ["S-r"], CommandId::ForceRedraw, "Redraw");
 
-    bind!(Layer::Global, ["q"], CommandId::Quit, "Quit");
+    bind!(Layer::Global, ["q"], CommandId::Quit);
     bind!(
         Layer::Global,
         ["S-t"],
@@ -23,71 +28,47 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         "Rotate theme"
     );
 
-    bind!(
-        Layer::Login,
-        ["enter"],
-        CommandId::Authenticate,
-        "Authenticate"
-    );
+    bind!(Layer::Login, ["enter"], CommandId::Authenticate);
     bind!(
         Layer::Login,
         ["k"],
-        CommandId::MoveAuthenticationProviderPrev,
-        "Prev provider"
+        CommandId::MoveAuthenticationProviderPrev
     );
     bind!(
         Layer::Login,
         ["up"],
-        CommandId::MoveAuthenticationProviderPrev,
-        "Prev provider"
+        CommandId::MoveAuthenticationProviderPrev
     );
     bind!(
         Layer::Login,
         ["j"],
-        CommandId::MoveAuthenticationProviderNext,
-        "Next provider"
+        CommandId::MoveAuthenticationProviderNext
     );
     bind!(
         Layer::Login,
         ["down"],
-        CommandId::MoveAuthenticationProviderNext,
-        "Next provider"
+        CommandId::MoveAuthenticationProviderNext
     );
 
-    bind!(Layer::List, ["k"], CommandId::ListPrev, "Prev");
-    bind!(Layer::List, ["up"], CommandId::ListPrev, "Prev");
-    bind!(Layer::List, ["j"], CommandId::ListNext, "Next");
-    bind!(Layer::List, ["down"], CommandId::ListNext, "Next");
+    bind!(Layer::List, ["k"], CommandId::ListPrev);
+    bind!(Layer::List, ["up"], CommandId::ListPrev);
+    bind!(Layer::List, ["j"], CommandId::ListNext);
+    bind!(Layer::List, ["down"], CommandId::ListNext);
     bind!(Layer::List, ["g", "g"], CommandId::ListFirst, "First");
     bind!(Layer::List, ["g", "e"], CommandId::ListLast, "Last");
 
-    bind!(Layer::Tabs, ["tab"], CommandId::MoveTabNext, "Next tab");
-    bind!(
-        Layer::Tabs,
-        ["backtab"],
-        CommandId::MoveTabPrev,
-        "Previous tab"
-    );
+    bind!(Layer::Tabs, ["tab"], CommandId::MoveTabNext);
+    bind!(Layer::Tabs, ["backtab"], CommandId::MoveTabPrev);
 
     bind!(Layer::Entries, ["r"], CommandId::RefreshTimeline, "Refresh");
-    bind!(Layer::Entries, ["enter"], CommandId::OpenEntry, "Open");
-    bind!(Layer::Entries, ["space"], CommandId::BrowseEntry, "Browse");
+    bind!(Layer::Entries, ["enter"], CommandId::OpenEntry);
+    bind!(Layer::Entries, ["space"], CommandId::BrowseEntry);
 
-    bind!(
-        Layer::Feeds,
-        ["a"],
-        CommandId::PromptFeedSubscription,
-        "Subscribe"
-    );
-    bind!(Layer::Feeds, ["e"], CommandId::PromptFeedEdition, "Edit");
-    bind!(
-        Layer::Feeds,
-        ["d"],
-        CommandId::PromptFeedUnsubscription,
-        "Unsubscribe"
-    );
+    bind!(Layer::Feeds, ["a"], CommandId::PromptFeedSubscription);
+    bind!(Layer::Feeds, ["e"], CommandId::PromptFeedEdition);
+    bind!(Layer::Feeds, ["d"], CommandId::PromptFeedUnsubscription);
     bind!(Layer::Feeds, ["r"], CommandId::ReloadSubscription, "Reload");
-    bind!(Layer::Feeds, ["enter"], CommandId::OpenFeed, "Open");
+    bind!(Layer::Feeds, ["enter"], CommandId::OpenFeed);
 
     bind!(
         Layer::Filter,
@@ -119,12 +100,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         CommandId::ActivateCategoryFiltering,
         "Categories"
     );
-    bind!(
-        Layer::Filter,
-        ["/"],
-        CommandId::ActivateSearchFiltering,
-        "Search"
-    );
+    bind!(Layer::Filter, ["/"], CommandId::ActivateSearchFiltering);
     bind!(
         Layer::Filter,
         ["esc"],
@@ -172,8 +148,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     bind!(
         Layer::GhNotifications,
         ["enter"],
-        CommandId::OpenGhNotification,
-        "Open"
+        CommandId::OpenGhNotification
     );
     bind!(
         Layer::GhNotifications,
@@ -190,8 +165,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     bind!(
         Layer::GhNotifications,
         ["d"],
-        CommandId::MarkGhNotificationAsDone,
-        "Done"
+        CommandId::MarkGhNotificationAsDone
     );
     bind!(
         Layer::GhNotifications,
@@ -208,8 +182,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     bind!(
         Layer::GhNotifications,
         ["f"],
-        CommandId::OpenGhNotificationFilter,
-        "Filters"
+        CommandId::OpenGhNotificationFilter
     );
 
     bind!(

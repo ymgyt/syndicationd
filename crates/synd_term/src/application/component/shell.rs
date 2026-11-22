@@ -93,7 +93,8 @@ impl Component for ShellComponent {
             buf,
             &cx.ui,
             self.in_flight.status(),
-            || cx.keymap.hints(&cx.layers),
+            cx.keymap,
+            &cx.layers,
         );
     }
 

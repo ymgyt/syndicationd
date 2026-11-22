@@ -84,10 +84,10 @@ impl KeyTrie {
         self.children.contains_key(&key)
     }
 
-    pub(super) fn visit_bindings(
-        &self,
+    pub(super) fn visit_bindings<'a>(
+        &'a self,
         keys: &mut Vec<KeyStroke>,
-        visit: &mut impl FnMut(&[KeyStroke], &CompiledBinding),
+        visit: &mut impl FnMut(&[KeyStroke], &'a CompiledBinding),
     ) {
         if let Some(binding) = &self.binding {
             visit(keys, binding);

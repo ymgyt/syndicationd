@@ -59,7 +59,7 @@ fn covered_list_consumes_its_bindings_without_running_them() {
     layers.extend(&[Layer::UnsubscribePopup]);
 
     let hints = keymap.hints(&layers);
-    assert!(hints.iter().any(|hint| hint.keys == "enter"));
+    assert!(hints.iter().any(|hint| hint.keys == "Ent"));
     assert!(
         !hints
             .iter()
@@ -96,12 +96,12 @@ fn view_override_keeps_other_list_bindings_with_the_same_prefix() {
         assert!(
             hints
                 .iter()
-                .any(|hint| hint.keys == "g" && hint.description == "entries.open")
+                .any(|hint| hint.keys == "g" && hint.command == Some(CommandId::OpenEntry))
         );
         assert!(
             hints
                 .iter()
-                .any(|hint| hint.keys == "e" && hint.description == "Last")
+                .any(|hint| hint.keys == "e" && hint.description == Some("Last"))
         );
         assert_eq!(
             matched_action(&keymap.resolve(&layers, key(last_key))),

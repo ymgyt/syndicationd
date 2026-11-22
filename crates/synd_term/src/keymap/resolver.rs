@@ -49,6 +49,10 @@ impl LayerStack {
     fn iter_high_to_low(&self) -> impl Iterator<Item = Layer> + '_ {
         self.layers.iter().rev().map(|(layer, _)| *layer)
     }
+
+    pub(crate) fn top(&self) -> Option<Layer> {
+        self.iter_high_to_low().next()
+    }
 }
 
 impl<const N: usize> From<[Layer; N]> for LayerStack {
@@ -177,8 +181,12 @@ impl Keymap {
         std::mem::take(&mut self.pending)
     }
 
+    pub(crate) fn has_pending_keys(&self) -> bool {
+        !self.pending.is_empty()
+    }
+
     /// Bindings reachable from the current input prefix, in layer priority order.
-    pub(crate) fn hints(&self, layers: &LayerStack) -> Vec<KeyHint> {
+    pub(crate) fn hints(&self, layers: &LayerStack) -> Vec<KeyHint<'_>> {
         let mut hints = Vec::new();
         let mut path = Vec::new();
         for &(layer, covered) in layers.layers.iter().rev() {
@@ -197,21 +205,20 @@ impl Keymap {
                 {
                     return;
                 }
-                let description = binding.desc.as_deref().or(match &binding.action {
-                    KeymapAction::Command(command) => Some(command.as_str()),
-                    _ => None,
+                let keys = keys[self.pending.len()..]
+                    .iter()
+                    .map(|key| key.help_label())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                hints.push(KeyHint {
+                    layer,
+                    keys,
+                    command: match binding.action {
+                        KeymapAction::Command(id) => Some(id),
+                        _ => None,
+                    },
+                    description: binding.desc.as_deref(),
                 });
-                if let Some(description) = description {
-                    let keys = keys[self.pending.len()..]
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    hints.push(KeyHint {
-                        keys,
-                        description: description.to_owned(),
-                    });
-                }
             });
         }
         hints
@@ -246,9 +253,11 @@ impl Default for Keymap {
     }
 }
 
-pub(crate) struct KeyHint {
+pub(crate) struct KeyHint<'a> {
+    pub(crate) layer: Layer,
     pub(crate) keys: String,
-    pub(crate) description: String,
+    pub(crate) command: Option<CommandId>,
+    pub(crate) description: Option<&'a str>,
 }
 
 /// Outcome of resolving one key event through the current keymap state.
