@@ -111,6 +111,16 @@ locations, see the [configuration guide][configuration].
 [keymap]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/keymap.md
 [configuration]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/configuration.md
 
+## Agent skill
+
+With `synd` installed, your agent can use the `synd` skill to manage feed
+subscriptions.
+
+| Tool | Command |
+| --- | --- |
+| [skills](https://github.com/vercel-labs/skills) | `npx skills add -g ymgyt/syndicationd` |
+| [APM](https://github.com/microsoft/apm) | `apm install -g ymgyt/syndicationd` |
+
 ## Development
 
 See

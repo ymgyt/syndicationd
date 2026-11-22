@@ -1,0 +1,4 @@
+name: synd
+version: "0.4.0"
+description: Manage RSS and Atom feed subscriptions with the synd CLI.
+license: MIT OR Apache-2.0
