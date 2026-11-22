@@ -140,6 +140,15 @@ Assisted-by: Codex:gpt-6.2-sol
 
 For information about CI, refer to [ci.md](/docs/ci.md).
 
+### Record the README demo
+
+On COSMIC, run `just demo` with Alacritty, Zellij, Nix, and Cargo installed.
+The recipe builds [wlrec](https://github.com/ymgyt/wlrec) from `../wlrec` (override with `WLREC_DIR`).
+Select the **synd demo** window when prompted. The recording replaces `etc/demo/demo.gif`.
+
+Edit [feeds.json](etc/demo/feeds.json) to change subscriptions and `play_demo` in
+[record.sh](etc/demo/record.sh) to change the recorded keys. Each run fetches current articles into a temporary database.
+
 ### Release Flow
 
 To perform a release, run `just synd <package> release (patch|minor|major) [--execute]`.

@@ -6,7 +6,6 @@ mod dot 'etc/just/dot.just'
 mod etc 'etc/just/etc'
 mod nix 'etc/just/nix'
 mod run 'etc/just/run.just'
-mod demo 'etc/just/demo.just'
 mod dist 'etc/just/dist.just'
 mod lint 'etc/just/lint.just'
 mod synd 'etc/just/synd.just'
@@ -22,6 +21,10 @@ mod license 'etc/just/license.just'
 # List recipe
 default:
     just --list --list-submodules
+
+# Record the README GIF on Wayland
+demo:
+    let wlrec = ($env.WLREC_DIR? | default '../wlrec'); nix develop $wlrec --command nix shell 'nixpkgs#jq' --command bash etc/demo/record.sh $wlrec
 
 # Generate product changelog
 changelog target:
