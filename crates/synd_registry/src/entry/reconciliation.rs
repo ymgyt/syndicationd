@@ -44,30 +44,61 @@ impl Change {
             Self::Discovered(entry) | Self::Changed(entry) => entry,
         }
     }
+}
 
-    pub(crate) fn decide(
+/// Result of comparing an observed source entry with its stored state.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum EntryChange {
+    Discovered(Entry),
+    Unchanged(SyndEntry),
+    Changed {
+        previous: Box<SyndEntry>,
+        observed: Entry,
+    },
+}
+
+impl EntryChange {
+    pub(crate) fn determine(
         current: Option<SyndEntry>,
         observed: Entry,
-        observed_at: Time,
-    ) -> Result<Option<Self>, EntryIdMismatch> {
-        let Some(current) = current else {
-            let order_key = observed.resolve_order_key(observed_at);
-            let entry = SyndEntry::builder()
-                .entry(observed)
-                .order_key(order_key)
-                .build();
-            return Ok(Some(Self::Discovered(entry)));
+    ) -> Result<Self, EntryIdMismatch> {
+        let Some(previous) = current else {
+            return Ok(Self::Discovered(observed));
         };
+        Ok(match previous.compute_diff(&observed)? {
+            SyndEntryDiff::Unchanged => Self::Unchanged(previous),
+            SyndEntryDiff::EntryChanged => Self::Changed {
+                previous: Box::new(previous),
+                observed,
+            },
+        })
+    }
 
-        match current.compute_diff(&observed)? {
-            SyndEntryDiff::Unchanged => Ok(None),
-            SyndEntryDiff::EntryChanged => {
-                let entry = SyndEntry::builder()
-                    .entry(observed)
-                    .order_key(current.order_key())
-                    .build();
-                Ok(Some(Self::Changed(entry)))
+    pub(crate) fn entry_id(&self) -> &EntryId {
+        match self {
+            Self::Discovered(observed) | Self::Changed { observed, .. } => observed.id(),
+            Self::Unchanged(current) => current.entry().id(),
+        }
+    }
+
+    pub(crate) fn into_write(self, seen_at: Time) -> Option<Change> {
+        match self {
+            Self::Unchanged(_) => None,
+            Self::Discovered(observed) => {
+                let order_key = observed.resolve_order_key(seen_at);
+                Some(Change::Discovered(
+                    SyndEntry::builder()
+                        .entry(observed)
+                        .order_key(order_key)
+                        .build(),
+                ))
             }
+            Self::Changed { previous, observed } => Some(Change::Changed(
+                SyndEntry::builder()
+                    .entry(observed)
+                    .order_key(previous.order_key())
+                    .build(),
+            )),
         }
     }
 }
@@ -119,7 +150,9 @@ mod tests {
             .published(published)
             .build();
 
-        let change = Change::decide(None, observed.clone(), observed_at).unwrap();
+        let change = EntryChange::determine(None, observed.clone())
+            .unwrap()
+            .into_write(observed_at);
 
         let Some(Change::Discovered(entry)) = change else {
             panic!("expected a discovered entry");
@@ -140,12 +173,9 @@ mod tests {
             .updated(time("2026-07-21T12:00:00Z"))
             .build();
 
-        let change = Change::decide(
-            Some(current),
-            observed.clone(),
-            time("2026-07-21T12:00:00Z"),
-        )
-        .unwrap();
+        let change = EntryChange::determine(Some(current), observed.clone())
+            .unwrap()
+            .into_write(time("2026-07-21T12:00:00Z"));
 
         let Some(Change::Changed(entry)) = change else {
             panic!("expected a changed entry");
@@ -163,7 +193,9 @@ mod tests {
             .order_key(observed.resolve_order_key(observed_at))
             .build();
 
-        let change = Change::decide(Some(current), observed, observed_at).unwrap();
+        let change = EntryChange::determine(Some(current), observed)
+            .unwrap()
+            .into_write(observed_at);
 
         assert_eq!(change, None);
     }

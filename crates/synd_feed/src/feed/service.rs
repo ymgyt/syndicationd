@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use feed_rs::parser::{ParseFeedError, Parser};
 
-use crate::types::{Feed, FeedUrl};
+use crate::{
+    entry::SourceEntry,
+    types::{Feed, FeedMeta, FeedUrl},
+};
 
 pub type FetchFeedResult<T> = std::result::Result<T, FetchFeedError>;
 pub type FeedParseResult<T> = std::result::Result<T, FeedParseError>;
@@ -527,11 +530,18 @@ impl FeedService {
     where
         S: std::io::Read,
     {
-        let parser = Self::build_parser(&url);
+        let (meta, entries) = Self::parse_source(url, source)?;
+        Ok(Feed::from_source(meta, entries))
+    }
 
-        parser
+    /// Parses the feed metadata and preserves entry fields for the entry pipeline.
+    pub fn parse_source(
+        url: FeedUrl,
+        source: impl std::io::Read,
+    ) -> FeedParseResult<(FeedMeta, Vec<SourceEntry>)> {
+        Self::build_parser(&url)
             .parse(source)
-            .map(|feed| Feed::from_feed_rs(url, feed))
+            .map(|feed| FeedMeta::split_source(url, feed))
             .map_err(FeedParseError::from)
     }
 

@@ -8,6 +8,8 @@ use crate::types::{FeedType, FeedUrl, Link, Person, Text, Time, link};
 
 use super::{Content, EntryId, EntryIdError};
 
+pub use feed_rs::model::Entry as SourceEntry;
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]
 pub struct Entry {
@@ -59,13 +61,25 @@ impl Entry {
     pub fn website_url(&self, feed_type: FeedType) -> Option<&str> {
         link::find_website_url(feed_type, &self.links)
     }
+}
 
-    pub(crate) fn from_feed_rs(
-        feed_url: &FeedUrl,
-        feed_type: FeedType,
-        entry: feedrs::Entry,
+/// An entry with its stable identity resolved from the original source fields.
+pub struct IdentifiedEntry {
+    id: EntryId,
+    source: SourceEntry,
+}
+
+impl IdentifiedEntry {
+    pub fn identify(
+        url: &FeedUrl,
+        format: FeedType,
+        source: SourceEntry,
     ) -> Result<Self, EntryIdError> {
-        let id = EntryId::from_feed_entry(feed_url, feed_type, &entry)?;
+        let id = EntryId::from_feed_entry(url, format, &source)?;
+        Ok(Self { id, source })
+    }
+
+    pub fn into_entry(self) -> Entry {
         let feedrs::Entry {
             title,
             updated,
@@ -75,9 +89,9 @@ impl Entry {
             summary,
             published,
             ..
-        } = entry;
-        Ok(Self {
-            id,
+        } = self.source;
+        Entry {
+            id: self.id,
             title: title.map(Into::into),
             updated,
             authors: authors.into_iter().map(Into::into).collect(),
@@ -85,7 +99,7 @@ impl Entry {
             links: links.into_iter().map(Into::into).collect(),
             summary: summary.map(Into::into),
             published,
-        })
+        }
     }
 }
 
@@ -146,12 +160,13 @@ mod tests {
             ..Default::default()
         };
 
-        let entry = Entry::from_feed_rs(
+        let entry = IdentifiedEntry::identify(
             &FeedUrl::parse("https://example.com/feed.xml").unwrap(),
             FeedType::Atom,
             source,
         )
-        .unwrap();
+        .unwrap()
+        .into_entry();
 
         assert_eq!(entry.title().map(Text::content), Some("Entry title"));
         assert_eq!(entry.updated(), Some(updated));

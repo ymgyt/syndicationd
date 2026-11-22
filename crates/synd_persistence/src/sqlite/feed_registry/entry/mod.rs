@@ -58,14 +58,17 @@ pub(super) async fn sync_membership(
     tx: &mut Transaction<'_, Sqlite>,
     feed_pk: i64,
     membership: &[EntryId],
+    preserve: &std::collections::HashSet<EntryId>,
 ) -> SqliteResult<()> {
     let entry_ids = membership.iter().map(EntryId::as_str).collect::<Vec<_>>();
     let entry_ids_json = serde_json::to_string(&entry_ids)?;
 
+    let retained_ids_json = serde_json::to_string(preserve)?;
     sqlx::query(
         r#"
             DELETE FROM feed_entry
             WHERE feed_pk = ?
+              AND entry_id NOT IN (SELECT value FROM json_each(?))
               AND NOT EXISTS (
                   SELECT 1
                   FROM json_each(?) AS desired
@@ -74,6 +77,7 @@ pub(super) async fn sync_membership(
             "#,
     )
     .bind(feed_pk)
+    .bind(retained_ids_json)
     .bind(&entry_ids_json)
     .execute(&mut **tx)
     .await?;

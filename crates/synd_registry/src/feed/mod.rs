@@ -1,3 +1,4 @@
+mod pipeline;
 mod projection;
 mod source;
 mod update;

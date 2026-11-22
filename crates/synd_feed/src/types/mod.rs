@@ -6,7 +6,7 @@ use feed_rs::model as feedrs;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use crate::entry::Entry;
+use crate::entry::{Entry, IdentifiedEntry, SourceEntry};
 
 pub type Time = DateTime<Utc>;
 
@@ -242,6 +242,34 @@ impl<T> Annotated<T> {
 }
 
 impl FeedMeta {
+    pub(crate) fn split_source(url: FeedUrl, feed: feedrs::Feed) -> (Self, Vec<SourceEntry>) {
+        let feed_rs::model::Feed {
+            feed_type,
+            title,
+            updated,
+            authors,
+            description,
+            links,
+            generator,
+            published,
+            entries,
+            ..
+        } = feed;
+        let feed_type = feed_type.into();
+        let meta = FeedMeta {
+            url,
+            feed_type,
+            title: title.map(Into::into),
+            updated,
+            authors: authors.into_iter().map(Into::into).collect(),
+            description: description.map(Into::into),
+            links: links.into_iter().map(Into::into).collect(),
+            generator: generator.map(Into::into),
+            published,
+        };
+        (meta, entries)
+    }
+
     /// Returns the feed format.
     pub fn r#type(&self) -> FeedType {
         self.feed_type
@@ -312,45 +340,23 @@ impl Feed {
         Self { meta, entries }
     }
 
-    pub(crate) fn from_feed_rs(url: FeedUrl, feed: feedrs::Feed) -> Self {
-        let feed_rs::model::Feed {
-            feed_type,
-            title,
-            updated,
-            authors,
-            description,
-            links,
-            generator,
-            published,
-            entries,
-            ..
-        } = feed;
-        let feed_type = feed_type.into();
+    pub(crate) fn from_source(meta: FeedMeta, entries: Vec<SourceEntry>) -> Self {
         let entries = entries
             .into_iter()
-            .filter_map(|entry| match Entry::from_feed_rs(&url, feed_type, entry) {
-                Ok(entry) => Some(entry),
-                Err(err) => {
-                    warn!(
-                        error = %err,
-                        feed_url = url.as_str(),
-                        "skip feed entry because EntryId cannot be generated"
-                    );
-                    None
-                }
-            })
+            .filter_map(
+                |entry| match IdentifiedEntry::identify(meta.url(), meta.r#type(), entry) {
+                    Ok(entry) => Some(entry.into_entry()),
+                    Err(err) => {
+                        warn!(
+                            error = %err,
+                            feed_url = meta.url().as_str(),
+                            "skip feed entry because EntryId cannot be generated"
+                        );
+                        None
+                    }
+                },
+            )
             .collect();
-        let meta = FeedMeta {
-            url,
-            feed_type,
-            title: title.map(Into::into),
-            updated,
-            authors: authors.into_iter().map(Into::into).collect(),
-            description: description.map(Into::into),
-            links: links.into_iter().map(Into::into).collect(),
-            generator: generator.map(Into::into),
-            published,
-        };
         Self::new(meta, entries)
     }
 

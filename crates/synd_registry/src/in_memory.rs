@@ -76,8 +76,9 @@ impl InMemoryFeeds {
         }
         let feed_url = update.source().feed_url.clone();
         self.meta.insert(feed_url.clone(), update.meta().clone());
-        self.membership
-            .insert(feed_url, update.membership().to_vec());
+        let membership = self.membership.entry(feed_url).or_default();
+        membership.retain(|id| update.preserve_membership().contains(id));
+        membership.extend_from_slice(update.membership());
     }
 
     fn load(&self, feed_urls: &[FeedUrl]) -> RegistryDbResult<HashMap<FeedUrl, Feed>> {

@@ -57,7 +57,13 @@ async fn apply_update(tx: &mut Transaction<'_, Sqlite>, update: &FeedUpdate) -> 
     let feed_pk = resolve_pk(tx, &update.source().feed_url).await?;
     upsert_snapshot(tx, feed_pk, update).await?;
     entry::apply_changes(tx, feed_pk, update.entry_changes()).await?;
-    entry::sync_membership(tx, feed_pk, update.membership()).await?;
+    entry::sync_membership(
+        tx,
+        feed_pk,
+        update.membership(),
+        update.preserve_membership(),
+    )
+    .await?;
     Ok(())
 }
 
