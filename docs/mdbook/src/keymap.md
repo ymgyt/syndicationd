@@ -122,21 +122,33 @@ dynamic bindings are managed by the application for now.
 
 ## Default Key Bindings
 
-| Key     | Description                                    |
-| ---     | ---                                            |
-| `k/j`   | Move up/down                                   |
-| `gg`    | Go to first                                    |
-| `ge`    | Go to end                                      |
-| `Tab`   | Switch tab                                     |
-| `Enter` | Open entry/feed with web browser               |
-| `Space` | Open entry with text browser (`$SYND_BROWSER`) |
-| `a`     | Add feed subscription on the Feeds tab         |
-| `e`     | Edit subscribed feed on the Feeds tab          |
-| `d`     | Delete subscribed feed on the Feeds tab        |
-| `r`     | Refresh timeline/feeds                         |
-| `h/l`   | Change requirement filter                      |
-| `c`     | Activate category filter (`Esc` to deactivate) |
-| `+`     | Activate all categories on category filter     |
-| `-`     | Deactivate all categories on category filter   |
-| `/`     | Activate keyword search (`Esc` to deactivate)  |
-| `q`     | Quit app                                       |
+| Layer               | Key                    | Action                                                |
+| ---                 | ---                    | ---                                                   |
+| `app`               | `Ctrl+C`               | Quit                                                  |
+| `app`               | `R`                    | Redraw the screen                                     |
+| `global`            | `q`                    | Quit                                                  |
+| `global`            | `T`                    | Cycle through themes                                  |
+| `tabs`              | `Tab` / `Shift+Tab`    | Switch to the next / previous tab                     |
+| `list`              | `k` or `↑`             | Move up                                               |
+| `list`              | `j` or `↓`             | Move down                                             |
+| `list`              | `gg` / `ge`            | Jump to the first / last item                         |
+| `entries`           | `Enter`                | Open the entry in your web browser                    |
+| `entries`           | `Space`                | Open the entry in your text browser (`$SYND_BROWSER`) |
+| `entries`           | `r`                    | Refresh the timeline                                  |
+| `feeds`             | `a` / `e`              | Add / edit a subscription                             |
+| `feeds`             | `d`                    | Open the unsubscribe confirmation                     |
+| `feeds`             | `Enter`                | Open the feed's website in your web browser           |
+| `feeds`             | `r`                    | Reload the subscription list                          |
+| `filter`            | `h` / `l` or `←` / `→` | Change the priority filter                            |
+| `filter`            | `c`                    | Open the category filter                              |
+| `filter`            | `/`                    | Search by keyword                                     |
+| `filter`            | `Esc`                  | Leave the category filter or search prompt            |
+| `category-filter`   | Category shortcut      | Toggle the corresponding category                     |
+| `category-filter`   | `+` / `-`              | Enable / disable all categories                       |
+| `search-prompt`     | `Backspace`            | Delete the previous character                         |
+| `unsubscribe-popup` | `h` / `l` or `←` / `→` | Change the selected choice                            |
+| `unsubscribe-popup` | `Enter` / `Esc`        | Confirm the selected choice / cancel                  |
+| `login`             | `k` / `j` or `↑` / `↓` | Select the previous / next provider                   |
+| `login`             | `Enter`                | Authenticate with the selected provider               |
+
+See the [built-in keymap](https://github.com/ymgyt/syndicationd/blob/main/crates/synd_term/src/keymap/default.rs) for all static bindings.
