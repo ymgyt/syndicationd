@@ -2,7 +2,69 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 📡 Features
+
+- Process feed entries through a typed pipeline by [@ymgyt](https://github.com/ymgyt) ([b2862b1d](https://github.com/ymgyt/syndicationd/commit/b2862b1d7fe818e1a29c95708f698cc802630435))
+- Persist RSS and Atom categories as entry labels by [@ymgyt](https://github.com/ymgyt) ([9cf9598b](https://github.com/ymgyt/syndicationd/commit/9cf9598b953bbdbc5b217fe383bca60527adf2f7))
+
+### 🐛 Bug Fixes
+
+- Elide SQLite encoder lifetimes by [@ymgyt](https://github.com/ymgyt) ([4000d74c](https://github.com/ymgyt/syndicationd/commit/4000d74c5fc6381f60aa9efad2293af70c82c78f))
+- Ignore stale list responses after reload by [@ymgyt](https://github.com/ymgyt) ([c99ab302](https://github.com/ymgyt/syndicationd/commit/c99ab302dafad587462d55613c35707d829c1e52))
+- Scope the GitHub concurrency limit to its client by [@ymgyt](https://github.com/ymgyt) ([47d634ae](https://github.com/ymgyt/syndicationd/commit/47d634aeedd2f28c96f2d1de9ea5852a80012a61))
+- Show key hints for the main actions on each screen by [@ymgyt](https://github.com/ymgyt) ([b908a7a1](https://github.com/ymgyt/syndicationd/commit/b908a7a16c481b75264f20d8e79a544713e01c28))
+
+### ⚙️ Miscellaneous Tasks
+
+- Update flake by [@ymgyt](https://github.com/ymgyt) ([fcdfa0ad](https://github.com/ymgyt/syndicationd/commit/fcdfa0ad81c5cfeb971cb5c44776882185e20e17))
+- Update advisory db by [@ymgyt](https://github.com/ymgyt) ([6a39be63](https://github.com/ymgyt/syndicationd/commit/6a39be631406255592daf4dac263e7abc2572e0a))
+- Update rust to 1.100.0 by [@ymgyt](https://github.com/ymgyt) ([d4f9d3a5](https://github.com/ymgyt/syndicationd/commit/d4f9d3a52af9d6976c559070e80d1d34ea9e0564))
+- Record the README demo with wlrec on Wayland by [@ymgyt](https://github.com/ymgyt) ([ec665493](https://github.com/ymgyt/syndicationd/commit/ec6654930b6a69bafb35fe0ec44c5e358ecbdf7b))
+- Generate the social preview from the README demo by [@ymgyt](https://github.com/ymgyt) ([58878437](https://github.com/ymgyt/syndicationd/commit/588784371e655c362fbb4f1844a27785c569d081))
+- Use chore for all dependency updates by ymgyt ([088b9df1](https://github.com/ymgyt/syndicationd/commit/088b9df13c49edd37c912f000899391fc8c7b16f))
+
+### 📚 Documentation
+
+- Document AI attribution in commits by [@ymgyt](https://github.com/ymgyt) ([ec2aba56](https://github.com/ymgyt/syndicationd/commit/ec2aba56fa300e5be2d1673f2d7cf91554e5ba6b))
+- Simplify the README and highlight TUI and CLI usage by [@ymgyt](https://github.com/ymgyt) ([a7971d2e](https://github.com/ymgyt/syndicationd/commit/a7971d2e63c38fae87dfe0c367c5ce753f9fb39c))
+- List default key bindings by layer by [@ymgyt](https://github.com/ymgyt) ([6302bed2](https://github.com/ymgyt/syndicationd/commit/6302bed27a7c144dfb71808642f8fc4b5c3981c2))
+
+### 🔧 Testing
+
+- Update OpenTelemetry SDK snapshots by [@ymgyt](https://github.com/ymgyt) ([7bb67c7a](https://github.com/ymgyt/syndicationd/commit/7bb67c7a0ed87b298cf8efb94ecd8a30c00900bc))
+- Expect string-encoded OTLP integers by [@ymgyt](https://github.com/ymgyt) ([09bb2d22](https://github.com/ymgyt/syndicationd/commit/09bb2d2267836ff6670da5ff092f12292f85117e))
+- Add target to feed-rs link fixtures by [@ymgyt](https://github.com/ymgyt) ([c1e84dfb](https://github.com/ymgyt/syndicationd/commit/c1e84dfbef19de685df00bba4bdee730047bd932))
+
+### 🧹 Refactor
+
+- Drive rendering and input through the compositor by [@ymgyt](https://github.com/ymgyt) ([39b5b834](https://github.com/ymgyt/syndicationd/commit/39b5b8340d441b27d27ef5a9d0b1081e3c3b932d))
+- Remove process start and stop events by [@ymgyt](https://github.com/ymgyt) ([69a142af](https://github.com/ymgyt/syndicationd/commit/69a142af862e9fd05cedeaffd36171d9df04378f))
+- Route events through component subscriptions by [@ymgyt](https://github.com/ymgyt) ([679d6c1a](https://github.com/ymgyt/syndicationd/commit/679d6c1a45799e8b2db189aeb3ce3a87522c1523))
+- Separate shell and domain component responsibilities by [@ymgyt](https://github.com/ymgyt) ([45c131c0](https://github.com/ymgyt/syndicationd/commit/45c131c09c906cada049816901a5de15ca816fe6))
+
+https://github.com/ymgyt/syndicationd/compare/v0.4.0...
+
+
+* @renovate[bot] made their first contribution in #469
+
+* @zyl71 made their first contribution in #465
+
 ## [v0.4.0] - 2026-07-29
+
+### 🐛 Bug Fixes
+
+- Remove tokio unstable dependency by [@ymgyt](https://github.com/ymgyt) ([c805f476](https://github.com/ymgyt/syndicationd/commit/c805f476f4144b489b7844cf8075acb610f43d9f))
+
+### 📚 Documentation
+
+- Prepare synd README for v0.4.0 by [@ymgyt](https://github.com/ymgyt) ([05c8b366](https://github.com/ymgyt/syndicationd/commit/05c8b366f3ce50ad49bc50a69341cae2b406a671))
+
+https://github.com/ymgyt/syndicationd/compare/v0.4.0-rc.1...v0.4.0
+
+
+## [v0.4.0-rc.1] - 2026-07-29
 
 ### 📡 Features
 
@@ -69,7 +131,6 @@ All notable changes to this project will be documented in this file.
 - Drop cursor position query from force redraw by [@ymgyt](https://github.com/ymgyt) ([c1bbb0a8](https://github.com/ymgyt/syndicationd/commit/c1bbb0a87766301cf3061f1d32ccd52ef10cdc4f))
 - Correct default requirement constant typo by [@ymgyt](https://github.com/ymgyt) ([4356e0d3](https://github.com/ymgyt/syndicationd/commit/4356e0d3abab0717c868dcd37e81e4f82645c4e3))
 - Align distribution names with synd by [@ymgyt](https://github.com/ymgyt) ([89356bba](https://github.com/ymgyt/syndicationd/commit/89356bbaa48e7244d14424e7330eecf73ecb6fd5))
-- Remove tokio unstable dependency by ymgyt ([c805f476](https://github.com/ymgyt/syndicationd/commit/c805f476f4144b489b7844cf8075acb610f43d9f))
 
 ### Infra
 
@@ -150,7 +211,6 @@ All notable changes to this project will be documented in this file.
 - Update app topology by [@ymgyt](https://github.com/ymgyt) ([c0c96857](https://github.com/ymgyt/syndicationd/commit/c0c96857714ff4bcea9a852346006ed0c54cbf72))
 - Prepare synd README for v0.4.0-rc.1 by [@ymgyt](https://github.com/ymgyt) ([d08c2698](https://github.com/ymgyt/syndicationd/commit/d08c2698228f8ff59a88d6dce0966491e501c930))
 - Streamline README by [@ymgyt](https://github.com/ymgyt) ([64e028e9](https://github.com/ymgyt/syndicationd/commit/64e028e91a25a4dcf1e93ab95d3eaa73c7813259))
-- Prepare synd README for v0.4.0 by ymgyt ([05c8b366](https://github.com/ymgyt/syndicationd/commit/05c8b366f3ce50ad49bc50a69341cae2b406a671))
 
 ### 🔧 Testing
 
@@ -237,7 +297,7 @@ All notable changes to this project will be documented in this file.
 - Remove dry-run startup probe by [@ymgyt](https://github.com/ymgyt) ([d75c7849](https://github.com/ymgyt/syndicationd/commit/d75c7849d72c38ceca05462c1d85bcf6eae43f9d))
 - Separate migration errors by [@ymgyt](https://github.com/ymgyt) ([0d05a68d](https://github.com/ymgyt/syndicationd/commit/0d05a68d72bc213c4dfdfdbc136750710c5c8e20))
 
-https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.2...v0.4.0
+https://github.com/ymgyt/syndicationd/compare/synd-term-v0.3.2...v0.4.0-rc.1
 
 
 ## [synd-term-v0.3.2] - 2025-01-25
