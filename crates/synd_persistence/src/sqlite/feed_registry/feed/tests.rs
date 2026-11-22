@@ -2,6 +2,89 @@ use synd_feed::types::Text;
 
 use crate::sqlite::feed_registry::test_support::*;
 
+fn rss_with_category(category_element: &str) -> Vec<u8> {
+    format!(
+        "<rss version='2.0'><channel><title>News</title><item><guid>news</guid>\
+         <title>New Regions</title>{category_element}</item></channel></rss>"
+    )
+    .into_bytes()
+}
+
+#[tokio::test]
+async fn rss_category_terms_round_trip_and_only_set_changes_emit_events() -> anyhow::Result<()> {
+    use synd_registry::event::EntryChangedEvent;
+
+    let url = feed_url("news");
+    let db = migrated_db().await?;
+
+    let observations = [
+        (
+            "auth,topic:systems/kernel",
+            vec![EntryDiscoveredEvent::TYPE],
+            vec!["auth", "topic:systems/kernel"],
+        ),
+        (
+            "topic:systems/kernel, auth,, auth",
+            vec![],
+            vec!["auth", "topic:systems/kernel"],
+        ),
+        (
+            "topic:systems/kernel",
+            vec![EntryChangedEvent::TYPE],
+            vec!["topic:systems/kernel"],
+        ),
+        ("", vec![EntryChangedEvent::TYPE], vec![]),
+    ];
+    for (seq, (category, events, terms)) in (0..).zip(observations) {
+        let body = rss_with_category(&format!("<category>{category}</category>"));
+        let crawl = record_fetched_crawl(&db, &url, body, seq).await?;
+        assert_eq!(project_feed(&db, crawl).await?.types(), events);
+        let mut tx = db.begin().await?;
+        let feeds = tx.load_feeds(std::slice::from_ref(&url)).await?;
+        tx.commit().await?;
+        let entry = feeds[&url].entries().next().unwrap();
+        let categories = entry.source_categories()?;
+        assert_eq!(categories.is_none(), terms.is_empty());
+        let stored: Vec<_> = categories
+            .into_iter()
+            .flatten()
+            .map(|category| category.term)
+            .collect();
+        assert_eq!(stored, terms);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn only_rss_category_terms_are_comma_delimited() -> anyhow::Result<()> {
+    let url = feed_url("categories");
+    let db = migrated_db().await?;
+    let rss = rss_with_category("<category domain='topics'>a,b</category>");
+    let atom = br#"<feed xmlns="http://www.w3.org/2005/Atom">
+        <title>News</title><entry><id>news</id><title>New Regions</title>
+        <category term="a,b" scheme="topics" label="A and B"/></entry></feed>"#;
+    let cases = [
+        (
+            rss,
+            serde_json::json!([{"term":"a","scheme":"topics"}, {"term":"b","scheme":"topics"}]),
+        ),
+        (
+            atom.to_vec(),
+            serde_json::json!([{"term":"a,b","scheme":"topics","label":"A and B"}]),
+        ),
+    ];
+    for (seq, (body, expected)) in (0..).zip(cases) {
+        let crawl = record_fetched_crawl(&db, &url, body, seq).await?;
+        project_feed(&db, crawl).await?;
+        let mut tx = db.begin().await?;
+        let feeds = tx.load_feeds(std::slice::from_ref(&url)).await?;
+        tx.commit().await?;
+        let entry = feeds[&url].entries().next().unwrap();
+        assert_eq!(entry.labels()["source.categories"], expected);
+    }
+    Ok(())
+}
+
 #[tokio::test]
 async fn feed_projection_stores_a_complete_current_feed() -> anyhow::Result<()> {
     let db = migrated_db().await?;

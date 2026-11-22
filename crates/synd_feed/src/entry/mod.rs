@@ -6,7 +6,7 @@ pub use content::Content;
     reason = "entry.rs owns the primary Entry value exposed by this first-class module"
 )]
 mod entry;
-pub use entry::{Entry, IdentifiedEntry, SourceEntry};
+pub use entry::{Entry, IdentifiedEntry, LabelDecodeError, SourceCategory, SourceEntry};
 
 mod id;
 pub(crate) use id::feed_rs_missing_id_marker;

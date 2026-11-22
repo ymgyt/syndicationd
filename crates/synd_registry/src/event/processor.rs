@@ -1,7 +1,7 @@
 use std::future::Future;
 
 use chrono::{DateTime, Utc};
-use synd_feed::feed::service::FeedParseError;
+use synd_feed::{entry::LabelDecodeError, feed::service::FeedParseError};
 use thiserror::Error;
 use tracing::warn;
 
@@ -66,6 +66,8 @@ pub enum ProcessorError {
     #[error(transparent)]
     FeedParse(#[from] FeedParseError),
     #[error(transparent)]
+    EntryLabel(#[from] LabelDecodeError),
+    #[error(transparent)]
     FeedUpdate(#[from] FeedUpdateError),
 }
 
@@ -107,9 +109,10 @@ impl ClassifyError for ProcessorError {
             Self::RegistryDb(err) => err.classify(),
             // Deterministic failures of the input itself: retrying the same
             // event can never succeed.
-            Self::UnexpectedEvent { .. } | Self::FeedParse(_) | Self::FeedUpdate(_) => {
-                FailureClass::Permanent
-            }
+            Self::UnexpectedEvent { .. }
+            | Self::FeedParse(_)
+            | Self::EntryLabel(_)
+            | Self::FeedUpdate(_) => FailureClass::Permanent,
         }
     }
 }

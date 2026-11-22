@@ -11,6 +11,7 @@ mod determine_entry_change;
 mod identify_entry;
 mod load_stored_entries;
 mod parse_feed;
+mod source_categories;
 
 pub(super) use apply_feed_update::ApplyFeedUpdate;
 pub(super) use build_feed_update::BuildFeedUpdate;
@@ -20,6 +21,7 @@ pub(super) use determine_entry_change::DetermineEntryChange;
 pub(super) use identify_entry::IdentifyEntry;
 pub(super) use load_stored_entries::LoadStoredEntries;
 pub(super) use parse_feed::ParseFeed;
+pub(super) use source_categories::SourceCategories;
 
 use synd_feed::entry::{Entry, SyndEntry};
 
