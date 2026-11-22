@@ -144,7 +144,8 @@ For information about CI, refer to [ci.md](/docs/ci.md).
 
 On COSMIC, run `just demo` with Alacritty, Zellij, Nix, and Cargo installed.
 The recipe builds [wlrec](https://github.com/ymgyt/wlrec) from `../wlrec` (override with `WLREC_DIR`).
-Select the **synd demo** window when prompted. The recording replaces `etc/demo/demo.gif`.
+Select the **synd demo** window when prompted. The recipe records a 1280×640 view of the terminal
+to `etc/demo/demo.gif` and saves the article list from the same recording to `etc/demo/social-preview.png`.
 
 Edit [feeds.json](etc/demo/feeds.json) to change subscriptions and `play_demo` in
 [record.sh](etc/demo/record.sh) to change the recorded keys. Each run fetches current articles into a temporary database.

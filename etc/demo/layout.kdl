@@ -1,0 +1,6 @@
+layout {
+    pane command="sleep" { args "infinity"; }
+    floating_panes {
+        pane name="synd" command="synd" borderless=true focus=true x=1 y=1
+    }
+}

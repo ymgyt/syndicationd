@@ -3,13 +3,54 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+readonly WIDTH=1280 HEIGHT=640
+
 function build_binary() {
   cargo build --locked --manifest-path "$1" --bin "$2" --message-format=json-render-diagnostics |
     jq -r --arg bin "$2" 'select(.target.name == $bin and .executable != null) | .executable'
 }
 
 function send_keys() {
-  zellij --session "$session" action send-keys "$@"
+  zellij --session "$session" action send-keys --pane-id "$pane" "$@"
+}
+
+function size_demo_pane() {
+  # Alacritty reports cell dimensions in physical pixels after applying display scaling.
+  local cell_width cell_height
+  read -r cell_width cell_height < <(awk '/Cell size:/ { w=$(NF-2); h=$NF } END { print w, h }' "$work/alacritty.log")
+  if ! [[ $cell_width =~ ^[1-9][0-9]*$ && $cell_height =~ ^[1-9][0-9]*$ ]]; then
+    echo 'Could not determine the Alacritty cell size.' >&2
+    return 1
+  fi
+
+  # Leave one terminal cell around the TUI inside the capture rectangle.
+  local columns=$((WIDTH / cell_width - 2)) rows=$((HEIGHT / cell_height - 2))
+  local panes
+  panes=$(zellij --session "$session" action list-panes --all --json)
+  if ! jq -e --argjson w "$cell_width" --argjson h "$cell_height" \
+      --argjson width "$WIDTH" --argjson height "$HEIGHT" \
+      'any(.[]; (.is_plugin or .is_floating | not) and .pane_columns * $w >= $width and .pane_rows * $h >= $height)' \
+      <<< "$panes" >/dev/null; then
+    echo "The demo window must fit a ${WIDTH}×${HEIGHT} recording." >&2
+    return 1
+  fi
+  pane=$(jq -er '.[] | select(.is_floating and .title == "synd") | "terminal_\(.id)"' <<< "$panes")
+  zellij --session "$session" action change-floating-pane-coordinates --pane-id "$pane" \
+    --x 1 --y 1 --width "$columns" --height "$rows"
+  pane_position="$cell_width,$cell_height"
+  pane_crop="${pane_position}+$((columns * cell_width))x$((rows * cell_height))"
+}
+
+function render_assets() {
+  local recording=$1 output=$2 crop=$3 position=$4
+  local background='#2b292d'
+  gifsicle --crop "$crop" --position "$position" --logical-screen "${WIDTH}x${HEIGHT}" \
+    --background "$background" --optimize=2 "$recording" -o "$output/demo.gif"
+  # Center horizontally for 16:9 cards. The terminal frame already supplies the top margin.
+  ffmpeg -v error -i "$output/demo.gif" -frames:v 1 \
+    -vf "fps=1:round=up,select='eq(n,2)',scale=1136:568:flags=lanczos,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:0:${background}" \
+    "$output/social-preview.png"
+  [[ -s $output/social-preview.png ]]
 }
 
 function play_demo() {
@@ -78,12 +119,11 @@ function main() {
     sleep 1
   done
 
-  printf 'session_serialization false\npane_frames false\n' > "$work/zellij.kdl"
-  printf 'layout { pane command="synd"; }\n' > "$work/layout.kdl"
-  PATH="$(dirname "$synd"):$PATH" alacritty -T 'synd demo' -o 'window.dynamic_title=false' \
-    -o 'window.startup_mode="Maximized"' -o 'font.size=19' \
+  printf 'session_serialization false\npane_frames false\nshow_release_notes false\n' > "$work/zellij.kdl"
+  PATH="$(dirname "$synd"):$PATH" alacritty -v -T 'synd demo' -o 'window.dynamic_title=false' \
+    -o 'window.startup_mode="Maximized"' -o 'window.padding={x=0,y=0}' -o 'window.dynamic_padding=false' -o 'font.size=12.5' \
     -e zellij --config "$work/zellij.kdl" --session "$session" \
-      --new-session-with-layout "$work/layout.kdl" &
+      --new-session-with-layout "$PWD/etc/demo/layout.kdl" > "$work/alacritty.log" 2>&1 &
   window_pid=$!
   deadline=$((SECONDS + 20))
   until [[ $(zellij --session "$session" action dump-screen 2>/dev/null) == *'Entry 1/'* ]]; do
@@ -95,9 +135,10 @@ function main() {
     fi
     sleep 0.2
   done
+  size_demo_pane
 
   echo 'Select the “synd demo” window in the screen sharing dialog.' >&2
-  coproc RECORDER { exec "$wlrec" "$work/demo.gif"; }
+  coproc RECORDER { exec "$wlrec" "$work/window.gif"; }
   recorder_pid=$! # PID of the wlrec coprocess.
   local status
   IFS= read -r status <&"${RECORDER[0]}" && [[ $status == ready ]] || return 1
@@ -105,7 +146,11 @@ function main() {
   kill -INT "$recorder_pid"
   wait "$recorder_pid"
   recorder_pid=
+  render_assets "$work/window.gif" "$work" "$pane_crop" "$pane_position"
   mv -- "$work/demo.gif" etc/demo/demo.gif
+  mv -- "$work/social-preview.png" etc/demo/social-preview.png
 }
 
-main "$@"
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi

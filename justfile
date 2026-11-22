@@ -22,9 +22,9 @@ mod license 'etc/just/license.just'
 default:
     just --list --list-submodules
 
-# Record the README GIF on Wayland
+# Record the README GIF and GitHub social preview on Wayland
 demo:
-    let wlrec = ($env.WLREC_DIR? | default '../wlrec'); nix develop $wlrec --command nix shell 'nixpkgs#jq' --command bash etc/demo/record.sh $wlrec
+    let wlrec = ($env.WLREC_DIR? | default '../wlrec'); nix develop $wlrec --command nix shell 'nixpkgs#jq' 'nixpkgs#gifsicle' 'nixpkgs#ffmpeg-headless' --command bash etc/demo/record.sh $wlrec
 
 # Generate product changelog
 changelog target:
