@@ -1,10 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", ":semanticCommitTypeAll(chore)"],
   "timezone": "Asia/Tokyo",
   "dependencyDashboard": true,
   "semanticCommits": "enabled",
-  "semanticCommitType": "chore",
   "enabledManagers": ["cargo", "github-actions"],
   "automerge": true,
   "reviewersFromCodeOwners": true,
