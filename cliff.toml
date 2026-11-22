@@ -25,7 +25,7 @@ body = """
      | trim_start_matches(pat="term-")
     }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
-    ## [unreleased] __release_date__
+    ## [unreleased]
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | upper_first }}
