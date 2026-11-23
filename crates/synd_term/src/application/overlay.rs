@@ -6,6 +6,7 @@ pub(crate) enum ComponentId {
     Login,
     Tabs,
     Entries,
+    Reader,
     Feeds,
     GhNotifications,
     Filter,
@@ -15,7 +16,7 @@ pub(crate) enum ComponentId {
 
 #[derive(Default)]
 pub(super) struct Overlay {
-    popups: Vec<(Tab, ComponentId)>,
+    overlays: Vec<(Tab, ComponentId)>,
 }
 
 impl Overlay {
@@ -26,28 +27,32 @@ impl Overlay {
         use ComponentId::{Entries, Feeds, Filter, GhNotifications, Login, Shell, Tabs};
         let base: &[ComponentId] = match tab {
             None => &[Shell, Login],
+            Some(Tab::Entries) if self.overlays.contains(&(Tab::Entries, ComponentId::Reader)) => {
+                &[Shell]
+            }
             Some(Tab::Entries) => &[Shell, Tabs, Entries, Filter],
             Some(Tab::Feeds) => &[Shell, Tabs, Feeds, Filter],
             Some(Tab::Gh) => &[Shell, Tabs, GhNotifications, Filter],
         };
         base.iter().copied().chain(
-            self.popups
+            self.overlays
                 .iter()
-                .filter_map(move |&(owner, popup)| (Some(owner) == tab).then_some(popup)),
+                .filter_map(move |&(owner, component)| (Some(owner) == tab).then_some(component)),
         )
     }
 
     pub(super) fn open(&mut self, sender: ComponentId) {
         let tab = match sender {
+            ComponentId::Reader => Tab::Entries,
             ComponentId::UnsubscribePopup => Tab::Feeds,
             ComponentId::GhFilterPopup => Tab::Gh,
-            _ => unreachable!("cannot open non-popup component: {sender:?}"),
+            _ => unreachable!("cannot open component: {sender:?}"),
         };
         self.close(sender);
-        self.popups.push((tab, sender));
+        self.overlays.push((tab, sender));
     }
 
     pub(super) fn close(&mut self, sender: ComponentId) {
-        self.popups.retain(|&(_, popup)| popup != sender);
+        self.overlays.retain(|&(_, component)| component != sender);
     }
 }

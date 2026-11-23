@@ -25,12 +25,14 @@ mod feed;
 mod feed_event_watcher;
 mod gh;
 mod interaction;
+mod reader;
 mod request;
 
 use auth::AuthDriver;
 use feed::FeedDriver;
 use gh::GhDriver;
 use interaction::{InteractionDriver, TerminalInteraction};
+use reader::ReaderDriver;
 use request::{JobFuture, RequestContext, RequestFuture};
 
 /// Owns external ports, request execution, and long-lived event sources.
@@ -41,6 +43,7 @@ pub(super) struct Drivers {
     auth: AuthDriver,
     gh: GhDriver,
     interaction: InteractionDriver,
+    reader: ReaderDriver,
     request_jobs: FuturesUnordered<JobFuture>,
     next_request_id: u64,
     event_tx: mpsc::UnboundedSender<Event>,
@@ -87,6 +90,7 @@ impl Drivers {
             auth,
             gh,
             interaction,
+            reader: ReaderDriver::default(),
             request_jobs: FuturesUnordered::new(),
             next_request_id: 0,
             event_tx,
@@ -194,6 +198,9 @@ impl Drivers {
                 if let Some(event) = self.interaction.open_browser(url) {
                     self.queue_event(event);
                 }
+            }
+            Operation::FetchArticle { generation, url } => {
+                self.register_request(|drivers, cx| drivers.reader.fetch(cx, generation, url));
             }
             Operation::OpenTextBrowser { url } => {
                 if let Some(event) = self.interaction.open_text_browser(url) {

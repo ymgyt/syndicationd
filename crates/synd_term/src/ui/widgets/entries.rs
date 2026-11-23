@@ -90,12 +90,7 @@ impl EntriesWidget {
             .map(|entry| &entry.entry)
     }
 
-    pub(crate) fn selected_entry_website_url(&self) -> Option<&str> {
-        self.selected_entry()
-            .and_then(|entry| entry.website_url.as_deref())
-    }
-
-    fn selected_entry(&self) -> Option<&payload::Entry> {
+    pub(crate) fn selected_entry(&self) -> Option<&payload::Entry> {
         self.entries.selected().map(|entry| &entry.entry)
     }
 }

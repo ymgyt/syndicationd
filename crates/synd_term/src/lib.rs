@@ -11,6 +11,7 @@ pub mod interact;
 pub mod keymap;
 pub mod matcher;
 pub(crate) mod operation;
+mod reader;
 pub mod terminal;
 pub mod types;
 pub mod ui;

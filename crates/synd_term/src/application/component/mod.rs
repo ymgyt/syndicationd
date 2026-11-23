@@ -22,6 +22,7 @@ mod feeds;
 mod filter;
 mod gh;
 mod login;
+mod reader;
 mod view;
 pub(super) use view::{FrameLayout, RenderContext};
 mod shell;
@@ -29,6 +30,7 @@ mod shell;
 pub(crate) use feeds::FeedsComponent;
 pub(crate) use gh::GhComponent;
 use login::LoginComponent;
+use reader::ReaderComponent;
 use shell::ShellComponent;
 
 pub(in crate::application) trait Component {
@@ -51,6 +53,7 @@ impl Components {
             ComponentId::Login => &self.login,
             ComponentId::Filter => &self.filter,
             ComponentId::Entries => &self.feeds.entries,
+            ComponentId::Reader => &self.reader,
             ComponentId::Feeds => &self.feeds,
             ComponentId::GhNotifications => &self.gh,
             ComponentId::UnsubscribePopup => &self.unsubscribe,
@@ -64,6 +67,7 @@ impl Components {
             ComponentId::Login => &mut self.login,
             ComponentId::Filter => &mut self.filter,
             ComponentId::Entries => &mut self.feeds.entries,
+            ComponentId::Reader => &mut self.reader,
             ComponentId::Feeds => &mut self.feeds,
             ComponentId::GhNotifications => &mut self.gh,
             ComponentId::UnsubscribePopup => &mut self.unsubscribe,
@@ -79,6 +83,7 @@ pub(crate) struct Components {
     pub(in crate::application) filter: FilterWidget,
     pub(in crate::application) tabs: TabsWidget,
     pub(crate) feeds: FeedsComponent,
+    reader: ReaderComponent,
     unsubscribe: UnsubscribePopup,
     pub(crate) gh: GhComponent,
 }
@@ -100,6 +105,7 @@ impl Components {
             tabs: TabsWidget::new(&config.features),
             filter: FilterWidget::new(Rc::clone(categories)),
             feeds: FeedsComponent::new(config, Rc::clone(categories)),
+            reader: ReaderComponent::default(),
             gh: GhComponent::new(
                 config.features.enable_gh_notification,
                 Rc::clone(categories),

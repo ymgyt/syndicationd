@@ -20,13 +20,13 @@ impl RequestId {
     }
 }
 
-/// Identifies the pages and details belonging to one reload of a list.
+/// Identifies results belonging to the current load of a view.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Generation(u64);
 
 impl Generation {
     pub(super) fn advance(&mut self) {
-        self.0 = self.0.checked_add(1).expect("list generation exhausted");
+        self.0 = self.0.checked_add(1).expect("view generation exhausted");
     }
 }
 
@@ -49,6 +49,9 @@ pub(crate) enum RequestKind {
         generation: Generation,
     },
     OpenInitialTimeline,
+    FetchArticle {
+        generation: Generation,
+    },
     FetchTimelineWindow {
         limit: usize,
     },
@@ -84,6 +87,7 @@ impl RequestKind {
             Self::UnsubscribeFeed { url } => Cow::Owned(format!("Unsubscribe feed {url}")),
             Self::FetchSubscription { .. } => Cow::Borrowed("Fetch subscriptions"),
             Self::OpenInitialTimeline => Cow::Borrowed("Open timeline"),
+            Self::FetchArticle { .. } => Cow::Borrowed("Fetch article"),
             Self::FetchTimelineWindow { .. } => Cow::Borrowed("Fetch timeline"),
             Self::CatchUpTimeline { since } => {
                 Cow::Owned(format!("Catch up timeline from {since}"))
@@ -111,6 +115,7 @@ pub(crate) enum RequestError {
     SyndApi(SyndApiError),
     Authentication(anyhow::Error),
     Gh(GhError),
+    Article(anyhow::Error),
 }
 
 pub(super) fn synd_api_error_message(error: &SyndApiError) -> String {

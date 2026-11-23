@@ -128,6 +128,10 @@ pub(crate) enum Operation {
     OpenBrowser {
         url: Url,
     },
+    FetchArticle {
+        generation: Generation,
+        url: Url,
+    },
     OpenTextBrowser {
         url: Url,
     },

@@ -18,6 +18,7 @@ impl Components {
             Command::Login(command) => (ComponentId::Login, self.login.apply_command(command)),
             Command::MoveTab(direction) => (ComponentId::Tabs, self.tabs.move_tab(direction)),
             Command::Feeds(command) => (ComponentId::Feeds, self.feeds.apply_command(command)),
+            Command::Reader(command) => (ComponentId::Reader, self.reader.apply_command(command)),
             Command::Filter(command) => (
                 ComponentId::Filter,
                 self.filter

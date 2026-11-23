@@ -62,7 +62,44 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
 
     bind!(Layer::Entries, ["r"], CommandId::RefreshTimeline, "Refresh");
     bind!(Layer::Entries, ["enter"], CommandId::OpenEntry);
-    bind!(Layer::Entries, ["space"], CommandId::BrowseEntry);
+    bind!(Layer::Entries, ["space"], CommandId::ReadEntry);
+
+    bind!(Layer::Reader, ["esc"], CommandId::CloseReader, "Back");
+    bind!(Layer::Reader, ["q"], CommandId::CloseReader, "Back");
+    bind!(Layer::Reader, ["j"], CommandId::ReaderLineDown, "Down");
+    bind!(Layer::Reader, ["down"], CommandId::ReaderLineDown, "Down");
+    bind!(Layer::Reader, ["k"], CommandId::ReaderLineUp, "Up");
+    bind!(Layer::Reader, ["up"], CommandId::ReaderLineUp, "Up");
+    bind!(
+        Layer::Reader,
+        ["z", "j"],
+        CommandId::ReaderHalfPageDown,
+        "Half page down"
+    );
+    bind!(
+        Layer::Reader,
+        ["z", "k"],
+        CommandId::ReaderHalfPageUp,
+        "Half page up"
+    );
+    bind!(
+        Layer::Reader,
+        ["space"],
+        CommandId::ReaderPageDown,
+        "Page down"
+    );
+    bind!(
+        Layer::Reader,
+        ["pagedown"],
+        CommandId::ReaderPageDown,
+        "Page down"
+    );
+    bind!(
+        Layer::Reader,
+        ["pageup"],
+        CommandId::ReaderPageUp,
+        "Page up"
+    );
 
     bind!(Layer::Feeds, ["a"], CommandId::PromptFeedSubscription);
     bind!(Layer::Feeds, ["e"], CommandId::PromptFeedEdition);

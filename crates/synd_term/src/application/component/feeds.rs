@@ -13,7 +13,9 @@ use crate::{
         Config, Generation, Populate, RequestError, RequestKind, effects::Effects,
         input_parser::InputParser, request::synd_api_error_message,
     },
-    command::{Command, FeedsCommand, ShellCommand, UnsubscribeCommand, UnsubscribeTarget},
+    command::{
+        Command, FeedsCommand, ReaderCommand, ShellCommand, UnsubscribeCommand, UnsubscribeTarget,
+    },
     config::Categories,
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
     keymap::Layer,
@@ -76,6 +78,7 @@ impl FeedsComponent {
             FeedsCommand::ReloadSubscription => self.reload_subscription().into(),
             FeedsCommand::OpenFeed => self.open_selected_feed().into(),
             FeedsCommand::RefreshTimeline => self.refresh_timeline().into(),
+            FeedsCommand::ReadEntry => return self.read_selected_entry(),
             FeedsCommand::OpenEntry => self.open_selected_entry().into(),
             FeedsCommand::BrowseEntry => self.browse_selected_entry(),
         };
@@ -113,12 +116,24 @@ impl FeedsComponent {
     }
 
     pub(in crate::application) fn open_selected_entry(&self) -> Option<Operation> {
-        self.selected_entry_url()
-            .map(|url| Operation::OpenBrowser { url })
+        Self::entry_url(self.entries.selected_entry()?).map(|url| Operation::OpenBrowser { url })
+    }
+
+    fn read_selected_entry(&self) -> Effects {
+        let Some(entry) = self.entries.selected_entry() else {
+            return Effects::NONE;
+        };
+        match Self::entry_url(entry) {
+            Some(url) => Command::Reader(ReaderCommand::Open(url)),
+            None => Command::Shell(ShellCommand::ShowError(
+                "This entry has no article URL".into(),
+            )),
+        }
+        .into()
     }
 
     pub(in crate::application) fn browse_selected_entry(&self) -> Operations {
-        let Some(url) = self.selected_entry_url() else {
+        let Some(url) = self.entries.selected_entry().and_then(Self::entry_url) else {
             return Operations::Nop;
         };
         [
@@ -128,9 +143,8 @@ impl FeedsComponent {
         .into()
     }
 
-    fn selected_entry_url(&self) -> Option<Url> {
-        let entry_website_url = self.entries.selected_entry_website_url()?;
-        Self::parse_url(entry_website_url, "entry")
+    fn entry_url(entry: &payload::Entry) -> Option<Url> {
+        Self::parse_url(entry.website_url.as_deref()?, "entry")
     }
 
     fn parse_browser_url(value: &str, kind: &str) -> Option<Operation> {

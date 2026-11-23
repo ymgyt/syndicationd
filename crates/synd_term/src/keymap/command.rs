@@ -4,8 +4,10 @@ use crate::{
     application::{ComponentId, Direction},
     command::{
         Command, FeedsCommand, FilterCommand, GhCommand, GhFilterCommand,
-        GhNotificationFilterOption, ListCommand, LoginCommand, ShellCommand, UnsubscribeCommand,
+        GhNotificationFilterOption, ListCommand, LoginCommand, ReaderCommand, ShellCommand,
+        UnsubscribeCommand,
     },
+    reader::Scroll,
     types::gh::{PullRequestState, Reason, RepoVisibility},
 };
 use serde::Deserialize;
@@ -35,7 +37,15 @@ pub enum CommandId {
     MoveEntryLast,
     RefreshTimeline,
     OpenEntry,
+    ReadEntry,
     BrowseEntry,
+    CloseReader,
+    ReaderLineUp,
+    ReaderLineDown,
+    ReaderHalfPageUp,
+    ReaderHalfPageDown,
+    ReaderPageUp,
+    ReaderPageDown,
     MoveSubscribedFeedPrev,
     MoveSubscribedFeedNext,
     MoveSubscribedFeedFirst,
@@ -99,7 +109,15 @@ impl CommandId {
             Self::MoveEntryLast => "entries.last",
             Self::RefreshTimeline => "timeline.refresh",
             Self::OpenEntry => "entries.open",
+            Self::ReadEntry => "entries.read",
             Self::BrowseEntry => "entries.browse",
+            Self::CloseReader => "reader.close",
+            Self::ReaderLineUp => "reader.line-up",
+            Self::ReaderLineDown => "reader.line-down",
+            Self::ReaderHalfPageUp => "reader.half-page-up",
+            Self::ReaderHalfPageDown => "reader.half-page-down",
+            Self::ReaderPageUp => "reader.page-up",
+            Self::ReaderPageDown => "reader.page-down",
             Self::MoveSubscribedFeedPrev => "feeds.prev",
             Self::MoveSubscribedFeedNext => "feeds.next",
             Self::MoveSubscribedFeedFirst => "feeds.first",
@@ -207,7 +225,17 @@ impl CommandId {
             Self::MoveTabNext => Command::MoveTab(Direction::Right),
             Self::RefreshTimeline => Command::Feeds(FeedsCommand::RefreshTimeline),
             Self::OpenEntry => Command::Feeds(FeedsCommand::OpenEntry),
+            Self::ReadEntry => Command::Feeds(FeedsCommand::ReadEntry),
             Self::BrowseEntry => Command::Feeds(FeedsCommand::BrowseEntry),
+            Self::CloseReader => Command::Reader(ReaderCommand::Close),
+            Self::ReaderLineUp => Command::Reader(ReaderCommand::Scroll(Scroll::LineUp)),
+            Self::ReaderLineDown => Command::Reader(ReaderCommand::Scroll(Scroll::LineDown)),
+            Self::ReaderHalfPageUp => Command::Reader(ReaderCommand::Scroll(Scroll::HalfPageUp)),
+            Self::ReaderHalfPageDown => {
+                Command::Reader(ReaderCommand::Scroll(Scroll::HalfPageDown))
+            }
+            Self::ReaderPageUp => Command::Reader(ReaderCommand::Scroll(Scroll::PageUp)),
+            Self::ReaderPageDown => Command::Reader(ReaderCommand::Scroll(Scroll::PageDown)),
             Self::PromptFeedSubscription => Command::Feeds(FeedsCommand::PromptFeedSubscription),
             Self::PromptFeedEdition => Command::Feeds(FeedsCommand::PromptFeedEdition),
             Self::PromptFeedUnsubscription => {
@@ -505,6 +533,46 @@ const COMMAND_SPECS: &[CommandSpec] = specs![
         aliases: ["browse_entry"],
         typable: None,
         layers: [Entries],
+    },
+    ReadEntry {
+        aliases: [],
+        typable: None,
+        layers: [Entries],
+    },
+    CloseReader {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
+    },
+    ReaderLineUp {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
+    },
+    ReaderLineDown {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
+    },
+    ReaderHalfPageUp {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
+    },
+    ReaderHalfPageDown {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
+    },
+    ReaderPageUp {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
+    },
+    ReaderPageDown {
+        aliases: [],
+        typable: None,
+        layers: [Reader],
     },
     MoveSubscribedFeedPrev {
         aliases: ["move_up_subscribed_feed"],

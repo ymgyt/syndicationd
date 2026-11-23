@@ -39,7 +39,10 @@ const MAIN_ACTIONS: &[(&[CommandId], &str)] = &[
         ],
         icon!(open),
     ),
-    (&[CommandId::BrowseEntry], icon!(browse)),
+    (
+        &[CommandId::ReadEntry, CommandId::BrowseEntry],
+        icon!(browse),
+    ),
     (&[CommandId::PromptFeedSubscription], icon!(feeds)),
     (&[CommandId::PromptFeedEdition], ""),
     (&[CommandId::PromptFeedUnsubscription], "󰼡"),
@@ -59,6 +62,7 @@ pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
         Some(Layer::CategoryFilter | Layer::SearchPrompt) => Some(CommandId::DeactivateFiltering),
         Some(Layer::UnsubscribePopup) => Some(CommandId::CancelFeedUnsubscriptionPopup),
         Some(Layer::GhNotificationFilterPopup) => Some(CommandId::CloseGhNotificationFilter),
+        Some(Layer::Reader) => Some(CommandId::CloseReader),
         _ => None,
     };
     if let Some(close) = close {

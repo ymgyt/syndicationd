@@ -28,9 +28,10 @@ User keymaps are merged onto the default keymaps:
 
 In a list, the status line shows one key binding for each main action. For
 example, Entries shows `Ent:󰏌` to open the selected entry and `Sp:󰏋` to
-read it in a text browser. Within each layer, configured keys take precedence
-over built-in aliases in the guide. A binding's `desc`, when set, replaces
-the action icon.
+read the article from its website in the built-in reader. To open an article
+with your configured text browser, bind `entries.browse` in `[keys.entries]`.
+Within each layer, configured keys take precedence over built-in aliases in
+the guide. A binding's `desc`, when set, replaces the action icon.
 
 While a key sequence is pending, the status line shows its continuations.
 Search, category filters, and popups show their own controls. These hints
@@ -56,6 +57,7 @@ Configurable layers:
 | `tabs`                               | Tab navigation                   |
 | `list`                               | Navigation in the active list    |
 | `entries`                            | Entries tab                      |
+| `reader`                             | Built-in article reader          |
 | `feeds`                              | Feeds tab                        |
 | `filter`                             | Entry/feed filter controls       |
 | `unsubscribe-popup`                  | Feed unsubscribe confirmation    |
@@ -85,7 +87,12 @@ dynamic bindings are managed by the application for now.
 | `entries.last`                                         | `entries`                          |
 | `timeline.refresh`                                     | `entries`                          |
 | `entries.open`                                         | `entries`                          |
+| `entries.read`                                         | `entries`                          |
 | `entries.browse`                                       | `entries`                          |
+| `reader.close`                                         | `reader`                           |
+| `reader.line-up`, `reader.line-down`                   | `reader`                           |
+| `reader.half-page-up`, `reader.half-page-down`         | `reader`                           |
+| `reader.page-up`, `reader.page-down`                   | `reader`                           |
 | `feeds.prev`                                           | `feeds`                            |
 | `feeds.next`                                           | `feeds`                            |
 | `feeds.first`                                          | `feeds`                            |
@@ -139,7 +146,11 @@ dynamic bindings are managed by the application for now.
 | `list`              | `j` or `↓`             | Move down                                             |
 | `list`              | `gg` / `ge`            | Jump to the first / last item                         |
 | `entries`           | `Enter`                | Open the entry in your web browser                    |
-| `entries`           | `Space`                | Open the entry in your text browser (`$SYND_BROWSER`) |
+| `entries`           | `Space`                | Open the article URL in the built-in reader           |
+| `reader`            | `j` / `↓`, `k` / `↑`    | Scroll down or up one line                            |
+| `reader`            | `z j` / `z k`          | Scroll down or up half a page                         |
+| `reader`            | `Space` / `PageDown`, `PageUp` | Scroll down or up one page                     |
+| `reader`            | `Esc` / `q`            | Return to Entries                                     |
 | `entries`           | `r`                    | Refresh the timeline                                  |
 | `feeds`             | `a` / `e`              | Add / edit a subscription                             |
 | `feeds`             | `d`                    | Open the unsubscribe confirmation                     |

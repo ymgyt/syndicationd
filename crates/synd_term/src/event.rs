@@ -1,4 +1,7 @@
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    sync::Arc,
+};
 
 use crate::ui::widgets::{filter::FilterCriteria, tabs::Tab};
 use synd_auth::device_flow::DeviceAuthorizationResponse;
@@ -11,6 +14,7 @@ use crate::{
     application::{Generation, PersistCacheError, Populate, RequestError, RequestId, RequestKind},
     auth::{AuthenticationProvider, Credential, CredentialError, Verified},
     interact::{OpenBrowserError, OpenEditorError},
+    reader::Article,
     types::gh::{IssueContext, Notification, NotificationId, PullRequestContext},
 };
 
@@ -133,6 +137,11 @@ pub(crate) enum Event {
         event: AuthEvent,
     },
     Feeds(FeedsEvent),
+    ArticleFetched {
+        request_id: RequestId,
+        generation: Generation,
+        article: Arc<Article>,
+    },
     Gh {
         request_id: RequestId,
         event: GhEvent,
@@ -188,6 +197,7 @@ impl Display for Event {
                 write!(f, "Feeds::Request({request_id:?}, {})", event.name())
             }
             Self::Feeds(FeedsEvent::Push { .. }) => f.write_str("Feeds::Push"),
+            Self::ArticleFetched { request_id, .. } => write!(f, "ArticleFetched({request_id:?})"),
             Self::Gh {
                 request_id, event, ..
             } => {

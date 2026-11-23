@@ -173,6 +173,8 @@ fn parse_key_stroke(value: &str) -> Result<KeyStroke, String> {
         "right" => KeyCode::Right,
         "up" => KeyCode::Up,
         "down" => KeyCode::Down,
+        "pageup" => KeyCode::PageUp,
+        "pagedown" => KeyCode::PageDown,
         "esc" => KeyCode::Esc,
         "space" => KeyCode::Char(' '),
         single if single.chars().count() == 1 => KeyCode::Char(single.chars().next().unwrap()),

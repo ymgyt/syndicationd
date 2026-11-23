@@ -3,6 +3,7 @@ use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
     application::{ComponentId, Direction},
+    reader::Scroll,
     types::gh::{PullRequestState, Reason, RepoVisibility},
 };
 
@@ -24,6 +25,7 @@ pub(crate) enum Command {
     Login(LoginCommand),
     MoveTab(Direction),
     Feeds(FeedsCommand),
+    Reader(ReaderCommand),
     Filter(FilterCommand),
     Gh(GhCommand),
 }
@@ -60,7 +62,15 @@ pub(crate) enum FeedsCommand {
 
     RefreshTimeline,
     OpenEntry,
+    ReadEntry,
     BrowseEntry,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ReaderCommand {
+    Open(url::Url),
+    Close,
+    Scroll(Scroll),
 }
 
 #[derive(Debug, Clone)]

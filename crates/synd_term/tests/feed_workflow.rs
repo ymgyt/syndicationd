@@ -30,6 +30,74 @@ async fn entering_feeds_requests_the_missing_subscription() {
 }
 
 #[tokio::test]
+async fn space_reads_the_selected_article_url_and_escape_returns_to_the_entry() {
+    use axum::{Router, response::Html, routing::get};
+    use std::fmt::Write as _;
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let article_url = format!("http://{}/article", listener.local_addr().unwrap());
+    let publisher = Router::new().route(
+        "/article",
+        get(|| async {
+            let mut paragraphs = String::new();
+            for number in 1..=45 {
+                write!(
+                    paragraphs,
+                    "<p>Reading this paragraph about topic {number}.</p>"
+                )
+                .unwrap();
+            }
+            Html(format!(
+                "<html><head><title>Publisher title</title></head><body>
+            <nav>Site navigation</nav><article><h2>First section</h2>{paragraphs}</article>
+            </body></html>"
+            ))
+        }),
+    );
+    let server = tokio::spawn(async move { axum::serve(listener, publisher).await.unwrap() });
+    let mut entries = timeline_entries();
+    entries.nodes[1].entry.website_url = Some(article_url);
+    let (_cache_dir, mut app) = start_app_with_entries(entries);
+    let (tx, mut input) = event_stream();
+    app.wait_until_jobs_completed(&mut input).await;
+
+    tx.send_multi([key!('j'), key!(' ')]);
+    app.wait_until_jobs_completed(&mut input).await;
+    let screen = Screen::new(app.buffer());
+    let initial = screen.lines();
+    assert_eq!(initial[0].trim(), "Publisher title");
+    assert!(screen.contains_text("First section"));
+    assert!(!screen.contains_text("Site navigation"));
+
+    let body = &initial[1..initial.len() - 1];
+    let half = body.len() / 2;
+    tx.send_multi([key!('z'), key!('j')]);
+    app.wait_until_jobs_completed(&mut input).await;
+    let scrolled = Screen::new(app.buffer()).lines();
+    assert_eq!(scrolled[0], initial[0]);
+    assert_eq!(scrolled[1..1 + body.len() - half], body[half..]);
+
+    tx.send_multi([key!('z'), key!('k')]);
+    app.wait_until_jobs_completed(&mut input).await;
+    let restored = Screen::new(app.buffer()).lines();
+    assert_eq!(restored[1..restored.len() - 1], *body);
+
+    tx.send(key!(' '));
+    app.wait_until_jobs_completed(&mut input).await;
+    let screen = Screen::new(app.buffer());
+    assert!(screen.contains_text("Reading this paragraph"));
+    assert!(!screen.contains_text("First section"));
+
+    tx.send(key!(esc));
+    app.wait_until_jobs_completed(&mut input).await;
+    let screen = Screen::new(app.buffer());
+    assert!(screen.contains_text("Entry 2/2"));
+    assert!(screen.contains_text("A note about testing async GraphQL code."));
+    server.abort();
+}
+
+#[tokio::test]
 async fn feeds_load_while_github_requests_wait_for_a_slot() {
     use std::{convert::Infallible, time::Duration};
     use tokio::sync::{mpsc, oneshot};
@@ -202,6 +270,10 @@ mod bootstrapped_app {
 }
 
 fn start_app() -> (TempDir, Application) {
+    start_app_with_entries(timeline_entries())
+}
+
+fn start_app_with_entries(entries: payload::TimelineEntryConnection) -> (TempDir, Application) {
     let timeline_id = payload::TimelineId::from_u128(1);
     let api = MockFeedApi::new([
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
@@ -211,7 +283,7 @@ fn start_app() -> (TempDir, Application) {
             "all".into(),
             Ok(payload::CreateTimelinePayload { timeline_id }),
         ),
-        MockFeedApiResponse::TimelineEntries(timeline_id, Ok(timeline_entries())),
+        MockFeedApiResponse::TimelineEntries(timeline_id, Ok(entries)),
         MockFeedApiResponse::TimelineChanges(
             timeline_id,
             Ok(payload::TimelineChangesPayload {
