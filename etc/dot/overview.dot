@@ -34,6 +34,12 @@ digraph {
         fillcolor="#f1f5f9"
     ];
 
+    mcp_client [
+        label="MCP client",
+        shape=oval,
+        fillcolor="#f1f5f9"
+    ];
+
     subgraph cluster_app {
         label="User process";
         color="#cbd5e1";
@@ -42,6 +48,9 @@ digraph {
         synd [ label="synd\nCLI + config" ];
         term [ label="synd_term\nTUI application" ];
         feed_commands [ label="feed subcommands\nimport/export" ];
+        mcp [ label="synd_mcp\nMCP server" ];
+
+        { rank=same; mcp; term; feed_commands; }
     }
 
     subgraph cluster_runtime {
@@ -75,6 +84,7 @@ digraph {
     }
 
     user -> synd [ label="runs" ];
+    mcp_client -> synd [ label="runs synd mcp\nover stdio" ];
     synd -> runtime [ label="resolve config\nacquire session" ];
     runtime -> daemon [ label="start/replace\nwhen needed" ];
     daemon -> api [ label="hosts" ];
@@ -84,6 +94,9 @@ digraph {
 
     synd -> term [ label="interactive mode" ];
     synd -> feed_commands [ label="feed CLI mode" ];
+    synd -> mcp [ label="MCP mode" ];
+    mcp -> runtime [ label="acquire session" ];
+    mcp -> client [ label="timelines/subscriptions" ];
     term -> client [ label="queries/subscribes" ];
     feed_commands -> client [ label="commands/queries" ];
 

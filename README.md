@@ -11,7 +11,9 @@
 
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
 
-`synd` is an RSS and Atom feed reader with a TUI and a CLI.
+`synd` is an RSS and Atom feed reader for the terminal.
+A local daemon fetches your feeds. Subscriptions you add from the command
+line are available in the TUI and through [MCP](#mcp).
 
 ## Installation
 
@@ -129,6 +131,15 @@ locations, see the [configuration guide][configuration].
 
 Configure your MCP client to launch `synd mcp` over stdio.
 
+<details>
+<summary>Add to Claude Code</summary>
+
+```sh
+claude mcp add synd -- synd mcp
+```
+
+</details>
+
 ## Agent skill
 
 With `synd` installed, your agent can use the `synd` skill to manage feed
@@ -145,6 +156,12 @@ npx skills add -g ymgyt/syndicationd
 ```sh
 apm install -g ymgyt/syndicationd
 ```
+
+## Application Topology
+
+![Application overview][topology]
+
+[topology]: https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/overview.svg
 
 ## Development
 
