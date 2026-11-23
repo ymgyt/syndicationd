@@ -11,11 +11,6 @@ use synd_protocol::session::{
 use super::Client;
 use crate::SyndApiError;
 
-enum SessionOutcome<T, E> {
-    Accepted(T),
-    Rejected(E),
-}
-
 trait SessionRequest: Serialize + Debug {
     type Response: DeserializeOwned;
     type Rejection: DeserializeOwned;
@@ -26,24 +21,18 @@ trait SessionRequest: Serialize + Debug {
 
     fn rejected(response: Self::Rejection) -> SyndApiError;
 
-    async fn decode_response(
-        response: reqwest::Response,
-    ) -> Result<SessionOutcome<Self::Response, Self::Rejection>, SyndApiError> {
+    async fn decode_response(response: reqwest::Response) -> Result<Self::Response, SyndApiError> {
         let status = response.status();
 
         if status.is_success() {
-            return response
-                .json()
-                .await
-                .map(SessionOutcome::Accepted)
-                .map_err(SyndApiError::DecodeResponse);
+            return response.json().await.map_err(SyndApiError::DecodeResponse);
         }
         if status == Self::REJECTION_STATUS {
-            return response
+            let rejection = response
                 .json()
                 .await
-                .map(SessionOutcome::Rejected)
-                .map_err(SyndApiError::DecodeResponse);
+                .map_err(SyndApiError::DecodeResponse)?;
+            return Err(Self::rejected(rejection));
         }
 
         response
@@ -121,12 +110,7 @@ impl Client {
         R: SessionRequest,
     {
         let response = self.send_session_request(&request).await?;
-        let outcome = R::decode_response(response).await?;
-
-        match outcome {
-            SessionOutcome::Accepted(response) => Ok(response),
-            SessionOutcome::Rejected(rejection) => Err(R::rejected(rejection)),
-        }
+        R::decode_response(response).await
     }
 
     async fn send_session_request<R>(&self, request: &R) -> Result<reqwest::Response, SyndApiError>

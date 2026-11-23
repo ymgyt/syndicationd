@@ -11,11 +11,15 @@ use std::{
 
 #[cfg(test)]
 use synd_api::session::DaemonSessionLeasePolicy;
+#[cfg(unix)]
+use synd_api::session::{DaemonSessions, SessionIdIssuer};
 use synd_api::{
     serve::{self, auth::Authenticator},
     session::DaemonSessionConfig,
     shutdown::Shutdown,
 };
+#[cfg(unix)]
+use synd_protocol::capability;
 
 #[cfg(unix)]
 use tokio::net::UnixListener;
@@ -84,29 +88,34 @@ impl Daemon {
             debug!("Running daemon shutdown callback");
         });
         let shutdown_status = shutdown.clone();
-        let serve_options = self.config.serve_options();
-        let daemon_sessions = serve_options.daemon_sessions;
         let api_service = ApiService::from_database(
             self.config.database(),
             Authenticator::trusted_local(),
-            serve_options,
+            serve::ServeOptions::default(),
             &shutdown,
         )
         .await?;
         let (dependency, _event_workers) = api_service.into_parts();
+        let session_config = self.config.session;
+        let sessions = DaemonSessions::new(
+            capability::local_api_capabilities(),
+            session_config,
+            SessionIdIssuer::default(),
+            Some(shutdown.clone()),
+        );
         info!(
             pid = std::process::id(),
             runtime_root = %placement.root().path().display(),
             runtime_instance_id = %placement.instance().id(),
             database = %placement.instance().canonical_database_path().display(),
             endpoint = %placement.endpoint().path().display(),
-            session_lease_ms = daemon_sessions.lease_policy().lease_duration().as_millis(),
-            idle_shutdown_grace_ms = daemon_sessions.idle_shutdown_grace().as_millis(),
+            session_lease_ms = session_config.lease_policy().lease_duration().as_millis(),
+            idle_shutdown_grace_ms = session_config.idle_shutdown_grace().as_millis(),
             "Daemon ready"
         );
 
         // Keep event workers alive for the entire serve future.
-        serve::serve_unix(listener, dependency, shutdown).await?;
+        serve::serve_unix(listener, dependency, sessions, shutdown).await?;
         info!(
             reason = shutdown_status
                 .reason()
@@ -124,8 +133,6 @@ pub struct DaemonConfig {
     database: RuntimeDatabase,
     session: DaemonSessionConfig,
     placement_environment: PlacementEnvironment,
-    #[cfg(test)]
-    session_lease_policy: Option<DaemonSessionLeasePolicy>,
 }
 
 impl DaemonConfig {
@@ -134,8 +141,6 @@ impl DaemonConfig {
             database,
             session: DaemonSessionConfig::default(),
             placement_environment: PlacementEnvironment::capture(),
-            #[cfg(test)]
-            session_lease_policy: None,
         }
     }
 
@@ -165,21 +170,6 @@ impl DaemonConfig {
         self
     }
 
-    fn serve_options(&self) -> serve::ServeOptions {
-        #[cfg(test)]
-        let session = match self.session_lease_policy {
-            Some(lease_policy) => {
-                DaemonSessionConfig::new(lease_policy, self.session.idle_shutdown_grace())
-            }
-            None => self.session,
-        };
-
-        #[cfg(not(test))]
-        let session = self.session;
-
-        serve::ServeOptions::default().with_daemon_sessions(session)
-    }
-
     #[cfg(test)]
     fn with_placement_environment(mut self, placement_environment: PlacementEnvironment) -> Self {
         self.placement_environment = placement_environment;
@@ -188,7 +178,7 @@ impl DaemonConfig {
 
     #[cfg(test)]
     fn with_session_lease_policy(mut self, lease_policy: DaemonSessionLeasePolicy) -> Self {
-        self.session_lease_policy = Some(lease_policy);
+        self.session = self.session.with_lease_policy(lease_policy);
         self
     }
 }

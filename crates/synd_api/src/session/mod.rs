@@ -4,7 +4,7 @@ use std::{
 };
 
 use synd_protocol::{
-    CapabilitySet, capability,
+    CapabilitySet,
     daemon::{DaemonIdleShutdownStatus, DaemonSessionStatus},
     session::{
         CloseSessionErrorResponse, CloseSessionRequest, CloseSessionResponse,
@@ -14,24 +14,21 @@ use synd_protocol::{
 };
 use tracing::debug;
 
-mod decision;
+use crate::shutdown::Shutdown;
+
+mod id_issuer;
 mod idle_shutdown;
 mod state;
 mod sweeper;
 
-pub use idle_shutdown::SessionIdleShutdown;
+pub use id_issuer::SessionIdIssuer;
 pub(crate) use sweeper::DaemonSessionSweeper;
 
-use decision::{
-    SessionCloseContext, SessionCloseDecision, SessionOpenContext, SessionOpenDecision,
-    SessionRenewContext, SessionRenewDecision, SessionSweepDecision,
-};
-use state::{
-    DaemonSession, DaemonSessionsState, SessionIdIssuer, SessionLeaseDeadline, SessionSweepOutcome,
-};
+use idle_shutdown::SessionIdleShutdown;
+use state::{DaemonSessionsState, SessionLeaseDeadline, SessionRenewal, SessionSweep};
 
 pub const DEFAULT_DAEMON_IDLE_SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
-pub const DEFAULT_DAEMON_SESSION_LEASE_DURATION: Duration = Duration::from_secs(30);
+pub const DEFAULT_DAEMON_SESSION_LEASE_DURATION: Duration = SessionLease::DEFAULT_DURATION;
 pub const DEFAULT_DAEMON_SESSION_SWEEP_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Session lifecycle settings used by a daemon API service.
@@ -52,11 +49,16 @@ impl DaemonSessionConfig {
 
     #[must_use]
     pub fn with_lease_duration(self, lease_duration: Duration) -> Self {
+        self.with_lease_policy(DaemonSessionLeasePolicy::new(
+            lease_duration,
+            self.lease_policy.sweep_interval(),
+        ))
+    }
+
+    #[must_use]
+    pub fn with_lease_policy(self, lease_policy: DaemonSessionLeasePolicy) -> Self {
         Self {
-            lease_policy: DaemonSessionLeasePolicy::new(
-                lease_duration,
-                self.lease_policy.sweep_interval(),
-            ),
+            lease_policy,
             ..self
         }
     }
@@ -95,50 +97,22 @@ pub struct DaemonSessions {
     inner: Arc<DaemonSessionsInner>,
 }
 
-impl Default for DaemonSessions {
-    fn default() -> Self {
-        Self::new(capability::local_api_capabilities())
-    }
-}
-
 impl DaemonSessions {
-    pub fn new(supported_capabilities: CapabilitySet) -> Self {
-        Self::from_parts(
-            supported_capabilities,
-            DaemonSessionLeasePolicy::default(),
-            None,
-        )
-    }
-
-    #[must_use]
-    pub fn with_idle_shutdown(&self, idle_shutdown: SessionIdleShutdown) -> Self {
-        Self::from_parts(
-            self.supported_capabilities().clone(),
-            self.inner.lease_policy,
-            Some(idle_shutdown),
-        )
-    }
-
-    #[must_use]
-    pub fn with_lease_policy(&self, lease_policy: DaemonSessionLeasePolicy) -> Self {
-        Self::from_parts(
-            self.supported_capabilities().clone(),
-            lease_policy,
-            self.inner.idle_shutdown.clone(),
-        )
-    }
-
-    fn from_parts(
+    /// Creates an empty registry for one daemon run. A shutdown handle enables idle shutdown.
+    pub fn new(
         supported_capabilities: CapabilitySet,
-        lease_policy: DaemonSessionLeasePolicy,
-        idle_shutdown: Option<SessionIdleShutdown>,
+        config: DaemonSessionConfig,
+        id_issuer: SessionIdIssuer,
+        shutdown: Option<Shutdown>,
     ) -> Self {
         Self {
             inner: Arc::new(DaemonSessionsInner {
                 supported_capabilities,
-                lease_policy,
-                id_issuer: SessionIdIssuer::default(),
-                idle_shutdown,
+                lease_policy: config.lease_policy(),
+                id_issuer,
+                idle_shutdown: shutdown.map(|shutdown| {
+                    SessionIdleShutdown::new(config.idle_shutdown_grace(), shutdown)
+                }),
                 state: Mutex::new(DaemonSessionsState::default()),
             }),
         }
@@ -156,54 +130,34 @@ impl DaemonSessions {
         request: &OpenSessionRequest,
         now: Instant,
     ) -> Result<OpenSessionResponse, OpenSessionErrorResponse> {
-        let context = SessionOpenContext::new(
-            request.required_capabilities().clone(),
-            self.supported_capabilities().clone(),
+        let supported = &self.inner.supported_capabilities;
+        let missing_capabilities = request.required_capabilities().missing_from(supported);
+        if !missing_capabilities.is_empty() {
+            debug!(?missing_capabilities, "Rejected daemon session open");
+            return Err(OpenSessionErrorResponse::from_missing_capabilities(
+                missing_capabilities,
+            ));
+        }
+
+        let session_id = self.inner.id_issuer.issue();
+        let lease = self.inner.lease_policy.lease();
+        let lease_deadline = self.inner.lease_policy.deadline_from(now);
+        let active_sessions = self.update_sessions(|state| {
+            state.insert(session_id.clone(), lease_deadline);
+            state.active_session_count()
+        });
+        debug!(
+            %session_id,
+            active_sessions,
+            lease_duration_ms = lease.duration().as_millis(),
+            "Opened daemon session"
         );
 
-        match SessionOpenDecision::from(context) {
-            SessionOpenDecision::Accept {
-                available_capabilities,
-            } => {
-                let session_id = self.inner.id_issuer.issue();
-                let lease = self.inner.lease_policy.lease();
-                let lease_deadline = self.inner.lease_policy.deadline_from(now);
-                let (effect, active_sessions) = {
-                    let mut state = self.lock_state();
-                    let effect = state.insert(DaemonSession::new(
-                        session_id.clone(),
-                        request.required_capabilities().clone(),
-                        lease_deadline,
-                    ));
-
-                    (effect, state.active_session_count())
-                };
-                effect.apply(self.inner.idle_shutdown.as_ref());
-                debug!(
-                    %session_id,
-                    active_sessions,
-                    lease_duration_ms = lease.duration().as_millis(),
-                    "Opened daemon session"
-                );
-
-                Ok(OpenSessionResponse::with_lease(
-                    session_id,
-                    available_capabilities,
-                    lease,
-                ))
-            }
-            SessionOpenDecision::RejectMissingCapabilities {
-                missing_capabilities,
-            } => {
-                debug!(
-                    missing_capabilities = ?missing_capabilities,
-                    "Rejected daemon session open"
-                );
-                Err(OpenSessionErrorResponse::from_missing_capabilities(
-                    missing_capabilities,
-                ))
-            }
-        }
+        Ok(OpenSessionResponse::with_lease(
+            session_id,
+            supported.clone(),
+            lease,
+        ))
     }
 
     pub fn renew(
@@ -219,39 +173,26 @@ impl DaemonSessions {
         now: Instant,
     ) -> Result<RenewSessionResponse, RenewSessionErrorResponse> {
         let session_id = request.session_id().clone();
-        let lease = self.inner.lease_policy.lease();
         let lease_deadline = self.inner.lease_policy.deadline_from(now);
-        let context = {
-            let mut state = self.lock_state();
-            let renew = state.renew(
-                &session_id,
-                now,
-                lease_deadline,
-                self.inner.idle_shutdown.is_some(),
-            );
+        let renewal = self.update_sessions(|state| state.renew(&session_id, now, lease_deadline));
 
-            SessionRenewContext::new(session_id, lease, lease_deadline, renew)
-        };
-
-        match SessionRenewDecision::from(context) {
-            SessionRenewDecision::Accept {
-                session_id,
-                lease,
-                lease_deadline,
-            } => {
+        match renewal {
+            SessionRenewal::Renewed => {
                 debug!(
                     %session_id,
                     lease_expires_in_ms = lease_deadline.remaining_from(now).as_millis(),
                     "Renewed daemon session"
                 );
-                Ok(RenewSessionResponse::new(session_id, lease))
+                Ok(RenewSessionResponse::new(
+                    session_id,
+                    self.inner.lease_policy.lease(),
+                ))
             }
-            SessionRenewDecision::RejectUnknownSession { session_id } => {
+            SessionRenewal::Unknown => {
                 debug!(%session_id, "Rejected daemon session renew");
                 Err(RenewSessionErrorResponse::unknown_session(session_id))
             }
-            SessionRenewDecision::RejectExpiredSession { session_id, effect } => {
-                effect.apply(self.inner.idle_shutdown.as_ref());
+            SessionRenewal::Expired => {
                 debug!(%session_id, "Expired daemon session during renew");
                 Err(RenewSessionErrorResponse::unknown_session(session_id))
             }
@@ -262,61 +203,36 @@ impl DaemonSessions {
         &self,
         request: &CloseSessionRequest,
     ) -> Result<CloseSessionResponse, CloseSessionErrorResponse> {
-        let session_id = request.session_id().clone();
-        let context = {
-            let mut state = self.lock_state();
-            let removed = state.remove(&session_id, self.inner.idle_shutdown.is_some());
-
-            SessionCloseContext::new(session_id.clone(), removed.known_session, removed.effect)
-        };
-
-        match SessionCloseDecision::from(context) {
-            SessionCloseDecision::Accept { effect } => {
-                effect.apply(self.inner.idle_shutdown.as_ref());
-                debug!(%session_id, "Closed daemon session");
-                Ok(CloseSessionResponse::new())
-            }
-            SessionCloseDecision::RejectUnknownSession { session_id } => {
-                debug!(%session_id, "Rejected daemon session close");
-                Err(CloseSessionErrorResponse::unknown_session(session_id))
-            }
+        let session_id = request.session_id();
+        if !self.update_sessions(|state| state.remove(session_id)) {
+            debug!(%session_id, "Rejected daemon session close");
+            return Err(CloseSessionErrorResponse::unknown_session(
+                session_id.clone(),
+            ));
         }
+
+        debug!(%session_id, "Closed daemon session");
+        Ok(CloseSessionResponse::new())
     }
 
     fn sweep_interval(&self) -> Duration {
         self.inner.lease_policy.sweep_interval()
     }
 
-    fn sweep_expired(&self) -> SessionSweepOutcome {
+    fn sweep_expired(&self) -> SessionSweep {
         self.sweep_expired_at(Instant::now())
     }
 
-    fn sweep_expired_at(&self, now: Instant) -> SessionSweepOutcome {
-        let facts = {
-            let mut state = self.lock_state();
-            state.sweep_expired(now, self.inner.idle_shutdown.is_some())
-        };
-
-        match SessionSweepDecision::from(facts) {
-            SessionSweepDecision::NoExpiredSessions { active_sessions } => {
-                SessionSweepOutcome::new(0, active_sessions)
-            }
-            SessionSweepDecision::ExpiredSessions {
-                expired_sessions,
-                active_sessions,
-                effect,
-            } => {
-                let expired_session_count = expired_sessions.len();
-                effect.apply(self.inner.idle_shutdown.as_ref());
-                debug!(
-                    expired_sessions = ?expired_sessions,
-                    active_sessions,
-                    "Expired daemon sessions during sweep"
-                );
-
-                SessionSweepOutcome::new(expired_session_count, active_sessions)
-            }
+    fn sweep_expired_at(&self, now: Instant) -> SessionSweep {
+        let sweep = self.update_sessions(|state| state.sweep_expired(now));
+        if !sweep.expired_sessions.is_empty() {
+            debug!(
+                expired_sessions = ?sweep.expired_sessions,
+                active_sessions = sweep.active_sessions,
+                "Expired daemon sessions during sweep"
+            );
         }
+        sweep
     }
 
     pub fn status(&self) -> DaemonSessionStatus {
@@ -337,8 +253,22 @@ impl DaemonSessions {
         )
     }
 
-    fn supported_capabilities(&self) -> &CapabilitySet {
-        &self.inner.supported_capabilities
+    fn update_sessions<T>(&self, update: impl FnOnce(&mut DaemonSessionsState) -> T) -> T {
+        let mut state = self.lock_state();
+        let was_empty = state.active_session_count() == 0;
+        let result = update(&mut state);
+        let is_empty = state.active_session_count() == 0;
+        if was_empty != is_empty {
+            state.idle_shutdown_timer = if is_empty {
+                self.inner
+                    .idle_shutdown
+                    .as_ref()
+                    .map(|idle| idle.schedule_check(self))
+            } else {
+                None
+            };
+        }
+        result
     }
 
     fn lock_state(&self) -> MutexGuard<'_, DaemonSessionsState> {
@@ -420,56 +350,35 @@ mod tests {
     };
 
     use synd_protocol::{
-        CapabilitySet,
-        session::{CloseSessionRequest, OpenSessionRequest, RenewSessionRequest, SessionId},
+        CapabilitySet, capability,
+        session::{
+            CloseSessionErrorCode, CloseSessionRequest, OpenSessionRequest, RenewSessionErrorCode,
+            RenewSessionRequest, SessionId,
+        },
     };
 
     use crate::shutdown::Shutdown;
 
-    use super::{
-        DaemonSessionLeasePolicy, DaemonSessions, SessionIdleShutdown,
-        decision::{
-            SessionCloseContext, SessionCloseDecision, SessionOpenContext, SessionOpenDecision,
-            SessionRenewContext, SessionRenewDecision, SessionSweepDecision,
-        },
-        idle_shutdown::DaemonSessionsEffect,
-        state::{SessionLeaseDeadline, SessionRenewChange, SessionSweepChange},
-    };
+    use super::{DaemonSessionConfig, DaemonSessionLeasePolicy, DaemonSessions, SessionIdIssuer};
 
-    #[test]
-    fn selects_open_decision_from_capabilities() {
-        let cases = [
-            (
-                SessionOpenContext::new(
-                    CapabilitySet::new(["timeline.read"]),
-                    CapabilitySet::new(["timeline.read", "subscription.write"]),
-                ),
-                SessionOpenDecision::Accept {
-                    available_capabilities: CapabilitySet::new([
-                        "timeline.read",
-                        "subscription.write",
-                    ]),
-                },
-            ),
-            (
-                SessionOpenContext::new(
-                    CapabilitySet::new(["timeline.read", "subscription.write"]),
-                    CapabilitySet::new(["timeline.read"]),
-                ),
-                SessionOpenDecision::RejectMissingCapabilities {
-                    missing_capabilities: CapabilitySet::new(["subscription.write"]),
-                },
-            ),
-        ];
-
-        for (context, expected) in cases {
-            assert_eq!(SessionOpenDecision::from(context), expected);
-        }
+    fn test_sessions(config: DaemonSessionConfig, shutdown: Option<Shutdown>) -> DaemonSessions {
+        DaemonSessions::new(
+            capability::local_api_capabilities(),
+            config,
+            SessionIdIssuer::new(42, 1),
+            shutdown,
+        )
     }
 
     #[test]
     fn opens_and_closes_session() {
-        let sessions = DaemonSessions::new(CapabilitySet::new(["timeline.read"]));
+        let supported = CapabilitySet::new(["timeline.read", capability::SUBSCRIPTION_WRITE]);
+        let sessions = DaemonSessions::new(
+            supported.clone(),
+            DaemonSessionConfig::default(),
+            SessionIdIssuer::new(42, 1),
+            None,
+        );
 
         let opened = sessions
             .open(&OpenSessionRequest::new(CapabilitySet::new([
@@ -477,20 +386,24 @@ mod tests {
             ])))
             .unwrap();
 
+        assert_eq!(opened.available_capabilities(), &supported);
         assert_eq!(sessions.active_session_count(), 1);
 
-        sessions
-            .close(&CloseSessionRequest::new(opened.session_id().clone()))
-            .unwrap();
-
+        let close = CloseSessionRequest::new(opened.session_id().clone());
+        sessions.close(&close).unwrap();
         assert_eq!(sessions.active_session_count(), 0);
+
+        let error = sessions.close(&close).unwrap_err();
+        assert_eq!(error.code(), CloseSessionErrorCode::UnknownSession);
+        assert_eq!(error.session_id(), opened.session_id());
     }
 
     #[test]
     fn opens_session_with_lease_policy() {
         let now = Instant::now();
         let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(12), Duration::from_secs(2));
-        let sessions = DaemonSessions::default().with_lease_policy(policy);
+        let config = DaemonSessionConfig::default().with_lease_policy(policy);
+        let sessions = test_sessions(config, None);
 
         let opened = sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
@@ -502,10 +415,11 @@ mod tests {
 
     #[test]
     fn rejects_session_when_required_capability_is_missing() {
-        let sessions = DaemonSessions::default();
+        let sessions = test_sessions(DaemonSessionConfig::default(), None);
 
         let error = sessions
             .open(&OpenSessionRequest::new(CapabilitySet::new([
+                capability::SUBSCRIPTION_WRITE,
                 "unsupported.capability",
             ])))
             .unwrap_err();
@@ -521,7 +435,8 @@ mod tests {
     fn renews_session_before_lease_deadline() {
         let now = Instant::now();
         let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(30), Duration::from_secs(5));
-        let sessions = DaemonSessions::default().with_lease_policy(policy);
+        let config = DaemonSessionConfig::default().with_lease_policy(policy);
+        let sessions = test_sessions(config, None);
         let opened = sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
             .unwrap();
@@ -542,7 +457,8 @@ mod tests {
     fn rejects_and_removes_expired_session_during_renew() {
         let now = Instant::now();
         let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(30), Duration::from_secs(5));
-        let sessions = DaemonSessions::default().with_lease_policy(policy);
+        let config = DaemonSessionConfig::default().with_lease_policy(policy);
+        let sessions = test_sessions(config, None);
         let opened = sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
             .unwrap();
@@ -554,107 +470,31 @@ mod tests {
             )
             .unwrap_err();
 
+        assert_eq!(error.code(), RenewSessionErrorCode::UnknownSession);
         assert_eq!(error.session_id(), opened.session_id());
         assert_eq!(sessions.active_session_count(), 0);
     }
 
     #[test]
     fn rejects_unknown_session_during_renew() {
-        let sessions = DaemonSessions::default();
+        let sessions = test_sessions(DaemonSessionConfig::default(), None);
         let session_id = SessionId::new("session-unknown");
 
         let error = sessions
             .renew(&RenewSessionRequest::new(session_id.clone()))
             .unwrap_err();
 
+        assert_eq!(error.code(), RenewSessionErrorCode::UnknownSession);
         assert_eq!(error.session_id(), &session_id);
-    }
-
-    #[test]
-    fn selects_renew_decision_from_change() {
-        let now = Instant::now();
-        let lease = synd_protocol::session::SessionLease::new(Duration::from_secs(30));
-        let lease_deadline = SessionLeaseDeadline::new(now + Duration::from_secs(30));
-        let cases = [
-            (
-                SessionRenewContext::new(
-                    SessionId::new("session-1"),
-                    lease,
-                    lease_deadline,
-                    SessionRenewChange::renewed(),
-                ),
-                SessionRenewDecision::Accept {
-                    session_id: SessionId::new("session-1"),
-                    lease,
-                    lease_deadline,
-                },
-            ),
-            (
-                SessionRenewContext::new(
-                    SessionId::new("session-1"),
-                    lease,
-                    lease_deadline,
-                    SessionRenewChange::expired(DaemonSessionsEffect::None),
-                ),
-                SessionRenewDecision::RejectExpiredSession {
-                    session_id: SessionId::new("session-1"),
-                    effect: DaemonSessionsEffect::None,
-                },
-            ),
-            (
-                SessionRenewContext::new(
-                    SessionId::new("session-1"),
-                    lease,
-                    lease_deadline,
-                    SessionRenewChange::unknown(),
-                ),
-                SessionRenewDecision::RejectUnknownSession {
-                    session_id: SessionId::new("session-1"),
-                },
-            ),
-        ];
-
-        for (context, expected) in cases {
-            assert_eq!(SessionRenewDecision::from(context), expected);
-        }
-    }
-
-    #[test]
-    fn selects_close_decision_from_known_session() {
-        let cases = [
-            (
-                SessionCloseContext::new(
-                    SessionId::new("session-1"),
-                    true,
-                    DaemonSessionsEffect::None,
-                ),
-                SessionCloseDecision::Accept {
-                    effect: DaemonSessionsEffect::None,
-                },
-            ),
-            (
-                SessionCloseContext::new(
-                    SessionId::new("session-1"),
-                    false,
-                    DaemonSessionsEffect::None,
-                ),
-                SessionCloseDecision::RejectUnknownSession {
-                    session_id: SessionId::new("session-1"),
-                },
-            ),
-        ];
-
-        for (context, expected) in cases {
-            assert_eq!(SessionCloseDecision::from(context), expected);
-        }
     }
 
     #[test]
     fn sweeps_expired_sessions() {
         let now = Instant::now();
         let policy = DaemonSessionLeasePolicy::new(Duration::from_secs(30), Duration::from_secs(5));
-        let sessions = DaemonSessions::default().with_lease_policy(policy);
-        sessions
+        let config = DaemonSessionConfig::default().with_lease_policy(policy);
+        let sessions = test_sessions(config, None);
+        let first = sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
             .unwrap();
         sessions
@@ -664,37 +504,17 @@ mod tests {
             )
             .unwrap();
 
+        let outcome = sessions.sweep_expired_at(now + Duration::from_secs(10));
+        assert_eq!(outcome.expired_sessions, []);
+        assert_eq!(outcome.active_sessions, 2);
+
         let outcome = sessions.sweep_expired_at(now + Duration::from_secs(31));
-
-        assert_eq!(outcome.expired_session_count(), 1);
-        assert_eq!(outcome.active_sessions(), 1);
+        assert_eq!(
+            outcome.expired_sessions.as_slice(),
+            std::slice::from_ref(first.session_id())
+        );
+        assert_eq!(outcome.active_sessions, 1);
         assert_eq!(sessions.active_session_count(), 1);
-    }
-
-    #[test]
-    fn selects_sweep_decision_from_change() {
-        let cases = [
-            (
-                SessionSweepChange::new(vec![], 2, DaemonSessionsEffect::None),
-                SessionSweepDecision::NoExpiredSessions { active_sessions: 2 },
-            ),
-            (
-                SessionSweepChange::new(
-                    vec![SessionId::new("session-1")],
-                    0,
-                    DaemonSessionsEffect::None,
-                ),
-                SessionSweepDecision::ExpiredSessions {
-                    expired_sessions: vec![SessionId::new("session-1")],
-                    active_sessions: 0,
-                    effect: DaemonSessionsEffect::None,
-                },
-            ),
-        ];
-
-        for (facts, expected) in cases {
-            assert_eq!(SessionSweepDecision::from(facts), expected);
-        }
     }
 
     #[tokio::test]
@@ -704,10 +524,9 @@ mod tests {
         let shutdown = Shutdown::manual(move || {
             shutdown_called_for_hook.store(true, Ordering::Relaxed);
         });
-        let sessions = DaemonSessions::default().with_idle_shutdown(SessionIdleShutdown::new(
-            Duration::from_millis(10),
-            shutdown,
-        ));
+        let config =
+            DaemonSessionConfig::default().with_idle_shutdown_grace(Duration::from_millis(10));
+        let sessions = test_sessions(config, Some(shutdown));
         let opened = sessions
             .open(&OpenSessionRequest::new(CapabilitySet::default()))
             .unwrap();
@@ -736,10 +555,9 @@ mod tests {
         let shutdown = Shutdown::manual(move || {
             shutdown_called_for_hook.store(true, Ordering::Relaxed);
         });
-        let sessions = DaemonSessions::default().with_idle_shutdown(SessionIdleShutdown::new(
-            Duration::from_millis(20),
-            shutdown,
-        ));
+        let config =
+            DaemonSessionConfig::default().with_idle_shutdown_grace(Duration::from_millis(20));
+        let sessions = test_sessions(config, Some(shutdown));
         let first = sessions
             .open(&OpenSessionRequest::new(CapabilitySet::default()))
             .unwrap();
@@ -765,20 +583,16 @@ mod tests {
         });
         let policy =
             DaemonSessionLeasePolicy::new(Duration::from_millis(10), Duration::from_millis(5));
-        let sessions = DaemonSessions::default()
-            .with_lease_policy(policy)
-            .with_idle_shutdown(SessionIdleShutdown::new(
-                Duration::from_millis(10),
-                shutdown,
-            ));
+        let config = DaemonSessionConfig::new(policy, Duration::from_millis(10));
+        let sessions = test_sessions(config, Some(shutdown));
         sessions
             .open_at(&OpenSessionRequest::new(CapabilitySet::default()), now)
             .unwrap();
 
         let outcome = sessions.sweep_expired_at(now + Duration::from_millis(11));
 
-        assert_eq!(outcome.expired_session_count(), 1);
-        assert_eq!(outcome.active_sessions(), 0);
+        assert_eq!(outcome.expired_sessions.len(), 1);
+        assert_eq!(outcome.active_sessions, 0);
         tokio::time::timeout(Duration::from_secs(1), async {
             loop {
                 if shutdown_called.load(Ordering::Relaxed) {

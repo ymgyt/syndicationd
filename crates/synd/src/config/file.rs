@@ -123,7 +123,7 @@ pub static INIT_CONFIG: &str = r#"
 # runtime_root = "path/to/runtime"
 
 # Session lease duration granted by the local daemon
-# session_lease_duration = "30s"
+# session_lease_duration = "3m"
 
 # Grace period before the local daemon shuts down after all sessions are gone
 # session_idle_shutdown_grace = "30s"

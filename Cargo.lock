@@ -5604,6 +5604,7 @@ dependencies = [
  "insta",
  "moka",
  "pin-project",
+ "rand 0.10.4",
  "reqwest",
  "serde",
  "synd-auth",

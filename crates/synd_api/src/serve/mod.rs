@@ -17,12 +17,13 @@ use tower_http::{
 };
 use tracing::{debug, info};
 
+#[cfg(unix)]
+use crate::session::{DaemonSessionSweeper, DaemonSessions};
 use crate::{
     Result, config,
     dependency::Dependency,
     gql::{self, SyndSchema},
     serve::layer::{authenticate, request_metrics::RequestMetricsLayer, trace},
-    session::{DaemonSessionConfig, DaemonSessionSweeper, SessionIdleShutdown},
     shutdown::Shutdown,
 };
 
@@ -45,15 +46,6 @@ pub struct ServeOptions {
     pub timeout: Duration,
     pub body_limit_bytes: usize,
     pub concurrency_limit: usize,
-    pub daemon_sessions: DaemonSessionConfig,
-}
-
-impl ServeOptions {
-    #[must_use]
-    pub fn with_daemon_sessions(mut self, daemon_sessions: DaemonSessionConfig) -> Self {
-        self.daemon_sessions = daemon_sessions;
-        self
-    }
 }
 
 impl Default for ServeOptions {
@@ -62,7 +54,6 @@ impl Default for ServeOptions {
             timeout: Duration::from_secs(30),
             body_limit_bytes: config::serve::DEFAULT_REQUEST_BODY_LIMIT_BYTES,
             concurrency_limit: config::serve::DEFAULT_REQUEST_CONCURRENCY_LIMIT,
-            daemon_sessions: DaemonSessionConfig::default(),
         }
     }
 }
@@ -100,15 +91,12 @@ pub async fn serve(listener: TcpListener, dep: Dependency, shutdown: Shutdown) -
 }
 
 #[cfg(unix)]
-pub async fn serve_unix(listener: UnixListener, dep: Dependency, shutdown: Shutdown) -> Result<()> {
-    let daemon_sessions = dep.serve_options.daemon_sessions;
-    let sessions = dep
-        .sessions
-        .with_lease_policy(daemon_sessions.lease_policy())
-        .with_idle_shutdown(SessionIdleShutdown::new(
-            daemon_sessions.idle_shutdown_grace(),
-            shutdown.clone(),
-        ));
+pub async fn serve_unix(
+    listener: UnixListener,
+    dep: Dependency,
+    sessions: DaemonSessions,
+    shutdown: Shutdown,
+) -> Result<()> {
     let ApiService { router, .. } = build_service(dep, &shutdown);
     let shutdown_requested = shutdown.cancellation_token();
     let _session_sweeper =
@@ -150,10 +138,8 @@ fn build_service(dep: Dependency, shutdown: &Shutdown) -> ApiService {
                 timeout: request_timeout,
                 body_limit_bytes: request_body_limit_bytes,
                 concurrency_limit,
-                daemon_sessions: _,
             },
         monitors,
-        sessions: _,
     } = dep;
 
     let cx = Context {

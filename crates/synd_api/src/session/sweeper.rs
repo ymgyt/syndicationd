@@ -53,8 +53,8 @@ impl DaemonSessionSweeper {
                 _ = interval.tick() => {
                     let outcome = self.sessions.sweep_expired();
                     debug!(
-                        expired_sessions = outcome.expired_session_count(),
-                        active_sessions = outcome.active_sessions(),
+                        expired_sessions = outcome.expired_sessions.len(),
+                        active_sessions = outcome.active_sessions,
                         "Daemon session sweeper tick"
                     );
                 }

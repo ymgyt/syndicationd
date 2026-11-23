@@ -324,7 +324,6 @@ pub async fn serve_api(
         timeout: Duration::from_secs(10),
         body_limit_bytes: 1024 * 2,
         concurrency_limit: 100,
-        ..ServeOptions::default()
     };
 
     let shutdown = Shutdown::watch_signal(future::pending(), || {});

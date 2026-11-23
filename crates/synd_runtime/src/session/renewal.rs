@@ -183,10 +183,9 @@ mod tests {
 
         #[test]
         fn derives_from_lease() {
-            let schedule =
-                SessionRenewalSchedule::from_lease(SessionLease::new(Duration::from_secs(30)));
+            let schedule = SessionRenewalSchedule::from_lease(SessionLease::default());
 
-            assert_eq!(schedule.renew_after(), Duration::from_secs(10));
+            assert_eq!(schedule.renew_after(), Duration::from_mins(1));
         }
 
         #[test]

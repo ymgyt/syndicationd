@@ -147,6 +147,8 @@ impl CloseSessionRequest {
 pub struct SessionLease(Duration);
 
 impl SessionLease {
+    pub const DEFAULT_DURATION: Duration = Duration::from_mins(3);
+
     pub fn new(duration: Duration) -> Self {
         Self(duration)
     }
@@ -158,7 +160,7 @@ impl SessionLease {
 
 impl Default for SessionLease {
     fn default() -> Self {
-        Self(Duration::from_secs(30))
+        Self(Self::DEFAULT_DURATION)
     }
 }
 
@@ -331,7 +333,7 @@ mod tests {
                         "names": ["timeline.read"]
                     },
                     "lease": {
-                        "secs": 30,
+                        "secs": 180,
                         "nanos": 0
                     }
                 }),

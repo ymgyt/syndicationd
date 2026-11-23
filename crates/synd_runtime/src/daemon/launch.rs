@@ -392,7 +392,7 @@ mod tests {
                     OsString::from("--sqlite-db"),
                     OsString::from("/tmp/synd.db"),
                     OsString::from("--session-lease-duration"),
-                    OsString::from("30s"),
+                    OsString::from("3m"),
                     OsString::from("--session-idle-shutdown-grace"),
                     OsString::from("30s"),
                 ]
