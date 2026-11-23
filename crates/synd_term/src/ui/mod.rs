@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::OnceLock};
 
-use ratatui::style::{Color, Modifier};
+use ratatui::style::{Color, Modifier, Style};
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
@@ -43,10 +43,11 @@ pub struct Context<'a> {
 }
 
 impl Context<'_> {
-    fn table_highlight_modifier(&self) -> Modifier {
+    fn table_selection_style(&self) -> Style {
+        let selected = self.theme.entries.selected_entry;
         match self.focus {
-            TerminalFocus::Gained => Modifier::empty(),
-            TerminalFocus::Lost => Modifier::DIM,
+            TerminalFocus::Gained => selected,
+            TerminalFocus::Lost => selected.add_modifier(Modifier::DIM),
         }
     }
 }

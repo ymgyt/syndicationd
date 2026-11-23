@@ -66,6 +66,12 @@ impl<T, F> FilterableVec<T, F> {
             .map(move |&idx| &self.items[idx])
     }
 
+    pub(crate) fn iter_with_selection(&self) -> impl Iterator<Item = (&T, bool)> {
+        self.iter()
+            .enumerate()
+            .map(|(index, item)| (item, index == self.selected_index()))
+    }
+
     pub(crate) fn as_unfiltered_slice(&self) -> &[T] {
         self.items.as_slice()
     }

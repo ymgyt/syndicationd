@@ -118,10 +118,8 @@ impl EntriesWidget {
             .header(header)
             .widths(widths)
             .rows(rows)
-            .theme(&cx.theme.entries)
             .selected_idx(self.entries.selected_index())
-            .highlight_modifier(cx.table_highlight_modifier())
-            .build()
+            .build(cx)
             .render(entries_area, buf);
 
         let header_rows = 2;
@@ -186,7 +184,7 @@ impl EntriesWidget {
             table::DATE_WIDTH,
         ];
 
-        let row = |timeline_entry: &'a payload::TimelineEntry| {
+        let row = |(timeline_entry, selected): (&'a payload::TimelineEntry, bool)| {
             let entry = &timeline_entry.entry;
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let category = entry.category();
@@ -198,17 +196,22 @@ impl EntriesWidget {
             let feed_title = entry.feed.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
 
             Row::new([
-                Cell::from(Line::from(vec![
+                table::title_cell(
                     Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
-                    Span::from(" "),
-                    Span::from(title),
-                ])),
+                    title,
+                    selected,
+                    cx,
+                ),
                 Cell::from(Span::from(feed_title)),
                 table::date_cell(entry.published.as_ref().or(entry.updated.as_ref())),
             ])
         };
 
-        (header, constraints, self.entries.iter().map(row))
+        (
+            header,
+            constraints,
+            self.entries.iter_with_selection().map(row),
+        )
     }
 
     fn render_detail(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {

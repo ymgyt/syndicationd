@@ -5,7 +5,7 @@ use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Modifier, Style, Styled, Stylize},
+    style::{Style, Styled, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
 };
@@ -35,8 +35,9 @@ use crate::{
         widgets::{
             collections::FilterableVec,
             filter::{CategoryAndMatcherFilterer, ComposedFilterer},
+            scrollbar::Scrollbar,
+            table::{self, Table},
         },
-        widgets::{scrollbar::Scrollbar, table::Table},
     },
 };
 
@@ -326,10 +327,8 @@ impl GhNotificationsWidget {
             .header(header)
             .widths(widths)
             .rows(rows)
-            .theme(&cx.theme.entries)
             .selected_idx(self.notifications.selected_index())
-            .highlight_modifier(cx.table_highlight_modifier())
-            .build()
+            .build(cx)
             .render(notifications_area, buf);
 
         let header_rows = 2;
@@ -382,31 +381,25 @@ impl GhNotificationsWidget {
             Constraint::Length(8),
         ];
 
-        let row = |n: &'a Notification| {
+        let row = |(n, selected): (&'a Notification, bool)| {
             let updated_at = HumanTime::from(n.updated_at.signed_duration_since(cx.now))
                 .to_text_en(Accuracy::Rough, Tense::Past);
             let updated_at = short_human_time(&updated_at);
-            let subject = n.title();
-            let subject_icon = n.subject_icon();
             let repo = n.repository.name.as_str();
             let reason = reason_label(&n.reason);
 
-            let modifier = Modifier::empty();
             Row::new([
-                Cell::from(
-                    Line::from(vec![subject_icon, Span::from(" "), Span::from(subject)])
-                        .add_modifier(modifier),
-                ),
-                Cell::from(Span::from(repo).add_modifier(modifier)),
-                Cell::from(Span::from(reason).add_modifier(modifier)),
-                Cell::from(
-                    Line::from(updated_at)
-                        .right_aligned()
-                        .add_modifier(modifier),
-                ),
+                table::title_cell(n.subject_icon(), n.title(), selected, cx),
+                Cell::from(Span::from(repo)),
+                Cell::from(Span::from(reason)),
+                Cell::from(Line::from(updated_at).right_aligned()),
             ])
         };
-        (header, constraints, self.notifications.iter().map(row))
+        (
+            header,
+            constraints,
+            self.notifications.iter_with_selection().map(row),
+        )
     }
 
     #[allow(clippy::too_many_lines)]

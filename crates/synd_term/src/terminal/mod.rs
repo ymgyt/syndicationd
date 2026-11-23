@@ -1,10 +1,11 @@
 use crossterm::{
     ExecutableCommand, cursor,
     event::{EnableFocusChange, EventStream},
+    style::Colored,
     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures_util::{Stream, future::Either, stream};
-use ratatui::{Frame, backend::Backend as _};
+use ratatui::{Frame, backend::Backend as _, style::Color};
 use std::io::{self, IsTerminal};
 
 #[cfg(not(feature = "integration"))]
@@ -57,7 +58,17 @@ impl Terminal {
     where
         F: FnOnce(&mut Frame),
     {
-        self.backend.draw(f)?;
+        self.backend.draw(|frame| {
+            f(frame);
+            // Under NO_COLOR, a crossterm color change can also reset bold and dim.
+            if Colored::ansi_color_disabled_memoized() {
+                for cell in &mut frame.buffer_mut().content {
+                    cell.fg = Color::Reset;
+                    cell.bg = Color::Reset;
+                    cell.underline_color = Color::Reset;
+                }
+            }
+        })?;
         Ok(())
     }
 

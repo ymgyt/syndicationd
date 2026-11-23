@@ -98,10 +98,8 @@ impl SubscriptionWidget {
             .header(header)
             .widths(widths)
             .rows(rows)
-            .theme(&cx.theme.entries)
             .selected_idx(self.feeds.selected_index())
-            .highlight_modifier(cx.table_highlight_modifier())
-            .build()
+            .build(cx)
             .render(feeds_area, buf);
 
         let header_rows = 2;
@@ -144,23 +142,26 @@ impl SubscriptionWidget {
             Cell::from(format!("Feed {n}/{m}")),
             Cell::from("URL"),
             Cell::from("Description"),
-            Cell::from(Line::from("Date").right_aligned()),
+            Cell::from(Line::from("Updated").right_aligned()),
         ]);
 
         let constraints = [
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(2),
-            table::DATE_WIDTH,
+            Constraint::Length(10),
         ];
 
-        let row = |feed_meta: &'a Feed| {
+        let row = |(feed_meta, selected): (&'a Feed, bool)| {
             let title = feed_meta.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
             let website_url = feed_meta
                 .website_url
                 .as_deref()
                 .unwrap_or(ui::UNKNOWN_SYMBOL);
             let desc = feed_meta.description.as_deref().unwrap_or("");
+            let updated = feed_meta
+                .updated_at()
+                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_owned(), TimeExt::local_ymd);
             let category = feed_meta.category();
             let icon = cx
                 .categories
@@ -168,11 +169,12 @@ impl SubscriptionWidget {
                 .unwrap_or_else(|| ui::default_icon());
 
             Row::new([
-                Cell::from(Line::from(vec![
+                table::title_cell(
                     Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
-                    Span::from(" "),
-                    Span::from(title),
-                ])),
+                    title,
+                    selected,
+                    cx,
+                ),
                 Cell::from(Span::from(
                     website_url
                         .trim_start_matches("http://")
@@ -180,11 +182,15 @@ impl SubscriptionWidget {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
-                table::date_cell(feed_meta.updated_at()),
+                Cell::from(Line::from(updated).right_aligned()),
             ])
         };
 
-        (header, constraints, self.feeds.iter().map(row))
+        (
+            header,
+            constraints,
+            self.feeds.iter_with_selection().map(row),
+        )
     }
 
     #[allow(clippy::too_many_lines)]

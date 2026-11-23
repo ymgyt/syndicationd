@@ -1,17 +1,31 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::Modifier,
-    text::Line,
+    style::{Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Cell, Padding, Row, StatefulWidget, TableState},
 };
 
 use crate::{
     types::{Time, format_local},
-    ui::{self, theme::EntriesTheme},
+    ui::{self, Context},
 };
 
 pub(super) const DATE_WIDTH: Constraint = Constraint::Length(5);
+
+pub(super) fn title_cell<'a>(
+    icon: Span<'a>,
+    title: &'a str,
+    selected: bool,
+    cx: &Context<'_>,
+) -> Cell<'a> {
+    let title = if selected {
+        Span::styled(title, cx.table_selection_style())
+    } else {
+        Span::raw(title)
+    };
+    Cell::from(Line::from(vec![icon, Span::raw(" "), title]))
+}
 
 pub(super) fn date_cell(time: Option<&Time>) -> Cell<'static> {
     let date = time.map_or_else(
@@ -21,43 +35,37 @@ pub(super) fn date_cell(time: Option<&Time>) -> Cell<'static> {
     Cell::from(Line::from(date).right_aligned())
 }
 
-pub(crate) struct TableBuilder<H, R, C, T, S, M> {
+pub(crate) struct TableBuilder<H, R, C, S> {
     header: H,
     rows: R,
     widths: C,
-    theme: T,
     selected_idx: S,
-    highlight_modifier: M,
 }
 
-impl Default for TableBuilder<(), (), (), (), (), ()> {
+impl Default for TableBuilder<(), (), (), ()> {
     fn default() -> Self {
         Self {
             header: (),
             rows: (),
             widths: (),
-            theme: (),
             selected_idx: (),
-            highlight_modifier: (),
         }
     }
 }
 
-impl<R, C, T, S, M> TableBuilder<(), R, C, T, S, M> {
-    pub(crate) fn header(self, header: Row<'_>) -> TableBuilder<Row<'_>, R, C, T, S, M> {
+impl<R, C, S> TableBuilder<(), R, C, S> {
+    pub(crate) fn header(self, header: Row<'_>) -> TableBuilder<Row<'_>, R, C, S> {
         TableBuilder {
             header,
             rows: self.rows,
             widths: self.widths,
-            theme: self.theme,
             selected_idx: self.selected_idx,
-            highlight_modifier: self.highlight_modifier,
         }
     }
 }
 
-impl<H, C, T, S, M> TableBuilder<H, (), C, T, S, M> {
-    pub(crate) fn rows<'a, Rows>(self, rows: Rows) -> TableBuilder<H, Vec<Row<'a>>, C, T, S, M>
+impl<H, C, S> TableBuilder<H, (), C, S> {
+    pub(crate) fn rows<'a, Rows>(self, rows: Rows) -> TableBuilder<H, Vec<Row<'a>>, C, S>
     where
         Rows: IntoIterator,
         Rows::Item: Into<Row<'a>>,
@@ -66,15 +74,13 @@ impl<H, C, T, S, M> TableBuilder<H, (), C, T, S, M> {
             header: self.header,
             rows: rows.into_iter().map(Into::into).collect(),
             widths: self.widths,
-            theme: self.theme,
             selected_idx: self.selected_idx,
-            highlight_modifier: self.highlight_modifier,
         }
     }
 }
 
-impl<H, R, T, S, M> TableBuilder<H, R, (), T, S, M> {
-    pub(crate) fn widths<C>(self, widths: C) -> TableBuilder<H, R, Vec<Constraint>, T, S, M>
+impl<H, R, S> TableBuilder<H, R, (), S> {
+    pub(crate) fn widths<C>(self, widths: C) -> TableBuilder<H, R, Vec<Constraint>, S>
     where
         C: IntoIterator,
         C::Item: Into<Constraint>,
@@ -83,75 +89,43 @@ impl<H, R, T, S, M> TableBuilder<H, R, (), T, S, M> {
             header: self.header,
             rows: self.rows,
             widths: widths.into_iter().map(Into::into).collect(),
-            theme: self.theme,
             selected_idx: self.selected_idx,
-            highlight_modifier: self.highlight_modifier,
         }
     }
 }
 
-impl<H, R, C, S, M> TableBuilder<H, R, C, (), S, M> {
-    pub(crate) fn theme(self, theme: &EntriesTheme) -> TableBuilder<H, R, C, &EntriesTheme, S, M>
-    where
-        C: IntoIterator,
-        C::Item: Into<Constraint>,
-    {
+impl<H, R, C> TableBuilder<H, R, C, ()> {
+    pub(crate) fn selected_idx(self, selected_idx: usize) -> TableBuilder<H, R, C, usize> {
         TableBuilder {
             header: self.header,
             rows: self.rows,
             widths: self.widths,
-            theme,
-            selected_idx: self.selected_idx,
-            highlight_modifier: self.highlight_modifier,
-        }
-    }
-}
-
-impl<H, R, C, T, M> TableBuilder<H, R, C, T, (), M> {
-    pub(crate) fn selected_idx(self, selected_idx: usize) -> TableBuilder<H, R, C, T, usize, M> {
-        TableBuilder {
-            header: self.header,
-            rows: self.rows,
-            widths: self.widths,
-            theme: self.theme,
             selected_idx,
-            highlight_modifier: self.highlight_modifier,
         }
     }
 }
 
-impl<H, R, C, T, S> TableBuilder<H, R, C, T, S, ()> {
-    pub(crate) fn highlight_modifier(
-        self,
-        highlight_modifier: Modifier,
-    ) -> TableBuilder<H, R, C, T, S, Modifier> {
-        TableBuilder {
-            header: self.header,
-            rows: self.rows,
-            widths: self.widths,
-            theme: self.theme,
-            selected_idx: self.selected_idx,
-            highlight_modifier,
-        }
-    }
-}
-
-impl<'a> TableBuilder<Row<'a>, Vec<Row<'a>>, Vec<Constraint>, &'a EntriesTheme, usize, Modifier> {
-    pub(crate) fn build(self) -> Table<'a> {
+impl<'a> TableBuilder<Row<'a>, Vec<Row<'a>>, Vec<Constraint>, usize> {
+    pub(crate) fn build(self, cx: &Context<'_>) -> Table<'a> {
         let TableBuilder {
             header,
             rows,
             widths,
-            theme,
             selected_idx,
-            highlight_modifier,
         } = self;
 
+        let selected = cx.table_selection_style();
+        let row_highlight = Style {
+            fg: selected.fg,
+            add_modifier: selected.add_modifier & Modifier::DIM,
+            ..Style::new()
+        };
+
         let table = ratatui::widgets::Table::new(rows, widths)
-            .header(header.style(theme.header))
+            .header(header.style(cx.theme.entries.header))
             .column_spacing(2)
-            .highlight_symbol(ui::TABLE_HIGHLIGHT_SYMBOL)
-            .row_highlight_style(theme.selected_entry.add_modifier(highlight_modifier))
+            .row_highlight_style(row_highlight)
+            .highlight_symbol(Span::styled(ui::TABLE_HIGHLIGHT_SYMBOL, selected))
             .highlight_spacing(ratatui::widgets::HighlightSpacing::Always);
 
         let state = TableState::new().with_offset(0).with_selected(selected_idx);
@@ -171,7 +145,7 @@ impl Table<'_> {
         Block::new().padding(Padding::new(0, 1, 1, 0)).inner(area)
     }
 
-    pub(crate) fn builder() -> TableBuilder<(), (), (), (), (), ()> {
+    pub(crate) fn builder() -> TableBuilder<(), (), (), ()> {
         TableBuilder::default()
     }
 
