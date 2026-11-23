@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use synd_feed::types::FeedUrl;
 use synd_registry::{
-    FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig, SubscribeFeedCommand, SubscriberId,
+    CreateTimelineCommand, FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig,
+    SubscribeFeedCommand, SubscriberId,
     api::ApiEvent,
     crawl::state::CrawlState,
     db::{CrawlStateDb, FeedRegistryDb},
@@ -83,6 +84,12 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
     let subscriber_id = SubscriberId::new("e2e-reader");
     let mut api_events = registry.subscribe_events(subscriber_id.clone());
     let feed_url = FeedUrl::parse(&format!("http://{mock_addr}/feed/twir_atom"))?;
+    let timeline = registry
+        .create_timeline(CreateTimelineCommand {
+            subscriber_id: subscriber_id.clone(),
+            name: "all".into(),
+        })
+        .await?;
 
     registry
         .subscribe(subscribe_command(&subscriber_id, &feed_url))
@@ -100,6 +107,7 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
     let page = registry
         .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id: subscriber_id.clone(),
+            timeline_id: timeline.timeline_id,
             after: None,
             first: 10,
         })

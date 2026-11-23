@@ -23,13 +23,14 @@ rand        = { workspace = true }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
 sha2        = { workspace = true }
-sqlx        = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
+sqlx        = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros", "uuid"] }
 strum       = { workspace = true }
 thiserror   = { workspace = true }
 tokio       = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 tokio-util  = { workspace = true }
 tracing     = { workspace = true }
 url         = { workspace = true }
+uuid        = { workspace = true, features = ["v4", "serde"] }
 zstd        = { workspace = true }
 
 [features]

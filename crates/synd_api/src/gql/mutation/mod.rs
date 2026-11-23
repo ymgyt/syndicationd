@@ -1,7 +1,8 @@
-use async_graphql::{Context, Enum, Error, InputObject, Object, SimpleObject};
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use async_graphql::{Context, Enum, Error, ID, InputObject, Object, SimpleObject};
+use synd_feed::types::{Category, FeedUrl, Requirement, TimelineName};
 use synd_registry::{
-    SubscribeFeedCommand, SubscribeOutcome, UnsubscribeFeedCommand, UnsubscribeOutcome,
+    CreateTimelineCommand, SubscribeFeedCommand, SubscribeOutcome, UnsubscribeFeedCommand,
+    UnsubscribeOutcome,
     crawl::policy::{CrawlPolicy, PollingInterval, PollingPolicy},
 };
 
@@ -120,10 +121,36 @@ enum UnsubscribeDisposition {
     Unsubscribed,
 }
 
+#[derive(InputObject)]
+struct CreateTimelineInput {
+    name: TimelineName,
+}
+
+#[derive(SimpleObject)]
+struct CreateTimelinePayload {
+    timeline_id: ID,
+}
+
 pub(crate) struct Mutation;
 
 #[Object]
 impl Mutation {
+    async fn create_timeline(
+        &self,
+        cx: &Context<'_>,
+        input: CreateTimelineInput,
+    ) -> async_graphql::Result<CreateTimelinePayload> {
+        let output = registry(cx)
+            .create_timeline(CreateTimelineCommand {
+                subscriber_id: subscriber_id(cx),
+                name: input.name,
+            })
+            .await?;
+        Ok(CreateTimelinePayload {
+            timeline_id: ID(output.timeline_id.to_string()),
+        })
+    }
+
     async fn subscribe_feed(
         &self,
         cx: &Context<'_>,

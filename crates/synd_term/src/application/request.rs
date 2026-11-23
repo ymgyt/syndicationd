@@ -48,6 +48,7 @@ pub(crate) enum RequestKind {
     FetchSubscription {
         generation: Generation,
     },
+    OpenInitialTimeline,
     FetchTimelineWindow {
         limit: usize,
     },
@@ -82,6 +83,7 @@ impl RequestKind {
             Self::SubscribeFeed { url } => Cow::Owned(format!("Subscribe feed {url}")),
             Self::UnsubscribeFeed { url } => Cow::Owned(format!("Unsubscribe feed {url}")),
             Self::FetchSubscription { .. } => Cow::Borrowed("Fetch subscriptions"),
+            Self::OpenInitialTimeline => Cow::Borrowed("Open timeline"),
             Self::FetchTimelineWindow { .. } => Cow::Borrowed("Fetch timeline"),
             Self::CatchUpTimeline { since } => {
                 Cow::Owned(format!("Catch up timeline from {since}"))

@@ -1,17 +1,17 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_graphql::{
-    Context, Enum, Object, Result, SimpleObject, Union,
+    Context, Enum, ID, Object, Result, SimpleObject, Union,
     connection::{Connection, Edge, EmptyFields},
 };
-use synd_feed::types::{Annotated, Category, Feed, FeedUrl, Requirement};
+use synd_feed::types::{Annotated, Category, Feed, FeedUrl, Requirement, TimelineName};
 use synd_registry::{
-    Subscription as RegistrySubscription,
+    Subscription as RegistrySubscription, TimelineId,
     crawl::policy::{CrawlPolicy as RegistryCrawlPolicy, PollingPolicy as RegistryPollingPolicy},
     query::{
         Subscriptions, SubscriptionsQuery, TimelineChange as RegistryTimelineChange,
         TimelineChangesQuery, TimelineEntriesPage, TimelineEntriesQuery,
-        TimelineEntry as RegistryTimelineEntry, TimelineEntryCursor,
+        TimelineEntry as RegistryTimelineEntry, TimelineEntryCursor, TimelinesQuery,
     },
 };
 
@@ -172,6 +172,12 @@ impl SubscribedFeed {
 
 struct FeedRegistry;
 
+#[derive(SimpleObject)]
+struct TimelineSummary {
+    id: ID,
+    name: TimelineName,
+}
+
 #[Object]
 impl FeedRegistry {
     async fn subscriptions(
@@ -183,12 +189,35 @@ impl FeedRegistry {
         Ok(SubscribedFeedsPage::load(cx, after, first).await?.into())
     }
 
-    async fn timeline(&self) -> Timeline {
-        Timeline
+    async fn timelines(&self, cx: &Context<'_>) -> Result<Vec<TimelineSummary>> {
+        let timelines = registry(cx)
+            .list_timelines(TimelinesQuery {
+                subscriber_id: subscriber_id(cx),
+            })
+            .await?;
+        Ok(timelines
+            .into_iter()
+            .map(|timeline| TimelineSummary {
+                id: ID(timeline.id.to_string()),
+                name: timeline.name,
+            })
+            .collect())
+    }
+
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql requires an async resolver"
+    )]
+    async fn timeline(&self, timeline_id: ID) -> Result<Timeline> {
+        Ok(Timeline {
+            id: timeline_id.parse()?,
+        })
     }
 }
 
-struct Timeline;
+struct Timeline {
+    id: TimelineId,
+}
 
 #[Object]
 impl Timeline {
@@ -198,7 +227,7 @@ impl Timeline {
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
     ) -> Result<Connection<String, TimelineEntry, TimelineEntriesFields>> {
-        let request = TimelineEntriesRequest::from_graphql(cx, after.as_deref(), first)?;
+        let request = TimelineEntriesRequest::from_graphql(cx, self.id, after.as_deref(), first)?;
         Ok(request.load(cx).await?.into())
     }
 
@@ -212,6 +241,7 @@ impl Timeline {
         let page = registry(cx)
             .list_timeline_changes(TimelineChangesQuery {
                 subscriber_id: subscriber_id(cx),
+                timeline_id: self.id,
                 since,
                 limit,
             })
@@ -275,7 +305,12 @@ impl From<TimelineEntriesGraphqlPage> for TimelineEntriesConnection {
 struct TimelineEntriesRequest(TimelineEntriesQuery);
 
 impl TimelineEntriesRequest {
-    fn from_graphql(cx: &Context<'_>, after: Option<&str>, first: Option<i32>) -> Result<Self> {
+    fn from_graphql(
+        cx: &Context<'_>,
+        timeline_id: TimelineId,
+        after: Option<&str>,
+        first: Option<i32>,
+    ) -> Result<Self> {
         let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
         let after = after
             .map(TimelineEntryCursor::decode)
@@ -283,6 +318,7 @@ impl TimelineEntriesRequest {
             .map_err(|err| async_graphql::Error::new(err.to_string()))?;
         Ok(Self(TimelineEntriesQuery {
             subscriber_id: subscriber_id(cx),
+            timeline_id,
             after,
             first,
         }))

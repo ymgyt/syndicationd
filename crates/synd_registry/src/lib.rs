@@ -20,8 +20,8 @@ pub mod subscription;
 pub mod timeline;
 
 pub use command::{
-    RequestCrawlCommand, RequestCrawlOutput, SubscribeFeedCommand, SubscribeFeedOutput,
-    UnsubscribeFeedCommand, UnsubscribeFeedOutput,
+    CreateTimelineCommand, CreateTimelineOutput, RequestCrawlCommand, RequestCrawlOutput,
+    SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
 };
 pub use config::{CrawlDispatchConfig, FeedRegistryConfig, FeedRegistryWorkerConfig};
 pub use crawl::request::{CrawlRequestReject, RequestCrawlOutcome};
@@ -34,3 +34,4 @@ pub use subscription::{
     FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, Subscription, SubscriptionKey,
     UnsubscribeOutcome,
 };
+pub use timeline::TimelineId;

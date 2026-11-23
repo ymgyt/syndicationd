@@ -29,6 +29,7 @@ tokio             = { workspace = true, features = ["net", "sync", "time"] }
 tokio-tungstenite = { version = "0.30.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 tracing           = { workspace = true }
 url               = { workspace = true }
+uuid              = { workspace = true, features = ["serde"] }
 webpki-roots      = { workspace = true }
 
 [features]

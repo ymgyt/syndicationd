@@ -1,10 +1,29 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use synd_feed::{
     entry::EntryId,
-    types::{Category, FeedUrl, Requirement, Time},
+    types::{Category, FeedUrl, Requirement, Time, TimelineName},
 };
 
 use super::PageInfo;
+
+pub use uuid::Uuid as TimelineId;
+
+#[derive(Debug, Deserialize)]
+pub struct Timeline {
+    pub id: TimelineId,
+    pub name: TimelineName,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateTimelineInput {
+    pub name: TimelineName,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTimelinePayload {
+    pub timeline_id: TimelineId,
+}
 
 /// Entry as it appears on one timeline: display position + content.
 #[derive(Debug, Clone, Deserialize)]

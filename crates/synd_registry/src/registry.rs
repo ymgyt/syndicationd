@@ -8,8 +8,8 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     api::{ApiEventPublisher, ApiEventSubscriber},
     command::{
-        RequestCrawlCommand, RequestCrawlOutput, SubscribeFeedCommand, SubscribeFeedOutput,
-        UnsubscribeFeedCommand, UnsubscribeFeedOutput,
+        CreateTimelineCommand, CreateTimelineOutput, RequestCrawlCommand, RequestCrawlOutput,
+        SubscribeFeedCommand, SubscribeFeedOutput, UnsubscribeFeedCommand, UnsubscribeFeedOutput,
     },
     config::FeedRegistryConfig,
     crawl::{
@@ -31,11 +31,11 @@ use crate::{
     feed::FeedProj,
     handler::CommandHandler,
     query::{
-        Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
-        TimelineEntriesPage, TimelineEntriesQuery,
+        Subscriptions, SubscriptionsQuery, Timeline, TimelineChangesPage, TimelineChangesQuery,
+        TimelineEntriesPage, TimelineEntriesQuery, TimelinesQuery,
     },
     subscription::{SubHandler, SubscriberId},
-    timeline::TimelineProj,
+    timeline::{TimelineHandler, TimelineProj},
 };
 
 /// Builds a registry facade with shared dispatch channels and clock wiring.
@@ -81,6 +81,7 @@ where
                 Arc::clone(&self.clock),
             ),
             crawl_requests: CrawlRequestHandler::new(self.db.clone(), Arc::clone(&self.clock)),
+            timelines: TimelineHandler::new(self.db.clone(), Arc::clone(&self.clock)),
         };
 
         FeedRegistry {
@@ -96,6 +97,7 @@ where
 pub(crate) struct RegistryHandlers<S> {
     subscriptions: SubHandler<S>,
     crawl_requests: CrawlRequestHandler<S>,
+    timelines: TimelineHandler<S>,
 }
 
 /// Facade for registry commands, queries, and API event subscriptions.
@@ -224,6 +226,28 @@ where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: TimelineDb,
 {
+    pub async fn create_timeline(
+        &self,
+        command: CreateTimelineCommand,
+    ) -> Result<CreateTimelineOutput, FeedRegistryError> {
+        let handled = self.handlers.timelines.handle(command).await?;
+        self.event_dispatch
+            .wake_publisher
+            .publish(handled.recorded_events);
+        Ok(handled.output)
+    }
+
+    /// Lists the subscriber's timelines in name order.
+    pub async fn list_timelines(
+        &self,
+        query: TimelinesQuery,
+    ) -> Result<Vec<Timeline>, FeedRegistryError> {
+        let mut tx = self.db.begin().await?;
+        let timelines = tx.list_timelines(query).await?;
+        tx.commit().await?;
+        Ok(timelines)
+    }
+
     pub async fn list_timeline_entries(
         &self,
         query: TimelineEntriesQuery,

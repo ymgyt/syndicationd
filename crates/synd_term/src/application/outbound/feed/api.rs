@@ -28,14 +28,23 @@ pub trait FeedApi: Send + Sync + 'static {
 
     fn unsubscribe_feed(&self, url: FeedUrl) -> BoxFuture<'static, Result<(), SyndApiError>>;
 
+    fn list_timelines(&self) -> BoxFuture<'static, Result<Vec<payload::Timeline>, SyndApiError>>;
+
+    fn create_timeline(
+        &self,
+        input: payload::CreateTimelineInput,
+    ) -> BoxFuture<'static, Result<payload::CreateTimelinePayload, SyndApiError>>;
+
     fn fetch_timeline_entries(
         &self,
+        timeline_id: payload::TimelineId,
         after: Option<String>,
         first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>>;
 
     fn fetch_timeline_changes(
         &self,
+        timeline_id: payload::TimelineId,
         since: i64,
         first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineChangesPayload, SyndApiError>>;

@@ -22,6 +22,9 @@ pub use url::FeedUrl;
 mod feed_type;
 pub use feed_type::FeedType;
 
+mod timeline_name;
+pub use timeline_name::TimelineName;
+
 /// Text content with its media type and optional source URI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
 #[serde(rename_all = "snake_case")]

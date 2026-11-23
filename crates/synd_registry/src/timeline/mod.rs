@@ -1,13 +1,44 @@
+use std::{fmt, str::FromStr};
+
+use serde::{Deserialize, Serialize};
 use synd_feed::types::FeedUrl;
+use uuid::Uuid;
 
 use crate::subscription::SubscriberId;
 
+mod handler;
 mod projection;
 pub mod query;
 
+pub(crate) use handler::TimelineHandler;
 pub use projection::{TimelineProj, TimelineProjInput};
 
-/// Result of catching up one feed into one subscriber's timeline.
+/// Stable identity of a timeline, independent of its name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(transparent)]
+pub struct TimelineId(Uuid);
+
+impl TimelineId {
+    pub(crate) fn generate() -> Self {
+        Self(Uuid::new_v4())
+    }
+}
+
+impl fmt::Display for TimelineId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl FromStr for TimelineId {
+    type Err = uuid::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        value.parse().map(Self)
+    }
+}
+
+/// Result of catching up one feed into a subscriber's timelines.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TimelineCatchup {
     subscriber_id: SubscriberId,

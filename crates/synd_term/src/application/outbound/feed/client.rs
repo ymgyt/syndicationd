@@ -64,22 +64,47 @@ impl FeedApi for ClientFeedApi {
         async move { client.unsubscribe_feed(url).await.map(|_| ()) }.boxed()
     }
 
+    fn list_timelines(&self) -> BoxFuture<'static, Result<Vec<payload::Timeline>, SyndApiError>> {
+        let client = self.client();
+        async move { client.list_timelines().await }.boxed()
+    }
+
+    fn create_timeline(
+        &self,
+        input: payload::CreateTimelineInput,
+    ) -> BoxFuture<'static, Result<payload::CreateTimelinePayload, SyndApiError>> {
+        let client = self.client();
+        async move { client.create_timeline(input).await }.boxed()
+    }
+
     fn fetch_timeline_entries(
         &self,
+        timeline_id: payload::TimelineId,
         after: Option<String>,
         first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>> {
         let client = self.client();
-        async move { client.fetch_timeline_entries(after, first).await }.boxed()
+        async move {
+            client
+                .fetch_timeline_entries(timeline_id, after, first)
+                .await
+        }
+        .boxed()
     }
 
     fn fetch_timeline_changes(
         &self,
+        timeline_id: payload::TimelineId,
         since: i64,
         first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineChangesPayload, SyndApiError>> {
         let client = self.client();
-        async move { client.fetch_timeline_changes(since, first).await }.boxed()
+        async move {
+            client
+                .fetch_timeline_changes(timeline_id, since, first)
+                .await
+        }
+        .boxed()
     }
 
     fn watch_feed_events(

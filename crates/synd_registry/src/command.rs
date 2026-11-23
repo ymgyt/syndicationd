@@ -1,11 +1,25 @@
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::{Category, FeedUrl, Requirement, TimelineName};
 
 use crate::{
     crawl::{policy::CrawlPolicy, request::RequestCrawlOutcome},
     subscription::{
         FeedSubscriptionAttrs, SubscribeOutcome, SubscriberId, SubscriptionKey, UnsubscribeOutcome,
     },
+    timeline::TimelineId,
 };
+
+/// Request to create a named timeline owned by the subscriber.
+#[derive(Debug, Clone)]
+pub struct CreateTimelineCommand {
+    pub subscriber_id: SubscriberId,
+    pub name: TimelineName,
+}
+
+/// Identity of the timeline saved by the create command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateTimelineOutput {
+    pub timeline_id: TimelineId,
+}
 
 /// Request to create or update one subscriber/feed relation.
 #[derive(Debug, Clone)]

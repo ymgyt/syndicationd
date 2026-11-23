@@ -1,0 +1,8 @@
+query ListTimelines {
+  feedRegistry {
+    timelines {
+      id
+      name
+    }
+  }
+}

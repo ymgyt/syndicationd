@@ -20,22 +20,22 @@ use crate::{
         target_list::{CrawlTarget, CrawlTargetState, FeedSubscriptions, SubscriptionPolicy},
     },
     db::{
-        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedDb, FeedRegistryDb, SubscriptionDb,
-        TimelineDb,
+        BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedDb, FeedRegistryDb,
+        InsertTimelineOutcome, SubscriptionDb, TimelineDb,
     },
     entry::Entries,
     error::{RegistryDbError, RegistryDbResult},
     event::{
         Event, EventCursor, EventCursorPos, EventInterests, EventJournal, EventJournalAppend,
-        EventType, JournaledEvent, ProcessorId,
+        EventType, JournaledEvent, ProcessorId, TimelineCreatedEvent,
     },
     feed::FeedUpdate,
     query::{
-        Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
-        TimelineEntriesPage, TimelineEntriesQuery,
+        Subscriptions, SubscriptionsQuery, Timeline, TimelineChangesPage, TimelineChangesQuery,
+        TimelineEntriesPage, TimelineEntriesQuery, TimelinesQuery,
     },
     subscription::{FeedSubscriptionAttrs, SubscriberId, Subscription, SubscriptionKey},
-    timeline::TimelineCatchup,
+    timeline::{TimelineCatchup, TimelineId},
 };
 
 /// Mutable registry state held by the in-memory adapter.
@@ -48,6 +48,7 @@ struct InMemoryState {
     manual_requests: HashMap<String, DateTime<Utc>>,
     crawl_states: HashMap<String, CrawlState>,
     timeline_catchup_counts: HashMap<String, u64>,
+    timelines: HashMap<TimelineId, TimelineCreatedEvent>,
     feeds: InMemoryFeeds,
     blobs: HashMap<i64, Vec<u8>>,
     next_blob_pk: i64,
@@ -533,6 +534,61 @@ impl FeedDb for InMemoryRegistryTx<'_> {
 }
 
 impl TimelineDb for InMemoryRegistryTx<'_> {
+    async fn list_timelines(&mut self, query: TimelinesQuery) -> RegistryDbResult<Vec<Timeline>> {
+        let mut timelines: Vec<_> = self
+            .state
+            .timelines
+            .values()
+            .filter(|timeline| timeline.subscriber_id == query.subscriber_id)
+            .map(|timeline| Timeline {
+                id: timeline.timeline_id,
+                name: timeline.name.clone(),
+            })
+            .collect();
+        timelines.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        Ok(timelines)
+    }
+
+    async fn insert_timeline(
+        &mut self,
+        timeline: &TimelineCreatedEvent,
+    ) -> RegistryDbResult<InsertTimelineOutcome> {
+        if self.state.timelines.values().any(|existing| {
+            existing.subscriber_id == timeline.subscriber_id && existing.name == timeline.name
+        }) {
+            return Ok(InsertTimelineOutcome::NameAlreadyExists);
+        }
+        if self.state.timelines.contains_key(&timeline.timeline_id) {
+            return Err(RegistryDbError::invariant("timeline ID already exists"));
+        }
+        self.state
+            .timelines
+            .insert(timeline.timeline_id, timeline.clone());
+        Ok(InsertTimelineOutcome::Inserted)
+    }
+
+    async fn catchup_created_timeline(
+        &mut self,
+        timeline_id: TimelineId,
+    ) -> RegistryDbResult<Vec<FeedUrl>> {
+        let Some(timeline) = self.state.timelines.get(&timeline_id) else {
+            return Ok(Vec::new());
+        };
+        Ok(self
+            .state
+            .subscriptions
+            .values()
+            .filter(|sub| sub.subscriber_id == timeline.subscriber_id)
+            .filter(|sub| {
+                self.state
+                    .timeline_catchup_counts
+                    .get(sub.feed_url.as_str())
+                    .is_some_and(|count| *count > 0)
+            })
+            .map(|sub| sub.feed_url.clone())
+            .collect())
+    }
+
     async fn list_timeline_entries(
         &mut self,
         _query: TimelineEntriesQuery,
@@ -561,12 +617,20 @@ impl TimelineDb for InMemoryRegistryTx<'_> {
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<TimelineCatchup> {
-        let inserted_items = self
+        let inserted_items = if self
             .state
-            .timeline_catchup_counts
-            .get(feed_url.as_str())
-            .copied()
-            .unwrap_or_default();
+            .timelines
+            .values()
+            .any(|t| &t.subscriber_id == subscriber_id)
+        {
+            self.state
+                .timeline_catchup_counts
+                .get(feed_url.as_str())
+                .copied()
+                .unwrap_or_default()
+        } else {
+            0
+        };
         Ok(TimelineCatchup::new(
             subscriber_id.clone(),
             feed_url.clone(),
@@ -619,7 +683,7 @@ mod tests {
     use super::*;
     use crate::{
         api::ApiEvent,
-        command::SubscribeFeedCommand,
+        command::{CreateTimelineCommand, SubscribeFeedCommand},
         config::{FeedRegistryConfig, FeedRegistryWorkerConfig},
         crawl::policy::{CrawlPolicy, PollingInterval},
         event::{FeedSubscribedEvent, RegistryEvent},
@@ -802,6 +866,12 @@ mod tests {
         let (registry, event_workers) = FeedRegistry::start(db, config, ct.clone());
         let mut api_events = registry.subscribe_events(subscriber_id());
 
+        registry
+            .create_timeline(CreateTimelineCommand {
+                subscriber_id: subscriber_id(),
+                name: "all".into(),
+            })
+            .await?;
         let output = registry
             .subscribe(SubscribeFeedCommand {
                 feed_url: feed_url.clone(),

@@ -53,6 +53,9 @@ pub(crate) enum FeedRequestEvent {
         populate: Populate,
         subscription: payload::SubscriptionPayload,
     },
+    InitialTimelineOpened {
+        timeline_id: payload::TimelineId,
+    },
     TimelineWindowChunkFetched {
         entries: Vec<payload::TimelineEntry>,
         base_seq: i64,
@@ -219,6 +222,7 @@ impl FeedRequestEvent {
             Self::FeedSubscribed { .. } => "FeedSubscribed",
             Self::FeedUnsubscribed { .. } => "FeedUnsubscribed",
             Self::SubscriptionFetched { .. } => "SubscriptionFetched",
+            Self::InitialTimelineOpened { .. } => "InitialTimelineOpened",
             Self::TimelineWindowChunkFetched { .. } => "TimelineWindowChunkFetched",
             Self::TimelineChangesFetched { .. } => "TimelineChangesFetched",
         }

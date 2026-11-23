@@ -25,10 +25,24 @@ use crate::{
 /// Timeline bootstrap and catch-up state.
 #[derive(Debug)]
 pub(crate) enum TimelineState {
-    Uninitialized,
-    FetchingWindow { base_seq: Option<i64> },
-    CatchingUp { seq: i64, dirty: bool },
-    Ready { seq: i64 },
+    WaitingForApi,
+    Opening,
+    LoadFailed {
+        timeline_id: Option<payload::TimelineId>,
+    },
+    FetchingWindow {
+        timeline_id: payload::TimelineId,
+        base_seq: Option<i64>,
+    },
+    CatchingUp {
+        timeline_id: payload::TimelineId,
+        seq: i64,
+        dirty: bool,
+    },
+    Ready {
+        timeline_id: payload::TimelineId,
+        seq: i64,
+    },
 }
 
 /// Feed subscription and timeline application state.
@@ -77,7 +91,7 @@ impl FeedsComponent {
             subscription: SubscriptionWidget::new(),
             matcher: crate::matcher::Matcher::new(),
             entries: EntriesWidget::new(),
-            timeline: TimelineState::Uninitialized,
+            timeline: TimelineState::WaitingForApi,
         }
     }
 
@@ -153,35 +167,41 @@ impl FeedsComponent {
         [
             Operation::WatchFeedEvents,
             self.reload_subscription(),
-            self.begin_timeline_bootstrap(),
+            self.open_initial_timeline(),
         ]
     }
 
-    fn begin_timeline_bootstrap(&mut self) -> Operation {
-        assert!(
-            matches!(self.timeline, TimelineState::Uninitialized),
-            "timeline bootstrap started more than once"
-        );
-        self.timeline = TimelineState::FetchingWindow { base_seq: None };
+    fn open_initial_timeline(&mut self) -> Operation {
+        self.timeline = TimelineState::Opening;
+        Operation::OpenInitialTimeline
+    }
+
+    fn fetch_timeline_window(&mut self, timeline_id: payload::TimelineId) -> Operation {
+        self.timeline = TimelineState::FetchingWindow {
+            timeline_id,
+            base_seq: None,
+        };
         Operation::FetchTimelineWindow {
+            timeline_id,
             limit: self.entries_limit,
         }
     }
 
     pub(in crate::application) fn refresh_timeline(&mut self) -> Option<Operation> {
-        match &mut self.timeline {
-            TimelineState::Uninitialized | TimelineState::FetchingWindow { .. } => None,
-            TimelineState::CatchingUp { dirty, .. } => {
+        match self.timeline {
+            TimelineState::WaitingForApi
+            | TimelineState::Opening
+            | TimelineState::FetchingWindow { .. } => None,
+            TimelineState::LoadFailed { timeline_id: None } => Some(self.open_initial_timeline()),
+            TimelineState::LoadFailed {
+                timeline_id: Some(id),
+            } => Some(self.fetch_timeline_window(id)),
+            TimelineState::CatchingUp { ref mut dirty, .. } => {
                 *dirty = true;
                 None
             }
-            TimelineState::Ready { seq } => {
-                let since = *seq;
-                self.timeline = TimelineState::CatchingUp {
-                    seq: since,
-                    dirty: false,
-                };
-                Some(Operation::CatchUpTimeline { since })
+            TimelineState::Ready { timeline_id, seq } => {
+                Some(self.catch_up_timeline(timeline_id, seq))
             }
         }
     }
@@ -193,6 +213,7 @@ impl FeedsComponent {
     ) {
         let TimelineState::FetchingWindow {
             base_seq: current_base,
+            ..
         } = &mut self.timeline
         else {
             panic!("timeline window chunk received outside window bootstrap");
@@ -215,21 +236,30 @@ impl FeedsComponent {
         &mut self,
         succeeded: bool,
     ) -> Option<Operation> {
-        let TimelineState::FetchingWindow { base_seq } =
-            std::mem::replace(&mut self.timeline, TimelineState::Uninitialized)
+        let TimelineState::FetchingWindow {
+            timeline_id,
+            base_seq,
+        } = self.timeline
         else {
             panic!("timeline window completed outside window bootstrap");
         };
-        match base_seq {
-            Some(seq) => {
-                self.timeline = TimelineState::CatchingUp { seq, dirty: false };
-                Some(Operation::CatchUpTimeline { since: seq })
-            }
-            None if succeeded => {
-                panic!("successful timeline window completed without its first chunk")
-            }
-            None => None,
+        if !succeeded {
+            self.timeline = TimelineState::LoadFailed {
+                timeline_id: Some(timeline_id),
+            };
+            return None;
         }
+        let seq = base_seq.expect("successful timeline window completed without its first chunk");
+        Some(self.catch_up_timeline(timeline_id, seq))
+    }
+
+    fn catch_up_timeline(&mut self, timeline_id: payload::TimelineId, since: i64) -> Operation {
+        self.timeline = TimelineState::CatchingUp {
+            timeline_id,
+            seq: since,
+            dirty: false,
+        };
+        Operation::CatchUpTimeline { timeline_id, since }
     }
 
     pub(in crate::application) fn apply_timeline_changes(
@@ -251,16 +281,18 @@ impl FeedsComponent {
         &mut self,
         succeeded: bool,
     ) -> Option<Operation> {
-        let TimelineState::CatchingUp { seq, dirty } =
-            std::mem::replace(&mut self.timeline, TimelineState::Uninitialized)
+        let TimelineState::CatchingUp {
+            timeline_id,
+            seq,
+            dirty,
+        } = self.timeline
         else {
             panic!("timeline catch-up completed outside catch-up");
         };
         if succeeded && dirty {
-            self.timeline = TimelineState::CatchingUp { seq, dirty: false };
-            Some(Operation::CatchUpTimeline { since: seq })
+            Some(self.catch_up_timeline(timeline_id, seq))
         } else {
-            self.timeline = TimelineState::Ready { seq };
+            self.timeline = TimelineState::Ready { timeline_id, seq };
             None
         }
     }
@@ -269,7 +301,9 @@ impl FeedsComponent {
     pub(in crate::application) fn timeline_is_settled(&self) -> bool {
         matches!(
             self.timeline,
-            TimelineState::Uninitialized | TimelineState::Ready { .. }
+            TimelineState::WaitingForApi
+                | TimelineState::LoadFailed { .. }
+                | TimelineState::Ready { .. }
         )
     }
 }
@@ -325,6 +359,10 @@ impl Component for FeedsComponent {
                     {
                         return Effects::NONE;
                     }
+                    RequestKind::OpenInitialTimeline if result.is_err() => {
+                        self.timeline = TimelineState::LoadFailed { timeline_id: None };
+                        None
+                    }
                     RequestKind::FetchTimelineWindow { .. } => {
                         self.complete_timeline_window(result.is_ok())
                     }
@@ -368,6 +406,9 @@ impl Component for FeedsComponent {
 impl FeedsComponent {
     fn apply_feed_request(&mut self, event: &FeedRequestEvent) -> Effects {
         match event {
+            FeedRequestEvent::InitialTimelineOpened { timeline_id } => {
+                return Effects::operations(self.fetch_timeline_window(*timeline_id));
+            }
             FeedRequestEvent::FeedSubscribed { url } => {
                 debug!(%url, "feed subscribed");
                 return Effects::operations(self.reload_subscription());

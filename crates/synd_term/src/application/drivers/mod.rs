@@ -154,11 +154,18 @@ impl Drivers {
                         .fetch_subscription(cx, generation, populate, after, first)
                 });
             }
-            Operation::FetchTimelineWindow { limit } => {
-                self.register_request(|drivers, cx| drivers.feed.fetch_timeline_window(cx, limit));
+            Operation::OpenInitialTimeline => {
+                self.register_request(|drivers, cx| drivers.feed.open_initial_timeline(cx));
             }
-            Operation::CatchUpTimeline { since } => {
-                self.register_request(|drivers, cx| drivers.feed.catch_up_timeline(cx, since));
+            Operation::FetchTimelineWindow { timeline_id, limit } => {
+                self.register_request(|drivers, cx| {
+                    drivers.feed.fetch_timeline_window(cx, timeline_id, limit)
+                });
+            }
+            Operation::CatchUpTimeline { timeline_id, since } => {
+                self.register_request(|drivers, cx| {
+                    drivers.feed.catch_up_timeline(cx, timeline_id, since)
+                });
             }
             Operation::WatchFeedEvents => self.feed.watch_events(),
             Operation::FetchGhNotifications {

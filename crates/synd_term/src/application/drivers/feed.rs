@@ -4,7 +4,9 @@ use synd_feed::types::FeedUrl;
 use tracing::debug;
 
 use crate::{
-    application::{FeedApiRef, Generation, Populate, RequestError, RequestKind},
+    application::{
+        FeedApiRef, Generation, Populate, RequestError, RequestKind, outbound::feed::FeedApi,
+    },
     event::{Event, FeedRequestEvent, FeedsEvent},
 };
 
@@ -112,17 +114,39 @@ impl FeedDriver {
         )
     }
 
+    pub(super) fn open_initial_timeline(
+        &self,
+        context: RequestContext,
+    ) -> (RequestKind, RequestFuture) {
+        let api = self.api.clone();
+        (
+            RequestKind::OpenInitialTimeline,
+            async move {
+                let timeline_id = initial_timeline(api.as_ref())
+                    .await
+                    .map_err(RequestError::SyndApi)?;
+                emit_feed_event(
+                    &context,
+                    FeedRequestEvent::InitialTimelineOpened { timeline_id },
+                );
+                Ok(())
+            }
+            .boxed(),
+        )
+    }
+
     /// Fetches one bounded timeline window while keeping cursor pagination private.
     pub(super) fn fetch_timeline_window(
         &self,
         context: RequestContext,
+        timeline_id: payload::TimelineId,
         limit: usize,
     ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
         (
             RequestKind::FetchTimelineWindow { limit },
-            TimelineWindowRequest::new(api, context, limit)
+            TimelineWindowRequest::new(api, context, timeline_id, limit)
                 .run()
                 .boxed(),
         )
@@ -132,16 +156,44 @@ impl FeedDriver {
     pub(super) fn catch_up_timeline(
         &self,
         context: RequestContext,
+        timeline_id: payload::TimelineId,
         since: i64,
     ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
         (
             RequestKind::CatchUpTimeline { since },
-            TimelineCatchUpRequest::new(api, context, since)
+            TimelineCatchUpRequest::new(api, context, timeline_id, since)
                 .run()
                 .boxed(),
         )
+    }
+}
+
+async fn initial_timeline(api: &dyn FeedApi) -> Result<payload::TimelineId, SyndApiError> {
+    const INITIAL_NAME: &str = "all";
+    if let Some(timeline) = api.list_timelines().await?.into_iter().next() {
+        return Ok(timeline.id);
+    }
+    // create default timeline
+    match api
+        .create_timeline(payload::CreateTimelineInput {
+            name: INITIAL_NAME.into(),
+        })
+        .await
+    {
+        Ok(created) => Ok(created.timeline_id),
+        Err(error) => {
+            // Another client can create the initial timeline between the list and the mutation.
+            if let Ok(timelines) = api.list_timelines().await
+                && let Some(timeline) = timelines
+                    .into_iter()
+                    .find(|timeline| timeline.name.as_str() == INITIAL_NAME)
+            {
+                return Ok(timeline.id);
+            }
+            Err(error)
+        }
     }
 }
 
@@ -153,14 +205,21 @@ fn emit_feed_event(context: &RequestContext, event: FeedRequestEvent) {
 struct TimelineWindowRequest {
     api: FeedApiRef,
     context: RequestContext,
+    timeline_id: payload::TimelineId,
     state: TimelineWindowState,
 }
 
 impl TimelineWindowRequest {
-    fn new(api: FeedApiRef, context: RequestContext, limit: usize) -> Self {
+    fn new(
+        api: FeedApiRef,
+        context: RequestContext,
+        timeline_id: payload::TimelineId,
+        limit: usize,
+    ) -> Self {
         Self {
             api,
             context,
+            timeline_id,
             state: TimelineWindowState::new(limit),
         }
     }
@@ -184,7 +243,7 @@ impl TimelineWindowRequest {
             "fetch timeline window chunk"
         );
         self.api
-            .fetch_timeline_entries(self.state.cursor(), first)
+            .fetch_timeline_entries(self.timeline_id, self.state.cursor(), first)
             .await
             .map_err(RequestError::SyndApi)
     }
@@ -318,14 +377,21 @@ impl From<TimelineWindowChunk> for FeedRequestEvent {
 struct TimelineCatchUpRequest {
     api: FeedApiRef,
     context: RequestContext,
+    timeline_id: payload::TimelineId,
     state: TimelineCatchUpState,
 }
 
 impl TimelineCatchUpRequest {
-    fn new(api: FeedApiRef, context: RequestContext, since: i64) -> Self {
+    fn new(
+        api: FeedApiRef,
+        context: RequestContext,
+        timeline_id: payload::TimelineId,
+        since: i64,
+    ) -> Self {
         Self {
             api,
             context,
+            timeline_id,
             state: TimelineCatchUpState::new(since),
         }
     }
@@ -344,7 +410,11 @@ impl TimelineCatchUpRequest {
 
     async fn observe_next_page(&self) -> Result<payload::TimelineChangesPayload, RequestError> {
         self.api
-            .fetch_timeline_changes(self.state.since, TIMELINE_CHANGES_PAGE_SIZE)
+            .fetch_timeline_changes(
+                self.timeline_id,
+                self.state.since,
+                TIMELINE_CHANGES_PAGE_SIZE,
+            )
             .await
             .map_err(RequestError::SyndApi)
     }
@@ -412,5 +482,40 @@ impl From<bool> for PageFlow {
 impl PageFlow {
     fn is_complete(self) -> bool {
         matches!(self, Self::Complete)
+    }
+}
+
+#[cfg(all(test, feature = "integration"))]
+mod tests {
+    use super::*;
+    use crate::application::outbound::feed::{MockFeedApi, MockFeedApiResponse};
+
+    #[tokio::test]
+    async fn concurrent_first_open_recovers_the_id_of_all() {
+        let all_id = payload::TimelineId::from_u128(2);
+        let duplicate = serde_json::from_value(serde_json::json!({
+            "message": "timeline name already exists for this subscriber: all"
+        }))
+        .unwrap();
+        let api = MockFeedApi::new([
+            MockFeedApiResponse::Timelines(Ok(vec![])),
+            MockFeedApiResponse::CreateTimeline(
+                "all".into(),
+                Err(SyndApiError::Graphql {
+                    errors: vec![duplicate],
+                }),
+            ),
+            MockFeedApiResponse::Timelines(Ok(vec![
+                payload::Timeline {
+                    id: payload::TimelineId::from_u128(1),
+                    name: "Tech".into(),
+                },
+                payload::Timeline {
+                    id: all_id,
+                    name: "all".into(),
+                },
+            ])),
+        ]);
+        assert_eq!(initial_timeline(&api).await.unwrap(), all_id);
     }
 }

@@ -268,11 +268,13 @@ pub(crate) async fn project_timeline(
 pub(crate) async fn list_timeline_entries(
     db: &SqliteFeedRegistryDb,
     subscriber_id: SubscriberId,
+    timeline_id: crate::TimelineId,
 ) -> anyhow::Result<TimelineEntriesPage> {
     let mut tx = db.begin().await?;
     let page = tx
         .list_timeline_entries(TimelineEntriesQuery {
             subscriber_id,
+            timeline_id,
             after: None,
             first: 10,
         })

@@ -7,7 +7,7 @@ use crate::{
     event::{
         EntryChangedEvent, EntryDiscoveredEvent, Event, EventInput, EventType, FeedSubscribedEvent,
         FeedUnsubscribedEvent, InputBatch, Processor, ProcessorError, ProcessorId, ProcessorResult,
-        Projector, RegistryEvent, TimelineChangedEvent,
+        Projector, RegistryEvent, TimelineChangedEvent, TimelineCreatedEvent,
     },
     subscription::SubscriberId,
 };
@@ -15,69 +15,16 @@ use crate::{
 /// Event input used to project timeline state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TimelineProjInput {
+    TimelineCreated(TimelineCreatedEvent),
     FeedSubscribed(FeedSubscribedEvent),
     FeedUnsubscribed(FeedUnsubscribedEvent),
     EntryDiscovered(EntryDiscoveredEvent),
     EntryChanged(EntryChangedEvent),
 }
 
-impl TimelineProjInput {
-    /// Applies this input to timeline membership and returns the touched
-    /// timelines with the feed that caused the change.
-    async fn apply<Tx>(self, tx: &mut Tx) -> ProcessorResult<Vec<(SubscriberId, FeedUrl)>>
-    where
-        Tx: TimelineDb + Send,
-    {
-        match self {
-            Self::FeedSubscribed(event) => {
-                let subscription = event.subscription;
-                let catchup = tx
-                    .catchup_subscribed_feed(&subscription.subscriber_id, &subscription.feed_url)
-                    .await?;
-                Ok(if catchup.inserted_items() > 0 {
-                    vec![(catchup.subscriber_id().clone(), catchup.feed_url().clone())]
-                } else {
-                    Vec::new()
-                })
-            }
-            Self::FeedUnsubscribed(event) => {
-                let subscription = event.subscription;
-                let subscriber_id = tx.apply_feed_unsubscribed(&subscription).await?;
-                Ok(subscriber_id
-                    .map(|subscriber_id| (subscriber_id, subscription.feed_url))
-                    .into_iter()
-                    .collect())
-            }
-            Self::EntryDiscovered(event) => {
-                Self::apply_entry(tx, event.feed_url, &event.entry_id, false).await
-            }
-            Self::EntryChanged(event) => {
-                Self::apply_entry(tx, event.feed_url, &event.entry_id, true).await
-            }
-        }
-    }
-
-    async fn apply_entry<Tx>(
-        tx: &mut Tx,
-        feed_url: FeedUrl,
-        entry_id: &EntryId,
-        content_changed: bool,
-    ) -> ProcessorResult<Vec<(SubscriberId, FeedUrl)>>
-    where
-        Tx: TimelineDb + Send,
-    {
-        let subscribers = tx
-            .apply_entry_to_timelines(&feed_url, entry_id, content_changed)
-            .await?;
-        Ok(subscribers
-            .into_iter()
-            .map(|subscriber_id| (subscriber_id, feed_url.clone()))
-            .collect())
-    }
-}
-
 impl EventInput for TimelineProjInput {
     const INTERESTS: &'static [EventType] = &[
+        TimelineCreatedEvent::TYPE,
         FeedSubscribedEvent::TYPE,
         FeedUnsubscribedEvent::TYPE,
         EntryDiscoveredEvent::TYPE,
@@ -86,6 +33,7 @@ impl EventInput for TimelineProjInput {
 
     fn from_event(event: Event, _occurred_at: DateTime<Utc>) -> ProcessorResult<Self> {
         match event {
+            Event::TimelineCreated(event) => Ok(Self::TimelineCreated(event)),
             Event::FeedSubscribed(event) => Ok(Self::FeedSubscribed(event)),
             Event::FeedUnsubscribed(event) => Ok(Self::FeedUnsubscribed(event)),
             Event::EntryDiscovered(event) => Ok(Self::EntryDiscovered(event)),
@@ -98,13 +46,74 @@ impl EventInput for TimelineProjInput {
     }
 }
 
-/// Projects subscription facts into timeline membership.
+/// Updates timeline membership from timeline, subscription, and entry events.
 #[derive(Debug, Clone)]
 pub struct TimelineProj;
 
 impl TimelineProj {
     pub fn new() -> Self {
         Self
+    }
+
+    async fn update_membership<Tx>(
+        tx: &mut Tx,
+        input: TimelineProjInput,
+        invalidations: &mut TimelineInvalidations,
+    ) -> ProcessorResult<()>
+    where
+        Tx: TimelineDb + Send,
+    {
+        match input {
+            TimelineProjInput::TimelineCreated(event) => {
+                let feeds = tx.catchup_created_timeline(event.timeline_id).await?;
+                for feed_url in feeds {
+                    invalidations.mark(event.subscriber_id.clone(), feed_url);
+                }
+            }
+            TimelineProjInput::FeedSubscribed(event) => {
+                let subscription = event.subscription;
+                let catchup = tx
+                    .catchup_subscribed_feed(&subscription.subscriber_id, &subscription.feed_url)
+                    .await?;
+                if catchup.inserted_items() > 0 {
+                    invalidations.mark(catchup.subscriber_id().clone(), catchup.feed_url().clone());
+                }
+            }
+            TimelineProjInput::FeedUnsubscribed(event) => {
+                let subscription = event.subscription;
+                if let Some(subscriber_id) = tx.apply_feed_unsubscribed(&subscription).await? {
+                    invalidations.mark(subscriber_id, subscription.feed_url);
+                }
+            }
+            TimelineProjInput::EntryDiscovered(event) => {
+                Self::project_entry(tx, &event.feed_url, &event.entry_id, false, invalidations)
+                    .await?;
+            }
+            TimelineProjInput::EntryChanged(event) => {
+                Self::project_entry(tx, &event.feed_url, &event.entry_id, true, invalidations)
+                    .await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn project_entry<Tx>(
+        tx: &mut Tx,
+        feed_url: &FeedUrl,
+        entry_id: &EntryId,
+        content_changed: bool,
+        invalidations: &mut TimelineInvalidations,
+    ) -> ProcessorResult<()>
+    where
+        Tx: TimelineDb + Send,
+    {
+        let subscribers = tx
+            .apply_entry_to_timelines(feed_url, entry_id, content_changed)
+            .await?;
+        for subscriber_id in subscribers {
+            invalidations.mark(subscriber_id, feed_url.clone());
+        }
+        Ok(())
     }
 }
 
@@ -144,13 +153,8 @@ where
         let mut invalidations = TimelineInvalidations::empty();
 
         for input in batch.into_inputs() {
-            match input.apply(tx).await {
-                Ok(touched) => {
-                    for (subscriber_id, feed_url) in touched {
-                        invalidations.mark(subscriber_id, feed_url);
-                    }
-                }
-                Err(err) => err.skip_permanent(processor, "input")?,
+            if let Err(err) = Self::update_membership(tx, input, &mut invalidations).await {
+                err.skip_permanent(processor, "input")?;
             }
         }
 

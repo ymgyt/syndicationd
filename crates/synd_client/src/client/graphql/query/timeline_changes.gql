@@ -1,6 +1,6 @@
-query TimelineChanges($since: Int!, $first: Int!) {
+query TimelineChanges($timelineId: ID!, $since: Int!, $first: Int!) {
   output: feedRegistry {
-    timeline {
+    timeline(timelineId: $timelineId) {
       changes(since: $since, first: $first) {
         changes {
           __typename

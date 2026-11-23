@@ -114,3 +114,62 @@ impl SqliteDatabase {
         .await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn named_timelines_preserve_the_old_membership_and_sync_position() -> anyhow::Result<()> {
+        let db = SqliteDatabase::in_memory().await?;
+        sqlx::migrate!("./migrations").run_to(5, &db.pool).await?;
+        sqlx::raw_sql(
+            r"
+            INSERT INTO feed (pk, url) VALUES (1, 'https://example.com/feed');
+            INSERT INTO feed_subscription (subscriber_id, feed_pk, crawl_policy_json, subscribed_at)
+                VALUES ('without-timeline', 1, '{}', '2026-10-01');
+            INSERT INTO entry (entry_id, feed_pk, entry_json, order_time)
+                VALUES ('a', 1, '{}', '2026-10-01'), ('b', 1, '{}', '2026-10-02');
+            INSERT INTO timeline (subscriber_id, last_seq) VALUES ('reader', 12), ('empty', 0);
+            INSERT INTO timeline_entry (subscriber_id, entry_id, order_time, seq, deleted)
+                VALUES ('reader', 'a', '2026-10-01', 4, 0), ('reader', 'b', '2026-10-02', 9, 1);
+            ",
+        )
+        .execute(&db.pool)
+        .await?;
+
+        db.migrate().await?;
+        let timelines: Vec<(String, String, i64)> = sqlx::query_as(
+            "SELECT subscriber_id, name, last_seq FROM timeline ORDER BY subscriber_id",
+        )
+        .fetch_all(&db.pool)
+        .await?;
+        assert_eq!(
+            timelines,
+            [
+                ("empty".into(), "all".into(), 0),
+                ("reader".into(), "all".into(), 12)
+            ]
+        );
+        let reader_id: Uuid =
+            sqlx::query_scalar("SELECT timeline_id FROM timeline WHERE subscriber_id = 'reader'")
+                .fetch_one(&db.pool)
+                .await?;
+        assert_eq!(reader_id.get_version_num(), 4);
+        let entries: Vec<(String, String, i64, bool)> = sqlx::query_as(
+            "SELECT entry_id, CAST(order_time AS TEXT), seq, deleted FROM timeline_entry WHERE timeline_id = ? ORDER BY seq",
+        )
+        .bind(reader_id)
+        .fetch_all(&db.pool)
+        .await?;
+        assert_eq!(
+            entries,
+            [
+                ("a".into(), "2026-10-01".into(), 4, false),
+                ("b".into(), "2026-10-02".into(), 9, true),
+            ]
+        );
+        Ok(())
+    }
+}

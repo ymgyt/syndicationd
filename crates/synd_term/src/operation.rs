@@ -98,10 +98,13 @@ pub(crate) enum Operation {
         after: Option<String>,
         first: i64,
     },
+    OpenInitialTimeline,
     FetchTimelineWindow {
+        timeline_id: payload::TimelineId,
         limit: usize,
     },
     CatchUpTimeline {
+        timeline_id: payload::TimelineId,
         since: i64,
     },
     WatchFeedEvents,

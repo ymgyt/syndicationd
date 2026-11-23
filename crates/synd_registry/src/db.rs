@@ -15,14 +15,14 @@ use crate::{
     },
     entry::Entries,
     error::{RegistryDbError, RegistryDbResult},
-    event::{EventJournal, EventJournalAppend},
+    event::{EventJournal, EventJournalAppend, TimelineCreatedEvent},
     feed::FeedUpdate,
     query::{
-        Subscriptions, SubscriptionsQuery, TimelineChangesPage, TimelineChangesQuery,
-        TimelineEntriesPage, TimelineEntriesQuery,
+        Subscriptions, SubscriptionsQuery, Timeline, TimelineChangesPage, TimelineChangesQuery,
+        TimelineEntriesPage, TimelineEntriesQuery, TimelinesQuery,
     },
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
-    timeline::TimelineCatchup,
+    timeline::{TimelineCatchup, TimelineId},
 };
 
 /// Opens registry database transactions.
@@ -153,8 +153,31 @@ pub trait FeedDb {
     ) -> impl Future<Output = RegistryDbResult<HashMap<FeedUrl, Feed>>> + Send;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InsertTimelineOutcome {
+    Inserted,
+    /// This subscriber already has a timeline with the requested name.
+    NameAlreadyExists,
+}
+
 /// Transactional operations for reading and applying timeline membership.
 pub trait TimelineDb {
+    fn list_timelines(
+        &mut self,
+        query: TimelinesQuery,
+    ) -> impl Future<Output = RegistryDbResult<Vec<Timeline>>> + Send;
+
+    fn insert_timeline(
+        &mut self,
+        timeline: &TimelineCreatedEvent,
+    ) -> impl Future<Output = RegistryDbResult<InsertTimelineOutcome>> + Send;
+
+    /// Adds known entries from the owner's subscriptions and returns the feeds that changed.
+    fn catchup_created_timeline(
+        &mut self,
+        timeline_id: TimelineId,
+    ) -> impl Future<Output = RegistryDbResult<Vec<FeedUrl>>> + Send;
+
     fn list_timeline_entries(
         &mut self,
         query: TimelineEntriesQuery,

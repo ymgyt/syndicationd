@@ -2,11 +2,15 @@ use chrono::{DateTime, Utc};
 use derive_more::From;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use strum::{Display, EnumDiscriminants, EnumString, IntoStaticStr};
-use synd_feed::{entry::EntryId, types::FeedUrl};
+use synd_feed::{
+    entry::EntryId,
+    types::{FeedUrl, TimelineName},
+};
 
 use crate::{
     crawl::{blob::BlobRef, job::CrawlJobId, policy::CrawlPolicy},
     subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
+    timeline::TimelineId,
 };
 
 /// A typed fact recorded in the registry event journal.
@@ -45,6 +49,9 @@ pub enum Event {
     #[serde(rename = "entry.changed")]
     #[strum_discriminants(strum(serialize = "entry.changed"))]
     EntryChanged(EntryChangedEvent),
+    #[serde(rename = "timeline.created")]
+    #[strum_discriminants(strum(serialize = "timeline.created"))]
+    TimelineCreated(TimelineCreatedEvent),
     #[serde(rename = "timeline.changed")]
     #[strum_discriminants(strum(serialize = "timeline.changed"))]
     TimelineChanged(TimelineChangedEvent),
@@ -301,7 +308,15 @@ impl EntryChangedEvent {
     }
 }
 
-/// Timeline membership changed for one subscriber's timeline.
+/// A subscriber created a named timeline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimelineCreatedEvent {
+    pub timeline_id: TimelineId,
+    pub subscriber_id: SubscriberId,
+    pub name: TimelineName,
+}
+
+/// Timeline membership changed for a subscriber.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TimelineChangedEvent {
     pub subscriber_id: SubscriberId,
@@ -359,4 +374,8 @@ impl RegistryEvent for EntryChangedEvent {
 
 impl RegistryEvent for TimelineChangedEvent {
     const TYPE: EventType = EventType::TimelineChanged;
+}
+
+impl RegistryEvent for TimelineCreatedEvent {
+    const TYPE: EventType = EventType::TimelineCreated;
 }

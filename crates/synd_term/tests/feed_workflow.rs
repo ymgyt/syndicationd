@@ -202,15 +202,24 @@ mod bootstrapped_app {
 }
 
 fn start_app() -> (TempDir, Application) {
+    let timeline_id = payload::TimelineId::from_u128(1);
     let api = MockFeedApi::new([
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
         MockFeedApiResponse::Subscription(Ok(subscription())),
-        MockFeedApiResponse::TimelineEntries(Ok(timeline_entries())),
-        MockFeedApiResponse::TimelineChanges(Ok(payload::TimelineChangesPayload {
-            changes: Vec::new(),
-            seq: 2,
-            has_more: false,
-        })),
+        MockFeedApiResponse::Timelines(Ok(Vec::new())),
+        MockFeedApiResponse::CreateTimeline(
+            "all".into(),
+            Ok(payload::CreateTimelinePayload { timeline_id }),
+        ),
+        MockFeedApiResponse::TimelineEntries(timeline_id, Ok(timeline_entries())),
+        MockFeedApiResponse::TimelineChanges(
+            timeline_id,
+            Ok(payload::TimelineChangesPayload {
+                changes: Vec::new(),
+                seq: 2,
+                has_more: false,
+            }),
+        ),
     ]);
     let (cache_dir, mut app) = app(api, None);
 

@@ -2,12 +2,13 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-pub const TIMELINE_READ: &str = "timeline.read";
+/// List and create named timelines, and read entries and changes by timeline ID.
+pub const NAMED_TIMELINES: &str = "timeline.named";
 pub const SUBSCRIPTION_WRITE: &str = "subscription.write";
 pub const FEED_REFRESH: &str = "feed.refresh";
 
 pub fn local_api_capabilities() -> CapabilitySet {
-    CapabilitySet::new([TIMELINE_READ, SUBSCRIPTION_WRITE, FEED_REFRESH])
+    CapabilitySet::new([NAMED_TIMELINES, SUBSCRIPTION_WRITE, FEED_REFRESH])
 }
 
 /// Capability names negotiated across the client/server protocol.

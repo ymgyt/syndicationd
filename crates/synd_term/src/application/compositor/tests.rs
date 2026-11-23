@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     application::{Features, Generation, Populate, RequestId, RequestKind},
-    event::{Event, GhEvent},
+    event::{Event, FeedRequestEvent, FeedsEvent, GhEvent},
     key,
     operation::Operation,
     types::gh::Notification,
@@ -81,21 +81,29 @@ fn replacing_a_credential_catches_up_the_existing_timeline() {
         [
             Operation::WatchFeedEvents,
             Operation::FetchSubscription { .. },
-            Operation::FetchTimelineWindow { .. },
+            Operation::OpenInitialTimeline,
         ]
     ));
-
+    let timeline_id = synd_client::payload::TimelineId::from_u128(42);
+    let opened = Event::Feeds(FeedsEvent::Request {
+        request_id: RequestId::new(1),
+        event: FeedRequestEvent::InitialTimelineOpened { timeline_id },
+    });
+    assert!(matches!(
+        compositor.apply_event(&opened),
+        Operations::One(Operation::FetchTimelineWindow { timeline_id: id, .. }) if id == timeline_id
+    ));
     let feeds = &mut compositor.components.feeds;
     feeds.apply_timeline_window_chunk(Vec::new(), 42);
     assert!(matches!(
         feeds.complete_timeline_window(true),
-        Some(Operation::CatchUpTimeline { since: 42 })
+        Some(Operation::CatchUpTimeline { timeline_id: id, since: 42 }) if id == timeline_id
     ));
     assert!(feeds.complete_timeline_catch_up(true).is_none());
 
     assert!(matches!(
         compositor.apply_event(&Event::ApiCredentialConfigured),
-        Operations::One(Operation::CatchUpTimeline { since: 42 })
+        Operations::One(Operation::CatchUpTimeline { timeline_id: id, since: 42 }) if id == timeline_id
     ));
 }
 

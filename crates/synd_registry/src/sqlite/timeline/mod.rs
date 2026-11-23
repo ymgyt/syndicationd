@@ -14,13 +14,14 @@ use super::{
 };
 use crate::{
     RegistryDbResult,
-    db::TimelineDb,
+    db::{InsertTimelineOutcome, TimelineDb},
+    event::TimelineCreatedEvent,
     query::{
-        TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntriesPage,
-        TimelineEntriesQuery, TimelineEntry, TimelineEntryCursor,
+        Timeline, TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntriesPage,
+        TimelineEntriesQuery, TimelineEntry, TimelineEntryCursor, TimelinesQuery,
     },
     subscription::{SubscriberId, SubscriptionKey},
-    timeline::TimelineCatchup,
+    timeline::{TimelineCatchup, TimelineId},
 };
 
 const TIMELINE_ENTRY_SELECT: &str = r#"
@@ -33,6 +34,7 @@ SELECT
     s.requirement,
     s.category
 FROM timeline_entry AS te
+INNER JOIN timeline AS t ON t.timeline_id = te.timeline_id
 INNER JOIN entry AS e
     ON e.entry_id = te.entry_id
 INNER JOIN feed AS f
@@ -40,123 +42,123 @@ INNER JOIN feed AS f
 INNER JOIN feed_snapshot AS fs
     ON fs.feed_pk = f.pk
 INNER JOIN feed_subscription AS s
-    ON s.subscriber_id = te.subscriber_id
+    ON s.subscriber_id = t.subscriber_id
    AND s.feed_pk = f.pk
 "#;
 
-async fn ensure_timeline(
+async fn insert_timeline(
     tx: &mut Transaction<'_, Sqlite>,
-    subscriber_id: &SubscriberId,
-) -> SqliteResult<()> {
-    sqlx::query(
+    timeline: &TimelineCreatedEvent,
+) -> SqliteResult<InsertTimelineOutcome> {
+    let result = sqlx::query(
         r#"
-            INSERT OR IGNORE INTO timeline (subscriber_id)
-            VALUES (?)
-            "#,
+        INSERT INTO timeline (timeline_id, subscriber_id, name)
+        VALUES (?, ?, ?)
+        ON CONFLICT (subscriber_id, name) DO NOTHING
+        "#,
     )
-    .bind(subscriber_id.as_str())
+    .bind(timeline.timeline_id)
+    .bind(timeline.subscriber_id.as_str())
+    .bind(&timeline.name)
     .execute(&mut **tx)
     .await?;
-    Ok(())
+    Ok(if result.rows_affected() == 0 {
+        InsertTimelineOutcome::NameAlreadyExists
+    } else {
+        InsertTimelineOutcome::Inserted
+    })
 }
 
-async fn catchup_feed(
+async fn subscriber_timeline_ids(
+    tx: &mut Transaction<'_, Sqlite>,
+    subscriber_id: &SubscriberId,
+) -> SqliteResult<Vec<TimelineId>> {
+    Ok(
+        sqlx::query_scalar("SELECT timeline_id FROM timeline WHERE subscriber_id = ?")
+            .bind(subscriber_id.as_str())
+            .fetch_all(&mut **tx)
+            .await?,
+    )
+}
+
+async fn catchup_created_timeline(
+    tx: &mut Transaction<'_, Sqlite>,
+    timeline_id: TimelineId,
+) -> SqliteResult<Vec<FeedUrl>> {
+    let feeds = sqlx::query_scalar::<_, FeedUrl>(
+        r#"
+        SELECT f.url
+        FROM timeline AS t
+        JOIN feed_subscription AS s ON s.subscriber_id = t.subscriber_id
+        JOIN feed AS f ON f.pk = s.feed_pk
+        WHERE t.timeline_id = ?
+        ORDER BY f.url
+        "#,
+    )
+    .bind(timeline_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut affected = Vec::new();
+    for feed in feeds {
+        if catchup_feed(tx, timeline_id, &feed, false).await? > 0 {
+            affected.push(feed);
+        }
+    }
+    Ok(affected)
+}
+
+async fn catchup_subscribed_feed(
     tx: &mut Transaction<'_, Sqlite>,
     subscriber_id: &SubscriberId,
     feed_url: &FeedUrl,
 ) -> SqliteResult<TimelineCatchup> {
-    FeedCatchupCandidates::load(tx, subscriber_id, feed_url)
-        .await?
-        .apply(tx)
-        .await
+    let mut inserted = 0;
+    for timeline_id in subscriber_timeline_ids(tx, subscriber_id).await? {
+        inserted += catchup_feed(tx, timeline_id, feed_url, true).await?;
+    }
+    Ok(TimelineCatchup::new(
+        subscriber_id.clone(),
+        feed_url.clone(),
+        inserted,
+    ))
 }
 
-/// Current feed members that may need to be added to one subscriber timeline.
-struct FeedCatchupCandidates {
-    subscriber_id: SubscriberId,
-    feed_url: FeedUrl,
-    count: i64,
-}
-
-impl FeedCatchupCandidates {
-    async fn load(
-        tx: &mut Transaction<'_, Sqlite>,
-        subscriber_id: &SubscriberId,
-        feed_url: &FeedUrl,
-    ) -> SqliteResult<Self> {
-        let count = sqlx::query_scalar::<_, i64>(
-            r#"
-                SELECT COUNT(*)
-                FROM feed_entry AS fe
-                INNER JOIN feed AS f
-                    ON f.pk = fe.feed_pk
-                WHERE f.url = ?
-                "#,
-        )
-        .bind(feed_url.as_str())
-        .fetch_one(&mut **tx)
-        .await?;
-        Ok(Self {
-            subscriber_id: subscriber_id.clone(),
-            feed_url: feed_url.clone(),
-            count,
-        })
+// A new timeline considers the whole entry catalog. A new subscription
+// catches up the current feed snapshot into the subscriber's existing timelines.
+async fn catchup_feed(
+    tx: &mut Transaction<'_, Sqlite>,
+    timeline_id: TimelineId,
+    feed_url: &FeedUrl,
+    current_snapshot_only: bool,
+) -> SqliteResult<u64> {
+    let inserted = sqlx::query(
+        r#"
+        INSERT INTO timeline_entry (timeline_id, entry_id, order_time, seq)
+        SELECT t.timeline_id, e.entry_id, e.order_time,
+               t.last_seq + ROW_NUMBER() OVER (ORDER BY e.entry_id)
+        FROM timeline AS t
+        JOIN feed_subscription AS s ON s.subscriber_id = t.subscriber_id
+        JOIN feed AS f ON f.pk = s.feed_pk
+        JOIN entry AS e ON e.feed_pk = f.pk
+        LEFT JOIN timeline_entry AS te ON te.timeline_id = t.timeline_id AND te.entry_id = e.entry_id
+        WHERE t.timeline_id = ? AND f.url = ?
+          AND (te.entry_id IS NULL OR te.deleted != 0)
+          AND (NOT ? OR EXISTS (
+              SELECT 1 FROM feed_entry AS fe WHERE fe.feed_pk = f.pk AND fe.entry_id = e.entry_id
+          ))
+        ON CONFLICT (timeline_id, entry_id) DO UPDATE SET seq = excluded.seq, deleted = 0
+        "#,
+    )
+    .bind(timeline_id)
+    .bind(feed_url.as_str())
+    .bind(current_snapshot_only)
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    if inserted > 0 {
+        alloc_seq_range(tx, timeline_id, i64::try_from(inserted).decode()?).await?;
     }
-
-    async fn apply(self, tx: &mut Transaction<'_, Sqlite>) -> SqliteResult<TimelineCatchup> {
-        if self.count == 0 {
-            return Ok(self.outcome(0));
-        }
-
-        // Every row gets its own seq: change pagination pages by seq alone, so
-        // rows sharing a seq would be lost at page boundaries. Candidates left
-        // untouched leave gaps, which is fine because seq only needs to be
-        // unique and increasing.
-        let base_seq = alloc_seq_range(tx, &self.subscriber_id, self.count).await?;
-        let inserted = self.insert(tx, base_seq).await?;
-        Ok(self.outcome(inserted))
-    }
-
-    async fn insert(&self, tx: &mut Transaction<'_, Sqlite>, base_seq: i64) -> SqliteResult<u64> {
-        // Insert missing entries and revive tombstoned ones(resubscribe).
-        // Live rows are left untouched so they emit no sync change.
-        let result = sqlx::query(
-            r#"
-                INSERT INTO timeline_entry (
-                    subscriber_id,
-                    entry_id,
-                    order_time,
-                    seq
-                )
-                SELECT
-                    ?,
-                    e.entry_id,
-                    e.order_time,
-                    ? + ROW_NUMBER() OVER (ORDER BY e.entry_id)
-                FROM feed_entry AS fe
-                INNER JOIN entry AS e
-                    ON e.feed_pk = fe.feed_pk
-                   AND e.entry_id = fe.entry_id
-                INNER JOIN feed AS f
-                    ON f.pk = fe.feed_pk
-                WHERE f.url = ?
-                ON CONFLICT (subscriber_id, entry_id) DO UPDATE SET
-                    seq = excluded.seq,
-                    deleted = 0
-                WHERE timeline_entry.deleted != 0
-                "#,
-        )
-        .bind(self.subscriber_id.as_str())
-        .bind(base_seq)
-        .bind(self.feed_url.as_str())
-        .execute(&mut **tx)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
-    fn outcome(&self, added: u64) -> TimelineCatchup {
-        TimelineCatchup::new(self.subscriber_id.clone(), self.feed_url.clone(), added)
-    }
+    Ok(inserted)
 }
 
 async fn apply_entry_to_timelines(
@@ -165,20 +167,18 @@ async fn apply_entry_to_timelines(
     entry_id: &EntryId,
     content_changed: bool,
 ) -> SqliteResult<Vec<SubscriberId>> {
-    ensure_subscriber_timelines(tx, feed_url).await?;
-
     let mut affected = Vec::new();
     for target in load_entry_timeline_targets(tx, feed_url, entry_id).await? {
         let touched = match &target.existing {
             None => {
-                let seq = next_seq(tx, &target.subscriber_id).await?;
+                let seq = next_seq(tx, target.timeline_id).await?;
                 insert_timeline_entry(tx, &target, seq).await?;
                 true
             }
             // order_time is frozen; the seq bump only tells syncing clients
             // to re-read the entry content or that a tombstone was revived
             Some(existing) if content_changed || existing.deleted => {
-                let seq = next_seq(tx, &target.subscriber_id).await?;
+                let seq = next_seq(tx, target.timeline_id).await?;
                 bump_timeline_entry(tx, &target, seq).await?;
                 true
             }
@@ -188,6 +188,7 @@ async fn apply_entry_to_timelines(
             affected.push(target.subscriber_id);
         }
     }
+    affected.dedup();
     Ok(affected)
 }
 
@@ -196,14 +197,23 @@ async fn apply_feed_unsubscribed(
     subscription: &SubscriptionKey,
 ) -> SqliteResult<Option<SubscriberId>> {
     let subscriber_id = &subscription.subscriber_id;
-    if !timeline_exists(tx, subscriber_id).await? {
-        return Ok(None);
+    let mut changed = false;
+    for timeline_id in subscriber_timeline_ids(tx, subscriber_id).await? {
+        changed |= remove_feed_entries(tx, timeline_id, &subscription.feed_url).await?;
     }
+    Ok(changed.then(|| subscriber_id.clone()))
+}
+
+async fn remove_feed_entries(
+    tx: &mut Transaction<'_, Sqlite>,
+    timeline_id: TimelineId,
+    feed_url: &FeedUrl,
+) -> SqliteResult<bool> {
     let candidates = sqlx::query_scalar::<_, i64>(
         r#"
             SELECT COUNT(*)
             FROM timeline_entry AS te
-            WHERE te.subscriber_id = ?
+            WHERE te.timeline_id = ?
               AND te.deleted = 0
               AND te.entry_id IN (
                 SELECT e.entry_id
@@ -214,19 +224,19 @@ async fn apply_feed_unsubscribed(
               )
             "#,
     )
-    .bind(subscriber_id.as_str())
-    .bind(subscription.feed_url.as_str())
+    .bind(timeline_id)
+    .bind(feed_url.as_str())
     .fetch_one(&mut **tx)
     .await?;
     if candidates == 0 {
-        return Ok(None);
+        return Ok(false);
     }
 
     // Removal keeps the row as a tombstone so syncing clients observe it
     // through the seq bump. Every row gets its own seq: change pagination
     // pages by seq alone, so rows sharing a seq would be lost at page
     // boundaries
-    let base_seq = alloc_seq_range(tx, subscriber_id, candidates).await?;
+    let base_seq = alloc_seq_range(tx, timeline_id, candidates).await?;
     sqlx::query(
         r#"
             UPDATE timeline_entry
@@ -238,7 +248,7 @@ async fn apply_feed_unsubscribed(
                     te.entry_id,
                     ROW_NUMBER() OVER (ORDER BY te.entry_id) AS rn
                 FROM timeline_entry AS te
-                WHERE te.subscriber_id = ?
+                WHERE te.timeline_id = ?
                   AND te.deleted = 0
                   AND te.entry_id IN (
                     SELECT e.entry_id
@@ -248,18 +258,18 @@ async fn apply_feed_unsubscribed(
                     WHERE f.url = ?
                   )
             ) AS ranked
-            WHERE timeline_entry.subscriber_id = ?
+            WHERE timeline_entry.timeline_id = ?
               AND timeline_entry.entry_id = ranked.entry_id
             "#,
     )
     .bind(base_seq)
-    .bind(subscriber_id.as_str())
-    .bind(subscription.feed_url.as_str())
-    .bind(subscriber_id.as_str())
+    .bind(timeline_id)
+    .bind(feed_url.as_str())
+    .bind(timeline_id)
     .execute(&mut **tx)
     .await?;
 
-    Ok(Some(subscriber_id.clone()))
+    Ok(true)
 }
 
 async fn list_entries(
@@ -284,7 +294,7 @@ impl StoredTimelineEntriesPage {
         query: TimelineEntriesQuery,
     ) -> SqliteResult<Self> {
         let limit = PageLimit::new(query.first);
-        let Some(seq) = load_last_seq(tx, &query.subscriber_id).await? else {
+        let Some(seq) = load_last_seq(tx, &query.subscriber_id, query.timeline_id).await? else {
             return Ok(Self {
                 nodes: Vec::new(),
                 limit,
@@ -313,7 +323,9 @@ async fn load_timeline_entries(
     limit: PageLimit,
 ) -> SqliteResult<Vec<TimelineEntry>> {
     let mut sql = QueryBuilder::<Sqlite>::new(TIMELINE_ENTRY_SELECT);
-    sql.push(" WHERE te.subscriber_id = ");
+    sql.push(" WHERE te.timeline_id = ");
+    sql.push_bind(query.timeline_id);
+    sql.push(" AND t.subscriber_id = ");
     sql.push_bind(query.subscriber_id.as_str());
     sql.push(" AND te.deleted = 0");
     if let Some(after) = query.after.as_ref() {
@@ -357,7 +369,8 @@ impl StoredTimelineChangesPage {
         query: TimelineChangesQuery,
     ) -> SqliteResult<Self> {
         let limit = PageLimit::new(query.limit);
-        let Some(last_seq) = load_last_seq(tx, &query.subscriber_id).await? else {
+        let Some(last_seq) = load_last_seq(tx, &query.subscriber_id, query.timeline_id).await?
+        else {
             return Ok(Self {
                 rows: Vec::new(),
                 limit,
@@ -415,6 +428,7 @@ async fn load_timeline_change_rows(
                 s.requirement,
                 s.category
             FROM timeline_entry AS te
+            INNER JOIN timeline AS t ON t.timeline_id = te.timeline_id
             INNER JOIN entry AS e
                 ON e.entry_id = te.entry_id
             INNER JOIN feed AS f
@@ -422,14 +436,15 @@ async fn load_timeline_change_rows(
             LEFT JOIN feed_snapshot AS fs
                 ON fs.feed_pk = f.pk
             LEFT JOIN feed_subscription AS s
-                ON s.subscriber_id = te.subscriber_id
+                ON s.subscriber_id = t.subscriber_id
                AND s.feed_pk = f.pk
-            WHERE te.subscriber_id = ?
+            WHERE te.timeline_id = ? AND t.subscriber_id = ?
               AND te.seq > ?
             ORDER BY te.seq ASC
             LIMIT ?
             "#,
     )
+    .bind(query.timeline_id)
     .bind(query.subscriber_id.as_str())
     .bind(query.since)
     .bind(limit.sql_limit())
@@ -438,24 +453,19 @@ async fn load_timeline_change_rows(
     Ok(rows)
 }
 
-async fn timeline_exists(
-    tx: &mut Transaction<'_, Sqlite>,
-    subscriber_id: &SubscriberId,
-) -> SqliteResult<bool> {
-    Ok(load_last_seq(tx, subscriber_id).await?.is_some())
-}
-
 async fn load_last_seq(
     tx: &mut Transaction<'_, Sqlite>,
     subscriber_id: &SubscriberId,
+    timeline_id: TimelineId,
 ) -> SqliteResult<Option<i64>> {
     let row = sqlx::query_scalar::<_, i64>(
         r#"
             SELECT last_seq
             FROM timeline
-            WHERE subscriber_id = ?
+            WHERE timeline_id = ? AND subscriber_id = ?
             "#,
     )
+    .bind(timeline_id)
     .bind(subscriber_id.as_str())
     .fetch_optional(&mut **tx)
     .await?;
@@ -464,11 +474,8 @@ async fn load_last_seq(
 }
 
 /// Takes the next change seq of one timeline.
-async fn next_seq(
-    tx: &mut Transaction<'_, Sqlite>,
-    subscriber_id: &SubscriberId,
-) -> SqliteResult<i64> {
-    Ok(alloc_seq_range(tx, subscriber_id, 1).await? + 1)
+async fn next_seq(tx: &mut Transaction<'_, Sqlite>, timeline_id: TimelineId) -> SqliteResult<i64> {
+    Ok(alloc_seq_range(tx, timeline_id, 1).await? + 1)
 }
 
 /// Allocates `count` change seqs of one timeline in one contiguous range.
@@ -476,44 +483,22 @@ async fn next_seq(
 /// returned value.
 async fn alloc_seq_range(
     tx: &mut Transaction<'_, Sqlite>,
-    subscriber_id: &SubscriberId,
+    timeline_id: TimelineId,
     count: i64,
 ) -> SqliteResult<i64> {
     let last_seq = sqlx::query_scalar::<_, i64>(
         r#"
             UPDATE timeline
             SET last_seq = last_seq + ?
-            WHERE subscriber_id = ?
+            WHERE timeline_id = ?
             RETURNING last_seq
             "#,
     )
     .bind(count)
-    .bind(subscriber_id.as_str())
+    .bind(timeline_id)
     .fetch_one(&mut **tx)
     .await?;
     Ok(last_seq - count)
-}
-
-/// Ensures every subscriber of the feed has a timeline row to allocate
-/// seqs from.
-async fn ensure_subscriber_timelines(
-    tx: &mut Transaction<'_, Sqlite>,
-    feed_url: &FeedUrl,
-) -> SqliteResult<()> {
-    sqlx::query(
-        r#"
-            INSERT OR IGNORE INTO timeline (subscriber_id)
-            SELECT s.subscriber_id
-            FROM feed_subscription AS s
-            INNER JOIN feed AS f
-                ON f.pk = s.feed_pk
-            WHERE f.url = ?
-            "#,
-    )
-    .bind(feed_url.as_str())
-    .execute(&mut **tx)
-    .await?;
-    Ok(())
 }
 
 async fn load_entry_timeline_targets(
@@ -525,11 +510,13 @@ async fn load_entry_timeline_targets(
         r#"
             SELECT
                 s.subscriber_id,
+                t.timeline_id,
                 e.entry_id,
                 e.order_time AS entry_order_time,
                 te.entry_id IS NOT NULL AS entry_exists,
                 COALESCE(te.deleted, 0) != 0 AS entry_deleted
             FROM feed_subscription AS s
+            INNER JOIN timeline AS t ON t.subscriber_id = s.subscriber_id
             INNER JOIN feed AS f
                 ON f.pk = s.feed_pk
             INNER JOIN feed_entry AS fe
@@ -538,11 +525,11 @@ async fn load_entry_timeline_targets(
                 ON e.feed_pk = fe.feed_pk
                AND e.entry_id = fe.entry_id
             LEFT JOIN timeline_entry AS te
-                ON te.subscriber_id = s.subscriber_id
+                ON te.timeline_id = t.timeline_id
                AND te.entry_id = e.entry_id
             WHERE f.url = ?
               AND e.entry_id = ?
-            ORDER BY s.subscriber_id
+            ORDER BY s.subscriber_id, t.timeline_id
             "#,
     )
     .bind(feed_url.as_str())
@@ -561,7 +548,7 @@ async fn insert_timeline_entry(
     sqlx::query(
         r#"
             INSERT INTO timeline_entry (
-                subscriber_id,
+                timeline_id,
                 entry_id,
                 order_time,
                 seq
@@ -569,7 +556,7 @@ async fn insert_timeline_entry(
             VALUES (?, ?, ?, ?)
             "#,
     )
-    .bind(target.subscriber_id.as_str())
+    .bind(target.timeline_id)
     .bind(&target.entry_id)
     .bind(target.entry_order_time)
     .bind(seq)
@@ -589,12 +576,12 @@ async fn bump_timeline_entry(
             SET
                 seq = ?,
                 deleted = 0
-            WHERE subscriber_id = ?
+            WHERE timeline_id = ?
               AND entry_id = ?
             "#,
     )
     .bind(seq)
-    .bind(target.subscriber_id.as_str())
+    .bind(target.timeline_id)
     .bind(&target.entry_id)
     .execute(&mut **tx)
     .await?;
@@ -603,6 +590,7 @@ async fn bump_timeline_entry(
 
 struct TimelineEntryTarget {
     subscriber_id: SubscriberId,
+    timeline_id: TimelineId,
     entry_id: String,
     entry_order_time: DateTime<Utc>,
     existing: Option<ExistingTimelineEntry>,
@@ -615,6 +603,7 @@ struct ExistingTimelineEntry {
 #[derive(sqlx::FromRow)]
 struct TimelineEntryTargetRow {
     subscriber_id: String,
+    timeline_id: TimelineId,
     entry_id: String,
     entry_order_time: DateTime<Utc>,
     entry_exists: bool,
@@ -625,6 +614,7 @@ impl From<TimelineEntryTargetRow> for TimelineEntryTarget {
     fn from(row: TimelineEntryTargetRow) -> Self {
         Self {
             subscriber_id: SubscriberId::new(row.subscriber_id),
+            timeline_id: row.timeline_id,
             entry_id: row.entry_id,
             entry_order_time: row.entry_order_time,
             existing: row.entry_exists.then_some(ExistingTimelineEntry {
@@ -710,6 +700,33 @@ impl TryFrom<TimelineEntryRow> for TimelineEntry {
 }
 
 impl TimelineDb for super::SqliteRegistryTx<'_> {
+    async fn list_timelines(&mut self, query: TimelinesQuery) -> RegistryDbResult<Vec<Timeline>> {
+        sqlx::query_as(
+            "SELECT timeline_id AS id, name FROM timeline WHERE subscriber_id = ? ORDER BY name",
+        )
+        .bind(query.subscriber_id.as_str())
+        .fetch_all(&mut *self.tx)
+        .await
+        .map_err(SqliteError::from)
+        .db()
+    }
+
+    async fn insert_timeline(
+        &mut self,
+        timeline: &TimelineCreatedEvent,
+    ) -> RegistryDbResult<InsertTimelineOutcome> {
+        insert_timeline(&mut self.tx, timeline).await.db()
+    }
+
+    async fn catchup_created_timeline(
+        &mut self,
+        timeline_id: TimelineId,
+    ) -> RegistryDbResult<Vec<FeedUrl>> {
+        catchup_created_timeline(&mut self.tx, timeline_id)
+            .await
+            .db()
+    }
+
     async fn list_timeline_entries(
         &mut self,
         query: TimelineEntriesQuery,
@@ -729,8 +746,7 @@ impl TimelineDb for super::SqliteRegistryTx<'_> {
         subscriber_id: &SubscriberId,
         feed_url: &FeedUrl,
     ) -> RegistryDbResult<TimelineCatchup> {
-        ensure_timeline(&mut self.tx, subscriber_id).await.db()?;
-        catchup_feed(&mut self.tx, subscriber_id, feed_url)
+        catchup_subscribed_feed(&mut self.tx, subscriber_id, feed_url)
             .await
             .db()
     }

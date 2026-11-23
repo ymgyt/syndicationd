@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 
+use synd_feed::types::TimelineName;
 use thiserror::Error;
 
 /// Result type returned by registry storage adapters.
@@ -39,6 +40,8 @@ impl RegistryDbError {
 /// Error returned by registry command and query operations.
 #[derive(Debug, Error)]
 pub enum FeedRegistryError {
+    #[error("timeline name already exists for this subscriber: {name}")]
+    TimelineNameAlreadyExists { name: TimelineName },
     #[error(transparent)]
     Db(#[from] RegistryDbError),
     #[error(transparent)]

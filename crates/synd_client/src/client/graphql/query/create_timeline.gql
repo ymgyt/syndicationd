@@ -1,0 +1,5 @@
+mutation CreateTimeline($input: CreateTimelineInput!) {
+  createTimeline(input: $input) {
+    timelineId
+  }
+}

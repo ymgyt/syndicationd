@@ -2,7 +2,7 @@ use std::{collections::VecDeque, future, sync::Mutex};
 
 use futures_util::{FutureExt as _, future::BoxFuture};
 use synd_client::{ApiCredential, SyndApiError, payload};
-use synd_feed::types::FeedUrl;
+use synd_feed::types::{FeedUrl, TimelineName};
 
 use super::{FeedApi, FeedEventWatch};
 
@@ -10,8 +10,19 @@ pub enum MockFeedApiResponse {
     Subscription(Result<payload::SubscriptionPayload, SyndApiError>),
     SubscribeFeed(Result<payload::SubscribeFeedPayload, SyndApiError>),
     UnsubscribeFeed(Result<(), SyndApiError>),
-    TimelineEntries(Result<payload::TimelineEntryConnection, SyndApiError>),
-    TimelineChanges(Result<payload::TimelineChangesPayload, SyndApiError>),
+    Timelines(Result<Vec<payload::Timeline>, SyndApiError>),
+    CreateTimeline(
+        TimelineName,
+        Result<payload::CreateTimelinePayload, SyndApiError>,
+    ),
+    TimelineEntries(
+        payload::TimelineId,
+        Result<payload::TimelineEntryConnection, SyndApiError>,
+    ),
+    TimelineChanges(
+        payload::TimelineId,
+        Result<payload::TimelineChangesPayload, SyndApiError>,
+    ),
     FeedEvents(Result<Vec<payload::FeedEvent>, SyndApiError>),
 }
 
@@ -118,15 +129,41 @@ impl FeedApi for MockFeedApi {
         future::ready(result).boxed()
     }
 
+    fn list_timelines(&self) -> BoxFuture<'static, Result<Vec<payload::Timeline>, SyndApiError>> {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::Timelines(_)))
+        {
+            Ok(MockFeedApiResponse::Timelines(result)) => result,
+            Ok(_) => Err(Self::mismatch()),
+            Err(err) => Err(err),
+        };
+        future::ready(result).boxed()
+    }
+
+    fn create_timeline(
+        &self,
+        input: payload::CreateTimelineInput,
+    ) -> BoxFuture<'static, Result<payload::CreateTimelinePayload, SyndApiError>> {
+        let result = match self
+            .pop_response(|response| matches!(response, MockFeedApiResponse::CreateTimeline(name, _) if name == &input.name))
+        {
+            Ok(MockFeedApiResponse::CreateTimeline(_, result)) => result,
+            Ok(_) => Err(Self::mismatch()),
+            Err(err) => Err(err),
+        };
+        future::ready(result).boxed()
+    }
+
     fn fetch_timeline_entries(
         &self,
+        timeline_id: payload::TimelineId,
         _after: Option<String>,
         _first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>> {
         let result = match self
-            .pop_response(|response| matches!(response, MockFeedApiResponse::TimelineEntries(_)))
+            .pop_response(|response| matches!(response, MockFeedApiResponse::TimelineEntries(id, _) if *id == timeline_id))
         {
-            Ok(MockFeedApiResponse::TimelineEntries(result)) => result,
+            Ok(MockFeedApiResponse::TimelineEntries(_, result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
         };
@@ -135,13 +172,14 @@ impl FeedApi for MockFeedApi {
 
     fn fetch_timeline_changes(
         &self,
+        timeline_id: payload::TimelineId,
         _since: i64,
         _first: i64,
     ) -> BoxFuture<'static, Result<payload::TimelineChangesPayload, SyndApiError>> {
         let result = match self
-            .pop_response(|response| matches!(response, MockFeedApiResponse::TimelineChanges(_)))
+            .pop_response(|response| matches!(response, MockFeedApiResponse::TimelineChanges(id, _) if *id == timeline_id))
         {
-            Ok(MockFeedApiResponse::TimelineChanges(result)) => result,
+            Ok(MockFeedApiResponse::TimelineChanges(_, result)) => result,
             Ok(_) => Err(Self::mismatch()),
             Err(err) => Err(err),
         };

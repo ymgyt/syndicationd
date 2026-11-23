@@ -4,16 +4,28 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use synd_feed::{
     entry::{Entry, EntryId},
-    types::{Annotated, FeedMeta},
+    types::{Annotated, FeedMeta, TimelineName},
 };
 use thiserror::Error;
 
-use crate::subscription::SubscriberId;
+use crate::{subscription::SubscriberId, timeline::TimelineId};
+
+#[derive(Debug, Clone)]
+pub struct TimelinesQuery {
+    pub subscriber_id: SubscriberId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct Timeline {
+    pub id: TimelineId,
+    pub name: TimelineName,
+}
 
 /// Query for timeline entries visible to one subscriber.
 #[derive(Debug, Clone)]
 pub struct TimelineEntriesQuery {
     pub subscriber_id: SubscriberId,
+    pub timeline_id: TimelineId,
     pub after: Option<TimelineEntryCursor>,
     pub first: usize,
 }
@@ -90,6 +102,7 @@ pub struct TimelineEntriesPage {
 #[derive(Debug, Clone)]
 pub struct TimelineChangesQuery {
     pub subscriber_id: SubscriberId,
+    pub timeline_id: TimelineId,
     pub since: i64,
     pub limit: usize,
 }
