@@ -13,6 +13,12 @@ pub(in crate::feed::pipeline) struct SourceCategories {
     pub rss_delimiter: char,
 }
 
+impl Default for SourceCategories {
+    fn default() -> Self {
+        Self { rss_delimiter: ',' }
+    }
+}
+
 impl Stage for SourceCategories {
     type Input = EntryBatch<Entry>;
     type Output = EntryBatch<Entry>;

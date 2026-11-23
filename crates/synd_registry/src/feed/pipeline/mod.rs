@@ -145,7 +145,7 @@ pub(super) fn default_pipeline() -> impl Stage<Input = FeedBody, Output = Vec<Ev
         .then(ForEachEntry(IdentifyEntry))
         .then(ForEachEntry(ConvertSourceFields))
         .then(ForEachEntry(RemoveQueryParams::default()))
-        .then(SourceCategories { rss_delimiter: ',' })
+        .then(SourceCategories::default())
         .then(DeduplicateEntries)
         .then(LoadStoredEntries)
         .then(ForEachEntry(DetermineEntryChange))
