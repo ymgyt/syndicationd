@@ -122,6 +122,11 @@ impl Link {
         &self.href
     }
 
+    /// Returns the target URI for editing.
+    pub fn href_mut(&mut self) -> &mut String {
+        &mut self.href
+    }
+
     /// Returns the link relation, such as `self` or `alternate`.
     pub fn rel(&self) -> Option<&str> {
         self.rel.as_deref()

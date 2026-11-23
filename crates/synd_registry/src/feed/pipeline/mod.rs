@@ -8,7 +8,8 @@ use crate::{
 };
 use stages::{
     ApplyFeedUpdate, BuildFeedUpdate, ConvertSourceFields, DeduplicateEntries,
-    DetermineEntryChange, IdentifyEntry, LoadStoredEntries, ParseFeed, SourceCategories,
+    DetermineEntryChange, IdentifyEntry, LoadStoredEntries, ParseFeed, RemoveQueryParams,
+    SourceCategories,
 };
 use std::collections::HashSet;
 use synd_feed::{entry::EntryId, types::FeedMeta};
@@ -143,6 +144,7 @@ pub(super) fn default_pipeline() -> impl Stage<Input = FeedBody, Output = Vec<Ev
         .then(ParseFeed)
         .then(ForEachEntry(IdentifyEntry))
         .then(ForEachEntry(ConvertSourceFields))
+        .then(ForEachEntry(RemoveQueryParams::default()))
         .then(SourceCategories { rss_delimiter: ',' })
         .then(DeduplicateEntries)
         .then(LoadStoredEntries)

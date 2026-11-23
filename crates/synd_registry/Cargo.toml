@@ -27,6 +27,7 @@ thiserror   = { workspace = true }
 tokio       = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 tokio-util  = { workspace = true }
 tracing     = { workspace = true }
+url         = { workspace = true }
 
 [features]
 default = []

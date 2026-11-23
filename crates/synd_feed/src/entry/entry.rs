@@ -89,6 +89,10 @@ impl Entry {
         &self.links
     }
 
+    pub fn links_mut(&mut self) -> &mut [Link] {
+        &mut self.links
+    }
+
     pub fn published(&self) -> Option<Time> {
         self.published
     }
