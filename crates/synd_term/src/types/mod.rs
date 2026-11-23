@@ -7,6 +7,7 @@ use tracing::warn;
 use crate::ui;
 
 mod time;
+pub(crate) use time::format_local;
 pub use time::{Time, TimeExt};
 
 pub use synd_client::payload::{EntryMeta, Link, PageInfo};

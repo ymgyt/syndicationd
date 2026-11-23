@@ -5,7 +5,7 @@ use synd_client::payload;
 use crate::{
     application::Populate,
     command::ListCommand,
-    types::{EntryExt, RequirementExt, TimeExt},
+    types::{EntryExt, TimeExt, format_local},
     ui::{
         self, Context, icon,
         widgets::{collections::FilterableVec, filter::FeedFilterer},
@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use ratatui::{
-    prelude::{Alignment, Buffer, Constraint, Layout, Rect},
+    prelude::{Buffer, Constraint, Layout, Rect},
     style::Stylize,
     text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
@@ -106,9 +106,10 @@ impl EntriesWidget {
     }
 
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let entries_area = Block::new().padding(Padding::top(1)).inner(area);
+        // The scrollbar occupies the rightmost cell beside the date.
+        let entries_area = Block::new().padding(Padding::new(0, 1, 1, 0)).inner(area);
 
-        let (header, widths, rows) = self.entry_rows(cx);
+        let (header, widths, rows) = self.entry_rows(entries_area.width, cx);
 
         Table::builder()
             .header(header)
@@ -140,6 +141,7 @@ impl EntriesWidget {
 
     fn entry_rows<'a>(
         &'a self,
+        table_width: u16,
         cx: &'a Context<'_>,
     ) -> (
         Row<'a>,
@@ -157,17 +159,28 @@ impl EntriesWidget {
             }
         };
         let header = Row::new([
-            Cell::from("Published"),
             Cell::from(format!("Entry {n}/{m}")),
             Cell::from("Feed"),
-            Cell::from("Req"),
+            Cell::from(Line::from("Date").right_aligned()),
         ]);
 
+        let feed_limit = (table_width / 4).min(30);
+        let mut feed_width = 4.min(feed_limit); // "Feed"
+        for name in self
+            .entries
+            .iter()
+            .filter_map(|e| e.entry.feed.title.as_deref())
+        {
+            let width = u16::try_from(Span::raw(name).width()).unwrap_or(feed_limit);
+            feed_width = feed_width.max(width).min(feed_limit);
+            if feed_width == feed_limit {
+                break;
+            }
+        }
         let constraints = [
-            Constraint::Length(10),
-            Constraint::Fill(2),
             Constraint::Fill(1),
-            Constraint::Length(4),
+            Constraint::Length(feed_width),
+            Constraint::Length(5),
         ];
 
         let row = |timeline_entry: &'a payload::TimelineEntry| {
@@ -177,7 +190,10 @@ impl EntriesWidget {
                 .published
                 .as_ref()
                 .or(entry.updated.as_ref())
-                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
+                .map_or_else(
+                    || ui::UNKNOWN_SYMBOL.to_owned(),
+                    |time| format_local(time, "%m/%d"),
+                );
             let category = entry.category();
             let icon = cx
                 .categories
@@ -185,17 +201,15 @@ impl EntriesWidget {
                 .unwrap_or_else(|| ui::default_icon());
 
             let feed_title = entry.feed.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let requirement = entry.requirement().label(&cx.theme.requirement);
 
             Row::new([
-                Cell::from(Span::from(published)),
                 Cell::from(Line::from(vec![
                     Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
                     Span::from(" "),
                     Span::from(title),
                 ])),
                 Cell::from(Span::from(feed_title)),
-                Cell::from(Line::from(vec![requirement, Span::from(" ")])),
+                Cell::from(Line::from(published).right_aligned()),
             ])
         };
 
@@ -215,66 +229,59 @@ impl EntriesWidget {
             return;
         };
 
-        let vertical = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Min(0),
-        ]);
-        let [
-            title_area,
-            url_area,
-            published_area,
-            _,
-            summary_heading_area,
-            summary_area,
-        ] = vertical.areas(inner);
-
-        Line::from(vec![
-            Span::from(concat!(icon!(entry), " Entry")).bold(),
-            Span::from("     "),
-            Span::from(entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL)),
-        ])
-        .render(title_area, buf);
-
-        Line::from(vec![
-            Span::from(concat!(icon!(open), " URL")).bold(),
-            Span::from("       "),
-            Span::from(entry.website_url.as_deref().unwrap_or_default()),
-        ])
-        .render(url_area, buf);
-
-        Line::from(vec![
-            Span::from(concat!(icon!(calendar), " Published")).bold(),
-            Span::from(" "),
-            Span::from(
-                entry
-                    .published
-                    .as_ref()
-                    .or(entry.updated.as_ref())
-                    .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd_hm),
-            ),
-        ])
-        .render(published_area, buf);
-
-        let Some(summary) = entry.summary_text(inner.width.into()) else {
+        if inner.is_empty() {
             return;
+        }
+
+        let mut metadata = Line::default().dim();
+        if let Some(time) = entry.published.as_ref().or(entry.updated.as_ref()) {
+            metadata.push_span(concat!(icon!(calendar), " "));
+            metadata.push_span(time.local_ymd_hm());
+        }
+        if let Some(url) = entry.website_url.as_deref().filter(|url| !url.is_empty()) {
+            if !metadata.spans.is_empty() {
+                metadata.push_span("  ");
+            }
+            metadata.push_span(concat!(icon!(open), " "));
+            metadata.push_span(url);
+        }
+
+        let show_metadata = inner.height > 1 && !metadata.spans.is_empty();
+        let [body, footer] = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(u16::from(show_metadata)),
+        ])
+        .areas(inner);
+
+        // Let the paragraph wrap the visible text together with its first-line label.
+        let summary = entry.summary_text(usize::from(body.width) * usize::from(body.height));
+        let (label, content) = match summary.as_deref().filter(|text| !text.trim().is_empty()) {
+            Some(text) => (concat!(icon!(summary), " "), text),
+            None => (
+                concat!(icon!(entry), " Entry  "),
+                entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL),
+            ),
         };
-
-        Line::from(
-            Span::from(concat!(icon!(summary), " Summary"))
-                .bold()
-                .underlined(),
-        )
-        .render(summary_heading_area, buf);
-
-        let paragraph = Paragraph::new(Text::from(summary))
+        let mut text = Text::from(content.trim_matches('\n'));
+        if let Some(first) = text.lines.first_mut() {
+            first.spans.insert(0, Span::raw(label).bold());
+        }
+        Paragraph::new(text)
             .wrap(Wrap { trim: false })
             .style(cx.theme.entries.summary)
-            .alignment(Alignment::Left);
+            .render(body, buf);
 
-        Widget::render(paragraph, summary_area, buf);
+        if show_metadata {
+            let clipped = metadata.width() > usize::from(footer.width);
+            let (x, y) = buf.set_line(
+                footer.x,
+                footer.y,
+                &metadata,
+                footer.width - u16::from(clipped),
+            );
+            if clipped {
+                buf.set_string(x, y, "…", metadata.style);
+            }
+        }
     }
 }
