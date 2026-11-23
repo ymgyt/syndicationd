@@ -70,7 +70,6 @@ digraph {
         style="rounded";
 
         registry [ label="synd_registry\nfeed registry workflow" ];
-        persistence [ label="synd_persistence\nSQLite adapters" ];
         sqlite [ label="SQLite DB", shape=cylinder ];
         feed_sources [ label="Feed sources", shape=oval ];
     }
@@ -91,7 +90,6 @@ digraph {
     client -> api [ label="GraphQL/local HTTP" ];
     api -> protocol [ label="implements" ];
     api -> registry [ label="serves commands" ];
-    registry -> persistence [ label="persists state" ];
+    registry -> sqlite [ label="reads/writes state" ];
     registry -> feed_sources [ label="refreshes" ];
-    persistence -> sqlite [ label="reads/writes" ];
 }

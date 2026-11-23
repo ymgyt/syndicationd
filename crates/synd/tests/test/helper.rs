@@ -15,11 +15,11 @@ use synd_auth::{
 use synd_client::{Client, ClientOptions};
 use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
-use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
 use synd_registry::{
     FeedRegistry, FeedSubscriptionAttrs, SubscriberId, SubscriptionKey,
     crawl::policy::{CrawlPolicy, PollingInterval},
     db::{CommitTx, FeedRegistryDb, SubscriptionDb},
+    sqlite::{SqliteDatabase, SqliteFeedRegistryDb},
 };
 pub use synd_term::integration::{event_stream, new_test_terminal};
 use synd_term::{

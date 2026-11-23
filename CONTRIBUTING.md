@@ -33,7 +33,7 @@ they should not start local API services or manage runtime sessions directly.
 
 `synd_api` owns the daemon's API surface. It implements session endpoints and the
 GraphQL/local API used by `synd_client`. Registry behavior stays in
-`synd_registry`, and SQLite storage concerns stay behind `synd_persistence`.
+`synd_registry`, with SQLite storage implemented in `synd_registry::sqlite`.
 
 `synd_protocol` owns the small wire contracts shared by the client, API server,
 and runtime daemon. Put session-open/session-close payloads, capability
@@ -49,8 +49,7 @@ negotiation, and other cross-process protocol contracts here instead of in
 | `synd_feed`        | Feed model, retrieval, and parsing                                |
 | `synd_auth`        | Authentication helpers and auth-domain types                      |
 | `synd_protocol`    | Shared wire contracts for client/server session negotiation       |
-| `synd_registry`    | Feed registry domain, subscription commands, and event processors |
-| `synd_persistence` | SQLite adapters for registry state and event transactions         |
+| `synd_registry`    | Feed registry, subscription commands, event processing, and SQLite storage |
 | `synd_api`         | GraphQL/local API server and daemon session endpoints             |
 | `synd_client`      | Typed API client, GraphQL operations, and session protocol calls   |
 | `synd_runtime`     | Runtime session acquisition and singleton daemon lifecycle        |

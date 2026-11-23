@@ -5574,7 +5574,6 @@ dependencies = [
  "synd-auth",
  "synd-client",
  "synd-feed",
- "synd-persistence",
  "synd-registry",
  "synd-runtime",
  "synd-support",
@@ -5609,7 +5608,6 @@ dependencies = [
  "serde",
  "synd-auth",
  "synd-feed",
- "synd-persistence",
  "synd-protocol",
  "synd-registry",
  "synd-support",
@@ -5686,27 +5684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "synd-persistence"
-version = "0.4.0"
-dependencies = [
- "anyhow",
- "chrono",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "synd-feed",
- "synd-registry",
- "synd-support",
- "synd-test",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-util",
- "tracing",
- "zstd",
-]
-
-[[package]]
 name = "synd-protocol"
 version = "0.4.0"
 dependencies = [
@@ -5725,14 +5702,19 @@ dependencies = [
  "rand 0.10.4",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
  "strum 0.28.0",
  "synd-feed",
  "synd-support",
+ "synd-test",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tokio-util",
  "tracing",
  "url",
+ "zstd",
 ]
 
 [[package]]
@@ -5745,7 +5727,6 @@ dependencies = [
  "sha2 0.11.1",
  "synd-api",
  "synd-client",
- "synd-persistence",
  "synd-protocol",
  "synd-registry",
  "synd-support",

@@ -6,8 +6,8 @@ syndicationd API service library
 
 `synd-api` is the transport boundary for syndicationd. It owns HTTP serving,
 GraphQL schema wiring, authentication, request limits, shutdown, and
-observability. Feed lifecycle behavior is delegated to `synd-registry`, and
-SQLite storage adapters are provided by `synd-persistence`.
+observability. It delegates feed lifecycle operations to `synd-registry`,
+which also owns their SQLite storage.
 
 This crate is a library. The local daemon process is started through
 `synd daemon serve`.

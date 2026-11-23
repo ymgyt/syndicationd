@@ -5,8 +5,11 @@ use synd_api::{
     serve::{ServeOptions, auth::Authenticator},
     shutdown::Shutdown,
 };
-use synd_persistence::sqlite::{SqliteDatabase, SqliteFeedRegistryDb};
-use synd_registry::{FeedRegistry, FeedRegistryConfig, event::WorkerSet};
+use synd_registry::{
+    FeedRegistry, FeedRegistryConfig,
+    event::WorkerSet,
+    sqlite::{SqliteDatabase, SqliteFeedRegistryDb},
+};
 
 use crate::{Result, RuntimeDatabase};
 

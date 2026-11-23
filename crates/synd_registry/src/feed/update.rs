@@ -20,24 +20,24 @@ pub struct FeedUpdate {
 }
 
 impl FeedUpdate {
-    pub fn source(&self) -> &FeedSource {
+    pub(crate) fn source(&self) -> &FeedSource {
         &self.source
     }
 
-    pub fn meta(&self) -> &FeedMeta {
+    pub(crate) fn meta(&self) -> &FeedMeta {
         &self.meta
     }
 
-    pub fn membership(&self) -> &[EntryId] {
+    pub(crate) fn membership(&self) -> &[EntryId] {
         &self.membership
     }
 
     /// IDs whose existing membership must survive a conflicting observation.
-    pub fn preserve_membership(&self) -> &HashSet<EntryId> {
+    pub(crate) fn preserve_membership(&self) -> &HashSet<EntryId> {
         &self.preserve_membership
     }
 
-    pub fn entry_changes(&self) -> &Changes {
+    pub(crate) fn entry_changes(&self) -> &Changes {
         &self.entry_changes
     }
 }

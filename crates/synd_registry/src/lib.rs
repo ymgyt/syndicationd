@@ -15,6 +15,7 @@ mod handler;
 pub mod in_memory;
 pub mod query;
 pub mod registry;
+pub mod sqlite;
 pub mod subscription;
 pub mod timeline;
 

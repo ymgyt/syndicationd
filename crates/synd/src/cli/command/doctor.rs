@@ -11,7 +11,7 @@ use std::os::unix::fs::FileTypeExt as _;
 
 use clap::Args;
 use serde::Serialize;
-use synd_persistence::sqlite::SqliteDatabase;
+use synd_registry::sqlite::SqliteDatabase;
 use synd_runtime::{DaemonState, PlacementSummary, Runtime, RuntimeConfig, RuntimeDatabase};
 
 use crate::{

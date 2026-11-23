@@ -13,7 +13,7 @@ readme      = "README.md"
 version.workspace = true
 
 [dependencies]
-synd-feed    = { workspace = true }
+synd-feed    = { workspace = true, features = ["sqlx"] }
 synd-support = { workspace = true }
 
 bon         = { workspace = true }
@@ -22,20 +22,25 @@ derive_more = { workspace = true }
 rand        = { workspace = true }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
+sha2        = { workspace = true }
+sqlx        = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono", "migrate", "macros"] }
 strum       = { workspace = true }
 thiserror   = { workspace = true }
 tokio       = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 tokio-util  = { workspace = true }
 tracing     = { workspace = true }
 url         = { workspace = true }
+zstd        = { workspace = true }
 
 [features]
 default = []
 test    = []
 
 [dev-dependencies]
-anyhow = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt"] }
+anyhow    = { workspace = true }
+synd-test = { workspace = true }
+tempfile  = { workspace = true }
+tokio     = { workspace = true, features = ["net"] }
 
 [lints]
 workspace = true

@@ -1,6 +1,5 @@
 use axum_server::tls_rustls::RustlsConfig;
-use synd_persistence::sqlite::SqliteFeedRegistryDb;
-use synd_registry::FeedRegistry;
+use synd_registry::{FeedRegistry, sqlite::SqliteFeedRegistryDb};
 
 use crate::{
     monitor::Monitors,

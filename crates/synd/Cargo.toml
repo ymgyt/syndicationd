@@ -16,7 +16,7 @@ version.workspace = true
 [dependencies]
 synd-client      = { workspace = true }
 synd-feed        = { workspace = true }
-synd-persistence = { workspace = true }
+synd-registry    = { workspace = true }
 synd-runtime     = { workspace = true }
 synd-support     = { workspace = true, features = ["conf", "humantime", "o11y"] }
 synd-term        = { workspace = true }
@@ -48,7 +48,6 @@ insta      = { workspace = true }
 mockall    = { workspace = true }
 synd-api      = { workspace = true }
 synd-auth     = { workspace = true }
-synd-registry = { workspace = true }
 synd-test     = { workspace = true }
 tempfile   = { workspace = true }
 tokio      = { workspace = true, features = ["net"] }
