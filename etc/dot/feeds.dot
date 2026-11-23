@@ -1,0 +1,44 @@
+digraph feeds {
+    graph [
+        rankdir=LR, newrank=true, bgcolor=white,
+        pad=0.18, nodesep=0.28, ranksep=0.38,
+        fontname="Helvetica,Arial,sans-serif"
+    ];
+    node [
+        shape=box, style=rounded, margin="0.14,0.10",
+        fontname="Helvetica,Arial,sans-serif", fontsize=14,
+        color="#58646c", fontcolor="#18222a"
+    ];
+    edge [
+        fontname="Helvetica,Arial,sans-serif", fontsize=12,
+        color="#53616a", fontcolor="#35424c", arrowsize=0.72
+    ];
+
+    cli [group=subscribe, label=<<B>Terminal 1</B><BR/><FONT FACE="monospace">synd feed subscribe</FONT>>];
+    tui [label=<<B>Terminal 2</B><BR/><FONT FACE="monospace">synd</FONT>>];
+    mcp [label=<<B>MCP client</B><BR/>via <FONT FACE="monospace">synd mcp</FONT>>];
+    feed [label="RSS / Atom feed", shape=ellipse];
+
+    subgraph cluster_daemon {
+        label=<<B>Local daemon</B>>;
+        style="rounded,filled";
+        color="#8b979e";
+        fillcolor="#f3f5f6";
+        margin=14;
+        node [style="rounded,filled", fillcolor=white];
+
+        subscriptions [group=subscribe, label="Subscriptions"];
+        entries [label="Stored entries"];
+        { rank=same; subscriptions; entries; }
+        subscriptions -> entries [style=invis];
+    }
+
+    { rank=same; cli; tui; mcp; }
+    cli -> tui -> mcp [style=invis];
+
+    cli -> subscriptions [label="feed URL"];
+    subscriptions -> feed [label="poll feed"];
+    entries -> feed [dir=back, label="new entries"];
+    tui -> entries [dir=back];
+    mcp -> entries [dir=back];
+}

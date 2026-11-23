@@ -3,7 +3,7 @@ import '.base.just'
 dot_dir := "etc/dot"
 format := "svg"
 
-default: overview authentication
+default: overview authentication feeds
 
 # Generate overview image
 [no-cd]
@@ -13,6 +13,10 @@ overview:
 [no-cd]
 authentication:
 	@just dot generate authentication
+
+[no-cd]
+feeds:
+	@just dot generate feeds
 
 [no-cd]
 [private]

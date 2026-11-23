@@ -11,9 +11,8 @@
 
 ![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
 
-`synd` is an RSS and Atom feed reader for the terminal.
-A local daemon fetches your feeds. Subscriptions you add from the command
-line are available in the TUI and through [MCP](#mcp).
+Syndicationd is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
+It also provides a CLI and an MCP server.
 
 ## Installation
 
@@ -80,52 +79,19 @@ Use the source install to try the current `main` branch behavior before the next
 > [!NOTE]
 > Install a [Nerd Font](https://www.nerdfonts.com/) to display icons in the TUI.
 
-## Quick Start
+Run `synd` to open the TUI.
 
-Run `synd` to open the TUI. Press `Tab` to switch to Feeds, then `a` to open
-your editor. Add the following line to subscribe to This Week in Rust.
+[Default key bindings][keymap]\
+[Configuration][configuration]
 
-```text
-MUST rust https://this-week-in-rust.org/atom.xml
-```
-
-Save and close the editor, then return to the Entries tab. Once the feed has
-loaded, select an entry and press `Enter` to open it in your web browser.
-
-## TUI
-
-- Customizable [Helix-like keybindings][keymap]
-- Keyword search and category filters for feeds and entries
-- Open entries in a web or text browser
-
-## CLI
-
-Subscribe to This Week in Rust with the same category and priority as in the Quick Start.
-
-```sh
-synd feed subscribe --url https://this-week-in-rust.org/atom.xml --category rust --requirement must
-```
-
-Save your subscriptions to a JSON file.
-
-```sh
-synd feed export > feeds.json
-```
-
-Import the subscriptions from that file.
-
-```sh
-synd feed import feeds.json
-```
-
-`synd config view -o json` prints the effective configuration as JSON.
-`synd doctor` checks local paths and reports the status of the daemon.
-
-Run `synd --help` to explore the other commands. For settings and configuration file
-locations, see the [configuration guide][configuration].
-
-[keymap]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/keymap.md
+[keymap]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/keymap.md#default-key-bindings
 [configuration]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/configuration.md
+
+## Overview
+
+![A local daemon polls the subscribed feed and serves its entries to the TUI and MCP clients.](etc/dot/dist/feeds.svg)
+
+Subscribe to a feed in one terminal, then open `synd` in another to read its entries.
 
 ## MCP
 
@@ -142,27 +108,13 @@ claude mcp add synd -- synd mcp
 
 ## Agent skill
 
-With `synd` installed, your agent can use the `synd` skill to manage feed
-subscriptions.
-
-### [skills](https://github.com/vercel-labs/skills)
-
 ```sh
+# skills
 npx skills add -g ymgyt/syndicationd
-```
 
-### [APM](https://github.com/microsoft/apm)
-
-```sh
+# apm
 apm install -g ymgyt/syndicationd
 ```
-
-## Application Topology
-
-![Application overview][topology]
-
-[topology]: https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/dot/dist/overview.svg
-
 ## Development
 
 See
