@@ -125,6 +125,10 @@ locations, see the [configuration guide][configuration].
 [keymap]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/keymap.md
 [configuration]: https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/configuration.md
 
+## MCP
+
+Configure your MCP client to launch `synd mcp` over stdio.
+
 ## Agent skill
 
 With `synd` installed, your agent can use the `synd` skill to manage feed

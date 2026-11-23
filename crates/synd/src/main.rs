@@ -63,6 +63,7 @@ fn init_tracing(
         cli::Command::Clean(_)
         | cli::Command::Doctor(_)
         | cli::Command::Feed(_)
+        | cli::Command::Mcp(_)
         | cli::Command::Config(_) => "warn",
     };
 
@@ -155,6 +156,7 @@ async fn main() -> ExitCode {
         cli::Command::Daemon(daemon) => daemon.run(config).await,
         cli::Command::Doctor(doctor) => doctor.run(config).await,
         cli::Command::Feed(feed) => feed.run(config).await,
+        cli::Command::Mcp(mcp) => mcp.run(&config).await,
         cli::Command::Config(command) => command.run(&config),
     }
 }

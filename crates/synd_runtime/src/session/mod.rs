@@ -6,7 +6,7 @@ pub(crate) use renewal::SessionRenewalObserver;
 use renewal::{SessionLeaseRenewal, SessionLeaseRenewalHandle, SessionRenewalSchedule};
 use synd_protocol::{
     capability,
-    session::{CloseSessionRequest, SessionId, SessionLease},
+    session::{CloseSessionRequest, RenewSessionRequest, SessionId, SessionLease},
 };
 
 mod renewal;
@@ -36,6 +36,18 @@ impl Session {
 
     pub fn available_capabilities(&self) -> &CapabilitySet {
         &self.available_capabilities
+    }
+
+    /// Confirm the daemon still recognizes this session and renew its lease.
+    pub async fn renew_lease(&self) -> Result<()> {
+        if let HandleKind::Daemon(handle) = &self.handle.kind {
+            handle
+                .client
+                .renew_session(RenewSessionRequest::new(handle.session_id.clone()))
+                .await?;
+        }
+
+        Ok(())
     }
 
     pub async fn close(self) -> Result<()> {

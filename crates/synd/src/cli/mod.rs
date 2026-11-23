@@ -149,6 +149,7 @@ pub enum Command {
     Daemon(command::daemon::DaemonCommand),
     Doctor(command::doctor::DoctorCommand),
     Feed(command::feed::FeedCommand),
+    Mcp(command::mcp::McpCommand),
     Config(command::config::ConfigCommand),
 }
 

@@ -16,6 +16,7 @@ version.workspace = true
 [dependencies]
 synd-client      = { workspace = true }
 synd-feed        = { workspace = true }
+synd-mcp         = { workspace = true }
 synd-registry    = { workspace = true }
 synd-runtime     = { workspace = true }
 synd-support     = { workspace = true, features = ["conf", "humantime", "o11y"] }
@@ -50,7 +51,7 @@ synd-api      = { workspace = true }
 synd-auth     = { workspace = true }
 synd-test     = { workspace = true }
 tempfile   = { workspace = true }
-tokio      = { workspace = true, features = ["net"] }
+tokio      = { workspace = true, features = ["io-util", "net", "process"] }
 url        = { workspace = true }
 
 [lints]
