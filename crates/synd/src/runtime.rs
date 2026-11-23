@@ -44,6 +44,10 @@ impl FeedRuntime {
             .context("Failed to acquire runtime session")
     }
 
+    pub(crate) fn into_runtime(self) -> Runtime {
+        self.runtime
+    }
+
     pub(crate) async fn inspect_daemon(&self) -> anyhow::Result<DaemonStatus> {
         self.runtime
             .daemon()
