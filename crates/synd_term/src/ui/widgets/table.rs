@@ -2,10 +2,24 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
     style::Modifier,
-    widgets::{Row, StatefulWidget, TableState},
+    text::Line,
+    widgets::{Block, Cell, Padding, Row, StatefulWidget, TableState},
 };
 
-use crate::ui::{self, theme::EntriesTheme};
+use crate::{
+    types::{Time, format_local},
+    ui::{self, theme::EntriesTheme},
+};
+
+pub(super) const DATE_WIDTH: Constraint = Constraint::Length(5);
+
+pub(super) fn date_cell(time: Option<&Time>) -> Cell<'static> {
+    let date = time.map_or_else(
+        || ui::UNKNOWN_SYMBOL.to_owned(),
+        |t| format_local(t, "%m/%d"),
+    );
+    Cell::from(Line::from(date).right_aligned())
+}
 
 pub(crate) struct TableBuilder<H, R, C, T, S, M> {
     header: H,
@@ -152,6 +166,11 @@ pub(crate) struct Table<'a> {
 }
 
 impl Table<'_> {
+    /// Leave a row above the header and the rightmost cell for the scrollbar.
+    pub(super) fn inner_area(area: Rect) -> Rect {
+        Block::new().padding(Padding::new(0, 1, 1, 0)).inner(area)
+    }
+
     pub(crate) fn builder() -> TableBuilder<(), (), (), (), (), ()> {
         TableBuilder::default()
     }

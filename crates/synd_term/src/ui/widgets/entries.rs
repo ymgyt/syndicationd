@@ -5,11 +5,15 @@ use synd_client::payload;
 use crate::{
     application::Populate,
     command::ListCommand,
-    types::{EntryExt, TimeExt, format_local},
+    types::{EntryExt, TimeExt},
     ui::{
         self, Context, icon,
-        widgets::{collections::FilterableVec, filter::FeedFilterer},
-        widgets::{scrollbar::Scrollbar, table::Table},
+        widgets::{
+            collections::FilterableVec,
+            filter::FeedFilterer,
+            scrollbar::Scrollbar,
+            table::{self, Table},
+        },
     },
 };
 use ratatui::{
@@ -106,8 +110,7 @@ impl EntriesWidget {
     }
 
     fn render_entries(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        // The scrollbar occupies the rightmost cell beside the date.
-        let entries_area = Block::new().padding(Padding::new(0, 1, 1, 0)).inner(area);
+        let entries_area = Table::inner_area(area);
 
         let (header, widths, rows) = self.entry_rows(entries_area.width, cx);
 
@@ -180,20 +183,12 @@ impl EntriesWidget {
         let constraints = [
             Constraint::Fill(1),
             Constraint::Length(feed_width),
-            Constraint::Length(5),
+            table::DATE_WIDTH,
         ];
 
         let row = |timeline_entry: &'a payload::TimelineEntry| {
             let entry = &timeline_entry.entry;
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let published = entry
-                .published
-                .as_ref()
-                .or(entry.updated.as_ref())
-                .map_or_else(
-                    || ui::UNKNOWN_SYMBOL.to_owned(),
-                    |time| format_local(time, "%m/%d"),
-                );
             let category = entry.category();
             let icon = cx
                 .categories
@@ -209,7 +204,7 @@ impl EntriesWidget {
                     Span::from(title),
                 ])),
                 Cell::from(Span::from(feed_title)),
-                Cell::from(Line::from(published).right_aligned()),
+                table::date_cell(entry.published.as_ref().or(entry.updated.as_ref())),
             ])
         };
 

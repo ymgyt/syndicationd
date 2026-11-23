@@ -318,7 +318,7 @@ impl GhNotificationsWidget {
     }
 
     fn render_notifications(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let notifications_area = Block::new().padding(Padding::top(1)).inner(area);
+        let notifications_area = Table::inner_area(area);
 
         let (header, widths, rows) = self.notification_rows(cx);
 
@@ -369,17 +369,17 @@ impl GhNotificationsWidget {
             }
         };
         let header = Row::new([
-            Cell::from("Updated"),
             Cell::from(format!("Title {n}/{m}")),
             Cell::from("Repository"),
             Cell::from("Reason"),
+            Cell::from(Line::from("Updated").right_aligned()),
         ]);
 
         let constraints = [
-            Constraint::Length(8),
             Constraint::Fill(1),
             Constraint::Max(self.max_repository_name.try_into().unwrap_or(30)),
             Constraint::Length(10),
+            Constraint::Length(8),
         ];
 
         let row = |n: &'a Notification| {
@@ -393,13 +393,17 @@ impl GhNotificationsWidget {
 
             let modifier = Modifier::empty();
             Row::new([
-                Cell::from(Span::from(updated_at).add_modifier(modifier)),
                 Cell::from(
                     Line::from(vec![subject_icon, Span::from(" "), Span::from(subject)])
                         .add_modifier(modifier),
                 ),
                 Cell::from(Span::from(repo).add_modifier(modifier)),
                 Cell::from(Span::from(reason).add_modifier(modifier)),
+                Cell::from(
+                    Line::from(updated_at)
+                        .right_aligned()
+                        .add_modifier(modifier),
+                ),
             ])
         };
         (header, constraints, self.notifications.iter().map(row))
@@ -637,7 +641,7 @@ fn reason_label(reason: &Reason) -> &str {
     }
 }
 
-// 3 days ago => "_3d ago"
+// 3 days ago => "3d ago"
 fn short_human_time(s: &str) -> String {
     if s == "now" {
         return s.to_owned();
@@ -662,9 +666,5 @@ fn short_human_time(s: &str) -> String {
         "an" | "a" => "1",
         n => n,
     };
-    if u == "mo" {
-        format!("{n}{u} ago")
-    } else {
-        format!("{n: >2}{u} ago")
-    }
+    format!("{n}{u} ago")
 }

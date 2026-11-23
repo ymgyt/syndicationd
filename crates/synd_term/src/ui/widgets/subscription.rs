@@ -16,12 +16,17 @@ use synd_feed::types::{FeedType, FeedUrl};
 use crate::{
     application::Populate,
     command::{ListCommand, UnsubscribeTarget},
-    types::{self, EntryMeta, EntryMetaExt, Feed, RequirementExt, TimeExt},
+    types::{self, EntryMeta, EntryMetaExt, Feed, TimeExt},
     ui::{
         self, Context,
         extension::RectExt,
-        widgets::{collections::FilterableVec, filter::FeedFilterer},
-        widgets::{scrollbar::Scrollbar, table::Table},
+        icon,
+        widgets::{
+            collections::FilterableVec,
+            filter::FeedFilterer,
+            scrollbar::Scrollbar,
+            table::{self, Table},
+        },
     },
 };
 
@@ -85,7 +90,7 @@ impl SubscriptionWidget {
     }
 
     fn render_feeds(&self, area: Rect, buf: &mut Buffer, cx: &Context<'_>) {
-        let feeds_area = Block::new().padding(Padding::top(1)).inner(area);
+        let feeds_area = Table::inner_area(area);
 
         let (header, widths, rows) = self.feed_rows(cx);
 
@@ -136,37 +141,26 @@ impl SubscriptionWidget {
             }
         };
         let header = Row::new([
-            Cell::from("Updated"),
             Cell::from(format!("Feed {n}/{m}")),
             Cell::from("URL"),
             Cell::from("Description"),
-            Cell::from("Req"),
+            Cell::from(Line::from("Date").right_aligned()),
         ]);
 
         let constraints = [
-            Constraint::Length(10),
             Constraint::Fill(1),
             Constraint::Fill(1),
             Constraint::Fill(2),
-            Constraint::Length(4),
+            table::DATE_WIDTH,
         ];
 
         let row = |feed_meta: &'a Feed| {
             let title = feed_meta.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let updated = feed_meta
-                .updated
-                .as_ref()
-                .or(feed_meta
-                    .entries
-                    .first()
-                    .and_then(|entry| entry.published.as_ref().or(entry.updated.as_ref())))
-                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
             let website_url = feed_meta
                 .website_url
                 .as_deref()
                 .unwrap_or(ui::UNKNOWN_SYMBOL);
             let desc = feed_meta.description.as_deref().unwrap_or("");
-            let requirement = feed_meta.requirement().label(&cx.theme.requirement);
             let category = feed_meta.category();
             let icon = cx
                 .categories
@@ -174,7 +168,6 @@ impl SubscriptionWidget {
                 .unwrap_or_else(|| ui::default_icon());
 
             Row::new([
-                Cell::from(Span::from(updated)),
                 Cell::from(Line::from(vec![
                     Span::from(icon.symbol()).fg(icon.color().unwrap_or(cx.theme.default_icon_fg)),
                     Span::from(" "),
@@ -187,7 +180,7 @@ impl SubscriptionWidget {
                         .trim_end_matches('/'),
                 )),
                 Cell::from(Span::from(desc)),
-                Cell::from(Line::from(vec![requirement, Span::from(" ")])),
+                table::date_cell(feed_meta.updated_at()),
             ])
         };
 
@@ -199,7 +192,7 @@ impl SubscriptionWidget {
         let block = Block::new()
             .padding(Padding {
                 left: 2,
-                right: 2,
+                right: 1,
                 top: 0,
                 bottom: 0,
             })
@@ -217,7 +210,7 @@ impl SubscriptionWidget {
         let [meta_area, entries_area] = vertical.areas(inner);
         let entries_area = Block::new().padding(Padding::top(1)).inner(entries_area);
 
-        let widths = [
+        let meta_widths = [
             Constraint::Length(11),
             Constraint::Fill(1),
             Constraint::Fill(2),
@@ -270,40 +263,46 @@ impl SubscriptionWidget {
                     Span::from(feed.requirement().to_string()),
                 ])),
             ]),
+            Row::new([
+                Cell::new(Span::from(concat!(icon!(calendar), " Updated")).bold()),
+                Cell::new(
+                    feed.updated_at()
+                        .map_or_else(|| ui::UNKNOWN_SYMBOL.to_owned(), TimeExt::local_ymd_hm),
+                )
+                .column_span(2),
+            ]),
         ];
 
-        let table = RatatuiTable::new(meta_rows, widths)
+        let table = RatatuiTable::new(meta_rows, meta_widths)
             .column_spacing(1)
             .style(cx.theme.subscription.background);
         Widget::render(table, meta_area, buf);
 
         let entry = |entry: &EntryMeta| {
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let published = entry
-                .published
-                .as_ref()
-                .or(entry.updated.as_ref())
-                .map_or_else(|| ui::UNKNOWN_SYMBOL.to_string(), TimeExt::local_ymd);
             let summary = entry.summary_text(100).unwrap_or(ui::UNKNOWN_SYMBOL.into());
 
             Row::new([
-                Cell::new(Span::from(published)),
                 Cell::new(Span::from(title.to_string())),
                 Cell::new(Span::from(summary)),
+                table::date_cell(entry.published.as_ref().or(entry.updated.as_ref())),
             ])
         };
 
         let header = Row::new([
-            Cell::new(Span::from("Published")),
             Cell::new(Span::from("Entry")),
             Cell::new(Span::from("Summary")),
+            Cell::new(Line::from("Date").right_aligned()),
         ]);
 
         let rows = feed.entries.iter().map(entry);
-        let table = RatatuiTable::new(rows, widths)
-            .header(header.style(cx.theme.subscription.header))
-            .column_spacing(1)
-            .style(cx.theme.subscription.background);
+        let table = RatatuiTable::new(
+            rows,
+            [Constraint::Fill(1), Constraint::Fill(2), table::DATE_WIDTH],
+        )
+        .header(header.style(cx.theme.subscription.header))
+        .column_spacing(1)
+        .style(cx.theme.subscription.background);
 
         Widget::render(table, entries_area, buf);
     }

@@ -80,6 +80,13 @@ pub struct Feed {
 }
 
 impl Feed {
+    pub(crate) fn updated_at(&self) -> Option<&Time> {
+        self.updated.as_ref().or_else(|| {
+            let entry = self.entries.first()?;
+            entry.published.as_ref().or(entry.updated.as_ref())
+        })
+    }
+
     pub fn requirement(&self) -> Requirement {
         self.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT)
     }
