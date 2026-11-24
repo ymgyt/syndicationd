@@ -16,12 +16,14 @@ version.workspace = true
 synd-client  = { workspace = true }
 synd-runtime = { workspace = true }
 
-anyhow   = { workspace = true }
-rmcp     = { workspace = true }
-schemars = { workspace = true, features = ["uuid1"] }
-serde    = { workspace = true }
-tokio    = { workspace = true, features = ["sync"] }
-tracing  = { workspace = true }
+anyhow    = { workspace = true }
+rmcp      = { workspace = true }
+schemars  = { workspace = true, features = ["uuid1"] }
+serde     = { workspace = true }
+thiserror = { workspace = true }
+tokio     = { workspace = true, features = ["sync"] }
+tracing   = { workspace = true }
+url       = { workspace = true }
 
 [lints]
 workspace = true
