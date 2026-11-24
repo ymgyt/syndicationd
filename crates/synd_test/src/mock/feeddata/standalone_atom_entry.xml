@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entry xmlns="http://www.w3.org/2005/Atom">
+  <id>urn:synd:test:updated-only</id>
+  <title>Updated only</title>
+  <updated>2024-05-01T12:00:00Z</updated>
+  <author><name>Test Author</name></author>
+  <content type="text">Hello from a standalone Atom entry.</content>
+</entry>

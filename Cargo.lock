@@ -5917,6 +5917,7 @@ dependencies = [
  "schemars",
  "serde",
  "synd-client",
+ "synd-feed",
  "synd-runtime",
  "thiserror 2.0.21",
  "tokio",

@@ -1,7 +1,11 @@
 use rmcp::{Json, handler::server::wrapper::Parameters, tool, tool_router};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use synd_client::payload::{self, TimelineEntriesRequest, TimelineEntryConnection, TimelineId};
+use synd_client::{
+    FeedUrl, Rfc3339Time,
+    payload::{self, TimelineEntriesRequest, TimelineEntryConnection, TimelineId},
+};
+use synd_feed::entry::EntryId;
 
 use super::{
     McpServer,
@@ -21,7 +25,7 @@ impl McpServer {
     }
 
     #[tool(
-        description = "List entries in the specified timeline from newest to oldest with their titles, plain-text excerpts, and URLs.",
+        description = "List timeline entries from newest to oldest with their IDs, titles, plain-text excerpts, article URLs, feeds, and publication times.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_timeline_entries(
@@ -92,21 +96,48 @@ impl TryFrom<TimelineEntriesParams> for TimelineEntriesRequest {
     }
 }
 
-// A timeline item exposes the excerpt text and the publisher's article URL.
+/// An article in the timeline and the feed it came from.
 #[derive(Serialize, JsonSchema)]
 struct TimelineEntry {
+    /// Opaque synd entry ID.
+    #[schemars(with = "String")]
+    id: EntryId,
     title: Option<String>,
     excerpt: Option<String>,
+    /// URL of the article on the publisher's website.
     url: Option<String>,
+    feed: Feed,
+    /// Publication time supplied by the feed, if available.
+    published: Option<Rfc3339Time>,
 }
 
 impl From<payload::TimelineEntry> for TimelineEntry {
     fn from(node: payload::TimelineEntry) -> Self {
         let entry = node.entry;
         Self {
+            id: entry.id,
             title: entry.title,
             excerpt: entry.excerpt.map(|excerpt| excerpt.text),
             url: entry.website_url,
+            feed: entry.feed.into(),
+            published: entry.published,
+        }
+    }
+}
+
+/// Source feed of a timeline entry.
+#[derive(Serialize, JsonSchema)]
+struct Feed {
+    title: Option<String>,
+    /// URL used to subscribe to the feed.
+    url: FeedUrl,
+}
+
+impl From<payload::FeedMeta> for Feed {
+    fn from(feed: payload::FeedMeta) -> Self {
+        Self {
+            title: feed.title,
+            url: feed.url,
         }
     }
 }

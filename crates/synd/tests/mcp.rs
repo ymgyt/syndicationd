@@ -4,7 +4,10 @@ use std::{path::Path, process::Stdio, time::Duration};
 
 use anyhow::{Context as _, ensure};
 use serde_json::{Value, json};
-use synd_client::payload::{CreateTimelineInput, TimelineId};
+use synd_client::{
+    Client,
+    payload::{CreateTimelineInput, TimelineEntriesRequest, TimelineId},
+};
 use synd_runtime::{Runtime, RuntimeConfig, RuntimeDatabase};
 use tokio::{
     io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader, Lines},
@@ -56,6 +59,15 @@ async fn test_stdio() -> anyhow::Result<()> {
         .find(|tool| tool["name"] == "list_timeline_entries")
         .unwrap();
     assert!(timeline_entries["inputSchema"]["properties"]["maxUnicodeWidth"].is_object());
+    let definitions_by_type = &timeline_entries["outputSchema"]["$defs"];
+    let fields = &definitions_by_type["TimelineEntry"]["properties"];
+    assert_eq!(fields["id"]["type"], "string");
+    assert_eq!(fields["feed"]["$ref"], "#/$defs/Feed");
+    let feed = &definitions_by_type["Feed"]["properties"];
+    assert_eq!(feed["title"]["type"], json!(["string", "null"]));
+    assert_eq!(feed["url"]["$ref"], "#/$defs/FeedUrl");
+    assert_eq!(definitions_by_type["FeedUrl"]["format"], "uri");
+    assert_eq!(fields["published"]["format"], "date-time");
     let mut tools: Vec<&str> = definitions
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
@@ -125,60 +137,25 @@ async fn check_timeline_tools(peer: &mut McpPeer, dir: &Path) -> anyhow::Result<
             .with_runtime_root(dir.join("run")),
     )?;
     let session = runtime.acquire_session().await?;
-    let created = session
+    let timeline_id = session
         .client()
         .create_timeline(CreateTimelineInput {
             name: "reading".into(),
         })
-        .await?;
-    session.close().await?;
-
+        .await?
+        .timeline_id;
     let timelines = peer.tool("list_timelines", json!({})).await?;
     assert_eq!(
         timelines,
-        json!({"items": [{"id": created.timeline_id, "name": "reading"}]})
+        json!({"items": [{"id": timeline_id, "name": "reading"}]})
     );
-    let id = &timelines["items"][0]["id"];
-
-    let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
-    let url = format!("http://{}/feed/twir_atom", listener.local_addr()?);
-    synd_test::mock::spawn(listener);
-    peer.tool("subscribe_feed", json!({"url": url})).await?;
-
-    // Wait for the daemon to project all four entries from the Atom feed.
-    let page = loop {
-        let page = peer
-            .tool(
-                "list_timeline_entries",
-                json!({"timeline_id": id, "first": 3}),
-            )
-            .await?;
-        if page["next_cursor"].is_string() {
-            break page;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    };
-    assert_eq!(page["items"][0]["title"], "This Week in Rust 549");
-    let excerpt = page["items"][0]["excerpt"]
-        .as_str()
-        .context("Missing excerpt")?;
-    assert!(excerpt.starts_with("Hello and welcome to another issue of This Week in Rust"));
-    assert_eq!(excerpt.len(), 200); // The start of this feed summary is ASCII.
-    assert!(page["items"][0].get("summary").is_none());
-    let page = peer
-        .tool(
-            "list_timeline_entries",
-            json!({"timeline_id": id, "first": 3, "after": page["next_cursor"], "maxUnicodeWidth": 5}),
-        )
-        .await?;
-    assert_eq!(page["items"][0]["title"], "This Week in Rust 546");
-    assert_eq!(page["items"][0]["excerpt"], "Hello");
-    assert!(page["next_cursor"].is_null());
+    check_timeline_entry_pages(peer, session.client(), timeline_id).await?;
+    session.close().await?;
 
     let error = peer
         .tool(
             "list_timeline_entries",
-            json!({"timeline_id": id, "maxUnicodeWidth": 1001}),
+            json!({"timeline_id": timeline_id, "maxUnicodeWidth": 1001}),
         )
         .await
         .unwrap_err();
@@ -191,6 +168,83 @@ async fn check_timeline_tools(peer: &mut McpPeer, dir: &Path) -> anyhow::Result<
         )
         .await?;
     assert_eq!(page, json!({"items": [], "next_cursor": null}));
+    Ok(())
+}
+
+async fn check_timeline_entry_pages(
+    peer: &mut McpPeer,
+    client: &Client,
+    timeline_id: TimelineId,
+) -> anyhow::Result<()> {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+    let addr = listener.local_addr()?;
+    let twir_url = format!("http://{addr}/feed/twir_atom");
+    let standalone_url = format!("http://{addr}/feed/standalone_atom_entry");
+    synd_test::mock::spawn(listener);
+    for url in [&twir_url, &standalone_url] {
+        peer.tool("subscribe_feed", json!({"url": url})).await?;
+    }
+
+    // Four entries from This Week in Rust and one older, standalone Atom entry.
+    let page = loop {
+        let page = peer
+            .tool(
+                "list_timeline_entries",
+                json!({"timeline_id": timeline_id, "first": 4}),
+            )
+            .await?;
+        if page["next_cursor"].is_string() {
+            break page;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    };
+    let entries = client
+        .fetch_timeline_entries(
+            TimelineEntriesRequest::builder()
+                .timeline_id(timeline_id)
+                .first(5)
+                .build(),
+        )
+        .await?
+        .nodes;
+    assert_eq!(entries.len(), 5);
+
+    let newest = &page["items"][0];
+    assert_eq!(newest["id"], entries[0].entry.id.as_str());
+    assert_eq!(newest["title"], "This Week in Rust 549");
+    assert_eq!(
+        newest["feed"],
+        json!({"title": "This Week in Rust", "url": twir_url})
+    );
+    assert_eq!(
+        newest["url"],
+        "https://this-week-in-rust.org/blog/2024/05/29/this-week-in-rust-549/"
+    );
+    assert_eq!(newest["published"], "2024-05-29T04:00:00Z");
+    let excerpt = newest["excerpt"].as_str().context("Missing excerpt")?;
+    assert!(excerpt.starts_with("Hello and welcome to another issue of This Week in Rust"));
+    assert_eq!(excerpt.len(), 200); // The start of this feed summary is ASCII.
+    assert!(newest.get("summary").is_none());
+    let page = peer
+        .tool(
+            "list_timeline_entries",
+            json!({"timeline_id": timeline_id, "first": 4, "after": page["next_cursor"], "maxUnicodeWidth": 5}),
+        )
+        .await?;
+    assert_eq!(
+        page,
+        json!({
+            "items": [{
+                "id": entries[4].entry.id,
+                "title": "Updated only",
+                "excerpt": "Hello",
+                "url": null,
+                "feed": {"title": null, "url": standalone_url},
+                "published": null
+            }],
+            "next_cursor": null
+        })
+    );
     Ok(())
 }
 
