@@ -17,27 +17,24 @@ version.workspace = true
 synd-auth    = { workspace = true }
 synd-client  = { workspace = true }
 synd-feed    = { workspace = true, features = ["fake", "jsonschema"] }
-synd-support = { workspace = true, features = ["html", "humantime", "conf", "o11y"] }
+synd-support = { workspace = true, features = ["html-fetch", "humantime", "conf", "o11y"] }
 
 anyhow               = { workspace = true }
 chrono               = { workspace = true, features = ["std", "now", "serde", "clock"] }
 chrono-humanize      = "0.2.3"
 crossterm            = { version = "0.29.0", features = ["event-stream"] }
 edit                 = "0.1.5"
-encoding_rs          = "0.8.35"
 futures-util         = { workspace = true }
 graphql_client       = { workspace = true, features = ["graphql_query_derive"] }
 indexmap             = { workspace = true }
 itertools            = { workspace = true }
 limner               = "0.10.0"
-mime                 = "0.3.17"
 nom                  = { workspace = true }
 nom-language         = "0.1.0"
 nucleo               = "0.5.0"
 octocrab             = { workspace = true, features = ["timeout", "tracing"] }
 open                 = "5.4.5"
 ratatui              = { version = "0.30.2", default-features = false, features = ["crossterm", "underline-color", "layout-cache", "unstable-rendered-line-info"] }
-reqwest              = { workspace = true }
 schemars             = { workspace = true, features = ["derive"] }
 serde                = { workspace = true, features = ["derive"] }
 serde_json           = "1.0.154"

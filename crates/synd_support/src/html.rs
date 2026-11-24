@@ -9,6 +9,9 @@ use unicode_segmentation::UnicodeSegmentation as _;
 use unicode_width::UnicodeWidthStr as _;
 use url::Url;
 
+#[cfg(feature = "html-fetch")]
+pub mod fetch;
+
 /// Synchronous conversion of a feed fragment or a fetched publisher page.
 pub trait HtmlConverter: Send + Sync {
     /// Return a plain-text prefix bounded by Unicode display width. A readable input
@@ -99,6 +102,10 @@ impl Article {
 
     pub fn markdown(&self) -> &str {
         &self.markdown
+    }
+
+    pub fn into_markdown(self) -> String {
+        self.markdown
     }
 }
 

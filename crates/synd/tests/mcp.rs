@@ -54,10 +54,20 @@ async fn test_stdio() -> anyhow::Result<()> {
 
     let listed = peer.request("tools/list", json!({})).await?;
     let definitions = listed["tools"].as_array().unwrap();
-    let get_entry = definitions
-        .iter()
-        .find(|tool| tool["name"] == "get_entry")
-        .unwrap();
+    let tool = |name: &str| {
+        definitions
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap()
+    };
+    let fetch = tool("fetch_entry_body");
+    assert_eq!(fetch["inputSchema"]["required"], json!(["url"]));
+    assert_eq!(
+        fetch["outputSchema"]["properties"]["body"]["type"],
+        "string"
+    );
+    assert_eq!(fetch["annotations"]["openWorldHint"], true);
+    let get_entry = tool("get_entry");
     assert_eq!(get_entry["inputSchema"]["required"], json!(["entry_id"]));
     let entry_schema = &get_entry["outputSchema"];
     let content = &entry_schema["$defs"]["Content"]["properties"];
@@ -65,10 +75,7 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert_eq!(content["content_type"]["type"], "string");
     assert!(content["length"].is_object());
     assert!(content["src"].is_object());
-    let timeline_entries = definitions
-        .iter()
-        .find(|tool| tool["name"] == "list_timeline_entries")
-        .unwrap();
+    let timeline_entries = tool("list_timeline_entries");
     assert!(timeline_entries["inputSchema"]["properties"]["maxUnicodeWidth"].is_object());
     let definitions_by_type = &timeline_entries["outputSchema"]["$defs"];
     let fields = &definitions_by_type["TimelineEntry"]["properties"];
@@ -87,6 +94,7 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert_eq!(
         tools,
         [
+            "fetch_entry_body",
             "get_entry",
             "list_subscriptions",
             "list_timeline_entries",
@@ -95,6 +103,8 @@ async fn test_stdio() -> anyhow::Result<()> {
             "unsubscribe_feed"
         ]
     );
+
+    check_fetch_entry_body(&mut peer).await?;
 
     let first = "http://127.0.0.1:1/first.xml";
     let second = "http://127.0.0.1:1/second.xml";
@@ -133,6 +143,70 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert!(peer.stdout.next_line().await?.is_none());
     assert_eq!(active_sessions(dir).await?, 0);
     shutdown_daemon(dir).await
+}
+
+async fn check_fetch_entry_body(peer: &mut McpPeer) -> anyhow::Result<()> {
+    use axum::{Router, http::header, response::Redirect, routing::get};
+
+    const PATCH_PAGE: &[u8] = b"<html><head><title>Patch</title></head><body><article>\
+        <p>Read the <a href=\"notes\">caf\xe9 notes</a> for this change.</p>\
+        <pre><span>@@ -1,2 +1,2 @@</span>\n     context\n\
+        <span>-\told</span>\n<span>+\tnew</span></pre></article></body></html>";
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await?;
+    let origin = format!("http://{}", listener.local_addr()?);
+    let publisher = Router::new()
+        .route(
+            "/entry",
+            get(|| async { Redirect::temporary("/posts/patch") }),
+        )
+        .route(
+            "/posts/patch",
+            get(|| async {
+                (
+                    [(
+                        header::CONTENT_TYPE,
+                        "application/xhtml+xml; charset=iso-8859-1",
+                    )],
+                    PATCH_PAGE,
+                )
+            }),
+        )
+        .route("/plain", get(|| async { "plain text" }));
+    let server = tokio::spawn(async move { axum::serve(listener, publisher).await });
+
+    let result = peer
+        .tool(
+            "fetch_entry_body",
+            json!({"url": format!("{origin}/entry")}),
+        )
+        .await?;
+    assert_eq!(result["url"], format!("{origin}/posts/patch"));
+    let body = result["body"].as_str().context("Missing Markdown body")?;
+    assert!(
+        body.contains(&format!("[café notes]({origin}/posts/notes)")),
+        "{body}"
+    );
+    assert!(
+        body.contains("@@ -1,2 +1,2 @@\n     context\n-\told\n+\tnew"),
+        "{body}"
+    );
+
+    let error = peer
+        .tool(
+            "fetch_entry_body",
+            json!({"url": format!("{origin}/plain")}),
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("expected an HTML article, received text/plain"),
+        "{error}"
+    );
+    server.abort();
+    Ok(())
 }
 
 async fn check_timeline_tools(peer: &mut McpPeer, dir: &Path) -> anyhow::Result<()> {

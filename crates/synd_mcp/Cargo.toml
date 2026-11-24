@@ -17,15 +17,16 @@ synd-client   = { workspace = true, features = ["jsonschema"] }
 synd-feed     = { workspace = true, features = ["jsonschema"] }
 synd-protocol = { workspace = true }
 synd-runtime  = { workspace = true }
+synd-support  = { workspace = true, features = ["html-fetch"] }
 
 anyhow    = { workspace = true }
 rmcp      = { workspace = true }
-schemars  = { workspace = true, features = ["chrono04", "uuid1"] }
+schemars  = { workspace = true, features = ["chrono04", "url2", "uuid1"] }
 serde     = { workspace = true }
 thiserror = { workspace = true }
 tokio     = { workspace = true, features = ["sync"] }
 tracing   = { workspace = true }
-url       = { workspace = true }
+url       = { workspace = true, features = ["serde"] }
 
 [lints]
 workspace = true

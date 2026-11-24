@@ -9,6 +9,7 @@ use rmcp::{
     tool_handler,
     transport::stdio,
 };
+use synd_support::html::{DefaultHtmlConverter, fetch::ArticleFetcher};
 
 use crate::session::McpSession;
 
@@ -17,9 +18,10 @@ mod page;
 mod subscription;
 mod timeline;
 
-/// Routes MCP tool calls through the active synd session.
+/// Serves synd data and fetches entry pages for MCP clients.
 pub(super) struct McpServer {
     session: Arc<McpSession>,
+    article_fetcher: ArticleFetcher,
     tool_router: ToolRouter<Self>,
 }
 
@@ -27,6 +29,7 @@ impl McpServer {
     pub(super) fn new(session: Arc<McpSession>) -> Self {
         Self {
             session,
+            article_fetcher: ArticleFetcher::new(Arc::new(DefaultHtmlConverter)),
             tool_router: Self::timeline_tools() + Self::entry_tools() + Self::subscription_tools(),
         }
     }
