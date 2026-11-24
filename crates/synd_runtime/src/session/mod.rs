@@ -227,10 +227,18 @@ impl Requirements {
     pub fn required_capabilities(&self) -> &CapabilitySet {
         &self.required_capabilities
     }
+
+    pub(crate) fn require(&mut self, capability: &str) {
+        self.required_capabilities.insert(capability);
+    }
 }
 
 impl Default for Requirements {
     fn default() -> Self {
-        Self::new(capability::local_api_capabilities())
+        Self::new(CapabilitySet::new([
+            capability::NAMED_TIMELINES,
+            capability::SUBSCRIPTION_WRITE,
+            capability::FEED_REFRESH,
+        ]))
     }
 }

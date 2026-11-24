@@ -54,6 +54,17 @@ async fn test_stdio() -> anyhow::Result<()> {
 
     let listed = peer.request("tools/list", json!({})).await?;
     let definitions = listed["tools"].as_array().unwrap();
+    let get_entry = definitions
+        .iter()
+        .find(|tool| tool["name"] == "get_entry")
+        .unwrap();
+    assert_eq!(get_entry["inputSchema"]["required"], json!(["entry_id"]));
+    let entry_schema = &get_entry["outputSchema"];
+    let content = &entry_schema["$defs"]["Content"]["properties"];
+    assert_eq!(content["body"]["type"], json!(["string", "null"]));
+    assert_eq!(content["content_type"]["type"], "string");
+    assert!(content["length"].is_object());
+    assert!(content["src"].is_object());
     let timeline_entries = definitions
         .iter()
         .find(|tool| tool["name"] == "list_timeline_entries")
@@ -76,6 +87,7 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert_eq!(
         tools,
         [
+            "get_entry",
             "list_subscriptions",
             "list_timeline_entries",
             "list_timelines",
@@ -225,6 +237,8 @@ async fn check_timeline_entry_pages(
     assert!(excerpt.starts_with("Hello and welcome to another issue of This Week in Rust"));
     assert_eq!(excerpt.len(), 200); // The start of this feed summary is ASCII.
     assert!(newest.get("summary").is_none());
+    assert!(newest.get("content").is_none());
+    check_inline_entry(peer, newest).await?;
     let page = peer
         .tool(
             "list_timeline_entries",
@@ -244,6 +258,77 @@ async fn check_timeline_entry_pages(
             }],
             "next_cursor": null
         })
+    );
+    check_summary_only_entry(peer, timeline_id, &format!("http://{addr}/feed/o11y_news")).await
+}
+
+async fn check_inline_entry(peer: &mut McpPeer, listed: &Value) -> anyhow::Result<()> {
+    let entry = peer
+        .tool("get_entry", json!({"entry_id": listed["id"]}))
+        .await?;
+    for field in ["id", "url", "feed", "published"] {
+        assert_eq!(entry[field], listed[field], "{field}");
+    }
+    assert_eq!(entry["title"]["content"], listed["title"]);
+    assert_eq!(entry["updated"], listed["published"]);
+    assert_eq!(entry["authors"][0]["name"], "TWiR Contributors");
+    assert_eq!(entry["links"][0]["href"], listed["url"]);
+    assert_eq!(
+        entry["labels"]["source.categories"][0]["term"],
+        "This Week in Rust"
+    );
+    assert_eq!(entry["content"]["content_type"], "text/html");
+    let body = entry["content"]["body"]
+        .as_str()
+        .context("Missing inline content")?;
+    let summary = entry["summary"]["content"]
+        .as_str()
+        .context("Missing feed summary")?;
+    assert!(body.contains("1d4aysp/this_week_in_rust_549/"));
+    assert!(body.len() > summary.len());
+    assert!(summary.starts_with("<p>Hello and welcome"));
+    Ok(())
+}
+
+async fn check_summary_only_entry(
+    peer: &mut McpPeer,
+    timeline_id: TimelineId,
+    url: &str,
+) -> anyhow::Result<()> {
+    peer.tool("subscribe_feed", json!({"url": url})).await?;
+    let id = loop {
+        let page = peer
+            .tool(
+                "list_timeline_entries",
+                json!({"timeline_id": timeline_id, "first": 1}),
+            )
+            .await?;
+        let newest = &page["items"][0];
+        if newest["feed"]["url"] == url {
+            break newest["id"].clone();
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    };
+    let entry = peer.tool("get_entry", json!({"entry_id": id})).await?;
+    let summary = entry["summary"]["content"]
+        .as_str()
+        .context("Missing feed summary")?;
+    assert!(summary.contains("Booking.com"));
+    assert_eq!(entry.get("content"), Some(&Value::Null));
+
+    peer.tool("unsubscribe_feed", json!({"url": url})).await?;
+    let missing = peer
+        .tool("get_entry", json!({"entry_id": id}))
+        .await
+        .unwrap_err();
+    assert!(missing.to_string().contains("Entry not found"), "{missing}");
+    let malformed = peer
+        .tool("get_entry", json!({"entry_id": "invalid"}))
+        .await
+        .unwrap_err();
+    assert!(
+        malformed.to_string().contains("entry id must start with"),
+        "{malformed}"
     );
     Ok(())
 }

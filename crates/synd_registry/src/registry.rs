@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use synd_feed::feed::service::FeedService;
 use synd_feed::types::{Feed, FeedUrl};
+use synd_feed::{entry::EntryId, feed::service::FeedService};
 use synd_support::time::{Clock, SystemClock};
 use tokio_util::sync::CancellationToken;
 
@@ -31,8 +31,8 @@ use crate::{
     feed::FeedProj,
     handler::CommandHandler,
     query::{
-        Subscriptions, SubscriptionsQuery, Timeline, TimelineChangesPage, TimelineChangesQuery,
-        TimelineEntriesPage, TimelineEntriesQuery, TimelinesQuery,
+        SubscribedEntry, Subscriptions, SubscriptionsQuery, Timeline, TimelineChangesPage,
+        TimelineChangesQuery, TimelineEntriesPage, TimelineEntriesQuery, TimelinesQuery,
     },
     subscription::{SubHandler, SubscriberId},
     timeline::{TimelineHandler, TimelineProj},
@@ -210,6 +210,17 @@ where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: FeedDb,
 {
+    pub async fn get_entry(
+        &self,
+        subscriber_id: &SubscriberId,
+        entry_id: &EntryId,
+    ) -> Result<Option<SubscribedEntry>, FeedRegistryError> {
+        let mut tx = self.db.begin().await?;
+        let entry = tx.get_entry(subscriber_id, entry_id).await?;
+        tx.commit().await?;
+        Ok(entry)
+    }
+
     pub async fn load_feeds(
         &self,
         feed_urls: &[FeedUrl],

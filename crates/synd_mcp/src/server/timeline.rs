@@ -2,8 +2,8 @@ use rmcp::{Json, handler::server::wrapper::Parameters, tool, tool_router};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_client::{
-    FeedUrl, Rfc3339Time,
-    payload::{self, TimelineEntriesRequest, TimelineEntryConnection, TimelineId},
+    Rfc3339Time,
+    payload::{self, Feed, TimelineEntriesRequest, TimelineEntryConnection, TimelineId},
 };
 use synd_feed::entry::EntryId;
 
@@ -25,7 +25,7 @@ impl McpServer {
     }
 
     #[tool(
-        description = "List timeline entries from newest to oldest with their IDs, titles, plain-text excerpts, article URLs, feeds, and publication times.",
+        description = "List timeline entries from newest to oldest with their titles, plain-text excerpts, article URLs, feeds, and publication times. Pass the selected item's id as entry_id to get_entry.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_timeline_entries(
@@ -99,7 +99,7 @@ impl TryFrom<TimelineEntriesParams> for TimelineEntriesRequest {
 /// An article in the timeline and the feed it came from.
 #[derive(Serialize, JsonSchema)]
 struct TimelineEntry {
-    /// Opaque synd entry ID.
+    /// Pass this entry ID as `entry_id` to `get_entry`.
     #[schemars(with = "String")]
     id: EntryId,
     title: Option<String>,
@@ -121,23 +121,6 @@ impl From<payload::TimelineEntry> for TimelineEntry {
             url: entry.website_url,
             feed: entry.feed.into(),
             published: entry.published,
-        }
-    }
-}
-
-/// Source feed of a timeline entry.
-#[derive(Serialize, JsonSchema)]
-struct Feed {
-    title: Option<String>,
-    /// URL used to subscribe to the feed.
-    url: FeedUrl,
-}
-
-impl From<payload::FeedMeta> for Feed {
-    fn from(feed: payload::FeedMeta) -> Self {
-        Self {
-            title: feed.title,
-            url: feed.url,
         }
     }
 }

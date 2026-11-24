@@ -1,4 +1,7 @@
-use synd_feed::types::{Link, Text};
+use synd_feed::{
+    entry::EntryId,
+    types::{Link, Text},
+};
 
 use crate::sqlite::test_support::*;
 
@@ -188,7 +191,9 @@ async fn feed_projection_stores_a_complete_current_feed() -> anyhow::Result<()> 
 async fn feed_projection_replaces_membership_without_deleting_catalog_history() -> anyhow::Result<()>
 {
     let db = migrated_db().await?;
-    let feed_url = feed_url("feed-membership");
+    let subscription = subscription("feed-membership");
+    let feed_url = subscription.feed_url.clone();
+    store_subscription_in_db(&db, subscription.clone()).await?;
     let first = record_fetched_crawl(
         &db,
         &feed_url,
@@ -212,6 +217,23 @@ async fn feed_projection_replaces_membership_without_deleting_catalog_history() 
     let catalog_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM entry")
         .fetch_one(&mut *tx.tx)
         .await?;
+    let old_id: EntryId =
+        sqlx::query_scalar("SELECT entry_id FROM entry EXCEPT SELECT entry_id FROM feed_entry")
+            .fetch_one(&mut *tx.tx)
+            .await?;
+    let old_entry = tx
+        .get_entry(&subscription.subscriber_id, &old_id)
+        .await?
+        .unwrap();
+    assert_eq!(
+        old_entry.entry.title().map(Text::content),
+        Some("old entry")
+    );
+    assert!(
+        tx.get_entry(&SubscriberId::new("other"), &old_id)
+            .await?
+            .is_none()
+    );
     tx.commit().await?;
     let feed = feeds.remove(&feed_url).unwrap();
     let titles = feed

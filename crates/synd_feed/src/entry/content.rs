@@ -10,6 +10,7 @@ use crate::types::Link;
     reason = "content_type is the feed domain term shared with Text"
 )]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub struct Content {
     body: Option<String>,

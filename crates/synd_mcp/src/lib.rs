@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Context as _;
+use synd_protocol::capability::ENTRY_READ;
 use synd_runtime::Runtime;
 
 use self::{server::McpServer, session::McpSession};
@@ -11,6 +12,7 @@ mod session;
 
 /// Serve tools over stdio until the MCP client closes the connection.
 pub async fn serve_stdio(runtime: Runtime) -> anyhow::Result<()> {
+    let runtime = runtime.with_required_capability(ENTRY_READ);
     let session = Arc::new(
         McpSession::acquire(runtime)
             .await

@@ -8,6 +8,7 @@ use tracing::{Span, debug, warn};
 use super::Client;
 use crate::SyndApiError;
 
+mod entry;
 mod feed;
 mod timeline;
 

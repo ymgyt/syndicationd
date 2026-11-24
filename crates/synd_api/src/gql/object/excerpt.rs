@@ -113,6 +113,8 @@ mod tests {
             .execute(
                 "{
             excerpt { source text }
+            feedSummary { content }
+            content { body contentType }
             short: excerpt(maxUnicodeWidth: 5) { text }
             max: excerpt(maxUnicodeWidth: 1000) { text }
         }",
@@ -123,6 +125,8 @@ mod tests {
             response.data,
             value!({
                 "excerpt": { "source": "CONTENT", "text": format!("Aあ&👩‍💻{}", "+".repeat(194)) },
+                "feedSummary": null,
+                "content": { "body": patch, "contentType": "text/html; charset=utf-8" },
                 "short": { "text": "Aあ&" },
                 "max": { "text": format!("Aあ&👩‍💻{}", "+".repeat(994)) },
             })

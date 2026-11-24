@@ -4,7 +4,10 @@ use async_graphql::{
     Context, Enum, ID, Object, Result, SimpleObject, Union,
     connection::{Connection, Edge, EmptyFields},
 };
-use synd_feed::types::{Annotated, Category, Feed, FeedUrl, Requirement, TimelineName};
+use synd_feed::{
+    entry::EntryId,
+    types::{Annotated, Category, Feed, FeedUrl, Requirement, TimelineName},
+};
 use synd_registry::{
     Subscription as RegistrySubscription, TimelineId,
     crawl::policy::{CrawlPolicy as RegistryCrawlPolicy, PollingPolicy as RegistryPollingPolicy},
@@ -180,6 +183,15 @@ struct TimelineSummary {
 
 #[Object]
 impl FeedRegistry {
+    /// Look up one stored entry by its synd ID.
+    async fn entry(&self, cx: &Context<'_>, id: ID) -> Result<Option<Entry>> {
+        let entry_id = EntryId::parse(id.0)?;
+        Ok(registry(cx)
+            .get_entry(&subscriber_id(cx), &entry_id)
+            .await?
+            .map(Entry::from))
+    }
+
     async fn subscriptions(
         &self,
         cx: &Context<'_>,

@@ -11,7 +11,13 @@ use super::{
     entry,
     error::{DecodeResultExt, IntoDbResult, SqliteError, SqliteResult},
 };
-use crate::{RegistryDbResult, db::FeedDb, entry::Entries, feed::FeedUpdate};
+use crate::{
+    RegistryDbResult,
+    db::FeedDb,
+    entry::{Entries, SubscribedEntry},
+    feed::FeedUpdate,
+    subscription::SubscriberId,
+};
 
 /// Registers the URL in the feed ledger and returns its pk.
 pub(super) async fn upsert_pk(
@@ -283,6 +289,14 @@ impl TryFrom<FeedEntryRow> for StoredFeedEntry {
 }
 
 impl FeedDb for super::SqliteRegistryTx<'_> {
+    async fn get_entry(
+        &mut self,
+        subscriber_id: &SubscriberId,
+        entry_id: &EntryId,
+    ) -> RegistryDbResult<Option<SubscribedEntry>> {
+        entry::get(&mut self.tx, subscriber_id, entry_id).await.db()
+    }
+
     async fn load_entries(&mut self, entry_ids: &[EntryId]) -> RegistryDbResult<Entries> {
         entry::load(&mut self.tx, entry_ids).await.db()
     }

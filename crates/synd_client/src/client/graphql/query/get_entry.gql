@@ -1,0 +1,37 @@
+query GetEntry($id: ID!) {
+  feedRegistry {
+    entry(id: $id) {
+      id
+      title: titleText { ...EntryText }
+      url: websiteUrl
+      feed { title url }
+      published
+      updated
+      authors { name uri email }
+      links { ...EntryLink }
+      labels
+      summary: feedSummary { ...EntryText }
+      content {
+        body
+        content_type: contentType
+        length
+        src { ...EntryLink }
+      }
+    }
+  }
+}
+
+fragment EntryText on Text {
+  content
+  content_type: contentType
+  src
+}
+
+fragment EntryLink on Link {
+  href
+  rel
+  media_type: mediaType
+  href_lang: hrefLang
+  title
+  length
+}

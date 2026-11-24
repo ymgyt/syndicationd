@@ -1,14 +1,15 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
 use async_graphql::{
-    ID, Object, SimpleObject,
+    ID, Json, Object, SimpleObject,
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
+use serde_json::Value;
 use synd_feed::{
-    entry::Entry as SyndFeedEntry,
+    entry::{self, Entry as SyndFeedEntry},
     types::{self, Annotated, Category, FeedType, FeedUrl, Requirement},
 };
-use synd_registry::query::TimelineEntry;
+use synd_registry::query::{SubscribedEntry, TimelineEntry};
 use synd_support::html::HtmlConverter;
 
 use crate::gql::scalar;
@@ -25,6 +26,7 @@ pub(crate) struct Link {
     pub media_type: Option<String>,
     pub href_lang: Option<String>,
     pub title: Option<String>,
+    pub length: Option<u64>,
 }
 
 impl From<&types::Link> for Link {
@@ -35,7 +37,65 @@ impl From<&types::Link> for Link {
             media_type: value.media_type().map(ToOwned::to_owned),
             href_lang: value.href_lang().map(ToOwned::to_owned),
             title: value.title().map(ToOwned::to_owned),
+            length: value.length(),
         }
+    }
+}
+
+#[derive(SimpleObject)]
+struct Person<'a> {
+    name: Option<&'a str>,
+    uri: Option<&'a str>,
+    email: Option<&'a str>,
+}
+
+impl<'a> From<&'a types::Person> for Person<'a> {
+    fn from(person: &'a types::Person) -> Self {
+        Self {
+            name: person.name(),
+            uri: person.uri(),
+            email: person.email(),
+        }
+    }
+}
+
+/// Text and metadata supplied by the feed for a title or summary.
+struct Text<'a>(&'a types::Text);
+
+#[Object]
+impl Text<'_> {
+    async fn content(&self) -> &str {
+        self.0.content()
+    }
+
+    async fn content_type(&self) -> &str {
+        self.0.content_type()
+    }
+
+    async fn src(&self) -> Option<&str> {
+        self.0.src()
+    }
+}
+
+/// Inline or externally referenced entry content declared by the feed.
+struct Content<'a>(&'a entry::Content);
+
+#[Object]
+impl Content<'_> {
+    async fn body(&self) -> Option<&str> {
+        self.0.body()
+    }
+
+    async fn content_type(&self) -> &str {
+        self.0.content_type()
+    }
+
+    async fn length(&self) -> Option<u64> {
+        self.0.length()
+    }
+
+    async fn src(&self) -> Option<Link> {
+        self.0.src().map(Link::from)
     }
 }
 
@@ -60,6 +120,32 @@ impl Entry {
     /// Entry title
     async fn title(&self) -> Option<&str> {
         self.entry.title().map(types::Text::content)
+    }
+
+    /// Entry title with its declared media type and source.
+    async fn title_text(&self) -> Option<Text<'_>> {
+        self.entry.title().map(Text)
+    }
+
+    async fn authors(&self) -> Vec<Person<'_>> {
+        self.entry.authors().iter().map(Person::from).collect()
+    }
+
+    async fn links(&self) -> Vec<Link> {
+        self.entry.links().iter().map(Link::from).collect()
+    }
+
+    async fn labels(&self) -> Json<&BTreeMap<String, Value>> {
+        Json(self.entry.labels())
+    }
+
+    /// Summary supplied by the feed.
+    async fn feed_summary(&self) -> Option<Text<'_>> {
+        self.entry.summary().map(Text)
+    }
+
+    async fn content(&self) -> Option<Content<'_>> {
+        self.entry.content().map(Content)
     }
 
     /// Time at which the entry was last modified
@@ -114,6 +200,12 @@ impl Entry {
 
 impl From<TimelineEntry> for Entry {
     fn from(node: TimelineEntry) -> Self {
+        Self::new(node.feed_meta, node.entry)
+    }
+}
+
+impl From<SubscribedEntry> for Entry {
+    fn from(node: SubscribedEntry) -> Self {
         Self::new(node.feed_meta, node.entry)
     }
 }
@@ -320,5 +412,57 @@ impl FeedMeta<'_> {
 impl<'a> From<Cow<'a, Annotated<types::FeedMeta>>> for FeedMeta<'a> {
     fn from(value: Cow<'a, Annotated<types::FeedMeta>>) -> Self {
         Self(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use async_graphql::{EmptyMutation, EmptySubscription, Schema, value};
+    use synd_feed::{
+        feed::service::FeedService,
+        types::{Annotated, FeedUrl},
+    };
+
+    use super::Entry;
+
+    #[tokio::test]
+    async fn external_content_keeps_its_reference_and_has_no_inline_body() {
+        let xml = r#"<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+                <id>urn:entry:external</id><title>Example</title><summary>Feed summary</summary>
+                <content type="text/html" src="https://example.com/body"/>
+            </entry></feed>"#;
+        let url = FeedUrl::parse("https://example.com/feed").unwrap();
+        let feed = FeedService::parse_feed(url, xml.as_bytes()).unwrap();
+        let entry = Entry::new(
+            Annotated::new(feed.meta().clone()),
+            feed.entries().next().unwrap().clone(),
+        );
+        let response = Schema::build(entry, EmptyMutation, EmptySubscription)
+            .finish()
+            .execute(
+                "{
+                    title
+                    titleText { content contentType src }
+                    feedSummary { content contentType src }
+                    content { body contentType length src { href } }
+                }",
+            )
+            .await
+            .into_result()
+            .unwrap();
+        assert_eq!(
+            response.data,
+            value!({
+                "title": "Example",
+                "titleText": { "content": "Example", "contentType": "text/plain", "src": null },
+                "feedSummary": { "content": "Feed summary", "contentType": "text/plain", "src": null },
+                "content": {
+                    "body": null,
+                    "contentType": "text/html",
+                    "length": null,
+                    "src": { "href": "https://example.com/body" }
+                }
+            })
+        );
     }
 }

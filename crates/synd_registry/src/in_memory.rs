@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use chrono::{DateTime, Utc};
 use synd_feed::{
     entry::{Entry, EntryId, SyndEntry},
-    types::{Feed, FeedMeta, FeedUrl},
+    types::{Annotated, Feed, FeedMeta, FeedUrl},
 };
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -23,7 +23,7 @@ use crate::{
         BlobDb, CommitTx, CrawlStateDb, CrawlTargetDb, FeedDb, FeedRegistryDb,
         InsertTimelineOutcome, SubscriptionDb, TimelineDb,
     },
-    entry::Entries,
+    entry::{Entries, SubscribedEntry},
     error::{RegistryDbError, RegistryDbResult},
     event::{
         Event, EventCursor, EventCursorPos, EventInterests, EventJournal, EventJournalAppend,
@@ -58,24 +58,40 @@ struct InMemoryState {
 #[derive(Debug, Clone, Default)]
 struct InMemoryFeeds {
     meta: HashMap<FeedUrl, FeedMeta>,
-    entries: HashMap<EntryId, SyndEntry>,
+    entries: HashMap<EntryId, StoredEntry>,
     membership: HashMap<FeedUrl, Vec<EntryId>>,
+}
+
+#[derive(Debug, Clone)]
+struct StoredEntry {
+    feed_url: FeedUrl,
+    entry: SyndEntry,
 }
 
 impl InMemoryFeeds {
     fn load_entries(&self, entry_ids: &[EntryId]) -> Entries {
         entry_ids
             .iter()
-            .filter_map(|entry_id| self.entries.get(entry_id).cloned())
+            .filter_map(|entry_id| {
+                self.entries
+                    .get(entry_id)
+                    .map(|stored| stored.entry.clone())
+            })
             .collect()
     }
 
     fn apply(&mut self, update: &FeedUpdate) {
-        for change in update.entry_changes() {
-            let entry = change.entry().clone();
-            self.entries.insert(entry.entry().id().clone(), entry);
-        }
         let feed_url = update.source().feed_url.clone();
+        for change in update.entry_changes() {
+            let entry = change.entry();
+            self.entries.insert(
+                entry.entry().id().clone(),
+                StoredEntry {
+                    feed_url: feed_url.clone(),
+                    entry: entry.clone(),
+                },
+            );
+        }
         self.meta.insert(feed_url.clone(), update.meta().clone());
         let membership = self.membership.entry(feed_url).or_default();
         membership.retain(|id| update.preserve_membership().contains(id));
@@ -111,14 +127,17 @@ struct CurrentFeedEntries(Vec<SyndEntry>);
 impl CurrentFeedEntries {
     fn load(
         membership: &[EntryId],
-        catalog: &HashMap<EntryId, SyndEntry>,
+        catalog: &HashMap<EntryId, StoredEntry>,
     ) -> RegistryDbResult<Self> {
         let mut entries = membership
             .iter()
             .map(|entry_id| {
-                catalog.get(entry_id).cloned().ok_or_else(|| {
-                    RegistryDbError::invariant(format!("feed entry not found: {entry_id}"))
-                })
+                catalog
+                    .get(entry_id)
+                    .map(|stored| stored.entry.clone())
+                    .ok_or_else(|| {
+                        RegistryDbError::invariant(format!("feed entry not found: {entry_id}"))
+                    })
             })
             .collect::<RegistryDbResult<Vec<_>>>()?;
         entries.sort_by(|left, right| {
@@ -516,6 +535,32 @@ impl CrawlStateDb for InMemoryRegistryTx<'_> {
 }
 
 impl FeedDb for InMemoryRegistryTx<'_> {
+    async fn get_entry(
+        &mut self,
+        subscriber_id: &SubscriberId,
+        entry_id: &EntryId,
+    ) -> RegistryDbResult<Option<SubscribedEntry>> {
+        let feeds = &self.state.feeds;
+        let Some(stored) = feeds.entries.get(entry_id) else {
+            return Ok(None);
+        };
+        let key = SubscriptionKeyParts::new(subscriber_id, &stored.feed_url);
+        let Some(subscription) = self.state.subscriptions.get(&key) else {
+            return Ok(None);
+        };
+        let meta = feeds.meta.get(&stored.feed_url).ok_or_else(|| {
+            RegistryDbError::invariant(format!("feed metadata not found: {}", stored.feed_url))
+        })?;
+        Ok(Some(SubscribedEntry {
+            entry: stored.entry.entry().clone(),
+            feed_meta: Annotated {
+                feed: meta.clone(),
+                requirement: subscription.requirement,
+                category: subscription.category.clone(),
+            },
+        }))
+    }
+
     async fn load_entries(&mut self, entry_ids: &[EntryId]) -> RegistryDbResult<Entries> {
         Ok(self.state.feeds.load_entries(entry_ids))
     }

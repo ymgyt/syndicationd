@@ -13,9 +13,10 @@ readme      = "README.md"
 version.workspace = true
 
 [dependencies]
-synd-client  = { workspace = true }
-synd-feed    = { workspace = true, features = ["jsonschema"] }
-synd-runtime = { workspace = true }
+synd-client   = { workspace = true, features = ["jsonschema"] }
+synd-feed     = { workspace = true, features = ["jsonschema"] }
+synd-protocol = { workspace = true }
+synd-runtime  = { workspace = true }
 
 anyhow    = { workspace = true }
 rmcp      = { workspace = true }

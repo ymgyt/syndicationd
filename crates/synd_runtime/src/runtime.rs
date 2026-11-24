@@ -25,6 +25,13 @@ impl Runtime {
         &self.config
     }
 
+    /// Require the daemon to support an additional operation when opening a session.
+    #[must_use]
+    pub fn with_required_capability(mut self, capability: &str) -> Self {
+        self.config.requirements.require(capability);
+        self
+    }
+
     pub(crate) fn placement(&self) -> &PlacementSpec {
         &self.placement
     }
@@ -202,10 +209,30 @@ impl Default for ApiClientConfig {
 mod tests {
     use std::time::Duration;
 
+    use synd_protocol::capability::{ENTRY_READ, local_api_capabilities};
+
     use crate::{
         DaemonExecutable, DaemonLaunchConfig, DaemonLaunchLog, Runtime, RuntimeConfig,
         RuntimeDatabase,
     };
+
+    #[test]
+    fn entry_read_is_an_additional_session_requirement() -> crate::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let runtime = Runtime::try_new(RuntimeConfig::new(RuntimeDatabase::sqlite(
+            dir.path().join("synd.db"),
+        )))?;
+        let available = local_api_capabilities();
+        let baseline = runtime.config().requirements().required_capabilities();
+        assert_eq!(available.missing_from(baseline).names(), [ENTRY_READ]);
+
+        let runtime = runtime.with_required_capability(ENTRY_READ);
+        assert_eq!(
+            runtime.config().requirements().required_capabilities(),
+            &available
+        );
+        Ok(())
+    }
 
     mod daemon_launch {
         use super::*;

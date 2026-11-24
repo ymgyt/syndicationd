@@ -23,6 +23,7 @@ futures-util      = { workspace = true, features = ["sink"] }
 graphql_client    = { workspace = true }
 reqwest           = { workspace = true }
 rustls            = { workspace = true }
+schemars          = { workspace = true, optional = true, features = ["derive", "chrono04"] }
 serde             = { workspace = true, features = ["derive"] }
 serde_json        = { workspace = true }
 thiserror         = { workspace = true }
@@ -34,7 +35,8 @@ uuid              = { workspace = true, features = ["serde"] }
 webpki-roots      = { workspace = true }
 
 [features]
-fake = ["dep:fake", "synd-feed/fake"]
+fake       = ["dep:fake", "synd-feed/fake"]
+jsonschema = ["dep:schemars", "synd-feed/jsonschema"]
 
 [dev-dependencies]
 fake = { workspace = true }

@@ -13,7 +13,7 @@ use crate::{
         state::{CrawlState, UpsertCrawlStateCommand},
         target_list::{CrawlTarget, FeedSubscriptions},
     },
-    entry::Entries,
+    entry::{Entries, SubscribedEntry},
     error::{RegistryDbError, RegistryDbResult},
     event::{EventJournal, EventJournalAppend, TimelineCreatedEvent},
     feed::FeedUpdate,
@@ -137,6 +137,13 @@ pub trait BlobDb {
 
 /// Transactional operations over parsed current feed state.
 pub trait FeedDb {
+    /// Reads a catalog entry belonging to one of the subscriber's feeds.
+    fn get_entry(
+        &mut self,
+        subscriber_id: &SubscriberId,
+        entry_id: &EntryId,
+    ) -> impl Future<Output = RegistryDbResult<Option<SubscribedEntry>>> + Send;
+
     fn load_entries(
         &mut self,
         entry_ids: &[EntryId],

@@ -27,6 +27,7 @@ pub use timeline_name::TimelineName;
 
 /// Text content with its media type and optional source URI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub struct Text {
     content: String,
@@ -63,6 +64,7 @@ impl From<feedrs::Text> for Text {
 
 /// Person credited by a feed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub struct Person {
     #[serde(default, deserialize_with = "deserialize_person_name")]
@@ -109,6 +111,7 @@ where
 
 /// Link relation declared by a feed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
+#[cfg_attr(feature = "jsonschema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub struct Link {
     href: String,

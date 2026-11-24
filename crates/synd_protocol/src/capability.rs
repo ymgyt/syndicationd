@@ -6,9 +6,15 @@ use serde::{Deserialize, Serialize};
 pub const NAMED_TIMELINES: &str = "timeline.named.v2";
 pub const SUBSCRIPTION_WRITE: &str = "subscription.write";
 pub const FEED_REFRESH: &str = "feed.refresh";
+pub const ENTRY_READ: &str = "entry.read";
 
 pub fn local_api_capabilities() -> CapabilitySet {
-    CapabilitySet::new([NAMED_TIMELINES, SUBSCRIPTION_WRITE, FEED_REFRESH])
+    CapabilitySet::new([
+        NAMED_TIMELINES,
+        SUBSCRIPTION_WRITE,
+        FEED_REFRESH,
+        ENTRY_READ,
+    ])
 }
 
 /// Capability names negotiated across the client/server protocol.
@@ -26,6 +32,12 @@ impl CapabilitySet {
 
     pub fn names(&self) -> &[String] {
         &self.names
+    }
+
+    pub fn insert(&mut self, name: &str) {
+        if !self.names.iter().any(|existing| existing == name) {
+            self.names.push(name.to_owned());
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -58,10 +70,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn summary_and_excerpt_clients_require_different_daemons() {
+    fn negotiates_named_timeline_revisions_and_single_entry_reads() {
         let legacy = CapabilitySet::new(["timeline.named", SUBSCRIPTION_WRITE, FEED_REFRESH]);
+        let excerpts = CapabilitySet::new([NAMED_TIMELINES, SUBSCRIPTION_WRITE, FEED_REFRESH]);
         let current = local_api_capabilities();
-        assert_eq!(current.missing_from(&legacy).names(), [NAMED_TIMELINES]);
-        assert_eq!(legacy.missing_from(&current).names(), ["timeline.named"]);
+        assert_eq!(excerpts.missing_from(&legacy).names(), [NAMED_TIMELINES]);
+        assert_eq!(legacy.missing_from(&excerpts).names(), ["timeline.named"]);
+        assert_eq!(current.missing_from(&excerpts).names(), [ENTRY_READ]);
+        assert!(excerpts.missing_from(&current).is_empty());
     }
 }

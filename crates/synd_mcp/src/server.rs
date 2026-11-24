@@ -12,6 +12,7 @@ use rmcp::{
 
 use crate::session::McpSession;
 
+mod entry;
 mod page;
 mod subscription;
 mod timeline;
@@ -26,7 +27,7 @@ impl McpServer {
     pub(super) fn new(session: Arc<McpSession>) -> Self {
         Self {
             session,
-            tool_router: Self::timeline_tools() + Self::subscription_tools(),
+            tool_router: Self::timeline_tools() + Self::entry_tools() + Self::subscription_tools(),
         }
     }
 
