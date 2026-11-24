@@ -149,7 +149,7 @@ async fn check_fetch_entry_body(peer: &mut McpPeer) -> anyhow::Result<()> {
     use axum::{Router, http::header, response::Redirect, routing::get};
 
     const PATCH_PAGE: &[u8] = b"<html><head><title>Patch</title></head><body><article>\
-        <p>Read the <a href=\"notes\">caf\xe9 notes</a> for this change.</p>\
+        <p>Read the <a href=\"notes\">notes by Ren\xe9</a> for this change.</p>\
         <pre><span>@@ -1,2 +1,2 @@</span>\n     context\n\
         <span>-\told</span>\n<span>+\tnew</span></pre></article></body></html>";
 
@@ -184,7 +184,7 @@ async fn check_fetch_entry_body(peer: &mut McpPeer) -> anyhow::Result<()> {
     assert_eq!(result["url"], format!("{origin}/posts/patch"));
     let body = result["body"].as_str().context("Missing Markdown body")?;
     assert!(
-        body.contains(&format!("[café notes]({origin}/posts/notes)")),
+        body.contains(&format!("[notes by René]({origin}/posts/notes)")),
         "{body}"
     );
     assert!(
