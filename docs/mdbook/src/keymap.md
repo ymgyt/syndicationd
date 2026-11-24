@@ -1,171 +1,121 @@
 # Keymap
 
-`synd` key bindings are grouped by keymap layer. A layer is an active UI
-context, such as `entries`, `feeds`, or `filter`.
+A key binding assigns a command to a key or a sequence of keys. A **layer**
+is a group of bindings. In the Entries tab, `j` moves to the next item
+using the `list` layer, and `Space` opens the reader using the `entries` layer.
+
+| Screen or prompt | Active layers, highest priority first |
+| --- | --- |
+| Entries tab | `filter` → `entries` → `list` → `tabs` → `global` → `app` |
+| Feeds tab | `filter` → `feeds` → `list` → `tabs` → `global` → `app` |
+| Typing a search | `search-prompt` just before `filter` in the current tab |
+| Choosing categories | `category-filter` just before `filter` in the current tab |
+| Article reader | `reader` → `global` → `app` |
+| Unsubscribe confirmation | `unsubscribe-popup` → `filter` → `tabs` → `global` → `app` |
+| Login screen | `login` → `global` → `app` |
+
+When two layers handle the same key, the one on the left takes priority.
+In the Entries list, `q` quits (`global`). In the article reader, `q` closes
+the article (`reader`).
 
 ## Custom Key Bindings
 
-Key bindings can be customized in the configuration file under
-`[keys.<layer>]`.
+To read the selected article with `o` in the Entries tab, add this to your
+[configuration file](./configuration.md).
 
 ```toml
 [keys.entries]
 keymap = [
-  { on = "j", command = "entries.next", desc = "Next entry" },
-  { on = ["g", "g"], command = "entries.first", desc = "Go to first entry" },
-  { on = "up", command = "no_op" },
+  { on = "o", command = "entries.read" },
 ]
 ```
 
-`on` is either a single key string or an array of key strings for multi-key
-sequences. The example above binds `g` followed by `g`.
+Restart `synd` and select an entry. Both `o` and `Space` now open the reader.
+Reusing a key in the same layer replaces its default binding. To disable
+`Space`, add `{ on = "space", command = "no_op" }` to the same array.
 
-User keymaps are merged onto the default keymaps:
-
-* a binding with the same `on` in the same layer replaces the default binding
-* a binding with a new `on` is added to that layer
-* `command = "no_op"` disables that key sequence in that layer
-
-In a list, the status line shows one key binding for each main action. For
-example, Entries shows `Ent:󰏌` to open the selected entry and `Sp:󰏋` to
-read the article from its website in the built-in reader. To open an article
-with your configured text browser, bind `entries.browse` in `[keys.entries]`.
-Within each layer, configured keys take precedence over built-in aliases in
-the guide. A binding's `desc`, when set, replaces the action icon.
-
-While a key sequence is pending, the status line shows its continuations.
-Search, category filters, and popups show their own controls. These hints
-use the binding description when available and otherwise show the command name.
-
-Commands are validated against the layer. For example, `entries.next` is valid
-in the `entries` layer, but not in the `feeds` layer.
-
-Key names use the same notation as the default keymap, including `enter`,
-`space`, `tab`, `backtab`, `esc`, arrow keys, `C-c` for Control-C, `S-t` for
-Shift-T, and `A-enter` for Alt-Enter.
-
-Use `[keys.list]` to bind a movement key for entries, feeds, and GitHub
-notifications together. A binding in an individual tab takes precedence.
-
-Configurable layers:
-
-| Layer                                | Context                          |
-| ---                                  | ---                              |
-| `app`                                | Always active application keys   |
-| `global`                             | Always active normal keys        |
-| `login`                              | Authentication screen            |
-| `tabs`                               | Tab navigation                   |
-| `list`                               | Navigation in the active list    |
-| `entries`                            | Entries tab                      |
-| `reader`                             | Built-in article reader          |
-| `feeds`                              | Feeds tab                        |
-| `filter`                             | Entry/feed filter controls       |
-| `unsubscribe-popup`                  | Feed unsubscribe confirmation    |
-| `github-notifications`               | GitHub notifications tab         |
-| `github-notification-filter-popup`   | GitHub notification filter popup |
-
-`category-filter` and `search-prompt` are runtime-generated layers. Their
-dynamic bindings are managed by the application for now.
-
-## Commands
-
-| Command                                                | Layer                              |
-| ---                                                    | ---                                |
-| `no_op`                                                | any layer                          |
-| `app.quit`                                             | `app`, `global`                    |
-| `app.redraw`                                           | `app`                              |
-| `theme.rotate`                                         | `global`                           |
-| `login.authenticate`                                   | `login`                            |
-| `login.provider.prev`                                  | `login`                            |
-| `login.provider.next`                                  | `login`                            |
-| `tabs.prev`                                            | `tabs`                             |
-| `tabs.next`                                            | `tabs`                             |
-| `list.prev`, `list.next`, `list.first`, `list.last`     | `list`, `entries`, `feeds`, `github-notifications` |
-| `entries.prev`                                         | `entries`                          |
-| `entries.next`                                         | `entries`                          |
-| `entries.first`                                        | `entries`                          |
-| `entries.last`                                         | `entries`                          |
-| `timeline.refresh`                                     | `entries`                          |
-| `entries.open`                                         | `entries`                          |
-| `entries.read`                                         | `entries`                          |
-| `entries.browse`                                       | `entries`                          |
-| `reader.close`                                         | `reader`                           |
-| `reader.line-up`, `reader.line-down`                   | `reader`                           |
-| `reader.half-page-up`, `reader.half-page-down`         | `reader`                           |
-| `reader.page-up`, `reader.page-down`                   | `reader`                           |
-| `feeds.prev`                                           | `feeds`                            |
-| `feeds.next`                                           | `feeds`                            |
-| `feeds.first`                                          | `feeds`                            |
-| `feeds.last`                                           | `feeds`                            |
-| `feeds.subscribe`                                      | `feeds`                            |
-| `feeds.edit`                                           | `feeds`                            |
-| `feeds.unsubscribe`                                    | `feeds`                            |
-| `feeds.reload`                                         | `feeds`                            |
-| `feeds.open`                                           | `feeds`                            |
-| `feeds.unsubscribe-popup.prev`                         | `unsubscribe-popup`                |
-| `feeds.unsubscribe-popup.next`                         | `unsubscribe-popup`                |
-| `feeds.unsubscribe-popup.select`                       | `unsubscribe-popup`                |
-| `feeds.unsubscribe-popup.cancel`                       | `unsubscribe-popup`                |
-| `filter.requirement.prev`                              | `filter`                           |
-| `filter.requirement.next`                              | `filter`                           |
-| `filter.category`                                      | `filter`                           |
-| `filter.search`                                        | `filter`                           |
-| `filter.close`                                         | `filter`                           |
-| `github-notifications.prev`                            | `github-notifications`             |
-| `github-notifications.next`                            | `github-notifications`             |
-| `github-notifications.first`                           | `github-notifications`             |
-| `github-notifications.last`                            | `github-notifications`             |
-| `github-notifications.open`                            | `github-notifications`             |
-| `github-notifications.open-and-done`                   | `github-notifications`             |
-| `github-notifications.reload`                          | `github-notifications`             |
-| `github-notifications.mark-done`                       | `github-notifications`             |
-| `github-notifications.mark-all-done`                   | `github-notifications`             |
-| `github-notifications.unsubscribe-thread`              | `github-notifications`             |
-| `github-notifications.filter.open`                     | `github-notifications`             |
-| `github-notifications.filter.close`                    | `github-notification-filter-popup` |
-| `github-notifications.filter.include-unread.toggle`    | `github-notification-filter-popup` |
-| `github-notifications.filter.participating.toggle`     | `github-notification-filter-popup` |
-| `github-notifications.filter.visibility-public.toggle` | `github-notification-filter-popup` |
-| `github-notifications.filter.visibility-private.toggle` | `github-notification-filter-popup` |
-| `github-notifications.filter.pr-open.toggle`           | `github-notification-filter-popup` |
-| `github-notifications.filter.pr-closed.toggle`         | `github-notification-filter-popup` |
-| `github-notifications.filter.pr-merged.toggle`         | `github-notification-filter-popup` |
-| `github-notifications.filter.reason-mentioned.toggle`  | `github-notification-filter-popup` |
-| `github-notifications.filter.reason-review-requested.toggle` | `github-notification-filter-popup` |
+To bind another action, put its layer name after `keys.` and its command name
+in `command`. You can find both under [Default Key Bindings](#default-key-bindings).
+An optional `desc` supplies the label when the binding appears in the status line.
 
 ## Default Key Bindings
 
-| Layer               | Key                    | Action                                                |
-| ---                 | ---                    | ---                                                   |
-| `app`               | `Ctrl+C`               | Quit                                                  |
-| `app`               | `R`                    | Redraw the screen                                     |
-| `global`            | `q`                    | Quit                                                  |
-| `global`            | `T`                    | Cycle through themes                                  |
-| `tabs`              | `Tab` / `Shift+Tab`    | Switch to the next / previous tab                     |
-| `list`              | `k` or `↑`             | Move up                                               |
-| `list`              | `j` or `↓`             | Move down                                             |
-| `list`              | `gg` / `ge`            | Jump to the first / last item                         |
-| `entries`           | `Enter`                | Open the entry in your web browser                    |
-| `entries`           | `Space`                | Open the article URL in the built-in reader           |
-| `reader`            | `j` / `↓`, `k` / `↑`    | Scroll down or up one line                            |
-| `reader`            | `z j` / `z k`          | Scroll down or up half a page                         |
-| `reader`            | `Space` / `PageDown`, `PageUp` | Scroll down or up one page                     |
-| `reader`            | `Esc` / `q`            | Return to Entries                                     |
-| `entries`           | `r`                    | Refresh the timeline                                  |
-| `feeds`             | `a` / `e`              | Add / edit a subscription                             |
-| `feeds`             | `d`                    | Open the unsubscribe confirmation                     |
-| `feeds`             | `Enter`                | Open the feed's website in your web browser           |
-| `feeds`             | `r`                    | Reload the subscription list                          |
-| `filter`            | `h` / `l` or `←` / `→` | Change the priority filter                            |
-| `filter`            | `c`                    | Open the category filter                              |
-| `filter`            | `/`                    | Search by keyword                                     |
-| `filter`            | `Esc`                  | Leave the category filter or search prompt            |
-| `category-filter`   | Category shortcut      | Toggle the corresponding category                     |
-| `category-filter`   | `+` / `-`              | Enable / disable all categories                       |
-| `search-prompt`     | `Backspace`            | Delete the previous character                         |
-| `unsubscribe-popup` | `h` / `l` or `←` / `→` | Change the selected choice                            |
-| `unsubscribe-popup` | `Enter` / `Esc`        | Confirm the selected choice / cancel                  |
-| `login`             | `k` / `j` or `↑` / `↓` | Select the previous / next provider                   |
-| `login`             | `Enter`                | Authenticate with the selected provider               |
+Use the key names below in `on`. For a sequence such as `g g`, write
+`on = ["g", "g"]`. The prefixes `C-`, `S-`, and `A-` stand for Ctrl,
+Shift, and Alt.
 
-See the [built-in keymap](https://github.com/ymgyt/syndicationd/blob/main/crates/synd_term/src/keymap/default.rs) for all static bindings.
+### Entries and Feeds
+
+Use `[keys.list]` for movement in both tabs. For a movement key specific to
+one tab, use the same `list` command in `[keys.entries]` or `[keys.feeds]`.
+These layers also accept tab-specific names such as `entries.next` and
+`feeds.first`.
+
+| Layer | Action | Default key | Command |
+| --- | --- | --- | --- |
+| `list` | Move to the next item | `j` or `down` | `list.next` |
+| `list` | Move to the previous item | `k` or `up` | `list.prev` |
+| `list` | Jump to the first item | `g g` | `list.first` |
+| `list` | Jump to the last item | `g e` | `list.last` |
+| `entries` | Read the article in the built-in reader | `space` | `entries.read` |
+| `entries` | Open the article in your web browser | `enter` | `entries.open` |
+| `entries` | Open the article in your configured text browser | Unbound | `entries.browse` |
+| `entries` | Refresh the timeline | `r` | `timeline.refresh` |
+| `feeds` | Add a subscription | `a` | `feeds.subscribe` |
+| `feeds` | Edit the selected subscription | `e` | `feeds.edit` |
+| `feeds` | Open the unsubscribe dialog | `d` | `feeds.unsubscribe` |
+| `feeds` | Open the feed's website in your web browser | `enter` | `feeds.open` |
+| `feeds` | Reload the subscription list | `r` | `feeds.reload` |
+
+### Article reader
+
+| Action | Default key | Command in `[keys.reader]` |
+| --- | --- | --- |
+| Scroll down one line | `j` or `down` | `reader.line-down` |
+| Scroll up one line | `k` or `up` | `reader.line-up` |
+| Scroll down half a page | `z j` | `reader.half-page-down` |
+| Scroll up half a page | `z k` | `reader.half-page-up` |
+| Scroll down one page | `space` or `pagedown` | `reader.page-down` |
+| Scroll up one page | `pageup` | `reader.page-up` |
+| Return to Entries | `esc` or `q` | `reader.close` |
+
+### Filters
+
+| Action | Default key | Command in `[keys.filter]` |
+| --- | --- | --- |
+| Search by keyword | `/` | `filter.search` |
+| Choose categories | `c` | `filter.category` |
+| Select the previous feed priority | `h` or `left` | `filter.requirement.prev` |
+| Select the next feed priority | `l` or `right` | `filter.requirement.next` |
+| Leave search or category selection | `esc` | `filter.close` |
+
+`synd` assigns the keys for `search-prompt` and `category-filter`. While
+searching, use `Backspace` to delete the previous character. While choosing
+categories, press the shortcut beside a category to toggle it, `+` to select
+all categories, or `-` to clear the selection.
+
+### Unsubscribe confirmation
+
+The dialog blocks the `feeds` and `list` bindings while you choose whether
+to unsubscribe.
+
+| Action | Default key | Command in `[keys.unsubscribe-popup]` |
+| --- | --- | --- |
+| Select the previous choice | `h` or `left` | `feeds.unsubscribe-popup.prev` |
+| Select the next choice | `l` or `right` | `feeds.unsubscribe-popup.next` |
+| Confirm the selected choice | `enter` | `feeds.unsubscribe-popup.select` |
+| Cancel | `esc` | `feeds.unsubscribe-popup.cancel` |
+
+### Application, tabs, and login
+
+| Layer | Action | Default key | Command |
+| --- | --- | --- | --- |
+| `app` | Quit | `C-c` | `app.quit` |
+| `app` | Redraw the screen | `S-r` | `app.redraw` |
+| `global` | Quit | `q` | `app.quit` |
+| `global` | Cycle through themes | `S-t` | `theme.rotate` |
+| `tabs` | Switch to the next tab | `tab` | `tabs.next` |
+| `tabs` | Switch to the previous tab | `backtab` (Shift+Tab) | `tabs.prev` |
+| `login` | Select the next provider | `j` or `down` | `login.provider.next` |
+| `login` | Select the previous provider | `k` or `up` | `login.provider.prev` |
+| `login` | Log in with the selected provider | `enter` | `login.authenticate` |
