@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use synd_feed::types::{Category, FeedType, FeedUrl, Requirement, Time};
 
-use super::PageInfo;
+use super::{EntryExcerpt, PageInfo};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SubscriptionPayload {
@@ -172,7 +172,7 @@ pub struct EntryMeta {
     pub title: Option<String>,
     pub published: Option<Time>,
     pub updated: Option<Time>,
-    pub summary: Option<String>,
+    pub excerpt: Option<EntryExcerpt>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

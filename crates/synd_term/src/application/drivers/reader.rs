@@ -3,23 +3,30 @@ use std::{sync::Arc, time::Duration};
 use anyhow::{Context as _, Result, ensure};
 use futures_util::FutureExt as _;
 use reqwest::{Client, header};
+use synd_support::html::{Article, ArticleRequest, HtmlConverter};
 use url::Url;
 
 use super::request::{RequestContext, RequestFuture};
 use crate::{
     application::{Generation, RequestError, RequestKind},
     event::Event,
-    reader::{self, Article},
 };
 
 const MAX_HTML_BYTES: usize = 8 * 1024 * 1024;
 
-#[derive(Default)]
 pub(super) struct ReaderDriver {
     http: Client,
+    converter: Arc<dyn HtmlConverter>,
 }
 
 impl ReaderDriver {
+    pub(super) fn new(converter: Arc<dyn HtmlConverter>) -> Self {
+        Self {
+            http: Client::new(),
+            converter,
+        }
+    }
+
     pub(super) fn fetch(
         &self,
         context: RequestContext,
@@ -27,10 +34,11 @@ impl ReaderDriver {
         url: Url,
     ) -> (RequestKind, RequestFuture) {
         let http = self.http.clone();
+        let converter = Arc::clone(&self.converter);
         (
             RequestKind::FetchArticle { generation },
             async move {
-                let article = fetch_article(&http, url)
+                let article = fetch_article(&http, url, converter)
                     .await
                     .map_err(RequestError::Article)?;
                 context.emit(|request_id| Event::ArticleFetched {
@@ -45,7 +53,11 @@ impl ReaderDriver {
     }
 }
 
-async fn fetch_article(http: &Client, url: Url) -> Result<Article> {
+async fn fetch_article(
+    http: &Client,
+    url: Url,
+    converter: Arc<dyn HtmlConverter>,
+) -> Result<Article> {
     let mut response = http
         .get(url)
         .header(
@@ -84,8 +96,14 @@ async fn fetch_article(http: &Client, url: Url) -> Result<Article> {
     }
     tokio::task::spawn_blocking(move || {
         let (html, _, _) = encoding.decode(&bytes);
-        reader::extract(&html, &final_url)
+        converter.extract_article(
+            ArticleRequest::builder()
+                .html(&html)
+                .base_url(&final_url)
+                .build(),
+        )
     })
     .await
     .context("article extraction task failed")?
+    .map_err(Into::into)
 }

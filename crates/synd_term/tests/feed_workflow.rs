@@ -1,7 +1,10 @@
 #![cfg(feature = "integration")]
 
+use std::sync::Arc;
+
 use serde_json::json;
 use synd_client::payload;
+use synd_support::html::HtmlConverter;
 use synd_term::{
     application::{
         Application, Cache, Config, Features,
@@ -22,7 +25,7 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn entering_feeds_requests_the_missing_subscription() {
     let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
-    let (_cache_dir, mut app) = app(api, None);
+    let (_cache_dir, mut app) = app(api, None, None);
     let (tx, mut input) = event_stream();
     tx.send(key!(tab));
     app.wait_until_jobs_completed(&mut input).await;
@@ -58,7 +61,7 @@ async fn space_reads_the_selected_article_url_and_escape_returns_to_the_entry() 
     let server = tokio::spawn(async move { axum::serve(listener, publisher).await.unwrap() });
     let mut entries = timeline_entries();
     entries.nodes[1].entry.website_url = Some(article_url);
-    let (_cache_dir, mut app) = start_app_with_entries(entries);
+    let (_cache_dir, mut app) = start_app_with_entries(entries, None);
     let (tx, mut input) = event_stream();
     app.wait_until_jobs_completed(&mut input).await;
 
@@ -93,7 +96,56 @@ async fn space_reads_the_selected_article_url_and_escape_returns_to_the_entry() 
     app.wait_until_jobs_completed(&mut input).await;
     let screen = Screen::new(app.buffer());
     assert!(screen.contains_text("Entry 2/2"));
-    assert!(screen.contains_text("A note about testing async GraphQL code."));
+    assert!(screen.contains_text("Testing a GraphQL Result<T>."));
+    server.abort();
+}
+
+#[tokio::test]
+async fn reader_passes_the_final_url_to_the_converter_and_displays_its_error() {
+    use axum::{
+        Router,
+        response::{Html, Redirect},
+        routing::get,
+    };
+    use synd_support::html::{Article, ArticleRequest, Excerpt, ExcerptRequest, HtmlConvError};
+    use tokio::net::TcpListener;
+
+    struct FailingConverter;
+    impl HtmlConverter for FailingConverter {
+        fn excerpt(&self, _: ExcerptRequest<'_>) -> Result<Excerpt, HtmlConvError> {
+            unreachable!()
+        }
+
+        fn extract_article(&self, request: ArticleRequest<'_>) -> Result<Article, HtmlConvError> {
+            assert_eq!(request.base_url().path(), "/articles/final");
+            assert_eq!(request.html(), "<p>Publisher body</p>");
+            Err(HtmlConvError::Conversion(
+                std::io::Error::other("publisher conversion failed").into(),
+            ))
+        }
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mut entries = timeline_entries();
+    entries.nodes[1].entry.website_url =
+        Some(format!("http://{}/link", listener.local_addr().unwrap()));
+    let publisher = Router::new()
+        .route(
+            "/link",
+            get(|| async { Redirect::temporary("/articles/final") }),
+        )
+        .route(
+            "/articles/final",
+            get(|| async { Html("<p>Publisher body</p>") }),
+        );
+    let server = tokio::spawn(async move { axum::serve(listener, publisher).await.unwrap() });
+
+    let (_cache_dir, mut app) = start_app_with_entries(entries, Some(Arc::new(FailingConverter)));
+    let (tx, mut input) = event_stream();
+    app.wait_until_jobs_completed(&mut input).await;
+    tx.send_multi([key!('j'), key!(' ')]);
+    app.wait_until_jobs_completed(&mut input).await;
+    assert!(Screen::new(app.buffer()).contains_text("publisher conversion failed"));
     server.abort();
 }
 
@@ -117,7 +169,7 @@ async fn feeds_load_while_github_requests_wait_for_a_slot() {
         .build()
         .unwrap();
     let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
-    let (_cache_dir, mut app) = app(api, Some(GhClient::with(octocrab)));
+    let (_cache_dir, mut app) = app(api, Some(GhClient::with(octocrab)), None);
     let (tx, mut input) = event_stream();
     tx.send_multi((0..91).map(|_| key!('r')));
 
@@ -270,10 +322,13 @@ mod bootstrapped_app {
 }
 
 fn start_app() -> (TempDir, Application) {
-    start_app_with_entries(timeline_entries())
+    start_app_with_entries(timeline_entries(), None)
 }
 
-fn start_app_with_entries(entries: payload::TimelineEntryConnection) -> (TempDir, Application) {
+fn start_app_with_entries(
+    entries: payload::TimelineEntryConnection,
+    converter: Option<Arc<dyn HtmlConverter>>,
+) -> (TempDir, Application) {
     let timeline_id = payload::TimelineId::from_u128(1);
     let api = MockFeedApi::new([
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
@@ -293,14 +348,18 @@ fn start_app_with_entries(entries: payload::TimelineEntryConnection) -> (TempDir
             }),
         ),
     ]);
-    let (cache_dir, mut app) = app(api, None);
+    let (cache_dir, mut app) = app(api, None, converter);
 
     app.bootstrap_for_test();
 
     (cache_dir, app)
 }
 
-fn app(feed_api: MockFeedApi, github: Option<GhClient>) -> (TempDir, Application) {
+fn app(
+    feed_api: MockFeedApi,
+    github: Option<GhClient>,
+    converter: Option<Arc<dyn HtmlConverter>>,
+) -> (TempDir, Application) {
     let cache_dir = tempfile::tempdir().expect("temp cache dir");
     let terminal = new_test_terminal(120, 30);
     let builder = Application::builder()
@@ -316,6 +375,10 @@ fn app(feed_api: MockFeedApi, github: Option<GhClient>) -> (TempDir, Application
         .cache(Cache::new(cache_dir.path().to_path_buf()))
         .theme(Theme::default())
         .interactor(Box::new(MockInteractor::new()));
+    let builder = match converter {
+        Some(converter) => builder.html_converter(converter),
+        None => builder,
+    };
     let app = match github {
         Some(client) => builder.gh_client(client).build(),
         None => builder.build(),
@@ -379,7 +442,7 @@ fn timeline_entries() -> payload::TimelineEntryConnection {
                     "published": null,
                     "updated": null,
                     "websiteUrl": "https://example.com/rust-feed-architecture",
-                    "summary": "A note about feed architecture.",
+                    "excerpt": { "text": "A note about feed architecture." },
                     "feed": {
                         "title": "Engineering Notes",
                         "url": "https://example.com/feed.xml",
@@ -396,7 +459,7 @@ fn timeline_entries() -> payload::TimelineEntryConnection {
                     "published": null,
                     "updated": null,
                     "websiteUrl": "https://example.com/async-graphql-testing",
-                    "summary": "A note about testing async GraphQL code.",
+                    "excerpt": { "text": "Testing a GraphQL Result<T>." },
                     "feed": {
                         "title": "Engineering Notes",
                         "url": "https://example.com/feed.xml",

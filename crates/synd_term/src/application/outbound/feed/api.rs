@@ -37,9 +37,7 @@ pub trait FeedApi: Send + Sync + 'static {
 
     fn fetch_timeline_entries(
         &self,
-        timeline_id: payload::TimelineId,
-        after: Option<String>,
-        first: i64,
+        request: payload::TimelineEntriesRequest,
     ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>>;
 
     fn fetch_timeline_changes(

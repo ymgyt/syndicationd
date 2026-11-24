@@ -50,9 +50,13 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert_eq!(active_sessions(dir).await?, 1);
 
     let listed = peer.request("tools/list", json!({})).await?;
-    let mut tools: Vec<&str> = listed["tools"]
-        .as_array()
-        .unwrap()
+    let definitions = listed["tools"].as_array().unwrap();
+    let timeline_entries = definitions
+        .iter()
+        .find(|tool| tool["name"] == "list_timeline_entries")
+        .unwrap();
+    assert!(timeline_entries["inputSchema"]["properties"]["maxUnicodeWidth"].is_object());
+    let mut tools: Vec<&str> = definitions
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
         .collect();
@@ -155,14 +159,30 @@ async fn check_timeline_tools(peer: &mut McpPeer, dir: &Path) -> anyhow::Result<
         tokio::time::sleep(Duration::from_millis(50)).await;
     };
     assert_eq!(page["items"][0]["title"], "This Week in Rust 549");
+    let excerpt = page["items"][0]["excerpt"]
+        .as_str()
+        .context("Missing excerpt")?;
+    assert!(excerpt.starts_with("Hello and welcome to another issue of This Week in Rust"));
+    assert_eq!(excerpt.len(), 200); // The start of this feed summary is ASCII.
+    assert!(page["items"][0].get("summary").is_none());
     let page = peer
         .tool(
             "list_timeline_entries",
-            json!({"timeline_id": id, "first": 3, "after": page["next_cursor"]}),
+            json!({"timeline_id": id, "first": 3, "after": page["next_cursor"], "maxUnicodeWidth": 5}),
         )
         .await?;
     assert_eq!(page["items"][0]["title"], "This Week in Rust 546");
+    assert_eq!(page["items"][0]["excerpt"], "Hello");
     assert!(page["next_cursor"].is_null());
+
+    let error = peer
+        .tool(
+            "list_timeline_entries",
+            json!({"timeline_id": id, "maxUnicodeWidth": 1001}),
+        )
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("maxUnicodeWidth"), "{error}");
 
     let page = peer
         .tool(

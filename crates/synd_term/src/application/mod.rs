@@ -91,6 +91,7 @@ impl Application {
             authenticator,
             interactor,
             clock,
+            html_converter,
             authentication_required,
         } = builder;
         let throbber = Throbber::new(config.throbber_timer_interval);
@@ -102,6 +103,7 @@ impl Application {
             authenticator,
             interactor,
             clock,
+            html_converter,
         });
 
         Self {

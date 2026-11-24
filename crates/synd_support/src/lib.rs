@@ -5,6 +5,8 @@
 pub mod conf;
 pub mod dirs;
 pub mod fs;
+#[cfg(feature = "html")]
+pub mod html;
 pub mod io;
 #[cfg(feature = "o11y")]
 pub mod o11y;

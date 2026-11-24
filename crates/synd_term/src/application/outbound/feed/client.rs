@@ -79,17 +79,10 @@ impl FeedApi for ClientFeedApi {
 
     fn fetch_timeline_entries(
         &self,
-        timeline_id: payload::TimelineId,
-        after: Option<String>,
-        first: i64,
+        request: payload::TimelineEntriesRequest,
     ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>> {
         let client = self.client();
-        async move {
-            client
-                .fetch_timeline_entries(timeline_id, after, first)
-                .await
-        }
-        .boxed()
+        async move { client.fetch_timeline_entries(request).await }.boxed()
     }
 
     fn fetch_timeline_changes(

@@ -1,9 +1,11 @@
 use std::{
     pin::Pin,
+    sync::Arc,
     task::{Context, Poll},
 };
 
 use futures_util::{FutureExt as _, Stream, stream::FuturesUnordered};
+use synd_support::html::HtmlConverter;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "integration")]
@@ -57,6 +59,7 @@ pub(super) struct DriverParts {
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Box<dyn Interact>,
     pub(super) clock: Option<Box<dyn Clock>>,
+    pub(super) html_converter: Arc<dyn HtmlConverter>,
 }
 
 impl Drivers {
@@ -68,6 +71,7 @@ impl Drivers {
             authenticator,
             interactor,
             clock,
+            html_converter,
         } = parts;
         let feed = {
             let api = feed_api.clone();
@@ -90,7 +94,7 @@ impl Drivers {
             auth,
             gh,
             interaction,
-            reader: ReaderDriver::default(),
+            reader: ReaderDriver::new(html_converter),
             request_jobs: FuturesUnordered::new(),
             next_request_id: 0,
             event_tx,

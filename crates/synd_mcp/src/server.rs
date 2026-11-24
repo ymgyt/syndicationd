@@ -12,7 +12,7 @@ use synd_client::{
     Client, FeedUrl,
     payload::{
         PageInfo, ResponseCode, ResponseStatus, SubscribeDisposition, SubscribeFeedInput,
-        TimelineId, UnsubscribeDisposition,
+        TimelineEntriesRequest, TimelineId, UnsubscribeDisposition,
     },
 };
 
@@ -56,25 +56,30 @@ impl McpServer {
     }
 
     #[tool(
-        description = "List entries in the specified timeline from newest to oldest with their titles, summaries, and URLs.",
+        description = "List entries in the specified timeline from newest to oldest with their titles, plain-text excerpts, and URLs.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_timeline_entries(
         &self,
         Parameters(params): Parameters<TimelineEntriesParams>,
     ) -> Result<Json<Page<TimelineEntry>>, String> {
-        let first = params.page.first()?;
+        let request = TimelineEntriesRequest::builder()
+            .timeline_id(params.timeline_id)
+            .first(params.page.first()?)
+            .maybe_after(params.page.after)
+            .maybe_max_unicode_width(params.max_unicode_width)
+            .build();
         let connection = self
             .client()
             .await?
-            .fetch_timeline_entries(params.timeline_id, params.page.after, first)
+            .fetch_timeline_entries(request)
             .await
             .map_err(|error| error.to_string())?;
 
         Ok(Json(Page::new(
             connection.nodes.into_iter().map(|node| TimelineEntry {
                 title: node.entry.title,
-                summary: node.entry.summary,
+                excerpt: node.entry.excerpt.map(|excerpt| excerpt.text),
                 url: node.entry.website_url,
             }),
             connection.page_info,
@@ -200,6 +205,10 @@ impl PageParams {
 struct TimelineEntriesParams {
     /// ID returned by `list_timelines`.
     timeline_id: TimelineId,
+    /// Maximum Unicode display width per excerpt. Defaults to 200.
+    #[serde(rename = "maxUnicodeWidth")]
+    #[schemars(range(min = 0, max = 1000))]
+    max_unicode_width: Option<u16>,
     #[serde(flatten)]
     page: PageParams,
 }
@@ -238,7 +247,7 @@ struct Timeline {
 #[derive(Serialize, JsonSchema)]
 struct TimelineEntry {
     title: Option<String>,
-    summary: Option<String>,
+    excerpt: Option<String>,
     url: Option<String>,
 }
 

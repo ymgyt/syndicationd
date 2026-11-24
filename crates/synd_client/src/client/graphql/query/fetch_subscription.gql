@@ -23,7 +23,9 @@ query Subscription($after: String, $first: Int) {
               title
               published
               updated
-              summary
+              excerpt {
+                text
+              }
             }
           }
           links {

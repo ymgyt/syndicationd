@@ -140,11 +140,15 @@ fn build_service(dep: Dependency, shutdown: &Shutdown) -> ApiService {
                 concurrency_limit,
             },
         monitors,
+        html_converter,
     } = dep;
 
     let cx = Context {
         gql_monitor: monitors.graphql_task_monitor(),
-        schema: gql::schema_builder().data(registry).finish(),
+        schema: gql::schema_builder()
+            .data(registry)
+            .data(html_converter)
+            .finish(),
     };
 
     tokio::spawn(monitors.emit_metrics(

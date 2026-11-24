@@ -1,3 +1,4 @@
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 use synd_feed::{
     entry::EntryId,
@@ -23,6 +24,36 @@ pub struct CreateTimelineInput {
 #[serde(rename_all = "camelCase")]
 pub struct CreateTimelinePayload {
     pub timeline_id: TimelineId,
+}
+
+/// Request one page of entries from a timeline.
+#[derive(Debug, Builder, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEntriesRequest {
+    timeline_id: TimelineId,
+    first: i64,
+    after: Option<String>,
+    /// Maximum Unicode display width per excerpt. Omit to use the server default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_unicode_width: Option<u16>,
+}
+
+impl TimelineEntriesRequest {
+    pub fn timeline_id(&self) -> TimelineId {
+        self.timeline_id
+    }
+
+    pub fn first(&self) -> i64 {
+        self.first
+    }
+
+    pub fn after(&self) -> Option<&str> {
+        self.after.as_deref()
+    }
+
+    pub fn max_unicode_width(&self) -> Option<u16> {
+        self.max_unicode_width
+    }
 }
 
 /// Entry as it appears on one timeline: display position + content.
@@ -72,8 +103,14 @@ pub struct Entry {
     pub published: Option<Time>,
     pub updated: Option<Time>,
     pub website_url: Option<String>,
-    pub summary: Option<String>,
+    pub excerpt: Option<EntryExcerpt>,
     pub feed: FeedMeta,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(any(test, feature = "fake"), derive(fake::Dummy))]
+pub struct EntryExcerpt {
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

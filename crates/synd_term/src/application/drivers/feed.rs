@@ -236,14 +236,18 @@ impl TimelineWindowRequest {
     }
 
     async fn observe_next_page(&self) -> Result<payload::TimelineEntryConnection, RequestError> {
-        let first = self.state.page_size();
+        let request = payload::TimelineEntriesRequest::builder()
+            .timeline_id(self.timeline_id)
+            .first(self.state.page_size())
+            .maybe_after(self.state.cursor())
+            .build();
         debug!(
-            first,
-            has_after = self.state.has_cursor(),
+            first = request.first(),
+            has_after = request.after().is_some(),
             "fetch timeline window chunk"
         );
         self.api
-            .fetch_timeline_entries(self.timeline_id, self.state.cursor(), first)
+            .fetch_timeline_entries(request)
             .await
             .map_err(RequestError::SyndApi)
     }
@@ -286,10 +290,6 @@ impl TimelineWindowState {
     fn page_size(&self) -> i64 {
         i64::try_from(self.remaining.min(TIMELINE_WINDOW_PAGE_SIZE))
             .expect("timeline page size fits in i64")
-    }
-
-    fn has_cursor(&self) -> bool {
-        self.after.is_some()
     }
 
     fn cursor(&self) -> Option<String> {

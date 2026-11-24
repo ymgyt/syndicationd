@@ -12,7 +12,9 @@ query TimelineChanges($timelineId: ID!, $since: Int!, $first: Int!) {
                 title
                 published
                 updated
-                summary
+                excerpt {
+                  text
+                }
                 websiteUrl
                 feed {
                   title

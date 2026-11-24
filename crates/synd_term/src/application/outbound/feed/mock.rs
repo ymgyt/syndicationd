@@ -156,12 +156,10 @@ impl FeedApi for MockFeedApi {
 
     fn fetch_timeline_entries(
         &self,
-        timeline_id: payload::TimelineId,
-        _after: Option<String>,
-        _first: i64,
+        request: payload::TimelineEntriesRequest,
     ) -> BoxFuture<'static, Result<payload::TimelineEntryConnection, SyndApiError>> {
         let result = match self
-            .pop_response(|response| matches!(response, MockFeedApiResponse::TimelineEntries(id, _) if *id == timeline_id))
+            .pop_response(|response| matches!(response, MockFeedApiResponse::TimelineEntries(id, _) if *id == request.timeline_id()))
         {
             Ok(MockFeedApiResponse::TimelineEntries(_, result)) => result,
             Ok(_) => Err(Self::mismatch()),

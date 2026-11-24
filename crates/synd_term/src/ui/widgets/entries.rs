@@ -247,10 +247,11 @@ impl EntriesWidget {
         .areas(inner);
 
         // Let the paragraph wrap the visible text together with its first-line label.
-        let summary = entry.summary_text(usize::from(body.width) * usize::from(body.height));
-        let (label, content) = match summary.as_deref().filter(|text| !text.trim().is_empty()) {
-            Some(text) => (concat!(icon!(summary), " "), text),
-            None => (
+        let (label, content) = match &entry.excerpt {
+            Some(excerpt) if !excerpt.text.trim().is_empty() => {
+                (concat!(icon!(summary), " "), excerpt.text.as_str())
+            }
+            _ => (
                 concat!(icon!(entry), " Entry  "),
                 entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL),
             ),

@@ -17,6 +17,7 @@ synd-feed     = { workspace = true }
 synd-protocol = { workspace = true }
 synd-support  = { workspace = true, features = ["o11y"] }
 
+bon               = { workspace = true }
 fake              = { workspace = true, optional = true }
 futures-util      = { workspace = true, features = ["sink"] }
 graphql_client    = { workspace = true }

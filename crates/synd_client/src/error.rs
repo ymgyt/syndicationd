@@ -29,6 +29,8 @@ pub enum SyndApiError {
     },
     #[error("graphql error: {errors:?}")]
     Graphql { errors: Vec<graphql_client::Error> },
+    #[error("maxUnicodeWidth must be between 0 and 1000 (got {0})")]
+    InvalidExcerptWidth(u16),
     #[error("session open rejected: {0}")]
     OpenSession(OpenSessionErrorResponse),
     #[error("session renew rejected: {0}")]
@@ -87,6 +89,7 @@ impl SyndApiError {
             | Self::DecodeResponse(_)
             | Self::HttpStatus { .. }
             | Self::Graphql { .. }
+            | Self::InvalidExcerptWidth(_)
             | Self::OpenSession(_)
             | Self::RenewSession(_)
             | Self::CloseSession(_)

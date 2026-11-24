@@ -2,8 +2,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-/// List and create named timelines, and read entries and changes by timeline ID.
-pub const NAMED_TIMELINES: &str = "timeline.named";
+/// Named timelines with entry excerpts. The first revision exposed `Entry.summary`.
+pub const NAMED_TIMELINES: &str = "timeline.named.v2";
 pub const SUBSCRIPTION_WRITE: &str = "subscription.write";
 pub const FEED_REFRESH: &str = "feed.refresh";
 
@@ -50,5 +50,18 @@ impl fmt::Display for CapabilitySet {
         }
 
         f.write_str(&self.names.join(", "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn summary_and_excerpt_clients_require_different_daemons() {
+        let legacy = CapabilitySet::new(["timeline.named", SUBSCRIPTION_WRITE, FEED_REFRESH]);
+        let current = local_api_capabilities();
+        assert_eq!(current.missing_from(&legacy).names(), [NAMED_TIMELINES]);
+        assert_eq!(legacy.missing_from(&current).names(), ["timeline.named"]);
     }
 }

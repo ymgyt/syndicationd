@@ -6,6 +6,7 @@ use ratatui::{
     text::Line,
     widgets::{Paragraph, Widget as _, Wrap},
 };
+use synd_support::html::Article;
 use url::Url;
 
 use super::{Component, RenderContext};
@@ -15,7 +16,7 @@ use crate::{
     event::{Event, EventKind},
     keymap::Layer,
     operation::Operation,
-    reader::{Article, ArticleBody},
+    reader::ArticleBody,
 };
 
 #[derive(Default)]
@@ -106,7 +107,7 @@ impl Component for ReaderComponent {
             .horizontal_margin(1)
             .areas(area);
         let title = match &self.state {
-            State::Ready { article, .. } => article.title.as_str(),
+            State::Ready { article, .. } => article.title(),
             _ => "Reader",
         };
         Line::styled(title, cx.ui.theme.application_title).render(title_area, buf);
@@ -133,8 +134,7 @@ mod tests {
     fn a_late_result_cannot_replace_the_reopened_article() {
         let mut reader = ReaderComponent::default();
         let url = Url::parse("https://example.com/article").unwrap();
-        let article =
-            crate::reader::extract("<article><p>Old article body.</p></article>", &url).unwrap();
+        let article = Article::new("Old article".into(), "Old article body.".into());
         let _ = reader.apply_command(ReaderCommand::Open(url.clone()));
         let first = reader.generation;
         let _ = reader.apply_command(ReaderCommand::Close);

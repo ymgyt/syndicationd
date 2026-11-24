@@ -17,7 +17,7 @@ synd-auth        = { workspace = true }
 synd-feed        = { workspace = true, features = ["graphql"] }
 synd-protocol    = { workspace = true }
 synd-registry    = { workspace = true }
-synd-support     = { workspace = true, features = ["o11y"] }
+synd-support     = { workspace = true, features = ["html", "o11y"] }
 
 async-graphql      = { workspace = true, features = ["tracing"] }
 async-graphql-axum = { version = "7.2.1" }

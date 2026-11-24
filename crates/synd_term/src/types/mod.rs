@@ -2,7 +2,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_client::payload;
 use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
-use tracing::warn;
 
 use crate::ui;
 
@@ -16,24 +15,6 @@ mod requirement_ext;
 pub use requirement_ext::RequirementExt;
 
 pub(crate) mod gh;
-
-pub trait EntryMetaExt {
-    fn summary_text(&self, width: usize) -> Option<String>;
-}
-
-impl EntryMetaExt for EntryMeta {
-    fn summary_text(&self, width: usize) -> Option<String> {
-        self.summary.as_deref().and_then(|summary| {
-            match html2text::from_read(summary.as_bytes(), width) {
-                Ok(text) => Some(text),
-                Err(err) => {
-                    warn!("convert summary html to text: {err}");
-                    None
-                }
-            }
-        })
-    }
-}
 
 pub trait CrawlPolicyExt {
     fn prompt_value(&self) -> Option<String>;
@@ -269,20 +250,11 @@ impl TryFrom<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
 }
 
 pub trait EntryExt {
-    fn summary_text(&self, width: usize) -> Option<String>;
     fn requirement(&self) -> Requirement;
     fn category(&self) -> &Category<'static>;
 }
 
 impl EntryExt for payload::Entry {
-    fn summary_text(&self, width: usize) -> Option<String> {
-        self.summary.as_deref().map(|summary| {
-            html2text::config::plain()
-                .string_from_read(summary.as_bytes(), width)
-                .unwrap_or_default()
-        })
-    }
-
     fn requirement(&self) -> Requirement {
         self.feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT)
     }

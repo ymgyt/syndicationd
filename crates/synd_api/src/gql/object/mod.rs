@@ -5,15 +5,17 @@ use async_graphql::{
     connection::{Connection, ConnectionNameType, Edge, EdgeNameType, EmptyFields},
 };
 use synd_feed::{
-    entry::{Content, Entry as SyndFeedEntry},
+    entry::Entry as SyndFeedEntry,
     types::{self, Annotated, Category, FeedType, FeedUrl, Requirement},
 };
 use synd_registry::query::TimelineEntry;
+use synd_support::html::HtmlConverter;
 
 use crate::gql::scalar;
 
-use self::id::FeedIdV1;
+use self::{excerpt::EntryExcerpt, id::FeedIdV1};
 
+mod excerpt;
 pub mod id;
 
 #[derive(SimpleObject)]
@@ -42,6 +44,8 @@ pub(crate) struct Entry {
     entry: SyndFeedEntry,
 }
 
+const DEFAULT_EXCERPT_WIDTH: usize = 200;
+
 #[Object]
 impl Entry {
     /// Entry id
@@ -68,12 +72,28 @@ impl Entry {
         self.entry.published().map(Into::into)
     }
 
-    /// Entry summary, falling back to the entry content body.
-    async fn summary(&self) -> Option<&str> {
-        self.entry
-            .summary()
-            .map(types::Text::content)
-            .or_else(|| self.entry.content().and_then(Content::body))
+    /// Plain-text excerpt from the feed summary or, if absent, the inline content.
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql requires an async resolver"
+    )]
+    async fn excerpt(
+        &self,
+        cx: &async_graphql::Context<'_>,
+        #[graphql(
+            desc = "Maximum Unicode display width of the entire excerpt, from 0 to 1000.",
+            default_with = "Some(DEFAULT_EXCERPT_WIDTH)",
+            validator(maximum = 1000)
+        )]
+        max_unicode_width: Option<usize>,
+    ) -> async_graphql::Result<Option<EntryExcerpt>> {
+        let converter = cx.data::<Arc<dyn HtmlConverter>>()?;
+        EntryExcerpt::from_entry(
+            &self.entry,
+            max_unicode_width.unwrap_or(DEFAULT_EXCERPT_WIDTH),
+            converter.as_ref(),
+        )
+        .map_err(async_graphql::Error::new_with_source)
     }
 
     /// Link to websiteurl at which this entry is published

@@ -16,7 +16,7 @@ use synd_feed::types::{FeedType, FeedUrl};
 use crate::{
     application::Populate,
     command::{ListCommand, UnsubscribeTarget},
-    types::{self, EntryMeta, EntryMetaExt, Feed, TimeExt},
+    types::{self, Feed, TimeExt},
     ui::{
         self, Context,
         extension::RectExt,
@@ -284,24 +284,26 @@ impl SubscriptionWidget {
             .style(cx.theme.subscription.background);
         Widget::render(table, meta_area, buf);
 
-        let entry = |entry: &EntryMeta| {
+        let rows = feed.entries.iter().map(|entry| {
             let title = entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);
-            let summary = entry.summary_text(100).unwrap_or(ui::UNKNOWN_SYMBOL.into());
+            let excerpt = entry
+                .excerpt
+                .as_ref()
+                .map_or(ui::UNKNOWN_SYMBOL, |excerpt| excerpt.text.as_str());
 
             Row::new([
-                Cell::new(Span::from(title.to_string())),
-                Cell::new(Span::from(summary)),
+                Cell::new(Span::from(title)),
+                Cell::new(Span::from(excerpt)),
                 table::date_cell(entry.published.as_ref().or(entry.updated.as_ref())),
             ])
-        };
+        });
 
         let header = Row::new([
             Cell::new(Span::from("Entry")),
-            Cell::new(Span::from("Summary")),
+            Cell::new(Span::from("Excerpt")),
             Cell::new(Line::from("Date").right_aligned()),
         ]);
 
-        let rows = feed.entries.iter().map(entry);
         let table = RatatuiTable::new(
             rows,
             [Constraint::Fill(1), Constraint::Fill(2), table::DATE_WIDTH],

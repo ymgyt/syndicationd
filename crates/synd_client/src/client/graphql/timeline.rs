@@ -5,7 +5,7 @@ use crate::{
     Client, SyndApiError,
     payload::{
         CreateTimelineInput, CreateTimelinePayload, Timeline, TimelineChangesPayload,
-        TimelineEntryConnection, TimelineId,
+        TimelineEntriesRequest, TimelineEntryConnection, TimelineId,
     },
 };
 
@@ -34,14 +34,6 @@ struct CreateTimelineVariables {
 #[serde(rename_all = "camelCase")]
 struct CreateTimelineData {
     create_timeline: CreateTimelinePayload,
-}
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TimelineEntriesVariables {
-    timeline_id: TimelineId,
-    after: Option<String>,
-    first: i64,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -125,18 +117,15 @@ impl Client {
     #[instrument(skip(self))]
     pub async fn fetch_timeline_entries(
         &self,
-        timeline_id: TimelineId,
-        after: Option<String>,
-        first: i64,
+        request: TimelineEntriesRequest,
     ) -> Result<TimelineEntryConnection, SyndApiError> {
+        if let Some(width @ 1001..) = request.max_unicode_width() {
+            return Err(SyndApiError::InvalidExcerptWidth(width));
+        }
         let outcome = self
             .execute_graphql::<_, TimelineEntriesData>(&GraphqlRequest::new(
                 TIMELINE_ENTRIES_QUERY,
-                TimelineEntriesVariables {
-                    timeline_id,
-                    after,
-                    first,
-                },
+                request,
             ))
             .await?
             .accept_partial()?;

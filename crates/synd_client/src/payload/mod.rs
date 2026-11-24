@@ -14,6 +14,7 @@ pub use subscription::{
     SubscriptionPayload, UnsubscribeDisposition, UnsubscribeFeedPayload, UnsupportedFeedType,
 };
 pub use timeline::{
-    CreateTimelineInput, CreateTimelinePayload, Entry, FeedMeta, Timeline, TimelineChange,
-    TimelineChangesPayload, TimelineEntry, TimelineEntryConnection, TimelineId,
+    CreateTimelineInput, CreateTimelinePayload, Entry, EntryExcerpt, FeedMeta, Timeline,
+    TimelineChange, TimelineChangesPayload, TimelineEntriesRequest, TimelineEntry,
+    TimelineEntryConnection, TimelineId,
 };

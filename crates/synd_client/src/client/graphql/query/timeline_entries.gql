@@ -1,4 +1,4 @@
-query TimelineEntries($timelineId: ID!, $after: String, $first: Int!) {
+query TimelineEntries($timelineId: ID!, $after: String, $first: Int!, $maxUnicodeWidth: Int) {
   output: feedRegistry {
     timeline(timelineId: $timelineId) {
       entries(after: $after, first: $first) {
@@ -9,7 +9,9 @@ query TimelineEntries($timelineId: ID!, $after: String, $first: Int!) {
             title
             published
             updated
-            summary
+            excerpt(maxUnicodeWidth: $maxUnicodeWidth) {
+              text
+            }
             websiteUrl
             feed {
               title

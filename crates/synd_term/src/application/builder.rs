@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use synd_support::html::{DefaultHtmlConverter, HtmlConverter};
+
 use crate::{
     application::outbound::gh::GhClient,
     application::{Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef},
@@ -29,6 +31,7 @@ pub struct ApplicationBuilder<
     pub(super) authenticator: Option<Authenticator>,
     pub(super) gh_client: Option<GhClient>,
     pub(super) clock: Option<Box<dyn Clock>>,
+    pub(super) html_converter: Arc<dyn HtmlConverter>,
     pub(super) authentication_required: bool,
 }
 
@@ -45,6 +48,7 @@ impl Default for ApplicationBuilder {
             authenticator: None,
             gh_client: None,
             clock: None,
+            html_converter: Arc::new(DefaultHtmlConverter),
             authentication_required: false,
         }
     }
@@ -67,6 +71,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -89,6 +94,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -111,6 +117,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -130,6 +137,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -149,6 +157,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -168,6 +177,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -190,6 +200,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
+            html_converter: self.html_converter,
             authentication_required: self.authentication_required,
         }
     }
@@ -216,6 +227,14 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
     pub fn clock(self, clock: Box<dyn Clock>) -> Self {
         Self {
             clock: Some(clock),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn html_converter(self, html_converter: Arc<dyn HtmlConverter>) -> Self {
+        Self {
+            html_converter,
             ..self
         }
     }

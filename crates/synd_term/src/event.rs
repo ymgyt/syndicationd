@@ -8,13 +8,13 @@ use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_client::{SyndApiError, payload};
 use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
+use synd_support::html::Article;
 use url::Url;
 
 use crate::{
     application::{Generation, PersistCacheError, Populate, RequestError, RequestId, RequestKind},
     auth::{AuthenticationProvider, Credential, CredentialError, Verified},
     interact::{OpenBrowserError, OpenEditorError},
-    reader::Article,
     types::gh::{IssueContext, Notification, NotificationId, PullRequestContext},
 };
 

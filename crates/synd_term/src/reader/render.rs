@@ -3,8 +3,9 @@ use ratatui::{
     layout::Rect,
     widgets::{Paragraph, Widget as _, Wrap},
 };
+use synd_support::html::Article;
 
-use super::{Article, Scroll};
+use super::Scroll;
 
 /// Layout of one article at the last rendered width.
 #[derive(Default)]
@@ -36,7 +37,7 @@ impl ArticleBody {
         }
         if self.width != area.width {
             let lines = limner::render_markdown(
-                &article.markdown,
+                article.markdown(),
                 &limner::MarkdownStyle::default(),
                 area.width,
             )

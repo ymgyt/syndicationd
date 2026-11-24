@@ -2412,18 +2412,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
 
 [[package]]
-name = "html2text"
-version = "0.17.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31e981cc9b710410461bf2e474b54da9ccb2fa3212936295bc5c02cb09f3d3f2"
-dependencies = [
- "html5ever",
- "tendril",
- "thiserror 2.0.21",
- "unicode-width",
-]
-
-[[package]]
 name = "html5ever"
 version = "0.40.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5877,6 +5865,7 @@ dependencies = [
 name = "synd-client"
 version = "0.4.0"
 dependencies = [
+ "bon",
  "fake",
  "futures-util",
  "graphql_client",
@@ -5993,8 +5982,11 @@ name = "synd-support"
 version = "0.4.0"
 dependencies = [
  "axum",
+ "bon",
  "chrono",
  "directories",
+ "dom_query",
+ "dom_smoothie",
  "humantime",
  "insta",
  "mockall",
@@ -6011,11 +6003,15 @@ dependencies = [
  "serde",
  "serde_json",
  "supports-color",
+ "thiserror 2.0.21",
  "tokio",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "unicode-segmentation",
+ "unicode-width",
+ "url",
 ]
 
 [[package]]
@@ -6028,13 +6024,11 @@ dependencies = [
  "chrono-humanize",
  "criterion",
  "crossterm",
- "dom_smoothie",
  "edit",
  "encoding_rs",
  "fake",
  "futures-util",
  "graphql_client",
- "html2text",
  "http",
  "indexmap",
  "itertools 0.15.0",
