@@ -1,0 +1,26 @@
+fragment TimelineEntriesPage on TimelineEntryConnection {
+  nodes {
+    orderTime
+    entry {
+      id
+      title
+      published
+      updated
+      excerpt(maxUnicodeWidth: $maxUnicodeWidth) {
+        text
+      }
+      websiteUrl
+      feed {
+        title
+        url
+        requirement
+        category
+      }
+    }
+  }
+  pageInfo {
+    hasNextPage
+    endCursor
+  }
+  seq
+}

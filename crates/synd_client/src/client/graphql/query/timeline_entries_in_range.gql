@@ -1,0 +1,16 @@
+query TimelineEntriesInRange(
+  $timelineId: ID!
+  $after: String
+  $first: Int!
+  $since: Rfc3339Time
+  $until: Rfc3339Time
+  $maxUnicodeWidth: Int
+) {
+  output: feedRegistry {
+    timeline(timelineId: $timelineId) {
+      entries(after: $after, first: $first, since: $since, until: $until) {
+        ...TimelineEntriesPage
+      }
+    }
+  }
+}

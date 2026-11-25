@@ -33,6 +33,12 @@ pub struct TimelineEntriesRequest {
     timeline_id: TimelineId,
     first: i64,
     after: Option<String>,
+    /// Include entries whose order time is at or after this instant.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    since: Option<Time>,
+    /// Include entries whose order time is before this instant.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    until: Option<Time>,
     /// Maximum Unicode display width per excerpt. Omit to use the server default.
     #[serde(skip_serializing_if = "Option::is_none")]
     max_unicode_width: Option<u16>,
@@ -49,6 +55,10 @@ impl TimelineEntriesRequest {
 
     pub fn after(&self) -> Option<&str> {
         self.after.as_deref()
+    }
+
+    pub(crate) fn has_time_range(&self) -> bool {
+        self.since.is_some() || self.until.is_some()
     }
 
     pub fn max_unicode_width(&self) -> Option<u16> {

@@ -76,7 +76,10 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert!(content["length"].is_object());
     assert!(content["src"].is_object());
     let timeline_entries = tool("list_timeline_entries");
-    assert!(timeline_entries["inputSchema"]["properties"]["maxUnicodeWidth"].is_object());
+    let params = &timeline_entries["inputSchema"]["properties"];
+    assert!(params["maxUnicodeWidth"].is_object());
+    assert_eq!(params["since"]["format"], "date-time");
+    assert_eq!(params["until"]["format"], "date-time");
     let definitions_by_type = &timeline_entries["outputSchema"]["$defs"];
     let fields = &definitions_by_type["TimelineEntry"]["properties"];
     assert_eq!(fields["id"]["type"], "string");
@@ -86,6 +89,7 @@ async fn test_stdio() -> anyhow::Result<()> {
     assert_eq!(feed["url"]["$ref"], "#/$defs/FeedUrl");
     assert_eq!(definitions_by_type["FeedUrl"]["format"], "uri");
     assert_eq!(fields["published"]["format"], "date-time");
+    assert_eq!(fields["orderTime"]["format"], "date-time");
     let mut tools: Vec<&str> = definitions
         .iter()
         .map(|tool| tool["name"].as_str().unwrap())
@@ -328,12 +332,66 @@ async fn check_timeline_entry_pages(
                 "excerpt": "Hello",
                 "url": null,
                 "feed": {"title": null, "url": standalone_url},
-                "published": null
+                "published": null,
+                "orderTime": "2024-05-01T12:00:00Z"
             }],
             "next_cursor": null
         })
     );
+    check_timeline_entry_time_range(peer, timeline_id).await?;
     check_summary_only_entry(peer, timeline_id, &format!("http://{addr}/feed/o11y_news")).await
+}
+
+async fn check_timeline_entry_time_range(
+    peer: &mut McpPeer,
+    timeline_id: TimelineId,
+) -> anyhow::Result<()> {
+    fn order_times(page: &Value) -> Vec<&str> {
+        page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["orderTime"].as_str().unwrap())
+            .collect()
+    }
+
+    let mut params = json!({
+        "timeline_id": timeline_id,
+        "since": "2024-05-15T13:00:00+09:00",
+        "until": "2024-05-29T13:00:00+09:00",
+        "first": 1,
+    });
+    let page = peer.tool("list_timeline_entries", params.clone()).await?;
+    assert_eq!(order_times(&page), ["2024-05-22T04:00:00Z"]);
+    params["after"] = json!(
+        page["next_cursor"]
+            .as_str()
+            .context("Expected a second page in the time range")?
+    );
+    let page = peer.tool("list_timeline_entries", params).await?;
+    assert_eq!(order_times(&page), ["2024-05-15T04:00:00Z"]);
+    assert!(page["next_cursor"].is_null());
+
+    for (mut bounds, expected) in [
+        (
+            json!({"since": "2024-05-29T04:00:00Z"}),
+            vec!["2024-05-29T04:00:00Z"],
+        ),
+        (
+            json!({"until": "2024-05-08T04:00:00Z"}),
+            vec!["2024-05-01T12:00:00Z"],
+        ),
+        (
+            json!({"since": "2024-05-22T04:00:00Z", "until": "2024-05-22T04:00:00Z"}),
+            vec![],
+        ),
+    ] {
+        bounds["timeline_id"] = json!(timeline_id);
+        let page = peer.tool("list_timeline_entries", bounds).await?;
+        assert_eq!(order_times(&page), expected);
+        assert!(page["next_cursor"].is_null());
+    }
+    Ok(())
 }
 
 async fn check_inline_entry(peer: &mut McpPeer, listed: &Value) -> anyhow::Result<()> {

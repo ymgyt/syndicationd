@@ -28,6 +28,12 @@ impl From<synd_feed::types::Time> for Rfc3339Time {
     }
 }
 
+impl From<Rfc3339Time> for synd_feed::types::Time {
+    fn from(value: Rfc3339Time) -> Self {
+        value.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

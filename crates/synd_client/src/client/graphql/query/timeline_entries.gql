@@ -2,30 +2,7 @@ query TimelineEntries($timelineId: ID!, $after: String, $first: Int!, $maxUnicod
   output: feedRegistry {
     timeline(timelineId: $timelineId) {
       entries(after: $after, first: $first) {
-        nodes {
-          orderTime
-          entry {
-            id
-            title
-            published
-            updated
-            excerpt(maxUnicodeWidth: $maxUnicodeWidth) {
-              text
-            }
-            websiteUrl
-            feed {
-              title
-              url
-              requirement
-              category
-            }
-          }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        seq
+        ...TimelineEntriesPage
       }
     }
   }

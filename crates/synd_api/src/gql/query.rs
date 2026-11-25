@@ -20,7 +20,9 @@ use synd_registry::{
 
 use crate::gql::{
     object::{self, Entry},
-    registry, subscriber_id,
+    registry,
+    scalar::Rfc3339Time,
+    subscriber_id,
 };
 
 #[derive(Enum, Clone, Copy, PartialEq, Eq)]
@@ -238,9 +240,22 @@ impl Timeline {
         cx: &Context<'_>,
         after: Option<String>,
         #[graphql(default = 20)] first: Option<i32>,
+        #[graphql(desc = "Include entries at or after this orderTime.")] since: Option<Rfc3339Time>,
+        #[graphql(desc = "Include entries before this orderTime.")] until: Option<Rfc3339Time>,
     ) -> Result<Connection<String, TimelineEntry, TimelineEntriesFields>> {
-        let request = TimelineEntriesRequest::from_graphql(cx, self.id, after.as_deref(), first)?;
-        Ok(request.load(cx).await?.into())
+        let query = TimelineEntriesQuery {
+            subscriber_id: subscriber_id(cx),
+            timeline_id: self.id,
+            after: after
+                .as_deref()
+                .map(TimelineEntryCursor::decode)
+                .transpose()?,
+            first: usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0),
+            since: since.map(Into::into),
+            until: until.map(Into::into),
+        };
+        let page = registry(cx).list_timeline_entries(query).await?;
+        Ok(TimelineEntriesGraphqlPage(page).into())
     }
 
     async fn changes(
@@ -271,7 +286,7 @@ impl Timeline {
 #[derive(SimpleObject)]
 struct TimelineEntry {
     /// Display position on the timeline
-    order_time: crate::gql::scalar::Rfc3339Time,
+    order_time: Rfc3339Time,
     entry: Entry,
 }
 
@@ -310,36 +325,6 @@ impl From<TimelineEntriesGraphqlPage> for TimelineEntriesConnection {
             Edge::new(cursor, TimelineEntry::from(node))
         }));
         connection
-    }
-}
-
-/// Validated GraphQL arguments for one timeline entries query.
-struct TimelineEntriesRequest(TimelineEntriesQuery);
-
-impl TimelineEntriesRequest {
-    fn from_graphql(
-        cx: &Context<'_>,
-        timeline_id: TimelineId,
-        after: Option<&str>,
-        first: Option<i32>,
-    ) -> Result<Self> {
-        let first = usize::try_from(first.unwrap_or(20).clamp(0, 100)).unwrap_or(0);
-        let after = after
-            .map(TimelineEntryCursor::decode)
-            .transpose()
-            .map_err(|err| async_graphql::Error::new(err.to_string()))?;
-        Ok(Self(TimelineEntriesQuery {
-            subscriber_id: subscriber_id(cx),
-            timeline_id,
-            after,
-            first,
-        }))
-    }
-
-    async fn load(self, cx: &Context<'_>) -> Result<TimelineEntriesGraphqlPage> {
-        Ok(TimelineEntriesGraphqlPage(
-            registry(cx).list_timeline_entries(self.0).await?,
-        ))
     }
 }
 

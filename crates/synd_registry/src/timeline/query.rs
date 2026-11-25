@@ -28,6 +28,10 @@ pub struct TimelineEntriesQuery {
     pub timeline_id: TimelineId,
     pub after: Option<TimelineEntryCursor>,
     pub first: usize,
+    /// Inclusive lower bound on the entry's timeline order time.
+    pub since: Option<DateTime<Utc>>,
+    /// Exclusive upper bound on the entry's timeline order time.
+    pub until: Option<DateTime<Utc>>,
 }
 
 /// Opaque pagination cursor for timeline entry ordering.

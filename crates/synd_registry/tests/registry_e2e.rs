@@ -110,6 +110,8 @@ async fn subscribe_flows_through_crawl_to_timeline_notification() -> anyhow::Res
             timeline_id: timeline.timeline_id,
             after: None,
             first: 10,
+            since: None,
+            until: None,
         })
         .await?;
     assert!(!page.nodes.is_empty(), "timeline should contain entries");

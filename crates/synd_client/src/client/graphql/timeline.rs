@@ -10,7 +10,14 @@ use crate::{
 };
 
 const TIMELINE_CHANGES_QUERY: &str = include_str!("query/timeline_changes.gql");
-const TIMELINE_ENTRIES_QUERY: &str = include_str!("query/timeline_entries.gql");
+const TIMELINE_ENTRIES_QUERY: &str = concat!(
+    include_str!("query/timeline_entries.gql"),
+    include_str!("query/timeline_entries_page.gql"),
+);
+const TIMELINE_ENTRIES_IN_RANGE_QUERY: &str = concat!(
+    include_str!("query/timeline_entries_in_range.gql"),
+    include_str!("query/timeline_entries_page.gql"),
+);
 const LIST_TIMELINES_QUERY: &str = include_str!("query/list_timelines.gql");
 const CREATE_TIMELINE_MUTATION: &str = include_str!("query/create_timeline.gql");
 
@@ -122,11 +129,14 @@ impl Client {
         if let Some(width @ 1001..) = request.max_unicode_width() {
             return Err(SyndApiError::InvalidExcerptWidth(width));
         }
+        // Older daemons reject unknown field arguments even when their values are null.
+        let query = if request.has_time_range() {
+            TIMELINE_ENTRIES_IN_RANGE_QUERY
+        } else {
+            TIMELINE_ENTRIES_QUERY
+        };
         let outcome = self
-            .execute_graphql::<_, TimelineEntriesData>(&GraphqlRequest::new(
-                TIMELINE_ENTRIES_QUERY,
-                request,
-            ))
+            .execute_graphql::<_, TimelineEntriesData>(&GraphqlRequest::new(query, request))
             .await?
             .accept_partial()?;
         outcome.warn_partial_errors();

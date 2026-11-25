@@ -277,6 +277,8 @@ pub(crate) async fn list_timeline_entries(
             timeline_id,
             after: None,
             first: 10,
+            since: None,
+            until: None,
         })
         .await?;
     tx.commit().await?;

@@ -328,6 +328,12 @@ async fn load_timeline_entries(
     sql.push(" AND t.subscriber_id = ");
     sql.push_bind(query.subscriber_id.as_str());
     sql.push(" AND te.deleted = 0");
+    if let Some(since) = query.since {
+        sql.push(" AND te.order_time >= ").push_bind(since);
+    }
+    if let Some(until) = query.until {
+        sql.push(" AND te.order_time < ").push_bind(until);
+    }
     if let Some(after) = query.after.as_ref() {
         sql.push(" AND (te.order_time, te.entry_id) < (");
         sql.push_bind(after.order_time());
