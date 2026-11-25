@@ -10,39 +10,6 @@ mod config;
 mod release;
 mod runtime;
 
-fn install_panic_hook() {
-    let previous = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
-        let message = panic
-            .payload()
-            .downcast_ref::<&str>()
-            .copied()
-            .or_else(|| panic.payload().downcast_ref::<String>().map(String::as_str))
-            .unwrap_or("non-string panic payload");
-        let thread = std::thread::current();
-        let thread_name = thread.name().unwrap_or("unnamed");
-
-        if let Some(location) = panic.location() {
-            tracing::error!(
-                panic_message = message,
-                panic_file = location.file(),
-                panic_line = location.line(),
-                panic_column = location.column(),
-                thread = thread_name,
-                "Synd process panicked"
-            );
-        } else {
-            tracing::error!(
-                panic_message = message,
-                thread = thread_name,
-                "Synd process panicked"
-            );
-        }
-
-        previous(panic);
-    }));
-}
-
 fn init_tracing(
     config: &ConfigResolver,
     command: &cli::Command,
@@ -110,47 +77,12 @@ fn init_tracing(
     Ok(guard)
 }
 
-mod crypto_provider {
-    use rustls::crypto::CryptoProvider;
-
-    pub(super) fn init() {
-        try_init().expect("failed to initialize rustls CryptoProvider");
-    }
-
-    pub(super) fn try_init() -> anyhow::Result<()> {
-        if CryptoProvider::get_default().is_some() {
-            return Ok(());
-        }
-
-        rustls::crypto::ring::default_provider()
-            .install_default()
-            .map_err(|_| anyhow::anyhow!("failed to install rustls ring CryptoProvider"))
-    }
-}
-
-#[tokio::main]
-async fn main() -> ExitCode {
-    crypto_provider::init();
-
+async fn run() -> anyhow::Result<ExitCode> {
     let (config_builder, command) = cli::parse();
-    let config = match config_builder.try_build() {
-        Ok(config) => config,
-        Err(err) => {
-            eprintln!("{err}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let config = config_builder.try_build()?;
+    let _guard = init_tracing(&config, &command)?;
 
-    let _guard = match init_tracing(&config, &command) {
-        Ok(guard) => guard,
-        Err(err) => {
-            eprintln!("{err:?}");
-            return ExitCode::FAILURE;
-        }
-    };
-    install_panic_hook();
-
-    match command {
+    Ok(match command {
         cli::Command::Term(term) => term.run(config).await,
         cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
         cli::Command::Daemon(daemon) => daemon.run(config).await,
@@ -158,5 +90,18 @@ async fn main() -> ExitCode {
         cli::Command::Feed(feed) => feed.run(config).await,
         cli::Command::Mcp(mcp) => mcp.run(&config).await,
         cli::Command::Config(command) => command.run(&config),
+    })
+}
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    synd::install_tls_crypto_provider().expect("rustls crypto provider already installed");
+
+    match run().await {
+        Ok(code) => code,
+        Err(err) => {
+            eprintln!("{err}");
+            ExitCode::FAILURE
+        }
     }
 }

@@ -124,6 +124,12 @@ impl TestCase {
     }
 
     pub async fn init_app(&self) -> anyhow::Result<TestApplication> {
+        static INSTALL_TLS_CRYPTO_PROVIDER: Once = Once::new();
+        INSTALL_TLS_CRYPTO_PROVIDER.call_once(|| {
+            synd::install_tls_crypto_provider()
+                .expect("test process already has a rustls crypto provider");
+        });
+
         let TestCase {
             terminal_col_row: (term_col, term_row),
             config,
@@ -234,9 +240,6 @@ pub fn init_tracing() {
     static INIT_SUBSCRIBER: Once = Once::new();
 
     INIT_SUBSCRIBER.call_once(|| {
-        // Initialize rustls crypto provider for integration tests
-        let _ = rustls::crypto::ring::default_provider().install_default();
-
         let show_code_location = std::env::var("SYND_LOG_LOCATION").ok().is_some();
 
         tracing_subscriber::fmt()

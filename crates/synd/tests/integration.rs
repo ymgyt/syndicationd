@@ -1,20 +1,12 @@
 #[cfg(feature = "integration")]
 mod test {
-    use std::{sync::Once, time::Duration};
+    use std::time::Duration;
 
     use synd_feed::types::{Category, FeedUrl, Requirement};
     use synd_term::{auth::Credential, key, test_support::screen::Screen};
 
     mod helper;
     use crate::test::helper::{SubscriptionSeed, TestCase};
-
-    static INIT: Once = Once::new();
-
-    fn ensure_init() {
-        INIT.call_once(|| {
-            let _ = rustls::crypto::ring::default_provider().install_default();
-        });
-    }
 
     mod auth_wiring {
         use super::*;
@@ -50,8 +42,6 @@ mod test {
 
         #[tokio::test(flavor = "multi_thread")]
         async fn seeded_subscriptions() -> anyhow::Result<()> {
-            ensure_init();
-
             let feed_url: FeedUrl = "https://example.com/feed.xml".try_into().unwrap();
             let test_case = TestCase {
                 terminal_col_row: (120, 30),
@@ -88,8 +78,6 @@ mod test {
 
         #[tokio::test(flavor = "multi_thread")]
         async fn unauthorized() -> anyhow::Result<()> {
-            ensure_init();
-
             let test_case = TestCase {
                 terminal_col_row: (120, 30),
                 ..Default::default()
