@@ -1,6 +1,5 @@
 use rmcp::model::{ContentBlock, IntoContents};
 use synd_client::{SyndApiError, payload::ResponseCode};
-use synd_feed::entry::EntryId;
 use synd_runtime::Error as RuntimeError;
 use synd_support::html::fetch::ArticleFetchError;
 use thiserror::Error;
@@ -9,8 +8,6 @@ use url::ParseError;
 /// Failures reported to the MCP client as tool errors.
 #[derive(Debug, Error)]
 pub(crate) enum ToolError {
-    #[error("Entry not found: {0}")]
-    EntryNotFound(EntryId),
     #[error(transparent)]
     FetchEntryBody(#[from] ArticleFetchError),
     #[error("first must be between 1 and 100")]

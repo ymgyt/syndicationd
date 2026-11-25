@@ -25,7 +25,7 @@ impl McpServer {
     }
 
     #[tool(
-        description = "List timeline entries newest first by orderTime, with titles, plain-text excerpts, article URLs, feeds, and publication times. When paging through a time range, repeat the same since and until bounds. Pass the selected item's id as entry_id to get_entry.",
+        description = "List timeline entries newest first by orderTime, with titles, plain-text excerpts, article URLs, feeds, and publication times. When paging through a time range, repeat the same since and until bounds. To read an article, pass its url to fetch_entry_body.",
         annotations(read_only_hint = true, open_world_hint = false)
     )]
     async fn list_timeline_entries(
@@ -105,7 +105,7 @@ impl TryFrom<TimelineEntriesParams> for TimelineEntriesRequest {
 /// An article in the timeline and the feed it came from.
 #[derive(Serialize, JsonSchema)]
 struct TimelineEntry {
-    /// Pass this entry ID as `entry_id` to `get_entry`.
+    /// Stable ID assigned by synd to the entry.
     #[schemars(with = "String")]
     id: EntryId,
     title: Option<String>,
