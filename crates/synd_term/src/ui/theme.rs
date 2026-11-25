@@ -1,8 +1,22 @@
 use ratatui::style::{Color, Modifier, Style};
+use serde::{Deserialize, Serialize};
+use strum::Display;
+
+/// The background used for the main surface of the TUI.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Display, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum ThemeBackground {
+    #[default]
+    Theme,
+    Transparent,
+}
 
 #[derive(Clone)]
 pub struct Theme {
     pub name: &'static str,
+    pub(crate) background: ThemeBackground,
+    dark_label_fg: Color,
     pub base: Style,
     pub application_title: Style,
     pub login: LoginTheme,
@@ -134,19 +148,29 @@ impl Palette {
 }
 
 impl Theme {
+    pub fn with_palette(palette: Palette) -> Self {
+        Self::new(palette, ThemeBackground::Theme)
+    }
+
     #[allow(clippy::needless_pass_by_value)]
-    pub fn with_palette(p: Palette) -> Self {
+    pub fn new(palette: Palette, background: ThemeBackground) -> Self {
         let Palette {
             name,
-            bg,
+            bg: palette_bg,
             fg,
             fg_inactive,
             fg_focus,
             error,
-        } = p;
+        } = palette;
+        let bg = match background {
+            ThemeBackground::Theme => palette_bg,
+            ThemeBackground::Transparent => Color::Reset,
+        };
 
         Self {
             name,
+            background,
+            dark_label_fg: palette_bg,
             base: Style::new().bg(bg).fg(fg),
             application_title: Style::new().fg(fg).bg(bg).add_modifier(Modifier::BOLD),
             login: LoginTheme {
@@ -181,7 +205,7 @@ impl Theme {
                 fg,
             },
             selection_popup: SelectionPopup {
-                highlight: Style::new().bg(Color::Yellow).fg(bg),
+                highlight: Style::new().bg(Color::Yellow).fg(palette_bg),
             },
         }
     }
@@ -196,7 +220,7 @@ impl Default for Theme {
 impl Theme {
     pub(crate) fn contrast_fg_from_luminance(&self, luminance: f64) -> Color {
         if luminance > 0.5 {
-            self.base.bg.unwrap_or_default()
+            self.dark_label_fg
         } else {
             self.base.fg.unwrap_or_default()
         }

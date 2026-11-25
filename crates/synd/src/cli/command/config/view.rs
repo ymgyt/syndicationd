@@ -7,6 +7,7 @@ use std::{
 use clap::Args;
 use serde::Serialize;
 use synd_support::time::humantime::HumanDuration;
+use synd_term::ui::theme::ThemeBackground;
 
 use crate::{
     cli::{OutputFormat, command::CommandFailure},
@@ -113,6 +114,7 @@ struct GhOutput {
 #[derive(Debug, Serialize)]
 struct ThemeOutput {
     name: &'static str,
+    background: ThemeBackground,
 }
 
 impl ConfigViewOutput {
@@ -162,6 +164,7 @@ impl ConfigViewOutput {
             },
             theme: ThemeOutput {
                 name: config.palette().name(),
+                background: config.theme_background,
             },
         }
     }
@@ -197,6 +200,7 @@ impl ConfigViewOutput {
             writeln!(writer, "Browser Arg: {}", self.feed.browser.args.join(" "))?;
         }
         writeln!(writer, "      Theme: {}", self.theme.name)?;
+        writeln!(writer, " Background: {}", self.theme.background)?;
         writeln!(
             writer,
             "     GitHub: {}",

@@ -53,6 +53,9 @@ synd config view -o json
 The theme can be changed with `--theme`, `SYND_THEME`, or `[theme.name]`.
 Run `synd --help` to see the available values.
 
+Under `[theme]`, set `background = "transparent"` to use your terminal's
+background and opacity. The default is `"theme"`.
+
 ## Log
 
 The default log file path is based on `ProjectDirs::data_dir()`.

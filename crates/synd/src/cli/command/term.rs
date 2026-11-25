@@ -89,7 +89,7 @@ async fn build_app(config: ConfigResolver) -> anyhow::Result<(Application, Sessi
             ..Default::default()
         };
         let cache = Cache::new(config.cache_dir());
-        let theme = Theme::with_palette(config.palette());
+        let theme = Theme::new(config.palette(), config.theme_background);
         let interactor = {
             let text_browser = TextBrowserInteractor::new(
                 config.feed_browser_command(),

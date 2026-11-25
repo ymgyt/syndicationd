@@ -23,6 +23,7 @@ ConfigFile {
             name: Some(
                 Ferra,
             ),
+            background: None,
         },
     ),
     backend: Some(

@@ -3,7 +3,7 @@ use std::{collections::HashMap, io, path::PathBuf, time::Duration};
 use serde::Deserialize;
 use thiserror::Error;
 
-use synd_term::{config::CategoryConfig, keymap::KeymapConfig};
+use synd_term::{config::CategoryConfig, keymap::KeymapConfig, ui::theme::ThemeBackground};
 
 use crate::cli::Palette;
 
@@ -20,6 +20,7 @@ pub struct LogEntry {
 #[derive(Debug, Deserialize)]
 pub struct ThemeEntry {
     pub(super) name: Option<Palette>,
+    pub(super) background: Option<ThemeBackground>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,6 +114,8 @@ pub static INIT_CONFIG: &str = r#"
 # Theme name 
 # The available themes can be found by `synd --help`
 # name = "ferra"
+# Use "transparent" to show the terminal background.
+# background = "theme"
 
 [api]
 # Client timeout duration 

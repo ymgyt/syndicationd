@@ -19,7 +19,10 @@ use crate::{
     },
 };
 use synd_term::keymap::{CompiledKeymaps, KeymapError};
-use synd_term::{config::Categories, ui::theme::Palette};
+use synd_term::{
+    config::Categories,
+    ui::theme::{Palette, ThemeBackground},
+};
 
 /// `ConfigResolver` is responsible for resolving the application's configuration
 /// while taking priority into account.
@@ -45,6 +48,7 @@ pub struct ConfigResolver {
     gh_enabled: Entry<bool>,
     gh_pat: Entry<String>,
     palette: Entry<Palette>,
+    pub(crate) theme_background: ThemeBackground,
     categories: Categories,
     keymaps: CompiledKeymaps,
 }
@@ -361,6 +365,9 @@ impl ConfigResolverBuilder {
                         .map(Into::into),
                 )
                 .with_flag(palette_flag.map(Into::into)),
+            theme_background: config_file
+                .and_then(|c| c.theme?.background)
+                .unwrap_or_default(),
             categories,
             keymaps,
         };

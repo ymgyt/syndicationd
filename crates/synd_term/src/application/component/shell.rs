@@ -66,7 +66,7 @@ impl ShellComponent {
             "dracula" => Palette::eldritch(),
             _ => Palette::ferra(),
         };
-        self.theme = Theme::with_palette(palette);
+        self.theme = Theme::new(palette, self.theme.background);
     }
 }
 
