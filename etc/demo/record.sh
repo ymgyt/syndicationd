@@ -5,10 +5,8 @@ set -o pipefail
 
 readonly WIDTH=1280 HEIGHT=640
 
-function build_binary() {
-  cargo build --locked --manifest-path "$1" --bin "$2" --message-format=json-render-diagnostics |
-    jq -r --arg bin "$2" 'select(.target.name == $bin and .executable != null) | .executable'
-}
+# shellcheck source=etc/demo/common.sh
+source "$(dirname -- "${BASH_SOURCE[0]}")/common.sh"
 
 function send_keys() {
   zellij --session "$session" action send-keys --pane-id "$pane" "$@"
@@ -41,16 +39,10 @@ function size_demo_pane() {
   pane_crop="${pane_position}+$((columns * cell_width))x$((rows * cell_height))"
 }
 
-function render_assets() {
+function render_gif() {
   local recording=$1 output=$2 crop=$3 position=$4
-  local background='#2b292d'
   gifsicle --crop "$crop" --position "$position" --logical-screen "${WIDTH}x${HEIGHT}" \
-    --background "$background" --optimize=2 "$recording" -o "$output/demo.gif"
-  # Center horizontally for 16:9 cards. The terminal frame already supplies the top margin.
-  ffmpeg -v error -i "$output/demo.gif" -frames:v 1 \
-    -vf "fps=1:round=up,select='eq(n,2)',scale=1136:568:flags=lanczos,pad=${WIDTH}:${HEIGHT}:(ow-iw)/2:0:${background}" \
-    "$output/social-preview.png"
-  [[ -s $output/social-preview.png ]]
+    --background '#2b292d' --optimize=2 "$recording" -o "$output"
 }
 
 function play_demo() {
@@ -105,19 +97,7 @@ function main() {
   trap 'exit 130' INT
   trap 'exit 143' TERM
 
-  local feeds=etc/demo/feeds.json
-  "$synd" feed import "$feeds"
-  local deadline=$((SECONDS + 90))
-  until "$synd" feed export | jq -e --slurpfile expected "$feeds" '
-    ([.feeds[] | select(.title != null) | .url] | sort) == ($expected[0].feeds | map(.url) | sort)
-  ' >/dev/null; do
-    if (( SECONDS >= deadline )); then
-      echo 'Timed out fetching demo feeds.' >&2
-      "$synd" feed export >&2
-      return 1
-    fi
-    sleep 1
-  done
+  fetch_demo_feeds "$synd" etc/demo/feeds.json
 
   printf 'session_serialization false\npane_frames false\nshow_release_notes false\n' > "$work/zellij.kdl"
   PATH="$(dirname "$synd"):$PATH" alacritty -v -T 'synd demo' -o 'window.dynamic_title=false' \
@@ -125,7 +105,7 @@ function main() {
     -e zellij --config "$work/zellij.kdl" --session "$session" \
       --new-session-with-layout "$PWD/etc/demo/layout.kdl" > "$work/alacritty.log" 2>&1 &
   window_pid=$!
-  deadline=$((SECONDS + 20))
+  local deadline=$((SECONDS + 20))
   until [[ $(zellij --session "$session" action dump-screen 2>/dev/null) == *'Entry 1/'* ]]; do
     kill -0 "$window_pid"
     if (( SECONDS >= deadline )); then
@@ -146,9 +126,8 @@ function main() {
   kill -INT "$recorder_pid"
   wait "$recorder_pid"
   recorder_pid=
-  render_assets "$work/window.gif" "$work" "$pane_crop" "$pane_position"
+  render_gif "$work/window.gif" "$work/demo.gif" "$pane_crop" "$pane_position"
   mv -- "$work/demo.gif" etc/demo/demo.gif
-  mv -- "$work/social-preview.png" etc/demo/social-preview.png
 }
 
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then

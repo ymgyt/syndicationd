@@ -2,8 +2,12 @@
   "feeds": [
     { "url": "https://blog.rust-lang.org/feed.xml", "category": "rust", "requirement": "Must" },
     { "url": "https://this-week-in-rust.org/atom.xml", "category": "rust", "requirement": "Must" },
+    { "url": "https://blog.rust-lang.org/inside-rust/feed.xml", "category": "rust", "requirement": "Must" },
     { "url": "https://rustsec.org/feed.xml", "category": "rust", "requirement": "May" },
-    { "url": "https://lwn.net/headlines/rss", "category": "linux", "requirement": "Must" },
-    { "url": "https://planet.kernel.org/rss20.xml", "category": "linux", "requirement": "Should" }
+    { "url": "https://lwn.net/headlines/rss", "category": "linux", "requirement": "Should" },
+    { "url": "https://planet.kernel.org/rss20.xml", "category": "linux", "requirement": "Should" },
+    { "url": "https://go.dev/blog/feed.atom", "category": "go", "requirement": "Must" },
+    { "url": "https://kubernetes.io/feed.xml", "category": "kubernetes", "requirement": "Must" },
+    { "url": "https://github.blog/engineering/feed/", "category": "misc", "requirement": "Must" }
   ]
 }

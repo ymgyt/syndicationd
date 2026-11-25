@@ -9,7 +9,7 @@
 [![Audit][workflow-audit-badge]][workflow-audit-url]
 [![Coverage][coverage-badge]][coverage-url]
 
-![Demo](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/demo.gif)
+![Syndicationd showing feed entries and the selected article's summary](https://raw.githubusercontent.com/ymgyt/syndicationd/main/etc/demo/readme.png)
 
 Syndicationd is a TUI feed viewer, based on [feed-rs](https://github.com/feed-rs/feed-rs) and [ratatui](https://github.com/ratatui-org/ratatui).
 It also provides a CLI and an MCP server.
