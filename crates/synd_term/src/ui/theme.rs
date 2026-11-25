@@ -1,6 +1,8 @@
 use ratatui::style::{Color, Modifier, Style};
 use serde::{Deserialize, Serialize};
 use strum::Display;
+pub use tuiframework::theme::Palette;
+use tuiframework::theme::Styles;
 
 /// The background used for the main surface of the TUI.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Display, Eq, PartialEq, Serialize)]
@@ -76,136 +78,60 @@ pub struct SelectionPopup {
     pub highlight: Style,
 }
 
-#[derive(Clone, Debug)]
-pub struct Palette {
-    name: &'static str,
-    bg: Color,
-    fg: Color,
-    fg_inactive: Color,
-    fg_focus: Color,
-    error: Color,
-}
-
-impl Palette {
-    pub fn name(&self) -> &'static str {
-        self.name
-    }
-
-    pub fn dracula() -> Self {
-        Self {
-            name: "dracula",
-            bg: Color::Rgb(0x28, 0x2a, 0x36),
-            fg: Color::Rgb(0xf8, 0xf8, 0xf2),
-            fg_inactive: Color::Rgb(0x62, 0x72, 0xa4),
-            fg_focus: Color::Rgb(0xff, 0x79, 0xc6),
-            error: Color::Rgb(0xff, 0x55, 0x55),
-        }
-    }
-
-    pub fn eldritch() -> Self {
-        Self {
-            name: "eldritch",
-            bg: Color::Rgb(0x21, 0x23, 0x37),
-            fg: Color::Rgb(0xeb, 0xfa, 0xfa),
-            fg_inactive: Color::Rgb(0x70, 0x81, 0xd0),
-            fg_focus: Color::Rgb(0x37, 0xf4, 0x99),
-            error: Color::Rgb(0xf1, 0x6c, 0x75),
-        }
-    }
-
-    pub fn helix() -> Self {
-        Self {
-            name: "helix",
-            bg: Color::Rgb(0x3b, 0x22, 0x4c),
-            fg: Color::Rgb(0xa4, 0xa0, 0xe8),
-            fg_inactive: Color::Rgb(0x69, 0x7c, 0x81),
-            fg_focus: Color::Rgb(0xff, 0xff, 0xff),
-            error: Color::Rgb(0xf4, 0x78, 0x68),
-        }
-    }
-
-    pub fn ferra() -> Self {
-        Self {
-            name: "ferra",
-            bg: Color::Rgb(0x2b, 0x29, 0x2d),
-            fg: Color::Rgb(0xfe, 0xcd, 0xb2),
-            fg_inactive: Color::Rgb(0x6F, 0x5D, 0x63),
-            fg_focus: Color::Rgb(0xff, 0xa0, 0x7a),
-            error: Color::Rgb(0xe0, 0x6b, 0x75),
-        }
-    }
-
-    pub fn solarized_dark() -> Self {
-        Self {
-            name: "solarized_dark",
-            bg: Color::Rgb(0x00, 0x2b, 0x36),
-            fg: Color::Rgb(0x93, 0xa1, 0xa1),
-            fg_inactive: Color::Rgb(0x58, 0x6e, 0x75),
-            fg_focus: Color::Rgb(0x26, 0x8b, 0xd2),
-            error: Color::Rgb(0xdc, 0x32, 0x2f),
-        }
-    }
-}
-
 impl Theme {
     pub fn with_palette(palette: Palette) -> Self {
         Self::new(palette, ThemeBackground::Theme)
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     pub fn new(palette: Palette, background: ThemeBackground) -> Self {
-        let Palette {
-            name,
-            bg: palette_bg,
-            fg,
-            fg_inactive,
-            fg_focus,
-            error,
-        } = palette;
         let bg = match background {
-            ThemeBackground::Theme => palette_bg,
+            ThemeBackground::Theme => palette.background,
             ThemeBackground::Transparent => Color::Reset,
         };
+        let common = Styles::from(Palette {
+            background: bg,
+            ..palette
+        });
 
         Self {
-            name,
+            name: palette.name,
             background,
-            dark_label_fg: palette_bg,
-            base: Style::new().bg(bg).fg(fg),
-            application_title: Style::new().fg(fg).bg(bg).add_modifier(Modifier::BOLD),
+            dark_label_fg: palette.background,
+            base: common.base,
+            application_title: common.title,
             login: LoginTheme {
                 title: Style::new().add_modifier(Modifier::BOLD),
                 selected_auth_provider_item: Style::new().add_modifier(Modifier::BOLD),
             },
-            tabs: Style::new().fg(fg),
-            tabs_selected: Style::new().fg(fg_focus).bold(),
+            tabs: Style::new().fg(palette.foreground),
+            tabs_selected: common.selected,
             prompt: PromptTheme {
-                key: Style::new().fg(fg_inactive).bg(bg),
-                key_desc: Style::new().fg(fg_inactive).bg(bg),
+                key: common.muted,
+                key_desc: common.muted,
                 background: Style::new().bg(bg),
             },
             subscription: SubscriptionTheme {
                 background: Style::new().bg(bg),
-                header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                selected_feed: Style::new().fg(fg_focus).add_modifier(Modifier::BOLD),
+                header: common.header,
+                selected_feed: common.selected,
             },
             entries: EntriesTheme {
-                header: Style::new().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                selected_entry: Style::new().fg(fg_focus).add_modifier(Modifier::BOLD),
-                summary: Style::new().fg(fg),
+                header: common.header,
+                selected_entry: common.selected,
+                summary: Style::new().fg(palette.foreground),
             },
             error: ErrorTheme {
-                message: Style::new().fg(error).bg(bg),
+                message: common.error,
             },
-            default_icon_fg: fg,
+            default_icon_fg: palette.foreground,
             requirement: RequirementLabelTheme {
                 must: bg,
                 should: bg,
                 may: bg,
-                fg,
+                fg: palette.foreground,
             },
             selection_popup: SelectionPopup {
-                highlight: Style::new().bg(Color::Yellow).fg(palette_bg),
+                highlight: Style::new().bg(Color::Yellow).fg(palette.background),
             },
         }
     }

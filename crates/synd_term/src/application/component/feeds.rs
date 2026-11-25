@@ -1,13 +1,14 @@
+use crate::application::{ComponentId, compositor::SyndUi};
 use std::rc::Rc;
+use tuiframework::{Component, Effects as UiEffects};
 
 use itertools::Itertools;
-use ratatui::buffer::Buffer;
 use synd_client::payload;
 use synd_feed::types::FeedUrl;
 use tracing::{debug, warn};
 use url::Url;
 
-use super::{Component, RenderContext};
+use super::RenderContext;
 use crate::{
     application::{
         Config, Generation, Populate, RequestError, RequestKind, effects::Effects,
@@ -322,16 +323,30 @@ impl FeedsComponent {
     }
 }
 
-impl Component for FeedsComponent {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for FeedsComponent {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::Feeds(action) => self
+                .apply_command(action)
+                .into_framework(ComponentId::Feeds),
+            Command::List(action) => {
+                self.subscription.apply_list(action);
+                UiEffects::NONE
+            }
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         self.subscription.render(cx.frame.content, buf, &cx.ui);
     }
 
     fn key_layers(&self) -> &[Layer] {
         &[Layer::List, Layer::Feeds]
     }
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[
+    fn subscribes(&self, event: &Event) -> bool {
+        [
             EventKind::ApiAccessReady,
             EventKind::ApiAccessRefreshed,
             EventKind::TabChanged,
@@ -341,8 +356,14 @@ impl Component for FeedsComponent {
             EventKind::FeedSubscriptionEditorClosed,
             EventKind::FeedEditionEditorClosed,
         ]
+        .contains(&EventKind::from(event))
     }
 
+    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
+        self.apply_event(event).into_framework(ComponentId::Feeds)
+    }
+}
+impl FeedsComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::ApiAccessReady => Effects::operations(self.bootstrap()),

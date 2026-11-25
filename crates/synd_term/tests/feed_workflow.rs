@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use serde_json::json;
-use synd_client::payload;
+use synd_client::{SyndApiError, payload};
 use synd_support::html::HtmlConverter;
 use synd_term::{
     application::{
@@ -13,7 +13,7 @@ use synd_term::{
     },
     config::Categories,
     integration::{
-        event_stream, focus_gained_event, focus_lost_event, new_test_terminal, resize_event,
+        TestApplication, event_stream, focus_gained_event, focus_lost_event, resize_event,
     },
     interact::mock::MockInteractor,
     key,
@@ -24,9 +24,10 @@ use tempfile::TempDir;
 
 #[tokio::test]
 async fn entering_feeds_requests_the_missing_subscription() {
-    let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
+    let api = api_with_missing_subscription();
     let (_cache_dir, mut app) = app(api, None, None);
     let (tx, mut input) = event_stream();
+    app.wait_until_jobs_completed(&mut input).await;
     tx.send(key!(tab));
     app.wait_until_jobs_completed(&mut input).await;
     assert!(Screen::new(app.buffer()).contains_text("Feed 1/1"));
@@ -168,10 +169,11 @@ async fn feeds_load_while_github_requests_wait_for_a_slot() {
         .with_auth(octocrab::AuthState::None)
         .build()
         .unwrap();
-    let api = MockFeedApi::new([MockFeedApiResponse::Subscription(Ok(subscription()))]);
+    let api = api_with_missing_subscription();
     let (_cache_dir, mut app) = app(api, Some(GhClient::with(octocrab)), None);
     let (tx, mut input) = event_stream();
-    tx.send_multi((0..91).map(|_| key!('r')));
+    // Startup already issues one GitHub request.
+    tx.send_multi((0..90).map(|_| key!('r')));
 
     tokio::time::timeout(Duration::from_secs(10), async {
         let (feed, mut running) = tokio::join!(
@@ -357,14 +359,14 @@ mod bootstrapped_app {
     }
 }
 
-fn start_app() -> (TempDir, Application) {
+fn start_app() -> (TempDir, TestApplication) {
     start_app_with_entries(timeline_entries(), None)
 }
 
 fn start_app_with_entries(
     entries: payload::TimelineEntryConnection,
     converter: Option<Arc<dyn HtmlConverter>>,
-) -> (TempDir, Application) {
+) -> (TempDir, TestApplication) {
     let timeline_id = payload::TimelineId::from_u128(1);
     let api = MockFeedApi::new([
         MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
@@ -384,22 +386,30 @@ fn start_app_with_entries(
             }),
         ),
     ]);
-    let (cache_dir, mut app) = app(api, None, converter);
+    app(api, None, converter)
+}
 
-    app.bootstrap_for_test();
-
-    (cache_dir, app)
+// The first subscription read fails on startup. Entering the Feeds tab retries it.
+fn api_with_missing_subscription() -> MockFeedApi {
+    MockFeedApi::new([
+        MockFeedApiResponse::FeedEvents(Ok(Vec::new())),
+        MockFeedApiResponse::Timelines(Err(SyndApiError::UnexpectedResponse {
+            context: "no timeline in this fixture",
+        })),
+        MockFeedApiResponse::Subscription(Err(SyndApiError::UnexpectedResponse {
+            context: "subscription unavailable at startup",
+        })),
+        MockFeedApiResponse::Subscription(Ok(subscription())),
+    ])
 }
 
 fn app(
     feed_api: MockFeedApi,
     github: Option<GhClient>,
     converter: Option<Arc<dyn HtmlConverter>>,
-) -> (TempDir, Application) {
+) -> (TempDir, TestApplication) {
     let cache_dir = tempfile::tempdir().expect("temp cache dir");
-    let terminal = new_test_terminal(120, 30);
     let builder = Application::builder()
-        .terminal(terminal)
         .feed_api(feed_api)
         .categories(Categories::default_toml())
         .config(Config {
@@ -418,7 +428,8 @@ fn app(
     let app = match github {
         Some(client) => builder.gh_client(client).build(),
         None => builder.build(),
-    };
+    }
+    .with_test_terminal(120, 30);
 
     (cache_dir, app)
 }

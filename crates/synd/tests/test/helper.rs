@@ -21,7 +21,8 @@ use synd_registry::{
     db::{CommitTx, FeedRegistryDb, SubscriptionDb},
     sqlite::{SqliteDatabase, SqliteFeedRegistryDb},
 };
-pub use synd_term::integration::{event_stream, new_test_terminal};
+use synd_term::integration::TestApplication;
+pub use synd_term::integration::event_stream;
 use synd_term::{
     application::{
         Application, Authenticator, Cache, ClientFeedApi, Config, DeviceFlows, JwtService,
@@ -122,7 +123,7 @@ impl TestCase {
         Ok(ServiceAddrs { mock, api })
     }
 
-    pub async fn init_app(&self) -> anyhow::Result<Application> {
+    pub async fn init_app(&self) -> anyhow::Result<TestApplication> {
         let TestCase {
             terminal_col_row: (term_col, term_row),
             config,
@@ -136,7 +137,6 @@ impl TestCase {
         // Configure application
         let application = {
             let endpoint = format!("https://{}/graphql", services.api).parse().unwrap();
-            let terminal = new_test_terminal(term_col, term_row);
             let client = Client::new(
                 endpoint,
                 ClientOptions::new(Duration::from_secs(10), "synd-integration-test")
@@ -208,7 +208,6 @@ impl TestCase {
             let interactor = Box::new(MockInteractor::new());
 
             let mut app = Application::builder()
-                .terminal(terminal)
                 .feed_api(ClientFeedApi::new(client))
                 .categories(Categories::default_toml())
                 .config(config)
@@ -217,7 +216,8 @@ impl TestCase {
                 .authenticator(authenticator)
                 .authentication_required(true)
                 .interactor(interactor)
-                .build();
+                .build()
+                .with_test_terminal(term_col, term_row);
 
             if should_reload {
                 app.reload_cache().await.unwrap();

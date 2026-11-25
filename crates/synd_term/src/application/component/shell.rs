@@ -1,7 +1,8 @@
-use super::{Component, RenderContext};
+use super::RenderContext;
+use crate::application::{ComponentId, compositor::SyndUi};
 use crate::{
     application::{InFlightRequests, effects::Effects, request::synd_api_error_message},
-    command::ShellCommand,
+    command::{Command, ShellCommand},
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent, OperationError},
     keymap::Layer,
     operation::Operation,
@@ -10,16 +11,13 @@ use crate::{
         widgets::status::StatusLineWidget,
     },
 };
-use ratatui::{
-    buffer::Buffer,
-    widgets::{Block, Widget},
-};
+use ratatui::widgets::{Block, Widget};
 use tracing::{error, warn};
+use tuiframework::{Component, Effects as UiEffects};
 
 /// Draws the background and status line and handles application-wide commands.
 pub(in crate::application) struct ShellComponent {
     pub(in crate::application) theme: Theme,
-    pub(in crate::application) should_quit: bool,
     status: StatusLineWidget,
     in_flight: InFlightRequests,
 }
@@ -28,7 +26,6 @@ impl ShellComponent {
     pub(super) fn new(theme: Theme) -> Self {
         Self {
             theme,
-            should_quit: false,
             status: StatusLineWidget::new(),
             in_flight: InFlightRequests::new(),
         }
@@ -44,18 +41,6 @@ impl ShellComponent {
 
     pub(in crate::application) fn dismiss_error(&mut self) {
         self.status.clear_error_message();
-    }
-
-    pub(super) fn apply_command(&mut self, command: ShellCommand) -> Effects {
-        match command {
-            ShellCommand::ShowError(message) => self.status.set_error_message(message),
-            ShellCommand::Quit => self.should_quit = true,
-            ShellCommand::RotateTheme => self.rotate_theme(),
-            ShellCommand::ForceRedraw => {
-                return Effects::operations(Operation::ForceRedrawTerminal);
-            }
-        }
-        Effects::NONE
     }
 
     fn rotate_theme(&mut self) {
@@ -83,8 +68,24 @@ impl ShellComponent {
     }
 }
 
-impl Component for ShellComponent {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for ShellComponent {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        let Command::Shell(action) = command else {
+            return UiEffects::NONE;
+        };
+        match action {
+            ShellCommand::ShowError(message) => self.status.set_error_message(message),
+            ShellCommand::Quit => return UiEffects::NONE.quit(),
+            ShellCommand::RotateTheme => self.rotate_theme(),
+            ShellCommand::ForceRedraw => {
+                return UiEffects::NONE.operation(Operation::ForceRedrawTerminal);
+            }
+        }
+        UiEffects::NONE
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         Block::new()
             .style(cx.ui.theme.base)
             .render(cx.frame.area, buf);
@@ -94,7 +95,7 @@ impl Component for ShellComponent {
             &cx.ui,
             self.in_flight.status(),
             cx.keymap,
-            &cx.layers,
+            cx.layers,
         );
     }
 
@@ -102,16 +103,22 @@ impl Component for ShellComponent {
         &[Layer::App, Layer::Global]
     }
 
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[
+    fn subscribes(&self, event: &Event) -> bool {
+        [
             EventKind::RequestEmitted,
             EventKind::RequestCompleted,
             EventKind::Feeds,
             EventKind::CredentialRefreshFailed,
             EventKind::OperationFailed,
         ]
+        .contains(&EventKind::from(event))
     }
 
+    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
+        self.apply_event(event).into_framework(ComponentId::Shell)
+    }
+}
+impl ShellComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::RequestEmitted { request_id, kind } => {

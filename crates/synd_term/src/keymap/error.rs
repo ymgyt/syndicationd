@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::{CommandId, KeySequence, Layer};
+use super::{CommandId, Layer};
 
 /// Error raised while parsing, validating, or compiling keymaps.
 #[derive(Debug, Error)]
@@ -11,12 +11,6 @@ pub enum KeymapError {
     UnknownCommand(String),
     #[error("command `{command}` is not allowed in `{layer}` keymap layer")]
     CommandNotAllowed { layer: Layer, command: CommandId },
-    #[error("invalid key notation `{0}`: {1}")]
-    InvalidKeyNotation(String, String),
-    #[error("key sequence must contain at least one key")]
-    EmptyKeySequence,
-    #[error("duplicate binding in `{layer}` keymap layer: {keys}")]
-    DuplicateBinding { layer: Layer, keys: KeySequence },
-    #[error("ambiguous key binding: {keys}")]
-    AmbiguousBinding { keys: KeySequence },
+    #[error(transparent)]
+    Bindings(#[from] tuiframework::keymap::KeymapError),
 }

@@ -35,7 +35,7 @@ impl ReaderDriver {
                     .fetch(url)
                     .await
                     .map_err(|error| RequestError::Article(error.into()))?;
-                context.emit(|request_id| Event::ArticleFetched {
+                let _ = context.emit(|request_id| Event::ArticleFetched {
                     request_id,
                     generation,
                     article: Arc::new(page.article),

@@ -47,7 +47,7 @@ impl GhDriver {
                     .fetch_notifications(params)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit(|request_id| Event::Gh {
+                let _ = context.emit(|request_id| Event::Gh {
                     request_id,
                     event: GhEvent::NotificationsFetched {
                         generation,
@@ -94,7 +94,7 @@ impl GhDriver {
                     .fetch_issue(issue)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit(|request_id| Event::Gh {
+                let _ = context.emit(|request_id| Event::Gh {
                     request_id,
                     event: GhEvent::IssueFetched {
                         generation,
@@ -129,7 +129,7 @@ impl GhDriver {
                     .fetch_pull_request(pull_request)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit(|request_id| Event::Gh {
+                let _ = context.emit(|request_id| Event::Gh {
                     request_id,
                     event: GhEvent::PullRequestFetched {
                         generation,
@@ -159,7 +159,7 @@ impl GhDriver {
                     .mark_thread_as_done(id)
                     .await
                     .map_err(RequestError::Gh)?;
-                context.emit(|request_id| Event::Gh {
+                let _ = context.emit(|request_id| Event::Gh {
                     request_id,
                     event: GhEvent::NotificationMarkedAsDone {
                         notification_id: id,

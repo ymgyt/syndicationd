@@ -1,9 +1,66 @@
+use std::path::Path;
+
 use synd_test::temp_dir;
+
+fn command(root: &Path) -> assert_cmd::Command {
+    let mut command = assert_cmd::Command::cargo_bin("synd").unwrap();
+    command
+        .env_clear()
+        .current_dir(root)
+        .env("HOME", root)
+        .env("XDG_CONFIG_HOME", root.join("config"))
+        .env("XDG_CACHE_HOME", root.join("cache"))
+        .env("XDG_DATA_HOME", root.join("data"))
+        .env("XDG_RUNTIME_DIR", root)
+        .env("SYND_LOG_FILE", root.join("synd.log"));
+    command
+}
+
+#[test]
+fn redirected_terminal_leaves_the_database_runtime_and_filter_cache_untouched() {
+    let dir = temp_dir();
+    let root = dir.path();
+    let config = root.join("config.toml");
+    let cache = root.join("cache");
+    let database = root.join("feeds.db");
+    let runtime = root.join("daemon");
+    std::fs::write(&config, "").unwrap();
+    std::fs::create_dir(&cache).unwrap();
+    let settings = cache.join(synd_term::config::cache::GH_NOTIFICATION_FILTER_OPTION_FILE);
+    std::fs::write(&settings, "preserve the original contents").unwrap();
+
+    let output = command(root)
+        .arg("--config")
+        .arg(config)
+        .arg("--cache-dir")
+        .arg(cache)
+        .arg("--sqlite-db")
+        .arg(&database)
+        .arg("--runtime-root")
+        .arg(&runtime)
+        .args(["--enable-gh", "true", "--github-pat", "test-token"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("stdout is not a terminal"),
+        "{:?}",
+        output.stderr
+    );
+    assert!(!database.exists());
+    assert!(!runtime.exists());
+    assert_eq!(
+        std::fs::read_to_string(settings).unwrap(),
+        "preserve the original contents"
+    );
+}
 
 #[test]
 #[ignore = "requires runtime daemon endpoint creation"]
 fn local_port_commands() {
-    let dir = temp_dir().keep();
+    let temp = temp_dir();
+    let dir = temp.path();
     let sqlite_db = dir.join("synd.db");
     let input = dir.join("subscriptions.json");
     std::fs::write(&input, r#"{"feeds":[]}"#).unwrap();
@@ -11,8 +68,7 @@ fn local_port_commands() {
     let sqlite_db = sqlite_db.display().to_string();
     let input = input.display().to_string();
 
-    let check = assert_cmd::Command::cargo_bin("synd")
-        .unwrap()
+    let check = command(dir)
         .args(["--sqlite-db", &sqlite_db, "config", "view"])
         .assert()
         .success();
@@ -25,14 +81,12 @@ fn local_port_commands() {
         String::from_utf8_lossy(&output.stderr),
     );
 
-    assert_cmd::Command::cargo_bin("synd")
-        .unwrap()
+    command(dir)
         .args(["--sqlite-db", &sqlite_db, "feed", "export"])
         .assert()
         .success();
 
-    assert_cmd::Command::cargo_bin("synd")
-        .unwrap()
+    command(dir)
         .args(["--sqlite-db", &sqlite_db, "feed", "import", &input])
         .assert()
         .success();
@@ -40,9 +94,9 @@ fn local_port_commands() {
 
 #[test]
 fn check_command() {
-    let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
-    let dir = temp_dir().keep();
-    let sqlite_db = dir.join("synd.db").display().to_string();
+    let dir = temp_dir();
+    let mut cmd = command(dir.path());
+    let sqlite_db = dir.path().join("synd.db").display().to_string();
 
     cmd.args(["--sqlite-db", &sqlite_db, "config", "view"])
         .assert()
@@ -54,9 +108,9 @@ fn check_command() {
 #[test]
 #[ignore = "requires runtime daemon endpoint creation"]
 fn export_command() {
-    let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
-    let dir = temp_dir().keep();
-    let sqlite_db = dir.join("synd.db").display().to_string();
+    let dir = temp_dir();
+    let mut cmd = command(dir.path());
+    let sqlite_db = dir.path().join("synd.db").display().to_string();
 
     cmd.args(["--sqlite-db", &sqlite_db, "feed", "export"])
         .assert()
@@ -67,10 +121,11 @@ fn export_command() {
 
 #[test]
 fn clean_command() {
-    let cache_dir = temp_dir().keep();
-    let mut cmd = assert_cmd::Command::cargo_bin("synd").unwrap();
+    let dir = temp_dir();
+    let log = dir.path().join("synd.log");
+    std::fs::write(&log, "test log").unwrap();
 
-    cmd.args(["--cache-dir", &cache_dir.display().to_string(), "clean"])
-        .assert()
-        .success();
+    command(dir.path()).arg("clean").assert().success();
+
+    assert!(!log.exists());
 }

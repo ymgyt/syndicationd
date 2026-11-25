@@ -1,15 +1,14 @@
-use super::{Component, RenderContext};
+use super::RenderContext;
 use crate::{
     application::{Populate, effects::Effects},
     command::{FilterCommand, FilterTarget},
     event::{Event, EventKind},
-    keymap::{Keymap, Layer, LayerKeymap},
+    keymap::Layer,
     ui::widgets::{
         filter::{FilterContext, FilterWidget},
         tabs::Tab,
     },
 };
-use ratatui::buffer::Buffer;
 
 impl Tab {
     pub(in crate::application) fn filter_target(self) -> FilterTarget {
@@ -21,7 +20,7 @@ impl Tab {
 }
 
 impl FilterWidget {
-    pub(super) fn apply_command(
+    pub(in crate::application) fn apply_command(
         &mut self,
         command: FilterCommand,
         current: FilterTarget,
@@ -72,20 +71,11 @@ impl FilterWidget {
             Effects::NONE
         }
     }
-
-    pub(in crate::application) fn install_filter_keymap(&self, keymap: &mut Keymap) {
-        keymap.clear_layer_keymap(Layer::CategoryFilter);
-        keymap.clear_layer_keymap(Layer::SearchPrompt);
-        if let Some(categories) = self.category_filter_keymap() {
-            keymap.set_layer_keymap(categories);
-        } else if self.is_search_active() {
-            keymap.set_layer_keymap(LayerKeymap::search_prompt());
-        }
-    }
 }
 
-impl Component for FilterWidget {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl tuiframework::Component<crate::application::compositor::SyndUi> for FilterWidget {
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         self.render(
             cx.frame.filter,
             buf,
@@ -106,13 +96,23 @@ impl Component for FilterWidget {
             &[Layer::Filter]
         }
     }
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[
+    fn subscribes(&self, event: &Event) -> bool {
+        [
             EventKind::FeedCategoriesChanged,
             EventKind::GhCategoriesChanged,
         ]
+        .contains(&EventKind::from(event))
     }
 
+    fn on_event(
+        &mut self,
+        event: &Event,
+    ) -> tuiframework::Effects<crate::application::compositor::SyndUi> {
+        self.apply_event(event)
+            .into_framework(crate::application::ComponentId::Filter)
+    }
+}
+impl FilterWidget {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::FeedCategoriesChanged(categories) => {

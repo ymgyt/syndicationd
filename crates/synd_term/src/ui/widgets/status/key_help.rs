@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 use crate::{
-    keymap::{CommandId, KeyHint, Keymap, Layer, LayerStack},
+    keymap::{CommandId, Keymap, KeymapAction, Layer, LayerStack},
     ui::icon,
 };
 
@@ -53,8 +53,24 @@ const MAIN_ACTIONS: &[(&[CommandId], &str)] = &[
 ];
 
 pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
-    let mut hints = keymap.hints(layers);
-    if keymap.has_pending_keys() {
+    let mut hints = keymap
+        .hints(layers)
+        .into_iter()
+        .filter_map(|hint| {
+            let command = match hint.command {
+                KeymapAction::Command(CommandId::Nop) => return None,
+                KeymapAction::Command(id) => Some(*id),
+                _ => None,
+            };
+            Some(KeyHint {
+                layer: hint.layer,
+                keys: hint.keys,
+                command,
+                description: hint.description,
+            })
+        })
+        .collect::<Vec<_>>();
+    if !keymap.pending_keys().is_empty() {
         return descriptions(hints);
     }
     let focus = layers.top();
@@ -105,4 +121,11 @@ fn descriptions<'a>(hints: impl IntoIterator<Item = KeyHint<'a>>) -> Vec<String>
         .into_iter()
         .map(|(label, keys)| format!("{}:{label}", keys.join("/")))
         .collect()
+}
+
+struct KeyHint<'a> {
+    layer: Layer,
+    keys: String,
+    command: Option<CommandId>,
+    description: Option<&'a str>,
 }

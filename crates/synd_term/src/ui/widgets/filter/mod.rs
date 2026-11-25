@@ -92,6 +92,7 @@ pub(crate) enum FilterResult {
 pub(crate) struct FilterWidget {
     categories: Rc<Categories>,
     state: State,
+    keymap_dirty: bool,
     feed: FeedHandler,
     gh_notification: GhNotificationHandler,
 
@@ -110,14 +111,35 @@ impl FilterWidget {
         Self {
             categories,
             state: State::Normal,
+            keymap_dirty: true,
             prompt: Rc::new(RefCell::new(Prompt::new())),
             feed: FeedHandler::new(),
             gh_notification: GhNotificationHandler::new(),
         }
     }
 
+    fn set_state(&mut self, state: State) {
+        if self.state != state {
+            self.state = state;
+            self.keymap_dirty = true;
+        }
+    }
+
+    pub(crate) fn install_filter_keymap(&mut self, map: &mut keymap::Keymap) {
+        if !std::mem::take(&mut self.keymap_dirty) {
+            return;
+        }
+        map.reset_layer(keymap::Layer::CategoryFilter);
+        map.reset_layer(keymap::Layer::SearchPrompt);
+        if let Some(categories) = self.category_filter_keymap() {
+            map.set_layer(keymap::Layer::CategoryFilter, categories);
+        } else if self.is_search_active() {
+            map.set_layer(keymap::Layer::SearchPrompt, keymap::search_prompt());
+        }
+    }
+
     pub fn activate_search_filtering(&mut self) {
-        self.state = State::SearchFiltering;
+        self.set_state(State::SearchFiltering);
     }
 
     pub fn is_search_active(&self) -> bool {
@@ -140,48 +162,48 @@ impl FilterWidget {
             return None;
         };
 
-        let mut keymap = keymap::LayerKeymap::builder(keymap::Layer::CategoryFilter);
+        let mut map = keymap::LayerKeymap::default();
         let categories = self.categories_state(target);
         for category in &categories.categories {
             let state = &categories.state[category];
-            if state.label == ' ' {
-                continue;
-            }
-            keymap
-                .bind_key(
-                    keymap::KeyStroke::from_char(state.label),
-                    keymap::KeymapAction::Filter(keymap::FilterAction::ToggleCategory {
+            if state.label != ' ' {
+                map.bind(tuiframework::keymap::Binding {
+                    on: keymap::KeySequence::new(vec![keymap::KeyStroke::from_char(state.label)])
+                        .unwrap(),
+                    command: keymap::FilterAction::ToggleCategory {
                         target,
                         category: category.clone(),
-                    }),
-                    Some(format!("Toggle {category} category")),
-                )
-                .expect("valid category filter key binding");
+                    }
+                    .into(),
+                    desc: Some(format!("Toggle {category} category")),
+                })
+                .expect("valid category binding");
+            }
         }
-        keymap
-            .bind(
-                ["+"],
-                keymap::KeymapAction::Filter(keymap::FilterAction::ActivateAllCategories {
-                    target,
-                }),
-                Some("Activate all categories"),
-            )
-            .expect("valid category filter key binding");
-        keymap
-            .bind(
-                ["-"],
-                keymap::KeymapAction::Filter(keymap::FilterAction::DeactivateAllCategories {
-                    target,
-                }),
-                Some("Deactivate all categories"),
-            )
-            .expect("valid category filter key binding");
-
-        Some(keymap.build().expect("valid category filter keymap"))
+        for (key, action, desc) in [
+            (
+                "+",
+                keymap::FilterAction::ActivateAllCategories { target },
+                "Activate all categories",
+            ),
+            (
+                "-",
+                keymap::FilterAction::DeactivateAllCategories { target },
+                "Deactivate all categories",
+            ),
+        ] {
+            map.bind(tuiframework::keymap::Binding {
+                on: key.parse().unwrap(),
+                command: action.into(),
+                desc: Some(desc.into()),
+            })
+            .expect("valid category binding");
+        }
+        Some(map)
     }
 
     pub fn activate_category_filtering(&mut self, target: FilterTarget) {
-        self.state = State::CategoryFiltering(target);
+        self.set_state(State::CategoryFiltering(target));
     }
 
     fn categories_state(&self, target: FilterTarget) -> &CategoriesState {
@@ -199,7 +221,7 @@ impl FilterWidget {
     }
 
     pub fn deactivate_filtering(&mut self) {
-        self.state = State::Normal;
+        self.set_state(State::Normal);
     }
 
     pub(crate) fn insert_prompt_char(&mut self, ch: char) {
@@ -291,6 +313,7 @@ impl FilterWidget {
             FilterTarget::GhNotifications => &mut self.gh_notification.categories_state,
         };
         state.update(&self.categories, populate, categories.iter().cloned());
+        self.keymap_dirty |= self.category_filter_target() == Some(target);
     }
 }
 

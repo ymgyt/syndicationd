@@ -1,8 +1,8 @@
+use super::{Clock, overlay::Overlay};
+use crate::keymap::Keymap;
 use crate::{
-    application::{ComponentId, Config, effects::Effects},
+    application::{ComponentId, Config},
     config::Categories,
-    event::{Event, EventKind},
-    keymap::{Layer, LayerStack},
     ui::{
         theme::Theme,
         widgets::{
@@ -11,8 +11,7 @@ use crate::{
         },
     },
 };
-use ratatui::buffer::Buffer;
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 use unsubscribe::UnsubscribePopup;
 
 mod commands;
@@ -33,20 +32,11 @@ use login::LoginComponent;
 use reader::ReaderComponent;
 use shell::ShellComponent;
 
-pub(in crate::application) trait Component {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>);
-    fn key_layers(&self) -> &[Layer];
-    fn mask_lower_layers(&self, _layers: &mut LayerStack) {}
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[]
-    }
-    fn apply_event(&mut self, _event: &Event) -> Effects {
-        Effects::NONE
-    }
-}
-
-impl Components {
-    pub(in crate::application) fn get(&self, id: ComponentId) -> &dyn Component {
+impl SyndUi {
+    pub(in crate::application) fn get(
+        &self,
+        id: ComponentId,
+    ) -> &dyn tuiframework::Component<Self> {
         match id {
             ComponentId::Shell => &self.shell,
             ComponentId::Tabs => &self.tabs,
@@ -60,7 +50,10 @@ impl Components {
             ComponentId::GhFilterPopup => &self.gh.notifications.filter_popup,
         }
     }
-    pub(in crate::application) fn get_mut(&mut self, id: ComponentId) -> &mut dyn Component {
+    pub(in crate::application) fn get_mut(
+        &mut self,
+        id: ComponentId,
+    ) -> &mut dyn tuiframework::Component<Self> {
         match id {
             ComponentId::Shell => &mut self.shell,
             ComponentId::Tabs => &mut self.tabs,
@@ -76,8 +69,11 @@ impl Components {
     }
 }
 
-/// Top-level application state machine that coordinates child components.
-pub(crate) struct Components {
+/// Owns the synd screens, their shared layout inputs, and the current overlays.
+pub(crate) struct SyndUi {
+    pub(super) categories: Rc<Categories>,
+    pub(super) clock: Arc<dyn Clock>,
+    pub(super) overlay: Overlay,
     pub(in crate::application) shell: ShellComponent,
     pub(in crate::application) login: LoginComponent,
     pub(in crate::application) filter: FilterWidget,
@@ -88,29 +84,35 @@ pub(crate) struct Components {
     pub(crate) gh: GhComponent,
 }
 
-impl Components {
+impl SyndUi {
     pub(in crate::application) fn visible_tab(&self) -> Option<Tab> {
         self.login.has_api_access().then(|| self.tabs.current())
     }
 
     pub(super) fn new(
-        config: &Config,
-        categories: &Rc<Categories>,
+        config: Config,
         theme: Theme,
+        categories: Categories,
         authentication_required: bool,
-    ) -> Self {
-        Self {
+        clock: Arc<dyn Clock>,
+    ) -> (Self, Keymap) {
+        let categories = Rc::new(categories);
+        let ui = Self {
             shell: ShellComponent::new(theme),
             login: LoginComponent::new(authentication_required),
             tabs: TabsWidget::new(&config.features),
-            filter: FilterWidget::new(Rc::clone(categories)),
-            feeds: FeedsComponent::new(config, Rc::clone(categories)),
+            filter: FilterWidget::new(Rc::clone(&categories)),
+            feeds: FeedsComponent::new(&config, Rc::clone(&categories)),
             reader: ReaderComponent::default(),
             gh: GhComponent::new(
                 config.features.enable_gh_notification,
-                Rc::clone(categories),
+                Rc::clone(&categories),
             ),
             unsubscribe: UnsubscribePopup::default(),
-        }
+            overlay: Overlay::default(),
+            categories,
+            clock,
+        };
+        (ui, config.keymaps.0)
     }
 }

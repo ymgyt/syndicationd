@@ -1,12 +1,10 @@
-use ratatui::{
-    buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
-};
+use crate::application::{ComponentId, compositor::SyndUi};
+use ratatui::layout::{Constraint, Layout, Rect};
+use tuiframework::{Component, Effects as UiEffects};
 
-use super::Component;
 use crate::{
     application::{Direction, effects::Effects},
-    command::FilterTarget,
+    command::{Command, FilterTarget},
     event::Event,
     keymap::{Keymap, Layer, LayerStack},
     ui::{
@@ -47,10 +45,10 @@ impl FrameLayout {
     }
 }
 
-pub(in crate::application) struct RenderContext<'a> {
+pub(crate) struct RenderContext<'a> {
     pub(in crate::application) ui: Context<'a>,
     pub(in crate::application) keymap: &'a Keymap,
-    pub(in crate::application) layers: LayerStack,
+    pub(in crate::application) layers: &'a LayerStack,
     pub(in crate::application) frame: FrameLayout,
     pub(in crate::application) filter_target: FilterTarget,
     pub(in crate::application) gh_options: &'a GhNotificationFilterOptions,
@@ -68,8 +66,16 @@ impl TabsWidget {
     }
 }
 
-impl Component for TabsWidget {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for TabsWidget {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::MoveTab(action) => self.move_tab(action).into_framework(ComponentId::Tabs),
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         self.render(cx.frame.tabs, buf, &cx.ui);
     }
 
@@ -78,8 +84,19 @@ impl Component for TabsWidget {
     }
 }
 
-impl Component for EntriesWidget {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for EntriesWidget {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::List(action) => {
+                self.apply_list(action);
+                UiEffects::NONE
+            }
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         self.render(cx.frame.content, buf, &cx.ui);
     }
 
@@ -88,8 +105,18 @@ impl Component for EntriesWidget {
     }
 }
 
-impl Component for FilterPopup {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for FilterPopup {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::GhFilterPopup(action) => {
+                Self::apply_command(action).into_framework(ComponentId::GhFilterPopup)
+            }
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         self.render_popup(cx.frame.content, buf, &cx.ui, cx.gh_options);
     }
 

@@ -17,10 +17,7 @@ pub(crate) enum Command {
     Close,
     UnsubscribePopup(UnsubscribeCommand),
     GhFilterPopup(GhFilterCommand),
-    List {
-        to: ComponentId,
-        command: ListCommand,
-    },
+    List(ListCommand),
     Shell(ShellCommand),
     Login(LoginCommand),
     MoveTab(Direction),
@@ -28,6 +25,24 @@ pub(crate) enum Command {
     Reader(ReaderCommand),
     Filter(FilterCommand),
     Gh(GhCommand),
+}
+
+impl Command {
+    /// Shared list and overlay commands belong to the component that issued them.
+    pub(crate) fn target(&self, owner: ComponentId) -> ComponentId {
+        match self {
+            Self::Nop | Self::Open | Self::Close | Self::List(_) => owner,
+            Self::Shell(_) => ComponentId::Shell,
+            Self::Login(_) => ComponentId::Login,
+            Self::MoveTab(_) => ComponentId::Tabs,
+            Self::Feeds(_) => ComponentId::Feeds,
+            Self::Reader(_) => ComponentId::Reader,
+            Self::Filter(_) => ComponentId::Filter,
+            Self::Gh(_) => ComponentId::GhNotifications,
+            Self::UnsubscribePopup(_) => ComponentId::UnsubscribePopup,
+            Self::GhFilterPopup(_) => ComponentId::GhFilterPopup,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

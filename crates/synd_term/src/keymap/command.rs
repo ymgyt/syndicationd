@@ -1,7 +1,7 @@
 use std::{fmt, str::FromStr};
 
 use crate::{
-    application::{ComponentId, Direction},
+    application::Direction,
     command::{
         Command, FeedsCommand, FilterCommand, GhCommand, GhFilterCommand,
         GhNotificationFilterOption, ListCommand, LoginCommand, ReaderCommand, ShellCommand,
@@ -12,7 +12,7 @@ use crate::{
 };
 use serde::Deserialize;
 
-use super::{KeyBinding, KeymapError, Layer};
+use super::{KeymapError, Layer};
 
 /// Stable command identifier accepted by keymap configuration.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -180,36 +180,24 @@ impl CommandId {
 }
 
 impl CommandId {
-    pub(super) fn command(self, owner: ComponentId) -> Command {
+    pub(super) fn command(self) -> Command {
         match self {
             Self::ListPrev
             | Self::MoveEntryPrev
             | Self::MoveSubscribedFeedPrev
-            | Self::MoveGhNotificationPrev => Command::List {
-                to: owner,
-                command: ListCommand::Previous,
-            },
+            | Self::MoveGhNotificationPrev => Command::List(ListCommand::Previous),
             Self::ListNext
             | Self::MoveEntryNext
             | Self::MoveSubscribedFeedNext
-            | Self::MoveGhNotificationNext => Command::List {
-                to: owner,
-                command: ListCommand::Next,
-            },
+            | Self::MoveGhNotificationNext => Command::List(ListCommand::Next),
             Self::ListFirst
             | Self::MoveEntryFirst
             | Self::MoveSubscribedFeedFirst
-            | Self::MoveGhNotificationFirst => Command::List {
-                to: owner,
-                command: ListCommand::First,
-            },
+            | Self::MoveGhNotificationFirst => Command::List(ListCommand::First),
             Self::ListLast
             | Self::MoveEntryLast
             | Self::MoveSubscribedFeedLast
-            | Self::MoveGhNotificationLast => Command::List {
-                to: owner,
-                command: ListCommand::Last,
-            },
+            | Self::MoveGhNotificationLast => Command::List(ListCommand::Last),
             Self::Nop => Command::Nop,
             Self::Quit => Command::Shell(ShellCommand::Quit),
             Self::ForceRedraw => Command::Shell(ShellCommand::ForceRedraw),
@@ -390,16 +378,13 @@ impl CommandRegistry {
     pub(super) fn validate_binding(
         &self,
         layer: Layer,
-        binding: &KeyBinding,
+        command: CommandId,
     ) -> Result<(), KeymapError> {
-        let spec = self.spec(binding.command);
+        let spec = self.spec(command);
         if spec.is_allowed_in_layer(layer) {
             Ok(())
         } else {
-            Err(KeymapError::CommandNotAllowed {
-                layer,
-                command: binding.command,
-            })
+            Err(KeymapError::CommandNotAllowed { layer, command })
         }
     }
 }

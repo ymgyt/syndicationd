@@ -1,6 +1,5 @@
-use ratatui::buffer::Buffer;
-
-use super::{Component, RenderContext};
+use super::RenderContext;
+use crate::application::{ComponentId, compositor::SyndUi};
 use crate::{
     application::effects::Effects,
     command::{Command, UnsubscribeCommand, UnsubscribeTarget},
@@ -8,6 +7,7 @@ use crate::{
     operation::Operation,
     ui::widgets::subscription::render_unsubscribe,
 };
+use tuiframework::{Component, Effects as UiEffects};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum UnsubscribeSelection {
@@ -58,8 +58,18 @@ impl UnsubscribePopup {
     }
 }
 
-impl Component for UnsubscribePopup {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for UnsubscribePopup {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::UnsubscribePopup(action) => self
+                .apply_command(action)
+                .into_framework(ComponentId::UnsubscribePopup),
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         if let Some(target) = &self.target {
             render_unsubscribe(
                 cx.frame.content,

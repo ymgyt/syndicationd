@@ -1,4 +1,37 @@
 use super::*;
+use crate::operation::Operations;
+use crate::{
+    application::{Clock, Config},
+    config::Categories,
+    ui::theme::Theme,
+};
+use chrono::{DateTime, Utc};
+use std::sync::Arc;
+
+type Compositor = tuiframework::Compositor<SyndUi>;
+fn make(config: Config, theme: Theme, categories: Categories, auth: bool) -> Compositor {
+    struct Epoch;
+    impl Clock for Epoch {
+        fn now(&self) -> DateTime<Utc> {
+            DateTime::UNIX_EPOCH
+        }
+    }
+    let (ui, keys) = SyndUi::new(config, theme, categories, auth, Arc::new(Epoch));
+    tuiframework::Compositor::new(ui, keys)
+}
+trait Input {
+    fn apply_terminal_event(&mut self, event: &TerminalEvent) -> Operations;
+    fn apply_event(&mut self, event: &Event) -> Operations;
+}
+impl Input for Compositor {
+    fn apply_terminal_event(&mut self, event: &TerminalEvent) -> Operations {
+        self.input(event).into()
+    }
+    fn apply_event(&mut self, event: &Event) -> Operations {
+        self.event(event).into()
+    }
+}
+
 use crate::{
     application::{Features, Generation, Populate, RequestId, RequestKind},
     event::{Event, FeedRequestEvent, FeedsEvent, GhEvent},
@@ -8,7 +41,36 @@ use crate::{
 };
 
 fn new_compositor(config: Config) -> Compositor {
-    Compositor::new(config, Theme::default(), Categories::default_toml(), false)
+    make(config, Theme::default(), Categories::default_toml(), false)
+}
+
+#[test]
+fn rotating_the_palette_preserves_the_transparent_background() {
+    use crate::ui::theme::{Palette, ThemeBackground};
+    use ratatui::{Terminal, backend::TestBackend, style::Color};
+
+    let mut compositor = make(
+        Config::default(),
+        Theme::new(Palette::ferra(), ThemeBackground::Transparent),
+        Categories::default_toml(),
+        false,
+    );
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let mut surface_colors = |compositor: &Compositor| {
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+        let cell = &frame.buffer[(0, 10)];
+        (cell.fg, cell.bg)
+    };
+
+    assert_eq!(
+        surface_colors(&compositor),
+        (Palette::ferra().foreground, Color::Reset)
+    );
+    let _ = compositor.input(&crate::shift!('t'));
+    assert_eq!(
+        surface_colors(&compositor),
+        (Palette::solarized_dark().foreground, Color::Reset)
+    );
 }
 
 #[test]
@@ -18,7 +80,7 @@ fn failed_login_shows_the_error_and_allows_retry_with_the_selected_provider() {
     };
     use ratatui::{Terminal, backend::TestBackend};
 
-    let mut compositor = Compositor::new(
+    let mut compositor = make(
         Config::default(),
         Theme::default(),
         Categories::default_toml(),
@@ -53,9 +115,7 @@ fn failed_login_shows_the_error_and_allows_retry_with_the_selected_provider() {
     });
 
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
-    let frame = terminal
-        .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
-        .unwrap();
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
     assert!(Screen::new(frame.buffer).contains_text("authorization unavailable"));
     assert!(matches!(
         compositor.apply_terminal_event(&key!(enter)),
@@ -67,7 +127,7 @@ fn failed_login_shows_the_error_and_allows_retry_with_the_selected_provider() {
 
 #[test]
 fn replacing_a_credential_catches_up_the_existing_timeline() {
-    let mut compositor = Compositor::new(
+    let mut compositor = make(
         Config::default(),
         Theme::default(),
         Categories::default_toml(),
@@ -152,21 +212,19 @@ fn shared_list_binding_follows_the_visible_list_and_yields_to_the_popup() {
         ComponentId::Feeds,
     ] {
         assert!(
-            matches!(compositor.resolve_keymap(key.into()), Some(Command::List {
-            to, command: ListCommand::Last,
-        }) if to == owner)
+            matches!(compositor.resolve_key(key), Some((to, Command::List(ListCommand::Last))) if to == owner)
         );
         let _ = compositor.apply_terminal_event(&key!(tab));
     }
     let _ = compositor.apply_terminal_event(&key!('f'));
-    assert!(compositor.resolve_keymap(key.into()).is_none());
+    assert!(compositor.resolve_key(key).is_none());
     let _ = compositor.apply_terminal_event(&key!(esc));
     assert!(matches!(
-        compositor.resolve_keymap(key.into()),
-        Some(Command::List {
-            to: ComponentId::GhNotifications,
-            command: ListCommand::Last,
-        })
+        compositor.resolve_key(key),
+        Some((
+            ComponentId::GhNotifications,
+            Command::List(ListCommand::Last)
+        ))
     ));
 }
 
@@ -289,9 +347,7 @@ fn failed_page_from_previous_list_finishes_without_disturbing_the_current_fetch(
     });
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
     let mut status = |compositor: &Compositor| {
-        let frame = terminal
-            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
-            .unwrap();
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
         Screen::new(frame.buffer).lines().pop().unwrap()
     };
     let failure = |page: PageRequest| Event::RequestCompleted {
@@ -317,7 +373,7 @@ fn failed_page_from_previous_list_finishes_without_disturbing_the_current_fetch(
     ));
 
     let _ = compositor.apply_event(&failure(current));
-    assert!(!compositor.is_busy());
+    assert!(!compositor.components.is_busy());
     assert!(status(&compositor).contains("secondary rate limits exceeded"));
     assert!(matches!(
         compositor.apply_terminal_event(&key!('y')),
@@ -364,9 +420,7 @@ fn github_filter_is_only_drawn_and_dismissed_on_its_tab() {
     });
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
     let mut popup_visible = |compositor: &Compositor| {
-        let frame = terminal
-            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
-            .unwrap();
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
         Screen::new(frame.buffer).contains_text("─Filter─")
     };
 
@@ -502,16 +556,14 @@ fn only_the_current_subscription_failure_reaches_the_status_line() {
     let current = start(2, key!('r'));
     let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
     let mut status = |compositor: &Compositor| {
-        let frame = terminal
-            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
-            .unwrap();
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
         Screen::new(frame.buffer).lines().pop().unwrap()
     };
     let _ = compositor.apply_event(&old);
-    assert!(compositor.is_busy());
+    assert!(compositor.components.is_busy());
     assert!(!status(&compositor).contains("page failed"));
     let _ = compositor.apply_event(&current);
-    assert!(!compositor.is_busy());
+    assert!(!compositor.components.is_busy());
     assert!(status(&compositor).contains("page failed"));
 }
 
@@ -565,9 +617,7 @@ fn status_line_shows_the_main_actions_for_each_list() {
     });
     let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
     let mut status = |compositor: &Compositor| {
-        let frame = terminal
-            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
-            .unwrap();
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
         Screen::new(frame.buffer)
             .lines()
             .pop()
@@ -627,9 +677,7 @@ fn status_hints_follow_remaps_and_search_input() {
     });
     let mut terminal = Terminal::new(TestBackend::new(240, 20)).unwrap();
     let mut status = |compositor: &Compositor| {
-        let frame = terminal
-            .draw(|frame| compositor.render(frame, DateTime::UNIX_EPOCH))
-            .unwrap();
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
         Screen::new(frame.buffer).lines().pop().unwrap()
     };
 

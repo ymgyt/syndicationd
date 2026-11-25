@@ -1,23 +1,16 @@
 use std::time::Duration;
 
-use ratatui::backend::TestBackend;
 use synd_client::{Client, ClientOptions};
 use synd_term::{
     application::{Application, Cache, ClientFeedApi, Config},
     config::Categories,
+    integration::TestApplication,
     interact::mock::MockInteractor,
-    terminal::Terminal,
     ui::theme::Theme,
 };
 use url::Url;
 
-pub fn init_app() -> Application {
-    let terminal = {
-        let backend = TestBackend::new(120, 40);
-        let terminal = ratatui::Terminal::new(backend).unwrap();
-        Terminal::with(terminal)
-    };
-
+pub fn init_app() -> TestApplication {
     let client = {
         Client::new(
             Url::parse("http://dummy.ymgyt.io").unwrap(),
@@ -29,7 +22,6 @@ pub fn init_app() -> Application {
     let cache = { Cache::new(tempfile::TempDir::new().unwrap().keep()) };
 
     Application::builder()
-        .terminal(terminal)
         .feed_api(ClientFeedApi::new(client))
         .categories(Categories::default_toml())
         .config(Config::default())
@@ -37,4 +29,5 @@ pub fn init_app() -> Application {
         .theme(Theme::default())
         .interactor(Box::new(MockInteractor::new()))
         .build()
+        .with_test_terminal(120, 40)
 }

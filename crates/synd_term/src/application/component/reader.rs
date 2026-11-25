@@ -1,7 +1,8 @@
+use crate::application::{ComponentId, compositor::SyndUi};
 use std::{cell::RefCell, sync::Arc};
+use tuiframework::{Component, Effects as UiEffects};
 
 use ratatui::{
-    buffer::Buffer,
     layout::{Constraint, Layout, Rect},
     text::Line,
     widgets::{Paragraph, Widget as _, Wrap},
@@ -9,7 +10,7 @@ use ratatui::{
 use synd_support::html::Article;
 use url::Url;
 
-use super::{Component, RenderContext};
+use super::RenderContext;
 use crate::{
     application::{Generation, RequestError, RequestKind, effects::Effects},
     command::{Command, ReaderCommand},
@@ -63,11 +64,56 @@ impl ReaderComponent {
     }
 }
 
-impl Component for ReaderComponent {
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[EventKind::ArticleFetched, EventKind::RequestCompleted]
+impl Component<SyndUi> for ReaderComponent {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::Reader(action) => self
+                .apply_command(action)
+                .into_framework(ComponentId::Reader),
+            _ => UiEffects::NONE,
+        }
     }
 
+    fn subscribes(&self, event: &Event) -> bool {
+        [EventKind::ArticleFetched, EventKind::RequestCompleted].contains(&EventKind::from(event))
+    }
+
+    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
+        self.apply_event(event).into_framework(ComponentId::Reader)
+    }
+
+    fn key_layers(&self) -> &[Layer] {
+        &[Layer::Reader]
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
+        let area = Rect {
+            height: cx.frame.status.y.saturating_sub(cx.frame.area.y),
+            ..cx.frame.area
+        };
+        let [title_area, body_area] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)])
+            .horizontal_margin(1)
+            .areas(area);
+        let title = match &self.state {
+            State::Ready { article, .. } => article.title(),
+            _ => "Reader",
+        };
+        Line::styled(title, cx.ui.theme.application_title).render(title_area, buf);
+        match &self.state {
+            State::Ready { article, body } => body.borrow_mut().render(article, body_area, buf),
+            State::Loading(url) => Paragraph::new(format!("Loading {url}…"))
+                .wrap(Wrap { trim: false })
+                .render(body_area, buf),
+            State::Failed(error) => Paragraph::new(error.as_str())
+                .style(cx.ui.theme.error.message)
+                .wrap(Wrap { trim: false })
+                .render(body_area, buf),
+            State::Closed => {}
+        }
+    }
+}
+impl ReaderComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         if matches!(self.state, State::Loading(_)) {
             match event {
@@ -92,36 +138,6 @@ impl Component for ReaderComponent {
             }
         }
         Effects::NONE
-    }
-
-    fn key_layers(&self) -> &[Layer] {
-        &[Layer::Reader]
-    }
-
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
-        let area = Rect {
-            height: cx.frame.status.y.saturating_sub(cx.frame.area.y),
-            ..cx.frame.area
-        };
-        let [title_area, body_area] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)])
-            .horizontal_margin(1)
-            .areas(area);
-        let title = match &self.state {
-            State::Ready { article, .. } => article.title(),
-            _ => "Reader",
-        };
-        Line::styled(title, cx.ui.theme.application_title).render(title_area, buf);
-        match &self.state {
-            State::Ready { article, body } => body.borrow_mut().render(article, body_area, buf),
-            State::Loading(url) => Paragraph::new(format!("Loading {url}…"))
-                .wrap(Wrap { trim: false })
-                .render(body_area, buf),
-            State::Failed(error) => Paragraph::new(error.as_str())
-                .style(cx.ui.theme.error.message)
-                .wrap(Wrap { trim: false })
-                .render(body_area, buf),
-            State::Closed => {}
-        }
     }
 }
 

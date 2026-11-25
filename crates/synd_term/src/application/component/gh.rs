@@ -1,4 +1,5 @@
-use super::{Component, RenderContext};
+use super::RenderContext;
+use crate::application::{ComponentId, compositor::SyndUi};
 use crate::{
     application::{Generation, Populate, RequestError, RequestKind, effects::Effects},
     client::gh::FetchNotificationsParams,
@@ -14,8 +15,8 @@ use crate::{
     event::{Event, EventKind, GhEvent},
     keymap::Layer,
 };
-use ratatui::buffer::Buffer;
 use std::rc::Rc;
+use tuiframework::{Component, Effects as UiEffects};
 
 /// GitHub notification state machine.
 pub(crate) struct GhComponent {
@@ -181,23 +182,44 @@ impl GhComponent {
     }
 }
 
-impl Component for GhComponent {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for GhComponent {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::Gh(action) => self
+                .apply_command(action)
+                .into_framework(ComponentId::GhNotifications),
+            Command::List(action) => {
+                self.notifications.apply_list(action);
+                UiEffects::NONE
+            }
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         self.notifications.render(cx.frame.content, buf, &cx.ui);
     }
 
     fn key_layers(&self) -> &[Layer] {
         &[Layer::List, Layer::GhNotifications]
     }
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[
+    fn subscribes(&self, event: &Event) -> bool {
+        [
             EventKind::ApiAccessReady,
             EventKind::GhFilterChanged,
             EventKind::Gh,
             EventKind::RequestCompleted,
         ]
+        .contains(&EventKind::from(event))
     }
 
+    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
+        self.apply_event(event)
+            .into_framework(ComponentId::GhNotifications)
+    }
+}
+impl GhComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::ApiAccessReady if self.enabled => {

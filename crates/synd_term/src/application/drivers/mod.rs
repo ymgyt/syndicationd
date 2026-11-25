@@ -4,22 +4,19 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures_util::{FutureExt as _, Stream, stream::FuturesUnordered};
+use super::compositor::SyndUi;
+use futures_util::Stream;
 use synd_support::html::HtmlConverter;
-use tokio::sync::mpsc;
+use tuiframework::{Driver, DriverContext, driver::DriverMessage};
 
 #[cfg(feature = "integration")]
 use crate::auth::CredentialError;
 use crate::{
-    application::{
-        Authenticator, Cache, Clock, FeedApiRef, RequestId, RequestKind, SystemClock,
-        outbound::gh::GhClient,
-    },
+    application::{Authenticator, Cache, Clock, FeedApiRef, RequestKind, outbound::gh::GhClient},
     auth::{Credential, Verified},
     event::{Event, FeedsEvent, OperationError},
     interact::Interact,
-    operation::{Operation, Operations},
-    terminal::Terminal,
+    operation::Operation,
 };
 
 mod auth;
@@ -35,21 +32,17 @@ use feed::FeedDriver;
 use gh::GhDriver;
 use interaction::{InteractionDriver, TerminalInteraction};
 use reader::ReaderDriver;
-use request::{JobFuture, RequestContext, RequestFuture};
+use request::{RequestContext, RequestFuture};
 
 /// Owns external ports, request execution, and long-lived event sources.
 pub(super) struct Drivers {
     pub(super) cache: Cache,
-    pub(super) clock: Box<dyn Clock>,
+    pub(super) clock: Arc<dyn Clock>,
     feed: FeedDriver,
     auth: AuthDriver,
     gh: GhDriver,
     interaction: InteractionDriver,
     reader: ReaderDriver,
-    request_jobs: FuturesUnordered<JobFuture>,
-    next_request_id: u64,
-    event_tx: mpsc::UnboundedSender<Event>,
-    event_rx: mpsc::UnboundedReceiver<Event>,
 }
 
 pub(super) struct DriverParts {
@@ -58,7 +51,7 @@ pub(super) struct DriverParts {
     pub(super) cache: Cache,
     pub(super) authenticator: Option<Authenticator>,
     pub(super) interactor: Box<dyn Interact>,
-    pub(super) clock: Option<Box<dyn Clock>>,
+    pub(super) clock: Arc<dyn Clock>,
     pub(super) html_converter: Arc<dyn HtmlConverter>,
 }
 
@@ -84,8 +77,6 @@ impl Drivers {
         };
         let gh = GhDriver::new(gh_client);
         let interaction = InteractionDriver::new(interactor);
-        let clock = clock.unwrap_or_else(|| Box::new(SystemClock));
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
 
         Self {
             cache,
@@ -95,37 +86,39 @@ impl Drivers {
             gh,
             interaction,
             reader: ReaderDriver::new(html_converter),
-            request_jobs: FuturesUnordered::new(),
-            next_request_id: 0,
-            event_tx,
-            event_rx,
         }
     }
+}
 
-    /// Starts ordered external side effects requested by one state transition.
-    pub(super) fn dispatch(&mut self, operations: Operations, terminal: &mut Terminal) {
-        match operations {
-            Operations::Nop => {}
-            Operations::One(operation) => self.dispatch_operation(operation, terminal),
-            Operations::Many(operations) => {
-                for operation in operations {
-                    self.dispatch_operation(operation, terminal);
-                }
-            }
-        }
+impl Driver<SyndUi> for Drivers {
+    fn shutdown(&mut self) {
+        self.auth.stop();
+        self.feed.watcher.stop();
     }
-
-    fn dispatch_operation(&mut self, operation: Operation, terminal: &mut Terminal) {
+    fn poll(&mut self, cx: &mut Context<'_>) -> Poll<DriverMessage<Event, Operation>> {
+        if let Poll::Ready(Some(event)) = Pin::new(&mut self.feed.watcher).poll_next(cx) {
+            return Poll::Ready(DriverMessage::Event(Event::Feeds(FeedsEvent::Push {
+                event,
+            })));
+        }
+        if let Poll::Ready(Some(event)) = Pin::new(&mut self.auth).poll_next(cx) {
+            return Poll::Ready(DriverMessage::Event(event));
+        }
+        Poll::Pending
+    }
+    fn dispatch(&mut self, operation: Operation, context: &mut DriverContext<Event>) {
         match operation {
             Operation::StartDeviceFlow { provider } => {
-                self.register_request(|drivers, cx| drivers.auth.start_device_flow(cx, provider));
+                self.register_request(context, |drivers, cx| {
+                    drivers.auth.start_device_flow(cx, provider)
+                });
             }
             Operation::PollDeviceFlowAccessToken {
                 provider,
                 device_authorization,
             } => {
                 let now = self.clock.now();
-                self.register_request(|drivers, cx| {
+                self.register_request(context, |drivers, cx| {
                     drivers.auth.poll_device_flow_access_token(
                         cx,
                         now,
@@ -135,20 +128,24 @@ impl Drivers {
                 });
             }
             Operation::OpenFeedSubscriptionEditor => {
-                let event = TerminalInteraction::new(&self.interaction, terminal)
+                let event = TerminalInteraction::new(&self.interaction, context)
                     .open_feed_subscription_editor();
-                self.queue_event(event);
+                context.emit(event);
             }
             Operation::OpenFeedEditionEditor { prompt } => {
-                let event = TerminalInteraction::new(&self.interaction, terminal)
+                let event = TerminalInteraction::new(&self.interaction, context)
                     .open_feed_edition_editor(prompt.as_str());
-                self.queue_event(event);
+                context.emit(event);
             }
             Operation::SubscribeFeed { input } => {
-                self.register_request(|drivers, cx| drivers.feed.subscribe_feed(cx, input));
+                self.register_request(context, |drivers, cx| {
+                    drivers.feed.subscribe_feed(cx, input)
+                });
             }
             Operation::UnsubscribeFeed { url } => {
-                self.register_request(|drivers, cx| drivers.feed.unsubscribe_feed(cx, url));
+                self.register_request(context, |drivers, cx| {
+                    drivers.feed.unsubscribe_feed(cx, url)
+                });
             }
             Operation::FetchSubscription {
                 generation,
@@ -156,22 +153,24 @@ impl Drivers {
                 after,
                 first,
             } => {
-                self.register_request(|drivers, cx| {
+                self.register_request(context, |drivers, cx| {
                     drivers
                         .feed
                         .fetch_subscription(cx, generation, populate, after, first)
                 });
             }
             Operation::OpenInitialTimeline => {
-                self.register_request(|drivers, cx| drivers.feed.open_initial_timeline(cx));
+                self.register_request(context, |drivers, cx| {
+                    drivers.feed.open_initial_timeline(cx)
+                });
             }
             Operation::FetchTimelineWindow { timeline_id, limit } => {
-                self.register_request(|drivers, cx| {
+                self.register_request(context, |drivers, cx| {
                     drivers.feed.fetch_timeline_window(cx, timeline_id, limit)
                 });
             }
             Operation::CatchUpTimeline { timeline_id, since } => {
-                self.register_request(|drivers, cx| {
+                self.register_request(context, |drivers, cx| {
                     drivers.feed.catch_up_timeline(cx, timeline_id, since)
                 });
             }
@@ -181,100 +180,94 @@ impl Drivers {
                 populate,
                 params,
             } => {
-                self.register_request(|drivers, cx| {
+                self.register_request(context, |drivers, cx| {
                     drivers
                         .gh
                         .fetch_notifications(cx, generation, populate, params)
                 });
             }
             Operation::FetchGhDetail { generation, detail } => {
-                self.register_request(|drivers, cx| {
+                self.register_request(context, |drivers, cx| {
                     drivers.gh.fetch_detail(cx, generation, detail)
                 });
             }
             Operation::MarkGhNotificationAsDone { id } => {
-                self.register_request(|drivers, cx| drivers.gh.mark_notification_as_done(cx, id));
+                self.register_request(context, |drivers, cx| {
+                    drivers.gh.mark_notification_as_done(cx, id)
+                });
             }
             Operation::UnsubscribeGhThread { id } => {
-                self.register_request(|drivers, cx| drivers.gh.unsubscribe_thread(cx, id));
+                self.register_request(context, |drivers, cx| drivers.gh.unsubscribe_thread(cx, id));
             }
             Operation::OpenBrowser { url } => {
                 if let Some(event) = self.interaction.open_browser(url) {
-                    self.queue_event(event);
+                    context.emit(event);
                 }
             }
             Operation::FetchArticle { generation, url } => {
-                self.register_request(|drivers, cx| drivers.reader.fetch(cx, generation, url));
+                self.register_request(context, |drivers, cx| {
+                    drivers.reader.fetch(cx, generation, url)
+                });
             }
             Operation::OpenTextBrowser { url } => {
                 if let Some(event) = self.interaction.open_text_browser(url) {
-                    self.queue_event(event);
+                    context.emit(event);
                 }
             }
-            Operation::ForceRedrawTerminal => terminal.force_redraw(),
+            Operation::ForceRedrawTerminal => context.force_redraw(),
             Operation::PersistCredential { credential } => {
-                self.persist_credential(&credential);
+                self.persist_credential(&credential, context);
             }
-            Operation::SetCredential { credential } => self.set_credential(&credential),
+            Operation::SetCredential { credential } => self.set_credential(&credential, context),
         }
     }
+}
 
-    fn register_request<F>(&mut self, make_request: F)
+impl Drivers {
+    fn register_request<F>(&self, context: &mut DriverContext<Event>, make_request: F)
     where
         F: FnOnce(&Self, RequestContext) -> (RequestKind, RequestFuture),
     {
-        let request_id = self.assign_request_id();
-        let context = RequestContext::new(request_id, self.event_tx.clone());
-        let (kind, request) = make_request(self, context);
-        let completion_tx = self.event_tx.clone();
-        self.queue_event(Event::RequestEmitted {
-            request_id,
-            kind: kind.clone(),
-        });
-        let job: JobFuture = async move {
-            let result = request.await;
-            completion_tx
-                .send(Event::RequestCompleted {
+        context.request(|cx| {
+            let request_id = cx.id();
+            let (kind, request) = make_request(self, cx);
+            let started = Event::RequestEmitted {
+                request_id,
+                kind: kind.clone(),
+            };
+            (started, async move {
+                Event::RequestCompleted {
                     request_id,
                     kind,
-                    result,
-                })
-                .expect("Drivers owns the event receiver");
-        }
-        .boxed();
-        self.request_jobs.push(job);
+                    result: request.await,
+                }
+            })
+        });
     }
 
-    fn persist_credential(&self, credential: &Verified<Credential>) {
+    fn persist_credential(
+        &self,
+        credential: &Verified<Credential>,
+        context: &DriverContext<Event>,
+    ) {
         if let Err(error) = self.cache.persist_credential(credential) {
-            self.queue_event(Event::OperationFailed {
+            context.emit(Event::OperationFailed {
                 error: OperationError::PersistCredential(error),
             });
         }
     }
 
-    fn assign_request_id(&mut self) -> RequestId {
-        let request_id = RequestId::new(self.next_request_id);
-        self.next_request_id = self
-            .next_request_id
-            .checked_add(1)
-            .expect("request ID sequence exhausted");
-        request_id
-    }
-
-    fn queue_event(&self, event: Event) {
-        self.event_tx
-            .send(event)
-            .expect("Drivers owns the event receiver");
-    }
-
-    fn set_credential(&mut self, credential: &Verified<Credential>) {
+    fn set_credential(
+        &mut self,
+        credential: &Verified<Credential>,
+        context: &DriverContext<Event>,
+    ) {
         match self.auth.set_credential(self.clock.now(), credential) {
             Ok(()) => {
                 self.feed.restart_events_if_started();
-                self.queue_event(Event::ApiCredentialConfigured);
+                context.emit(Event::ApiCredentialConfigured);
             }
-            Err(error) => self.queue_event(Event::OperationFailed {
+            Err(error) => context.emit(Event::OperationFailed {
                 error: OperationError::SetCredential(error),
             }),
         }
@@ -289,45 +282,5 @@ impl Drivers {
             persist_when_refreshed: true,
         };
         restore.restore().await
-    }
-
-    pub(super) fn shutdown(&mut self) {
-        self.request_jobs.clear();
-        self.auth.stop();
-        self.feed.watcher.stop();
-    }
-
-    #[cfg(feature = "integration")]
-    pub(super) fn request_jobs_is_empty(&self) -> bool {
-        self.request_jobs.is_empty()
-    }
-}
-
-impl Stream for Drivers {
-    type Item = Event;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-
-        if let Poll::Ready(Some(event)) = this.event_rx.poll_recv(cx) {
-            return Poll::Ready(Some(event));
-        }
-
-        // Polling a job can enqueue its result.
-        let _ = Pin::new(&mut this.request_jobs).poll_next(cx);
-
-        if let Poll::Ready(Some(event)) = this.event_rx.poll_recv(cx) {
-            return Poll::Ready(Some(event));
-        }
-
-        if let Poll::Ready(Some(event)) = Pin::new(&mut this.feed.watcher).poll_next(cx) {
-            return Poll::Ready(Some(Event::Feeds(FeedsEvent::Push { event })));
-        }
-
-        if let Poll::Ready(Some(event)) = Pin::new(&mut this.auth).poll_next(cx) {
-            return Poll::Ready(Some(event));
-        }
-
-        Poll::Pending
     }
 }

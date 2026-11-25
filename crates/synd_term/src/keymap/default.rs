@@ -1,19 +1,15 @@
-use super::{CommandId, KeymapConfig, Layer};
+use super::{CommandId, KeymapConfig, Layer, config::binding};
 
 #[expect(clippy::too_many_lines)]
 pub(super) fn default_keymap_config() -> KeymapConfig {
-    let mut config = KeymapConfig::new();
+    let mut config = KeymapConfig::default();
 
     macro_rules! bind {
         ($layer:expr, $keys:expr, $command:expr) => {
-            config
-                .add($layer, $keys, $command, None)
-                .expect("valid default keymap binding");
+            config.bind($layer, binding($keys, $command, None));
         };
         ($layer:expr, $keys:expr, $command:expr, $desc:literal) => {
-            config
-                .add($layer, $keys, $command, Some($desc))
-                .expect("valid default keymap binding");
+            config.bind($layer, binding($keys, $command, Some($desc)));
         };
     }
 

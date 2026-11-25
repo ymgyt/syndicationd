@@ -1,16 +1,13 @@
-use crossterm::event::Event as CrosstermEvent;
-use futures_util::{Stream, StreamExt as _};
+use std::sync::Arc;
 use tracing::warn;
+use tuiframework::{Application as Tui, RunError};
 
-use crate::{
-    config::Categories, event::Event, interact::Interact, terminal::Terminal, ui::theme::Theme,
-};
+use crate::{config::Categories, interact::Interact, ui::theme::Theme};
 
 mod direction;
 mod effects;
-mod throbber;
+
 pub(crate) use direction::Direction;
-use throbber::Throbber;
 
 mod request;
 pub(crate) use request::{Generation, RequestError, RequestId, RequestKind};
@@ -46,8 +43,10 @@ pub(crate) use overlay::ComponentId;
 mod drivers;
 #[cfg(feature = "integration")]
 mod integration;
-use compositor::Compositor;
+use compositor::SyndUi;
 use drivers::{DriverParts, Drivers};
+#[cfg(feature = "integration")]
+pub use integration::TestApplication;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Populate {
@@ -55,12 +54,9 @@ pub enum Populate {
     Replace,
 }
 
-/// Composition root that owns orchestration between state and external drivers.
+/// Wires the synd screens and services into the terminal application.
 pub struct Application {
-    terminal: Terminal,
-    drivers: Drivers,
-    compositor: Compositor,
-    throbber: Throbber,
+    tui: Tui<SyndUi, Drivers>,
 }
 
 impl Application {
@@ -71,7 +67,6 @@ impl Application {
 
     fn new(
         builder: ApplicationBuilder<
-            Terminal,
             FeedApiRef,
             Categories,
             Cache,
@@ -81,7 +76,6 @@ impl Application {
         >,
     ) -> Self {
         let ApplicationBuilder {
-            terminal,
             feed_api,
             gh_client,
             categories,
@@ -94,8 +88,15 @@ impl Application {
             html_converter,
             authentication_required,
         } = builder;
-        let throbber = Throbber::new(config.throbber_timer_interval);
-        let compositor = Compositor::new(config, theme, categories, authentication_required);
+        let period = config.throbber_timer_interval;
+        let clock: Arc<dyn Clock> = Arc::from(clock.unwrap_or_else(|| Box::new(SystemClock)));
+        let (mut ui, keymap) = SyndUi::new(
+            config,
+            theme,
+            categories,
+            authentication_required,
+            Arc::clone(&clock),
+        );
         let drivers = Drivers::new(DriverParts {
             feed_api,
             gh_client,
@@ -106,90 +107,35 @@ impl Application {
             html_converter,
         });
 
-        Self {
-            terminal,
-            drivers,
-            compositor,
-            throbber,
-        }
-    }
-
-    fn render(&mut self) -> anyhow::Result<()> {
-        let now = self.drivers.clock.now();
-        self.terminal
-            .render(|frame| self.compositor.render(frame, now))
-    }
-
-    pub async fn run<S>(mut self, input: &mut S) -> anyhow::Result<()>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        let _terminal = self.terminal.init()?;
-        self.restore_gh_filter();
-        if self.compositor.components.login.has_api_access() {
-            let operations = self.compositor.apply_event(&Event::ApiAccessReady);
-            self.drivers.dispatch(operations, &mut self.terminal);
-        }
-        let result = self.event_loop(input).await;
-        self.drivers.shutdown();
-        self.persist_gh_filter();
-        result
-    }
-
-    async fn event_loop<S>(&mut self, input: &mut S) -> anyhow::Result<()>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        while !self.compositor.should_quit() {
-            self.render()?;
-            self.process_next(input).await?;
-        }
-        Ok(())
-    }
-
-    async fn process_next<S>(&mut self, input: &mut S) -> anyhow::Result<()>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        tokio::select! {
-            biased;
-            event = input.next() => match event {
-                Some(event) => {
-                    let operations = self.compositor.apply_terminal_event(&event?);
-                    self.drivers.dispatch(operations, &mut self.terminal);
-                }
-                None => self.compositor.quit(),
-            },
-            Some(event) = self.drivers.next() => {
-                let operations = self.compositor.apply_event(&event);
-                self.drivers.dispatch(operations, &mut self.terminal);
+        if ui.gh.enabled {
+            match drivers.cache.load_gh_notification_filter_options() {
+                Ok(options) => ui.gh.restore_filter_options(options),
+                Err(error) => warn!("Load GitHub notification filter options: {error}"),
             }
-            () = self.throbber.tick(), if self.compositor.is_busy() => self.compositor.tick(),
         }
-        Ok(())
+        let tui = Tui::builder()
+            .components(ui)
+            .driver(drivers)
+            .keymap(keymap)
+            .tick_interval(period)
+            .build();
+        Self { tui }
     }
-
-    fn restore_gh_filter(&mut self) {
-        if !self.compositor.components.gh.enabled {
-            return;
+    pub async fn run(mut self) -> anyhow::Result<()> {
+        let result = self.tui.run().await;
+        if !matches!(result, Err(RunError::Setup(_))) {
+            self.persist_gh_filter();
         }
-        match self.drivers.cache.load_gh_notification_filter_options() {
-            Ok(options) => self
-                .compositor
-                .components
-                .gh
-                .restore_filter_options(options),
-            Err(error) => warn!("Load GitHub notification filter options: {error}"),
-        }
+        Ok(result?)
     }
-
     fn persist_gh_filter(&self) {
-        if !self.compositor.components.gh.enabled {
+        if !self.tui.components().gh.enabled {
             return;
         }
-        let options = self.compositor.components.gh.filter_options_snapshot();
+        let options = self.tui.components().gh.filter_options_snapshot();
         if let Err(error) = self
-            .drivers
+            .tui
+            .driver()
             .cache
             .persist_gh_notification_filter_options(options)
         {

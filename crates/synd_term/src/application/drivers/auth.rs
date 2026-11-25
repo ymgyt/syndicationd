@@ -68,7 +68,7 @@ impl AuthDriver {
                 let authorization = ValidatedDeviceAuthorization::try_from(device_authorization)
                     .map_err(RequestError::Authentication)?;
 
-                context.emit(|request_id| Event::Auth {
+                let _ = context.emit(|request_id| Event::Auth {
                     request_id,
                     event: authorization.into_event(provider),
                 });
@@ -94,7 +94,7 @@ impl AuthDriver {
                     .poll_device_flow_access_token(now, provider, device_authorization)
                     .await
                     .map_err(RequestError::Authentication)?;
-                context.emit(|request_id| Event::Auth {
+                let _ = context.emit(|request_id| Event::Auth {
                     request_id,
                     event: AuthEvent::DeviceFlowCredentialReceived { credential },
                 });

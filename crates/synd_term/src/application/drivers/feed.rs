@@ -198,7 +198,7 @@ async fn initial_timeline(api: &dyn FeedApi) -> Result<payload::TimelineId, Synd
 }
 
 fn emit_feed_event(context: &RequestContext, event: FeedRequestEvent) {
-    context.emit(|request_id| Event::Feeds(FeedsEvent::Request { request_id, event }));
+    let _ = context.emit(|request_id| Event::Feeds(FeedsEvent::Request { request_id, event }));
 }
 
 /// Owns cursor and base-sequence invariants for one bounded timeline request.

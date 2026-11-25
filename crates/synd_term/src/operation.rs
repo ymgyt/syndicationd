@@ -144,3 +144,16 @@ pub(crate) enum Operation {
         credential: Verified<Credential>,
     },
 }
+
+impl IntoIterator for Operations {
+    type Item = Operation;
+    type IntoIter = std::vec::IntoIter<Operation>;
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::Nop => Vec::new(),
+            Self::One(op) => vec![op],
+            Self::Many(ops) => ops,
+        }
+        .into_iter()
+    }
+}

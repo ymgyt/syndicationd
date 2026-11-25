@@ -1,4 +1,5 @@
-use super::{Component, RenderContext};
+use super::RenderContext;
+use crate::application::{ComponentId, compositor::SyndUi};
 use crate::{
     application::{RequestError, RequestKind, effects::Effects},
     auth::{AuthenticationProvider, Credential, Verified},
@@ -8,7 +9,7 @@ use crate::{
     operation::Operation,
     ui::widgets::authentication,
 };
-use ratatui::buffer::Buffer;
+use tuiframework::{Component, Effects as UiEffects};
 use url::Url;
 
 /// Owns the login screen and the device flow that grants access to the API.
@@ -184,8 +185,18 @@ impl LoginComponent {
     }
 }
 
-impl Component for LoginComponent {
-    fn render(&self, buf: &mut Buffer, cx: &RenderContext<'_>) {
+impl Component<SyndUi> for LoginComponent {
+    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+        match command {
+            Command::Login(action) => self
+                .apply_command(action)
+                .into_framework(ComponentId::Login),
+            _ => UiEffects::NONE,
+        }
+    }
+
+    fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
+        let buf = frame.buffer_mut();
         match &self.state {
             AuthenticationState::Required | AuthenticationState::RequestingDeviceFlow { .. } => {
                 authentication::render_login(
@@ -215,16 +226,22 @@ impl Component for LoginComponent {
         &[Layer::Login]
     }
 
-    fn subscriptions(&self) -> &'static [EventKind] {
-        &[
+    fn subscribes(&self, event: &Event) -> bool {
+        [
             EventKind::Auth,
             EventKind::ApiCredentialConfigured,
             EventKind::CredentialRefreshed,
             EventKind::RequestCompleted,
             EventKind::OperationFailed,
         ]
+        .contains(&EventKind::from(event))
     }
 
+    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
+        self.apply_event(event).into_framework(ComponentId::Login)
+    }
+}
+impl LoginComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::Auth { event, .. } => Effects::operations(self.state.apply_event(event)),

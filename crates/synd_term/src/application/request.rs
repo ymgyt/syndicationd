@@ -10,15 +10,7 @@ use crate::{
     types::gh::{IssueId, NotificationId, PullRequestId, ThreadId},
 };
 
-/// Opaque identity assigned to one logical external request.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub(crate) struct RequestId(u64);
-
-impl RequestId {
-    pub(super) fn new(value: u64) -> Self {
-        Self(value)
-    }
-}
+pub(crate) use tuiframework::driver::RequestId;
 
 /// Identifies results belonging to the current load of a view.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

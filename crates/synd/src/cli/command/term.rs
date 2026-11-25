@@ -1,4 +1,7 @@
-use std::process::ExitCode;
+use std::{
+    io::{self, IsTerminal as _},
+    process::ExitCode,
+};
 
 use anyhow::Context as _;
 use synd_runtime::Session;
@@ -6,7 +9,6 @@ use synd_term::{
     application::{Application, Cache, ClientFeedApi, Config, Features},
     client::gh::GhClient,
     interact::{ProcessInteractor, TextBrowserInteractor},
-    terminal::{self, Terminal},
     ui::theme::Theme,
 };
 use tracing::{error, info, warn};
@@ -44,11 +46,10 @@ impl TermCommand {
             }
         };
 
-        let mut event_stream = terminal::event_stream();
         let release_check = release::ReleaseCheck::spawn();
 
         info!("Terminal UI started");
-        let result = app.run(&mut event_stream).await;
+        let result = app.run().await;
 
         if let Err(err) = session.close().await {
             warn!("Failed to close runtime session: {err}");
@@ -65,7 +66,7 @@ impl TermCommand {
 }
 
 async fn build_app(config: ConfigResolver) -> anyhow::Result<(Application, Session)> {
-    let terminal = Terminal::new().context("Failed to construct terminal")?;
+    anyhow::ensure!(io::stdout().is_terminal(), "stdout is not a terminal");
     let gh_client = {
         if config.is_gh_enabled() {
             Some(GhClient::new(config.gh_pat()).context("Failed to construct GitHub client")?)
@@ -99,7 +100,6 @@ async fn build_app(config: ConfigResolver) -> anyhow::Result<(Application, Sessi
         };
 
         let builder = Application::builder()
-            .terminal(terminal)
             .feed_api(feed_api)
             .authentication_required(false)
             .categories(config.categories())

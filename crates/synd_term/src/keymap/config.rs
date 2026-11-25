@@ -1,121 +1,16 @@
-use std::collections::HashMap;
+use super::{CommandId, KeySequence, Layer};
+use tuiframework::keymap::Binding;
 
-use indexmap::IndexMap;
-use serde::Deserialize;
+pub type KeymapConfig = tuiframework::keymap::KeymapConfig<Layer, CommandId>;
 
-use super::{CommandId, KeyBinding, KeySequence, KeymapError, Layer};
-
-/// User-facing keymap configuration before validation and compilation.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct KeymapConfig {
-    pub(super) bindings: HashMap<Layer, Vec<KeyBinding>>,
-}
-
-impl KeymapConfig {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub(crate) fn add<const N: usize>(
-        &mut self,
-        layer: Layer,
-        keys: [&str; N],
-        command: CommandId,
-        desc: Option<&str>,
-    ) -> Result<(), KeymapError> {
-        let on = KeySequence::parse(keys)?;
-        self.bindings
-            .entry(layer)
-            .or_default()
-            .push(KeyBinding::new(on, command, desc.map(str::to_owned)));
-        Ok(())
-    }
-
-    pub(crate) fn merge(&mut self, other: Self) {
-        for (layer, bindings) in other.bindings {
-            // Visit configured keys before built-in aliases when choosing a hint.
-            let overrides: IndexMap<_, _> = bindings
-                .into_iter()
-                .map(|binding| (binding.on.clone(), binding))
-                .collect();
-            let defaults = self.bindings.entry(layer).or_default();
-            defaults.retain(|binding| !overrides.contains_key(&binding.on));
-            defaults.splice(..0, overrides.into_values());
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for KeymapConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let layers = HashMap::<Layer, LayerConfig>::deserialize(deserializer)?;
-        let mut bindings = HashMap::with_capacity(layers.len());
-        for (layer, layer_config) in layers {
-            bindings.insert(
-                layer,
-                layer_config.keymap.into_iter().map(Into::into).collect(),
-            );
-        }
-        Ok(Self { bindings })
-    }
-}
-
-/// TOML table for one keymap layer.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LayerConfig {
-    #[serde(default)]
-    keymap: Vec<KeyBindingEntry>,
-}
-
-/// TOML entry for one key binding.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct KeyBindingEntry {
-    #[serde(deserialize_with = "deserialize_key_sequence")]
-    on: KeySequence,
+pub(super) fn binding<const N: usize>(
+    keys: [&str; N],
     command: CommandId,
-    desc: Option<String>,
-}
-
-impl From<KeyBindingEntry> for KeyBinding {
-    fn from(entry: KeyBindingEntry) -> Self {
-        Self::new(entry.on, entry.command, entry.desc)
+    desc: Option<&str>,
+) -> Binding<CommandId> {
+    Binding {
+        on: KeySequence::parse(keys).expect("valid built-in key sequence"),
+        command,
+        desc: desc.map(str::to_owned),
     }
-}
-
-impl<'de> Deserialize<'de> for KeyBinding {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        KeyBindingEntry::deserialize(deserializer).map(Into::into)
-    }
-}
-
-fn deserialize_key_sequence<'de, D>(deserializer: D) -> Result<KeySequence, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let raw = RawKeySequence::deserialize(deserializer)?;
-    let keys = match raw {
-        RawKeySequence::One(key) => vec![key],
-        RawKeySequence::Many(keys) => keys,
-    };
-    let keys = keys
-        .into_iter()
-        .map(|key| key.parse())
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(serde::de::Error::custom)?;
-    KeySequence::new(keys).map_err(serde::de::Error::custom)
-}
-
-/// TOML shape accepted for a single key or a multi-key sequence.
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum RawKeySequence {
-    One(String),
-    Many(Vec<String>),
 }

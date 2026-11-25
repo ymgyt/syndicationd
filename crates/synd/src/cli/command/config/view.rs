@@ -163,7 +163,7 @@ impl ConfigViewOutput {
                 pat_configured: !config.gh_pat().is_empty(),
             },
             theme: ThemeOutput {
-                name: config.palette().name(),
+                name: config.palette().name,
                 background: config.theme_background,
             },
         }

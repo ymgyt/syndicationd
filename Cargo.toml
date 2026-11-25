@@ -72,6 +72,7 @@ tokio-util         = { version = "0.7.20" }
 toml               = { version = "1.2.2" }
 tracing            = { version = "0.1.44" }
 tracing-subscriber = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
+tuiframework       = { version = "0.1.0", git = "https://github.com/ymgyt/tuiframework", rev = "61241295890bf9a93aa4553afe0f6bf6996ba107" }
 url                = { version = "2.5.9" }
 uuid               = { version = "1.29.3" }
 webpki-roots       = { version = "1.0.12" }

@@ -13,8 +13,7 @@ use crate::{
     },
 };
 
-#[allow(dead_code)]
-static LABELS: &[char] = &[
+const LABELS: &[char] = &[
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
     't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
@@ -109,16 +108,14 @@ impl CategoriesState {
 
         new_categories.sort_unstable();
         self.categories = new_categories;
-        self.assigine_category_labels();
+        self.assign_category_labels();
     }
 
-    fn assigine_category_labels(&mut self) {
-        self.categories
-            .iter()
-            .zip(LABELS)
-            .for_each(|(category, label)| {
-                self.state.get_mut(category).unwrap().label = *label;
-            });
+    fn assign_category_labels(&mut self) {
+        for (index, category) in self.categories.iter().enumerate() {
+            let state = self.state.get_mut(category).expect("known category");
+            state.label = LABELS.get(index).copied().unwrap_or(' ');
+        }
     }
 }
 
@@ -171,5 +168,26 @@ impl Filterable<Notification> for CategoryFilterer {
         } else {
             FilterResult::Use
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inserting_a_category_releases_labels_that_move_past_z() {
+        let config = Categories::default_toml();
+        let mut categories = CategoriesState::new();
+        let initial = (0..26).map(|n| Category::new(format!("topic{n:02}")).unwrap());
+        categories.update(&config, Populate::Replace, initial);
+        let last = Category::new("topic25").unwrap();
+        assert_eq!(categories.state[&last].label, 'z');
+        categories.update(&config, Populate::Append, [Category::new("first").unwrap()]);
+        assert_eq!(categories.state[&last].label, ' ');
+        assert_eq!(
+            categories.state[&Category::new("topic24").unwrap()].label,
+            'z'
+        );
     }
 }

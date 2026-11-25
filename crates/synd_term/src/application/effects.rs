@@ -26,13 +26,6 @@ impl Effects {
             ..Self::NONE
         }
     }
-
-    pub(super) fn with_sender(self, sender: ComponentId) -> ComponentEffects {
-        ComponentEffects {
-            sender,
-            effects: self,
-        }
-    }
 }
 
 impl From<Event> for Effects {
@@ -44,13 +37,27 @@ impl From<Event> for Effects {
     }
 }
 
-pub(super) struct ComponentEffects {
-    pub(super) sender: ComponentId,
-    pub(super) effects: Effects,
-}
-
 impl From<Command> for Effects {
     fn from(command: Command) -> Self {
         Self::NONE.with_command(command)
+    }
+}
+
+impl Effects {
+    pub(in crate::application) fn into_framework(
+        self,
+        sender: ComponentId,
+    ) -> tuiframework::Effects<super::compositor::SyndUi> {
+        let mut effects = tuiframework::Effects::NONE;
+        for event in self.events {
+            effects = effects.emit(event);
+        }
+        for command in self.commands {
+            effects = effects.send(command.target(sender), command);
+        }
+        for operation in self.operations {
+            effects = effects.operation(operation);
+        }
+        effects
     }
 }

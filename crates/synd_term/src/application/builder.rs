@@ -7,12 +7,10 @@ use crate::{
     application::{Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef},
     config::Categories,
     interact::Interact,
-    terminal::Terminal,
     ui::theme::Theme,
 };
 
 pub struct ApplicationBuilder<
-    Terminal = (),
     FeedApi = (),
     Categories = (),
     Cache = (),
@@ -20,7 +18,6 @@ pub struct ApplicationBuilder<
     Theme = (),
     Interactor = (),
 > {
-    pub(super) terminal: Terminal,
     pub(super) feed_api: FeedApi,
     pub(super) categories: Categories,
     pub(super) cache: Cache,
@@ -38,7 +35,6 @@ pub struct ApplicationBuilder<
 impl Default for ApplicationBuilder {
     fn default() -> Self {
         Self {
-            terminal: (),
             feed_api: (),
             categories: (),
             cache: (),
@@ -54,37 +50,13 @@ impl Default for ApplicationBuilder {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<(), T1, T2, T3, T4, T5, T6> {
-    #[must_use]
-    pub fn terminal(
-        self,
-        terminal: Terminal,
-    ) -> ApplicationBuilder<Terminal, T1, T2, T3, T4, T5, T6> {
-        ApplicationBuilder {
-            terminal,
-            feed_api: self.feed_api,
-            categories: self.categories,
-            cache: self.cache,
-            config: self.config,
-            theme: self.theme,
-            interactor: self.interactor,
-            authenticator: self.authenticator,
-            gh_client: self.gh_client,
-            clock: self.clock,
-            html_converter: self.html_converter,
-            authentication_required: self.authentication_required,
-        }
-    }
-}
-
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
+impl<T2, T3, T4, T5, T6> ApplicationBuilder<(), T2, T3, T4, T5, T6> {
     #[must_use]
     pub fn feed_api(
         self,
         feed_api: impl FeedApi,
-    ) -> ApplicationBuilder<T1, FeedApiRef, T2, T3, T4, T5, T6> {
+    ) -> ApplicationBuilder<FeedApiRef, T2, T3, T4, T5, T6> {
         ApplicationBuilder {
-            terminal: self.terminal,
             feed_api: Arc::new(feed_api),
             categories: self.categories,
             cache: self.cache,
@@ -100,14 +72,13 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, (), T2, T3, T4, T5, T6> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
+impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, (), T3, T4, T5, T6> {
     #[must_use]
     pub fn categories(
         self,
         categories: Categories,
-    ) -> ApplicationBuilder<T1, T2, Categories, T3, T4, T5, T6> {
+    ) -> ApplicationBuilder<T2, Categories, T3, T4, T5, T6> {
         ApplicationBuilder {
-            terminal: self.terminal,
             feed_api: self.feed_api,
             categories,
             cache: self.cache,
@@ -123,11 +94,10 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, (), T3, T4, T5, T6> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
+impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, (), T4, T5, T6> {
     #[must_use]
-    pub fn cache(self, cache: Cache) -> ApplicationBuilder<T1, T2, T3, Cache, T4, T5, T6> {
+    pub fn cache(self, cache: Cache) -> ApplicationBuilder<T2, T3, Cache, T4, T5, T6> {
         ApplicationBuilder {
-            terminal: self.terminal,
             feed_api: self.feed_api,
             categories: self.categories,
             cache,
@@ -143,11 +113,10 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, (), T4, T5, T6> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
+impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, (), T5, T6> {
     #[must_use]
-    pub fn config(self, config: Config) -> ApplicationBuilder<T1, T2, T3, T4, Config, T5, T6> {
+    pub fn config(self, config: Config) -> ApplicationBuilder<T2, T3, T4, Config, T5, T6> {
         ApplicationBuilder {
-            terminal: self.terminal,
             feed_api: self.feed_api,
             categories: self.categories,
             cache: self.cache,
@@ -163,11 +132,10 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, (), T5, T6> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
+impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, T5, (), T6> {
     #[must_use]
-    pub fn theme(self, theme: Theme) -> ApplicationBuilder<T1, T2, T3, T4, T5, Theme, T6> {
+    pub fn theme(self, theme: Theme) -> ApplicationBuilder<T2, T3, T4, T5, Theme, T6> {
         ApplicationBuilder {
-            terminal: self.terminal,
             feed_api: self.feed_api,
             categories: self.categories,
             cache: self.cache,
@@ -183,14 +151,13 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, (), T6> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
+impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, T5, T6, ()> {
     #[must_use]
     pub fn interactor(
         self,
         interactor: Box<dyn Interact>,
-    ) -> ApplicationBuilder<T1, T2, T3, T4, T5, T6, Box<dyn Interact>> {
+    ) -> ApplicationBuilder<T2, T3, T4, T5, T6, Box<dyn Interact>> {
         ApplicationBuilder {
-            terminal: self.terminal,
             feed_api: self.feed_api,
             categories: self.categories,
             cache: self.cache,
@@ -206,7 +173,7 @@ impl<T1, T2, T3, T4, T5, T6> ApplicationBuilder<T1, T2, T3, T4, T5, T6, ()> {
     }
 }
 
-impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> {
+impl<T2, T3, T4, T5, T6, T7> ApplicationBuilder<T2, T3, T4, T5, T6, T7> {
     #[must_use]
     pub fn authenticator(self, authenticator: Authenticator) -> Self {
         Self {
@@ -249,7 +216,7 @@ impl<T1, T2, T3, T4, T5, T6, T7> ApplicationBuilder<T1, T2, T3, T4, T5, T6, T7> 
     }
 }
 
-impl ApplicationBuilder<Terminal, FeedApiRef, Categories, Cache, Config, Theme, Box<dyn Interact>> {
+impl ApplicationBuilder<FeedApiRef, Categories, Cache, Config, Theme, Box<dyn Interact>> {
     #[must_use]
     pub fn build(self) -> Application {
         Application::new(self)

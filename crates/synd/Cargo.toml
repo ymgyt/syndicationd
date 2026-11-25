@@ -44,7 +44,6 @@ integration = ["synd-term/integration"]
 assert_cmd = { workspace = true }
 axum       = { workspace = true, features = ["http1", "tokio"] }
 chrono     = { workspace = true }
-crossterm  = "0.29.0"
 futures-util = { workspace = true }
 insta      = { workspace = true }
 mockall    = { workspace = true }

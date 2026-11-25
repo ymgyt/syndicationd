@@ -111,7 +111,7 @@ impl ConfigResolver {
     }
 
     pub fn palette(&self) -> Palette {
-        self.palette.resolve_ref().clone()
+        self.palette.resolve()
     }
 
     pub fn categories(&self) -> Categories {

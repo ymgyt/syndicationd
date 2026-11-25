@@ -5,7 +5,6 @@ use crate::{
     application::input_parser::InputParser,
     event::{Event, OperationError},
     interact::{Interact, OpenEditorError},
-    terminal::Terminal,
 };
 
 /// Executes interactions that do not require direct terminal coordination.
@@ -40,11 +39,14 @@ impl InteractionDriver {
 /// Coordinates editor execution with the redraw performed after a successful edit.
 pub(super) struct TerminalInteraction<'a> {
     interaction: &'a InteractionDriver,
-    terminal: &'a mut Terminal,
+    terminal: &'a mut tuiframework::DriverContext<Event>,
 }
 
 impl<'a> TerminalInteraction<'a> {
-    pub(super) fn new(interaction: &'a InteractionDriver, terminal: &'a mut Terminal) -> Self {
+    pub(super) fn new(
+        interaction: &'a InteractionDriver,
+        terminal: &'a mut tuiframework::DriverContext<Event>,
+    ) -> Self {
         Self {
             interaction,
             terminal,

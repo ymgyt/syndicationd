@@ -5783,7 +5783,6 @@ dependencies = [
  "axum",
  "chrono",
  "clap",
- "crossterm",
  "either",
  "futures-util",
  "insta",
@@ -6033,7 +6032,6 @@ dependencies = [
  "chrono",
  "chrono-humanize",
  "criterion",
- "crossterm",
  "edit",
  "fake",
  "futures-util",
@@ -6066,6 +6064,7 @@ dependencies = [
  "tower",
  "tracing",
  "tui-widgets",
+ "tuiframework",
  "unicode-segmentation",
  "url",
 ]
@@ -6743,6 +6742,21 @@ dependencies = [
  "document-features",
  "ratatui-core",
  "tui-big-text",
+]
+
+[[package]]
+name = "tuiframework"
+version = "0.1.0"
+source = "git+https://github.com/ymgyt/tuiframework?rev=61241295890bf9a93aa4553afe0f6bf6996ba107#61241295890bf9a93aa4553afe0f6bf6996ba107"
+dependencies = [
+ "bon",
+ "crossterm",
+ "futures-util",
+ "indexmap",
+ "ratatui",
+ "serde",
+ "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]
