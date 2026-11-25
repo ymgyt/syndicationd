@@ -390,7 +390,7 @@ mod tests {
             preview(29, 1),
             [concat!(icon!(tag), r#" "This Week in Rust" … +1"#)]
         );
-        assert_eq!(preview(8, 1), [r#""Thi… +1"#]);
+        assert_eq!(preview(9, 1), [r#""This… +1"#]);
     }
 
     #[test]
