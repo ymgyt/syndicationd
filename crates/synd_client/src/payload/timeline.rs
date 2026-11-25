@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
+
 use bon::Builder;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 use synd_feed::{
-    entry::EntryId,
+    entry::{EntryId, SourceCategory},
     types::{Category, FeedUrl, Requirement, Time, TimelineName},
 };
 
@@ -114,7 +117,26 @@ pub struct Entry {
     pub updated: Option<Time>,
     pub website_url: Option<String>,
     pub excerpt: Option<EntryExcerpt>,
+    /// Categories declared by the publisher of this entry.
+    #[serde(
+        default,
+        rename = "labels",
+        deserialize_with = "source_categories_from_labels"
+    )]
+    pub source_categories: Vec<SourceCategory>,
     pub feed: FeedMeta,
+}
+
+// The current GraphQL API returns publisher categories inside the entry's labels.
+fn source_categories_from_labels<'de, D>(deserializer: D) -> Result<Vec<SourceCategory>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut labels = BTreeMap::<String, Value>::deserialize(deserializer)?;
+    let Some(categories) = labels.remove(SourceCategory::LABEL_KEY) else {
+        return Ok(Vec::new());
+    };
+    Ok(serde_json::from_value(categories).unwrap_or_default())
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -204,6 +204,42 @@ mod bootstrapped_app {
     use super::*;
 
     #[tokio::test]
+    async fn entry_preview_reserves_one_category_row_and_uses_space_left_by_the_excerpt() {
+        let mut entries = timeline_entries();
+        let [short, long] = entries.nodes.as_mut_slice() else {
+            unreachable!()
+        };
+        long.entry
+            .source_categories
+            .clone_from(&short.entry.source_categories);
+        long.entry.excerpt.as_mut().unwrap().text = "More about this entry.\n".repeat(20);
+        let (_cache_dir, mut app) = start_app_with_entries(entries, None);
+        let (tx, mut input) = event_stream();
+        app.wait_until_jobs_completed(&mut input).await;
+
+        let lines = Screen::new(app.buffer()).lines();
+        let footer = lines
+            .iter()
+            .position(|line| line.contains("https://example.com/rust-feed-architecture"))
+            .unwrap();
+        assert!(
+            lines[footer - 2].contains("architecture:event-sourcing programming:languages/rust")
+        );
+        assert!(lines[footer - 1].contains("syndication:feed-formats/rss-2.0"));
+
+        tx.send(key!('j'));
+        app.wait_until_jobs_completed(&mut input).await;
+        let lines = Screen::new(app.buffer()).lines();
+        let footer = lines
+            .iter()
+            .position(|line| line.contains("https://example.com/async-graphql-testing"))
+            .unwrap();
+        assert!(lines[footer - 2].contains("More about this entry."));
+        assert!(lines[footer - 1].contains("architecture:event-sourcing"));
+        assert!(lines[footer - 1].contains("… +1"));
+    }
+
+    #[tokio::test]
     async fn unsubscribe_popup_only_receives_keys_on_its_tab() {
         let (_cache_dir, mut app) = start_app();
         let (tx, mut input) = event_stream();
@@ -443,6 +479,14 @@ fn timeline_entries() -> payload::TimelineEntryConnection {
                     "updated": null,
                     "websiteUrl": "https://example.com/rust-feed-architecture",
                     "excerpt": { "text": "A note about feed architecture." },
+                    "labels": {
+                        "source.categories": [
+                            { "term": "architecture:event-sourcing" },
+                            { "term": "programming:languages/rust" },
+                            { "term": "syndication:feed-formats/atom" },
+                            { "term": "syndication:feed-formats/rss-2.0" }
+                        ]
+                    },
                     "feed": {
                         "title": "Engineering Notes",
                         "url": "https://example.com/feed.xml",

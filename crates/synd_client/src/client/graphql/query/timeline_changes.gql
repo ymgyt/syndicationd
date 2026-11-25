@@ -12,6 +12,7 @@ query TimelineChanges($timelineId: ID!, $since: Int!, $first: Int!) {
                 title
                 published
                 updated
+                labels
                 excerpt {
                   text
                 }

@@ -6,6 +6,7 @@ fragment TimelineEntriesPage on TimelineEntryConnection {
       title
       published
       updated
+      labels
       excerpt(maxUnicodeWidth: $maxUnicodeWidth) {
         text
       }

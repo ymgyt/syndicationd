@@ -1,6 +1,14 @@
 use std::borrow::Cow;
 
+use ratatui::{
+    buffer::Buffer,
+    layout::{Constraint, Flex, Layout, Rect},
+    style::Stylize,
+    text::{Line, Span, Text},
+    widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
+};
 use synd_client::payload;
+use synd_feed::{entry::SourceCategory, types::FeedUrl};
 
 use crate::{
     application::Populate,
@@ -16,13 +24,6 @@ use crate::{
         },
     },
 };
-use ratatui::{
-    prelude::{Buffer, Constraint, Layout, Rect},
-    style::Stylize,
-    text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Widget, Wrap},
-};
-use synd_feed::types::FeedUrl;
 
 #[allow(clippy::struct_field_names)]
 pub(crate) struct EntriesWidget {
@@ -239,31 +240,25 @@ impl EntriesWidget {
             metadata.push_span(url);
         }
 
-        let show_metadata = inner.height > 1 && !metadata.spans.is_empty();
+        let has_categories = !entry.source_categories.is_empty();
+        let show_metadata =
+            !metadata.spans.is_empty() && inner.height > 1 + u16::from(has_categories);
         let [body, footer] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Length(u16::from(show_metadata)),
         ])
         .areas(inner);
 
-        // Let the paragraph wrap the visible text together with its first-line label.
-        let (label, content) = match &entry.excerpt {
-            Some(excerpt) if !excerpt.text.trim().is_empty() => {
-                (concat!(icon!(summary), " "), excerpt.text.as_str())
-            }
-            _ => (
-                concat!(icon!(entry), " Entry  "),
-                entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL),
-            ),
-        };
-        let mut text = Text::from(content.trim_matches('\n'));
-        if let Some(first) = text.lines.first_mut() {
-            first.spans.insert(0, Span::raw(label).bold());
+        let summary = summary_paragraph(entry).style(cx.theme.entries.summary);
+        if has_categories {
+            let lines = u16::try_from(summary.line_count(body.width)).unwrap_or(u16::MAX);
+            let [summary_area, category_area] =
+                Layout::vertical([Constraint::Length(lines), Constraint::Min(1)]).areas(body);
+            summary.render(summary_area, buf);
+            render_categories(&entry.source_categories, category_area, buf);
+        } else {
+            summary.render(body, buf);
         }
-        Paragraph::new(text)
-            .wrap(Wrap { trim: false })
-            .style(cx.theme.entries.summary)
-            .render(body, buf);
 
         if show_metadata {
             let clipped = metadata.width() > usize::from(footer.width);
@@ -277,5 +272,140 @@ impl EntriesWidget {
                 buf.set_string(x, y, "…", metadata.style);
             }
         }
+    }
+}
+
+fn summary_paragraph(entry: &payload::Entry) -> Paragraph<'_> {
+    let (label, content) = match &entry.excerpt {
+        Some(excerpt) if !excerpt.text.trim().is_empty() => {
+            (concat!(icon!(summary), " "), excerpt.text.as_str())
+        }
+        _ => (
+            concat!(icon!(entry), " Entry  "),
+            entry.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL),
+        ),
+    };
+    let mut text = Text::from(content.trim_matches('\n'));
+    if let Some(first) = text.lines.first_mut() {
+        first.spans.insert(0, Span::raw(label).bold());
+    }
+    Paragraph::new(text).wrap(Wrap { trim: false })
+}
+
+fn render_categories(categories: &[SourceCategory], area: Rect, buf: &mut Buffer) {
+    let terms: Vec<_> = categories.iter().map(display_category_term).collect();
+    let paragraph = |visible: usize| {
+        let mut line = Line::from(icon!(tag));
+        for term in &terms[..visible] {
+            line.push_span(" ");
+            line.push_span(term.as_ref());
+        }
+        if visible < terms.len() {
+            line.push_span(format!(" … +{}", terms.len() - visible));
+        }
+        let paragraph = Paragraph::new(line).dim().wrap(Wrap { trim: true });
+        let lines = paragraph.line_count(area.width);
+        (paragraph, lines)
+    };
+    let height = usize::from(area.height);
+    let (all, all_lines) = paragraph(terms.len());
+    let fitting = if all_lines <= height {
+        Some((all, all_lines))
+    } else {
+        // Include the omission count when measuring the visible terms.
+        (1..terms.len())
+            .map(paragraph)
+            .take_while(|(_, lines)| *lines <= height)
+            .last()
+    };
+    if let Some((candidate, lines)) = fitting {
+        let [bottom] = Layout::vertical([Constraint::Length(
+            u16::try_from(lines).unwrap_or(area.height),
+        )])
+        .flex(Flex::End)
+        .areas(area);
+        candidate.render(bottom, buf);
+        return;
+    }
+
+    // Even one complete term would not fit. Keep its prefix visible beside the marker.
+    let omitted = terms.len() - 1;
+    let marker = if omitted == 0 {
+        "…".to_owned()
+    } else {
+        format!("… +{omitted}")
+    };
+    let marker_width = u16::try_from(Span::raw(&marker).width()).unwrap_or(u16::MAX);
+    let [term, tail] =
+        Layout::horizontal([Constraint::Min(1), Constraint::Length(marker_width)]).areas(area);
+    Paragraph::new(terms[0].as_ref())
+        .dim()
+        .wrap(Wrap { trim: true })
+        .render(term, buf);
+    if let Some(last) = tail.rows().next_back() {
+        Line::from(marker).dim().render(last, buf);
+    }
+}
+
+fn display_category_term(category: &SourceCategory) -> Cow<'_, str> {
+    let term = category.term.as_str();
+    if term.contains(char::is_whitespace) {
+        Cow::Owned(serde_json::to_string(term).expect("a string always serializes to JSON"))
+    } else {
+        Cow::Borrowed(term)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::screen::Screen;
+
+    #[test]
+    fn multiword_category_quotes_count_toward_the_preview_width() {
+        let categories = ["This Week in Rust", "Releases"].map(|term| SourceCategory {
+            term: term.to_owned(),
+            scheme: None,
+            label: None,
+        });
+        let preview = |width, height| {
+            let area = Rect::new(0, 0, width, height);
+            let mut buffer = Buffer::empty(area);
+            render_categories(&categories, area, &mut buffer);
+            Screen::new(&buffer).lines()
+        };
+
+        assert_eq!(
+            preview(30, 1),
+            [concat!(icon!(tag), r#" "This Week in Rust" Releases"#)]
+        );
+        assert_eq!(
+            preview(16, 2),
+            [
+                concat!(icon!(tag), r#" "This Week in"#),
+                r#"Rust" Releases"#
+            ]
+        );
+        assert_eq!(
+            preview(29, 1),
+            [concat!(icon!(tag), r#" "This Week in Rust" … +1"#)]
+        );
+        assert_eq!(preview(8, 1), [r#""Thi… +1"#]);
+    }
+
+    #[test]
+    fn an_overlong_category_keeps_its_prefix_and_omission_count() {
+        let categories = ["東京都市圏", "地域"].map(|term| SourceCategory {
+            term: term.to_owned(),
+            scheme: None,
+            label: None,
+        });
+        let area = Rect::new(0, 0, 8, 1);
+        let mut buffer = Buffer::empty(area);
+        render_categories(&categories, area, &mut buffer);
+        assert_eq!(buffer[(0, 0)].symbol(), "東");
+        assert_eq!(buffer[(2, 0)].symbol(), "京");
+        assert_eq!(buffer[(4, 0)].symbol(), "…");
+        assert_eq!(buffer[(7, 0)].symbol(), "1");
     }
 }

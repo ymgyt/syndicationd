@@ -6,7 +6,7 @@ use anyhow::{Context as _, ensure};
 use serde_json::{Value, json};
 use synd_client::{
     Client,
-    payload::{CreateTimelineInput, TimelineEntriesRequest, TimelineId},
+    payload::{CreateTimelineInput, TimelineChange, TimelineEntriesRequest, TimelineId},
 };
 use synd_runtime::{Runtime, RuntimeConfig, RuntimeDatabase};
 use tokio::{
@@ -289,9 +289,20 @@ async fn check_timeline_entry_pages(
         .await?
         .nodes;
     assert_eq!(entries.len(), 5);
+    let first_entry = &entries[0].entry;
+    assert!(
+        matches!(first_entry.source_categories.as_slice(), [category] if category.term == "This Week in Rust")
+    );
+    let changes = client.fetch_timeline_changes(timeline_id, 0, 20).await?;
+    assert!(changes.changes.iter().any(|change| matches!(
+        change,
+        TimelineChange::Upsert { timeline_entry }
+            if timeline_entry.entry.id == first_entry.id
+                && timeline_entry.entry.source_categories == first_entry.source_categories
+    )));
 
     let newest = &page["items"][0];
-    assert_eq!(newest["id"], entries[0].entry.id.as_str());
+    assert_eq!(newest["id"], first_entry.id.as_str());
     assert_eq!(newest["title"], "This Week in Rust 549");
     assert_eq!(
         newest["feed"],
