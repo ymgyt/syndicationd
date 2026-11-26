@@ -1,6 +1,7 @@
-use crate::application::{ComponentId, compositor::SyndUi};
+use super::Ui;
+use crate::application::ComponentId;
 use std::rc::Rc;
-use tuiframework::{Component, Effects as UiEffects};
+use tuiframework::Component;
 
 use itertools::Itertools;
 use synd_client::payload;
@@ -20,7 +21,7 @@ use crate::{
     config::Categories,
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
     keymap::Layer,
-    operation::{Operation, Operations},
+    operation::Operation,
     types::EntryExt,
     ui::widgets::{entries::EntriesWidget, subscription::SubscriptionWidget, tabs::Tab},
 };
@@ -62,28 +63,30 @@ pub(crate) struct FeedsComponent {
 
 impl FeedsComponent {
     pub(in crate::application) fn apply_command(&mut self, command: FeedsCommand) -> Effects {
-        let operations = match command {
-            FeedsCommand::PromptFeedSubscription => Operation::OpenFeedSubscriptionEditor.into(),
-            FeedsCommand::PromptFeedEdition => self.edit_selected_feed().into(),
+        match command {
+            FeedsCommand::PromptFeedSubscription => {
+                Effects::NONE.operation(Operation::OpenFeedSubscriptionEditor)
+            }
+            FeedsCommand::PromptFeedEdition => Effects::from_operations(self.edit_selected_feed()),
             FeedsCommand::PromptFeedUnsubscription => {
                 let Some(feed) = self.subscription.selected_feed() else {
                     return Effects::NONE;
                 };
-                return Effects::NONE.with_command(Command::UnsubscribePopup(
-                    UnsubscribeCommand::Open(UnsubscribeTarget {
+                Effects::NONE.send(
+                    ComponentId::UnsubscribePopup,
+                    Command::UnsubscribePopup(UnsubscribeCommand::Open(UnsubscribeTarget {
                         url: feed.url.clone(),
                         title: feed.title.clone(),
-                    }),
-                ));
+                    })),
+                )
             }
-            FeedsCommand::ReloadSubscription => self.reload_subscription().into(),
-            FeedsCommand::OpenFeed => self.open_selected_feed().into(),
-            FeedsCommand::RefreshTimeline => self.refresh_timeline().into(),
-            FeedsCommand::ReadEntry => return self.read_selected_entry(),
-            FeedsCommand::OpenEntry => self.open_selected_entry().into(),
+            FeedsCommand::ReloadSubscription => Effects::NONE.operation(self.reload_subscription()),
+            FeedsCommand::OpenFeed => Effects::from_operations(self.open_selected_feed()),
+            FeedsCommand::RefreshTimeline => Effects::from_operations(self.refresh_timeline()),
+            FeedsCommand::ReadEntry => self.read_selected_entry(),
+            FeedsCommand::OpenEntry => Effects::from_operations(self.open_selected_entry()),
             FeedsCommand::BrowseEntry => self.browse_selected_entry(),
-        };
-        Effects::operations(operations)
+        }
     }
 
     pub(super) fn new(config: &Config, categories: Rc<Categories>) -> Self {
@@ -125,23 +128,26 @@ impl FeedsComponent {
             return Effects::NONE;
         };
         match Self::entry_url(entry) {
-            Some(url) => Command::Reader(ReaderCommand::Open(url)),
-            None => Command::Shell(ShellCommand::ShowError(
-                "This entry has no article URL".into(),
-            )),
+            Some(url) => Effects::NONE.send(
+                ComponentId::Reader,
+                Command::Reader(ReaderCommand::Open(url)),
+            ),
+            None => Effects::NONE.send(
+                ComponentId::Shell,
+                Command::Shell(ShellCommand::ShowError(
+                    "This entry has no article URL".into(),
+                )),
+            ),
         }
-        .into()
     }
 
-    pub(in crate::application) fn browse_selected_entry(&self) -> Operations {
+    fn browse_selected_entry(&self) -> Effects {
         let Some(url) = self.entries.selected_entry().and_then(Self::entry_url) else {
-            return Operations::Nop;
+            return Effects::NONE;
         };
-        [
-            Operation::OpenTextBrowser { url },
-            Operation::ForceRedrawTerminal,
-        ]
-        .into()
+        Effects::NONE
+            .operation(Operation::OpenTextBrowser { url })
+            .operation(Operation::ForceRedrawTerminal)
     }
 
     fn entry_url(entry: &payload::Entry) -> Option<Url> {
@@ -178,7 +184,7 @@ impl FeedsComponent {
     }
 
     /// Moves feed-backed state into its initial synchronization phase.
-    fn bootstrap(&mut self) -> impl Into<Operations> {
+    fn bootstrap(&mut self) -> [Operation; 3] {
         [
             Operation::WatchFeedEvents,
             self.reload_subscription(),
@@ -323,17 +329,15 @@ impl FeedsComponent {
     }
 }
 
-impl Component<SyndUi> for FeedsComponent {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for FeedsComponent {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
-            Command::Feeds(action) => self
-                .apply_command(action)
-                .into_framework(ComponentId::Feeds),
+            Command::Feeds(action) => self.apply_command(action),
             Command::List(action) => {
                 self.subscription.apply_list(action);
-                UiEffects::NONE
+                Effects::NONE
             }
-            _ => UiEffects::NONE,
+            _ => Effects::NONE,
         }
     }
 
@@ -359,17 +363,12 @@ impl Component<SyndUi> for FeedsComponent {
         .contains(&EventKind::from(event))
     }
 
-    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
-        self.apply_event(event).into_framework(ComponentId::Feeds)
-    }
-}
-impl FeedsComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
-            Event::ApiAccessReady => Effects::operations(self.bootstrap()),
-            Event::ApiAccessRefreshed => Effects::operations(self.refresh_timeline()),
+            Event::ApiAccessReady => Effects::from_operations(self.bootstrap()),
+            Event::ApiAccessRefreshed => Effects::from_operations(self.refresh_timeline()),
             Event::TabChanged(Tab::Feeds) if !self.subscription.has_subscription() => {
-                Effects::operations(self.reload_subscription())
+                Effects::NONE.operation(self.reload_subscription())
             }
             Event::FeedFilterChanged {
                 requirement,
@@ -385,7 +384,7 @@ impl FeedsComponent {
                 event: payload::FeedEvent::TimelineChanged(event),
             }) => {
                 debug!(changed_at = %event.changed_at, affected_feeds = ?event.affected_feeds, "timeline changed");
-                Effects::operations(self.refresh_timeline())
+                Effects::from_operations(self.refresh_timeline())
             }
             Event::RequestCompleted { kind, result, .. } => {
                 let follow_up = match kind {
@@ -406,12 +405,12 @@ impl FeedsComponent {
                     }
                     _ => None,
                 };
-                let effects = Effects::operations(follow_up);
+                let effects = Effects::from_operations(follow_up);
                 if let Err(RequestError::SyndApi(error)) = result {
-                    effects.with_command(Command::show_request_error(
-                        kind,
-                        synd_api_error_message(error),
-                    ))
+                    effects.send(
+                        ComponentId::Shell,
+                        Command::show_request_error(kind, synd_api_error_message(error)),
+                    )
                 } else {
                     effects
                 }
@@ -423,14 +422,19 @@ impl FeedsComponent {
                         if matches!(event, Event::FeedSubscriptionEditorClosed { .. })
                             && self.is_already_subscribed(&input.url) =>
                     {
-                        Command::Shell(ShellCommand::ShowError(format!(
-                            "{} already subscribed",
-                            input.url
-                        )))
-                        .into()
+                        Effects::NONE.send(
+                            ComponentId::Shell,
+                            Command::Shell(ShellCommand::ShowError(format!(
+                                "{} already subscribed",
+                                input.url
+                            ))),
+                        )
                     }
-                    Ok(input) => Effects::operations(Operation::SubscribeFeed { input }),
-                    Err(error) => Command::Shell(ShellCommand::ShowError(error.to_string())).into(),
+                    Ok(input) => Effects::NONE.operation(Operation::SubscribeFeed { input }),
+                    Err(error) => Effects::NONE.send(
+                        ComponentId::Shell,
+                        Command::Shell(ShellCommand::ShowError(error.to_string())),
+                    ),
                 }
             }
             _ => Effects::NONE,
@@ -442,11 +446,11 @@ impl FeedsComponent {
     fn apply_feed_request(&mut self, event: &FeedRequestEvent) -> Effects {
         match event {
             FeedRequestEvent::InitialTimelineOpened { timeline_id } => {
-                return Effects::operations(self.fetch_timeline_window(*timeline_id));
+                return Effects::NONE.operation(self.fetch_timeline_window(*timeline_id));
             }
             FeedRequestEvent::FeedSubscribed { url } => {
                 debug!(%url, "feed subscribed");
-                return Effects::operations(self.reload_subscription());
+                return Effects::NONE.operation(self.reload_subscription());
             }
             FeedRequestEvent::SubscriptionFetched {
                 generation,
@@ -467,7 +471,7 @@ impl FeedsComponent {
                 };
                 self.subscription
                     .update_subscription(*populate, subscription.clone());
-                return Effects::operations(next);
+                return Effects::from_operations(next);
             }
             FeedRequestEvent::FeedUnsubscribed { url } => self.feed_unsubscribed(url),
             FeedRequestEvent::TimelineWindowChunkFetched { entries, base_seq } => {

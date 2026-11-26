@@ -1,6 +1,6 @@
-use crate::application::{ComponentId, compositor::SyndUi};
+use crate::application::component::Ui;
 use ratatui::layout::{Constraint, Layout, Rect};
-use tuiframework::{Component, Effects as UiEffects};
+use tuiframework::Component;
 
 use crate::{
     application::{Direction, effects::Effects},
@@ -54,6 +54,25 @@ pub(crate) struct RenderContext<'a> {
     pub(in crate::application) gh_options: &'a GhNotificationFilterOptions,
 }
 
+impl<'a> From<tuiframework::RenderContext<'a, Ui>> for RenderContext<'a> {
+    fn from(cx: tuiframework::RenderContext<'a, Ui>) -> Self {
+        let ui = cx.ui;
+        Self {
+            ui: Context {
+                theme: cx.theme,
+                categories: &ui.categories,
+                focus: cx.focus,
+                now: ui.clock.now(),
+            },
+            keymap: cx.keymap,
+            layers: cx.layers,
+            frame: FrameLayout::new(cx.area, ui.visible_tab()),
+            filter_target: ui.tabs.current().filter_target(),
+            gh_options: ui.gh.notifications.filter_options(),
+        }
+    }
+}
+
 impl TabsWidget {
     pub(super) fn move_tab(&mut self, direction: Direction) -> Effects {
         let previous = self.current();
@@ -66,11 +85,11 @@ impl TabsWidget {
     }
 }
 
-impl Component<SyndUi> for TabsWidget {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for TabsWidget {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
-            Command::MoveTab(action) => self.move_tab(action).into_framework(ComponentId::Tabs),
-            _ => UiEffects::NONE,
+            Command::MoveTab(action) => self.move_tab(action),
+            _ => Effects::NONE,
         }
     }
 
@@ -84,14 +103,14 @@ impl Component<SyndUi> for TabsWidget {
     }
 }
 
-impl Component<SyndUi> for EntriesWidget {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for EntriesWidget {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
             Command::List(action) => {
                 self.apply_list(action);
-                UiEffects::NONE
+                Effects::NONE
             }
-            _ => UiEffects::NONE,
+            _ => Effects::NONE,
         }
     }
 
@@ -105,13 +124,11 @@ impl Component<SyndUi> for EntriesWidget {
     }
 }
 
-impl Component<SyndUi> for FilterPopup {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for FilterPopup {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
-            Command::GhFilterPopup(action) => {
-                Self::apply_command(action).into_framework(ComponentId::GhFilterPopup)
-            }
-            _ => UiEffects::NONE,
+            Command::GhFilterPopup(action) => Self::apply_command(action),
+            _ => Effects::NONE,
         }
     }
 

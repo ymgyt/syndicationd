@@ -1,4 +1,6 @@
+use crate::application::{ComponentId, component::Ui};
 use synd_feed::types::Category;
+use tuiframework::KeyAction;
 
 use crate::command::{Command, FilterCommand, FilterTarget};
 
@@ -10,6 +12,13 @@ pub(crate) enum KeymapAction {
     Command(CommandId),
     Prompt(PromptAction),
     Filter(FilterAction),
+}
+
+impl KeyAction<Ui> for KeymapAction {
+    fn command_for(self, owner: ComponentId) -> (ComponentId, Command) {
+        let command = Command::from(self);
+        (command.target(owner), command)
+    }
 }
 
 impl From<KeymapAction> for Command {

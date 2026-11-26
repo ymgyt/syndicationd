@@ -1,41 +1,48 @@
-use futures_util::Stream;
+use super::{Application, Drivers, Effects, Ui};
+use crate::integration::{UnboundedSenderWrapper, event_stream};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+use std::io;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tuiframework::crossterm::event::Event as CrosstermEvent;
+use tuiframework::event_loop::Started;
+use tuiframework::{EventLoop, Ui as _};
 
 use crate::operation::Operation;
 
-use super::Application;
+type TestEventLoop = EventLoop<
+    Started<'static, Ui, Drivers>,
+    Terminal<TestBackend>,
+    UnboundedReceiverStream<io::Result<CrosstermEvent>>,
+>;
 
 /// Runs the synd screens against a terminal buffer with controlled input.
 pub struct TestApplication {
-    app: Application,
-    terminal: Terminal<TestBackend>,
+    events: TestEventLoop,
+    input: UnboundedSenderWrapper,
 }
 impl Application {
     pub fn with_test_terminal(self, width: u16, height: u16) -> TestApplication {
-        TestApplication {
-            app: self,
-            terminal: Terminal::new(TestBackend::new(width, height)).unwrap(),
-        }
+        let (input, receiver) = event_stream();
+        let terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        let events = self.event_loop(terminal, receiver).start();
+        TestApplication { events, input }
     }
 }
 impl TestApplication {
-    pub fn buffer(&self) -> &Buffer {
-        self.terminal.backend().buffer()
+    pub fn input(&self) -> UnboundedSenderWrapper {
+        self.input.clone()
     }
 
-    pub async fn wait_until_jobs_completed<S>(&mut self, input: &mut S)
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        while !self.app.tui.is_finished() {
-            self.app
-                .tui
-                .render(&mut self.terminal)
-                .expect("render test terminal");
+    pub fn buffer(&self) -> &Buffer {
+        self.events.terminal().backend().buffer()
+    }
+
+    pub async fn wait_until_jobs_completed(&mut self) {
+        while !self.events.should_quit() {
+            self.events.render().expect("render test terminal");
             tokio::select! {
                 biased;
-                result = self.app.tui.step(input) => result.expect("process test event"),
+                result = self.events.process_next() => result.expect("process test event"),
                 () = std::future::ready(()), if self.jobs_completed() => return,
             }
         }
@@ -43,68 +50,93 @@ impl TestApplication {
     }
 
     fn jobs_completed(&self) -> bool {
-        !self.app.tui.has_pending_work()
-            && !tuiframework::Components::is_busy(self.app.tui.components())
-            && self.app.tui.components().feeds.timeline_is_settled()
+        !self.events.has_pending_work()
+            && !self.events.ui().is_busy()
+            && self.events.ui().feeds.timeline_is_settled()
     }
 
-    pub async fn run_until<S>(
-        &mut self,
-        input: &mut S,
-        shown: impl Fn(&Buffer) -> bool,
-    ) -> anyhow::Result<()>
-    where
-        S: Stream<Item = std::io::Result<CrosstermEvent>> + Unpin,
-    {
-        loop {
-            self.app.tui.render(&mut self.terminal)?;
+    pub async fn run_until(&mut self, shown: impl Fn(&Buffer) -> bool) -> anyhow::Result<()> {
+        while !self.events.should_quit() {
+            self.events.render()?;
             if shown(self.buffer()) {
                 return Ok(());
             }
-            self.app.tui.step(input).await?;
-            anyhow::ensure!(
-                !self.app.tui.is_finished(),
-                "TUI exited before the expected screen"
-            );
+            self.events.process_next().await?;
         }
+        anyhow::bail!("TUI exited before the expected screen")
     }
 
     pub async fn reload_cache(&mut self) -> anyhow::Result<()> {
-        let credential = self.app.tui.driver().restore_credential().await?;
-        self.app
-            .tui
-            .dispatch(Operation::SetCredential { credential });
+        if !self.events.should_quit() {
+            let credential = self.events.driver().restore_credential().await?;
+            self.events
+                .apply_effects(Effects::NONE.operation(Operation::SetCredential { credential }));
+        }
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use futures_util::{FutureExt as _, stream};
+    use ratatui::{Terminal, backend::TestBackend};
+
     use crate::{
-        application::{Application, Cache, Config, outbound::feed::MockFeedApi},
+        application::{
+            Application, Cache, ComponentId, Config, Features, outbound::feed::MockFeedApi,
+        },
+        client::gh::FetchNotificationInclude,
+        command::{Command, GhCommand, GhNotificationFilterOption},
         config::Categories,
         interact::mock::MockInteractor,
-        ui::theme::Theme,
+        ui::{theme::Theme, widgets::gh_notifications::GhNotificationFilterOptions},
     };
-    use futures_util::{FutureExt as _, stream};
 
     #[tokio::test]
-    async fn eof_finishes_the_loop_without_waiting_for_a_driver_event() {
-        let cache = tempfile::tempdir().unwrap();
-        let mut app = Application::builder()
+    async fn eof_persists_the_applied_github_filter_without_waiting_for_a_request() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::new(dir.path());
+        let stored = GhNotificationFilterOptions {
+            include: FetchNotificationInclude::All,
+            ..Default::default()
+        };
+        cache
+            .persist_gh_notification_filter_options(&stored)
+            .unwrap();
+        let app = Application::builder()
             .feed_api(MockFeedApi::new([]))
             .categories(Categories::default_toml())
-            .config(Config::default())
-            .cache(Cache::new(cache.path()))
+            .config(Config {
+                features: Features {
+                    enable_gh_notification: true,
+                },
+                ..Config::default()
+            })
+            .authentication_required(true)
+            .cache(Cache::new(dir.path()))
             .theme(Theme::default())
             .interactor(Box::new(MockInteractor::new()))
-            .build()
-            .with_test_terminal(80, 24);
-        app.app
-            .tui
-            .run_with(&mut app.terminal, &mut stream::empty())
+            .build();
+        let terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let mut running = app.event_loop(terminal, stream::empty()).start();
+        assert_eq!(running.ui().gh.notifications.filter_options(), &stored);
+        running.apply_effects(super::Effects::NONE.send_all(
+            ComponentId::GhNotifications,
+            [
+                Command::Gh(GhCommand::ToggleNotificationFilter(
+                    GhNotificationFilterOption::UnreadOnly,
+                )),
+                Command::Gh(GhCommand::ApplyNotificationFilter),
+            ],
+        ));
+        running
+            .run()
             .now_or_never()
             .expect("EOF must be ready")
             .unwrap();
+        assert_eq!(
+            cache.load_gh_notification_filter_options().unwrap(),
+            GhNotificationFilterOptions::default()
+        );
     }
 }

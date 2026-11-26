@@ -1,3 +1,4 @@
+use super::ComponentId;
 use crate::{
     application::{RequestKind, effects::Effects},
     command::{Command, GhCommand, GhFilterCommand, ShellCommand},
@@ -6,10 +7,13 @@ use crate::{
 impl FilterPopup {
     pub(super) fn apply_command(command: GhFilterCommand) -> Effects {
         match command {
-            GhFilterCommand::Open => Effects::NONE.with_command(Command::Open),
+            GhFilterCommand::Open => Effects::NONE.send(ComponentId::GhFilterPopup, Command::Open),
             GhFilterCommand::Close => Effects::NONE
-                .with_command(Command::Close)
-                .with_command(Command::Gh(GhCommand::ApplyNotificationFilter)),
+                .send(ComponentId::GhFilterPopup, Command::Close)
+                .send(
+                    ComponentId::GhNotifications,
+                    Command::Gh(GhCommand::ApplyNotificationFilter),
+                ),
         }
     }
 }

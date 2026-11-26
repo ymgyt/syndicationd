@@ -1,5 +1,6 @@
 use super::RenderContext;
-use crate::application::{ComponentId, compositor::SyndUi};
+use super::Ui;
+use crate::application::ComponentId;
 use crate::{
     application::{RequestError, RequestKind, effects::Effects},
     auth::{AuthenticationProvider, Credential, Verified},
@@ -9,7 +10,7 @@ use crate::{
     operation::Operation,
     ui::widgets::authentication,
 };
-use tuiframework::{Component, Effects as UiEffects};
+use tuiframework::Component;
 use url::Url;
 
 /// Owns the login screen and the device flow that grants access to the API.
@@ -170,7 +171,7 @@ impl LoginComponent {
             LoginCommand::Authenticate => {
                 let provider = Self::PROVIDERS[self.selected_provider];
                 if self.state.begin(provider) {
-                    return Effects::operations(Operation::StartDeviceFlow { provider });
+                    return Effects::NONE.operation(Operation::StartDeviceFlow { provider });
                 }
             }
             LoginCommand::MoveProvider(direction)
@@ -185,13 +186,11 @@ impl LoginComponent {
     }
 }
 
-impl Component<SyndUi> for LoginComponent {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for LoginComponent {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
-            Command::Login(action) => self
-                .apply_command(action)
-                .into_framework(ComponentId::Login),
-            _ => UiEffects::NONE,
+            Command::Login(action) => self.apply_command(action),
+            _ => Effects::NONE,
         }
     }
 
@@ -237,17 +236,12 @@ impl Component<SyndUi> for LoginComponent {
         .contains(&EventKind::from(event))
     }
 
-    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
-        self.apply_event(event).into_framework(ComponentId::Login)
-    }
-}
-impl LoginComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
-            Event::Auth { event, .. } => Effects::operations(self.state.apply_event(event)),
+            Event::Auth { event, .. } => Effects::from_operations(self.state.apply_event(event)),
             Event::ApiCredentialConfigured => self.state.api_credential_configured().into(),
             Event::CredentialRefreshed { credential } => {
-                Effects::operations(configure_credential(credential))
+                Effects::from_operations(configure_credential(credential))
             }
             Event::RequestCompleted {
                 kind,
@@ -256,7 +250,10 @@ impl LoginComponent {
             } => {
                 self.state.request_failed(kind, error);
                 if let RequestError::Authentication(error) = error {
-                    return Command::show_request_error(kind, error.to_string()).into();
+                    return Effects::NONE.send(
+                        ComponentId::Shell,
+                        Command::show_request_error(kind, error.to_string()),
+                    );
                 }
                 Effects::NONE
             }

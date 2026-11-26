@@ -1,5 +1,5 @@
 use super::RenderContext;
-use crate::application::{ComponentId, compositor::SyndUi};
+use crate::application::component::Ui;
 use crate::{
     application::{InFlightRequests, effects::Effects, request::synd_api_error_message},
     command::{Command, ShellCommand},
@@ -13,7 +13,7 @@ use crate::{
 };
 use ratatui::widgets::{Block, Widget};
 use tracing::{error, warn};
-use tuiframework::{Component, Effects as UiEffects};
+use tuiframework::Component;
 
 /// Draws the background and status line and handles application-wide commands.
 pub(in crate::application) struct ShellComponent {
@@ -68,20 +68,20 @@ impl ShellComponent {
     }
 }
 
-impl Component<SyndUi> for ShellComponent {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for ShellComponent {
+    fn apply_command(&mut self, command: Command) -> Effects {
         let Command::Shell(action) = command else {
-            return UiEffects::NONE;
+            return Effects::NONE;
         };
         match action {
             ShellCommand::ShowError(message) => self.status.set_error_message(message),
-            ShellCommand::Quit => return UiEffects::NONE.quit(),
+            ShellCommand::Quit => return Effects::NONE.quit(),
             ShellCommand::RotateTheme => self.rotate_theme(),
             ShellCommand::ForceRedraw => {
-                return UiEffects::NONE.operation(Operation::ForceRedrawTerminal);
+                return Effects::NONE.operation(Operation::ForceRedrawTerminal);
             }
         }
-        UiEffects::NONE
+        Effects::NONE
     }
 
     fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
@@ -114,11 +114,6 @@ impl Component<SyndUi> for ShellComponent {
         .contains(&EventKind::from(event))
     }
 
-    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
-        self.apply_event(event).into_framework(ComponentId::Shell)
-    }
-}
-impl ShellComponent {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::RequestEmitted { request_id, kind } => {

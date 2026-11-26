@@ -5,6 +5,7 @@ pub use crate::application::TestApplication;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+#[derive(Clone)]
 pub struct UnboundedSenderWrapper {
     inner: UnboundedSender<io::Result<Event>>,
 }

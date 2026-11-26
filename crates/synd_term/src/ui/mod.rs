@@ -1,10 +1,10 @@
 use std::{str::FromStr, sync::OnceLock};
+use tuiframework::TerminalFocus;
 
 use ratatui::style::{Color, Modifier, Style};
 use synd_feed::types::{Category, Requirement};
 
 use crate::{
-    application::TerminalFocus,
     config::{Categories, Icon, IconColor},
     types::Time,
     ui::theme::Theme,

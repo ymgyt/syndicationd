@@ -1,5 +1,6 @@
 use super::RenderContext;
-use crate::application::{ComponentId, compositor::SyndUi};
+use super::Ui;
+use crate::application::ComponentId;
 use crate::{
     application::effects::Effects,
     command::{Command, UnsubscribeCommand, UnsubscribeTarget},
@@ -7,7 +8,7 @@ use crate::{
     operation::Operation,
     ui::widgets::subscription::render_unsubscribe,
 };
-use tuiframework::{Component, Effects as UiEffects};
+use tuiframework::Component;
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum UnsubscribeSelection {
@@ -36,7 +37,7 @@ impl UnsubscribePopup {
         match command {
             UnsubscribeCommand::Open(target) => {
                 self.target = Some(target);
-                Effects::NONE.with_command(Command::Open)
+                Effects::NONE.send(ComponentId::UnsubscribePopup, Command::Open)
             }
             UnsubscribeCommand::ToggleSelection => {
                 self.selection = self.selection.toggle();
@@ -48,23 +49,22 @@ impl UnsubscribePopup {
                     .take()
                     .filter(|_| self.selection == UnsubscribeSelection::Yes)
                     .map(|target| Operation::UnsubscribeFeed { url: target.url });
-                Effects::operations(operation).with_command(Command::Close)
+                Effects::from_operations(operation)
+                    .send(ComponentId::UnsubscribePopup, Command::Close)
             }
             UnsubscribeCommand::Cancel => {
                 self.target = None;
-                Effects::NONE.with_command(Command::Close)
+                Effects::NONE.send(ComponentId::UnsubscribePopup, Command::Close)
             }
         }
     }
 }
 
-impl Component<SyndUi> for UnsubscribePopup {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for UnsubscribePopup {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
-            Command::UnsubscribePopup(action) => self
-                .apply_command(action)
-                .into_framework(ComponentId::UnsubscribePopup),
-            _ => UiEffects::NONE,
+            Command::UnsubscribePopup(action) => self.apply_command(action),
+            _ => Effects::NONE,
         }
     }
 

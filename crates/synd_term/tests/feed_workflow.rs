@@ -12,9 +12,7 @@ use synd_term::{
         outbound::gh::GhClient,
     },
     config::Categories,
-    integration::{
-        TestApplication, event_stream, focus_gained_event, focus_lost_event, resize_event,
-    },
+    integration::{TestApplication, focus_gained_event, focus_lost_event, resize_event},
     interact::mock::MockInteractor,
     key,
     test_support::screen::Screen,
@@ -26,10 +24,10 @@ use tempfile::TempDir;
 async fn entering_feeds_requests_the_missing_subscription() {
     let api = api_with_missing_subscription();
     let (_cache_dir, mut app) = app(api, None, None);
-    let (tx, mut input) = event_stream();
-    app.wait_until_jobs_completed(&mut input).await;
+    let tx = app.input();
+    app.wait_until_jobs_completed().await;
     tx.send(key!(tab));
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     assert!(Screen::new(app.buffer()).contains_text("Feed 1/1"));
 }
 
@@ -63,11 +61,11 @@ async fn space_reads_the_selected_article_url_and_escape_returns_to_the_entry() 
     let mut entries = timeline_entries();
     entries.nodes[1].entry.website_url = Some(article_url);
     let (_cache_dir, mut app) = start_app_with_entries(entries, None);
-    let (tx, mut input) = event_stream();
-    app.wait_until_jobs_completed(&mut input).await;
+    let tx = app.input();
+    app.wait_until_jobs_completed().await;
 
     tx.send_multi([key!('j'), key!(' ')]);
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     let screen = Screen::new(app.buffer());
     let initial = screen.lines();
     assert_eq!(initial[0].trim(), "Publisher title");
@@ -77,24 +75,24 @@ async fn space_reads_the_selected_article_url_and_escape_returns_to_the_entry() 
     let body = &initial[1..initial.len() - 1];
     let half = body.len() / 2;
     tx.send_multi([key!('z'), key!('j')]);
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     let scrolled = Screen::new(app.buffer()).lines();
     assert_eq!(scrolled[0], initial[0]);
     assert_eq!(scrolled[1..1 + body.len() - half], body[half..]);
 
     tx.send_multi([key!('z'), key!('k')]);
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     let restored = Screen::new(app.buffer()).lines();
     assert_eq!(restored[1..restored.len() - 1], *body);
 
     tx.send(key!(' '));
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     let screen = Screen::new(app.buffer());
     assert!(screen.contains_text("Reading this paragraph"));
     assert!(!screen.contains_text("First section"));
 
     tx.send(key!(esc));
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     let screen = Screen::new(app.buffer());
     assert!(screen.contains_text("Entry 2/2"));
     assert!(screen.contains_text("Testing a GraphQL Result<T>."));
@@ -142,10 +140,10 @@ async fn reader_passes_the_final_url_to_the_converter_and_displays_its_error() {
     let server = tokio::spawn(async move { axum::serve(listener, publisher).await.unwrap() });
 
     let (_cache_dir, mut app) = start_app_with_entries(entries, Some(Arc::new(FailingConverter)));
-    let (tx, mut input) = event_stream();
-    app.wait_until_jobs_completed(&mut input).await;
+    let tx = app.input();
+    app.wait_until_jobs_completed().await;
     tx.send_multi([key!('j'), key!(' ')]);
-    app.wait_until_jobs_completed(&mut input).await;
+    app.wait_until_jobs_completed().await;
     assert!(Screen::new(app.buffer()).contains_text("publisher conversion failed"));
     server.abort();
 }
@@ -171,13 +169,13 @@ async fn feeds_load_while_github_requests_wait_for_a_slot() {
         .unwrap();
     let api = api_with_missing_subscription();
     let (_cache_dir, mut app) = app(api, Some(GhClient::with(octocrab)), None);
-    let (tx, mut input) = event_stream();
+    let tx = app.input();
     // Startup already issues one GitHub request.
     tx.send_multi((0..90).map(|_| key!('r')));
 
     tokio::time::timeout(Duration::from_secs(10), async {
         let (feed, mut running) = tokio::join!(
-            app.run_until(&mut input, |buf| Screen::new(buf).contains_text("Feed 1/1")),
+            app.run_until(|buf| Screen::new(buf).contains_text("Feed 1/1")),
             async {
                 let mut running = Vec::new();
                 for _ in 0..90 {
@@ -191,7 +189,7 @@ async fn feeds_load_while_github_requests_wait_for_a_slot() {
         assert!(matches!(requests.try_recv(), Err(mpsc::error::TryRecvError::Empty)));
 
         running.pop().unwrap().send(()).unwrap();
-        tokio::join!(app.wait_until_jobs_completed(&mut input), async {
+        tokio::join!(app.wait_until_jobs_completed(), async {
             requests.recv().await.unwrap().send(()).unwrap();
             for request in running {
                 request.send(()).unwrap();
@@ -216,8 +214,8 @@ mod bootstrapped_app {
             .clone_from(&short.entry.source_categories);
         long.entry.excerpt.as_mut().unwrap().text = "More about this entry.\n".repeat(20);
         let (_cache_dir, mut app) = start_app_with_entries(entries, None);
-        let (tx, mut input) = event_stream();
-        app.wait_until_jobs_completed(&mut input).await;
+        let tx = app.input();
+        app.wait_until_jobs_completed().await;
 
         let lines = Screen::new(app.buffer()).lines();
         let footer = lines
@@ -230,7 +228,7 @@ mod bootstrapped_app {
         assert!(lines[footer - 1].contains("syndication:feed-formats/rss-2.0"));
 
         tx.send(key!('j'));
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         let lines = Screen::new(app.buffer()).lines();
         let footer = lines
             .iter()
@@ -244,41 +242,39 @@ mod bootstrapped_app {
     #[tokio::test]
     async fn unsubscribe_popup_only_receives_keys_on_its_tab() {
         let (_cache_dir, mut app) = start_app();
-        let (tx, mut input) = event_stream();
-        app.wait_until_jobs_completed(&mut input).await;
+        let tx = app.input();
+        app.wait_until_jobs_completed().await;
 
         tx.send_multi([key!(tab), key!('d')]);
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
 
         tx.send_multi([key!(tab), key!('j')]);
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("Entry 2/2"));
 
         tx.send(key!(tab));
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
         tx.send(key!(esc));
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(!Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
     }
 
     #[tokio::test]
     async fn status_shows_loaded_timeline_entries_before_completion() {
         let (_cache_dir, mut app) = start_app();
-        let (_tx, mut input) = event_stream();
+        let _tx = app.input();
         let progress = format!("Fetch timeline 2/{}", Config::default().entries_limit);
         tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            app.run_until(&mut input, |buffer| {
-                Screen::new(buffer).contains_text(&progress)
-            }),
+            app.run_until(|buffer| Screen::new(buffer).contains_text(&progress)),
         )
         .await
         .unwrap()
         .unwrap();
 
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(!Screen::new(app.buffer()).contains_text(&progress));
     }
 
@@ -286,8 +282,8 @@ mod bootstrapped_app {
     async fn initial_view() {
         let (_cache_dir, mut app) = start_app();
 
-        let (_tx, mut input) = event_stream();
-        app.wait_until_jobs_completed(&mut input).await;
+        let _tx = app.input();
+        app.wait_until_jobs_completed().await;
 
         let screen = Screen::new(app.buffer());
         assert!(screen.contains_text("Syndicationd"));
@@ -300,29 +296,29 @@ mod bootstrapped_app {
     #[tokio::test]
     async fn search_applies_to_both_feed_views() {
         let (_cache_dir, mut app) = start_app();
-        let (tx, mut input) = event_stream();
-        app.wait_until_jobs_completed(&mut input).await;
+        let tx = app.input();
+        app.wait_until_jobs_completed().await;
 
         tx.send_multi([key!(tab), key!('/'), key!('z'), key!(esc)]);
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("Feed -/-"));
 
         tx.send(key!(tab));
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("Entry -/-"));
 
         tx.send_multi([key!('/'), key!(backspace)]);
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("Entry 1/2"));
     }
 
     #[tokio::test]
     async fn category_hints_are_ready_when_the_filter_opens() {
         let (_cache_dir, mut app) = start_app();
-        let (tx, mut input) = event_stream();
-        app.wait_until_jobs_completed(&mut input).await;
+        let tx = app.input();
+        app.wait_until_jobs_completed().await;
         tx.send(key!('c'));
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(
             Screen::new(app.buffer())
                 .lines()
@@ -331,19 +327,19 @@ mod bootstrapped_app {
                 .contains("a:Toggle rust category")
         );
         tx.send(key!('a'));
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
         assert!(Screen::new(app.buffer()).contains_text("Entry -/-"));
     }
 
     #[tokio::test]
     async fn terminal_events() {
         let (_cache_dir, mut app) = start_app();
-        let (tx, mut input) = event_stream();
-        app.wait_until_jobs_completed(&mut input).await;
+        let tx = app.input();
+        app.wait_until_jobs_completed().await;
 
         tx.send(focus_gained_event());
         tx.send(focus_lost_event());
-        app.wait_until_jobs_completed(&mut input).await;
+        app.wait_until_jobs_completed().await;
 
         let (mut columns, mut rows) = (120, 30);
         loop {
@@ -354,7 +350,7 @@ mod bootstrapped_app {
             }
 
             tx.send(resize_event(columns, rows));
-            app.wait_until_jobs_completed(&mut input).await;
+            app.wait_until_jobs_completed().await;
         }
     }
 }

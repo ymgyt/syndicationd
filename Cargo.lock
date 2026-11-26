@@ -6747,7 +6747,7 @@ dependencies = [
 [[package]]
 name = "tuiframework"
 version = "0.1.0"
-source = "git+https://github.com/ymgyt/tuiframework?rev=61241295890bf9a93aa4553afe0f6bf6996ba107#61241295890bf9a93aa4553afe0f6bf6996ba107"
+source = "git+https://github.com/ymgyt/tuiframework?rev=afe88192f84c6a8e61cc34791c51edcf6d11857e#afe88192f84c6a8e61cc34791c51edcf6d11857e"
 dependencies = [
  "bon",
  "crossterm",

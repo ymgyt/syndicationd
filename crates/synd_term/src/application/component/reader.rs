@@ -1,6 +1,7 @@
-use crate::application::{ComponentId, compositor::SyndUi};
+use super::Ui;
+use crate::application::ComponentId;
 use std::{cell::RefCell, sync::Arc};
-use tuiframework::{Component, Effects as UiEffects};
+use tuiframework::Component;
 
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -44,15 +45,16 @@ impl ReaderComponent {
             ReaderCommand::Open(url) => {
                 self.generation.advance();
                 self.state = State::Loading(url.clone());
-                Effects::operations(Operation::FetchArticle {
-                    generation: self.generation,
-                    url,
-                })
-                .with_command(Command::Open)
+                Effects::NONE
+                    .operation(Operation::FetchArticle {
+                        generation: self.generation,
+                        url,
+                    })
+                    .send(ComponentId::Reader, Command::Open)
             }
             ReaderCommand::Close => {
                 self.state = State::Closed;
-                Command::Close.into()
+                Effects::NONE.send(ComponentId::Reader, Command::Close)
             }
             ReaderCommand::Scroll(by) => {
                 if let State::Ready { body, .. } = &mut self.state {
@@ -64,13 +66,11 @@ impl ReaderComponent {
     }
 }
 
-impl Component<SyndUi> for ReaderComponent {
-    fn command(&mut self, command: Command) -> UiEffects<SyndUi> {
+impl Component<Ui> for ReaderComponent {
+    fn apply_command(&mut self, command: Command) -> Effects {
         match command {
-            Command::Reader(action) => self
-                .apply_command(action)
-                .into_framework(ComponentId::Reader),
-            _ => UiEffects::NONE,
+            Command::Reader(action) => self.apply_command(action),
+            _ => Effects::NONE,
         }
     }
 
@@ -78,8 +78,30 @@ impl Component<SyndUi> for ReaderComponent {
         [EventKind::ArticleFetched, EventKind::RequestCompleted].contains(&EventKind::from(event))
     }
 
-    fn on_event(&mut self, event: &Event) -> UiEffects<SyndUi> {
-        self.apply_event(event).into_framework(ComponentId::Reader)
+    fn apply_event(&mut self, event: &Event) -> Effects {
+        if matches!(self.state, State::Loading(_)) {
+            match event {
+                Event::ArticleFetched {
+                    generation,
+                    article,
+                    ..
+                } if *generation == self.generation => {
+                    self.state = State::Ready {
+                        article: Arc::clone(article),
+                        body: Box::default(),
+                    };
+                }
+                Event::RequestCompleted {
+                    kind: RequestKind::FetchArticle { generation },
+                    result: Err(RequestError::Article(error)),
+                    ..
+                } if *generation == self.generation => {
+                    self.state = State::Failed(format!("{error:#}"));
+                }
+                _ => {}
+            }
+        }
+        Effects::NONE
     }
 
     fn key_layers(&self) -> &[Layer] {
@@ -111,33 +133,6 @@ impl Component<SyndUi> for ReaderComponent {
                 .render(body_area, buf),
             State::Closed => {}
         }
-    }
-}
-impl ReaderComponent {
-    fn apply_event(&mut self, event: &Event) -> Effects {
-        if matches!(self.state, State::Loading(_)) {
-            match event {
-                Event::ArticleFetched {
-                    generation,
-                    article,
-                    ..
-                } if *generation == self.generation => {
-                    self.state = State::Ready {
-                        article: Arc::clone(article),
-                        body: Box::default(),
-                    };
-                }
-                Event::RequestCompleted {
-                    kind: RequestKind::FetchArticle { generation },
-                    result: Err(RequestError::Article(error)),
-                    ..
-                } if *generation == self.generation => {
-                    self.state = State::Failed(format!("{error:#}"));
-                }
-                _ => {}
-            }
-        }
-        Effects::NONE
     }
 }
 

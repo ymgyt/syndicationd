@@ -2,7 +2,7 @@ use criterion::Criterion;
 
 mod bench {
     use criterion::Criterion;
-    use synd_term::{integration, key};
+    use synd_term::key;
 
     mod helper;
 
@@ -11,14 +11,14 @@ mod bench {
             b.to_async(runtime()).iter_batched(
                 || {
                     let app = helper::init_app();
-                    let (tx, event_stream) = integration::event_stream();
+                    let tx = app.input();
                     for _ in 0..100 {
                         tx.send(key!('j'));
                     }
-                    (app, event_stream)
+                    app
                 },
-                |(mut app, mut event_stream)| async move {
-                    app.wait_until_jobs_completed(&mut event_stream).await;
+                |mut app| async move {
+                    app.wait_until_jobs_completed().await;
                 },
                 criterion::BatchSize::SmallInput,
             );

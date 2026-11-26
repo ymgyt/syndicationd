@@ -22,7 +22,6 @@ use synd_registry::{
     sqlite::{SqliteDatabase, SqliteFeedRegistryDb},
 };
 use synd_term::integration::TestApplication;
-pub use synd_term::integration::event_stream;
 use synd_term::{
     application::{
         Application, Authenticator, Cache, ClientFeedApi, Config, DeviceFlows, JwtService,

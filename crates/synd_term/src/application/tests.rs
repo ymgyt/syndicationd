@@ -1,5 +1,4 @@
-use super::*;
-use crate::operation::Operations;
+use super::component::Ui;
 use crate::{
     application::{Clock, Config},
     config::Categories,
@@ -7,8 +6,9 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
+use tuiframework::Ui as _;
 
-type Compositor = tuiframework::Compositor<SyndUi>;
+type Compositor = tuiframework::Compositor<Ui>;
 fn make(config: Config, theme: Theme, categories: Categories, auth: bool) -> Compositor {
     struct Epoch;
     impl Clock for Epoch {
@@ -16,20 +16,8 @@ fn make(config: Config, theme: Theme, categories: Categories, auth: bool) -> Com
             DateTime::UNIX_EPOCH
         }
     }
-    let (ui, keys) = SyndUi::new(config, theme, categories, auth, Arc::new(Epoch));
-    tuiframework::Compositor::new(ui, keys)
-}
-trait Input {
-    fn apply_terminal_event(&mut self, event: &TerminalEvent) -> Operations;
-    fn apply_event(&mut self, event: &Event) -> Operations;
-}
-impl Input for Compositor {
-    fn apply_terminal_event(&mut self, event: &TerminalEvent) -> Operations {
-        self.input(event).into()
-    }
-    fn apply_event(&mut self, event: &Event) -> Operations {
-        self.event(event).into()
-    }
+    let ui = Ui::new(&config, theme, categories, auth, Arc::new(Epoch));
+    tuiframework::Compositor::new(ui, config.keymaps.0)
 }
 
 use crate::{
@@ -66,7 +54,7 @@ fn rotating_the_palette_preserves_the_transparent_background() {
         surface_colors(&compositor),
         (Palette::ferra().foreground, Color::Reset)
     );
-    let _ = compositor.input(&crate::shift!('t'));
+    let _ = compositor.apply_terminal_event(&crate::shift!('t'));
     assert_eq!(
         surface_colors(&compositor),
         (Palette::solarized_dark().foreground, Color::Reset)
@@ -88,14 +76,20 @@ fn failed_login_shows_the_error_and_allows_retry_with_the_selected_provider() {
     );
     let _ = compositor.apply_terminal_event(&key!('j'));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(enter)),
-        Operations::One(Operation::StartDeviceFlow {
+        compositor
+            .apply_terminal_event(&key!(enter))
+            .operations
+            .as_slice(),
+        [Operation::StartDeviceFlow {
             provider: AuthenticationProvider::Google
-        })
+        }]
     ));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(enter)),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!(enter))
+            .operations
+            .as_slice(),
+        []
     ));
 
     let request_id = RequestId::new(1);
@@ -118,10 +112,13 @@ fn failed_login_shows_the_error_and_allows_retry_with_the_selected_provider() {
     let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
     assert!(Screen::new(frame.buffer).contains_text("authorization unavailable"));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(enter)),
-        Operations::One(Operation::StartDeviceFlow {
+        compositor
+            .apply_terminal_event(&key!(enter))
+            .operations
+            .as_slice(),
+        [Operation::StartDeviceFlow {
             provider: AuthenticationProvider::Google
-        })
+        }]
     ));
 }
 
@@ -133,11 +130,9 @@ fn replacing_a_credential_catches_up_the_existing_timeline() {
         Categories::default_toml(),
         true,
     );
-    let Operations::Many(initial) = compositor.apply_event(&Event::ApiCredentialConfigured) else {
-        panic!("first credential should start feed synchronization");
-    };
+    let initial = compositor.apply_event(&Event::ApiCredentialConfigured);
     assert!(matches!(
-        initial.as_slice(),
+        initial.operations.as_slice(),
         [
             Operation::WatchFeedEvents,
             Operation::FetchSubscription { .. },
@@ -150,10 +145,10 @@ fn replacing_a_credential_catches_up_the_existing_timeline() {
         event: FeedRequestEvent::InitialTimelineOpened { timeline_id },
     });
     assert!(matches!(
-        compositor.apply_event(&opened),
-        Operations::One(Operation::FetchTimelineWindow { timeline_id: id, .. }) if id == timeline_id
+        compositor.apply_event(&opened).operations.as_slice(),
+        [Operation::FetchTimelineWindow { timeline_id: id, .. }] if *id == timeline_id
     ));
-    let feeds = &mut compositor.components.feeds;
+    let feeds = &mut compositor.ui.feeds;
     feeds.apply_timeline_window_chunk(Vec::new(), 42);
     assert!(matches!(
         feeds.complete_timeline_window(true),
@@ -162,8 +157,8 @@ fn replacing_a_credential_catches_up_the_existing_timeline() {
     assert!(feeds.complete_timeline_catch_up(true).is_none());
 
     assert!(matches!(
-        compositor.apply_event(&Event::ApiCredentialConfigured),
-        Operations::One(Operation::CatchUpTimeline { timeline_id: id, since: 42 }) if id == timeline_id
+        compositor.apply_event(&Event::ApiCredentialConfigured).operations.as_slice(),
+        [Operation::CatchUpTimeline { timeline_id: id, since: 42 }] if *id == timeline_id
     ));
 }
 
@@ -174,13 +169,16 @@ fn entering_feeds_requests_the_configured_page_size() {
         ..Config::default()
     });
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(tab)),
-        Operations::One(Operation::FetchSubscription {
+        compositor
+            .apply_terminal_event(&key!(tab))
+            .operations
+            .as_slice(),
+        [Operation::FetchSubscription {
             populate: Populate::Replace,
             after: None,
             first: 17,
             ..
-        })
+        }]
     ));
 }
 
@@ -247,31 +245,36 @@ struct PageRequest {
     generation: Generation,
 }
 
-fn start_page(compositor: &mut Compositor, id: RequestId, operation: Operations) -> PageRequest {
-    let Operations::One(Operation::FetchGhNotifications {
-        generation,
-        populate,
-        params,
-    }) = operation
+fn start_page(compositor: &mut Compositor, id: RequestId, operation: &[Operation]) -> PageRequest {
+    let [
+        Operation::FetchGhNotifications {
+            generation,
+            populate,
+            params,
+        },
+    ] = operation
     else {
         panic!("expected one GitHub page request, got {operation:?}");
     };
     let kind = RequestKind::FetchGhNotifications {
-        generation,
+        generation: *generation,
         page: params.page,
     };
     assert!(matches!(
-        compositor.apply_event(&Event::RequestEmitted {
-            request_id: id,
-            kind: kind.clone()
-        }),
-        Operations::Nop
+        compositor
+            .apply_event(&Event::RequestEmitted {
+                request_id: id,
+                kind: kind.clone()
+            })
+            .operations
+            .as_slice(),
+        []
     ));
     PageRequest {
         id,
         kind,
-        populate,
-        generation,
+        populate: *populate,
+        generation: *generation,
     }
 }
 
@@ -279,22 +282,27 @@ fn deliver_page(
     compositor: &mut Compositor,
     page: PageRequest,
     notification_id: u64,
-) -> Operations {
-    let operations = compositor.apply_event(&Event::Gh {
-        request_id: page.id,
-        event: GhEvent::NotificationsFetched {
-            generation: page.generation,
-            populate: page.populate,
-            notifications: vec![notification(notification_id)],
-        },
-    });
-    assert!(matches!(
-        compositor.apply_event(&Event::RequestCompleted {
+) -> Vec<Operation> {
+    let operations = compositor
+        .apply_event(&Event::Gh {
             request_id: page.id,
-            kind: page.kind,
-            result: Ok(())
-        }),
-        Operations::Nop
+            event: GhEvent::NotificationsFetched {
+                generation: page.generation,
+                populate: page.populate,
+                notifications: vec![notification(notification_id)],
+            },
+        })
+        .operations;
+    assert!(matches!(
+        compositor
+            .apply_event(&Event::RequestCompleted {
+                request_id: page.id,
+                kind: page.kind,
+                result: Ok(())
+            })
+            .operations
+            .as_slice(),
+        []
     ));
     operations
 }
@@ -311,25 +319,25 @@ fn previous_lists_next_page_arriving_after_reload_is_ignored() {
     let old_page = RequestId::new(2);
     let refreshed = RequestId::new(3);
 
-    let fetch = compositor.apply_terminal_event(&key!('r'));
-    let first_page = start_page(&mut compositor, first, fetch);
+    let fetch = compositor.apply_terminal_event(&key!('r')).operations;
+    let first_page = start_page(&mut compositor, first, &fetch);
     let fetch = deliver_page(&mut compositor, first_page, 1);
-    let append = start_page(&mut compositor, old_page, fetch);
+    let append = start_page(&mut compositor, old_page, &fetch);
     assert_eq!(append.populate, Populate::Append);
 
-    let fetch = compositor.apply_terminal_event(&key!('r'));
-    let replace = start_page(&mut compositor, refreshed, fetch);
+    let fetch = compositor.apply_terminal_event(&key!('r')).operations;
+    let replace = start_page(&mut compositor, refreshed, &fetch);
     assert_eq!(replace.populate, Populate::Replace);
     let next = deliver_page(&mut compositor, replace, 2);
     assert!(
-        matches!(next, Operations::One(Operation::FetchGhNotifications { params, .. }) if params.page == 2)
+        matches!(next.as_slice(), [Operation::FetchGhNotifications { params, .. }] if params.page == 2)
     );
 
     assert!(matches!(
-        deliver_page(&mut compositor, append, 3),
-        Operations::Nop
+        deliver_page(&mut compositor, append, 3).as_slice(),
+        []
     ));
-    let list = &compositor.components.gh.notifications;
+    let list = &compositor.ui.gh.notifications;
     assert_eq!(list.notification_ids(), vec![2u64.into()]);
     assert_eq!(list.fetch_next_if_needed().unwrap().page, 2);
 }
@@ -356,10 +364,10 @@ fn failed_page_from_previous_list_finishes_without_disturbing_the_current_fetch(
         result: Err(RequestError::Gh(GhError::SecondaryRateLimit)),
     };
 
-    let fetch = compositor.apply_terminal_event(&key!('r'));
-    let old = start_page(&mut compositor, RequestId::new(1), fetch);
-    let fetch = compositor.apply_terminal_event(&key!('r'));
-    let current = start_page(&mut compositor, RequestId::new(2), fetch);
+    let fetch = compositor.apply_terminal_event(&key!('r')).operations;
+    let old = start_page(&mut compositor, RequestId::new(1), &fetch);
+    let fetch = compositor.apply_terminal_event(&key!('r')).operations;
+    let current = start_page(&mut compositor, RequestId::new(2), &fetch);
     assert!(status(&compositor).contains("(+1)"));
 
     let _ = compositor.apply_event(&failure(old));
@@ -368,16 +376,22 @@ fn failed_page_from_previous_list_finishes_without_disturbing_the_current_fetch(
     assert!(!remaining.contains("(+1)"));
     let _ = compositor.apply_terminal_event(&key!('/'));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!('x')),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!('x'))
+            .operations
+            .as_slice(),
+        []
     ));
 
     let _ = compositor.apply_event(&failure(current));
-    assert!(!compositor.components.is_busy());
+    assert!(!compositor.ui.is_busy());
     assert!(status(&compositor).contains("secondary rate limits exceeded"));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!('y')),
-        Operations::One(Operation::FetchGhNotifications { .. })
+        compositor
+            .apply_terminal_event(&key!('y'))
+            .operations
+            .as_slice(),
+        [Operation::FetchGhNotifications { .. }]
     ));
 }
 
@@ -390,20 +404,32 @@ fn github_search_fetches_more_only_when_the_filter_changes() {
         ..Config::default()
     });
     assert!(matches!(
-        compositor.apply_terminal_event(&key!('/')),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!('/'))
+            .operations
+            .as_slice(),
+        []
     ));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(backspace)),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!(backspace))
+            .operations
+            .as_slice(),
+        []
     ));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!('x')),
-        Operations::One(Operation::FetchGhNotifications { .. })
+        compositor
+            .apply_terminal_event(&key!('x'))
+            .operations
+            .as_slice(),
+        [Operation::FetchGhNotifications { .. }]
     ));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!('y')),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!('y'))
+            .operations
+            .as_slice(),
+        []
     ));
 }
 
@@ -439,17 +465,19 @@ fn github_filter_is_only_drawn_and_dismissed_on_its_tab() {
 fn deliver_subscription_page(
     compositor: &mut Compositor,
     id: u64,
-    fetch: &Operations,
+    fetch: &[Operation],
     url: &str,
     next_cursor: Option<&str>,
-) -> Operations {
+) -> Vec<Operation> {
     use crate::event::{FeedRequestEvent, FeedsEvent};
 
-    let Operations::One(Operation::FetchSubscription {
-        generation,
-        populate,
-        ..
-    }) = fetch
+    let [
+        Operation::FetchSubscription {
+            generation,
+            populate,
+            ..
+        },
+    ] = fetch
     else {
         panic!("expected a subscription page request, got {fetch:?}");
     };
@@ -468,14 +496,16 @@ fn deliver_subscription_page(
         request_id,
         kind: kind.clone(),
     });
-    let next = compositor.apply_event(&Event::Feeds(FeedsEvent::Request {
-        request_id,
-        event: FeedRequestEvent::SubscriptionFetched {
-            generation: *generation,
-            populate: *populate,
-            subscription,
-        },
-    }));
+    let next = compositor
+        .apply_event(&Event::Feeds(FeedsEvent::Request {
+            request_id,
+            event: FeedRequestEvent::SubscriptionFetched {
+                generation: *generation,
+                populate: *populate,
+                subscription,
+            },
+        }))
+        .operations;
     let _ = compositor.apply_event(&Event::RequestCompleted {
         request_id,
         kind,
@@ -488,7 +518,7 @@ fn deliver_subscription_page(
 fn reloading_subscriptions_discards_old_pages_and_their_cursors() {
     for pending_append in [false, true] {
         let mut compositor = new_compositor(Config::default());
-        let first = compositor.apply_terminal_event(&key!(tab));
+        let first = compositor.apply_terminal_event(&key!(tab)).operations;
         let old = if pending_append {
             deliver_subscription_page(
                 &mut compositor,
@@ -501,23 +531,22 @@ fn reloading_subscriptions_discards_old_pages_and_their_cursors() {
             first
         };
 
-        let refresh = compositor.apply_terminal_event(&key!('r'));
+        let refresh = compositor.apply_terminal_event(&key!('r')).operations;
         let current = "https://example.com/current";
         let obsolete = "https://example.com/obsolete";
         let next =
             deliver_subscription_page(&mut compositor, 2, &refresh, current, Some("current-next"));
-        assert!(
-            matches!(&next, Operations::One(Operation::FetchSubscription {
+        assert!(matches!(next.as_slice(), [Operation::FetchSubscription {
             after: Some(cursor), populate: Populate::Append, ..
-        }) if cursor == "current-next")
-        );
+        }] if cursor == "current-next"));
         assert!(matches!(
-            deliver_subscription_page(&mut compositor, 3, &old, obsolete, Some("obsolete-next")),
-            Operations::Nop
+            deliver_subscription_page(&mut compositor, 3, &old, obsolete, Some("obsolete-next"))
+                .as_slice(),
+            []
         ));
         let last = "https://example.com/last";
         let _ = deliver_subscription_page(&mut compositor, 4, &next, last, None);
-        let feeds = &compositor.components.feeds;
+        let feeds = &compositor.ui.feeds;
         assert!(feeds.is_already_subscribed(&current.try_into().unwrap()));
         assert!(feeds.is_already_subscribed(&last.try_into().unwrap()));
         assert!(!feeds.is_already_subscribed(&obsolete.try_into().unwrap()));
@@ -531,13 +560,14 @@ fn only_the_current_subscription_failure_reaches_the_status_line() {
 
     let mut compositor = new_compositor(Config::default());
     let mut start = |id, key| {
-        let Operations::One(Operation::FetchSubscription { generation, .. }) =
-            compositor.apply_terminal_event(&key)
-        else {
+        let operations = compositor.apply_terminal_event(&key).operations;
+        let [Operation::FetchSubscription { generation, .. }] = operations.as_slice() else {
             panic!("expected a subscription fetch")
         };
         let request_id = RequestId::new(id);
-        let kind = RequestKind::FetchSubscription { generation };
+        let kind = RequestKind::FetchSubscription {
+            generation: *generation,
+        };
         let _ = compositor.apply_event(&Event::RequestEmitted {
             request_id,
             kind: kind.clone(),
@@ -560,17 +590,17 @@ fn only_the_current_subscription_failure_reaches_the_status_line() {
         Screen::new(frame.buffer).lines().pop().unwrap()
     };
     let _ = compositor.apply_event(&old);
-    assert!(compositor.components.is_busy());
+    assert!(compositor.ui.is_busy());
     assert!(!status(&compositor).contains("page failed"));
     let _ = compositor.apply_event(&current);
-    assert!(!compositor.components.is_busy());
+    assert!(!compositor.ui.is_busy());
     assert!(status(&compositor).contains("page failed"));
 }
 
 #[test]
 fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
     let mut compositor = new_compositor(Config::default());
-    let first = compositor.apply_terminal_event(&key!(tab));
+    let first = compositor.apply_terminal_event(&key!(tab)).operations;
     let _ = deliver_subscription_page(
         &mut compositor,
         1,
@@ -579,7 +609,7 @@ fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
         None,
     );
     let _ = compositor.apply_terminal_event(&key!('d'));
-    let refresh = compositor.components.feeds.reload_subscription().into();
+    let refresh = [compositor.ui.feeds.reload_subscription()];
     let _ = deliver_subscription_page(
         &mut compositor,
         2,
@@ -587,20 +617,28 @@ fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
         "https://example.com/second",
         None,
     );
-    assert!(matches!(compositor.apply_terminal_event(&key!(enter)),
-        Operations::One(Operation::UnsubscribeFeed { url }) if url.as_str() == "https://example.com/first"
-    ));
+    assert!(
+        matches!(compositor.apply_terminal_event(&key!(enter)).operations.as_slice(),
+            [Operation::UnsubscribeFeed { url }] if url.as_str() == "https://example.com/first"
+        )
+    );
 
     let _ = compositor.apply_terminal_event(&key!('d'));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(esc)),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!(esc))
+            .operations
+            .as_slice(),
+        []
     ));
     let _ = compositor.apply_terminal_event(&key!('d'));
     let _ = compositor.apply_terminal_event(&key!('l'));
     assert!(matches!(
-        compositor.apply_terminal_event(&key!(enter)),
-        Operations::Nop
+        compositor
+            .apply_terminal_event(&key!(enter))
+            .operations
+            .as_slice(),
+        []
     ));
 }
 

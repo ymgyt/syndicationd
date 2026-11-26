@@ -10,66 +10,6 @@ use crate::{
     types::gh::{NotificationDetail, NotificationId, ThreadId},
 };
 
-/// Ordered side effects requested by one application state transition.
-#[derive(Debug)]
-#[must_use]
-pub(crate) enum Operations {
-    Nop,
-    One(Operation),
-    Many(Vec<Operation>),
-}
-
-impl From<Vec<Operation>> for Operations {
-    fn from(mut operations: Vec<Operation>) -> Self {
-        match operations.len() {
-            0 => Self::Nop,
-            1 => Self::One(operations.pop().expect("length checked")),
-            _ => Self::Many(operations),
-        }
-    }
-}
-
-impl From<Operation> for Operations {
-    fn from(operation: Operation) -> Self {
-        Self::One(operation)
-    }
-}
-
-impl From<Option<Operation>> for Operations {
-    fn from(operation: Option<Operation>) -> Self {
-        match operation {
-            Some(operation) => Self::One(operation),
-            None => Self::Nop,
-        }
-    }
-}
-
-impl From<Vec<Operations>> for Operations {
-    fn from(groups: Vec<Operations>) -> Self {
-        let mut operations = Vec::new();
-        for group in groups {
-            match group {
-                Self::Nop => {}
-                Self::One(operation) => operations.push(operation),
-                Self::Many(mut group) => operations.append(&mut group),
-            }
-        }
-        operations.into()
-    }
-}
-
-impl<const N: usize> From<[Operation; N]> for Operations {
-    fn from(operations: [Operation; N]) -> Self {
-        Vec::from(operations).into()
-    }
-}
-
-impl<const N: usize> From<[Operations; N]> for Operations {
-    fn from(groups: [Operations; N]) -> Self {
-        Vec::from(groups).into()
-    }
-}
-
 /// External side-effect request emitted by application state transitions.
 #[derive(Debug)]
 pub(crate) enum Operation {
@@ -143,17 +83,4 @@ pub(crate) enum Operation {
     SetCredential {
         credential: Verified<Credential>,
     },
-}
-
-impl IntoIterator for Operations {
-    type Item = Operation;
-    type IntoIter = std::vec::IntoIter<Operation>;
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::Nop => Vec::new(),
-            Self::One(op) => vec![op],
-            Self::Many(ops) => ops,
-        }
-        .into_iter()
-    }
 }

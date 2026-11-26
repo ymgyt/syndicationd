@@ -1,6 +1,12 @@
-use std::sync::Arc;
+use futures_util::Stream;
+use std::{io, sync::Arc};
 use tracing::warn;
-use tuiframework::{Application as Tui, RunError};
+use tuiframework::crossterm::event::{Event as CrosstermEvent, EventStream};
+use tuiframework::event_loop::Ready;
+use tuiframework::{
+    AnimationTimer, Compositor, EventLoop, Hooks, RenderTarget, Terminal, TerminalDevice,
+    TerminalOptions,
+};
 
 use crate::{config::Categories, interact::Interact, ui::theme::Theme};
 
@@ -34,17 +40,17 @@ pub use outbound::feed::{ClientFeedApi, FeedApi, FeedApiRef, FeedEventWatch};
 mod app_config;
 pub use app_config::{Config, Features};
 
-pub(crate) use compositor::TerminalFocus;
-
 pub(crate) mod component;
-mod compositor;
 mod overlay;
+#[cfg(test)]
+mod tests;
 pub(crate) use overlay::ComponentId;
 mod drivers;
 #[cfg(feature = "integration")]
 mod integration;
-use compositor::SyndUi;
+use component::Ui;
 use drivers::{DriverParts, Drivers};
+use effects::Effects;
 #[cfg(feature = "integration")]
 pub use integration::TestApplication;
 
@@ -56,7 +62,9 @@ pub enum Populate {
 
 /// Wires the synd screens and services into the terminal application.
 pub struct Application {
-    tui: Tui<SyndUi, Drivers>,
+    compositor: Compositor<Ui>,
+    drivers: Drivers,
+    animation_timer: AnimationTimer,
 }
 
 impl Application {
@@ -88,10 +96,9 @@ impl Application {
             html_converter,
             authentication_required,
         } = builder;
-        let period = config.throbber_timer_interval;
         let clock: Arc<dyn Clock> = Arc::from(clock.unwrap_or_else(|| Box::new(SystemClock)));
-        let (mut ui, keymap) = SyndUi::new(
-            config,
+        let ui = Ui::new(
+            &config,
             theme,
             categories,
             authentication_required,
@@ -107,39 +114,64 @@ impl Application {
             html_converter,
         });
 
+        Self {
+            compositor: Compositor::new(ui, config.keymaps.0),
+            drivers,
+            animation_timer: AnimationTimer::new(config.throbber_timer_interval),
+        }
+    }
+
+    fn event_loop<T, I>(self, terminal: T, input: I) -> EventLoop<Ready<'static, Ui, Drivers>, T, I>
+    where
+        T: RenderTarget,
+        I: Stream<Item = io::Result<CrosstermEvent>> + Unpin,
+    {
+        let hooks = Hooks::default()
+            .on_start(Box::new(Self::start))
+            .on_exit(Box::new(Self::persist_gh_filter));
+        EventLoop::builder()
+            .compositor(self.compositor)
+            .driver(self.drivers)
+            .terminal(terminal)
+            .input(input)
+            .animation_timer(self.animation_timer)
+            .hooks(hooks)
+            .build()
+    }
+
+    pub async fn run(self) -> io::Result<()> {
+        let mut device = TerminalDevice::stdout();
+        device.install_abort_hook();
+        let terminal = Terminal::init(&mut device, TerminalOptions::default())?;
+        let events = self.event_loop(terminal, EventStream::new());
+        // Keep the running event loop out of the enclosing CLI future.
+        Box::pin(events.run()).await.map_err(io::Error::from)
+    }
+
+    fn start(ui: &mut Ui, drivers: &mut Drivers) -> Effects {
         if ui.gh.enabled {
             match drivers.cache.load_gh_notification_filter_options() {
                 Ok(options) => ui.gh.restore_filter_options(options),
                 Err(error) => warn!("Load GitHub notification filter options: {error}"),
             }
         }
-        let tui = Tui::builder()
-            .components(ui)
-            .driver(drivers)
-            .keymap(keymap)
-            .tick_interval(period)
-            .build();
-        Self { tui }
-    }
-    pub async fn run(mut self) -> anyhow::Result<()> {
-        let result = self.tui.run().await;
-        if !matches!(result, Err(RunError::Setup(_))) {
-            self.persist_gh_filter();
+        if ui.login.has_api_access() {
+            Effects::NONE.emit(crate::event::Event::ApiAccessReady)
+        } else {
+            Effects::NONE
         }
-        Ok(result?)
     }
-    fn persist_gh_filter(&self) {
-        if !self.tui.components().gh.enabled {
-            return;
-        }
-        let options = self.tui.components().gh.filter_options_snapshot();
-        if let Err(error) = self
-            .tui
-            .driver()
-            .cache
-            .persist_gh_notification_filter_options(options)
-        {
-            warn!("Failed to persist GitHub notification filter options: {error}");
+
+    fn persist_gh_filter(ui: &Ui, drivers: &mut Drivers) {
+        let gh = &ui.gh;
+        if gh.enabled {
+            let options = gh.notifications.filter_options();
+            if let Err(error) = drivers
+                .cache
+                .persist_gh_notification_filter_options(options)
+            {
+                warn!("Failed to persist GitHub notification filter options: {error}");
+            }
         }
     }
 }

@@ -16,15 +16,13 @@ mod test {
             helper::init_tracing();
 
             let mut application = TestCase::default().init_app().await?;
-            let (tx, mut events) = helper::event_stream();
+            let tx = application.input();
 
-            application.wait_until_jobs_completed(&mut events).await;
+            application.wait_until_jobs_completed().await;
             tx.send(key!(enter));
             tokio::time::timeout(
                 Duration::from_secs(10),
-                application.run_until(&mut events, |buffer| {
-                    Screen::new(buffer).contains_text("UC123456")
-                }),
+                application.run_until(|buffer| Screen::new(buffer).contains_text("UC123456")),
             )
             .await??;
 
@@ -56,11 +54,11 @@ mod test {
             .already_logined();
 
             let mut application = test_case.init_app().await?;
-            let (tx, mut events) = helper::event_stream();
-            application.wait_until_jobs_completed(&mut events).await;
+            let tx = application.input();
+            application.wait_until_jobs_completed().await;
 
             tx.send(key!(tab));
-            application.wait_until_jobs_completed(&mut events).await;
+            application.wait_until_jobs_completed().await;
 
             let screen = Screen::new(application.buffer());
             assert!(screen.contains_text("Syndicationd"));
@@ -87,8 +85,7 @@ mod test {
             });
 
             let mut application = test_case.init_app().await?;
-            let (_tx, mut events) = helper::event_stream();
-            application.wait_until_jobs_completed(&mut events).await;
+            application.wait_until_jobs_completed().await;
 
             let screen = Screen::new(application.buffer());
             assert!(screen.contains_text("Login"));

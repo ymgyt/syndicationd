@@ -1,4 +1,5 @@
 use tracing::debug;
+use tuiframework::DriverContext;
 use url::Url;
 
 use crate::{
@@ -34,46 +35,26 @@ impl InteractionDriver {
                 error: OperationError::OpenTextBrowser(error),
             })
     }
-}
 
-/// Coordinates editor execution with the redraw performed after a successful edit.
-pub(super) struct TerminalInteraction<'a> {
-    interaction: &'a InteractionDriver,
-    terminal: &'a mut tuiframework::DriverContext<Event>,
-}
-
-impl<'a> TerminalInteraction<'a> {
-    pub(super) fn new(
-        interaction: &'a InteractionDriver,
-        terminal: &'a mut tuiframework::DriverContext<Event>,
-    ) -> Self {
-        Self {
-            interaction,
-            terminal,
-        }
+    pub(super) fn open_feed_subscription_editor(&self, cx: &mut DriverContext<Event>) {
+        self.open_editor(FeedSubscriptionEditor, cx);
     }
 
-    pub(super) fn open_feed_subscription_editor(self) -> Event {
-        self.open_editor(FeedSubscriptionEditor)
+    pub(super) fn open_feed_edition_editor(&self, prompt: &str, cx: &mut DriverContext<Event>) {
+        self.open_editor(FeedEditionEditor { prompt }, cx);
     }
 
-    pub(super) fn open_feed_edition_editor(self, prompt: &str) -> Event {
-        self.open_editor(FeedEditionEditor { prompt })
-    }
-
-    fn open_editor<P>(self, purpose: P) -> Event
-    where
-        P: EditorPurpose,
-    {
-        match self.interaction.interactor.open_editor(purpose.prompt()) {
+    fn open_editor(&self, purpose: impl EditorPurpose, cx: &mut DriverContext<Event>) {
+        let event = match self.interactor.open_editor(purpose.prompt()) {
             Ok(input) => {
-                self.terminal.force_redraw();
+                cx.force_redraw();
                 purpose.closed(input)
             }
             Err(error) => Event::OperationFailed {
                 error: purpose.failed(error),
             },
-        }
+        };
+        cx.emit(event);
     }
 }
 

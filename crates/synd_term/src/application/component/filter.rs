@@ -1,4 +1,5 @@
 use super::RenderContext;
+use super::Ui;
 use crate::{
     application::{Populate, effects::Effects},
     command::{FilterCommand, FilterTarget},
@@ -9,6 +10,7 @@ use crate::{
         tabs::Tab,
     },
 };
+use tuiframework::Component;
 
 impl Tab {
     pub(in crate::application) fn filter_target(self) -> FilterTarget {
@@ -73,7 +75,7 @@ impl FilterWidget {
     }
 }
 
-impl tuiframework::Component<crate::application::compositor::SyndUi> for FilterWidget {
+impl Component<Ui> for FilterWidget {
     fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
         let buf = frame.buffer_mut();
         self.render(
@@ -104,15 +106,6 @@ impl tuiframework::Component<crate::application::compositor::SyndUi> for FilterW
         .contains(&EventKind::from(event))
     }
 
-    fn on_event(
-        &mut self,
-        event: &Event,
-    ) -> tuiframework::Effects<crate::application::compositor::SyndUi> {
-        self.apply_event(event)
-            .into_framework(crate::application::ComponentId::Filter)
-    }
-}
-impl FilterWidget {
     fn apply_event(&mut self, event: &Event) -> Effects {
         match event {
             Event::FeedCategoriesChanged(categories) => {
