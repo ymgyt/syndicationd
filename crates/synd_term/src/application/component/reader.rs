@@ -4,7 +4,7 @@ use std::{cell::RefCell, sync::Arc};
 use tuiframework::Component;
 
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Layout},
     text::Line,
     widgets::{Paragraph, Widget as _, Wrap},
 };
@@ -110,10 +110,7 @@ impl Component<Ui> for ReaderComponent {
 
     fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
         let buf = frame.buffer_mut();
-        let area = Rect {
-            height: cx.frame.status.y.saturating_sub(cx.frame.area.y),
-            ..cx.frame.area
-        };
+        let area = cx.frame.full_screen_content();
         let [title_area, body_area] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)])
             .horizontal_margin(1)
             .areas(area);

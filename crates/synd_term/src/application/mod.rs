@@ -142,7 +142,10 @@ impl Application {
     pub async fn run(self) -> io::Result<()> {
         let mut device = TerminalDevice::stdout();
         device.install_abort_hook();
-        let terminal = Terminal::init(&mut device, TerminalOptions::default())?;
+        let terminal = Terminal::init(
+            &mut device,
+            TerminalOptions::default().with_bracketed_paste(true),
+        )?;
         let events = self.event_loop(terminal, EventStream::new());
         // Keep the running event loop out of the enclosing CLI future.
         Box::pin(events.run()).await.map_err(io::Error::from)

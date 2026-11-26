@@ -13,7 +13,7 @@ use synd_feed::types::{Category, Requirement};
 use crate::{
     application::{Direction, Populate},
     client::gh::{FetchNotificationInclude, FetchNotificationParticipating},
-    command::FilterTarget,
+    command::{FilterTarget, PromptAction},
     config::Categories,
     keymap,
     matcher::Matcher,
@@ -130,11 +130,8 @@ impl FilterWidget {
             return;
         }
         map.reset_layer(keymap::Layer::CategoryFilter);
-        map.reset_layer(keymap::Layer::SearchPrompt);
         if let Some(categories) = self.category_filter_keymap() {
             map.set_layer(keymap::Layer::CategoryFilter, categories);
-        } else if self.is_search_active() {
-            map.set_layer(keymap::Layer::SearchPrompt, keymap::search_prompt());
         }
     }
 
@@ -224,12 +221,8 @@ impl FilterWidget {
         self.set_state(State::Normal);
     }
 
-    pub(crate) fn insert_prompt_char(&mut self, ch: char) {
-        self.prompt.borrow_mut().insert_char(ch);
-    }
-
-    pub(crate) fn delete_prompt_backward(&mut self) -> bool {
-        self.prompt.borrow_mut().delete_backward()
+    pub(crate) fn edit_prompt(&mut self, action: &PromptAction) -> bool {
+        self.prompt.borrow_mut().apply(action)
     }
 
     #[must_use]

@@ -434,8 +434,7 @@ fn subscription() -> payload::SubscriptionPayload {
         "feeds": {
             "nodes": [{
                 "url": "https://example.com/feed.xml",
-                "requirement": "SHOULD",
-                "category": "rust",
+                "labels": { "requirement": "should", "category": "rust" },
                 "crawlPolicy": {
                     "polling": {
                         "kind": "INTERVAL",
@@ -496,8 +495,7 @@ fn timeline_entries() -> payload::TimelineEntryConnection {
                     "feed": {
                         "title": "Engineering Notes",
                         "url": "https://example.com/feed.xml",
-                        "requirement": "SHOULD",
-                        "category": "rust"
+                        "labels": { "requirement": "should", "category": "rust" }
                     }
                 }
             },
@@ -513,8 +511,7 @@ fn timeline_entries() -> payload::TimelineEntryConnection {
                     "feed": {
                         "title": "Engineering Notes",
                         "url": "https://example.com/feed.xml",
-                        "requirement": "SHOULD",
-                        "category": "rust"
+                        "labels": { "requirement": "should", "category": "rust" }
                     }
                 }
             }

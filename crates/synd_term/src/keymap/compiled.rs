@@ -14,6 +14,8 @@ impl CompiledKeymaps {
             Ok::<_, KeymapError>(KeymapAction::from(command))
         })?;
         let mut map = Keymap::compile(config)?;
+        map.set_layer(Layer::SearchPrompt, super::search_prompt());
+        map.set_layer(Layer::TextInput, super::runtime::line_editor());
         for layer in [Layer::Entries, Layer::Feeds, Layer::GhNotifications] {
             map.inherit_shared_prefixes(layer, Layer::List);
         }

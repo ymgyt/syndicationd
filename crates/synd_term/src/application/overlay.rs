@@ -8,6 +8,7 @@ pub(crate) enum ComponentId {
     Entries,
     Reader,
     Feeds,
+    Subscribe,
     GhNotifications,
     Filter,
     UnsubscribePopup,
@@ -24,27 +25,27 @@ impl Overlay {
         &self,
         tab: Option<Tab>,
     ) -> impl DoubleEndedIterator<Item = ComponentId> + '_ {
-        use ComponentId::{Entries, Feeds, Filter, GhNotifications, Login, Shell, Tabs};
+        use ComponentId::{
+            Entries, Feeds, Filter, GhNotifications, Login, Reader, Shell, Subscribe, Tabs,
+        };
+        let overlays = self
+            .overlays
+            .iter()
+            .filter_map(move |&(owner, component)| (Some(owner) == tab).then_some(component));
         let base: &[ComponentId] = match tab {
             None => &[Shell, Login],
-            Some(Tab::Entries) if self.overlays.contains(&(Tab::Entries, ComponentId::Reader)) => {
-                &[Shell]
-            }
+            Some(_) if overlays.clone().any(|id| matches!(id, Reader | Subscribe)) => &[Shell],
             Some(Tab::Entries) => &[Shell, Tabs, Entries, Filter],
             Some(Tab::Feeds) => &[Shell, Tabs, Feeds, Filter],
             Some(Tab::Gh) => &[Shell, Tabs, GhNotifications, Filter],
         };
-        base.iter().copied().chain(
-            self.overlays
-                .iter()
-                .filter_map(move |&(owner, component)| (Some(owner) == tab).then_some(component)),
-        )
+        base.iter().copied().chain(overlays)
     }
 
     pub(super) fn open(&mut self, sender: ComponentId) {
         let tab = match sender {
             ComponentId::Reader => Tab::Entries,
-            ComponentId::UnsubscribePopup => Tab::Feeds,
+            ComponentId::Subscribe | ComponentId::UnsubscribePopup => Tab::Feeds,
             ComponentId::GhFilterPopup => Tab::Gh,
             _ => unreachable!("cannot open component: {sender:?}"),
         };

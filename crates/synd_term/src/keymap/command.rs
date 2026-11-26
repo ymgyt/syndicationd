@@ -5,7 +5,7 @@ use crate::{
     command::{
         Command, FeedsCommand, FilterCommand, GhCommand, GhFilterCommand,
         GhNotificationFilterOption, ListCommand, LoginCommand, ReaderCommand, ShellCommand,
-        UnsubscribeCommand,
+        SubscribeCommand, UnsubscribeCommand,
     },
     reader::Scroll,
     types::gh::{PullRequestState, Reason, RepoVisibility},
@@ -51,6 +51,10 @@ pub enum CommandId {
     MoveSubscribedFeedFirst,
     MoveSubscribedFeedLast,
     PromptFeedSubscription,
+    NextSubscribeField,
+    PreviousSubscribeField,
+    ConfirmSubscribeField,
+    CancelSubscribe,
     PromptFeedEdition,
     PromptFeedUnsubscription,
     ReloadSubscription,
@@ -123,6 +127,10 @@ impl CommandId {
             Self::MoveSubscribedFeedFirst => "feeds.first",
             Self::MoveSubscribedFeedLast => "feeds.last",
             Self::PromptFeedSubscription => "feeds.subscribe",
+            Self::NextSubscribeField => "subscribe.next",
+            Self::PreviousSubscribeField => "subscribe.previous",
+            Self::ConfirmSubscribeField => "subscribe.confirm",
+            Self::CancelSubscribe => "subscribe.cancel",
             Self::PromptFeedEdition => "feeds.edit",
             Self::PromptFeedUnsubscription => "feeds.unsubscribe",
             Self::ReloadSubscription => "feeds.reload",
@@ -224,7 +232,13 @@ impl CommandId {
             }
             Self::ReaderPageUp => Command::Reader(ReaderCommand::Scroll(Scroll::PageUp)),
             Self::ReaderPageDown => Command::Reader(ReaderCommand::Scroll(Scroll::PageDown)),
-            Self::PromptFeedSubscription => Command::Feeds(FeedsCommand::PromptFeedSubscription),
+            Self::PromptFeedSubscription => Command::Subscribe(SubscribeCommand::Open),
+            Self::NextSubscribeField => Command::Subscribe(SubscribeCommand::Move(Direction::Down)),
+            Self::PreviousSubscribeField => {
+                Command::Subscribe(SubscribeCommand::Move(Direction::Up))
+            }
+            Self::ConfirmSubscribeField => Command::Subscribe(SubscribeCommand::Confirm),
+            Self::CancelSubscribe => Command::Subscribe(SubscribeCommand::Cancel),
             Self::PromptFeedEdition => Command::Feeds(FeedsCommand::PromptFeedEdition),
             Self::PromptFeedUnsubscription => {
                 Command::Feeds(FeedsCommand::PromptFeedUnsubscription)
@@ -583,6 +597,26 @@ const COMMAND_SPECS: &[CommandSpec] = specs![
         aliases: ["prompt_feed_subscription"],
         typable: None,
         layers: [Feeds],
+    },
+    NextSubscribeField {
+        aliases: [],
+        typable: None,
+        layers: [Subscribe],
+    },
+    PreviousSubscribeField {
+        aliases: [],
+        typable: None,
+        layers: [Subscribe],
+    },
+    ConfirmSubscribeField {
+        aliases: [],
+        typable: None,
+        layers: [Subscribe],
+    },
+    CancelSubscribe {
+        aliases: [],
+        typable: None,
+        layers: [Subscribe],
     },
     PromptFeedEdition {
         aliases: ["prompt_feed_edition"],

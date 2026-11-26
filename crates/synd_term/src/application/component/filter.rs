@@ -2,7 +2,7 @@ use super::RenderContext;
 use super::Ui;
 use crate::{
     application::{Populate, effects::Effects},
-    command::{FilterCommand, FilterTarget},
+    command::{Command, FilterCommand, FilterTarget},
     event::{Event, EventKind},
     keymap::Layer,
     ui::widgets::{
@@ -24,9 +24,16 @@ impl Tab {
 impl FilterWidget {
     pub(in crate::application) fn apply_command(
         &mut self,
-        command: FilterCommand,
+        command: Command,
         current: FilterTarget,
     ) -> Effects {
+        let command = match command {
+            Command::Filter(command) => command,
+            Command::Prompt(action) if self.is_search_active() && self.edit_prompt(&action) => {
+                return self.changed(current).into();
+            }
+            _ => return Effects::NONE,
+        };
         let (target, changed) = match command {
             FilterCommand::MoveFilterRequirement(direction) if current == FilterTarget::Feeds => {
                 (current, self.move_requirement(direction))
@@ -42,13 +49,6 @@ impl FilterWidget {
             FilterCommand::DeactivateFiltering => {
                 self.deactivate_filtering();
                 return Effects::NONE;
-            }
-            FilterCommand::PromptInsertChar(ch) if self.is_search_active() => {
-                self.insert_prompt_char(ch);
-                (current, true)
-            }
-            FilterCommand::PromptDeleteBackward if self.is_search_active() => {
-                (current, self.delete_prompt_backward())
             }
             FilterCommand::ToggleFilterCategory { category, target }
                 if self.category_filter_target() == Some(target) =>

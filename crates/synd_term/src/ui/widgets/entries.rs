@@ -186,7 +186,7 @@ impl EntriesWidget {
             let category = entry.category();
             let icon = cx
                 .categories
-                .icon(category)
+                .icon(&category)
                 .unwrap_or_else(|| ui::default_icon());
 
             let feed_title = entry.feed.title.as_deref().unwrap_or(ui::UNKNOWN_SYMBOL);

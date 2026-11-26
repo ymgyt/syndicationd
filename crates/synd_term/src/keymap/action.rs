@@ -2,7 +2,7 @@ use crate::application::{ComponentId, component::Ui};
 use synd_feed::types::Category;
 use tuiframework::KeyAction;
 
-use crate::command::{Command, FilterCommand, FilterTarget};
+use crate::command::{Command, FilterCommand, FilterTarget, PromptAction};
 
 use super::CommandId;
 
@@ -25,7 +25,7 @@ impl From<KeymapAction> for Command {
     fn from(action: KeymapAction) -> Self {
         match action {
             KeymapAction::Command(command) => command.command(),
-            KeymapAction::Prompt(action) => Self::Filter(action.into()),
+            KeymapAction::Prompt(action) => Self::Prompt(action),
             KeymapAction::Filter(action) => Self::Filter(action.into()),
         }
     }
@@ -34,22 +34,6 @@ impl From<KeymapAction> for Command {
 impl From<CommandId> for KeymapAction {
     fn from(command: CommandId) -> Self {
         Self::Command(command)
-    }
-}
-
-/// Text-editing action for prompt-style keymap layers.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum PromptAction {
-    InsertChar(char),
-    DeleteBackward,
-}
-
-impl From<PromptAction> for FilterCommand {
-    fn from(action: PromptAction) -> Self {
-        match action {
-            PromptAction::InsertChar(ch) => Self::PromptInsertChar(ch),
-            PromptAction::DeleteBackward => Self::PromptDeleteBackward,
-        }
     }
 }
 

@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use synd_client::payload::SubscribeFeedInput;
 use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
@@ -18,24 +19,27 @@ pub(crate) enum Command {
     UnsubscribePopup(UnsubscribeCommand),
     GhFilterPopup(GhFilterCommand),
     List(ListCommand),
+    Prompt(PromptAction),
     Shell(ShellCommand),
     Login(LoginCommand),
     MoveTab(Direction),
     Feeds(FeedsCommand),
+    Subscribe(SubscribeCommand),
     Reader(ReaderCommand),
     Filter(FilterCommand),
     Gh(GhCommand),
 }
 
 impl Command {
-    /// Shared list and overlay commands belong to the component that issued them.
+    /// Shared commands belong to the component that issued them.
     pub(crate) fn target(&self, owner: ComponentId) -> ComponentId {
         match self {
-            Self::Nop | Self::Open | Self::Close | Self::List(_) => owner,
+            Self::Nop | Self::Open | Self::Close | Self::List(_) | Self::Prompt(_) => owner,
             Self::Shell(_) => ComponentId::Shell,
             Self::Login(_) => ComponentId::Login,
             Self::MoveTab(_) => ComponentId::Tabs,
             Self::Feeds(_) => ComponentId::Feeds,
+            Self::Subscribe(_) => ComponentId::Subscribe,
             Self::Reader(_) => ComponentId::Reader,
             Self::Filter(_) => ComponentId::Filter,
             Self::Gh(_) => ComponentId::GhNotifications,
@@ -53,6 +57,19 @@ pub(crate) enum ListCommand {
     Last,
 }
 
+/// An edit to the focused single-line prompt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum PromptAction {
+    InsertChar(char),
+    Paste(String),
+    DeleteBackward,
+    DeleteForward,
+    Left,
+    Right,
+    Home,
+    End,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum ShellCommand {
     ShowError(String),
@@ -67,9 +84,9 @@ pub(crate) enum LoginCommand {
     MoveProvider(Direction),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum FeedsCommand {
-    PromptFeedSubscription,
+    Subscribe(SubscribeFeedInput),
     PromptFeedEdition,
     PromptFeedUnsubscription,
     ReloadSubscription,
@@ -79,6 +96,15 @@ pub(crate) enum FeedsCommand {
     OpenEntry,
     ReadEntry,
     BrowseEntry,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SubscribeCommand {
+    Open,
+    Cancel,
+    Confirm,
+    AlreadySubscribed,
+    Move(Direction),
 }
 
 #[derive(Debug, Clone)]
@@ -113,8 +139,6 @@ pub(crate) enum FilterCommand {
     MoveFilterRequirement(Direction),
     ActivateCategoryFiltering,
     ActivateSearchFiltering,
-    PromptInsertChar(char),
-    PromptDeleteBackward,
     DeactivateFiltering,
     ToggleFilterCategory {
         target: FilterTarget,

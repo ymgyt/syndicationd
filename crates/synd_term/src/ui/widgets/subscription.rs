@@ -46,7 +46,10 @@ impl SubscriptionWidget {
     }
 
     pub(crate) fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
-        self.feeds.iter().any(|feed| &feed.url == url)
+        self.feeds
+            .as_unfiltered_slice()
+            .iter()
+            .any(|feed| &feed.url == url)
     }
 
     pub(crate) fn selected_feed(&self) -> Option<&types::Feed> {
@@ -165,7 +168,7 @@ impl SubscriptionWidget {
             let category = feed_meta.category();
             let icon = cx
                 .categories
-                .icon(category)
+                .icon(&category)
                 .unwrap_or_else(|| ui::default_icon());
 
             Row::new([
@@ -263,7 +266,7 @@ impl SubscriptionWidget {
                     " Category",
                     Style::default().add_modifier(Modifier::BOLD),
                 )),
-                Cell::new(Span::from(feed.category().as_str())),
+                Cell::new(Span::from(feed.category().into_inner())),
                 Cell::new(Line::from(vec![
                     Span::styled(" Req  ", Style::default().add_modifier(Modifier::BOLD)),
                     Span::from(feed.requirement().to_string()),
@@ -404,9 +407,9 @@ mod tests {
     use super::*;
 
     fn feed(url: &str) -> types::Feed {
-        let feed: types::Feed = Faker.fake();
+        let mut feed: types::Feed = Faker.fake();
+        feed.labels.set_requirement(Requirement::May);
         feed.with_url(url.try_into().unwrap())
-            .with_requirement(Requirement::May)
     }
 
     #[test]

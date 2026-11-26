@@ -141,7 +141,7 @@ impl CategoryFilterer {
 
 impl Filterable<payload::Entry> for CategoryFilterer {
     fn filter(&self, entry: &payload::Entry) -> super::FilterResult {
-        self.filter_by_category(entry.category())
+        self.filter_by_category(&entry.category())
     }
 }
 
@@ -153,7 +153,7 @@ impl Filterable<payload::TimelineEntry> for CategoryFilterer {
 
 impl Filterable<types::Feed> for CategoryFilterer {
     fn filter(&self, feed: &types::Feed) -> super::FilterResult {
-        self.filter_by_category(feed.category())
+        self.filter_by_category(&feed.category())
     }
 }
 

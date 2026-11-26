@@ -484,7 +484,7 @@ fn deliver_subscription_page(
     let request_id = RequestId::new(id);
     let subscription = serde_json::from_value(serde_json::json!({
         "feeds": {
-            "nodes": [{ "url": url, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
+            "nodes": [{ "url": url, "labels": {}, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
             "pageInfo": { "hasNextPage": next_cursor.is_some(), "endCursor": next_cursor }
         }
     }))
@@ -680,7 +680,7 @@ fn status_line_shows_the_main_actions_for_each_list() {
     let _ = compositor.apply_terminal_event(&key!(tab));
     assert_eq!(
         status(&compositor),
-        "Tab:󰹳  j/k:󰹹  Ent:󰏌  a:󰑫  e:  d:󰼡  /:  q:"
+        "Tab:󰹳  j/k:󰹹  Ent:󰏌  a:Subscribe  e:  d:󰼡  /:  q:"
     );
 }
 

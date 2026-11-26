@@ -5,14 +5,11 @@ use ratatui::{
     text::{Line, Span},
     widgets::Widget,
 };
-use unicode_segmentation::GraphemeCursor;
+use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 
-#[derive(Debug, Clone, Copy)]
-enum Move {
-    BackwardChar(usize),
-}
+use crate::command::PromptAction;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct Prompt {
     line: String,
     cursor: usize,
@@ -20,32 +17,73 @@ pub(crate) struct Prompt {
 
 impl Prompt {
     pub fn new() -> Self {
-        Self {
-            line: String::new(),
-            cursor: 0,
-        }
+        Self::default()
     }
 
     pub fn line(&self) -> &str {
         self.line.as_str()
     }
 
+    /// Returns whether the text changed.
+    pub(crate) fn apply(&mut self, action: &PromptAction) -> bool {
+        let before = self.line.len();
+        match action {
+            PromptAction::InsertChar(ch) => self.insert_char(*ch),
+            PromptAction::Paste(text) => self.insert_text(text),
+            PromptAction::DeleteBackward => self.delete_backward(),
+            PromptAction::DeleteForward => self.delete_forward(),
+            PromptAction::Left => self.left(),
+            PromptAction::Right => self.right(),
+            PromptAction::Home => self.cursor = 0,
+            PromptAction::End => self.cursor = self.line.len(),
+        }
+        before != self.line.len()
+    }
+
     pub(crate) fn insert_char(&mut self, c: char) {
         self.line.insert(self.cursor, c);
+        self.right();
+    }
+
+    fn insert_text(&mut self, text: &str) {
+        let text: String = text.chars().filter(|ch| !ch.is_control()).collect();
+        self.line.insert_str(self.cursor, &text);
+        self.cursor += text.len();
         let mut cursor = GraphemeCursor::new(self.cursor, self.line.len(), true);
-        if let Ok(Some(pos)) = cursor.next_boundary(&self.line, 0) {
-            self.cursor = pos;
+        if cursor.is_boundary(&self.line, 0) == Ok(false) {
+            self.right();
         }
     }
 
-    pub(crate) fn delete_backward(&mut self) -> bool {
-        let pos = self.move_cursor(Move::BackwardChar(1));
-        if pos == self.cursor {
-            return false;
-        }
-        self.line.replace_range(pos..self.cursor, "");
-        self.cursor = pos;
-        true
+    fn left(&mut self) {
+        let mut cursor = GraphemeCursor::new(self.cursor, self.line.len(), true);
+        self.cursor = cursor
+            .prev_boundary(&self.line, 0)
+            .ok()
+            .flatten()
+            .unwrap_or(0);
+    }
+
+    fn right(&mut self) {
+        let mut cursor = GraphemeCursor::new(self.cursor, self.line.len(), true);
+        self.cursor = cursor
+            .next_boundary(&self.line, 0)
+            .ok()
+            .flatten()
+            .unwrap_or(self.line.len());
+    }
+
+    fn delete_forward(&mut self) {
+        let start = self.cursor;
+        self.right();
+        self.line.replace_range(start..self.cursor, "");
+        self.cursor = start;
+    }
+
+    fn delete_backward(&mut self) {
+        let end = self.cursor;
+        self.left();
+        self.line.replace_range(self.cursor..end, "");
     }
 }
 
@@ -56,30 +94,29 @@ pub(crate) enum RenderCursor {
 }
 
 impl Prompt {
-    fn move_cursor(&self, m: Move) -> usize {
-        match m {
-            Move::BackwardChar(n) => {
-                let mut position = self.cursor;
-                for _ in 0..n {
-                    let mut cursor = GraphemeCursor::new(position, self.line.len(), true);
-                    if let Ok(Some(pos)) = cursor.prev_boundary(&self.line, 0) {
-                        position = pos;
-                    } else {
-                        break;
-                    }
-                }
-                position
-            }
-        }
-    }
-
     pub fn render(&self, area: Rect, buf: &mut Buffer, cursor: RenderCursor) {
-        let mut spans = vec![Span::from(&self.line)];
-
-        if cursor == RenderCursor::Enable {
-            spans.push(Span::from(" ").reversed());
+        if cursor == RenderCursor::Disable {
+            Line::raw(&self.line).render(area, buf);
+            return;
         }
-        Line::from(spans).render(area, buf);
+        let (before, after) = self.line.split_at(self.cursor);
+        let mut after = after.graphemes(true);
+        let caret = after.next().unwrap_or(" ");
+        let mut width = usize::from(area.width).saturating_sub(Span::raw(caret).width());
+        let mut start = before.len();
+        for (index, grapheme) in before.grapheme_indices(true).rev() {
+            let Some(remaining) = width.checked_sub(Span::raw(grapheme).width()) else {
+                break;
+            };
+            width = remaining;
+            start = index;
+        }
+        Line::from(vec![
+            Span::raw(&before[start..]),
+            Span::raw(caret).reversed(),
+            Span::raw(after.as_str()),
+        ])
+        .render(area, buf);
     }
 }
 

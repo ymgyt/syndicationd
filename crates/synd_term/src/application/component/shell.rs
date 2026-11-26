@@ -58,8 +58,7 @@ impl ShellComponent {
 impl ShellComponent {
     fn operation_error_message(error: &OperationError) -> String {
         match error {
-            OperationError::OpenFeedSubscriptionEditor(error)
-            | OperationError::OpenFeedEditionEditor(error) => error.to_string(),
+            OperationError::OpenFeedEditionEditor(error) => error.to_string(),
             OperationError::OpenBrowser(error) => format!("open browser: {error}"),
             OperationError::OpenTextBrowser(error) => format!("open text browser: {error}"),
             OperationError::PersistCredential(error) => error.to_string(),

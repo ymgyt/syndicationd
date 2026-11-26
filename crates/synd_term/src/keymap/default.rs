@@ -104,6 +104,31 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
     bind!(Layer::Feeds, ["enter"], CommandId::OpenFeed);
 
     bind!(
+        Layer::Subscribe,
+        ["enter"],
+        CommandId::ConfirmSubscribeField,
+        "Confirm/subscribe"
+    );
+    bind!(
+        Layer::Subscribe,
+        ["tab"],
+        CommandId::NextSubscribeField,
+        "Next"
+    );
+    bind!(
+        Layer::Subscribe,
+        ["S-tab"],
+        CommandId::PreviousSubscribeField,
+        "Previous"
+    );
+    bind!(
+        Layer::Subscribe,
+        ["esc"],
+        CommandId::CancelSubscribe,
+        "Cancel"
+    );
+
+    bind!(
         Layer::Filter,
         ["h"],
         CommandId::MoveFilterRequirementPrev,

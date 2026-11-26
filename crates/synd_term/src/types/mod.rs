@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_client::payload;
-use synd_feed::types::{Category, FeedType, FeedUrl, Requirement};
+use synd_feed::types::{Category, FeedType, FeedUrl, Requirement, SubscriptionLabels};
 
 use crate::ui;
 
@@ -56,8 +56,8 @@ pub struct Feed {
     pub entries: Vec<EntryMeta>,
     pub authors: Vec<String>,
     pub crawl_policy: payload::CrawlPolicy,
-    requirement: Option<Requirement>,
-    category: Option<Category<'static>>,
+    #[cfg_attr(test, dummy(default))]
+    pub labels: SubscriptionLabels,
 }
 
 impl Feed {
@@ -69,32 +69,18 @@ impl Feed {
     }
 
     pub fn requirement(&self) -> Requirement {
-        self.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT)
+        self.labels.requirement().unwrap_or(ui::DEFAULT_REQUIREMENT)
     }
 
-    pub fn category(&self) -> &Category<'static> {
-        self.category.as_ref().unwrap_or(ui::default_category())
+    pub fn category(&self) -> Category<'static> {
+        self.labels
+            .category()
+            .unwrap_or_else(|| ui::default_category().clone())
     }
 
     #[must_use]
     pub fn with_url(self, url: FeedUrl) -> Self {
         Self { url, ..self }
-    }
-
-    #[must_use]
-    pub fn with_requirement(self, requirement: Requirement) -> Self {
-        Self {
-            requirement: Some(requirement),
-            ..self
-        }
-    }
-
-    #[must_use]
-    pub fn with_category(self, category: Category<'static>) -> Self {
-        Self {
-            category: Some(category),
-            ..self
-        }
     }
 }
 
@@ -102,8 +88,7 @@ impl From<payload::SubscribedFeed> for Feed {
     fn from(f: payload::SubscribedFeed) -> Self {
         let payload::SubscribedFeed {
             url,
-            requirement,
-            category,
+            labels,
             crawl_policy,
             feed: details,
         } = f;
@@ -133,20 +118,53 @@ impl From<payload::SubscribedFeed> for Feed {
                 .as_ref()
                 .map_or_default(|details| details.authors.nodes.clone()),
             crawl_policy,
-            requirement,
-            category,
+            labels,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(from = "ImportedFeed")]
+#[schemars(!from)]
 pub struct ExportedFeed {
     pub title: Option<String>,
     pub url: FeedUrl,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    #[serde(default)]
+    pub labels: SubscriptionLabels,
     #[serde(default)]
     pub crawl_policy: Option<ExportedCrawlPolicy>,
+}
+
+/// Also reads subscription files exported before labels were introduced.
+#[derive(Deserialize)]
+struct ImportedFeed {
+    title: Option<String>,
+    url: FeedUrl,
+    labels: Option<SubscriptionLabels>,
+    category: Option<Category<'static>>,
+    requirement: Option<Requirement>,
+    crawl_policy: Option<ExportedCrawlPolicy>,
+}
+
+impl From<ImportedFeed> for ExportedFeed {
+    fn from(feed: ImportedFeed) -> Self {
+        let labels = feed.labels.unwrap_or_else(|| {
+            let mut labels = SubscriptionLabels::default();
+            if let Some(category) = feed.category {
+                labels.set_category(category);
+            }
+            if let Some(requirement) = feed.requirement {
+                labels.set_requirement(requirement);
+            }
+            labels
+        });
+        Self {
+            title: feed.title,
+            url: feed.url,
+            labels,
+            crawl_policy: feed.crawl_policy,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -229,8 +247,7 @@ impl From<payload::SubscribedFeed> for ExportedFeed {
         Self {
             title: v.feed.and_then(|feed| feed.title),
             url: v.url,
-            requirement: v.requirement,
-            category: v.category,
+            labels: v.labels,
             crawl_policy,
         }
     }
@@ -242,8 +259,7 @@ impl TryFrom<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
     fn try_from(feed: ExportedFeed) -> Result<Self, Self::Error> {
         Ok(Self {
             url: feed.url,
-            requirement: feed.requirement,
-            category: feed.category,
+            labels: feed.labels,
             crawl_policy: feed.crawl_policy.map(TryInto::try_into).transpose()?,
         })
     }
@@ -251,18 +267,21 @@ impl TryFrom<ExportedFeed> for synd_client::payload::SubscribeFeedInput {
 
 pub trait EntryExt {
     fn requirement(&self) -> Requirement;
-    fn category(&self) -> &Category<'static>;
+    fn category(&self) -> Category<'static>;
 }
 
 impl EntryExt for payload::Entry {
     fn requirement(&self) -> Requirement {
-        self.feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT)
+        self.feed
+            .labels
+            .requirement()
+            .unwrap_or(ui::DEFAULT_REQUIREMENT)
     }
 
-    fn category(&self) -> &Category<'static> {
+    fn category(&self) -> Category<'static> {
         self.feed
-            .category
-            .as_ref()
-            .unwrap_or_else(|| ui::default_category())
+            .labels
+            .category()
+            .unwrap_or_else(|| ui::default_category().clone())
     }
 }

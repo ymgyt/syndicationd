@@ -1,6 +1,6 @@
 use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_client::payload;
-use synd_feed::types::FeedUrl;
+use synd_feed::types::{FeedUrl, SubscriptionLabels};
 use url::Url;
 
 use crate::{
@@ -21,9 +21,9 @@ pub(crate) enum Operation {
         device_authorization: Box<DeviceAuthorizationResponse>,
     },
 
-    OpenFeedSubscriptionEditor,
     OpenFeedEditionEditor {
         prompt: String,
+        labels: SubscriptionLabels,
     },
 
     SubscribeFeed {

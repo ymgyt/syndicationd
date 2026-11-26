@@ -26,6 +26,13 @@ pub(in crate::application) struct FrameLayout {
 }
 
 impl FrameLayout {
+    pub(super) fn full_screen_content(&self) -> Rect {
+        Rect {
+            height: self.status.y.saturating_sub(self.area.y),
+            ..self.area
+        }
+    }
+
     pub(in crate::application) fn new(area: Rect, tab: Option<Tab>) -> Self {
         let height = |n| Constraint::Length(if tab.is_some() { n } else { 0 });
         let [tabs, filter, content, status] = Layout::vertical([

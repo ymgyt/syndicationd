@@ -16,7 +16,8 @@ use crate::{
         input_parser::InputParser, request::synd_api_error_message,
     },
     command::{
-        Command, FeedsCommand, ReaderCommand, ShellCommand, UnsubscribeCommand, UnsubscribeTarget,
+        Command, FeedsCommand, ReaderCommand, ShellCommand, SubscribeCommand, UnsubscribeCommand,
+        UnsubscribeTarget,
     },
     config::Categories,
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
@@ -64,8 +65,17 @@ pub(crate) struct FeedsComponent {
 impl FeedsComponent {
     pub(in crate::application) fn apply_command(&mut self, command: FeedsCommand) -> Effects {
         match command {
-            FeedsCommand::PromptFeedSubscription => {
-                Effects::NONE.operation(Operation::OpenFeedSubscriptionEditor)
+            FeedsCommand::Subscribe(input) => {
+                if self.is_already_subscribed(&input.url) {
+                    Effects::NONE.send(
+                        ComponentId::Subscribe,
+                        Command::Subscribe(SubscribeCommand::AlreadySubscribed),
+                    )
+                } else {
+                    Effects::NONE
+                        .send(ComponentId::Subscribe, Command::Close)
+                        .operation(Operation::SubscribeFeed { input })
+                }
             }
             FeedsCommand::PromptFeedEdition => Effects::from_operations(self.edit_selected_feed()),
             FeedsCommand::PromptFeedUnsubscription => {
@@ -111,6 +121,7 @@ impl FeedsComponent {
             .selected_feed()
             .map(|feed| Operation::OpenFeedEditionEditor {
                 prompt: InputParser::edit_feed_prompt(feed),
+                labels: feed.labels.clone(),
             })
     }
 
@@ -357,7 +368,6 @@ impl Component<Ui> for FeedsComponent {
             EventKind::FeedFilterChanged,
             EventKind::Feeds,
             EventKind::RequestCompleted,
-            EventKind::FeedSubscriptionEditorClosed,
             EventKind::FeedEditionEditorClosed,
         ]
         .contains(&EventKind::from(event))
@@ -415,21 +425,8 @@ impl Component<Ui> for FeedsComponent {
                     effects
                 }
             }
-            Event::FeedSubscriptionEditorClosed { input }
-            | Event::FeedEditionEditorClosed { input } => {
-                match InputParser::new(input).parse_feed_subscription(&self.categories) {
-                    Ok(input)
-                        if matches!(event, Event::FeedSubscriptionEditorClosed { .. })
-                            && self.is_already_subscribed(&input.url) =>
-                    {
-                        Effects::NONE.send(
-                            ComponentId::Shell,
-                            Command::Shell(ShellCommand::ShowError(format!(
-                                "{} already subscribed",
-                                input.url
-                            ))),
-                        )
-                    }
+            Event::FeedEditionEditorClosed { input, labels } => {
+                match InputParser::new(input).parse_feed_edition(&self.categories, labels) {
                     Ok(input) => Effects::NONE.operation(Operation::SubscribeFeed { input }),
                     Err(error) => Effects::NONE.send(
                         ComponentId::Shell,
@@ -486,7 +483,6 @@ impl FeedsComponent {
                 .entries()
                 .map(EntryExt::category)
                 .unique()
-                .cloned()
                 .collect(),
         )
         .into()

@@ -1,17 +1,26 @@
 use nom_language::error::{VerboseError, VerboseErrorKind};
-use synd_client::payload::SubscribeFeedInput;
+use synd_client::payload::{CrawlPolicyInput, PollingIntervalSeconds, SubscribeFeedInput};
+use synd_feed::types::{Category, FeedUrl, Requirement, SubscriptionLabels};
 use thiserror::Error;
 
 use crate::{
     config::Categories,
     types::{self, CrawlPolicyExt},
+    ui,
 };
 
 type NomError<'s> = VerboseError<&'s str>;
 
+pub(super) fn polling_interval(text: &str) -> Option<PollingIntervalSeconds> {
+    let duration = synd_support::time::humantime::parse_duration(text).ok()?;
+    if duration.subsec_nanos() != 0 {
+        return None;
+    }
+    i64::try_from(duration.as_secs()).ok()?.try_into().ok()
+}
+
 const CTX_REQUIREMENT: &str = "requirement";
 const CTX_CATEGORY: &str = "category";
-const CTX_CATEGORY_POST: &str = "category_post";
 const CTX_URL: &str = "url";
 const CTX_CRAWL_POLICY: &str = "crawl_policy";
 
@@ -25,8 +34,16 @@ pub(super) struct InputParser<'a> {
     input: &'a str,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct FeedEdition {
+    url: FeedUrl,
+    requirement: Requirement,
+    category: Category<'static>,
+    crawl_policy: Option<CrawlPolicyInput>,
+}
+
 impl<'a> InputParser<'a> {
-    pub(super) const SUSBSCRIBE_FEED_PROMPT: &'static str =
+    const EDIT_FEED_PROMPT: &'static str =
         "# Please enter the requirement, category, and URL for subscription in the following format
 #
 # <requirement> <category> <url> [manual|interval:<duration>]
@@ -35,7 +52,7 @@ impl<'a> InputParser<'a> {
 #     * \"MUST\" 
 #     * \"SHOULD\" 
 #     * \"MAY\"
-#   * For the category, please choose one category of the feed(for example, \"rust\")
+#   * Quote a category containing spaces, e.g. \"open source\".
 #   * Crawl policy is optional. Use \"manual\" or \"interval:2h\".
 #
 # with '#' will be ignored, and an empty URL aborts the subscription.
@@ -48,16 +65,30 @@ impl<'a> InputParser<'a> {
         Self { input }
     }
 
-    pub(super) fn parse_feed_subscription(
+    pub(super) fn parse_feed_edition(
         &self,
         categories: &Categories,
+        original: &SubscriptionLabels,
     ) -> Result<SubscribeFeedInput, ParseFeedError> {
         feed::parse(self.input)
-            .map(|mut input| {
-                if let Some(category) = input.category {
-                    input.category = Some(categories.normalize(category));
+            .map(|edit| {
+                let mut labels = original.clone();
+                if edit.requirement != original.requirement().unwrap_or(ui::DEFAULT_REQUIREMENT) {
+                    labels.set_requirement(edit.requirement);
                 }
-                input
+                if original
+                    .category()
+                    .as_ref()
+                    .unwrap_or(ui::default_category())
+                    != &edit.category
+                {
+                    labels.set_category(categories.normalize(edit.category));
+                }
+                SubscribeFeedInput {
+                    url: edit.url,
+                    labels,
+                    crawl_policy: edit.crawl_policy,
+                }
             })
             .map_err(|mut verbose_err: NomError| {
                 let msg = match verbose_err.errors.pop() {
@@ -66,7 +97,7 @@ impl<'a> InputParser<'a> {
                             "Invalid requirement: must be one of 'MUST' 'SHOULD' 'MAY'. {input}"
                         )
                     }
-                    Some((input, VerboseErrorKind::Context(CTX_CATEGORY_POST))) => {
+                    Some((input, VerboseErrorKind::Context(CTX_CATEGORY))) => {
                         format!("Invalid category: {input}")
                     }
                     Some((input, VerboseErrorKind::Context(CTX_URL))) => {
@@ -85,6 +116,13 @@ impl<'a> InputParser<'a> {
     }
 
     pub(super) fn edit_feed_prompt(feed: &types::Feed) -> String {
+        let category = feed.category();
+        let name = category.as_str();
+        let category = if name.contains(char::is_whitespace) || name.starts_with('"') {
+            serde_json::to_string(name).expect("a string is valid JSON")
+        } else {
+            category.to_string()
+        };
         let crawl_policy = feed
             .crawl_policy
             .prompt_value()
@@ -92,9 +130,8 @@ impl<'a> InputParser<'a> {
 
         format!(
             "{}\n{requirement} {category} {feed_url}{crawl_policy}",
-            Self::SUSBSCRIBE_FEED_PROMPT,
+            Self::EDIT_FEED_PROMPT,
             requirement = feed.requirement(),
-            category = feed.category(),
             feed_url = feed.url,
         )
     }
@@ -102,41 +139,39 @@ impl<'a> InputParser<'a> {
 
 mod feed {
     use nom::{
-        AsChar, Finish, IResult, Parser,
+        Finish, IResult, Parser,
         branch::alt,
-        bytes::complete::{tag_no_case, take_while, take_while_m_n},
+        bytes::complete::{tag_no_case, take_till1, take_while, take_while_m_n},
         character::complete::{multispace0, multispace1},
         combinator::{all_consuming, map, opt, value},
         error::context,
         sequence::delimited,
     };
     use nom_language::error::{VerboseError, VerboseErrorKind};
-    use synd_client::payload::{
-        CrawlPolicyInput, PollingIntervalSeconds, PollingPolicyInput, SubscribeFeedInput,
-    };
+    use synd_client::payload::{CrawlPolicyInput, PollingPolicyInput};
     use synd_feed::types::{Category, FeedUrl, Requirement};
     use tracing::{Level, event};
     use url::Url;
 
-    use super::NomError;
+    use super::{FeedEdition, NomError};
     use crate::application::input_parser::{
-        CTX_CATEGORY, CTX_CATEGORY_POST, CTX_CRAWL_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
+        CTX_CATEGORY, CTX_CRAWL_POLICY, CTX_REQUIREMENT, CTX_URL, comment,
     };
 
-    pub(super) fn parse(s: &'_ str) -> Result<SubscribeFeedInput, NomError<'_>> {
+    pub(super) fn parse(s: &'_ str) -> Result<FeedEdition, NomError<'_>> {
         all_consuming(delimited(comment::comments, feed_input, comment::comments))
             .parse(s)
             .finish()
             .map(|(_, input)| input)
     }
 
-    fn feed_input(s: &'_ str) -> IResult<&'_ str, SubscribeFeedInput, NomError<'_>> {
+    fn feed_input(s: &'_ str) -> IResult<&'_ str, FeedEdition, NomError<'_>> {
         let (remain, (_, requirement, _, category, _, feed_url, crawl_policy, _)) = (
             multispace0,
             requirement,
             multispace1,
             category,
-            context(CTX_CATEGORY_POST, multispace1),
+            context(CTX_CATEGORY, multispace1),
             url,
             opt((multispace1, crawl_policy).map(|(_, policy)| policy)),
             multispace0,
@@ -144,10 +179,10 @@ mod feed {
             .parse(s)?;
         Ok((
             remain,
-            SubscribeFeedInput {
+            FeedEdition {
                 url: feed_url,
-                requirement: Some(requirement),
-                category: Some(category),
+                requirement,
+                category,
                 crawl_policy,
             },
         ))
@@ -166,16 +201,20 @@ mod feed {
     }
 
     fn category(s: &'_ str) -> IResult<&'_ str, Category<'static>, NomError<'_>> {
-        let (remain, category) = context(
-            CTX_CATEGORY,
-            take_while_m_n(1, 20, |c: char| c.is_alphanum()),
-        )
-        .parse(s)?;
-
-        Ok((
-            remain,
-            Category::new(category.to_owned()).expect("this is a bug"),
-        ))
+        let invalid = || {
+            nom::Err::Failure(VerboseError {
+                errors: vec![(s, VerboseErrorKind::Context(CTX_CATEGORY))],
+            })
+        };
+        let (remain, name) = if s.starts_with('"') {
+            let mut strings = serde_json::Deserializer::from_str(s).into_iter::<String>();
+            let name = strings.next().and_then(Result::ok).ok_or_else(invalid)?;
+            (&s[strings.byte_offset()..], name)
+        } else {
+            let (remain, name) = context(CTX_CATEGORY, take_till1(char::is_whitespace)).parse(s)?;
+            (remain, name.to_owned())
+        };
+        Ok((remain, Category::new(name).map_err(|_| invalid())?))
     }
 
     fn url(s: &'_ str) -> IResult<&'_ str, FeedUrl, NomError<'_>> {
@@ -221,14 +260,7 @@ mod feed {
             return Err(invalid_crawl_policy(s));
         }
 
-        let duration = synd_support::time::humantime::parse_duration(duration)
-            .map_err(|_| invalid_crawl_policy(s))?;
-        if duration.subsec_nanos() != 0 {
-            return Err(invalid_crawl_policy(s));
-        }
-        let seconds = i64::try_from(duration.as_secs()).unwrap_or(i64::MAX);
-        let seconds =
-            PollingIntervalSeconds::try_from(seconds).map_err(|_| invalid_crawl_policy(s))?;
+        let seconds = super::polling_interval(duration).ok_or_else(|| invalid_crawl_policy(s))?;
 
         Ok((
             remain,
@@ -247,6 +279,7 @@ mod feed {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use synd_client::payload::PollingIntervalSeconds;
 
         #[test]
         fn parse_requirement() {
@@ -273,10 +306,10 @@ mod feed {
                 feed_input("MUST rust https://example.ymgyt.io/atom.xml"),
                 Ok((
                     "",
-                    SubscribeFeedInput {
+                    FeedEdition {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
-                        requirement: Some(Requirement::Must),
-                        category: Some(Category::new("rust").unwrap()),
+                        requirement: Requirement::Must,
+                        category: Category::new("rust").unwrap(),
                         crawl_policy: None,
                     }
                 ))
@@ -289,10 +322,10 @@ mod feed {
                 feed_input("MUST rust https://example.ymgyt.io/atom.xml manual"),
                 Ok((
                     "",
-                    SubscribeFeedInput {
+                    FeedEdition {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
-                        requirement: Some(Requirement::Must),
-                        category: Some(Category::new("rust").unwrap()),
+                        requirement: Requirement::Must,
+                        category: Category::new("rust").unwrap(),
                         crawl_policy: Some(CrawlPolicyInput {
                             polling: PollingPolicyInput::Manual,
                         }),
@@ -307,10 +340,10 @@ mod feed {
                 feed_input("MUST rust https://example.ymgyt.io/atom.xml interval:30m"),
                 Ok((
                     "",
-                    SubscribeFeedInput {
+                    FeedEdition {
                         url: "https://example.ymgyt.io/atom.xml".try_into().unwrap(),
-                        requirement: Some(Requirement::Must),
-                        category: Some(Category::new("rust").unwrap()),
+                        requirement: Requirement::Must,
+                        category: Category::new("rust").unwrap(),
                         crawl_policy: Some(CrawlPolicyInput {
                             polling: PollingPolicyInput::Interval {
                                 seconds: PollingIntervalSeconds::try_from(1800).unwrap(),
@@ -328,10 +361,7 @@ mod feed {
                     "foo rust https://example.ymgyt.io/atom.xml",
                     CTX_REQUIREMENT,
                 ),
-                (
-                    "should https://example.ymgyt.io/atom.xml",
-                    CTX_CATEGORY_POST,
-                ),
+                ("should https://example.ymgyt.io/atom.xml", CTX_CATEGORY),
                 (
                     "should rust https://example.ymgyt.io/atom.xml interval:0s",
                     CTX_CRAWL_POLICY,

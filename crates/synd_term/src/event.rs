@@ -6,8 +6,8 @@ use std::{
 use crate::ui::widgets::{filter::FilterCriteria, tabs::Tab};
 use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_client::{SyndApiError, payload};
-use synd_feed::types::FeedUrl;
 use synd_feed::types::{Category, Requirement};
+use synd_feed::types::{FeedUrl, SubscriptionLabels};
 use synd_support::html::Article;
 use url::Url;
 
@@ -96,7 +96,6 @@ pub(crate) enum GhEvent {
 /// Failure of a synchronous operation that is not a registered request.
 #[derive(Debug)]
 pub(crate) enum OperationError {
-    OpenFeedSubscriptionEditor(OpenEditorError),
     OpenFeedEditionEditor(OpenEditorError),
     OpenBrowser(OpenBrowserError),
     OpenTextBrowser(OpenBrowserError),
@@ -147,11 +146,9 @@ pub(crate) enum Event {
         event: GhEvent,
     },
 
-    FeedSubscriptionEditorClosed {
-        input: String,
-    },
     FeedEditionEditorClosed {
         input: String,
+        labels: SubscriptionLabels,
     },
 
     ApiCredentialConfigured,
@@ -203,9 +200,6 @@ impl Display for Event {
             } => {
                 write!(f, "Gh({request_id:?}, {})", event.name())
             }
-            Self::FeedSubscriptionEditorClosed { .. } => {
-                f.write_str("FeedSubscriptionEditorClosed")
-            }
             Self::FeedEditionEditorClosed { .. } => f.write_str("FeedEditionEditorClosed"),
             Self::ApiCredentialConfigured => f.write_str("ApiCredentialConfigured"),
             Self::CredentialRefreshed { .. } => f.write_str("CredentialRefreshed"),
@@ -253,7 +247,6 @@ impl GhEvent {
 impl OperationError {
     fn name(&self) -> &'static str {
         match self {
-            Self::OpenFeedSubscriptionEditor(_) => "OpenFeedSubscriptionEditor",
             Self::OpenFeedEditionEditor(_) => "OpenFeedEditionEditor",
             Self::OpenBrowser(_) => "OpenBrowser",
             Self::OpenTextBrowser(_) => "OpenTextBrowser",

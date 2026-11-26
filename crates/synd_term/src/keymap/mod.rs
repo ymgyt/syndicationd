@@ -7,7 +7,8 @@ mod error;
 mod layer;
 mod runtime;
 
-pub(crate) use action::{FilterAction, KeymapAction, PromptAction};
+use crate::command::PromptAction;
+pub(crate) use action::{FilterAction, KeymapAction};
 pub use command::CommandId;
 pub(crate) use command::CommandRegistry;
 pub use compiled::CompiledKeymaps;

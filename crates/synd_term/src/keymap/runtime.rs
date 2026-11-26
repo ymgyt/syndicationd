@@ -12,3 +12,23 @@ pub(crate) fn search_prompt() -> LayerKeymap {
     .expect("valid keymap");
     map
 }
+
+pub(super) fn line_editor() -> LayerKeymap {
+    use PromptAction::{DeleteForward, End, Home, Left, Right};
+    let mut map = search_prompt();
+    for (key, action) in [
+        ("delete", DeleteForward),
+        ("left", Left),
+        ("right", Right),
+        ("home", Home),
+        ("end", End),
+    ] {
+        map.bind(Binding {
+            on: KeySequence::parse([key]).expect("valid editing key"),
+            command: KeymapAction::Prompt(action),
+            desc: None,
+        })
+        .expect("unique editing key");
+    }
+    map
+}

@@ -43,7 +43,7 @@ const MAIN_ACTIONS: &[(&[CommandId], &str)] = &[
         &[CommandId::ReadEntry, CommandId::BrowseEntry],
         icon!(browse),
     ),
-    (&[CommandId::PromptFeedSubscription], icon!(feeds)),
+    (&[CommandId::PromptFeedSubscription], "Subscribe"),
     (&[CommandId::PromptFeedEdition], ""),
     (&[CommandId::PromptFeedUnsubscription], "󰼡"),
     (&[CommandId::MarkGhNotificationAsDone], icon!(check)),
@@ -77,6 +77,7 @@ pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
     let close = match focus {
         Some(Layer::CategoryFilter | Layer::SearchPrompt) => Some(CommandId::DeactivateFiltering),
         Some(Layer::UnsubscribePopup) => Some(CommandId::CancelFeedUnsubscriptionPopup),
+        Some(Layer::Subscribe) => Some(CommandId::CancelSubscribe),
         Some(Layer::GhNotificationFilterPopup) => Some(CommandId::CloseGhNotificationFilter),
         Some(Layer::Reader) => Some(CommandId::CloseReader),
         _ => None,
@@ -92,13 +93,16 @@ pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
     }
 
     let mut groups = IndexMap::<_, Vec<&str>>::new();
-    for &(commands, icon) in MAIN_ACTIONS {
+    for &(commands, default_label) in MAIN_ACTIONS {
         if let Some(hint) = hints
             .iter()
             .find(|hint| hint.command.is_some_and(|cmd| commands.contains(&cmd)))
         {
-            let label = hint.description.unwrap_or(icon);
-            groups.entry((icon, label)).or_default().push(&hint.keys);
+            let label = hint.description.unwrap_or(default_label);
+            groups
+                .entry((default_label, label))
+                .or_default()
+                .push(&hint.keys);
         }
     }
     groups

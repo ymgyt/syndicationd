@@ -5,7 +5,7 @@ use tuiframework::Component;
 
 use super::{Clock, ComponentId, Config, effects::Effects, overlay::Overlay};
 use crate::{
-    command::Command,
+    command::{Command, PromptAction},
     config::Categories,
     crossterm::event::Event as TerminalEvent,
     event::Event,
@@ -21,6 +21,7 @@ use crate::{
 };
 
 mod commands;
+mod subscribe;
 mod unsubscribe;
 
 mod feeds;
@@ -50,6 +51,7 @@ pub(crate) struct Ui {
     pub(in crate::application) tabs: TabsWidget,
     pub(crate) feeds: FeedsComponent,
     reader: ReaderComponent,
+    subscribe: subscribe::SubscribeForm,
     unsubscribe: UnsubscribePopup,
     pub(crate) gh: GhComponent,
 }
@@ -74,6 +76,7 @@ impl Ui {
             filter: FilterWidget::new(Rc::clone(&categories)),
             feeds: FeedsComponent::new(config, Rc::clone(&categories)),
             reader: ReaderComponent::default(),
+            subscribe: subscribe::SubscribeForm::new(Rc::clone(&categories)),
             gh: GhComponent::new(
                 config.features.enable_gh_notification,
                 Rc::clone(&categories),
@@ -94,6 +97,7 @@ impl Ui {
             ComponentId::Entries => &mut self.feeds.entries,
             ComponentId::Reader => &mut self.reader,
             ComponentId::Feeds => &mut self.feeds,
+            ComponentId::Subscribe => &mut self.subscribe,
             ComponentId::GhNotifications => &mut self.gh,
             ComponentId::UnsubscribePopup => &mut self.unsubscribe,
             ComponentId::GhFilterPopup => &mut self.gh.notifications.filter_popup,
@@ -128,6 +132,7 @@ impl tuiframework::Ui for Ui {
             ComponentId::Entries => &self.feeds.entries,
             ComponentId::Reader => &self.reader,
             ComponentId::Feeds => &self.feeds,
+            ComponentId::Subscribe => &self.subscribe,
             ComponentId::GhNotifications => &self.gh,
             ComponentId::UnsubscribePopup => &self.unsubscribe,
             ComponentId::GhFilterPopup => &self.gh.notifications.filter_popup,
@@ -146,7 +151,7 @@ impl tuiframework::Ui for Ui {
         match command {
             Command::Open => self.overlay.open(to),
             Command::Close => self.overlay.close(to),
-            Command::Filter(command) => {
+            command if to == ComponentId::Filter => {
                 let target = self.tabs.current().filter_target();
                 return self.filter.apply_command(command, target);
             }
@@ -160,8 +165,13 @@ impl tuiframework::Ui for Ui {
     }
 
     fn on_input(&mut self, event: &TerminalEvent) -> Effects {
-        if matches!(event, TerminalEvent::Key(_)) {
+        if matches!(event, TerminalEvent::Key(_) | TerminalEvent::Paste(_)) {
             self.shell.dismiss_error();
+        }
+        if let TerminalEvent::Paste(text) = event
+            && let Some(owner) = self.overlay.visible(self.visible_tab()).next_back()
+        {
+            return Effects::NONE.send(owner, Command::Prompt(PromptAction::Paste(text.clone())));
         }
         Effects::NONE
     }
