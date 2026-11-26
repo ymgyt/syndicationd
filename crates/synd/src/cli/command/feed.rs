@@ -2,7 +2,7 @@ use std::io::{self, Write as _};
 
 use clap::{Args, Subcommand};
 use synd_client::payload::{SubscribeDisposition, SubscribeFeedInput, UnsubscribeDisposition};
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::{Category, FeedUrl, Requirement, SubscriptionLabels};
 
 use crate::{config::ConfigResolver, runtime::FeedRuntime};
 
@@ -73,16 +73,21 @@ impl SubscribeCommand {
             requirement,
         } = self;
         let url = FeedUrl::parse(&url)?;
-        let category: Option<Category<'static>> = category.map(Category::new).transpose()?;
-        let requirement = requirement
-            .as_deref()
-            .map(|value| value.parse::<Requirement>().map_err(anyhow::Error::msg))
-            .transpose()?;
+        let mut labels = SubscriptionLabels::default();
+        if let Some(category) = category {
+            labels.set_category(Category::new(category)?);
+        }
+        if let Some(requirement) = requirement {
+            labels.set_requirement(
+                requirement
+                    .parse::<Requirement>()
+                    .map_err(anyhow::Error::msg)?,
+            );
+        }
 
         Ok(SubscribeFeedInput {
             url,
-            requirement,
-            category,
+            labels,
             crawl_policy: None,
         })
     }

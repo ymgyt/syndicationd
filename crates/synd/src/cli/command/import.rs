@@ -119,8 +119,8 @@ where
             .feeds
             .iter()
             .map(|f| {
-                f.category
-                    .as_ref()
+                f.labels
+                    .category()
                     .map_or(0, |c| c.as_str().chars().count())
             })
             .max()
@@ -133,10 +133,10 @@ where
         for feed in input.feeds {
             interval.tick().await;
             let url = feed.url.clone();
-            let requirement = feed.requirement.unwrap_or(ui::DEFAULT_REQUIREMENT);
+            let requirement = feed.labels.requirement().unwrap_or(ui::DEFAULT_REQUIREMENT);
             let category = feed
-                .category
-                .clone()
+                .labels
+                .category()
                 .unwrap_or_else(|| ui::default_category().clone());
             let input = match SubscribeFeedInput::try_from(feed) {
                 Ok(input) => input,
@@ -170,7 +170,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::*;
-    use synd_feed::types::{Category, FeedUrl, Requirement};
+    use synd_feed::types::{FeedUrl, SubscriptionLabels};
 
     #[tokio::test]
     async fn import_feeds_reports_success_and_failure() {
@@ -179,30 +179,29 @@ mod tests {
         let url_unavailable: FeedUrl = "https://err_unavailable.ymgyt.io/feed.xml"
             .try_into()
             .unwrap();
-        let cat_rust = Category::new("rust").unwrap();
-        let cat_long = Category::new("longcategory").unwrap();
+        let rust: SubscriptionLabels =
+            serde_json::from_str(r#"{"category":"rust","requirement":"must"}"#).unwrap();
+        let long =
+            serde_json::from_str(r#"{"category":"longcategory","requirement":"should"}"#).unwrap();
 
         let input = Input {
             feeds: vec![
                 ExportedFeed {
                     title: Some(String::from("ok1")),
                     url: url_ok1.clone(),
-                    requirement: Some(Requirement::Must),
-                    category: Some(cat_rust.clone()),
+                    labels: rust.clone(),
                     crawl_policy: None,
                 },
                 ExportedFeed {
                     title: Some(String::from("err unuvailable")),
                     url: url_unavailable.clone(),
-                    requirement: Some(Requirement::Must),
-                    category: Some(cat_rust.clone()),
+                    labels: rust,
                     crawl_policy: None,
                 },
                 ExportedFeed {
                     title: Some(String::from("ok2")),
                     url: url_ok2.clone(),
-                    requirement: Some(Requirement::Should),
-                    category: Some(cat_long.clone()),
+                    labels: long,
                     crawl_policy: None,
                 },
             ],
