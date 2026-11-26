@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 use async_graphql::{
     ID, Json, Object, SimpleObject,
@@ -7,9 +7,9 @@ use async_graphql::{
 use serde_json::Value;
 use synd_feed::{
     entry::{self, Entry as SyndFeedEntry},
-    types::{self, Annotated, Category, FeedType, FeedUrl, Requirement},
+    types::{self, FeedType, FeedUrl, SubscriptionLabels},
 };
-use synd_registry::query::{SubscribedEntry, TimelineEntry};
+use synd_registry::query::SubscribedEntry;
 use synd_support::html::HtmlConverter;
 
 use crate::gql::scalar;
@@ -100,7 +100,7 @@ impl Content<'_> {
 }
 
 pub(crate) struct Entry {
-    meta: Annotated<types::FeedMeta>,
+    feed: Arc<FeedMeta>,
     entry: SyndFeedEntry,
 }
 
@@ -114,8 +114,8 @@ impl Entry {
     }
 
     /// Feed of this entry
-    async fn feed(&self) -> FeedMeta<'_> {
-        Cow::Borrowed(&self.meta).into()
+    async fn feed(&self) -> &FeedMeta {
+        &self.feed
     }
     /// Entry title
     async fn title(&self) -> Option<&str> {
@@ -184,33 +184,26 @@ impl Entry {
 
     /// Link to websiteurl at which this entry is published
     async fn website_url(&self) -> Option<&str> {
-        self.entry.website_url(self.meta.feed.r#type())
-    }
-}
-
-impl Entry {
-    pub fn new(meta: Annotated<types::FeedMeta>, entry: SyndFeedEntry) -> Self {
-        Self { meta, entry }
-    }
-
-    fn from_feed(feed: &Annotated<Arc<types::Feed>>, entry: &SyndFeedEntry) -> Self {
-        Self::new(feed.project(|feed| feed.meta().clone()), entry.clone())
-    }
-}
-
-impl From<TimelineEntry> for Entry {
-    fn from(node: TimelineEntry) -> Self {
-        Self::new(node.feed_meta, node.entry)
+        self.entry.website_url(self.feed.meta.r#type())
     }
 }
 
 impl From<SubscribedEntry> for Entry {
     fn from(node: SubscribedEntry) -> Self {
-        Self::new(node.feed_meta, node.entry)
+        Self {
+            feed: Arc::new(FeedMeta {
+                meta: node.feed_meta,
+                subscription_labels: node.subscription_labels,
+            }),
+            entry: node.entry,
+        }
     }
 }
 
-pub struct Feed(Annotated<Arc<types::Feed>>);
+pub(super) struct Feed<'a> {
+    pub(super) feed: &'a types::Feed,
+    pub(super) subscription_labels: &'a SubscriptionLabels,
+}
 
 type FeedEntriesConnection =
     Connection<usize, Entry, EmptyFields, EmptyFields, FeedEntryConnectionName, FeedEntryEdgeName>;
@@ -222,13 +215,20 @@ struct FeedEntryPage {
 }
 
 impl FeedEntryPage {
-    fn read(feed: &Annotated<Arc<types::Feed>>, first: Option<i32>) -> Self {
+    fn read(feed: &Feed<'_>, first: Option<i32>) -> Self {
         let limit = usize::try_from(first.unwrap_or(5).max(0)).unwrap_or_default();
+        let feed_meta = Arc::new(FeedMeta {
+            meta: feed.feed.meta().clone(),
+            subscription_labels: feed.subscription_labels.clone(),
+        });
         Self::from_overfetch(
             feed.feed
                 .entries()
-                .map(|entry| Entry::from_feed(feed, entry))
                 .take(limit.saturating_add(1))
+                .map(|entry| Entry {
+                    feed: Arc::clone(&feed_meta),
+                    entry: entry.clone(),
+                })
                 .collect(),
             limit,
         )
@@ -258,21 +258,20 @@ impl From<FeedEntryPage> for FeedEntriesConnection {
 }
 
 #[Object]
-impl Feed {
+impl Feed<'_> {
     /// Feed Id
     async fn id(&self) -> ID {
-        FeedIdV1::new(self.0.feed.meta().url()).into()
+        FeedIdV1::new(self.feed.meta().url()).into()
     }
 
     /// Undering feed specification
     async fn r#type(&self) -> FeedType {
-        self.0.feed.meta().r#type()
+        self.feed.meta().r#type()
     }
 
     /// Feed title
     async fn title(&self) -> Option<&str> {
-        self.0
-            .feed
+        self.feed
             .meta()
             .title()
             .map(synd_feed::types::Text::content)
@@ -280,12 +279,12 @@ impl Feed {
 
     /// Feed URL
     async fn url(&self) -> &FeedUrl {
-        self.0.feed.meta().url()
+        self.feed.meta().url()
     }
 
     /// The time at which the feed was last modified
     async fn updated(&self) -> Option<scalar::Rfc3339Time> {
-        self.0.feed.meta().updated().map(Into::into)
+        self.feed.meta().updated().map(Into::into)
     }
 
     /// Feed entries
@@ -293,15 +292,14 @@ impl Feed {
         &'_ self,
         #[graphql(default = 5)] first: Option<i32>,
     ) -> FeedEntriesConnection {
-        FeedEntryPage::read(&self.0, first).into()
+        FeedEntryPage::read(self, first).into()
     }
 
     /// Feed author names
     async fn authors(&self) -> Connection<usize, String> {
         let mut c = Connection::new(false, false);
         c.edges.extend(
-            self.0
-                .feed
+            self.feed
                 .meta()
                 .authors()
                 .iter()
@@ -316,8 +314,7 @@ impl Feed {
 
     /// Description of feed
     async fn description(&self) -> Option<&str> {
-        self.0
-            .feed
+        self.feed
             .meta()
             .description()
             .map(synd_feed::types::Text::content)
@@ -326,8 +323,7 @@ impl Feed {
     async fn links(&self) -> Connection<usize, Link> {
         let mut c = Connection::new(false, false);
         c.edges.extend(
-            self.0
-                .feed
+            self.feed
                 .meta()
                 .links()
                 .iter()
@@ -340,25 +336,19 @@ impl Feed {
     }
 
     async fn website_url(&self) -> Option<&str> {
-        self.0.feed.meta().website_url()
+        self.feed.meta().website_url()
     }
 
     async fn generator(&self) -> Option<&str> {
-        self.0
-            .feed
+        self.feed
             .meta()
             .generator()
             .map(synd_feed::types::Generator::content)
     }
 
-    /// Requirement level for feed
-    async fn requirement(&self) -> Option<Requirement> {
-        self.0.requirement
-    }
-
-    /// Feed category
-    async fn category(&self) -> Option<&Category<'static>> {
-        self.0.category.as_ref()
+    /// Labels this subscriber assigned to the feed.
+    async fn labels(&self) -> Json<&SubscriptionLabels> {
+        Json(self.subscription_labels)
     }
 }
 
@@ -378,40 +368,26 @@ impl EdgeNameType for FeedEntryEdgeName {
     }
 }
 
-impl From<Annotated<Arc<types::Feed>>> for Feed {
-    fn from(value: Annotated<Arc<types::Feed>>) -> Self {
-        Self(value)
-    }
+struct FeedMeta {
+    meta: types::FeedMeta,
+    subscription_labels: SubscriptionLabels,
 }
 
-pub(super) struct FeedMeta<'a>(Cow<'a, Annotated<types::FeedMeta>>);
-
 #[Object]
-impl FeedMeta<'_> {
+impl FeedMeta {
     /// Title of the feed
     async fn title(&self) -> Option<&str> {
-        self.0.feed.title().map(synd_feed::types::Text::content)
+        self.meta.title().map(types::Text::content)
     }
 
     /// Url of the feed
     async fn url(&self) -> &FeedUrl {
-        self.0.feed.url()
+        self.meta.url()
     }
 
-    /// Requirement Level for the feed
-    async fn requirement(&self) -> Option<Requirement> {
-        self.0.requirement
-    }
-
-    /// Category of the feed
-    async fn category(&self) -> Option<&Category<'static>> {
-        self.0.category.as_ref()
-    }
-}
-
-impl<'a> From<Cow<'a, Annotated<types::FeedMeta>>> for FeedMeta<'a> {
-    fn from(value: Cow<'a, Annotated<types::FeedMeta>>) -> Self {
-        Self(value)
+    /// Labels this subscriber assigned to the feed.
+    async fn labels(&self) -> Json<&SubscriptionLabels> {
+        Json(&self.subscription_labels)
     }
 }
 
@@ -420,8 +396,9 @@ mod tests {
     use async_graphql::{EmptyMutation, EmptySubscription, Schema, value};
     use synd_feed::{
         feed::service::FeedService,
-        types::{Annotated, FeedUrl},
+        types::{FeedUrl, SubscriptionLabels},
     };
+    use synd_registry::query::SubscribedEntry;
 
     use super::Entry;
 
@@ -433,10 +410,11 @@ mod tests {
             </entry></feed>"#;
         let url = FeedUrl::parse("https://example.com/feed").unwrap();
         let feed = FeedService::parse_feed(url, xml.as_bytes()).unwrap();
-        let entry = Entry::new(
-            Annotated::new(feed.meta().clone()),
-            feed.entries().next().unwrap().clone(),
-        );
+        let entry = Entry::from(SubscribedEntry {
+            entry: feed.entries().next().unwrap().clone(),
+            feed_meta: feed.meta().clone(),
+            subscription_labels: SubscriptionLabels::default(),
+        });
         let response = Schema::build(entry, EmptyMutation, EmptySubscription)
             .finish()
             .execute(

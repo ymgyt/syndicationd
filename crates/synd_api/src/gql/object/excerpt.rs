@@ -61,8 +61,9 @@ mod tests {
     use async_graphql::{EmptyMutation, EmptySubscription, Schema, value};
     use synd_feed::{
         entry::{Content, EntryId},
-        types::{Annotated, FeedMeta, FeedType, FeedUrl, Text},
+        types::{FeedMeta, FeedType, FeedUrl, SubscriptionLabels, Text},
     };
+    use synd_registry::query::SubscribedEntry;
     use synd_support::html::{Article, ArticleRequest, DefaultHtmlConverter, Excerpt};
 
     use super::{Entry, ExcerptRequest, HtmlConvError, HtmlConverter};
@@ -93,7 +94,11 @@ mod tests {
             .feed_type(FeedType::Atom)
             .build();
         Schema::build(
-            object::Entry::new(Annotated::new(meta), entry),
+            object::Entry::from(SubscribedEntry {
+                entry,
+                feed_meta: meta,
+                subscription_labels: SubscriptionLabels::default(),
+            }),
             EmptyMutation,
             EmptySubscription,
         )

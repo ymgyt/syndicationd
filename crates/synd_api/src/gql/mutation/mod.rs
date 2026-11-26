@@ -1,5 +1,5 @@
-use async_graphql::{Context, Enum, Error, ID, InputObject, Object, SimpleObject};
-use synd_feed::types::{Category, FeedUrl, Requirement, TimelineName};
+use async_graphql::{Context, Enum, Error, ID, InputObject, Json, Object, SimpleObject};
+use synd_feed::types::{FeedUrl, SubscriptionLabels, TimelineName};
 use synd_registry::{
     CreateTimelineCommand, SubscribeFeedCommand, SubscribeOutcome, UnsubscribeFeedCommand,
     UnsubscribeOutcome,
@@ -33,8 +33,8 @@ impl ResponseStatus {
 #[derive(InputObject)]
 struct SubscribeFeedInput {
     url: FeedUrl,
-    requirement: Option<Requirement>,
-    category: Option<Category<'static>>,
+    /// Subscription labels as a JSON object. Defaults to an empty object.
+    labels: Option<Json<SubscriptionLabels>>,
     crawl_policy: Option<CrawlPolicyInput>,
 }
 
@@ -164,9 +164,8 @@ impl Mutation {
         let out = registry(cx)
             .subscribe(SubscribeFeedCommand {
                 subscriber_id,
-                feed_url: input.url.clone(),
-                requirement: input.requirement,
-                category: input.category,
+                feed_url: input.url,
+                labels: input.labels.unwrap_or_default().0,
                 crawl_policy,
             })
             .await?;

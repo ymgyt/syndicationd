@@ -2,9 +2,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-/// Named timelines with entry excerpts. The first revision exposed `Entry.summary`.
-pub const NAMED_TIMELINES: &str = "timeline.named.v2";
-pub const SUBSCRIPTION_WRITE: &str = "subscription.write";
+/// Named timeline entries expose subscription labels in their feed metadata.
+pub const NAMED_TIMELINES: &str = "timeline.named.v3";
+/// Subscriptions accept a JSON object of labels.
+pub const SUBSCRIPTION_WRITE: &str = "subscription.write.v2";
 pub const FEED_REFRESH: &str = "feed.refresh";
 pub const ENTRY_READ: &str = "entry.read";
 

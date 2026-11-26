@@ -1,12 +1,12 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use async_graphql::{
-    Context, Enum, ID, Object, Result, SimpleObject, Union,
+    Context, Enum, ID, Json, Object, Result, SimpleObject, Union,
     connection::{Connection, Edge, EmptyFields},
 };
 use synd_feed::{
     entry::EntryId,
-    types::{Annotated, Category, Feed, FeedUrl, Requirement, TimelineName},
+    types::{Feed, FeedUrl, SubscriptionLabels, TimelineName},
 };
 use synd_registry::{
     Subscription as RegistrySubscription, TimelineId,
@@ -67,7 +67,7 @@ impl From<RegistryCrawlPolicy> for CrawlPolicy {
 
 struct SubscribedFeed {
     subscription: RegistrySubscription,
-    feed: Option<object::Feed>,
+    feed: Option<Feed>,
 }
 
 #[Object]
@@ -76,20 +76,19 @@ impl SubscribedFeed {
         &self.subscription.feed_url
     }
 
-    async fn requirement(&self) -> Option<Requirement> {
-        self.subscription.labels.requirement()
-    }
-
-    async fn category(&self) -> Option<Category<'static>> {
-        self.subscription.labels.category()
+    async fn labels(&self) -> Json<&SubscriptionLabels> {
+        Json(&self.subscription.labels)
     }
 
     async fn crawl_policy(&self) -> CrawlPolicy {
         self.subscription.crawl_policy.into()
     }
 
-    async fn feed(&self) -> Option<&object::Feed> {
-        self.feed.as_ref()
+    async fn feed(&self) -> Option<object::Feed<'_>> {
+        self.feed.as_ref().map(|feed| object::Feed {
+            feed,
+            subscription_labels: &self.subscription.labels,
+        })
     }
 }
 
@@ -114,7 +113,7 @@ impl FeedBatch {
 
     fn resolve(&mut self, subscription: RegistrySubscription) -> SubscribedFeed {
         let feed = self.0.remove(&subscription.feed_url);
-        SubscribedFeed::resolve(subscription, feed)
+        SubscribedFeed { subscription, feed }
     }
 }
 
@@ -158,20 +157,6 @@ impl From<SubscribedFeedsPage> for SubscribedFeedsConnection {
             .edges
             .extend(page.feeds.into_iter().map(Edge::from));
         connection
-    }
-}
-
-impl SubscribedFeed {
-    fn resolve(subscription: RegistrySubscription, feed: Option<Feed>) -> Self {
-        let feed = feed.map(|feed| {
-            Annotated {
-                feed: Arc::new(feed),
-                requirement: subscription.labels.requirement(),
-                category: subscription.labels.category(),
-            }
-            .into()
-        });
-        Self { subscription, feed }
     }
 }
 
@@ -295,7 +280,7 @@ impl From<RegistryTimelineEntry> for TimelineEntry {
         let order_time = node.cursor.order_time().into();
         Self {
             order_time,
-            entry: node.into(),
+            entry: node.subscribed_entry.into(),
         }
     }
 }
