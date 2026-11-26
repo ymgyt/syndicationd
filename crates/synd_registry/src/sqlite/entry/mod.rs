@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
 use synd_feed::{
     entry::{EntryId, EntryOrderKey, SyndEntry},
-    types::{Annotated, Category, Requirement},
+    types::{Annotated, SubscriptionLabels},
 };
 
 use super::{
@@ -21,7 +21,7 @@ pub(super) async fn get(
 ) -> SqliteResult<Option<SubscribedEntry>> {
     let row = sqlx::query_as::<_, SubscribedEntryRow>(
         r#"
-        SELECT e.entry_id, e.entry_json, f.url AS feed_url, fs.meta_json, s.requirement, s.category
+        SELECT e.entry_id, e.entry_json, f.url AS feed_url, fs.meta_json, s.labels_json
         FROM entry AS e
         JOIN feed AS f ON f.pk = e.feed_pk
         JOIN feed_snapshot AS fs ON fs.feed_pk = e.feed_pk
@@ -42,20 +42,20 @@ struct SubscribedEntryRow {
     entry_json: String,
     feed_url: String,
     meta_json: String,
-    requirement: Option<Requirement>,
-    category: Option<Category<'static>>,
+    labels_json: String,
 }
 
 impl TryFrom<SubscribedEntryRow> for SubscribedEntry {
     type Error = SqliteError;
 
     fn try_from(row: SubscribedEntryRow) -> SqliteResult<Self> {
+        let labels: SubscriptionLabels = serde_json::from_str(&row.labels_json)?;
         Ok(Self {
             entry: decode_stored_entry(&row.entry_id, &row.entry_json)?,
             feed_meta: Annotated {
                 feed: decode_stored_feed_meta(&row.feed_url, &row.meta_json)?,
-                requirement: row.requirement,
-                category: row.category,
+                requirement: labels.requirement(),
+                category: labels.category(),
             },
         })
     }

@@ -4,7 +4,7 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::{FeedUrl, SubscriptionLabels};
 
 use crate::crawl::policy::CrawlPolicy;
 
@@ -12,7 +12,7 @@ pub mod decider;
 mod handler;
 pub mod query;
 
-pub use decider::{SubCommand, SubDecider, SubReject, SubState};
+pub use decider::{SubReject, SubState};
 pub(crate) use handler::SubHandler;
 
 /// Opaque registry identity that owns subscriptions.
@@ -57,8 +57,7 @@ impl SubscriptionKey {
 /// Registry-owned attributes applied to one subscriber/feed relation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FeedSubscriptionAttrs {
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
     pub crawl_policy: CrawlPolicy,
 }
 
@@ -80,8 +79,7 @@ pub enum UnsubscribeOutcome {
 pub struct Subscription {
     pub subscriber_id: SubscriberId,
     pub feed_url: FeedUrl,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
     pub crawl_policy: CrawlPolicy,
     /// When the relation was created. Editing attributes keeps this value.
     pub subscribed_at: DateTime<Utc>,

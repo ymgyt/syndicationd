@@ -4,6 +4,7 @@ pub(crate) use chrono::{DateTime, TimeZone, Utc};
 pub(crate) use sqlx::Row;
 pub(crate) use synd_feed::feed::service::FeedHttpStatus;
 pub(crate) use synd_feed::types::FeedUrl;
+use synd_feed::types::SubscriptionLabels;
 pub(crate) use synd_support::time::Clock;
 
 pub(crate) use super::{SqliteDatabase, SqliteFeedRegistryDb, SqliteRegistryTx};
@@ -87,8 +88,7 @@ pub(crate) fn subscription_with(
     Subscription {
         subscriber_id,
         feed_url: feed_url(path),
-        requirement: None,
-        category: None,
+        labels: SubscriptionLabels::default(),
         crawl_policy,
         subscribed_at: Utc.with_ymd_and_hms(2026, 5, 24, 12, 0, 0).unwrap(),
     }
@@ -103,8 +103,7 @@ pub(crate) fn subscription_key(subscription: &Subscription) -> SubscriptionKey {
 
 pub(crate) fn subscription_attrs(subscription: &Subscription) -> FeedSubscriptionAttrs {
     FeedSubscriptionAttrs {
-        requirement: subscription.requirement,
-        category: subscription.category.clone(),
+        labels: subscription.labels.clone(),
         crawl_policy: subscription.crawl_policy,
     }
 }

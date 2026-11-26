@@ -2,7 +2,7 @@
 mod test {
     use std::time::Duration;
 
-    use synd_feed::types::{Category, FeedUrl, Requirement};
+    use synd_feed::types::FeedUrl;
     use synd_term::{auth::Credential, key, test_support::screen::Screen};
 
     mod helper;
@@ -45,8 +45,7 @@ mod test {
                 terminal_col_row: (120, 30),
                 subscriptions: vec![SubscriptionSeed::interval(
                     feed_url.clone(),
-                    Some(Requirement::Must),
-                    Some(Category::new("rust").unwrap()),
+                    serde_json::from_str(r#"{"requirement":"must","category":"rust"}"#)?,
                     Duration::from_hours(1),
                 )],
                 ..Default::default()

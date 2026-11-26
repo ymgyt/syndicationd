@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use synd_feed::types::FeedUrl;
+use synd_feed::types::{FeedUrl, SubscriptionLabels};
 use synd_registry::{
     CreateTimelineCommand, FeedRegistry, FeedRegistryConfig, FeedRegistryWorkerConfig,
     SubscribeFeedCommand, SubscriberId,
@@ -43,8 +43,7 @@ fn subscribe_command(subscriber_id: &SubscriberId, feed_url: &FeedUrl) -> Subscr
     SubscribeFeedCommand {
         subscriber_id: subscriber_id.clone(),
         feed_url: feed_url.clone(),
-        requirement: None,
-        category: None,
+        labels: SubscriptionLabels::default(),
         crawl_policy: None,
     }
 }

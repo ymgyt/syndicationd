@@ -13,8 +13,7 @@ use synd_auth::{
     jwt,
 };
 use synd_client::{Client, ClientOptions};
-use synd_feed::types::FeedUrl;
-use synd_feed::types::{Category, Requirement};
+use synd_feed::types::{FeedUrl, SubscriptionLabels};
 use synd_registry::{
     FeedRegistry, FeedSubscriptionAttrs, SubscriberId, SubscriptionKey,
     crawl::policy::{CrawlPolicy, PollingInterval},
@@ -48,22 +47,15 @@ pub struct TestCase {
 #[derive(Clone)]
 pub struct SubscriptionSeed {
     pub feed_url: FeedUrl,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
     pub crawl_policy: CrawlPolicy,
 }
 
 impl SubscriptionSeed {
-    pub fn interval(
-        feed_url: FeedUrl,
-        requirement: Option<Requirement>,
-        category: Option<Category<'static>>,
-        interval: Duration,
-    ) -> Self {
+    pub fn interval(feed_url: FeedUrl, labels: SubscriptionLabels, interval: Duration) -> Self {
         Self {
             feed_url,
-            requirement,
-            category,
+            labels,
             crawl_policy: CrawlPolicy::interval(polling_interval(interval)),
         }
     }
@@ -254,8 +246,7 @@ fn polling_interval(duration: Duration) -> PollingInterval {
 struct SubscriptionFixture {
     subscriber_id: SubscriberId,
     feed_url: FeedUrl,
-    requirement: Option<Requirement>,
-    category: Option<Category<'static>>,
+    labels: SubscriptionLabels,
     crawl_policy: CrawlPolicy,
     subscribed_at: DateTime<Utc>,
 }
@@ -267,8 +258,7 @@ async fn seed_subscription(
     let mut tx = db.begin().await?;
     let subscription = SubscriptionKey::new(fixture.subscriber_id, fixture.feed_url.clone());
     let attrs = FeedSubscriptionAttrs {
-        requirement: fixture.requirement,
-        category: fixture.category,
+        labels: fixture.labels,
         crawl_policy: fixture.crawl_policy,
     };
     tx.upsert_subscription(&subscription, attrs, fixture.subscribed_at)
@@ -296,8 +286,7 @@ pub async fn serve_api(
             for subscription in subscriptions {
                 let SubscriptionSeed {
                     feed_url,
-                    requirement,
-                    category,
+                    labels,
                     crawl_policy,
                 } = subscription;
 
@@ -306,8 +295,7 @@ pub async fn serve_api(
                     SubscriptionFixture {
                         subscriber_id: subscriber_id.clone(),
                         feed_url,
-                        requirement,
-                        category,
+                        labels,
                         crawl_policy,
                         subscribed_at,
                     },

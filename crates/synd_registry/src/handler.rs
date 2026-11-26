@@ -16,20 +16,6 @@ pub(crate) trait CommandHandler<C> {
     async fn handle(&self, command: C) -> Result<HandledCommand<Self::Output>, Self::Error>;
 }
 
-/// Makes a pure domain decision from a command and the current state.
-pub(crate) trait Decider {
-    type Command;
-    type State;
-    type Event;
-    type Reject;
-
-    fn decide(
-        &self,
-        command: Self::Command,
-        state: Self::State,
-    ) -> Result<Vec<Self::Event>, Self::Reject>;
-}
-
 /// Applies newly decided domain events to transactional current state.
 pub(crate) trait StateApplier<Tx> {
     type Event;

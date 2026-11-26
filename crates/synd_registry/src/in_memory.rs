@@ -315,8 +315,7 @@ impl SubscriptionDb for InMemoryRegistryTx<'_> {
             Subscription {
                 subscriber_id: subscription.subscriber_id.clone(),
                 feed_url: subscription.feed_url.clone(),
-                requirement: attrs.requirement,
-                category: attrs.category,
+                labels: attrs.labels,
                 crawl_policy: attrs.crawl_policy,
                 subscribed_at,
             },
@@ -555,8 +554,8 @@ impl FeedDb for InMemoryRegistryTx<'_> {
             entry: stored.entry.entry().clone(),
             feed_meta: Annotated {
                 feed: meta.clone(),
-                requirement: subscription.requirement,
-                category: subscription.category.clone(),
+                requirement: subscription.labels.requirement(),
+                category: subscription.labels.category(),
             },
         }))
     }
@@ -722,6 +721,7 @@ mod tests {
     use std::time::Duration;
 
     use chrono::{TimeZone, Utc};
+    use synd_feed::types::SubscriptionLabels;
     use synd_support::time::Clock;
     use tokio_util::sync::CancellationToken;
 
@@ -766,8 +766,7 @@ mod tests {
         SubscribeFeedCommand {
             subscriber_id: subscriber_id(),
             feed_url: feed_url(name),
-            requirement: None,
-            category: None,
+            labels: SubscriptionLabels::default(),
             crawl_policy: Some(CrawlPolicy::interval(interval(seconds))),
         }
     }

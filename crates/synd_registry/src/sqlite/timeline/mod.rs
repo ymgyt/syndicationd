@@ -1,10 +1,8 @@
-use std::str::FromStr;
-
 use chrono::{DateTime, Utc};
 use sqlx::{QueryBuilder, Sqlite, Transaction};
 use synd_feed::{
     entry::EntryId,
-    types::{Annotated, Category, FeedUrl, Requirement},
+    types::{Annotated, FeedUrl, SubscriptionLabels},
 };
 
 use super::{
@@ -31,8 +29,7 @@ SELECT
     e.entry_json,
     f.url AS feed_url,
     fs.meta_json,
-    s.requirement,
-    s.category
+    s.labels_json
 FROM timeline_entry AS te
 INNER JOIN timeline AS t ON t.timeline_id = te.timeline_id
 INNER JOIN entry AS e
@@ -431,8 +428,7 @@ async fn load_timeline_change_rows(
                 e.entry_json,
                 f.url AS feed_url,
                 fs.meta_json,
-                s.requirement,
-                s.category
+                COALESCE(s.labels_json, '{}') AS labels_json
             FROM timeline_entry AS te
             INNER JOIN timeline AS t ON t.timeline_id = te.timeline_id
             INNER JOIN entry AS e
@@ -672,8 +668,7 @@ struct TimelineEntryColumns {
     entry_id: String,
     entry_json: String,
     feed_url: String,
-    requirement: Option<String>,
-    category: Option<String>,
+    labels_json: String,
 }
 
 impl TryFrom<TimelineEntryRow> for TimelineEntry {
@@ -682,19 +677,12 @@ impl TryFrom<TimelineEntryRow> for TimelineEntry {
     fn try_from(row: TimelineEntryRow) -> Result<Self, Self::Error> {
         let entry = decode_stored_entry(&row.entry.entry_id, &row.entry.entry_json)?;
         let feed_meta = decode_stored_feed_meta(&row.entry.feed_url, &row.meta_json)?;
-        let requirement = row
-            .entry
-            .requirement
-            .as_deref()
-            .map(Requirement::from_str)
-            .transpose()
-            .decode()?;
-        let category = row.entry.category.map(Category::new).transpose().decode()?;
+        let labels: SubscriptionLabels = serde_json::from_str(&row.entry.labels_json)?;
         let cursor = TimelineEntryCursor::new(row.entry.order_time, entry.id().clone());
         let feed_meta = Annotated {
             feed: feed_meta,
-            requirement,
-            category,
+            requirement: labels.requirement(),
+            category: labels.category(),
         };
 
         Ok(TimelineEntry {

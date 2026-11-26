@@ -1,8 +1,6 @@
-use std::str::FromStr;
-
 use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
-use synd_feed::types::{Category, FeedUrl, Requirement};
+use synd_feed::types::FeedUrl;
 
 use super::{
     SqliteRegistryTx, codec,
@@ -23,8 +21,7 @@ async fn upsert(
     attrs: FeedSubscriptionAttrs,
     now: DateTime<Utc>,
 ) -> SqliteResult<()> {
-    let requirement = attrs.requirement.map(|r| r.to_string());
-    let category = attrs.category.map(|c| c.to_string());
+    let labels_json = serde_json::to_string(&attrs.labels)?;
     let policy_json = codec::encode_crawl_policy_json(attrs.crawl_policy)?;
     let feed_pk = feed::upsert_pk(tx, &subscription.feed_url).await?;
 
@@ -34,22 +31,19 @@ async fn upsert(
             INSERT INTO feed_subscription (
                 subscriber_id,
                 feed_pk,
-                requirement,
-                category,
+                labels_json,
                 crawl_policy_json,
                 subscribed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(subscriber_id, feed_pk) DO UPDATE SET
-                requirement = excluded.requirement,
-                category = excluded.category,
+                labels_json = excluded.labels_json,
                 crawl_policy_json = excluded.crawl_policy_json
             "#,
     )
     .bind(subscription.subscriber_id.as_str())
     .bind(feed_pk)
-    .bind(requirement)
-    .bind(category)
+    .bind(labels_json)
     .bind(policy_json)
     .bind(now)
     .execute(&mut **tx)
@@ -116,8 +110,7 @@ async fn list(
                 SELECT
                     s.subscriber_id AS subscriber_id,
                     f.url AS feed_url,
-                    s.requirement AS requirement,
-                    s.category AS category,
+                    s.labels_json,
                     s.crawl_policy_json AS crawl_policy_json,
                     s.subscribed_at AS subscribed_at
                 FROM feed_subscription AS s
@@ -139,8 +132,7 @@ async fn list(
                 SELECT
                     s.subscriber_id AS subscriber_id,
                     f.url AS feed_url,
-                    s.requirement AS requirement,
-                    s.category AS category,
+                    s.labels_json,
                     s.crawl_policy_json AS crawl_policy_json,
                     s.subscribed_at AS subscribed_at
                 FROM feed_subscription AS s
@@ -204,8 +196,7 @@ async fn load_for_feed(
 struct SubscriptionRow {
     subscriber_id: String,
     feed_url: String,
-    requirement: Option<String>,
-    category: Option<String>,
+    labels_json: String,
     crawl_policy_json: String,
     subscribed_at: DateTime<Utc>,
 }
@@ -215,13 +206,7 @@ impl SubscriptionRow {
         Ok(Subscription {
             subscriber_id: SubscriberId::new(self.subscriber_id),
             feed_url: FeedUrl::parse(&self.feed_url).decode()?,
-            requirement: self
-                .requirement
-                .as_deref()
-                .map(Requirement::from_str)
-                .transpose()
-                .decode()?,
-            category: self.category.map(Category::new).transpose().decode()?,
+            labels: serde_json::from_str(&self.labels_json)?,
             crawl_policy: codec::decode_crawl_policy_json(&self.crawl_policy_json)?,
             subscribed_at: self.subscribed_at,
         })

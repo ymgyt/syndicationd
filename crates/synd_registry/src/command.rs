@@ -1,4 +1,4 @@
-use synd_feed::types::{Category, FeedUrl, Requirement, TimelineName};
+use synd_feed::types::{FeedUrl, SubscriptionLabels, TimelineName};
 
 use crate::{
     crawl::{policy::CrawlPolicy, request::RequestCrawlOutcome},
@@ -26,8 +26,7 @@ pub struct CreateTimelineOutput {
 pub struct SubscribeFeedCommand {
     pub subscriber_id: SubscriberId,
     pub feed_url: FeedUrl,
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
     pub crawl_policy: Option<CrawlPolicy>,
 }
 
@@ -38,8 +37,7 @@ impl SubscribeFeedCommand {
     ) -> (SubscriptionKey, FeedSubscriptionAttrs) {
         let subscription = SubscriptionKey::new(self.subscriber_id, self.feed_url);
         let attrs = FeedSubscriptionAttrs {
-            requirement: self.requirement,
-            category: self.category,
+            labels: self.labels,
             crawl_policy: self.crawl_policy.unwrap_or(default_crawl_policy),
         };
         (subscription, attrs)

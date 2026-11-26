@@ -1,4 +1,4 @@
-use synd_feed::types::Text;
+use synd_feed::types::{SubscriptionLabels, Text};
 
 use std::sync::Arc;
 
@@ -71,8 +71,7 @@ async fn create_after_crawl_projects_known_entries_from_the_owners_subscriptions
         .subscribe(SubscribeFeedCommand {
             subscriber_id: owner.clone(),
             feed_url: url.clone(),
-            requirement: None,
-            category: None,
+            labels: SubscriptionLabels::default(),
             crawl_policy: None,
         })
         .await?;

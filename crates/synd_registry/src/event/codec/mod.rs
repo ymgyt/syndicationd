@@ -63,7 +63,7 @@ mod tests {
         subscription::{FeedSubscriptionAttrs, SubscriberId, SubscriptionKey},
     };
     use std::time::Duration;
-    use synd_feed::types::FeedUrl;
+    use synd_feed::types::{FeedUrl, SubscriptionLabels};
 
     #[test]
     fn event_encoding_roundtrips_tagged_event() {
@@ -73,8 +73,7 @@ mod tests {
                 FeedUrl::parse("https://example.com/feed.xml").unwrap(),
             ),
             FeedSubscriptionAttrs {
-                requirement: None,
-                category: None,
+                labels: SubscriptionLabels::default(),
                 crawl_policy: CrawlPolicy::interval(
                     PollingInterval::try_from(Duration::from_hours(1)).unwrap(),
                 ),
@@ -92,8 +91,7 @@ mod tests {
                     "feed_url": "https://example.com/feed.xml"
                 },
                 "attrs": {
-                    "requirement": null,
-                    "category": null,
+                    "labels": {},
                     "crawl_policy": {
                         "polling": {
                             "kind": "interval",

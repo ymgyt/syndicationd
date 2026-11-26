@@ -16,6 +16,9 @@ pub use requirement::Requirement;
 mod category;
 pub use category::Category;
 
+mod labels;
+pub use labels::{Labels, SubscriptionLabels};
+
 mod url;
 pub use url::FeedUrl;
 

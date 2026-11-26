@@ -77,11 +77,11 @@ impl SubscribedFeed {
     }
 
     async fn requirement(&self) -> Option<Requirement> {
-        self.subscription.requirement
+        self.subscription.labels.requirement()
     }
 
-    async fn category(&self) -> Option<&Category<'static>> {
-        self.subscription.category.as_ref()
+    async fn category(&self) -> Option<Category<'static>> {
+        self.subscription.labels.category()
     }
 
     async fn crawl_policy(&self) -> CrawlPolicy {
@@ -166,8 +166,8 @@ impl SubscribedFeed {
         let feed = feed.map(|feed| {
             Annotated {
                 feed: Arc::new(feed),
-                requirement: subscription.requirement,
-                category: subscription.category.clone(),
+                requirement: subscription.labels.requirement(),
+                category: subscription.labels.category(),
             }
             .into()
         });

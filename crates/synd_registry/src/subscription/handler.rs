@@ -10,12 +10,10 @@ use crate::{
     },
     crawl::policy::CrawlPolicy,
     db::{CommitTx, FeedRegistryDb, SubscriptionDb},
-    error::{FeedRegistryError, RegistryDbError, RegistryDbResult},
+    error::{FeedRegistryError, RegistryDbResult},
     event::{EventRecorder, RecordedEvents, SubEvent},
-    handler::{CommandHandler, Decider, HandledCommand, StateApplier},
-    subscription::{
-        SubCommand, SubDecider, SubState, SubscribeOutcome, SubscriptionKey, UnsubscribeOutcome,
-    },
+    handler::{CommandHandler, HandledCommand, StateApplier},
+    subscription::{SubState, SubscriptionKey},
 };
 
 /// Handles subscription commands as DB state changes plus journaled domain events.
@@ -24,7 +22,6 @@ pub(crate) struct SubHandler<S> {
     db: S,
     default_crawl_policy: CrawlPolicy,
     clock: Arc<dyn Clock>,
-    decider: SubDecider,
     applier: SubStateApplier,
 }
 
@@ -34,7 +31,6 @@ impl<S> SubHandler<S> {
             db,
             default_crawl_policy,
             clock,
-            decider: SubDecider,
             applier: SubStateApplier,
         }
     }
@@ -60,23 +56,6 @@ impl SubState {
 /// Applies subscription domain events to the subscription store transaction.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct SubStateApplier;
-
-impl SubStateApplier {
-    async fn apply_all<Tx>(
-        &self,
-        tx: &mut Tx,
-        events: &[SubEvent],
-        now: DateTime<Utc>,
-    ) -> RegistryDbResult<()>
-    where
-        Tx: SubscriptionDb + Send,
-    {
-        for event in events {
-            self.apply(tx, event, now).await?;
-        }
-        Ok(())
-    }
-}
 
 impl<Tx> StateApplier<Tx> for SubStateApplier
 where
@@ -110,85 +89,36 @@ where
     }
 }
 
-/// Translates the events decided for one subscription command into the
-/// command-specific output.
-trait SubCommandOutput: Sized {
-    const COMMAND_NAME: &'static str;
-
-    fn from_event(event: &SubEvent) -> Result<Self, FeedRegistryError>;
-
-    fn from_events(events: &[SubEvent]) -> Result<Self, FeedRegistryError> {
-        match events {
-            [event] => Self::from_event(event),
-            events => Err(unexpected_event_count(Self::COMMAND_NAME, events.len())),
-        }
-    }
-}
-
-impl SubCommandOutput for SubscribeFeedOutput {
-    const COMMAND_NAME: &'static str = "subscribe";
-
-    fn from_event(event: &SubEvent) -> Result<Self, FeedRegistryError> {
-        let outcome = match event {
-            SubEvent::Subscribed(event) => SubscribeOutcome::Subscribed(event.subscription.clone()),
-            SubEvent::Changed(event) => SubscribeOutcome::Changed(event.subscription.clone()),
-            SubEvent::Unsubscribed(_) => {
-                return Err(unexpected_event(Self::COMMAND_NAME, event));
-            }
-        };
-        Ok(Self { outcome })
-    }
-}
-
-impl SubCommandOutput for UnsubscribeFeedOutput {
-    const COMMAND_NAME: &'static str = "unsubscribe";
-
-    fn from_event(event: &SubEvent) -> Result<Self, FeedRegistryError> {
-        let outcome = match event {
-            SubEvent::Unsubscribed(event) => {
-                UnsubscribeOutcome::Unsubscribed(event.subscription.clone())
-            }
-            SubEvent::Subscribed(_) | SubEvent::Changed(_) => {
-                return Err(unexpected_event(Self::COMMAND_NAME, event));
-            }
-        };
-        Ok(Self { outcome })
-    }
-}
-
 impl<S> SubHandler<S>
 where
     S: FeedRegistryDb,
     for<'tx> S::Tx<'tx>: SubscriptionDb,
 {
-    /// Runs one subscription command through the shared decide -> apply ->
-    /// record -> commit flow.
-    async fn handle_sub_command<O>(
+    /// Commits the subscription change and its journal event together.
+    async fn commit_event(
         &self,
-        sub_command: SubCommand,
-    ) -> Result<HandledCommand<O>, FeedRegistryError>
-    where
-        O: SubCommandOutput,
-    {
-        let mut tx = self.db.begin().await?;
-        let state = SubState::load(&mut tx, sub_command.subscription()).await?;
-        let events = self.decider.decide(sub_command, state)?;
-        let output = O::from_events(&events)?;
-
+        mut tx: S::Tx<'_>,
+        event: SubEvent,
+    ) -> RegistryDbResult<RecordedEvents> {
         self.applier
-            .apply_all(&mut tx, &events, self.clock.now())
+            .apply(&mut tx, &event, self.clock.now())
             .await?;
-        let mut recorded_events = RecordedEvents::with_capacity(events.len());
+        let subscription = event.subscription().clone();
+        let outcome = event.outcome_label();
+        let event_type = event.event_type();
+        let mut recorded_events = RecordedEvents::with_capacity(1);
         EventRecorder::new(&mut tx, &mut recorded_events, self.clock.as_ref())
-            .record_all(events.iter().cloned())
+            .record(event)
             .await?;
         tx.commit().await?;
-        log_events(&events);
-
-        Ok(HandledCommand {
-            output,
-            recorded_events,
-        })
+        info!(
+            subscriber_id = subscription.subscriber_id.as_str(),
+            feed_url = subscription.feed_url.as_str(),
+            outcome,
+            %event_type,
+            "registry subscription committed"
+        );
+        Ok(recorded_events)
     }
 }
 
@@ -205,11 +135,14 @@ where
         command: SubscribeFeedCommand,
     ) -> Result<HandledCommand<Self::Output>, Self::Error> {
         let (subscription, attrs) = command.into_parts(self.default_crawl_policy);
-        self.handle_sub_command(SubCommand::Subscribe {
-            subscription,
-            attrs,
+        let mut tx = self.db.begin().await?;
+        let state = SubState::load(&mut tx, &subscription).await?;
+        let (outcome, event) = state.subscribe(subscription, attrs);
+        let recorded_events = self.commit_event(tx, event).await?;
+        Ok(HandledCommand {
+            output: SubscribeFeedOutput { outcome },
+            recorded_events,
         })
-        .await
     }
 }
 
@@ -225,37 +158,14 @@ where
         &self,
         command: UnsubscribeFeedCommand,
     ) -> Result<HandledCommand<Self::Output>, Self::Error> {
-        self.handle_sub_command(SubCommand::Unsubscribe {
-            subscription: command.into_subscription(),
+        let subscription = command.into_subscription();
+        let mut tx = self.db.begin().await?;
+        let state = SubState::load(&mut tx, &subscription).await?;
+        let (outcome, event) = state.unsubscribe(subscription)?;
+        let recorded_events = self.commit_event(tx, event).await?;
+        Ok(HandledCommand {
+            output: UnsubscribeFeedOutput { outcome },
+            recorded_events,
         })
-        .await
-    }
-}
-
-fn unexpected_event_count(command_name: &'static str, event_count: usize) -> FeedRegistryError {
-    RegistryDbError::invariant(format!(
-        "subscription {command_name} produced unexpected event count: {event_count}"
-    ))
-    .into()
-}
-
-fn unexpected_event(command_name: &'static str, event: &SubEvent) -> FeedRegistryError {
-    RegistryDbError::invariant(format!(
-        "subscription {command_name} produced unexpected event type: {}",
-        event.event_type()
-    ))
-    .into()
-}
-
-fn log_events(events: &[SubEvent]) {
-    for event in events {
-        let subscription = event.subscription();
-        info!(
-            subscriber_id = subscription.subscriber_id.as_str(),
-            feed_url = subscription.feed_url.as_str(),
-            outcome = event.outcome_label(),
-            event_type = %event.event_type(),
-            "registry subscription committed"
-        );
     }
 }
