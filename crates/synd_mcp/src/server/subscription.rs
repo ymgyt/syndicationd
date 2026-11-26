@@ -2,7 +2,7 @@ use rmcp::{Json, handler::server::wrapper::Parameters, tool, tool_router};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use synd_client::{
-    FeedUrl,
+    FeedUrl, SubscriptionLabels,
     payload::{
         ResponseCode, ResponseStatus, SubscribeDisposition, SubscribeFeedInput,
         SubscribeFeedPayload, SubscribedFeed, SubscriptionPayload, UnsubscribeDisposition,
@@ -107,8 +107,7 @@ impl TryFrom<FeedParams> for SubscribeFeedInput {
     fn try_from(params: FeedParams) -> Result<Self, Self::Error> {
         Ok(Self {
             url: params.try_into()?,
-            requirement: None,
-            category: None,
+            labels: SubscriptionLabels::default(),
             crawl_policy: None,
         })
     }
