@@ -49,12 +49,13 @@ async fn subscription_catchup_reads_complete_entries_from_current_membership() -
     assert_eq!(recorded.types(), &[TimelineChangedEvent::TYPE]);
     let page = list_timeline_entries(&db, subscription.subscriber_id, timeline.timeline_id).await?;
     assert_eq!(page.nodes.len(), 1);
+    let subscribed_entry = &page.nodes[0].subscribed_entry;
     assert_eq!(
-        page.nodes[0].entry.title().map(Text::content),
+        subscribed_entry.entry.title().map(Text::content),
         Some("current entry")
     );
     assert_eq!(
-        page.nodes[0].feed_meta.feed.title().map(Text::content),
+        subscribed_entry.feed_meta.title().map(Text::content),
         Some("timeline feed")
     );
     Ok(())
@@ -145,7 +146,7 @@ async fn create_after_crawl_projects_known_entries_from_the_owners_subscriptions
         let [TimelineChange::Upsert(node)] = page.changes.as_slice() else {
             anyhow::bail!("expected one entry on each page");
         };
-        titles.push(node.entry.title().unwrap().content());
+        titles.push(node.subscribed_entry.entry.title().unwrap().content());
     }
     titles.sort_unstable();
     assert_eq!(titles, ["current", "old"]);

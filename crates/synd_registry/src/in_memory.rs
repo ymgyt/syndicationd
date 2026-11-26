@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use chrono::{DateTime, Utc};
 use synd_feed::{
     entry::{Entry, EntryId, SyndEntry},
-    types::{Annotated, Feed, FeedMeta, FeedUrl},
+    types::{Feed, FeedMeta, FeedUrl},
 };
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -552,11 +552,8 @@ impl FeedDb for InMemoryRegistryTx<'_> {
         })?;
         Ok(Some(SubscribedEntry {
             entry: stored.entry.entry().clone(),
-            feed_meta: Annotated {
-                feed: meta.clone(),
-                requirement: subscription.labels.requirement(),
-                category: subscription.labels.category(),
-            },
+            feed_meta: meta.clone(),
+            subscription_labels: subscription.labels.clone(),
         }))
     }
 

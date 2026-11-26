@@ -2,13 +2,10 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use synd_feed::{
-    entry::{Entry, EntryId},
-    types::{Annotated, FeedMeta, TimelineName},
-};
+use synd_feed::{entry::EntryId, types::TimelineName};
 use thiserror::Error;
 
-use crate::{subscription::SubscriberId, timeline::TimelineId};
+use crate::{entry::SubscribedEntry, subscription::SubscriberId, timeline::TimelineId};
 
 #[derive(Debug, Clone)]
 pub struct TimelinesQuery {
@@ -83,11 +80,10 @@ pub enum TimelineEntryCursorError {
     Invalid(serde_json::Error),
 }
 
-/// GraphQL/query node assembled for one timeline entry.
+/// A subscriber's entry and its position on the timeline.
 #[derive(Debug, Clone)]
 pub struct TimelineEntry {
-    pub entry: Entry,
-    pub feed_meta: Annotated<FeedMeta>,
+    pub subscribed_entry: SubscribedEntry,
     pub cursor: TimelineEntryCursor,
 }
 

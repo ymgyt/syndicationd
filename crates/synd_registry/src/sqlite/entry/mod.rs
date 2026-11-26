@@ -1,9 +1,6 @@
 use chrono::{DateTime, Utc};
 use sqlx::{Sqlite, Transaction};
-use synd_feed::{
-    entry::{EntryId, EntryOrderKey, SyndEntry},
-    types::{Annotated, SubscriptionLabels},
-};
+use synd_feed::entry::{EntryId, EntryOrderKey, SyndEntry};
 
 use super::{
     codec::{decode_stored_entry, decode_stored_feed_meta, encode_entry_json},
@@ -49,14 +46,10 @@ impl TryFrom<SubscribedEntryRow> for SubscribedEntry {
     type Error = SqliteError;
 
     fn try_from(row: SubscribedEntryRow) -> SqliteResult<Self> {
-        let labels: SubscriptionLabels = serde_json::from_str(&row.labels_json)?;
         Ok(Self {
             entry: decode_stored_entry(&row.entry_id, &row.entry_json)?,
-            feed_meta: Annotated {
-                feed: decode_stored_feed_meta(&row.feed_url, &row.meta_json)?,
-                requirement: labels.requirement(),
-                category: labels.category(),
-            },
+            feed_meta: decode_stored_feed_meta(&row.feed_url, &row.meta_json)?,
+            subscription_labels: serde_json::from_str(&row.labels_json)?,
         })
     }
 }

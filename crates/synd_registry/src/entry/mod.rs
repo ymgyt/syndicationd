@@ -2,15 +2,16 @@ mod reconciliation;
 
 use synd_feed::{
     entry::Entry,
-    types::{Annotated, FeedMeta},
+    types::{FeedMeta, SubscriptionLabels},
 };
 
 pub(crate) use reconciliation::EntryChange;
 pub use reconciliation::{Change, Changes, Entries};
 
-/// A stored entry and its source feed as seen by a subscriber.
+/// A stored entry, its source feed metadata, and the subscriber's labels for that feed.
 #[derive(Debug, Clone)]
 pub struct SubscribedEntry {
     pub entry: Entry,
-    pub feed_meta: Annotated<FeedMeta>,
+    pub feed_meta: FeedMeta,
+    pub subscription_labels: SubscriptionLabels,
 }

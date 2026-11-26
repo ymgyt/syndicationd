@@ -1,9 +1,6 @@
 use chrono::{DateTime, Utc};
 use sqlx::{QueryBuilder, Sqlite, Transaction};
-use synd_feed::{
-    entry::EntryId,
-    types::{Annotated, FeedUrl, SubscriptionLabels},
-};
+use synd_feed::{entry::EntryId, types::FeedUrl};
 
 use super::{
     codec::{decode_stored_entry, decode_stored_feed_meta},
@@ -13,6 +10,7 @@ use super::{
 use crate::{
     RegistryDbResult,
     db::{InsertTimelineOutcome, TimelineDb},
+    entry::SubscribedEntry,
     event::TimelineCreatedEvent,
     query::{
         Timeline, TimelineChange, TimelineChangesPage, TimelineChangesQuery, TimelineEntriesPage,
@@ -676,18 +674,13 @@ impl TryFrom<TimelineEntryRow> for TimelineEntry {
 
     fn try_from(row: TimelineEntryRow) -> Result<Self, Self::Error> {
         let entry = decode_stored_entry(&row.entry.entry_id, &row.entry.entry_json)?;
-        let feed_meta = decode_stored_feed_meta(&row.entry.feed_url, &row.meta_json)?;
-        let labels: SubscriptionLabels = serde_json::from_str(&row.entry.labels_json)?;
         let cursor = TimelineEntryCursor::new(row.entry.order_time, entry.id().clone());
-        let feed_meta = Annotated {
-            feed: feed_meta,
-            requirement: labels.requirement(),
-            category: labels.category(),
-        };
-
-        Ok(TimelineEntry {
-            entry,
-            feed_meta,
+        Ok(Self {
+            subscribed_entry: SubscribedEntry {
+                entry,
+                feed_meta: decode_stored_feed_meta(&row.entry.feed_url, &row.meta_json)?,
+                subscription_labels: serde_json::from_str(&row.entry.labels_json)?,
+            },
             cursor,
         })
     }
