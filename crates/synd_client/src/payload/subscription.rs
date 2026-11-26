@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use synd_feed::types::{Category, FeedType, FeedUrl, Requirement, Time};
+use synd_feed::types::{FeedType, FeedUrl, SubscriptionLabels, Time};
 
 use super::{EntryExcerpt, PageInfo};
 
@@ -19,9 +19,7 @@ pub struct FeedConnection {
 #[serde(rename_all = "camelCase")]
 pub struct SubscribedFeed {
     pub url: FeedUrl,
-    #[serde(default, with = "super::requirement")]
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
     pub crawl_policy: CrawlPolicy,
     pub feed: Option<FeedDetails>,
 }
@@ -179,9 +177,7 @@ pub struct EntryMeta {
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeFeedInput {
     pub url: FeedUrl,
-    #[serde(default, with = "super::requirement")]
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
     pub crawl_policy: Option<CrawlPolicyInput>,
 }
 

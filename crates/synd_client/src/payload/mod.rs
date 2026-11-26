@@ -1,7 +1,6 @@
 mod entry;
 mod event;
 mod page;
-mod requirement;
 mod subscription;
 mod timeline;
 

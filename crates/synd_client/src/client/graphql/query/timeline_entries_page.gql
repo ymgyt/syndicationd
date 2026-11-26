@@ -14,8 +14,7 @@ fragment TimelineEntriesPage on TimelineEntryConnection {
       feed {
         title
         url
-        requirement
-        category
+        labels
       }
     }
   }

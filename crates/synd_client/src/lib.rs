@@ -7,4 +7,5 @@ mod scalar;
 
 pub use client::{ApiCredential, Client, ClientOptions, FeedEventWatch};
 pub use error::{Retryability, SyndApiError};
-pub use scalar::{Category, FeedUrl, Rfc3339Time};
+pub use scalar::{FeedUrl, Rfc3339Time};
+pub use synd_feed::types::SubscriptionLabels;

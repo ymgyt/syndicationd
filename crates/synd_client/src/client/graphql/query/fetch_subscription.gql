@@ -3,8 +3,7 @@ query Subscription($after: String, $first: Int) {
     feeds: subscriptions(after: $after, first: $first) {
       nodes {
         url
-        requirement
-        category
+        labels
         crawlPolicy {
           polling {
             kind

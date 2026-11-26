@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use synd_feed::{
     entry::{EntryId, SourceCategory},
-    types::{Category, FeedUrl, Requirement, Time, TimelineName},
+    types::{FeedUrl, SubscriptionLabels, Time, TimelineName},
 };
 
 use super::PageInfo;
@@ -149,7 +149,5 @@ pub struct EntryExcerpt {
 pub struct FeedMeta {
     pub title: Option<String>,
     pub url: FeedUrl,
-    #[serde(default, with = "super::requirement")]
-    pub requirement: Option<Requirement>,
-    pub category: Option<Category<'static>>,
+    pub labels: SubscriptionLabels,
 }
