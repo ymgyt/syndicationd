@@ -27,7 +27,7 @@ synd-support  = { path = "crates/synd_support", version = "=0.4.0" }
 synd-term     = { path = "crates/synd_term", version = "=0.4.0" }
 synd-test     = { path = "crates/synd_test" }
 
-anyhow               = { version = "1.0.104", default-features = false, features = ["std"] }
+anyhow               = { version = "1.0.105", default-features = false, features = ["std"] }
 assert_cmd           = { version = "2.2.2" }
 async-graphql        = { version = "7.2.1" }
 async-trait          = { version = "0.1.92", default-features = false }
@@ -35,7 +35,7 @@ axum                 = { version = "0.8.9", default-features = false }
 axum-server          = { version = "0.9.2", features = ["tls-rustls"] }
 bon                  = { version = "3.10.3" }
 chrono               = { version = "0.4.45", default-features = false }
-clap                 = { version = "4.6.9", default-features = false }
+clap                 = { version = "4.6.10", default-features = false }
 criterion            = { version = "0.8.2", features = ["async_tokio"] }
 derive_more          = { version = "2.1.1", default-features = false, features = ["from"] }
 dom_query            = { version = "0.30.0", default-features = false }
@@ -64,23 +64,23 @@ rustls               = { version = "0.23.46", default-features = false, features
 schemars             = { version = "1.2.3", default-features = false, features = ["derive"] }
 serde                = { version = "1.0.229", features = ["derive"] }
 serde_json           = { version = "1.0.154" }
-sha2                 = { version = "0.11.1" }
+sha2                 = { version = "0.11.2" }
 sqlx                 = { version = "0.9.1", default-features = false }
 strum                = { version = "0.28.0", features = ["derive"] }
 tempfile             = { version = "3.27.0" }
 thiserror            = { version = "2.0.21" }
 tokio                = { version = "1.54.1", default-features = false }
 tokio-util           = { version = "0.7.20" }
-toml                 = { version = "1.2.2" }
+toml                 = { version = "1.2.3" }
 tracing              = { version = "0.1.44" }
 tracing-subscriber   = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
 tuiframework         = { version = "0.1.0", git = "https://github.com/ymgyt/tuiframework", rev = "afe88192f84c6a8e61cc34791c51edcf6d11857e" }
 unicode-segmentation = { version = "1.13.3" }
-unicode-width        = { version = "0.2.2" }
+unicode-width        = { version = "0.2.3" }
 url                  = { version = "2.5.9" }
 uuid                 = { version = "1.29.3" }
 webpki-roots         = { version = "1.0.12" }
-zstd                 = { version = "0.14.4", default-features = false }
+zstd                 = { version = "0.14.5", default-features = false }
 
 [profile.release]
 panic = "abort"
