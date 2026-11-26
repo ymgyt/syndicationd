@@ -3,7 +3,6 @@ use std::{
     io::Write as _,
     path::{Path, PathBuf},
     process::ExitCode,
-    time::Duration,
 };
 
 #[cfg(unix)]
@@ -12,14 +11,9 @@ use std::os::unix::fs::FileTypeExt as _;
 use clap::Args;
 use serde::Serialize;
 use synd_registry::sqlite::SqliteDatabase;
-use synd_runtime::{DaemonState, PlacementSummary, Runtime, RuntimeConfig, RuntimeDatabase};
+use synd_runtime::{DaemonState, PlacementSummary, Runtime};
 
-use crate::{
-    cli::{OutputFormat, command::CommandFailure},
-    config::ConfigResolver,
-};
-
-const DOCTOR_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+use crate::{cli::OutputFormat, config::ConfigResolver, runtime::FeedRuntime};
 
 /// Diagnose local environment
 #[derive(Args, Debug)]
@@ -30,17 +24,8 @@ pub struct DoctorCommand {
 }
 
 impl DoctorCommand {
-    pub async fn run(self, config: ConfigResolver) -> ExitCode {
-        match self.diagnose(config).await {
-            Ok(has_failures) if has_failures => ExitCode::from(1),
-            Ok(_) => ExitCode::SUCCESS,
-            Err(err) => CommandFailure::report(err),
-        }
-    }
-
-    async fn diagnose(self, config: ConfigResolver) -> anyhow::Result<bool> {
-        let output = DoctorOutput::from_config(&config).await;
-        let has_failures = output.has_failures();
+    pub async fn run(self, config: &ConfigResolver) -> anyhow::Result<ExitCode> {
+        let output = DoctorOutput::from_config(config).await;
 
         match self.output {
             OutputFormat::Human => output.print(io::stdout())?,
@@ -51,7 +36,11 @@ impl DoctorCommand {
             }
         }
 
-        Ok(has_failures)
+        Ok(if output.has_failures() {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        })
     }
 }
 
@@ -76,7 +65,18 @@ impl DoctorOutput {
             existing_parent("sqlite_parent", &sqlite_db, MissingSeverity::Fail),
             sqlite_database(&sqlite_db).await,
         ];
-        checks.extend(RuntimeDoctor::from_config(config).diagnose().await);
+        match FeedRuntime::new(config) {
+            Ok(runtime) => {
+                let report =
+                    RuntimeDoctorReport::inspect(runtime.into_runtime(), config.log_file()).await;
+                checks.extend(report.into_checks());
+            }
+            Err(err) => checks.push(DoctorCheck::fail(
+                "runtime_placement",
+                sqlite_db,
+                format!("{err:#}"),
+            )),
+        }
 
         Self { checks }
     }
@@ -89,23 +89,14 @@ impl DoctorOutput {
 
     fn print(&self, mut writer: impl io::Write) -> io::Result<()> {
         for check in &self.checks {
-            match &check.path {
-                Some(path) => writeln!(
-                    writer,
-                    "{:>4} {:<16} {} ({})",
-                    check.status.label(),
-                    check.name,
-                    check.message,
-                    path.display()
-                )?,
-                None => writeln!(
-                    writer,
-                    "{:>4} {:<16} {}",
-                    check.status.label(),
-                    check.name,
-                    check.message
-                )?,
-            }
+            writeln!(
+                writer,
+                "{:>4} {:<16} {} ({})",
+                check.status.label(),
+                check.name,
+                check.message,
+                check.path.display()
+            )?;
         }
 
         Ok(())
@@ -116,7 +107,7 @@ impl DoctorOutput {
 struct DoctorCheck {
     name: &'static str,
     status: DoctorStatus,
-    path: Option<PathBuf>,
+    path: PathBuf,
     message: String,
 }
 
@@ -125,7 +116,7 @@ impl DoctorCheck {
         Self {
             name,
             status: DoctorStatus::Pass,
-            path: Some(path.into()),
+            path: path.into(),
             message: message.into(),
         }
     }
@@ -134,7 +125,7 @@ impl DoctorCheck {
         Self {
             name,
             status: DoctorStatus::Warn,
-            path: Some(path.into()),
+            path: path.into(),
             message: message.into(),
         }
     }
@@ -143,7 +134,7 @@ impl DoctorCheck {
         Self {
             name,
             status: DoctorStatus::Fail,
-            path: Some(path.into()),
+            path: path.into(),
             message: message.into(),
         }
     }
@@ -209,67 +200,11 @@ fn existing_parent(
     path: &Path,
     missing_severity: MissingSeverity,
 ) -> DoctorCheck {
-    let parent = path.parent().unwrap_or_else(|| Path::new(".")).to_owned();
-    existing_directory(name, parent, missing_severity)
-}
-
-struct RuntimeDoctor {
-    config: RuntimeDoctorConfig,
-}
-
-impl RuntimeDoctor {
-    fn from_config(config: &ConfigResolver) -> Self {
-        Self {
-            config: RuntimeDoctorConfig::from(config),
-        }
-    }
-
-    async fn diagnose(self) -> Vec<DoctorCheck> {
-        let runtime = match Runtime::try_new(self.config.runtime_config()) {
-            Ok(runtime) => runtime,
-            Err(error) => {
-                return vec![DoctorCheck::fail(
-                    "runtime_placement",
-                    self.config.sqlite_db,
-                    format!("failed to resolve runtime placement: {error}"),
-                )];
-            }
-        };
-
-        RuntimeDoctorReport::inspect(runtime, self.config.log_file)
-            .await
-            .into_checks()
-    }
-}
-
-struct RuntimeDoctorConfig {
-    sqlite_db: PathBuf,
-    api_timeout: Duration,
-    runtime_root: Option<PathBuf>,
-    log_file: PathBuf,
-}
-
-impl RuntimeDoctorConfig {
-    fn runtime_config(&self) -> RuntimeConfig {
-        let config = RuntimeConfig::new(RuntimeDatabase::sqlite(self.sqlite_db.clone()))
-            .with_api_timeout(self.api_timeout, DOCTOR_USER_AGENT);
-
-        match &self.runtime_root {
-            Some(root) => config.with_runtime_root(root),
-            None => config,
-        }
-    }
-}
-
-impl From<&ConfigResolver> for RuntimeDoctorConfig {
-    fn from(config: &ConfigResolver) -> Self {
-        Self {
-            sqlite_db: config.sqlite_db(),
-            api_timeout: config.api_timeout(),
-            runtime_root: config.daemon_runtime_root(),
-            log_file: config.log_file(),
-        }
-    }
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    existing_directory(name, parent.to_owned(), missing_severity)
 }
 
 struct RuntimeDoctorReport {
@@ -478,8 +413,8 @@ impl RuntimeDoctorReport {
 
 async fn sqlite_database(path: &Path) -> DoctorCheck {
     match fs::metadata(path) {
-        Ok(metadata) if metadata.is_file() => match SqliteDatabase::open(path).await {
-            Ok(_) => DoctorCheck::pass("sqlite_db", path, "database opens"),
+        Ok(metadata) if metadata.is_file() => match SqliteDatabase::check_readable(path).await {
+            Ok(()) => DoctorCheck::pass("sqlite_db", path, "database opens"),
             Err(err) => {
                 DoctorCheck::fail("sqlite_db", path, format!("failed to open database: {err}"))
             }
@@ -506,6 +441,7 @@ fn missing_check(
 
 #[cfg(test)]
 mod tests {
+    use synd_runtime::{RuntimeConfig, RuntimeDatabase};
     use tempfile::TempDir;
 
     use super::*;

@@ -1,19 +1,16 @@
-use std::{
-    io::{self, IsTerminal as _},
-    process::ExitCode,
-};
+use std::io::{self, IsTerminal as _};
 
 use anyhow::Context as _;
-use synd_runtime::Session;
+use synd_client::Client;
 use synd_term::{
-    application::{Application, Cache, ClientFeedApi, Config, Features},
+    application::{Application, Cache, Config, Features, FeedClient},
     client::gh::GhClient,
-    interact::{ProcessInteractor, TextBrowserInteractor},
+    external_tools::SystemTools,
     ui::theme::Theme,
 };
 use tracing::{error, info, warn};
 
-use crate::{config::ConfigResolver, release, runtime::FeedRuntime};
+use crate::{config::ConfigResolver, release::ReleaseCheck, runtime::FeedRuntime};
 
 /// Run the terminal UI.
 /// This is the default command executed when `synd` is invoked without a subcommand;
@@ -22,97 +19,54 @@ use crate::{config::ConfigResolver, release, runtime::FeedRuntime};
 pub struct TermCommand;
 
 impl TermCommand {
-    pub async fn run(self, config: ConfigResolver) -> ExitCode {
-        let log_file = config.log_file();
-        info!(
-            config_file = %config.config_file().display(),
-            log_file = %log_file.display(),
-            database = %config.sqlite_db().display(),
-            runtime_root = ?config.daemon_runtime_root(),
-            api_timeout_ms = config.api_timeout().as_millis(),
-            session_lease_ms = config.daemon_session_lease_duration().as_millis(),
-            idle_shutdown_grace_ms = config.daemon_session_idle_shutdown_grace().as_millis(),
-            entries_limit = config.feed_entries_limit(),
-            gh_enabled = config.is_gh_enabled(),
-            "Resolved terminal configuration"
-        );
-        let (app, session) = match build_app(config).await {
-            Ok(started) => started,
-            Err(err) => {
-                error!("{err:?}");
-                eprintln!("error: {err:#}");
-                eprintln!("see log: {}", log_file.display());
-                return ExitCode::FAILURE;
-            }
-        };
-
-        let release_check = release::ReleaseCheck::spawn();
-
-        info!("Terminal UI started");
-        let result = app.run().await;
-
-        if let Err(err) = session.close().await {
-            warn!("Failed to close runtime session: {err}");
-        }
-
-        if let Err(err) = result {
+    pub async fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
+        self.run_session(config).await.map_err(|err| {
             error!("{err:?}");
-            ExitCode::FAILURE
-        } else {
-            release_check.print_notice_if_ready();
-            ExitCode::SUCCESS
-        }
+            let log = config.log_file();
+            err.context(format!("terminal UI failed (see log: {})", log.display()))
+        })
     }
-}
 
-async fn build_app(config: ConfigResolver) -> anyhow::Result<(Application, Session)> {
-    anyhow::ensure!(io::stdout().is_terminal(), "stdout is not a terminal");
-    let gh_client = {
-        if config.is_gh_enabled() {
+    async fn run_session(self, config: &ConfigResolver) -> anyhow::Result<()> {
+        anyhow::ensure!(io::stdout().is_terminal(), "stdout is not a terminal");
+        let gh_client = if config.is_gh_enabled() {
             Some(GhClient::new(config.gh_pat()).context("Failed to construct GitHub client")?)
         } else {
             None
+        };
+        let session = FeedRuntime::new(config)?.acquire_session().await?;
+        let app = build_app(config, session.client(), gh_client);
+        let release_check = ReleaseCheck::spawn();
+        info!("Starting terminal UI");
+        let result = app.run().await;
+        if let Err(err) = session.close().await {
+            warn!("Failed to close runtime session: {err}");
         }
-    };
-    let session = {
-        let runtime = FeedRuntime::new(&config)?;
-        runtime.acquire_session().await?
-    };
+        result?;
+        release_check.print_notice_if_ready();
+        Ok(())
+    }
+}
 
-    let application = {
-        let feed_api = ClientFeedApi::new(session.client().clone());
-        let app_config = Config {
-            entries_limit: config.feed_entries_limit(),
-            features: Features {
-                enable_gh_notification: gh_client.is_some(),
-            },
-            keymaps: config.keymaps(),
-            ..Default::default()
-        };
-        let cache = Cache::new(config.cache_dir());
-        let theme = Theme::new(config.palette(), config.theme_background);
-        let interactor = {
-            let text_browser = TextBrowserInteractor::new(
-                config.feed_browser_command(),
-                config.feed_browser_args(),
-            );
-            Box::new(ProcessInteractor::new(text_browser))
-        };
-
-        let builder = Application::builder()
-            .feed_api(feed_api)
-            .authentication_required(false)
-            .categories(config.categories())
-            .config(app_config)
-            .cache(cache)
-            .theme(theme)
-            .interactor(interactor);
-        let builder = match gh_client {
-            Some(gh_client) => builder.gh_client(gh_client),
-            None => builder,
-        };
-        builder.build()
+fn build_app(config: &ConfigResolver, client: &Client, gh_client: Option<GhClient>) -> Application {
+    let app_config = Config {
+        entries_limit: config.feed_entries_limit(),
+        features: Features {
+            enable_gh_notification: gh_client.is_some(),
+        },
+        keymaps: config.keymaps(),
+        ..Default::default()
     };
-
-    Ok((application, session))
+    Application::builder()
+        .feed_api(FeedClient::new(client.clone()))
+        .gh_client(gh_client)
+        .categories(config.categories())
+        .config(app_config)
+        .cache(Cache::new(config.cache_dir()))
+        .theme(Theme::new(config.palette()).with_background(config.theme_background))
+        .external_tools(SystemTools::new(
+            config.feed_browser_command(),
+            config.feed_browser_args(),
+        ))
+        .build()
 }

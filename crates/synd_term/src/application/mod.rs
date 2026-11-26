@@ -8,7 +8,7 @@ use tuiframework::{
     TerminalOptions,
 };
 
-use crate::{config::Categories, interact::Interact, ui::theme::Theme};
+use crate::{config::Categories, external_tools::ExternalTools, ui::theme::Theme};
 
 mod direction;
 mod effects;
@@ -35,7 +35,7 @@ mod builder;
 pub use builder::ApplicationBuilder;
 
 pub mod outbound;
-pub use outbound::feed::{ClientFeedApi, FeedApi, FeedApiRef, FeedEventWatch};
+pub use outbound::feed::{FeedApi, FeedApiRef, FeedClient, FeedEventWatch};
 
 mod app_config;
 pub use app_config::{Config, Features};
@@ -80,7 +80,7 @@ impl Application {
             Cache,
             Config,
             Theme,
-            Box<dyn Interact>,
+            Box<dyn ExternalTools>,
         >,
     ) -> Self {
         let ApplicationBuilder {
@@ -91,7 +91,7 @@ impl Application {
             config,
             theme,
             authenticator,
-            interactor,
+            external_tools,
             clock,
             html_converter,
             authentication_required,
@@ -109,7 +109,7 @@ impl Application {
             gh_client,
             cache,
             authenticator,
-            interactor,
+            external_tools,
             clock,
             html_converter,
         });

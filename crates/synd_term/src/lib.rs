@@ -9,7 +9,7 @@ pub mod client;
 pub(crate) mod command;
 pub mod config;
 pub(crate) mod event;
-pub mod interact;
+pub mod external_tools;
 pub mod keymap;
 pub mod matcher;
 pub(crate) mod operation;

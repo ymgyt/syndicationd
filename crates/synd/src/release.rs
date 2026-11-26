@@ -1,8 +1,4 @@
-use std::{
-    sync::mpsc::{self, TryRecvError},
-    thread,
-    time::Duration,
-};
+use std::{sync::mpsc, thread, time::Duration};
 
 use tracing::warn;
 use update_informer::{Check, Version, registry};
@@ -31,11 +27,8 @@ impl ReleaseCheck {
     }
 
     pub(crate) fn print_notice_if_ready(self) {
-        match self.receiver.try_recv() {
-            Ok(Some(new_version)) => {
-                println!("A new release of synd is available: v{CURRENT_VERSION} -> {new_version}");
-            }
-            Ok(None) | Err(TryRecvError::Empty | TryRecvError::Disconnected) => {}
+        if let Ok(Some(new_version)) = self.receiver.try_recv() {
+            println!("A new release of synd is available: v{CURRENT_VERSION} -> {new_version}");
         }
     }
 }

@@ -4,7 +4,6 @@ use synd_support::dirs::SyndicationdDirs;
 
 mod file;
 pub use file::INIT_CONFIG;
-pub(crate) mod parse;
 
 mod resolver;
 pub use resolver::{ConfigResolver, ConfigResolverBuilder};

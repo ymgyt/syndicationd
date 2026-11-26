@@ -9,11 +9,11 @@ use synd_feed::types::FeedUrl;
 use super::{FeedApi, FeedEventWatch};
 
 /// Production `FeedApi` adapter backed by `synd_client::Client`.
-pub struct ClientFeedApi {
+pub struct FeedClient {
     client: RwLock<Client>,
 }
 
-impl ClientFeedApi {
+impl FeedClient {
     pub fn new(client: Client) -> Self {
         Self {
             client: RwLock::new(client),
@@ -34,7 +34,7 @@ impl FeedEventWatch for ClientFeedEventWatch {
     }
 }
 
-impl FeedApi for ClientFeedApi {
+impl FeedApi for FeedClient {
     fn set_credential(&self, credential: ApiCredential) -> Result<(), SyndApiError> {
         self.client
             .write()

@@ -18,7 +18,7 @@ pub enum ThemeBackground {
 pub struct Theme {
     pub name: &'static str,
     pub(crate) background: ThemeBackground,
-    dark_label_fg: Color,
+    palette_background: Color,
     pub base: Style,
     pub application_title: Style,
     pub login: LoginTheme,
@@ -80,23 +80,18 @@ pub struct SelectionPopup {
 
 impl Theme {
     pub fn with_palette(palette: Palette) -> Self {
-        Self::new(palette, ThemeBackground::Theme)
+        Self::new(palette)
     }
 
-    pub fn new(palette: Palette, background: ThemeBackground) -> Self {
-        let bg = match background {
-            ThemeBackground::Theme => palette.background,
-            ThemeBackground::Transparent => Color::Reset,
-        };
-        let common = Styles::from(Palette {
-            background: bg,
-            ..palette
-        });
+    /// Creates a theme with the palette's own background.
+    pub fn new(palette: Palette) -> Self {
+        let bg = palette.background;
+        let common = Styles::from(palette);
 
         Self {
             name: palette.name,
-            background,
-            dark_label_fg: palette.background,
+            background: ThemeBackground::Theme,
+            palette_background: bg,
             base: common.base,
             application_title: common.title,
             login: LoginTheme {
@@ -135,20 +130,67 @@ impl Theme {
             },
         }
     }
+
+    /// Selects the background used for the main surface.
+    #[must_use]
+    pub fn with_background(mut self, background: ThemeBackground) -> Self {
+        let color = match background {
+            ThemeBackground::Theme => self.palette_background,
+            ThemeBackground::Transparent => Color::Reset,
+        };
+        self.background = background;
+        for style in [
+            &mut self.base,
+            &mut self.application_title,
+            &mut self.prompt.key,
+            &mut self.prompt.key_desc,
+            &mut self.prompt.background,
+            &mut self.subscription.background,
+            &mut self.error.message,
+        ] {
+            style.bg = Some(color);
+        }
+        self.requirement.must = color;
+        self.requirement.should = color;
+        self.requirement.may = color;
+        self
+    }
 }
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::with_palette(Palette::ferra())
+        Self::new(Palette::ferra())
     }
 }
 
 impl Theme {
     pub(crate) fn contrast_fg_from_luminance(&self, luminance: f64) -> Color {
         if luminance > 0.5 {
-            self.dark_label_fg
+            self.palette_background
         } else {
             self.base.fg.unwrap_or_default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn palette_background_can_be_restored_after_applying_transparency() {
+        let palette = Palette::dracula();
+        let theme = Theme::new(palette);
+        assert_eq!(theme.base.bg, Some(palette.background));
+
+        let theme = theme.with_background(ThemeBackground::Transparent);
+        assert_eq!(theme.prompt.background.bg, Some(Color::Reset));
+        assert_eq!(theme.requirement.must, Color::Reset);
+        assert_eq!(theme.contrast_fg_from_luminance(1.0), palette.background);
+
+        let theme = theme.with_background(ThemeBackground::Theme);
+        assert_eq!(theme.base.bg, Some(palette.background));
+        assert_eq!(theme.prompt.background.bg, Some(palette.background));
+        assert_eq!(theme.requirement.must, palette.background);
     }
 }

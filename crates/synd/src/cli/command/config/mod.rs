@@ -1,5 +1,3 @@
-use std::process::ExitCode;
-
 use clap::{Args, Subcommand};
 
 use crate::config::ConfigResolver;
@@ -22,10 +20,8 @@ pub enum ConfigSubcommand {
 }
 
 impl ConfigCommand {
-    pub fn run(self, config: &ConfigResolver) -> ExitCode {
-        let ConfigCommand { command } = self;
-
-        match command {
+    pub fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
+        match self.command {
             ConfigSubcommand::Init(init) => init.run(),
             ConfigSubcommand::View(view) => view.run(config),
         }

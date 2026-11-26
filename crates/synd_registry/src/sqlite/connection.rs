@@ -4,7 +4,7 @@ use std::{
 };
 
 use sqlx::{
-    Sqlite, SqlitePool, Transaction,
+    ConnectOptions as _, Sqlite, SqlitePool, Transaction,
     migrate::MigrateError as SqlxMigrateError,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
 };
@@ -35,6 +35,21 @@ enum FileMode {
 }
 
 impl SqliteDatabase {
+    /// Checks that an existing database has a readable SQLite schema.
+    pub async fn check_readable(path: &Path) -> Result<(), RegistryDbError> {
+        let mut connection = SqliteConnectOptions::new()
+            .filename(path)
+            .read_only(true)
+            .connect()
+            .await
+            .map_err(RegistryDbError::retryable)?;
+        sqlx::query("PRAGMA schema_version")
+            .fetch_one(&mut connection)
+            .await
+            .map_err(RegistryDbError::retryable)?;
+        Ok(())
+    }
+
     pub async fn open(db_path: impl AsRef<Path>) -> Result<Self, RegistryDbError> {
         Self::open_file(db_path, FileMode::Existing).await
     }
@@ -119,6 +134,34 @@ impl SqliteDatabase {
 mod tests {
     use super::*;
     use uuid::Uuid;
+
+    #[tokio::test]
+    async fn checking_readability_preserves_the_database_and_rejects_invalid_files()
+    -> anyhow::Result<()> {
+        use sqlx::Connection as _;
+
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("example.db");
+        let mut connection = SqliteConnectOptions::new()
+            .filename(&path)
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Delete)
+            .connect()
+            .await?;
+        sqlx::query("CREATE TABLE example (id INTEGER)")
+            .execute(&mut connection)
+            .await?;
+        connection.close().await?;
+
+        let original = std::fs::read(&path)?;
+        SqliteDatabase::check_readable(&path).await?;
+        assert_eq!(std::fs::read(&path)?, original);
+
+        let invalid = dir.path().join("invalid.db");
+        std::fs::write(&invalid, b"not a SQLite database")?;
+        assert!(SqliteDatabase::check_readable(&invalid).await.is_err());
+        Ok(())
+    }
 
     #[tokio::test]
     async fn named_timelines_preserve_the_old_membership_and_sync_position() -> anyhow::Result<()> {

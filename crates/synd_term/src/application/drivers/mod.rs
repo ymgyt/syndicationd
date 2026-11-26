@@ -14,7 +14,7 @@ use crate::{
     application::{Authenticator, Cache, Clock, FeedApiRef, RequestKind, outbound::gh::GhClient},
     auth::{Credential, Verified},
     event::{Event, FeedsEvent, OperationError},
-    interact::Interact,
+    external_tools::ExternalTools,
     operation::Operation,
 };
 
@@ -49,7 +49,7 @@ pub(super) struct DriverParts {
     pub(super) gh_client: Option<GhClient>,
     pub(super) cache: Cache,
     pub(super) authenticator: Option<Authenticator>,
-    pub(super) interactor: Box<dyn Interact>,
+    pub(super) external_tools: Box<dyn ExternalTools>,
     pub(super) clock: Arc<dyn Clock>,
     pub(super) html_converter: Arc<dyn HtmlConverter>,
 }
@@ -61,7 +61,7 @@ impl Drivers {
             gh_client,
             cache,
             authenticator,
-            interactor,
+            external_tools,
             clock,
             html_converter,
         } = parts;
@@ -75,7 +75,7 @@ impl Drivers {
             AuthDriver::new(authenticator, api)
         };
         let gh = GhDriver::new(gh_client);
-        let interaction = InteractionDriver::new(interactor);
+        let interaction = InteractionDriver::new(external_tools);
 
         Self {
             cache,

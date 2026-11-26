@@ -152,11 +152,11 @@ pub struct ConfigResolverBuilder<FS = fsimpl::FileSystem> {
     config_file: Option<PathBuf>,
     log_file_flag: Option<PathBuf>,
     cache_dir_flag: Option<PathBuf>,
-    api_flags: Option<ApiOptions>,
-    daemon_flags: Option<DaemonOptions>,
-    backend_flags: Option<BackendOptions>,
-    feed_flags: Option<FeedOptions>,
-    gh_flags: Option<GhOptions>,
+    api_flags: ApiOptions,
+    daemon_flags: DaemonOptions,
+    backend_flags: BackendOptions,
+    feed_flags: FeedOptions,
+    gh_flags: GhOptions,
     palette_flag: Option<cli::Palette>,
     fs: FS,
 }
@@ -189,7 +189,7 @@ impl ConfigResolverBuilder {
     #[must_use]
     pub fn api_options(self, api_options: ApiOptions) -> Self {
         Self {
-            api_flags: Some(api_options),
+            api_flags: api_options,
             ..self
         }
     }
@@ -197,7 +197,7 @@ impl ConfigResolverBuilder {
     #[must_use]
     pub fn daemon_options(self, daemon_options: DaemonOptions) -> Self {
         Self {
-            daemon_flags: Some(daemon_options),
+            daemon_flags: daemon_options,
             ..self
         }
     }
@@ -205,7 +205,7 @@ impl ConfigResolverBuilder {
     #[must_use]
     pub fn backend_options(self, backend_options: BackendOptions) -> Self {
         Self {
-            backend_flags: Some(backend_options),
+            backend_flags: backend_options,
             ..self
         }
     }
@@ -213,7 +213,7 @@ impl ConfigResolverBuilder {
     #[must_use]
     pub fn feed_options(self, feed_options: FeedOptions) -> Self {
         Self {
-            feed_flags: Some(feed_options),
+            feed_flags: feed_options,
             ..self
         }
     }
@@ -221,7 +221,7 @@ impl ConfigResolverBuilder {
     #[must_use]
     pub fn gh_options(self, gh_options: GhOptions) -> Self {
         Self {
-            gh_flags: Some(gh_options),
+            gh_flags: gh_options,
             ..self
         }
     }
@@ -250,28 +250,25 @@ impl ConfigResolverBuilder {
         let keymaps = CompiledKeymaps::default_with_user_config(user_keymaps)?;
 
         let ConfigResolverBuilder {
-            api_flags: Some(ApiOptions { client_timeout }),
-            daemon_flags: Some(daemon_flags),
-            backend_flags: Some(BackendOptions { sqlite_db }),
+            api_flags: ApiOptions { client_timeout },
+            daemon_flags,
+            backend_flags: BackendOptions { sqlite_db },
             feed_flags:
-                Some(FeedOptions {
+                FeedOptions {
                     entries_limit,
                     browser,
                     browser_args,
-                }),
+                },
             gh_flags:
-                Some(GhOptions {
+                GhOptions {
                     enable_gh_notification,
                     gh_pat,
-                }),
+                },
             log_file_flag,
             cache_dir_flag,
             palette_flag,
             ..
-        } = self
-        else {
-            panic!()
-        };
+        } = self;
 
         let daemon_entries = DaemonConfigEntries::from_sources(&mut config_file, daemon_flags);
         let resolver = ConfigResolver {
@@ -447,5 +444,25 @@ impl DaemonConfigEntries {
             .with_file(session_idle_shutdown_grace_file)
             .with_flag(daemon_session_idle_shutdown_grace),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_file_and_default_values_without_cli_options() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, "[feed]\nentries_limit = 17\n").unwrap();
+
+        let config = ConfigResolver::builder()
+            .config_file(Some(path))
+            .try_build()
+            .unwrap();
+
+        assert_eq!(config.feed_entries_limit(), 17);
+        assert_eq!(config.api_timeout(), config::client::DEFAULT_TIMEOUT);
     }
 }

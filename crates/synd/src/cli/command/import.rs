@@ -6,10 +6,10 @@
 use std::{
     io,
     path::{Path, PathBuf},
-    process::ExitCode,
     time::Duration,
 };
 
+use anyhow::Context as _;
 use clap::Args;
 use either::Either;
 use schemars::JsonSchema;
@@ -20,10 +20,9 @@ use synd_client::{
 };
 use synd_term::{types::ExportedFeed, ui};
 
-use crate::{
-    cli::{command::CommandFailure, port::PortContext},
-    config::ConfigResolver,
-};
+use crate::{config::ConfigResolver, runtime::FeedRuntime};
+
+use super::print_json_schema;
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 struct Input {
@@ -47,47 +46,24 @@ pub struct ImportCommand {
 }
 
 impl ImportCommand {
-    pub async fn run(self, config: ConfigResolver) -> ExitCode {
-        let err = if self.print_schema {
-            Self::print_json_schema()
-        } else {
-            self.import(config).await
-        };
-        if let Err(err) = err {
-            CommandFailure::report(err)
-        } else {
-            ExitCode::SUCCESS
+    pub async fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
+        if self.print_schema {
+            return print_json_schema::<Input>();
         }
-    }
-
-    fn print_json_schema() -> anyhow::Result<()> {
-        let schema = schemars::schema_for!(Input);
-        serde_json::to_writer_pretty(std::io::stdout(), &schema).map_err(anyhow::Error::from)
-    }
-
-    async fn import(self, config: ConfigResolver) -> anyhow::Result<()> {
-        let Self {
-            print_schema: _,
-            input,
-        } = self;
-
-        let input = match input {
-            Some(input) => Self::read_input(input.as_path())?,
-            None => {
-                anyhow::bail!("input file path required")
-            }
-        };
-        let cx = PortContext::new(&config).await?;
-        let import = Import {
-            client: &cx.client,
-            input,
-            out: io::stdout(),
-            interval: Duration::from_millis(500),
-        };
-
-        let result = import.import().await;
-
-        cx.finish(result).await
+        let path = self.input.as_deref().context("input file path required")?;
+        let input = Self::read_input(path)?;
+        FeedRuntime::new(config)?
+            .with_session(async |client| {
+                Import {
+                    client,
+                    input,
+                    out: io::stdout(),
+                    interval: Duration::from_millis(500),
+                }
+                .import()
+                .await
+            })
+            .await
     }
 
     fn read_input(path: &Path) -> anyhow::Result<Input> {
@@ -118,24 +94,15 @@ impl SubscribeFeed for Client {
     }
 }
 
-impl SubscribeFeed for &Client {
-    async fn subscribe_feed(
-        &self,
-        input: SubscribeFeedInput,
-    ) -> Result<SubscribeFeedPayload, SyndApiError> {
-        Client::subscribe_feed(self, input).await
-    }
-}
-
-/// Represents import process
-struct Import<Client, Out> {
-    client: Client,
+/// Subscribes to each input feed and reports its outcome.
+struct Import<'a, Client, Out> {
+    client: &'a Client,
     input: Input,
     out: Out,
     interval: Duration,
 }
 
-impl<Client, Out> Import<Client, Out>
+impl<Client, Out> Import<'_, Client, Out>
 where
     Client: SubscribeFeed,
     Out: io::Write,
@@ -286,7 +253,7 @@ mod tests {
         let mut out = Vec::new();
 
         let import = Import {
-            client,
+            client: &client,
             input,
             out: &mut out,
             interval,

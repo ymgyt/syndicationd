@@ -39,7 +39,7 @@ fn rotating_the_palette_preserves_the_transparent_background() {
 
     let mut compositor = make(
         Config::default(),
-        Theme::new(Palette::ferra(), ThemeBackground::Transparent),
+        Theme::new(Palette::ferra()).with_background(ThemeBackground::Transparent),
         Categories::default_toml(),
         false,
     );

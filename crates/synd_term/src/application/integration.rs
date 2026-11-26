@@ -88,7 +88,7 @@ mod tests {
         client::gh::FetchNotificationInclude,
         command::{Command, GhCommand, GhNotificationFilterOption},
         config::Categories,
-        interact::mock::MockInteractor,
+        external_tools::mock::MockExternalTools,
         ui::{theme::Theme, widgets::gh_notifications::GhNotificationFilterOptions},
     };
 
@@ -115,7 +115,7 @@ mod tests {
             .authentication_required(true)
             .cache(Cache::new(dir.path()))
             .theme(Theme::default())
-            .interactor(Box::new(MockInteractor::new()))
+            .external_tools(MockExternalTools::new())
             .build();
         let terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         let mut running = app.event_loop(terminal, stream::empty()).start();

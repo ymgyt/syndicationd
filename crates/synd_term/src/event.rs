@@ -14,7 +14,7 @@ use url::Url;
 use crate::{
     application::{Generation, PersistCacheError, Populate, RequestError, RequestId, RequestKind},
     auth::{AuthenticationProvider, Credential, CredentialError, Verified},
-    interact::{OpenBrowserError, OpenEditorError},
+    external_tools::{OpenBrowserError, OpenEditorError},
     types::gh::{IssueContext, Notification, NotificationId, PullRequestContext},
 };
 

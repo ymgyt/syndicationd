@@ -1,5 +1,5 @@
 use std::{
-    fmt,
+    fmt, io,
     path::{Path, PathBuf},
 };
 
@@ -60,19 +60,25 @@ impl fmt::Display for RuntimeInstanceId {
 }
 
 fn canonical_database_path(path: &Path) -> Result<PathBuf> {
-    if path.exists() {
-        return path.canonicalize().map_err(Into::into);
+    // Status queries need the same instance ID before the daemon creates the database directory.
+    let mut ancestor = std::path::absolute(path)?;
+    let mut missing = Vec::new();
+    loop {
+        match ancestor.canonicalize() {
+            Ok(mut canonical) => {
+                canonical.extend(missing.into_iter().rev());
+                return Ok(canonical);
+            }
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                let Some(name) = ancestor.file_name() else {
+                    return Err(err.into());
+                };
+                missing.push(name.to_owned());
+                ancestor.pop();
+            }
+            Err(err) => return Err(err.into()),
+        }
     }
-
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let file_name = path.file_name();
-    let mut canonical = parent.canonicalize()?;
-
-    if let Some(file_name) = file_name {
-        canonical.push(file_name);
-    }
-
-    Ok(canonical)
 }
 
 fn hex_prefix(bytes: &[u8], chars: usize) -> String {
@@ -119,17 +125,23 @@ mod tests {
         use super::*;
 
         #[test]
-        fn canonicalizes_parent() {
+        fn keeps_the_same_instance_when_missing_database_directories_are_created() {
             let tmp = tempfile::tempdir().unwrap();
-            let db = tmp.path().join("synd.db");
+            let db = tmp.path().join("data/syndicationd/synd.db");
 
             let instance = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(&db)).unwrap();
 
             assert_eq!(
                 instance.canonical_database_path(),
-                tmp.path().canonicalize().unwrap().join("synd.db")
+                tmp.path()
+                    .canonicalize()
+                    .unwrap()
+                    .join("data/syndicationd/synd.db")
             );
-            assert_eq!(instance.id().as_str().len(), 32);
+            std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+            std::fs::write(&db, "").unwrap();
+            let existing = RuntimeInstance::from_database(&RuntimeDatabase::sqlite(&db)).unwrap();
+            assert_eq!(instance, existing);
         }
     }
 }

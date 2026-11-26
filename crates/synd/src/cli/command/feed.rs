@@ -1,13 +1,10 @@
-use std::process::ExitCode;
+use std::io::{self, Write as _};
 
 use clap::{Args, Subcommand};
 use synd_client::payload::{SubscribeDisposition, SubscribeFeedInput, UnsubscribeDisposition};
 use synd_feed::types::{Category, FeedUrl, Requirement};
 
-use crate::{
-    cli::{command::CommandFailure, port::PortContext},
-    config::ConfigResolver,
-};
+use crate::{config::ConfigResolver, runtime::FeedRuntime};
 
 use super::{export::ExportCommand, import::ImportCommand};
 
@@ -27,7 +24,7 @@ enum FeedSubcommand {
 }
 
 impl FeedCommand {
-    pub async fn run(self, config: ConfigResolver) -> ExitCode {
+    pub async fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
         match self.command {
             FeedSubcommand::Import(import) => import.run(config).await,
             FeedSubcommand::Export(export) => export.run(config).await,
@@ -52,35 +49,21 @@ struct SubscribeCommand {
 }
 
 impl SubscribeCommand {
-    async fn run(self, config: ConfigResolver) -> ExitCode {
-        match self.subscribe(config).await {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(err) => CommandFailure::report(err),
-        }
-    }
-
-    async fn subscribe(self, config: ConfigResolver) -> anyhow::Result<()> {
+    async fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
         let input = self.input()?;
         let url = input.url.clone();
-        let cx = PortContext::new(&config).await?;
-        let result = async {
-            let response = cx.client.subscribe_feed(input).await?;
-            match response.disposition {
-                SubscribeDisposition::Subscribed => {
-                    println!("{url} subscription recorded.");
-                }
-                SubscribeDisposition::Changed => {
-                    println!("{url} subscription updated.");
-                }
-                SubscribeDisposition::Other(disposition) => {
-                    println!("{url} subscription updated ({disposition}).");
-                }
+        let response = FeedRuntime::new(config)?
+            .with_session(async |client| client.subscribe_feed(input).await)
+            .await?;
+        let mut stdout = io::stdout().lock();
+        match response.disposition {
+            SubscribeDisposition::Subscribed => writeln!(stdout, "{url} subscription recorded."),
+            SubscribeDisposition::Changed => writeln!(stdout, "{url} subscription updated."),
+            SubscribeDisposition::Other(disposition) => {
+                writeln!(stdout, "{url} subscription updated ({disposition}).")
             }
-            Ok(())
-        }
-        .await;
-
-        cx.finish(result).await
+        }?;
+        Ok(())
     }
 
     fn input(self) -> anyhow::Result<SubscribeFeedInput> {
@@ -114,31 +97,19 @@ struct UnsubscribeCommand {
 }
 
 impl UnsubscribeCommand {
-    async fn run(self, config: ConfigResolver) -> ExitCode {
-        match self.unsubscribe(config).await {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(err) => CommandFailure::report(err),
-        }
-    }
-
-    async fn unsubscribe(self, config: ConfigResolver) -> anyhow::Result<()> {
+    async fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
         let url = FeedUrl::parse(&self.url)?;
-        let cx = PortContext::new(&config).await?;
-        let result = async {
-            let response = cx.client.unsubscribe_feed(url).await?;
-            let url = response.url;
-            match response.disposition {
-                UnsubscribeDisposition::Unsubscribed => {
-                    println!("{url} subscription removed.");
-                }
-                UnsubscribeDisposition::Other(disposition) => {
-                    println!("{url} subscription removed ({disposition}).");
-                }
+        let response = FeedRuntime::new(config)?
+            .with_session(async |client| client.unsubscribe_feed(url).await)
+            .await?;
+        let url = response.url;
+        let mut stdout = io::stdout().lock();
+        match response.disposition {
+            UnsubscribeDisposition::Unsubscribed => writeln!(stdout, "{url} subscription removed."),
+            UnsubscribeDisposition::Other(disposition) => {
+                writeln!(stdout, "{url} subscription removed ({disposition}).")
             }
-            Ok(())
-        }
-        .await;
-
-        cx.finish(result).await
+        }?;
+        Ok(())
     }
 }

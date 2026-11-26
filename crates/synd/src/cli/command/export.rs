@@ -1,15 +1,14 @@
-use std::process::ExitCode;
+use std::io;
 
 use clap::Args;
 use schemars::JsonSchema;
 use serde::Serialize;
-use synd_client::payload::PageInfo;
+use synd_client::{Client, SyndApiError, payload::PageInfo};
 use synd_term::types::ExportedFeed;
 
-use crate::{
-    cli::{command::CommandFailure, port::PortContext},
-    config::ConfigResolver,
-};
+use crate::{config::ConfigResolver, runtime::FeedRuntime};
+
+use super::print_json_schema;
 
 #[derive(Serialize, JsonSchema)]
 struct Export {
@@ -30,51 +29,30 @@ pub struct ExportCommand {
 }
 
 impl ExportCommand {
-    pub async fn run(self, config: ConfigResolver) -> ExitCode {
-        let err = if self.print_schema {
-            Self::print_json_schema()
-        } else {
-            self.export(config).await
-        };
-        if let Err(err) = err {
-            CommandFailure::report(err)
-        } else {
-            ExitCode::SUCCESS
+    pub async fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
+        if self.print_schema {
+            return print_json_schema::<Export>();
         }
+        let export = FeedRuntime::new(config)?
+            .with_session(Export::fetch)
+            .await?;
+        serde_json::to_writer_pretty(io::stdout().lock(), &export)?;
+        Ok(())
     }
+}
 
-    fn print_json_schema() -> anyhow::Result<()> {
-        let schema = schemars::schema_for!(Export);
-        serde_json::to_writer_pretty(std::io::stdout(), &schema).map_err(anyhow::Error::from)
-    }
-
-    async fn export(self, config: ConfigResolver) -> anyhow::Result<()> {
-        let cx = PortContext::new(&config).await?;
-        let result = async {
-            let mut after = None;
-            let mut exported_feeds = Vec::new();
-
-            loop {
-                let response = cx.client.fetch_subscription(after.take(), Some(50)).await?;
-                let page_info = response.feeds.page_info;
-                exported_feeds.extend(response.feeds.nodes.into_iter().map(ExportedFeed::from));
-
-                match page_info {
-                    PageInfo::Complete { .. } => break,
-                    PageInfo::More { next_cursor } => after = Some(next_cursor),
-                }
+impl Export {
+    async fn fetch(client: &Client) -> Result<Self, SyndApiError> {
+        let mut feeds = Vec::new();
+        let mut after = None;
+        loop {
+            let page = client.fetch_subscription(after, Some(50)).await?.feeds;
+            feeds.extend(page.nodes.into_iter().map(ExportedFeed::from));
+            match page.page_info {
+                PageInfo::Complete { .. } => break,
+                PageInfo::More { next_cursor } => after = Some(next_cursor),
             }
-
-            let output = Export {
-                feeds: exported_feeds,
-            };
-
-            serde_json::to_writer_pretty(std::io::stdout(), &output)?;
-
-            Ok(())
         }
-        .await;
-
-        cx.finish(result).await
+        Ok(Self { feeds })
     }
 }

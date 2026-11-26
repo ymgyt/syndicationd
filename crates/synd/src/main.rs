@@ -67,8 +67,7 @@ fn init_tracing(
         )
         .with(
             EnvFilter::try_from_env(config::env::LOG_DIRECTIVE)
-                .or_else(|_| EnvFilter::try_new(default_filter))
-                .unwrap(),
+                .or_else(|_| EnvFilter::try_new(default_filter))?,
         )
         .try_init()?;
 
@@ -80,17 +79,18 @@ fn init_tracing(
 async fn run() -> anyhow::Result<ExitCode> {
     let (config_builder, command) = cli::parse();
     let config = config_builder.try_build()?;
-    let _guard = init_tracing(&config, &command)?;
+    let _tracing_guard = init_tracing(&config, &command)?;
 
-    Ok(match command {
-        cli::Command::Term(term) => term.run(config).await,
+    match command {
+        cli::Command::Term(term) => term.run(&config).await,
         cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
-        cli::Command::Daemon(daemon) => daemon.run(config).await,
-        cli::Command::Doctor(doctor) => doctor.run(config).await,
-        cli::Command::Feed(feed) => feed.run(config).await,
+        cli::Command::Daemon(daemon) => daemon.run(&config).await,
+        cli::Command::Doctor(doctor) => return doctor.run(&config).await,
+        cli::Command::Feed(feed) => feed.run(&config).await,
         cli::Command::Mcp(mcp) => mcp.run(&config).await,
         cli::Command::Config(command) => command.run(&config),
-    })
+    }?;
+    Ok(ExitCode::SUCCESS)
 }
 
 #[tokio::main]
@@ -100,7 +100,7 @@ async fn main() -> ExitCode {
     match run().await {
         Ok(code) => code,
         Err(err) => {
-            eprintln!("{err}");
+            eprintln!("error: {err:#}");
             ExitCode::FAILURE
         }
     }

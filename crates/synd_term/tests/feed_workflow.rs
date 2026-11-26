@@ -12,8 +12,8 @@ use synd_term::{
         outbound::gh::GhClient,
     },
     config::Categories,
+    external_tools::mock::MockExternalTools,
     integration::{TestApplication, focus_gained_event, focus_lost_event, resize_event},
-    interact::mock::MockInteractor,
     key,
     test_support::screen::Screen,
     ui::theme::Theme,
@@ -416,16 +416,15 @@ fn app(
         })
         .cache(Cache::new(cache_dir.path().to_path_buf()))
         .theme(Theme::default())
-        .interactor(Box::new(MockInteractor::new()));
+        .external_tools(MockExternalTools::new());
     let builder = match converter {
         Some(converter) => builder.html_converter(converter),
         None => builder,
     };
-    let app = match github {
-        Some(client) => builder.gh_client(client).build(),
-        None => builder.build(),
-    }
-    .with_test_terminal(120, 30);
+    let app = builder
+        .gh_client(github)
+        .build()
+        .with_test_terminal(120, 30);
 
     (cache_dir, app)
 }

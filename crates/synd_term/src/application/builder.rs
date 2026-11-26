@@ -6,7 +6,7 @@ use crate::{
     application::outbound::gh::GhClient,
     application::{Application, Authenticator, Cache, Clock, Config, FeedApi, FeedApiRef},
     config::Categories,
-    interact::Interact,
+    external_tools::ExternalTools,
     ui::theme::Theme,
 };
 
@@ -16,14 +16,14 @@ pub struct ApplicationBuilder<
     Cache = (),
     Config = (),
     Theme = (),
-    Interactor = (),
+    Tools = (),
 > {
     pub(super) feed_api: FeedApi,
     pub(super) categories: Categories,
     pub(super) cache: Cache,
     pub(super) config: Config,
     pub(super) theme: Theme,
-    pub(super) interactor: Interactor,
+    pub(super) external_tools: Tools,
 
     pub(super) authenticator: Option<Authenticator>,
     pub(super) gh_client: Option<GhClient>,
@@ -40,7 +40,7 @@ impl Default for ApplicationBuilder {
             cache: (),
             config: (),
             theme: (),
-            interactor: (),
+            external_tools: (),
             authenticator: None,
             gh_client: None,
             clock: None,
@@ -62,7 +62,7 @@ impl<T2, T3, T4, T5, T6> ApplicationBuilder<(), T2, T3, T4, T5, T6> {
             cache: self.cache,
             config: self.config,
             theme: self.theme,
-            interactor: self.interactor,
+            external_tools: self.external_tools,
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
@@ -84,7 +84,7 @@ impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, (), T3, T4, T5, T6> {
             cache: self.cache,
             config: self.config,
             theme: self.theme,
-            interactor: self.interactor,
+            external_tools: self.external_tools,
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
@@ -103,7 +103,7 @@ impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, (), T4, T5, T6> {
             cache,
             config: self.config,
             theme: self.theme,
-            interactor: self.interactor,
+            external_tools: self.external_tools,
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
@@ -122,7 +122,7 @@ impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, (), T5, T6> {
             cache: self.cache,
             config,
             theme: self.theme,
-            interactor: self.interactor,
+            external_tools: self.external_tools,
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
@@ -141,7 +141,7 @@ impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, T5, (), T6> {
             cache: self.cache,
             config: self.config,
             theme,
-            interactor: self.interactor,
+            external_tools: self.external_tools,
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
@@ -153,17 +153,17 @@ impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, T5, (), T6> {
 
 impl<T2, T3, T4, T5, T6> ApplicationBuilder<T2, T3, T4, T5, T6, ()> {
     #[must_use]
-    pub fn interactor(
+    pub fn external_tools(
         self,
-        interactor: Box<dyn Interact>,
-    ) -> ApplicationBuilder<T2, T3, T4, T5, T6, Box<dyn Interact>> {
+        external_tools: impl ExternalTools + 'static,
+    ) -> ApplicationBuilder<T2, T3, T4, T5, T6, Box<dyn ExternalTools>> {
         ApplicationBuilder {
             feed_api: self.feed_api,
             categories: self.categories,
             cache: self.cache,
             config: self.config,
             theme: self.theme,
-            interactor,
+            external_tools: Box::new(external_tools),
             authenticator: self.authenticator,
             gh_client: self.gh_client,
             clock: self.clock,
@@ -183,9 +183,9 @@ impl<T2, T3, T4, T5, T6, T7> ApplicationBuilder<T2, T3, T4, T5, T6, T7> {
     }
 
     #[must_use]
-    pub fn gh_client(self, gh_client: GhClient) -> Self {
+    pub fn gh_client(self, gh_client: impl Into<Option<GhClient>>) -> Self {
         Self {
-            gh_client: Some(gh_client),
+            gh_client: gh_client.into(),
             ..self
         }
     }
@@ -216,7 +216,7 @@ impl<T2, T3, T4, T5, T6, T7> ApplicationBuilder<T2, T3, T4, T5, T6, T7> {
     }
 }
 
-impl ApplicationBuilder<FeedApiRef, Categories, Cache, Config, Theme, Box<dyn Interact>> {
+impl ApplicationBuilder<FeedApiRef, Categories, Cache, Config, Theme, Box<dyn ExternalTools>> {
     #[must_use]
     pub fn build(self) -> Application {
         Application::new(self)

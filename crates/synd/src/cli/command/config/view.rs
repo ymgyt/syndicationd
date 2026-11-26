@@ -1,7 +1,6 @@
 use std::{
     io::{self, Write},
     path::{Path, PathBuf},
-    process::ExitCode,
 };
 
 use clap::Args;
@@ -9,10 +8,7 @@ use serde::Serialize;
 use synd_support::time::humantime::HumanDuration;
 use synd_term::ui::theme::ThemeBackground;
 
-use crate::{
-    cli::{OutputFormat, command::CommandFailure},
-    config::ConfigResolver,
-};
+use crate::{cli::OutputFormat, config::ConfigResolver};
 
 /// View resolved configuration
 #[derive(Args, Debug)]
@@ -23,15 +19,7 @@ pub struct ConfigViewCommand {
 }
 
 impl ConfigViewCommand {
-    pub fn run(self, config: &ConfigResolver) -> ExitCode {
-        if let Err(err) = self.view(config) {
-            CommandFailure::report(err)
-        } else {
-            ExitCode::SUCCESS
-        }
-    }
-
-    fn view(self, config: &ConfigResolver) -> anyhow::Result<()> {
+    pub fn run(self, config: &ConfigResolver) -> anyhow::Result<()> {
         let output = ConfigViewOutput::from_config(config);
         let mut stdout = io::stdout();
 

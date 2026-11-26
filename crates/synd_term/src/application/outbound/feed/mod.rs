@@ -5,7 +5,7 @@ mod client;
 mod mock;
 
 pub use api::{FeedApi, FeedApiRef, FeedEventWatch};
-pub use client::ClientFeedApi;
+pub use client::FeedClient;
 
 #[cfg(feature = "integration")]
 pub use mock::{MockFeedApi, MockFeedApiResponse};

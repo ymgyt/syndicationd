@@ -23,12 +23,10 @@ use synd_registry::{
 };
 use synd_term::integration::TestApplication;
 use synd_term::{
-    application::{
-        Application, Authenticator, Cache, ClientFeedApi, Config, DeviceFlows, JwtService,
-    },
+    application::{Application, Authenticator, Cache, Config, DeviceFlows, FeedClient, JwtService},
     auth::Credential,
     config::Categories,
-    interact::mock::MockInteractor,
+    external_tools::mock::MockExternalTools,
     ui::theme::Theme,
 };
 use synd_test::temp_dir;
@@ -210,17 +208,15 @@ impl TestCase {
                 should_reload = true;
             }
 
-            let interactor = Box::new(MockInteractor::new());
-
             let mut app = Application::builder()
-                .feed_api(ClientFeedApi::new(client))
+                .feed_api(FeedClient::new(client))
                 .categories(Categories::default_toml())
                 .config(config)
                 .cache(cache)
                 .theme(Theme::default())
                 .authenticator(authenticator)
                 .authentication_required(true)
-                .interactor(interactor)
+                .external_tools(MockExternalTools::new())
                 .build()
                 .with_test_terminal(term_col, term_row);
 

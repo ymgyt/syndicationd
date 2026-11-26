@@ -1,10 +1,10 @@
-use std::{io::ErrorKind, path::Path, process::ExitCode};
+use std::{io::ErrorKind, path::Path};
 
 use anyhow::Context;
 use clap::Args;
 use synd_support::fs::FileSystem;
 use synd_term::application::Cache;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::config::ConfigResolver;
 
@@ -20,72 +20,44 @@ pub struct CleanCommand {
 }
 
 impl CleanCommand {
-    #[allow(clippy::unused_self)]
-    pub fn run<FS>(self, config: &ConfigResolver, fs: &FS) -> ExitCode
-    where
-        FS: FileSystem + Clone,
-    {
-        let cache_dir = config.cache_dir();
-        let log_file = config.log_file();
-        ExitCode::from(self.clean(fs, &cache_dir, &log_file))
+    pub fn run(
+        self,
+        config: &ConfigResolver,
+        fs: &(impl FileSystem + Clone),
+    ) -> anyhow::Result<()> {
+        self.remove_files(fs, &config.cache_dir(), &config.log_file())
     }
 
-    fn clean<FS>(self, fs: &FS, cache_dir: &Path, log: &Path) -> u8
-    where
-        FS: FileSystem + Clone,
-    {
-        if let Err(err) = self.try_clean(fs, cache_dir, log) {
-            error!("{err}");
-            1
-        } else {
-            0
-        }
-    }
-    fn try_clean<FS>(self, fs: &FS, cache_dir: &Path, log: &Path) -> anyhow::Result<()>
-    where
-        FS: FileSystem + Clone,
-    {
-        let targets = self.targets();
+    fn remove_files(
+        self,
+        fs: &(impl FileSystem + Clone),
+        cache_dir: &Path,
+        log: &Path,
+    ) -> anyhow::Result<()> {
+        let clean_all = !self.cache && !self.logs;
 
-        if targets.cache {
+        if clean_all || self.cache {
             let cache = Cache::with(cache_dir, fs.clone());
             cache
                 .clean()
-                .map_err(anyhow::Error::from)
-                .with_context(|| format!("path: {}", cache_dir.display()))?;
+                .with_context(|| format!("failed to clean cache in {}", cache_dir.display()))?;
         }
 
-        if targets.logs {
+        if clean_all || self.logs {
             match fs.remove_file(log) {
                 Ok(()) => {
                     info!("Remove {}", log.display());
                 }
-                Err(err) => match err.kind() {
-                    ErrorKind::NotFound => {}
-                    _ => {
-                        return Err(anyhow::Error::from(err))
-                            .with_context(|| format!("path: {}", log.display()));
-                    }
-                },
+                Err(err) if err.kind() == ErrorKind::NotFound => {}
+                Err(err) => {
+                    return Err(err)
+                        .with_context(|| format!("failed to remove log file {}", log.display()));
+                }
             }
         }
 
         Ok(())
     }
-
-    fn targets(&self) -> CleanTargets {
-        let default_all = !self.cache && !self.logs;
-        CleanTargets {
-            cache: default_all || self.cache,
-            logs: default_all || self.logs,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct CleanTargets {
-    cache: bool,
-    logs: bool,
 }
 
 #[cfg(test)]
@@ -140,12 +112,13 @@ mod tests {
         let clean = CleanCommand::all();
         let cache_dir = TempDir::new().unwrap();
         let log_file = NamedTempFile::new().unwrap();
-        let exit_code = clean.clean(
-            &fsimpl::FileSystem::new(),
-            cache_dir.path(),
-            log_file.path(),
-        );
-        assert_eq!(exit_code, 0);
+        clean
+            .remove_files(
+                &fsimpl::FileSystem::new(),
+                cache_dir.path(),
+                log_file.path(),
+            )
+            .unwrap();
         assert!(!log_file.path().exists());
     }
 
@@ -155,19 +128,23 @@ mod tests {
         let cache_dir = TempDir::new().unwrap();
         let log_file = Path::new("./not_exists");
         let fs = MockFileSystem::default().with_remove_errors(log_file, io::ErrorKind::NotFound);
-        let exit_code = clean.clean(&fs, cache_dir.path(), log_file);
-        assert_eq!(exit_code, 0);
+        clean.remove_files(&fs, cache_dir.path(), log_file).unwrap();
     }
 
     #[test]
-    fn exit_code_on_permission_error() {
+    fn propagates_permission_errors() {
         let clean = CleanCommand::logs();
         let cache_dir = TempDir::new().unwrap();
         let log_file = Path::new("./not_allowed");
         let fs =
             MockFileSystem::default().with_remove_errors(log_file, io::ErrorKind::PermissionDenied);
-        let exit_code = clean.clean(&fs, cache_dir.path(), log_file);
-        assert_eq!(exit_code, 1);
+        let error = clean
+            .remove_files(&fs, cache_dir.path(), log_file)
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<io::Error>().unwrap().kind(),
+            io::ErrorKind::PermissionDenied
+        );
     }
 
     #[test]
@@ -175,12 +152,13 @@ mod tests {
         let clean = CleanCommand::cache();
         let cache_dir = TempDir::new().unwrap();
         let log_file = NamedTempFile::new().unwrap();
-        let exit_code = clean.clean(
-            &fsimpl::FileSystem::new(),
-            cache_dir.path(),
-            log_file.path(),
-        );
-        assert_eq!(exit_code, 0);
+        clean
+            .remove_files(
+                &fsimpl::FileSystem::new(),
+                cache_dir.path(),
+                log_file.path(),
+            )
+            .unwrap();
         assert!(log_file.path().exists());
     }
 

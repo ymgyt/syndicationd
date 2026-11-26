@@ -2,13 +2,13 @@ use std::{path::PathBuf, time::Duration};
 
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use synd_support::time::humantime::parse_duration;
 
 use synd_term::ui::theme;
 
 use crate::config::{self, ConfigResolver, ConfigResolverBuilder};
 
 mod command;
-mod port;
 
 use command::term::TermCommand;
 
@@ -73,29 +73,29 @@ pub struct TermOptions {
     pub gh: GhOptions,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Default)]
 #[command(next_help_heading = "Api options")]
 pub struct ApiOptions {
     /// Client timeout(ex. 30s)
-    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::CLIENT_TIMEOUT)]
+    #[arg(long, value_parser = parse_duration, env = config::env::CLIENT_TIMEOUT)]
     pub client_timeout: Option<Duration>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Default)]
 #[command(next_help_heading = "Daemon options")]
 pub struct DaemonOptions {
     /// Runtime artifact root for daemon socket and startup lock
     #[arg(long = "runtime-root", env = config::env::RUNTIME_ROOT, global = true)]
     pub runtime_root: Option<PathBuf>,
     /// Session lease duration granted by the local daemon
-    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_LEASE_DURATION)]
+    #[arg(long, value_parser = parse_duration, env = config::env::DAEMON_SESSION_LEASE_DURATION)]
     pub daemon_session_lease_duration: Option<Duration>,
     /// Grace period before the local daemon shuts down after all sessions are gone
-    #[arg(long, value_parser = config::parse::flag::parse_duration_opt, env = config::env::DAEMON_SESSION_IDLE_SHUTDOWN_GRACE)]
+    #[arg(long, value_parser = parse_duration, env = config::env::DAEMON_SESSION_IDLE_SHUTDOWN_GRACE)]
     pub daemon_session_idle_shutdown_grace: Option<Duration>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Default)]
 #[command(next_help_heading = "Backend options")]
 pub struct BackendOptions {
     /// `SQLite` database path
@@ -103,7 +103,7 @@ pub struct BackendOptions {
     pub sqlite_db: Option<PathBuf>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Default)]
 #[command(next_help_heading = "Feed options")]
 pub struct FeedOptions {
     /// Feed entries limit to fetch
@@ -117,7 +117,7 @@ pub struct FeedOptions {
     pub browser_args: Option<Vec<String>>,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(clap::Args, Debug, Default)]
 #[command(next_help_heading = "GitHub options")]
 pub struct GhOptions {
     /// Enable GitHub notification feature
