@@ -132,6 +132,8 @@ to get started with development.
 * **Long-term maintenance**.
   Prefer simple designs and stable dependencies so the project can be maintained for years.
 
+[Feed tips](https://github.com/ymgyt/syndicationd/blob/main/docs/mdbook/src/feed-tips.md)
+
 ## License
 
 This project is available under the terms of either the
