@@ -90,6 +90,7 @@ pub(crate) enum FilterResult {
 
 #[derive(Debug)]
 pub(crate) struct FilterWidget {
+    pub(crate) target: FilterTarget,
     categories: Rc<Categories>,
     state: State,
     keymap_dirty: bool,
@@ -107,10 +108,11 @@ enum State {
 }
 
 impl FilterWidget {
-    pub fn new(categories: Rc<Categories>) -> Self {
+    pub fn new(categories: Rc<Categories>, target: FilterTarget) -> Self {
         Self {
             categories,
             state: State::Normal,
+            target,
             keymap_dirty: true,
             prompt: Rc::new(RefCell::new(Prompt::new())),
             feed: FeedHandler::new(),

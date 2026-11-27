@@ -1,4 +1,4 @@
-use crate::application::{ComponentId, component::Ui};
+use crate::application::{ComponentId, component::Screens};
 use synd_feed::types::Category;
 use tuiframework::KeyAction;
 
@@ -14,7 +14,7 @@ pub(crate) enum KeymapAction {
     Filter(FilterAction),
 }
 
-impl KeyAction<Ui> for KeymapAction {
+impl KeyAction<Screens> for KeymapAction {
     fn command_for(self, owner: ComponentId) -> (ComponentId, Command) {
         let command = Command::from(self);
         (command.target(owner), command)

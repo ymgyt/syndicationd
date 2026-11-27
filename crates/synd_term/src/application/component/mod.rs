@@ -3,11 +3,10 @@ use std::{rc::Rc, sync::Arc};
 use strum::IntoEnumIterator as _;
 use tuiframework::Component;
 
-use super::{Clock, ComponentId, Config, effects::Effects, overlay::Overlay};
+use super::{Clock, ComponentId, Config};
 use crate::{
-    command::{Command, PromptAction},
+    command::Command,
     config::Categories,
-    crossterm::event::Event as TerminalEvent,
     event::Event,
     keymap::{Keymap, Layer},
     operation::Operation,
@@ -40,11 +39,10 @@ use reader::ReaderComponent;
 use shell::ShellComponent;
 use unsubscribe::UnsubscribePopup;
 
-/// Owns the synd screens, their shared layout inputs, and the current overlays.
-pub(crate) struct Ui {
+/// Owns the synd screens, their shared layout inputs, and domain state.
+pub(crate) struct Screens {
     categories: Rc<Categories>,
     clock: Arc<dyn Clock>,
-    overlay: Overlay,
     pub(in crate::application) shell: ShellComponent,
     pub(in crate::application) login: LoginComponent,
     pub(in crate::application) filter: FilterWidget,
@@ -56,7 +54,7 @@ pub(crate) struct Ui {
     pub(crate) gh: GhComponent,
 }
 
-impl Ui {
+impl Screens {
     pub(in crate::application) fn visible_tab(&self) -> Option<Tab> {
         self.login.has_api_access().then(|| self.tabs.current())
     }
@@ -69,11 +67,13 @@ impl Ui {
         clock: Arc<dyn Clock>,
     ) -> Self {
         let categories = Rc::new(categories);
+        let tabs = TabsWidget::new(&config.features);
+        let filter = FilterWidget::new(Rc::clone(&categories), tabs.current().filter_target());
         Self {
             shell: ShellComponent::new(theme),
             login: LoginComponent::new(authentication_required),
-            tabs: TabsWidget::new(&config.features),
-            filter: FilterWidget::new(Rc::clone(&categories)),
+            tabs,
+            filter,
             feeds: FeedsComponent::new(config, Rc::clone(&categories)),
             reader: ReaderComponent::default(),
             subscribe: subscribe::SubscribeForm::new(Rc::clone(&categories)),
@@ -82,48 +82,28 @@ impl Ui {
                 Rc::clone(&categories),
             ),
             unsubscribe: UnsubscribePopup::default(),
-            overlay: Overlay::default(),
             categories,
             clock,
         }
     }
-
-    fn get_mut(&mut self, id: ComponentId) -> &mut dyn Component<Self> {
-        match id {
-            ComponentId::Shell => &mut self.shell,
-            ComponentId::Tabs => &mut self.tabs,
-            ComponentId::Login => &mut self.login,
-            ComponentId::Filter => &mut self.filter,
-            ComponentId::Entries => &mut self.feeds.entries,
-            ComponentId::Reader => &mut self.reader,
-            ComponentId::Feeds => &mut self.feeds,
-            ComponentId::Subscribe => &mut self.subscribe,
-            ComponentId::GhNotifications => &mut self.gh,
-            ComponentId::UnsubscribePopup => &mut self.unsubscribe,
-            ComponentId::GhFilterPopup => &mut self.gh.notifications.filter_popup,
-        }
-    }
 }
 
-impl tuiframework::Ui for Ui {
+impl tuiframework::Components for Screens {
     type Id = ComponentId;
     type Layer = Layer;
     type Keymap = Keymap;
-    type Theme = Theme;
+    type OverlayId = super::overlay::OverlayId;
+    type StackId = super::overlay::StackId;
     type Command = Command;
     type Event = Event;
     type Operation = Operation;
-    type Context<'a> = RenderContext<'a>;
-
-    fn theme(&self) -> &Self::Theme {
-        &self.shell.theme
-    }
+    type RenderContext<'a> = RenderContext<'a>;
 
     fn ids(&self) -> impl IntoIterator<Item = ComponentId> {
         ComponentId::iter()
     }
 
-    fn component(&self, id: ComponentId) -> Option<&dyn Component<Self>> {
+    fn get(&self, id: ComponentId) -> Option<&dyn Component<Self>> {
         Some(match id {
             ComponentId::Shell => &self.shell,
             ComponentId::Tabs => &self.tabs,
@@ -139,48 +119,19 @@ impl tuiframework::Ui for Ui {
         })
     }
 
-    fn component_mut(&mut self, id: ComponentId) -> Option<&mut dyn Component<Self>> {
-        Some(self.get_mut(id))
-    }
-
-    fn visible(&self) -> impl IntoIterator<Item = ComponentId> {
-        self.overlay.visible(self.visible_tab())
-    }
-
-    fn apply_command(&mut self, to: ComponentId, command: Command) -> Effects {
-        match command {
-            Command::Open => self.overlay.open(to),
-            Command::Close => self.overlay.close(to),
-            command if to == ComponentId::Filter => {
-                let target = self.tabs.current().filter_target();
-                return self.filter.apply_command(command, target);
-            }
-            _ => return self.get_mut(to).apply_command(command),
-        }
-        Effects::NONE
-    }
-
-    fn update_keymap(&mut self, map: &mut Keymap) {
-        self.filter.install_filter_keymap(map);
-    }
-
-    fn on_input(&mut self, event: &TerminalEvent) -> Effects {
-        if matches!(event, TerminalEvent::Key(_) | TerminalEvent::Paste(_)) {
-            self.shell.dismiss_error();
-        }
-        if let TerminalEvent::Paste(text) = event
-            && let Some(owner) = self.overlay.visible(self.visible_tab()).next_back()
-        {
-            return Effects::NONE.send(owner, Command::Prompt(PromptAction::Paste(text.clone())));
-        }
-        Effects::NONE
-    }
-
-    fn tick(&mut self) {
-        self.shell.tick();
-    }
-
-    fn is_busy(&self) -> bool {
-        self.shell.is_busy()
+    fn get_mut(&mut self, id: ComponentId) -> Option<&mut dyn Component<Self>> {
+        Some(match id {
+            ComponentId::Shell => &mut self.shell,
+            ComponentId::Tabs => &mut self.tabs,
+            ComponentId::Login => &mut self.login,
+            ComponentId::Filter => &mut self.filter,
+            ComponentId::Entries => &mut self.feeds.entries,
+            ComponentId::Reader => &mut self.reader,
+            ComponentId::Feeds => &mut self.feeds,
+            ComponentId::Subscribe => &mut self.subscribe,
+            ComponentId::GhNotifications => &mut self.gh,
+            ComponentId::UnsubscribePopup => &mut self.unsubscribe,
+            ComponentId::GhFilterPopup => &mut self.gh.notifications.filter_popup,
+        })
     }
 }

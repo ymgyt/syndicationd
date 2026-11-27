@@ -1,5 +1,5 @@
 use super::RenderContext;
-use crate::application::component::Ui;
+use crate::application::component::Screens;
 use crate::{
     application::{InFlightRequests, effects::Effects, request::synd_api_error_message},
     command::{Command, ShellCommand},
@@ -31,18 +31,6 @@ impl ShellComponent {
         }
     }
 
-    pub(in crate::application) fn tick(&mut self) {
-        self.in_flight.tick();
-    }
-
-    pub(in crate::application) fn is_busy(&self) -> bool {
-        !self.in_flight.is_empty()
-    }
-
-    pub(in crate::application) fn dismiss_error(&mut self) {
-        self.status.clear_error_message();
-    }
-
     fn rotate_theme(&mut self) {
         let palette = match self.theme.name {
             "ferra" => Palette::solarized_dark(),
@@ -67,20 +55,30 @@ impl ShellComponent {
     }
 }
 
-impl Component<Ui> for ShellComponent {
-    fn apply_command(&mut self, command: Command) -> Effects {
+impl Component<Screens> for ShellComponent {
+    fn tick(&mut self) {
+        self.in_flight.tick();
+    }
+    fn is_busy(&self) -> bool {
+        !self.in_flight.is_empty()
+    }
+    fn on_input(&mut self, input: &crate::crossterm::event::Event, _: bool, _: &mut Effects) {
+        use crate::crossterm::event::Event::{Key, Paste};
+        if matches!(input, Key(_) | Paste(_)) {
+            self.status.clear_error_message();
+        }
+    }
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
         let Command::Shell(action) = command else {
-            return Effects::NONE;
+            return;
         };
         match action {
-            ShellCommand::ShowError(message) => self.status.set_error_message(message),
-            ShellCommand::Quit => return Effects::NONE.quit(),
+            ShellCommand::Quit => effects.quit(),
             ShellCommand::RotateTheme => self.rotate_theme(),
             ShellCommand::ForceRedraw => {
-                return Effects::NONE.operation(Operation::ForceRedrawTerminal);
+                effects.operation(Operation::ForceRedrawTerminal);
             }
         }
-        Effects::NONE
     }
 
     fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
@@ -109,11 +107,12 @@ impl Component<Ui> for ShellComponent {
             EventKind::Feeds,
             EventKind::CredentialRefreshFailed,
             EventKind::OperationFailed,
+            EventKind::ErrorReported,
         ]
         .contains(&EventKind::from(event))
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, _: &mut Effects) {
         match event {
             Event::RequestEmitted { request_id, kind } => {
                 self.in_flight.register(*request_id, kind.clone());
@@ -138,6 +137,7 @@ impl Component<Ui> for ShellComponent {
                 warn!(%error, "credential refresh failed");
                 self.status.set_error_message(error.to_string());
             }
+            Event::ErrorReported(message) => self.status.set_error_message(message.clone()),
             Event::OperationFailed { error } => {
                 let message = Self::operation_error_message(error);
                 error!(%message, "application operation failed");
@@ -145,6 +145,5 @@ impl Component<Ui> for ShellComponent {
             }
             _ => {}
         }
-        Effects::NONE
     }
 }

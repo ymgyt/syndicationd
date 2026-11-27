@@ -4,8 +4,7 @@ use tracing::{info, warn};
 use tuiframework::crossterm::event::{Event as CrosstermEvent, EventStream};
 use tuiframework::event_loop::Ready;
 use tuiframework::{
-    AnimationTimer, Compositor, EventLoop, Hooks, RenderTarget, Terminal, TerminalDevice,
-    TerminalOptions,
+    AnimationTimer, ApplicationEffects, EventLoop, Hooks, RenderTarget, Terminal, TerminalOptions,
 };
 
 use crate::{config::Categories, external_tools::ExternalTools, ui::theme::Theme};
@@ -48,9 +47,9 @@ pub(crate) use overlay::ComponentId;
 mod drivers;
 #[cfg(feature = "integration")]
 mod integration;
-use component::Ui;
+use component::Screens;
 use drivers::{DriverParts, Drivers};
-use effects::Effects;
+
 #[cfg(feature = "integration")]
 pub use integration::TestApplication;
 
@@ -62,7 +61,8 @@ pub enum Populate {
 
 /// Wires the synd screens and services into the terminal application.
 pub struct Application {
-    compositor: Compositor<Ui>,
+    screens: Screens,
+    keymap: crate::keymap::Keymap,
     drivers: Drivers,
     animation_timer: AnimationTimer,
 }
@@ -97,7 +97,7 @@ impl Application {
             authentication_required,
         } = builder;
         let clock: Arc<dyn Clock> = Arc::from(clock.unwrap_or_else(|| Box::new(SystemClock)));
-        let ui = Ui::new(
+        let ui = Screens::new(
             &config,
             theme,
             categories,
@@ -115,13 +115,18 @@ impl Application {
         });
 
         Self {
-            compositor: Compositor::new(ui, config.keymaps.0),
+            screens: ui,
+            keymap: config.keymaps.0,
             drivers,
             animation_timer: AnimationTimer::new(config.throbber_timer_interval),
         }
     }
 
-    fn event_loop<T, I>(self, terminal: T, input: I) -> EventLoop<Ready<'static, Ui, Drivers>, T, I>
+    fn event_loop<T, I>(
+        self,
+        terminal: T,
+        input: I,
+    ) -> EventLoop<Ready<'static, Screens, Drivers>, T, I>
     where
         T: RenderTarget,
         I: Stream<Item = io::Result<CrosstermEvent>> + Unpin,
@@ -130,7 +135,9 @@ impl Application {
             .on_start(Box::new(Self::start))
             .on_exit(Box::new(Self::persist_gh_filter));
         EventLoop::builder()
-            .compositor(self.compositor)
+            .components(self.screens)
+            .keymap(self.keymap)
+            .overlay(overlay::layout())
             .driver(self.drivers)
             .terminal(terminal)
             .input(input)
@@ -141,18 +148,15 @@ impl Application {
 
     pub async fn run(self) -> io::Result<()> {
         info!("Starting terminal UI");
-        let mut device = TerminalDevice::stdout();
-        device.install_abort_hook();
-        let terminal = Terminal::init(
-            &mut device,
-            TerminalOptions::default().with_bracketed_paste(true),
-        )?;
-        let events = self.event_loop(terminal, EventStream::new());
-        // Keep the running event loop out of the enclosing CLI future.
-        Box::pin(events.run()).await.map_err(io::Error::from)
+        let options = TerminalOptions::default()
+            .with_bracketed_paste(true)
+            .with_restore_on_panic_abort(true);
+        let terminal = Terminal::init(options)?;
+        let event_loop = self.event_loop(terminal, EventStream::new());
+        Box::pin(event_loop.run()).await.map_err(io::Error::from)
     }
 
-    fn start(ui: &mut Ui, drivers: &mut Drivers) -> Effects {
+    fn start(ui: &mut Screens, drivers: &mut Drivers, effects: &mut ApplicationEffects<Screens>) {
         if ui.gh.enabled {
             match drivers.cache.load_gh_notification_filter_options() {
                 Ok(options) => ui.gh.restore_filter_options(options),
@@ -160,13 +164,11 @@ impl Application {
             }
         }
         if ui.login.has_api_access() {
-            Effects::NONE.emit(crate::event::Event::ApiAccessReady)
-        } else {
-            Effects::NONE
+            effects.emit(crate::event::Event::ApiAccessReady);
         }
     }
 
-    fn persist_gh_filter(ui: &Ui, drivers: &mut Drivers) {
+    fn persist_gh_filter(ui: &Screens, drivers: &mut Drivers) {
         let gh = &ui.gh;
         if gh.enabled {
             let options = gh.notifications.filter_options();

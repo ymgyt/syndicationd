@@ -1,6 +1,6 @@
-use crate::application::component::Ui;
+use crate::application::component::Screens;
 use ratatui::layout::{Constraint, Layout, Rect};
-use tuiframework::Component;
+use tuiframework::{Component, RenderInputs};
 
 use crate::{
     application::{Direction, effects::Effects},
@@ -61,12 +61,12 @@ pub(crate) struct RenderContext<'a> {
     pub(in crate::application) gh_options: &'a GhNotificationFilterOptions,
 }
 
-impl<'a> From<tuiframework::RenderContext<'a, Ui>> for RenderContext<'a> {
-    fn from(cx: tuiframework::RenderContext<'a, Ui>) -> Self {
-        let ui = cx.ui;
+impl<'a> From<RenderInputs<'a, Screens>> for RenderContext<'a> {
+    fn from(cx: RenderInputs<'a, Screens>) -> Self {
+        let ui = cx.components;
         Self {
             ui: Context {
-                theme: cx.theme,
+                theme: &ui.shell.theme,
                 categories: &ui.categories,
                 focus: cx.focus,
                 now: ui.clock.now(),
@@ -81,22 +81,19 @@ impl<'a> From<tuiframework::RenderContext<'a, Ui>> for RenderContext<'a> {
 }
 
 impl TabsWidget {
-    pub(super) fn move_tab(&mut self, direction: Direction) -> Effects {
+    pub(super) fn move_tab(&mut self, direction: Direction, effects: &mut Effects) {
         let previous = self.current();
         let tab = self.move_selection(direction);
-        if tab == previous {
-            Effects::NONE
-        } else {
-            Event::TabChanged(tab).into()
+        if tab != previous {
+            effects.emit(Event::TabChanged(tab));
         }
     }
 }
 
-impl Component<Ui> for TabsWidget {
-    fn apply_command(&mut self, command: Command) -> Effects {
-        match command {
-            Command::MoveTab(action) => self.move_tab(action),
-            _ => Effects::NONE,
+impl Component<Screens> for TabsWidget {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
+        if let Command::MoveTab(action) = command {
+            self.move_tab(action, effects);
         }
     }
 
@@ -110,14 +107,10 @@ impl Component<Ui> for TabsWidget {
     }
 }
 
-impl Component<Ui> for EntriesWidget {
-    fn apply_command(&mut self, command: Command) -> Effects {
-        match command {
-            Command::List(action) => {
-                self.apply_list(action);
-                Effects::NONE
-            }
-            _ => Effects::NONE,
+impl Component<Screens> for EntriesWidget {
+    fn apply_command(&mut self, command: Command, _: &mut Effects) {
+        if let Command::List(action) = command {
+            self.apply_list(action);
         }
     }
 
@@ -131,11 +124,10 @@ impl Component<Ui> for EntriesWidget {
     }
 }
 
-impl Component<Ui> for FilterPopup {
-    fn apply_command(&mut self, command: Command) -> Effects {
-        match command {
-            Command::GhFilterPopup(action) => Self::apply_command(action),
-            _ => Effects::NONE,
+impl Component<Screens> for FilterPopup {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
+        if let Command::GhFilterPopup(action) = command {
+            Self::apply_command(action, effects);
         }
     }
 

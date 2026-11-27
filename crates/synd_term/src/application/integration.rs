@@ -1,16 +1,16 @@
-use super::{Application, Drivers, Effects, Ui};
+use super::{Application, Drivers, Screens};
 use crate::integration::{UnboundedSenderWrapper, event_stream};
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
 use std::io;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use tuiframework::EventLoop;
 use tuiframework::crossterm::event::Event as CrosstermEvent;
 use tuiframework::event_loop::Started;
-use tuiframework::{EventLoop, Ui as _};
 
 use crate::operation::Operation;
 
 type TestEventLoop = EventLoop<
-    Started<'static, Ui, Drivers>,
+    Started<'static, Screens, Drivers>,
     Terminal<TestBackend>,
     UnboundedReceiverStream<io::Result<CrosstermEvent>>,
 >;
@@ -51,8 +51,8 @@ impl TestApplication {
 
     fn jobs_completed(&self) -> bool {
         !self.events.has_pending_work()
-            && !self.events.ui().is_busy()
-            && self.events.ui().feeds.timeline_is_settled()
+            && !self.events.is_busy()
+            && self.events.components().feeds.timeline_is_settled()
     }
 
     pub async fn run_until(&mut self, shown: impl Fn(&Buffer) -> bool) -> anyhow::Result<()> {
@@ -69,8 +69,9 @@ impl TestApplication {
     pub async fn reload_cache(&mut self) -> anyhow::Result<()> {
         if !self.events.should_quit() {
             let credential = self.events.driver().restore_credential().await?;
-            self.events
-                .apply_effects(Effects::NONE.operation(Operation::SetCredential { credential }));
+            self.events.apply_effects(|effects| {
+                effects.operation(Operation::SetCredential { credential });
+            });
         }
         Ok(())
     }
@@ -119,16 +120,17 @@ mod tests {
             .build();
         let terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         let mut running = app.event_loop(terminal, stream::empty()).start();
-        assert_eq!(running.ui().gh.notifications.filter_options(), &stored);
-        running.apply_effects(super::Effects::NONE.send_all(
+        assert_eq!(
+            running.components().gh.notifications.filter_options(),
+            &stored
+        );
+        running.apply_command(
             ComponentId::GhNotifications,
-            [
-                Command::Gh(GhCommand::ToggleNotificationFilter(
-                    GhNotificationFilterOption::UnreadOnly,
-                )),
-                Command::Gh(GhCommand::ApplyNotificationFilter),
-            ],
-        ));
+            Command::Gh(GhCommand::ToggleNotificationFilter(
+                GhNotificationFilterOption::UnreadOnly,
+            )),
+        );
+        running.apply_effects(|effects| effects.emit(crate::event::Event::GhFilterEditingFinished));
         running
             .run()
             .now_or_never()

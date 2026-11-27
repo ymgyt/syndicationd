@@ -1,6 +1,5 @@
 use super::RenderContext;
-use super::Ui;
-use crate::application::ComponentId;
+use super::Screens;
 use crate::{
     application::{RequestError, RequestKind, effects::Effects},
     auth::{AuthenticationProvider, Credential, Verified},
@@ -166,12 +165,12 @@ impl LoginComponent {
         )
     }
 
-    pub(super) fn apply_command(&mut self, command: LoginCommand) -> Effects {
+    pub(super) fn apply_command(&mut self, command: LoginCommand, effects: &mut Effects) {
         match command {
             LoginCommand::Authenticate => {
                 let provider = Self::PROVIDERS[self.selected_provider];
                 if self.state.begin(provider) {
-                    return Effects::NONE.operation(Operation::StartDeviceFlow { provider });
+                    effects.operation(Operation::StartDeviceFlow { provider });
                 }
             }
             LoginCommand::MoveProvider(direction)
@@ -182,15 +181,13 @@ impl LoginComponent {
             }
             LoginCommand::MoveProvider(_) => {}
         }
-        Effects::NONE
     }
 }
 
-impl Component<Ui> for LoginComponent {
-    fn apply_command(&mut self, command: Command) -> Effects {
-        match command {
-            Command::Login(action) => self.apply_command(action),
-            _ => Effects::NONE,
+impl Component<Screens> for LoginComponent {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
+        if let Command::Login(action) = command {
+            self.apply_command(action, effects);
         }
     }
 
@@ -236,12 +233,12 @@ impl Component<Ui> for LoginComponent {
         .contains(&EventKind::from(event))
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, effects: &mut Effects) {
         match event {
-            Event::Auth { event, .. } => Effects::from_operations(self.state.apply_event(event)),
-            Event::ApiCredentialConfigured => self.state.api_credential_configured().into(),
+            Event::Auth { event, .. } => effects.operations(self.state.apply_event(event)),
+            Event::ApiCredentialConfigured => effects.emit(self.state.api_credential_configured()),
             Event::CredentialRefreshed { credential } => {
-                Effects::from_operations(configure_credential(credential))
+                effects.operations(configure_credential(credential));
             }
             Event::RequestCompleted {
                 kind,
@@ -250,18 +247,13 @@ impl Component<Ui> for LoginComponent {
             } => {
                 self.state.request_failed(kind, error);
                 if let RequestError::Authentication(error) = error {
-                    return Effects::NONE.send(
-                        ComponentId::Shell,
-                        Command::show_request_error(kind, error.to_string()),
-                    );
+                    effects.emit(Event::request_failed(kind, error.to_string()));
                 }
-                Effects::NONE
             }
             Event::OperationFailed { error } => {
                 self.state.operation_failed(error);
-                Effects::NONE
             }
-            _ => Effects::NONE,
+            _ => {}
         }
     }
 }

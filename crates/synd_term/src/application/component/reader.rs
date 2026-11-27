@@ -1,5 +1,4 @@
-use super::Ui;
-use crate::application::ComponentId;
+use super::Screens;
 use std::{cell::RefCell, sync::Arc};
 use tuiframework::Component;
 
@@ -40,45 +39,51 @@ enum State {
 }
 
 impl ReaderComponent {
-    pub(super) fn apply_command(&mut self, command: ReaderCommand) -> Effects {
+    pub(super) fn apply_command(&mut self, command: ReaderCommand, effects: &mut Effects) {
         match command {
             ReaderCommand::Open(url) => {
                 self.generation.advance();
                 self.state = State::Loading(url.clone());
-                Effects::NONE
-                    .operation(Operation::FetchArticle {
-                        generation: self.generation,
-                        url,
-                    })
-                    .send(ComponentId::Reader, Command::Open)
+                effects.operation(Operation::FetchArticle {
+                    generation: self.generation,
+                    url,
+                });
+                effects.push(crate::application::overlay::StackId::Entries);
             }
             ReaderCommand::Close => {
                 self.state = State::Closed;
-                Effects::NONE.send(ComponentId::Reader, Command::Close)
+                effects.close();
             }
             ReaderCommand::Scroll(by) => {
                 if let State::Ready { body, .. } = &mut self.state {
                     body.get_mut().scroll(by);
                 }
-                Effects::NONE
             }
         }
     }
 }
 
-impl Component<Ui> for ReaderComponent {
-    fn apply_command(&mut self, command: Command) -> Effects {
-        match command {
-            Command::Reader(action) => self.apply_command(action),
-            _ => Effects::NONE,
+impl Component<Screens> for ReaderComponent {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
+        if let Command::Reader(action) = command {
+            self.apply_command(action, effects);
         }
     }
 
     fn subscribes(&self, event: &Event) -> bool {
-        [EventKind::ArticleFetched, EventKind::RequestCompleted].contains(&EventKind::from(event))
+        [
+            EventKind::ArticleRequested,
+            EventKind::ArticleFetched,
+            EventKind::RequestCompleted,
+        ]
+        .contains(&EventKind::from(event))
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, effects: &mut Effects) {
+        if let Event::ArticleRequested(url) = event {
+            self.apply_command(ReaderCommand::Open(url.clone()), effects);
+            return;
+        }
         if matches!(self.state, State::Loading(_)) {
             match event {
                 Event::ArticleFetched {
@@ -101,7 +106,6 @@ impl Component<Ui> for ReaderComponent {
                 _ => {}
             }
         }
-        Effects::NONE
     }
 
     fn key_layers(&self) -> &[Layer] {
@@ -143,30 +147,39 @@ mod tests {
         let mut reader = ReaderComponent::default();
         let url = Url::parse("https://example.com/article").unwrap();
         let article = Article::new("Old article".into(), "Old article body.".into());
-        let _ = reader.apply_command(ReaderCommand::Open(url.clone()));
+        reader.apply_command(ReaderCommand::Open(url.clone()), &mut Effects::default());
         let first = reader.generation;
-        let _ = reader.apply_command(ReaderCommand::Close);
-        let _ = reader.apply_command(ReaderCommand::Open(url));
+        reader.apply_command(ReaderCommand::Close, &mut Effects::default());
+        reader.apply_command(ReaderCommand::Open(url), &mut Effects::default());
         let request_id = RequestId::new(1);
-        let _ = reader.apply_event(&Event::ArticleFetched {
-            request_id,
-            generation: first,
-            article: Arc::new(article),
-        });
-        let _ = reader.apply_event(&Event::RequestCompleted {
-            request_id,
-            kind: RequestKind::FetchArticle { generation: first },
-            result: Err(RequestError::Article(anyhow::anyhow!("old failure"))),
-        });
+        reader.apply_event(
+            &Event::ArticleFetched {
+                request_id,
+                generation: first,
+                article: Arc::new(article),
+            },
+            &mut Effects::default(),
+        );
+        reader.apply_event(
+            &Event::RequestCompleted {
+                request_id,
+                kind: RequestKind::FetchArticle { generation: first },
+                result: Err(RequestError::Article(anyhow::anyhow!("old failure"))),
+            },
+            &mut Effects::default(),
+        );
         assert!(matches!(reader.state, State::Loading(_)));
 
-        let _ = reader.apply_event(&Event::RequestCompleted {
-            request_id: RequestId::new(2),
-            kind: RequestKind::FetchArticle {
-                generation: reader.generation,
+        reader.apply_event(
+            &Event::RequestCompleted {
+                request_id: RequestId::new(2),
+                kind: RequestKind::FetchArticle {
+                    generation: reader.generation,
+                },
+                result: Err(RequestError::Article(anyhow::anyhow!("publisher offline"))),
             },
-            result: Err(RequestError::Article(anyhow::anyhow!("publisher offline"))),
-        });
+            &mut Effects::default(),
+        );
         assert!(
             matches!(reader.state, State::Failed(ref message) if message.contains("publisher offline"))
         );

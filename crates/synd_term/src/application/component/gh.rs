@@ -1,6 +1,5 @@
 use super::RenderContext;
-use super::Ui;
-use crate::application::ComponentId;
+use super::Screens;
 use crate::{
     application::{Generation, Populate, RequestError, RequestKind, effects::Effects},
     client::gh::FetchNotificationsParams,
@@ -30,28 +29,26 @@ pub(crate) struct GhComponent {
 }
 
 impl GhComponent {
-    pub(in crate::application) fn apply_command(&mut self, command: GhCommand) -> Effects {
+    pub(in crate::application) fn apply_command(
+        &mut self,
+        command: GhCommand,
+        effects: &mut Effects,
+    ) {
         match command {
-            GhCommand::OpenNotification => {
-                Effects::from_operations(self.open_selected_notification())
-            }
+            GhCommand::OpenNotification => effects.operations(self.open_selected_notification()),
             GhCommand::OpenNotificationAndMarkAsDone => {
-                self.open_selected_notification_and_mark_as_done()
+                self.open_selected_notification_and_mark_as_done(effects);
             }
-            GhCommand::ReloadNotifications => Effects::NONE.operation(self.reload_notifications()),
+            GhCommand::ReloadNotifications => effects.operation(self.reload_notifications()),
             GhCommand::MarkNotificationAsDone => {
-                Effects::from_operations(self.mark_selected_notification_as_done())
+                effects.operations(self.mark_selected_notification_as_done());
             }
             GhCommand::MarkAllNotificationsAsDone => {
-                Effects::from_operations(self.mark_all_notifications_as_done())
+                effects.operations(self.mark_all_notifications_as_done());
             }
-            GhCommand::UnsubscribeThread => self.unsubscribe_selected_thread(),
-            GhCommand::ApplyNotificationFilter => {
-                Effects::from_operations(self.close_filter_popup())
-            }
+            GhCommand::UnsubscribeThread => self.unsubscribe_selected_thread(effects),
             GhCommand::ToggleNotificationFilter(option) => {
                 self.toggle_filter_option(&option);
-                Effects::NONE
             }
         }
     }
@@ -107,12 +104,12 @@ impl GhComponent {
             .map(|id| Operation::MarkGhNotificationAsDone { id })
     }
 
-    fn open_selected_notification_and_mark_as_done(&self) -> Effects {
-        Effects::from_operations(
+    fn open_selected_notification_and_mark_as_done(&self, effects: &mut Effects) {
+        effects.operations(
             self.open_selected_notification()
                 .into_iter()
                 .chain(self.mark_selected_notification_as_done()),
-        )
+        );
     }
 
     fn mark_all_notifications_as_done(&self) -> impl Iterator<Item = Operation> {
@@ -122,15 +119,15 @@ impl GhComponent {
             .map(|id| Operation::MarkGhNotificationAsDone { id })
     }
 
-    fn unsubscribe_selected_thread(&self) -> Effects {
+    fn unsubscribe_selected_thread(&self, effects: &mut Effects) {
         let unsubscribe = self
             .selected_thread()
             .map(|id| Operation::UnsubscribeGhThread { id });
-        Effects::from_operations(
+        effects.operations(
             unsubscribe
                 .into_iter()
                 .chain(self.mark_selected_notification_as_done()),
-        )
+        );
     }
 
     pub(in crate::application) fn selected_thread(&self) -> Option<ThreadId> {
@@ -187,15 +184,14 @@ impl GhComponent {
     }
 }
 
-impl Component<Ui> for GhComponent {
-    fn apply_command(&mut self, command: Command) -> Effects {
+impl Component<Screens> for GhComponent {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
         match command {
-            Command::Gh(action) => self.apply_command(action),
+            Command::Gh(action) => self.apply_command(action, effects),
             Command::List(action) => {
                 self.notifications.apply_list(action);
-                Effects::NONE
             }
-            _ => Effects::NONE,
+            _ => {}
         }
     }
 
@@ -210,6 +206,7 @@ impl Component<Ui> for GhComponent {
     fn subscribes(&self, event: &Event) -> bool {
         [
             EventKind::ApiAccessReady,
+            EventKind::GhFilterEditingFinished,
             EventKind::GhFilterChanged,
             EventKind::Gh,
             EventKind::RequestCompleted,
@@ -217,15 +214,14 @@ impl Component<Ui> for GhComponent {
         .contains(&EventKind::from(event))
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, effects: &mut Effects) {
         match event {
-            Event::ApiAccessReady if self.enabled => {
-                Effects::NONE.operation(self.reload_notifications())
-            }
+            Event::ApiAccessReady if self.enabled => effects.operation(self.reload_notifications()),
+            Event::GhFilterEditingFinished => effects.operations(self.close_filter_popup()),
             Event::GhFilterChanged(criteria) => {
                 self.notifications
                     .update_filterer(criteria.filterer(&mut self.matcher));
-                Effects::from_operations(self.fetch_next_notifications_if_needed())
+                effects.operations(self.fetch_next_notifications_if_needed());
             }
             Event::RequestCompleted {
                 kind,
@@ -236,29 +232,26 @@ impl Component<Ui> for GhComponent {
                     | RequestKind::FetchGhIssue { generation, .. }
                     | RequestKind::FetchGhPullRequest { generation, .. } if *generation != self.generation)
                 {
-                    return Effects::NONE;
+                    return;
                 }
                 if matches!(kind, RequestKind::FetchGhNotifications { .. }) {
                     self.page_pending = false;
                 }
-                Effects::NONE.send(
-                    ComponentId::Shell,
-                    Command::show_request_error(kind, error.to_string()),
-                )
+                effects.emit(Event::request_failed(kind, error.to_string()));
             }
-            Event::Gh { event, .. } => self.apply_gh_event(event),
-            _ => Effects::NONE,
+            Event::Gh { event, .. } => self.apply_gh_event(event, effects),
+            _ => {}
         }
     }
 }
 
 impl GhComponent {
-    fn apply_gh_event(&mut self, event: &GhEvent) -> Effects {
+    fn apply_gh_event(&mut self, event: &GhEvent, effects: &mut Effects) {
         if matches!(event, GhEvent::NotificationsFetched { generation, .. }
             | GhEvent::IssueFetched { generation, .. }
             | GhEvent::PullRequestFetched { generation, .. } if *generation != self.generation)
         {
-            return Effects::NONE;
+            return;
         }
         let notification = match event {
             GhEvent::NotificationsFetched {
@@ -267,15 +260,14 @@ impl GhComponent {
                 ..
             } => {
                 let details = self.apply_notifications(*populate, notifications.clone());
-                let mut effects =
-                    Effects::from_operations(self.fetch_notification_details(details));
+                effects.operations(self.fetch_notification_details(details));
                 if *populate == Populate::Replace {
-                    effects = effects.emit(Event::GhCategoriesChanged {
+                    effects.emit(Event::GhCategoriesChanged {
                         populate: Populate::Replace,
                         categories: Vec::new(),
                     });
                 }
-                return effects;
+                return;
             }
             GhEvent::IssueFetched {
                 notification_id,
@@ -295,15 +287,14 @@ impl GhComponent {
             ),
             GhEvent::NotificationMarkedAsDone { notification_id } => {
                 self.notifications.marked_as_done(*notification_id);
-                return Effects::NONE;
+                return;
             }
         };
-        notification.map_or(Effects::NONE, |n| {
-            Event::GhCategoriesChanged {
+        if let Some(n) = notification {
+            effects.emit(Event::GhCategoriesChanged {
                 populate: Populate::Append,
                 categories: n.categories().cloned().collect(),
-            }
-            .into()
-        })
+            });
+        }
     }
 }

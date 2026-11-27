@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use synd_client::payload::SubscribeFeedInput;
 use synd_feed::types::{Category, FeedUrl};
 
 use crate::{
@@ -12,10 +11,6 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(crate) enum Command {
     Nop,
-    /// Show the component that returned this command.
-    Open,
-    /// Hide the component that returned this command.
-    Close,
     UnsubscribePopup(UnsubscribeCommand),
     GhFilterPopup(GhFilterCommand),
     List(ListCommand),
@@ -34,7 +29,7 @@ impl Command {
     /// Shared commands belong to the component that issued them.
     pub(crate) fn target(&self, owner: ComponentId) -> ComponentId {
         match self {
-            Self::Nop | Self::Open | Self::Close | Self::List(_) | Self::Prompt(_) => owner,
+            Self::Nop | Self::List(_) | Self::Prompt(_) => owner,
             Self::Shell(_) => ComponentId::Shell,
             Self::Login(_) => ComponentId::Login,
             Self::MoveTab(_) => ComponentId::Tabs,
@@ -72,7 +67,6 @@ pub(crate) enum PromptAction {
 
 #[derive(Debug, Clone)]
 pub(crate) enum ShellCommand {
-    ShowError(String),
     Quit,
     RotateTheme,
     ForceRedraw,
@@ -84,9 +78,8 @@ pub(crate) enum LoginCommand {
     MoveProvider(Direction),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum FeedsCommand {
-    Subscribe(SubscribeFeedInput),
     PromptFeedEdition,
     PromptFeedUnsubscription,
     ReloadSubscription,
@@ -103,7 +96,6 @@ pub(crate) enum SubscribeCommand {
     Open,
     Cancel,
     Confirm,
-    AlreadySubscribed,
     Move(Direction),
 }
 
@@ -178,7 +170,6 @@ pub(crate) enum GhCommand {
     MarkAllNotificationsAsDone,
     UnsubscribeThread,
 
-    ApplyNotificationFilter,
     ToggleNotificationFilter(GhNotificationFilterOption),
 }
 

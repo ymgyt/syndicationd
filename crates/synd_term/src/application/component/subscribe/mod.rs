@@ -5,13 +5,13 @@ use synd_client::payload::{CrawlPolicyInput, PollingPolicyInput, SubscribeFeedIn
 use synd_feed::types::{Category, FeedUrl, SubscriptionLabels};
 use tuiframework::Component;
 
-use super::{ComponentId, RenderContext, Ui};
+use super::{RenderContext, Screens};
 use crate::{
     application::{
         Direction, RequestError, RequestKind, effects::Effects, input_parser::polling_interval,
         request::synd_api_error_message,
     },
-    command::{Command, FeedsCommand, SubscribeCommand},
+    command::{Command, SubscribeCommand},
     config::Categories,
     event::Event,
     keymap::{Layer, LayerStack},
@@ -87,7 +87,7 @@ impl Field {
     }
 }
 
-impl Component<Ui> for SubscribeForm {
+impl Component<Screens> for SubscribeForm {
     fn key_layers(&self) -> &[Layer] {
         match self.state {
             FormState::Submitting => &[],
@@ -99,22 +99,19 @@ impl Component<Ui> for SubscribeForm {
         layers.truncate_after(Layer::App);
     }
 
-    fn apply_command(&mut self, command: Command) -> Effects {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
         match command {
-            Command::Subscribe(SubscribeCommand::AlreadySubscribed) => {
-                self.show_error(Field::Url, "Already subscribed to this URL".into());
-            }
             _ if matches!(self.state, FormState::Submitting) => {}
             Command::Subscribe(SubscribeCommand::Open) => {
                 self.draft = Draft::default();
                 self.focus = Field::Url;
                 self.state = FormState::Editing;
-                return Effects::NONE.send(ComponentId::Subscribe, Command::Open);
+                effects.open(crate::application::overlay::OverlayId::Feeds);
             }
             Command::Subscribe(SubscribeCommand::Cancel) => {
-                return Effects::NONE.send(ComponentId::Subscribe, Command::Close);
+                effects.close();
             }
-            Command::Subscribe(SubscribeCommand::Confirm) => return self.confirm(),
+            Command::Subscribe(SubscribeCommand::Confirm) => self.confirm(effects),
             Command::Subscribe(SubscribeCommand::Move(direction)) => self.move_focus(direction),
             Command::Prompt(action) => {
                 if let Some(prompt) = self.draft.prompt_mut(self.focus)
@@ -126,28 +123,45 @@ impl Component<Ui> for SubscribeForm {
             }
             _ => {}
         }
-        Effects::NONE
+    }
+
+    fn on_input(
+        &mut self,
+        input: &crate::crossterm::event::Event,
+        frontmost: bool,
+        effects: &mut Effects,
+    ) {
+        if frontmost && let crate::crossterm::event::Event::Paste(text) = input {
+            self.apply_command(
+                Command::Prompt(crate::command::PromptAction::Paste(text.clone())),
+                effects,
+            );
+        }
     }
 
     fn subscribes(&self, event: &Event) -> bool {
         matches!(self.state, FormState::Submitting)
             && matches!(
                 event,
-                Event::RequestCompleted {
-                    kind: RequestKind::SubscribeFeed {
-                        origin: SubscriptionOrigin::Form,
+                Event::SubscriptionDuplicate
+                    | Event::RequestCompleted {
+                        kind: RequestKind::SubscribeFeed {
+                            origin: SubscriptionOrigin::Form,
+                            ..
+                        },
                         ..
-                    },
-                    ..
-                }
+                    }
             )
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, effects: &mut Effects) {
         match event {
+            Event::SubscriptionDuplicate => {
+                self.show_error(Field::Url, "Already subscribed to this URL".into());
+            }
             Event::RequestCompleted { result: Ok(()), .. } => {
                 self.state = FormState::Editing;
-                return Effects::NONE.send(ComponentId::Subscribe, Command::Close);
+                effects.close();
             }
             Event::RequestCompleted {
                 result: Err(RequestError::SyndApi(error)),
@@ -161,7 +175,6 @@ impl Component<Ui> for SubscribeForm {
             }
             _ => {}
         }
-        Effects::NONE
     }
 
     fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
@@ -188,15 +201,12 @@ impl SubscribeForm {
         self.focus = fields[direction.apply(current, fields.len())];
     }
 
-    fn confirm(&mut self) -> Effects {
+    fn confirm(&mut self, effects: &mut Effects) {
         match self.focus {
             Field::Url | Field::Submit => match self.draft.input(&self.categories) {
                 Ok(input) => {
                     self.state = FormState::Submitting;
-                    return Effects::NONE.send(
-                        ComponentId::Feeds,
-                        Command::Feeds(FeedsCommand::Subscribe(input)),
-                    );
+                    effects.emit(Event::SubscriptionSubmitted(input));
                 }
                 Err((field, message)) => self.show_error(field, message),
             },
@@ -225,7 +235,6 @@ impl SubscribeForm {
             }
             Field::Key(_) | Field::PollEvery => self.move_focus(Direction::Down),
         }
-        Effects::NONE
     }
 
     fn show_error(&mut self, field: Field, message: String) {

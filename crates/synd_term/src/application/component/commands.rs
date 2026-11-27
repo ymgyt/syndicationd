@@ -1,26 +1,25 @@
-use super::ComponentId;
+use crate::application::overlay::OverlayId;
+use crate::event::Event;
 use crate::{
     application::{RequestKind, effects::Effects},
-    command::{Command, GhCommand, GhFilterCommand, ShellCommand},
+    command::GhFilterCommand,
     ui::widgets::gh_notifications::FilterPopup,
 };
 impl FilterPopup {
-    pub(super) fn apply_command(command: GhFilterCommand) -> Effects {
+    pub(super) fn apply_command(command: GhFilterCommand, effects: &mut Effects) {
         match command {
-            GhFilterCommand::Open => Effects::NONE.send(ComponentId::GhFilterPopup, Command::Open),
-            GhFilterCommand::Close => Effects::NONE
-                .send(ComponentId::GhFilterPopup, Command::Close)
-                .send(
-                    ComponentId::GhNotifications,
-                    Command::Gh(GhCommand::ApplyNotificationFilter),
-                ),
+            GhFilterCommand::Open => effects.open(OverlayId::GitHub),
+            GhFilterCommand::Close => {
+                effects.close();
+                effects.emit(Event::GhFilterEditingFinished);
+            }
         }
     }
 }
 
-impl Command {
-    pub(super) fn show_request_error(kind: &RequestKind, message: String) -> Self {
+impl Event {
+    pub(super) fn request_failed(kind: &RequestKind, message: String) -> Self {
         tracing::error!(?kind, %message, "request failed");
-        Self::Shell(ShellCommand::ShowError(message))
+        Self::ErrorReported(message)
     }
 }

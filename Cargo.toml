@@ -74,7 +74,7 @@ tokio-util           = { version = "0.7.20" }
 toml                 = { version = "1.2.3" }
 tracing              = { version = "0.1.44" }
 tracing-subscriber   = { version = "0.3.23", features = ["smallvec", "fmt", "ansi", "std", "env-filter", "time"], default-features = false }
-tuiframework         = { version = "0.1.0", git = "https://github.com/ymgyt/tuiframework", rev = "afe88192f84c6a8e61cc34791c51edcf6d11857e" }
+tuiframework         = { version = "0.1.0", git = "https://github.com/ymgyt/tuiframework", rev = "f3b10f2eb1f7a48f5d9febbcb6d7074facb45518" }
 unicode-segmentation = { version = "1.13.3" }
 unicode-width        = { version = "0.2.3" }
 url                  = { version = "2.5.9" }

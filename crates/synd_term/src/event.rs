@@ -108,6 +108,12 @@ pub(crate) enum OperationError {
 #[strum_discriminants(name(EventKind), derive(Hash))]
 pub(crate) enum Event {
     TabChanged(Tab),
+    GhFilterEditingFinished,
+    SubscriptionSubmitted(payload::SubscribeFeedInput),
+    SubscriptionDuplicate,
+    UnsubscriptionRequested(crate::command::UnsubscribeTarget),
+    ArticleRequested(Url),
+    ErrorReported(String),
     FeedFilterChanged {
         requirement: Requirement,
         criteria: FilterCriteria,
@@ -167,6 +173,12 @@ pub(crate) enum Event {
 impl Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::GhFilterEditingFinished => f.write_str("GhFilterEditingFinished"),
+            Self::SubscriptionSubmitted(_) => f.write_str("SubscriptionSubmitted"),
+            Self::SubscriptionDuplicate => f.write_str("SubscriptionDuplicate"),
+            Self::UnsubscriptionRequested(_) => f.write_str("UnsubscriptionRequested"),
+            Self::ArticleRequested(_) => f.write_str("ArticleRequested"),
+            Self::ErrorReported(_) => f.write_str("ErrorReported"),
             Self::FeedFilterChanged { .. } => f.write_str("FeedFilterChanged"),
             Self::GhFilterChanged(_) => f.write_str("GhFilterChanged"),
             Self::FeedCategoriesChanged(_) => f.write_str("FeedCategoriesChanged"),

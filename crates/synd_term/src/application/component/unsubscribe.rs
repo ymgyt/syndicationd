@@ -1,6 +1,5 @@
 use super::RenderContext;
-use super::Ui;
-use crate::application::ComponentId;
+use super::Screens;
 use crate::{
     application::effects::Effects,
     command::{Command, UnsubscribeCommand, UnsubscribeTarget},
@@ -33,15 +32,14 @@ pub(super) struct UnsubscribePopup {
 }
 
 impl UnsubscribePopup {
-    pub(super) fn apply_command(&mut self, command: UnsubscribeCommand) -> Effects {
+    pub(super) fn apply_command(&mut self, command: UnsubscribeCommand, effects: &mut Effects) {
         match command {
             UnsubscribeCommand::Open(target) => {
                 self.target = Some(target);
-                Effects::NONE.send(ComponentId::UnsubscribePopup, Command::Open)
+                effects.open(crate::application::overlay::OverlayId::Feeds);
             }
             UnsubscribeCommand::ToggleSelection => {
                 self.selection = self.selection.toggle();
-                Effects::NONE
             }
             UnsubscribeCommand::Select => {
                 let operation = self
@@ -49,22 +47,30 @@ impl UnsubscribePopup {
                     .take()
                     .filter(|_| self.selection == UnsubscribeSelection::Yes)
                     .map(|target| Operation::UnsubscribeFeed { url: target.url });
-                Effects::from_operations(operation)
-                    .send(ComponentId::UnsubscribePopup, Command::Close)
+                effects.operations(operation);
+                effects.close();
             }
             UnsubscribeCommand::Cancel => {
                 self.target = None;
-                Effects::NONE.send(ComponentId::UnsubscribePopup, Command::Close)
+                effects.close();
             }
         }
     }
 }
 
-impl Component<Ui> for UnsubscribePopup {
-    fn apply_command(&mut self, command: Command) -> Effects {
-        match command {
-            Command::UnsubscribePopup(action) => self.apply_command(action),
-            _ => Effects::NONE,
+impl Component<Screens> for UnsubscribePopup {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
+        if let Command::UnsubscribePopup(action) = command {
+            self.apply_command(action, effects);
+        }
+    }
+
+    fn subscribes(&self, event: &crate::event::Event) -> bool {
+        matches!(event, crate::event::Event::UnsubscriptionRequested(_))
+    }
+    fn apply_event(&mut self, event: &crate::event::Event, effects: &mut Effects) {
+        if let crate::event::Event::UnsubscriptionRequested(target) = event {
+            self.apply_command(UnsubscribeCommand::Open(target.clone()), effects);
         }
     }
 

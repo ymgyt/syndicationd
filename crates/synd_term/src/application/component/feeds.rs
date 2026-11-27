@@ -1,5 +1,4 @@
-use super::Ui;
-use crate::application::ComponentId;
+use super::Screens;
 use std::rc::Rc;
 use tuiframework::Component;
 
@@ -15,10 +14,7 @@ use crate::{
         Config, Generation, Populate, RequestError, RequestKind, effects::Effects,
         input_parser::InputParser, request::synd_api_error_message,
     },
-    command::{
-        Command, FeedsCommand, ReaderCommand, ShellCommand, SubscribeCommand, UnsubscribeCommand,
-        UnsubscribeTarget,
-    },
+    command::{Command, FeedsCommand, UnsubscribeTarget},
     config::Categories,
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
     keymap::Layer,
@@ -63,40 +59,28 @@ pub(crate) struct FeedsComponent {
 }
 
 impl FeedsComponent {
-    pub(in crate::application) fn apply_command(&mut self, command: FeedsCommand) -> Effects {
+    pub(in crate::application) fn apply_command(
+        &mut self,
+        command: FeedsCommand,
+        effects: &mut Effects,
+    ) {
         match command {
-            FeedsCommand::Subscribe(input) => {
-                if self.is_already_subscribed(&input.url) {
-                    Effects::NONE.send(
-                        ComponentId::Subscribe,
-                        Command::Subscribe(SubscribeCommand::AlreadySubscribed),
-                    )
-                } else {
-                    Effects::NONE.operation(Operation::SubscribeFeed {
-                        input,
-                        origin: SubscriptionOrigin::Form,
-                    })
-                }
-            }
-            FeedsCommand::PromptFeedEdition => Effects::from_operations(self.edit_selected_feed()),
+            FeedsCommand::PromptFeedEdition => effects.operations(self.edit_selected_feed()),
             FeedsCommand::PromptFeedUnsubscription => {
                 let Some(feed) = self.subscription.selected_feed() else {
-                    return Effects::NONE;
+                    return;
                 };
-                Effects::NONE.send(
-                    ComponentId::UnsubscribePopup,
-                    Command::UnsubscribePopup(UnsubscribeCommand::Open(UnsubscribeTarget {
-                        url: feed.url.clone(),
-                        title: feed.title.clone(),
-                    })),
-                )
+                effects.emit(Event::UnsubscriptionRequested(UnsubscribeTarget {
+                    url: feed.url.clone(),
+                    title: feed.title.clone(),
+                }));
             }
-            FeedsCommand::ReloadSubscription => Effects::NONE.operation(self.reload_subscription()),
-            FeedsCommand::OpenFeed => Effects::from_operations(self.open_selected_feed()),
-            FeedsCommand::RefreshTimeline => Effects::from_operations(self.refresh_timeline()),
-            FeedsCommand::ReadEntry => self.read_selected_entry(),
-            FeedsCommand::OpenEntry => Effects::from_operations(self.open_selected_entry()),
-            FeedsCommand::BrowseEntry => self.browse_selected_entry(),
+            FeedsCommand::ReloadSubscription => effects.operation(self.reload_subscription()),
+            FeedsCommand::OpenFeed => effects.operations(self.open_selected_feed()),
+            FeedsCommand::RefreshTimeline => effects.operations(self.refresh_timeline()),
+            FeedsCommand::ReadEntry => self.read_selected_entry(effects),
+            FeedsCommand::OpenEntry => effects.operations(self.open_selected_entry()),
+            FeedsCommand::BrowseEntry => self.browse_selected_entry(effects),
         }
     }
 
@@ -135,31 +119,22 @@ impl FeedsComponent {
         Self::entry_url(self.entries.selected_entry()?).map(|url| Operation::OpenBrowser { url })
     }
 
-    fn read_selected_entry(&self) -> Effects {
+    fn read_selected_entry(&self, effects: &mut Effects) {
         let Some(entry) = self.entries.selected_entry() else {
-            return Effects::NONE;
+            return;
         };
         match Self::entry_url(entry) {
-            Some(url) => Effects::NONE.send(
-                ComponentId::Reader,
-                Command::Reader(ReaderCommand::Open(url)),
-            ),
-            None => Effects::NONE.send(
-                ComponentId::Shell,
-                Command::Shell(ShellCommand::ShowError(
-                    "This entry has no article URL".into(),
-                )),
-            ),
+            Some(url) => effects.emit(Event::ArticleRequested(url)),
+            None => effects.emit(Event::ErrorReported("This entry has no article URL".into())),
         }
     }
 
-    fn browse_selected_entry(&self) -> Effects {
+    fn browse_selected_entry(&self, effects: &mut Effects) {
         let Some(url) = self.entries.selected_entry().and_then(Self::entry_url) else {
-            return Effects::NONE;
+            return;
         };
-        Effects::NONE
-            .operation(Operation::OpenTextBrowser { url })
-            .operation(Operation::ForceRedrawTerminal)
+        effects.operation(Operation::OpenTextBrowser { url });
+        effects.operation(Operation::ForceRedrawTerminal);
     }
 
     fn entry_url(entry: &payload::Entry) -> Option<Url> {
@@ -341,15 +316,14 @@ impl FeedsComponent {
     }
 }
 
-impl Component<Ui> for FeedsComponent {
-    fn apply_command(&mut self, command: Command) -> Effects {
+impl Component<Screens> for FeedsComponent {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
         match command {
-            Command::Feeds(action) => self.apply_command(action),
+            Command::Feeds(action) => self.apply_command(action, effects),
             Command::List(action) => {
                 self.subscription.apply_list(action);
-                Effects::NONE
             }
-            _ => Effects::NONE,
+            _ => {}
         }
     }
 
@@ -363,6 +337,7 @@ impl Component<Ui> for FeedsComponent {
     }
     fn subscribes(&self, event: &Event) -> bool {
         [
+            EventKind::SubscriptionSubmitted,
             EventKind::ApiAccessReady,
             EventKind::ApiAccessRefreshed,
             EventKind::TabChanged,
@@ -374,12 +349,22 @@ impl Component<Ui> for FeedsComponent {
         .contains(&EventKind::from(event))
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, effects: &mut Effects) {
         match event {
-            Event::ApiAccessReady => Effects::from_operations(self.bootstrap()),
-            Event::ApiAccessRefreshed => Effects::from_operations(self.refresh_timeline()),
+            Event::SubscriptionSubmitted(input) => {
+                if self.is_already_subscribed(&input.url) {
+                    effects.emit(Event::SubscriptionDuplicate);
+                } else {
+                    effects.operation(Operation::SubscribeFeed {
+                        input: input.clone(),
+                        origin: SubscriptionOrigin::Form,
+                    });
+                }
+            }
+            Event::ApiAccessReady => effects.operations(self.bootstrap()),
+            Event::ApiAccessRefreshed => effects.operations(self.refresh_timeline()),
             Event::TabChanged(Tab::Feeds) if !self.subscription.has_subscription() => {
-                Effects::NONE.operation(self.reload_subscription())
+                effects.operation(self.reload_subscription());
             }
             Event::FeedFilterChanged {
                 requirement,
@@ -388,25 +373,26 @@ impl Component<Ui> for FeedsComponent {
                 let filter = criteria.feed_filterer(*requirement, &mut self.matcher);
                 self.entries.update_filterer(filter.clone());
                 self.subscription.update_filterer(filter);
-                Effects::NONE
             }
-            Event::Feeds(FeedsEvent::Request { event, .. }) => self.apply_feed_request(event),
+            Event::Feeds(FeedsEvent::Request { event, .. }) => {
+                self.apply_feed_request(event, effects);
+            }
             Event::Feeds(FeedsEvent::Push {
                 event: payload::FeedEvent::TimelineChanged(event),
             }) => {
                 debug!(changed_at = %event.changed_at, affected_feeds = ?event.affected_feeds, "timeline changed");
-                Effects::from_operations(self.refresh_timeline())
+                effects.operations(self.refresh_timeline());
             }
             Event::RequestCompleted { kind, result, .. } => {
                 let follow_up = match kind {
                     RequestKind::SubscribeFeed {
                         origin: SubscriptionOrigin::Form,
                         ..
-                    } => return Effects::NONE,
+                    } => return,
                     RequestKind::FetchSubscription { generation }
                         if *generation != self.subscription_generation =>
                     {
-                        return Effects::NONE;
+                        return;
                     }
                     RequestKind::OpenInitialTimeline if result.is_err() => {
                         self.timeline = TimelineState::LoadFailed { timeline_id: None };
@@ -420,42 +406,34 @@ impl Component<Ui> for FeedsComponent {
                     }
                     _ => None,
                 };
-                let effects = Effects::from_operations(follow_up);
+                effects.operations(follow_up);
                 if let Err(RequestError::SyndApi(error)) = result {
-                    effects.send(
-                        ComponentId::Shell,
-                        Command::show_request_error(kind, synd_api_error_message(error)),
-                    )
-                } else {
-                    effects
+                    effects.emit(Event::request_failed(kind, synd_api_error_message(error)));
                 }
             }
             Event::FeedEditionEditorClosed { input, labels } => {
                 match InputParser::new(input).parse_feed_edition(&self.categories, labels) {
-                    Ok(input) => Effects::NONE.operation(Operation::SubscribeFeed {
+                    Ok(input) => effects.operation(Operation::SubscribeFeed {
                         input,
                         origin: SubscriptionOrigin::Editor,
                     }),
-                    Err(error) => Effects::NONE.send(
-                        ComponentId::Shell,
-                        Command::Shell(ShellCommand::ShowError(error.to_string())),
-                    ),
+                    Err(error) => effects.emit(Event::ErrorReported(error.to_string())),
                 }
             }
-            _ => Effects::NONE,
+            _ => {}
         }
     }
 }
 
 impl FeedsComponent {
-    fn apply_feed_request(&mut self, event: &FeedRequestEvent) -> Effects {
+    fn apply_feed_request(&mut self, event: &FeedRequestEvent, effects: &mut Effects) {
         match event {
             FeedRequestEvent::InitialTimelineOpened { timeline_id } => {
-                return Effects::NONE.operation(self.fetch_timeline_window(*timeline_id));
+                return effects.operation(self.fetch_timeline_window(*timeline_id));
             }
             FeedRequestEvent::FeedSubscribed { url } => {
                 debug!(%url, "feed subscribed");
-                return Effects::NONE.operation(self.reload_subscription());
+                return effects.operation(self.reload_subscription());
             }
             FeedRequestEvent::SubscriptionFetched {
                 generation,
@@ -463,7 +441,7 @@ impl FeedsComponent {
                 subscription,
             } => {
                 if *generation != self.subscription_generation {
-                    return Effects::NONE;
+                    return;
                 }
                 let next = match &subscription.feeds.page_info {
                     payload::PageInfo::Complete { .. } => None,
@@ -476,7 +454,7 @@ impl FeedsComponent {
                 };
                 self.subscription
                     .update_subscription(*populate, subscription.clone());
-                return Effects::from_operations(next);
+                return effects.operations(next);
             }
             FeedRequestEvent::FeedUnsubscribed { url } => self.feed_unsubscribed(url),
             FeedRequestEvent::TimelineWindowChunkFetched { entries, base_seq } => {
@@ -486,13 +464,12 @@ impl FeedsComponent {
                 self.apply_timeline_changes(changes.clone(), *seq);
             }
         }
-        Event::FeedCategoriesChanged(
+        effects.emit(Event::FeedCategoriesChanged(
             self.entries
                 .entries()
                 .map(EntryExt::category)
                 .unique()
                 .collect(),
-        )
-        .into()
+        ));
     }
 }

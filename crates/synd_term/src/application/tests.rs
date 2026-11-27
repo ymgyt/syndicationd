@@ -1,4 +1,4 @@
-use super::component::Ui;
+use super::component::Screens;
 use crate::{
     application::{Clock, Config},
     config::Categories,
@@ -6,9 +6,8 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
-use tuiframework::Ui as _;
 
-type Compositor = tuiframework::Compositor<Ui>;
+type Compositor = tuiframework::testing::TestScreen<Screens>;
 fn make(config: Config, theme: Theme, categories: Categories, auth: bool) -> Compositor {
     struct Epoch;
     impl Clock for Epoch {
@@ -16,8 +15,8 @@ fn make(config: Config, theme: Theme, categories: Categories, auth: bool) -> Com
             DateTime::UNIX_EPOCH
         }
     }
-    let ui = Ui::new(&config, theme, categories, auth, Arc::new(Epoch));
-    tuiframework::Compositor::new(ui, config.keymaps.0)
+    let ui = Screens::new(&config, theme, categories, auth, Arc::new(Epoch));
+    tuiframework::testing::TestScreen::new(ui, super::overlay::layout(), config.keymaps.0)
 }
 
 use crate::{
@@ -148,7 +147,7 @@ fn replacing_a_credential_catches_up_the_existing_timeline() {
         compositor.apply_event(&opened).operations.as_slice(),
         [Operation::FetchTimelineWindow { timeline_id: id, .. }] if *id == timeline_id
     ));
-    let feeds = &mut compositor.ui.feeds;
+    let feeds = &mut compositor.components.feeds;
     feeds.apply_timeline_window_chunk(Vec::new(), 42);
     assert!(matches!(
         feeds.complete_timeline_window(true),
@@ -337,7 +336,7 @@ fn previous_lists_next_page_arriving_after_reload_is_ignored() {
         deliver_page(&mut compositor, append, 3).as_slice(),
         []
     ));
-    let list = &compositor.ui.gh.notifications;
+    let list = &compositor.components.gh.notifications;
     assert_eq!(list.notification_ids(), vec![2u64.into()]);
     assert_eq!(list.fetch_next_if_needed().unwrap().page, 2);
 }
@@ -384,7 +383,7 @@ fn failed_page_from_previous_list_finishes_without_disturbing_the_current_fetch(
     ));
 
     let _ = compositor.apply_event(&failure(current));
-    assert!(!compositor.ui.is_busy());
+    assert!(!compositor.is_busy());
     assert!(status(&compositor).contains("secondary rate limits exceeded"));
     assert!(matches!(
         compositor
@@ -546,7 +545,7 @@ fn reloading_subscriptions_discards_old_pages_and_their_cursors() {
         ));
         let last = "https://example.com/last";
         let _ = deliver_subscription_page(&mut compositor, 4, &next, last, None);
-        let feeds = &compositor.ui.feeds;
+        let feeds = &compositor.components.feeds;
         assert!(feeds.is_already_subscribed(&current.try_into().unwrap()));
         assert!(feeds.is_already_subscribed(&last.try_into().unwrap()));
         assert!(!feeds.is_already_subscribed(&obsolete.try_into().unwrap()));
@@ -590,10 +589,10 @@ fn only_the_current_subscription_failure_reaches_the_status_line() {
         Screen::new(frame.buffer).lines().pop().unwrap()
     };
     let _ = compositor.apply_event(&old);
-    assert!(compositor.ui.is_busy());
+    assert!(compositor.is_busy());
     assert!(!status(&compositor).contains("page failed"));
     let _ = compositor.apply_event(&current);
-    assert!(!compositor.ui.is_busy());
+    assert!(!compositor.is_busy());
     assert!(status(&compositor).contains("page failed"));
 }
 
@@ -827,7 +826,7 @@ fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
         None,
     );
     let _ = compositor.apply_terminal_event(&key!('d'));
-    let refresh = [compositor.ui.feeds.reload_subscription()];
+    let refresh = [compositor.components.feeds.reload_subscription()];
     let _ = deliver_subscription_page(
         &mut compositor,
         2,

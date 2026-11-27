@@ -1,5 +1,5 @@
 use super::RenderContext;
-use super::Ui;
+use super::Screens;
 use crate::{
     application::{Populate, effects::Effects},
     command::{Command, FilterCommand, FilterTarget},
@@ -26,13 +26,14 @@ impl FilterWidget {
         &mut self,
         command: Command,
         current: FilterTarget,
-    ) -> Effects {
+        effects: &mut Effects,
+    ) {
         let command = match command {
             Command::Filter(command) => command,
             Command::Prompt(action) if self.is_search_active() && self.edit_prompt(&action) => {
-                return self.changed(current).into();
+                return effects.emit(self.changed(current));
             }
-            _ => return Effects::NONE,
+            _ => return,
         };
         let (target, changed) = match command {
             FilterCommand::MoveFilterRequirement(direction) if current == FilterTarget::Feeds => {
@@ -40,15 +41,15 @@ impl FilterWidget {
             }
             FilterCommand::ActivateCategoryFiltering => {
                 self.activate_category_filtering(current);
-                return Effects::NONE;
+                return;
             }
             FilterCommand::ActivateSearchFiltering => {
                 self.activate_search_filtering();
-                return Effects::NONE;
+                return;
             }
             FilterCommand::DeactivateFiltering => {
                 self.deactivate_filtering();
-                return Effects::NONE;
+                return;
             }
             FilterCommand::ToggleFilterCategory { category, target }
                 if self.category_filter_target() == Some(target) =>
@@ -65,17 +66,35 @@ impl FilterWidget {
             {
                 (target, self.set_all_categories_active(target, false))
             }
-            _ => return Effects::NONE,
+            _ => return,
         };
         if changed {
-            self.changed(target).into()
-        } else {
-            Effects::NONE
+            effects.emit(self.changed(target));
         }
     }
 }
 
-impl Component<Ui> for FilterWidget {
+impl Component<Screens> for FilterWidget {
+    fn apply_command(&mut self, command: Command, effects: &mut Effects) {
+        self.apply_command(command, self.target, effects);
+    }
+    fn update_keymap(&mut self, map: &mut crate::keymap::Keymap) {
+        self.install_filter_keymap(map);
+    }
+    fn on_input(
+        &mut self,
+        input: &crate::crossterm::event::Event,
+        frontmost: bool,
+        effects: &mut Effects,
+    ) {
+        if frontmost && let crate::crossterm::event::Event::Paste(text) = input {
+            self.apply_command(
+                Command::Prompt(crate::command::PromptAction::Paste(text.clone())),
+                self.target,
+                effects,
+            );
+        }
+    }
     fn render(&self, frame: &mut ratatui::Frame<'_>, cx: &RenderContext<'_>) {
         let buf = frame.buffer_mut();
         self.render(
@@ -100,14 +119,16 @@ impl Component<Ui> for FilterWidget {
     }
     fn subscribes(&self, event: &Event) -> bool {
         [
+            EventKind::TabChanged,
             EventKind::FeedCategoriesChanged,
             EventKind::GhCategoriesChanged,
         ]
         .contains(&EventKind::from(event))
     }
 
-    fn apply_event(&mut self, event: &Event) -> Effects {
+    fn apply_event(&mut self, event: &Event, _: &mut Effects) {
         match event {
+            Event::TabChanged(tab) => self.target = tab.filter_target(),
             Event::FeedCategoriesChanged(categories) => {
                 self.update_categories(FilterTarget::Feeds, Populate::Replace, categories);
             }
@@ -117,6 +138,5 @@ impl Component<Ui> for FilterWidget {
             } => self.update_categories(FilterTarget::GhNotifications, *populate, categories),
             _ => {}
         }
-        Effects::NONE
     }
 }
