@@ -1,6 +1,6 @@
 use futures_util::Stream;
 use std::{io, sync::Arc};
-use tracing::warn;
+use tracing::{info, warn};
 use tuiframework::crossterm::event::{Event as CrosstermEvent, EventStream};
 use tuiframework::event_loop::Ready;
 use tuiframework::{
@@ -140,6 +140,7 @@ impl Application {
     }
 
     pub async fn run(self) -> io::Result<()> {
+        info!("Starting terminal UI");
         let mut device = TerminalDevice::stdout();
         device.install_abort_hook();
         let terminal = Terminal::init(

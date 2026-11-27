@@ -1,6 +1,7 @@
 use std::{io::IsTerminal as _, process::ExitCode};
 
 use synd_support::fs::fsimpl::FileSystem;
+use tracing::error;
 use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::config::ConfigResolver;
@@ -82,7 +83,13 @@ async fn run() -> anyhow::Result<ExitCode> {
     let _tracing_guard = init_tracing(&config, &command)?;
 
     match command {
-        cli::Command::Term(term) => term.run(&config).await,
+        cli::Command::Term(term) => term.run(&config).await.map_err(|err| {
+            error!("{err:?}");
+            err.context(format!(
+                "terminal UI failed (see log: {})",
+                config.log_file().display()
+            ))
+        }),
         cli::Command::Clean(clean) => clean.run(&config, &FileSystem::new()),
         cli::Command::Daemon(daemon) => daemon.run(&config).await,
         cli::Command::Doctor(doctor) => return doctor.run(&config).await,
