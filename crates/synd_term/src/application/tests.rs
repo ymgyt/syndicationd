@@ -598,6 +598,224 @@ fn only_the_current_subscription_failure_reaches_the_status_line() {
 }
 
 #[test]
+fn subscribe_keeps_the_default_interval_as_a_placeholder() {
+    use crate::{
+        crossterm::event::{Event, Event::Paste, KeyCode, KeyEvent, KeyModifiers},
+        keymap::CompiledKeymaps,
+        test_support::screen::Screen,
+    };
+    use ratatui::{Terminal, backend::TestBackend};
+
+    let bindings = toml::from_str(
+        r#"
+        [subscribe]
+        keymap = [
+            { on = "tab", command = "nop" },
+            { on = "f2", command = "subscribe.next", desc = "Next field" }
+        ]
+    "#,
+    )
+    .unwrap();
+    let mut compositor = new_compositor(Config {
+        keymaps: CompiledKeymaps::default_with_user_config(bindings).unwrap(),
+        ..Config::default()
+    });
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let mut screen = |compositor: &Compositor| {
+        let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+        Screen::new(frame.buffer).lines()
+    };
+    for event in [
+        key!(tab),
+        key!('a'),
+        Paste("https://example.org/feed.xml".into()),
+    ] {
+        let _ = compositor.apply_terminal_event(&event);
+    }
+    let lines = screen(&compositor);
+    let status = lines.last().unwrap();
+    assert!(status.contains("f2:Next field") && !status.contains("Tab:Next"));
+    assert!(status.ends_with("esc:Cancel"));
+    assert!(lines.iter().any(|line| line.contains("Poll every    2h")));
+
+    let _ = compositor.apply_terminal_event(&Event::Key(KeyCode::F(2).into()));
+    assert!(
+        screen(&compositor)
+            .iter()
+            .any(|line| line.contains("Poll every    2h"))
+    );
+    let _ = compositor.apply_terminal_event(&Paste("30m".into()));
+    assert!(
+        screen(&compositor)
+            .iter()
+            .any(|line| line.contains("Poll every    30m"))
+    );
+    for _ in 0..3 {
+        let _ = compositor.apply_terminal_event(&key!(backspace));
+    }
+    assert!(
+        screen(&compositor)
+            .iter()
+            .any(|line| line.contains("Poll every    2h"))
+    );
+    let previous = Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+    let _ = compositor.apply_terminal_event(&previous);
+    let submit = compositor.apply_terminal_event(&key!(enter));
+    assert!(matches!(submit.operations.as_slice(),
+        [Operation::SubscribeFeed { input, .. }] if input.crawl_policy.is_none()));
+}
+
+#[test]
+fn failed_subscribe_keeps_the_draft_for_one_retry() {
+    use crate::{
+        application::RequestError, crossterm::event::Event::Paste, operation::SubscriptionOrigin,
+        test_support::screen::Screen,
+    };
+    use ratatui::{Terminal, backend::TestBackend};
+
+    let mut compositor = new_compositor(Config::default());
+    for event in [
+        key!(tab),
+        key!('a'),
+        Paste("https://example.org/feed".into()),
+        key!(tab),
+        Paste("30m".into()),
+        key!(tab),
+        Paste("k8s".into()),
+        key!(tab),
+        key!(tab),
+        key!(tab),
+    ] {
+        let _ = compositor.apply_terminal_event(&event);
+    }
+    let submit = compositor.apply_terminal_event(&key!(enter));
+    let [
+        Operation::SubscribeFeed {
+            input,
+            origin: SubscriptionOrigin::Form,
+        },
+    ] = submit.operations.as_slice()
+    else {
+        panic!("expected a subscription");
+    };
+    assert_eq!(input.labels.category().unwrap().as_str(), "kubernetes");
+
+    let finish = |compositor: &mut Compositor, id, origin, result| {
+        let request_id = RequestId::new(id);
+        let kind = RequestKind::SubscribeFeed {
+            url: input.url.clone(),
+            origin,
+        };
+        let _ = compositor.apply_event(&Event::RequestEmitted {
+            request_id,
+            kind: kind.clone(),
+        });
+        let _ = compositor.apply_event(&Event::RequestCompleted {
+            request_id,
+            kind,
+            result,
+        });
+    };
+    finish(&mut compositor, 1, SubscriptionOrigin::Editor, Ok(()));
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    assert!(Screen::new(frame.buffer).contains_text("Subscribing…"));
+    for event in [Paste("/extra".into()), key!(enter)] {
+        assert!(
+            compositor
+                .apply_terminal_event(&event)
+                .operations
+                .is_empty()
+        );
+    }
+
+    finish(
+        &mut compositor,
+        2,
+        SubscriptionOrigin::Form,
+        Err(RequestError::SyndApi(
+            synd_client::SyndApiError::UnexpectedResponse {
+                context: "try again",
+            },
+        )),
+    );
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    let lines = Screen::new(frame.buffer).lines();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("Could not subscribe:"))
+    );
+    assert!(lines.iter().any(|line| line.contains("try again")));
+    assert!(!lines.last().unwrap().contains("try again"));
+    assert!(lines.iter().any(|line| line.contains("k8s")));
+
+    let retry = compositor.apply_terminal_event(&key!(enter));
+    assert!(matches!(retry.operations.as_slice(),
+        [Operation::SubscribeFeed { input: retried, origin: SubscriptionOrigin::Form }] if retried == input
+    ));
+    finish(&mut compositor, 3, SubscriptionOrigin::Form, Ok(()));
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    assert!(Screen::new(frame.buffer).contains_text("a:Subscribe"));
+    assert!(!Screen::new(frame.buffer).contains_text("Subscribe to feed"));
+}
+
+#[test]
+fn narrow_subscribe_keeps_the_invalid_label_and_its_error_together() {
+    use crate::{crossterm::event::Event::Paste, test_support::screen::Screen};
+    use ratatui::{Terminal, backend::TestBackend};
+
+    let mut compositor = new_compositor(Config::default());
+    let url = "https://example.org/long/path/to/a/feed/with/a/long/name.xml";
+    for event in [
+        key!(tab),
+        key!('a'),
+        Paste(url.into()),
+        key!(tab),
+        key!(tab),
+        key!(tab),
+        key!(enter), // Remove the initial category.
+        key!(enter),
+        Paste("priority".into()),
+        key!(enter),
+        Paste("{".into()),
+        key!(tab),
+        key!(enter), // Confirm the value with Done.
+    ] {
+        let _ = compositor.apply_terminal_event(&event);
+    }
+    let mut terminal = Terminal::new(TestBackend::new(44, 14)).unwrap();
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    let lines = Screen::new(frame.buffer).lines();
+    assert!(lines[0].contains("Feeds"));
+    let error = lines
+        .iter()
+        .position(|line| line.contains("Enter a JSON value"))
+        .unwrap();
+    assert!(lines[error - 1].contains('{'));
+    assert!(lines.iter().any(|line| line.contains("Cancel")));
+
+    for event in [
+        Paste("}".into()),
+        key!(enter),
+        key!(tab),
+        key!(tab),
+        key!(tab),
+    ] {
+        let _ = compositor.apply_terminal_event(&event);
+    }
+    let submit = compositor.apply_terminal_event(&key!(enter));
+    let [Operation::SubscribeFeed { input, .. }] = submit.operations.as_slice() else {
+        panic!("expected the corrected label to be accepted");
+    };
+    assert_eq!(input.url.as_str(), url);
+    assert_eq!(
+        serde_json::to_value(&input.labels).unwrap(),
+        serde_json::json!({ "priority": {} })
+    );
+}
+
+#[test]
 fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
     let mut compositor = new_compositor(Config::default());
     let first = compositor.apply_terminal_event(&key!(tab)).operations;

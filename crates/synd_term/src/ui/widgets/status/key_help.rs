@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use ratatui::text::{Line, Span};
 use std::collections::HashSet;
 
 use crate::{
@@ -52,7 +53,7 @@ const MAIN_ACTIONS: &[(&[CommandId], &str)] = &[
     (&[CommandId::Quit], ""),
 ];
 
-pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
+pub(super) fn line(keymap: &Keymap, layers: &LayerStack, width: u16) -> Line<'static> {
     let mut hints = keymap
         .hints(layers)
         .into_iter()
@@ -71,13 +72,13 @@ pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
         })
         .collect::<Vec<_>>();
     if !keymap.pending_keys().is_empty() {
-        return descriptions(hints);
+        return fit(descriptions(hints), None, width);
     }
     let focus = layers.top();
     let close = match focus {
         Some(Layer::CategoryFilter | Layer::SearchPrompt) => Some(CommandId::DeactivateFiltering),
-        Some(Layer::UnsubscribePopup) => Some(CommandId::CancelFeedUnsubscriptionPopup),
         Some(Layer::Subscribe) => Some(CommandId::CancelSubscribe),
+        Some(Layer::UnsubscribePopup) => Some(CommandId::CancelFeedUnsubscriptionPopup),
         Some(Layer::GhNotificationFilterPopup) => Some(CommandId::CloseGhNotificationFilter),
         Some(Layer::Reader) => Some(CommandId::CloseReader),
         _ => None,
@@ -89,7 +90,17 @@ pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
                 && hint.command.is_none_or(|id| commands.insert(id))
         });
         hints.sort_by_key(|hint| hint.command != Some(close));
-        return descriptions(hints);
+        // The form's cancel hint comes last, with space reserved even on narrow terminals.
+        let trailing = if focus == Some(Layer::Subscribe)
+            && hints
+                .first()
+                .is_some_and(|hint| hint.command == Some(close))
+        {
+            descriptions([hints.remove(0)]).pop()
+        } else {
+            None
+        };
+        return fit(descriptions(hints), trailing, width);
     }
 
     let mut groups = IndexMap::<_, Vec<&str>>::new();
@@ -105,10 +116,29 @@ pub(super) fn entries(keymap: &Keymap, layers: &LayerStack) -> Vec<String> {
                 .push(&hint.keys);
         }
     }
-    groups
+    let entries = groups
         .into_iter()
         .map(|((_, label), keys)| format!("{}:{label}", keys.join("/")))
-        .collect()
+        .collect();
+    fit(entries, None, width)
+}
+
+fn fit(mut entries: Vec<String>, trailing: Option<String>, width: u16) -> Line<'static> {
+    let width = usize::from(width);
+    let display_width = |s: &str| Span::raw(s).width();
+    let trailing = trailing.filter(|s| display_width(s) <= width);
+    let room = width.saturating_sub(trailing.as_ref().map_or(0, |s| display_width(s) + 2));
+    let mut used = 0;
+    entries.retain(|entry| {
+        let next = used + usize::from(used > 0) * 2 + display_width(entry);
+        if next > room {
+            return false;
+        }
+        used = next;
+        true
+    });
+    entries.extend(trailing);
+    Line::raw(entries.join("  "))
 }
 
 fn descriptions<'a>(hints: impl IntoIterator<Item = KeyHint<'a>>) -> Vec<String> {

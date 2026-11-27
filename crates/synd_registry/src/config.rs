@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use synd_feed::feed::DEFAULT_POLLING_INTERVAL;
+
 use crate::crawl::{
     policy::{CrawlPolicy, PollingInterval},
     worker::CrawlWorkerPoolConfig,
@@ -63,7 +65,7 @@ impl Default for FeedRegistryConfig {
     fn default() -> Self {
         Self {
             default_crawl_policy: CrawlPolicy::interval(
-                PollingInterval::try_from(Duration::from_hours(2))
+                PollingInterval::try_from(DEFAULT_POLLING_INTERVAL)
                     .expect("default polling interval is non-zero"),
             ),
             event_wake_channel_capacity: 1024,

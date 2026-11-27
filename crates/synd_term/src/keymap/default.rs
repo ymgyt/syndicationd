@@ -107,7 +107,7 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
         Layer::Subscribe,
         ["enter"],
         CommandId::ConfirmSubscribeField,
-        "Confirm/subscribe"
+        "Confirm"
     );
     bind!(
         Layer::Subscribe,

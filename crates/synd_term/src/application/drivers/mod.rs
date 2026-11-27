@@ -131,8 +131,8 @@ impl Driver for Drivers {
                 self.interaction
                     .open_feed_edition_editor(&prompt, labels, context);
             }
-            Operation::SubscribeFeed { input } => {
-                Self::register_request(context, |cx| self.feed.subscribe_feed(cx, input));
+            Operation::SubscribeFeed { input, origin } => {
+                Self::register_request(context, |cx| self.feed.subscribe_feed(cx, input, origin));
             }
             Operation::UnsubscribeFeed { url } => {
                 Self::register_request(context, |cx| self.feed.unsubscribe_feed(cx, url));

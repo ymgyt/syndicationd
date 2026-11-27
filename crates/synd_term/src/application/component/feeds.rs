@@ -22,7 +22,7 @@ use crate::{
     config::Categories,
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
     keymap::Layer,
-    operation::Operation,
+    operation::{Operation, SubscriptionOrigin},
     types::EntryExt,
     ui::widgets::{entries::EntriesWidget, subscription::SubscriptionWidget, tabs::Tab},
 };
@@ -72,9 +72,10 @@ impl FeedsComponent {
                         Command::Subscribe(SubscribeCommand::AlreadySubscribed),
                     )
                 } else {
-                    Effects::NONE
-                        .send(ComponentId::Subscribe, Command::Close)
-                        .operation(Operation::SubscribeFeed { input })
+                    Effects::NONE.operation(Operation::SubscribeFeed {
+                        input,
+                        origin: SubscriptionOrigin::Form,
+                    })
                 }
             }
             FeedsCommand::PromptFeedEdition => Effects::from_operations(self.edit_selected_feed()),
@@ -398,6 +399,10 @@ impl Component<Ui> for FeedsComponent {
             }
             Event::RequestCompleted { kind, result, .. } => {
                 let follow_up = match kind {
+                    RequestKind::SubscribeFeed {
+                        origin: SubscriptionOrigin::Form,
+                        ..
+                    } => return Effects::NONE,
                     RequestKind::FetchSubscription { generation }
                         if *generation != self.subscription_generation =>
                     {
@@ -427,7 +432,10 @@ impl Component<Ui> for FeedsComponent {
             }
             Event::FeedEditionEditorClosed { input, labels } => {
                 match InputParser::new(input).parse_feed_edition(&self.categories, labels) {
-                    Ok(input) => Effects::NONE.operation(Operation::SubscribeFeed { input }),
+                    Ok(input) => Effects::NONE.operation(Operation::SubscribeFeed {
+                        input,
+                        origin: SubscriptionOrigin::Editor,
+                    }),
                     Err(error) => Effects::NONE.send(
                         ComponentId::Shell,
                         Command::Shell(ShellCommand::ShowError(error.to_string())),

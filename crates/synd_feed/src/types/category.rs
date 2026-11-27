@@ -19,7 +19,8 @@ pub enum CategoryError {
 pub struct Category<'a>(Cow<'a, str>);
 
 impl<'a> Category<'a> {
-    const MAX_LEN: usize = 30;
+    /// Maximum length of a category name in UTF-8 bytes.
+    pub const MAX_LEN: usize = 30;
     pub fn new(c: impl Into<Cow<'a, str>>) -> Result<Self, CategoryError> {
         let c = c.into().trim().to_ascii_lowercase();
 

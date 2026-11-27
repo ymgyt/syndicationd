@@ -25,16 +25,14 @@ impl Overlay {
         &self,
         tab: Option<Tab>,
     ) -> impl DoubleEndedIterator<Item = ComponentId> + '_ {
-        use ComponentId::{
-            Entries, Feeds, Filter, GhNotifications, Login, Reader, Shell, Subscribe, Tabs,
-        };
+        use ComponentId::{Entries, Feeds, Filter, GhNotifications, Login, Reader, Shell, Tabs};
         let overlays = self
             .overlays
             .iter()
             .filter_map(move |&(owner, component)| (Some(owner) == tab).then_some(component));
         let base: &[ComponentId] = match tab {
             None => &[Shell, Login],
-            Some(_) if overlays.clone().any(|id| matches!(id, Reader | Subscribe)) => &[Shell],
+            Some(_) if overlays.clone().any(|id| id == Reader) => &[Shell],
             Some(Tab::Entries) => &[Shell, Tabs, Entries, Filter],
             Some(Tab::Feeds) => &[Shell, Tabs, Feeds, Filter],
             Some(Tab::Gh) => &[Shell, Tabs, GhNotifications, Filter],

@@ -1,6 +1,6 @@
 use ratatui::{
     prelude::{Alignment, Buffer, Constraint, Layout, Rect},
-    text::{Line, Span},
+    text::Line,
     widgets::{Paragraph, StatefulWidget, Widget, Wrap},
 };
 
@@ -51,7 +51,11 @@ impl StatusLineWidget {
         } else if let Some(status) = in_flight {
             Self::render_in_flight(area, buf, cx, &status);
         } else {
-            Self::render_key_hints(area, buf, cx, key_help::entries(keymap, layers));
+            let hints = key_help::line(keymap, layers, area.width);
+            Paragraph::new(hints.style(cx.theme.prompt.key_desc))
+                .alignment(Alignment::Center)
+                .style(cx.theme.prompt.background)
+                .render(area, buf);
         }
     }
 
@@ -95,26 +99,6 @@ impl StatusLineWidget {
         Paragraph::new(suffix)
             .style(cx.theme.prompt.background)
             .render(suffix_area, buf);
-    }
-
-    fn render_key_hints(area: Rect, buf: &mut Buffer, cx: &Context<'_>, hints: Vec<String>) {
-        let mut line = Line::default();
-        let mut width = 0;
-        for hint in hints {
-            let span = Span::styled(hint, cx.theme.prompt.key_desc);
-            let gap = if line.spans.is_empty() { 0 } else { 2 };
-            if width + gap + span.width() <= usize::from(area.width) {
-                if gap != 0 {
-                    line.push_span("  ");
-                }
-                width += gap + span.width();
-                line.push_span(span);
-            }
-        }
-        Paragraph::new(line)
-            .alignment(Alignment::Center)
-            .style(cx.theme.prompt.background)
-            .render(area, buf);
     }
 
     fn render_error(area: Rect, buf: &mut Buffer, cx: &Context<'_>, error_message: &str) {

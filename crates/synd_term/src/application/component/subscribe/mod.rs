@@ -7,61 +7,108 @@ use tuiframework::Component;
 
 use super::{ComponentId, RenderContext, Ui};
 use crate::{
-    application::{Direction, effects::Effects, input_parser::polling_interval},
-    command::{Command, FeedsCommand, ShellCommand, SubscribeCommand},
+    application::{
+        Direction, RequestError, RequestKind, effects::Effects, input_parser::polling_interval,
+        request::synd_api_error_message,
+    },
+    command::{Command, FeedsCommand, SubscribeCommand},
     config::Categories,
-    keymap::Layer,
+    event::Event,
+    keymap::{Layer, LayerStack},
+    operation::SubscriptionOrigin,
     ui::widgets::prompt::Prompt,
 };
 
 mod render;
-use render::Row;
 
-/// Edits a subscription until Feeds accepts the draft.
+/// Owns the draft until the subscription is accepted or the user cancels.
 pub(super) struct SubscribeForm {
     categories: Rc<Categories>,
     draft: Draft,
     focus: Field,
+    state: FormState,
 }
 
-#[derive(Default)]
+enum FormState {
+    Editing,
+    Invalid(Field, String),
+    Submitting,
+}
+
 struct Draft {
     url: Prompt,
-    category: Prompt,
     labels: Vec<LabelRow>,
     poll_every: Prompt,
+}
+
+impl Default for Draft {
+    fn default() -> Self {
+        Self {
+            url: Prompt::default(),
+            labels: vec![LabelRow {
+                key: "category".into(),
+                ..LabelRow::default()
+            }],
+            poll_every: Prompt::default(),
+        }
+    }
 }
 
 #[derive(Default)]
 struct LabelRow {
     key: Prompt,
     value: Prompt,
-    json: bool,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Field {
     Url,
-    Category,
+    PollEvery,
+    /// The compact row edits the value directly. Confirm opens the key and value editor.
+    Label(usize),
     Key(usize),
     Value(usize),
-    Format(usize),
+    Done(usize),
     Remove(usize),
     Add,
-    PollEvery,
     Submit,
+}
+
+impl Field {
+    fn expanded_label(self) -> Option<usize> {
+        match self {
+            Self::Key(i) | Self::Value(i) | Self::Done(i) => Some(i),
+            _ => None,
+        }
+    }
+
+    fn shares_value_with(self, other: Self) -> bool {
+        self == other || matches!((self, other), (Self::Label(i), Self::Value(j)) if i == j)
+    }
 }
 
 impl Component<Ui> for SubscribeForm {
     fn key_layers(&self) -> &[Layer] {
-        &[Layer::TextInput, Layer::Subscribe]
+        match self.state {
+            FormState::Submitting => &[],
+            _ => &[Layer::TextInput, Layer::Subscribe],
+        }
+    }
+
+    fn mask_lower_layers(&self, layers: &mut LayerStack) {
+        layers.truncate_after(Layer::App);
     }
 
     fn apply_command(&mut self, command: Command) -> Effects {
         match command {
+            Command::Subscribe(SubscribeCommand::AlreadySubscribed) => {
+                self.show_error(Field::Url, "Already subscribed to this URL".into());
+            }
+            _ if matches!(self.state, FormState::Submitting) => {}
             Command::Subscribe(SubscribeCommand::Open) => {
                 self.draft = Draft::default();
                 self.focus = Field::Url;
+                self.state = FormState::Editing;
                 return Effects::NONE.send(ComponentId::Subscribe, Command::Open);
             }
             Command::Subscribe(SubscribeCommand::Cancel) => {
@@ -69,13 +116,48 @@ impl Component<Ui> for SubscribeForm {
             }
             Command::Subscribe(SubscribeCommand::Confirm) => return self.confirm(),
             Command::Subscribe(SubscribeCommand::Move(direction)) => self.move_focus(direction),
-            Command::Subscribe(SubscribeCommand::AlreadySubscribed) => {
-                return self.show_error(Field::Url, "Already subscribed to this URL".into());
-            }
             Command::Prompt(action) => {
-                if let Some(prompt) = self.draft.prompt_mut(self.focus) {
-                    prompt.apply(&action);
+                if let Some(prompt) = self.draft.prompt_mut(self.focus)
+                    && prompt.apply(&action)
+                    && matches!(self.state, FormState::Invalid(field, _) if self.focus.shares_value_with(field) || field == Field::Submit)
+                {
+                    self.state = FormState::Editing;
                 }
+            }
+            _ => {}
+        }
+        Effects::NONE
+    }
+
+    fn subscribes(&self, event: &Event) -> bool {
+        matches!(self.state, FormState::Submitting)
+            && matches!(
+                event,
+                Event::RequestCompleted {
+                    kind: RequestKind::SubscribeFeed {
+                        origin: SubscriptionOrigin::Form,
+                        ..
+                    },
+                    ..
+                }
+            )
+    }
+
+    fn apply_event(&mut self, event: &Event) -> Effects {
+        match event {
+            Event::RequestCompleted { result: Ok(()), .. } => {
+                self.state = FormState::Editing;
+                return Effects::NONE.send(ComponentId::Subscribe, Command::Close);
+            }
+            Event::RequestCompleted {
+                result: Err(RequestError::SyndApi(error)),
+                ..
+            } => {
+                tracing::error!(%error, "subscription request failed");
+                self.show_error(
+                    Field::Submit,
+                    format!("Could not subscribe: {}", synd_api_error_message(error)),
+                );
             }
             _ => {}
         }
@@ -93,16 +175,16 @@ impl SubscribeForm {
             categories,
             draft: Draft::default(),
             focus: Field::Url,
+            state: FormState::Editing,
         }
     }
 
     fn move_focus(&mut self, direction: Direction) {
-        let rows = self.draft.rows();
-        let fields: Vec<_> = rows.iter().flat_map(Row::fields).copied().collect();
+        let fields = self.focus_order();
         let current = fields
             .iter()
             .position(|&field| field == self.focus)
-            .expect("focused field exists");
+            .expect("focused control");
         self.focus = fields[direction.apply(current, fields.len())];
     }
 
@@ -110,40 +192,87 @@ impl SubscribeForm {
         match self.focus {
             Field::Url | Field::Submit => match self.draft.input(&self.categories) {
                 Ok(input) => {
+                    self.state = FormState::Submitting;
                     return Effects::NONE.send(
                         ComponentId::Feeds,
                         Command::Feeds(FeedsCommand::Subscribe(input)),
                     );
                 }
-                Err((field, message)) => return self.show_error(field, message),
+                Err((field, message)) => self.show_error(field, message),
             },
             Field::Add => {
                 self.focus = Field::Key(self.draft.labels.len());
                 self.draft.labels.push(LabelRow::default());
             }
-            Field::Remove(index) => {
-                self.draft.labels.remove(index);
-                self.focus = if index < self.draft.labels.len() {
-                    Field::Key(index)
+            Field::Label(i) => self.focus = Field::Key(i),
+            Field::Value(i) | Field::Done(i) => {
+                match self.draft.labels[i].entry(i, &self.categories) {
+                    Ok(_) => {
+                        self.state = FormState::Editing;
+                        self.focus = Field::Label(i);
+                    }
+                    Err((field, message)) => self.show_error(field, message),
+                }
+            }
+            Field::Remove(i) => {
+                self.draft.labels.remove(i);
+                self.state = FormState::Editing;
+                self.focus = if i < self.draft.labels.len() {
+                    Field::Label(i)
                 } else {
                     Field::Add
                 };
             }
-            Field::Format(index) => {
-                let row = &mut self.draft.labels[index];
-                row.json = !row.json;
-            }
-            _ => self.move_focus(Direction::Down),
+            Field::Key(_) | Field::PollEvery => self.move_focus(Direction::Down),
         }
         Effects::NONE
     }
 
-    fn show_error(&mut self, field: Field, message: String) -> Effects {
+    fn show_error(&mut self, field: Field, message: String) {
         self.focus = field;
-        Effects::NONE.send(
-            ComponentId::Shell,
-            Command::Shell(ShellCommand::ShowError(message)),
-        )
+        self.state = FormState::Invalid(field, message);
+    }
+}
+
+impl LabelRow {
+    fn entry(
+        &self,
+        index: usize,
+        categories: &Categories,
+    ) -> Result<Option<(&str, Value)>, (Field, String)> {
+        let key = self.key.line().trim();
+        let raw = self.value.line();
+        if key.is_empty() {
+            return Err((
+                Field::Key(index),
+                "Enter a label key or remove this label.".into(),
+            ));
+        }
+        let value = if key == "category" {
+            if raw.trim().is_empty() {
+                return Ok(None);
+            }
+            let category = Category::new(raw.to_owned()).map_err(|_| {
+                (
+                    Field::Value(index),
+                    format!(
+                        "Use at most {} bytes for a category name.",
+                        Category::MAX_LEN
+                    ),
+                )
+            })?;
+            Value::String(categories.normalize(category).into_inner().into_owned())
+        } else {
+            match serde_json::from_str(raw) {
+                Ok(value) => value,
+                // An unfinished object, array or quoted string needs a correction.
+                Err(err) if raw.trim_start().starts_with(['{', '[', '"']) => {
+                    return Err((Field::Value(index), format!("Enter a JSON value: {err}")));
+                }
+                Err(_) => Value::String(raw.to_owned()),
+            }
+        };
+        Ok(Some((key, value)))
     }
 }
 
@@ -151,11 +280,10 @@ impl Draft {
     fn prompt_mut(&mut self, field: Field) -> Option<&mut Prompt> {
         match field {
             Field::Url => Some(&mut self.url),
-            Field::Category => Some(&mut self.category),
+            Field::Label(i) | Field::Value(i) => Some(&mut self.labels[i].value),
             Field::Key(i) => Some(&mut self.labels[i].key),
-            Field::Value(i) => Some(&mut self.labels[i].value),
             Field::PollEvery => Some(&mut self.poll_every),
-            Field::Format(_) | Field::Remove(_) | Field::Add | Field::Submit => None,
+            _ => None,
         }
     }
 
@@ -166,39 +294,20 @@ impl Draft {
                 "Enter a feed URL, e.g. https://example.org/feed.xml".into(),
             )
         })?;
-        Ok(SubscribeFeedInput {
-            url,
-            labels: self.subscription_labels(categories)?,
-            crawl_policy: self.crawl_policy()?,
-        })
-    }
-
-    fn subscription_labels(
-        &self,
-        categories: &Categories,
-    ) -> Result<SubscriptionLabels, (Field, String)> {
+        let crawl_policy = self.crawl_policy()?;
         let mut labels = SubscriptionLabels::default();
-        if !self.category.line().trim().is_empty() {
-            let category = Category::new(self.category.line().to_owned())
-                .map_err(|err| (Field::Category, format!("Category: {err}")))?;
-            labels.set_category(categories.normalize(category));
-        }
         for (i, row) in self.labels.iter().enumerate() {
-            let key = row.key.line().trim();
-            if key.is_empty() {
-                return Err((Field::Key(i), "Enter a label key or remove the row".into()));
-            }
-            let value = if row.json {
-                serde_json::from_str(row.value.line())
-                    .map_err(|err| (Field::Value(i), format!("Invalid JSON: {err}")))?
-            } else {
-                Value::String(row.value.line().to_owned())
-            };
-            if labels.insert(key, value).is_some() {
+            if let Some((key, value)) = row.entry(i, categories)?
+                && labels.insert(key, value).is_some()
+            {
                 return Err((Field::Key(i), format!("Duplicate label key: {key}")));
             }
         }
-        Ok(labels)
+        Ok(SubscribeFeedInput {
+            url,
+            labels,
+            crawl_policy,
+        })
     }
 
     fn crawl_policy(&self) -> Result<Option<CrawlPolicyInput>, (Field, String)> {
@@ -209,11 +318,48 @@ impl Draft {
         let seconds = polling_interval(interval).ok_or_else(|| {
             (
                 Field::PollEvery,
-                "Enter default or a positive whole-second interval, e.g. 30m or 2h".into(),
+                "Use a duration of at least 1s in whole seconds, e.g. 30m.".into(),
             )
         })?;
         Ok(Some(CrawlPolicyInput {
             polling: PollingPolicyInput::Interval { seconds },
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn infers_label_values_and_keeps_category_names_as_text() {
+        let draft = Draft {
+            url: "https://example.org/feed.xml".into(),
+            labels: [
+                ("priority", "3"),
+                ("code", r#""3""#),
+                ("issue", "003"),
+                ("topic", "rust"),
+                ("archived", "false"),
+                ("tags", r#"["rust", "releases"]"#),
+                ("category", "2026"),
+            ]
+            .into_iter()
+            .map(|(key, value)| LabelRow {
+                key: key.into(),
+                value: value.into(),
+            })
+            .collect(),
+            ..Draft::default()
+        };
+        let input = draft.input(&Categories::default_toml()).unwrap();
+        assert_eq!(
+            serde_json::to_value(input.labels).unwrap(),
+            json!({
+                "priority": 3, "code": "3", "issue": "003", "topic": "rust",
+                "archived": false, "tags": ["rust", "releases"], "category": "2026"
+            })
+        );
     }
 }

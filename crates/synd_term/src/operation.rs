@@ -10,6 +10,13 @@ use crate::{
     types::gh::{NotificationDetail, NotificationId, ThreadId},
 };
 
+/// Identifies the UI that handles the outcome of a subscription write.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SubscriptionOrigin {
+    Form,
+    Editor,
+}
+
 /// External side-effect request emitted by application state transitions.
 #[derive(Debug)]
 pub(crate) enum Operation {
@@ -28,6 +35,7 @@ pub(crate) enum Operation {
 
     SubscribeFeed {
         input: payload::SubscribeFeedInput,
+        origin: SubscriptionOrigin,
     },
     UnsubscribeFeed {
         url: FeedUrl,

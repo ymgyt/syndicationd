@@ -15,6 +15,15 @@ pub(crate) struct Prompt {
     cursor: usize,
 }
 
+impl From<&str> for Prompt {
+    fn from(line: &str) -> Self {
+        Self {
+            line: line.to_owned(),
+            cursor: line.len(),
+        }
+    }
+}
+
 impl Prompt {
     pub fn new() -> Self {
         Self::default()
