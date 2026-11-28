@@ -1,0 +1,308 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js oranda-dark">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Keymap - syndicationd</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" href="oranda-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "oranda-dark" : "oranda-dark";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('orandamdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('orandamdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('orandamdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('oranda-dark')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="configuration.html"><strong aria-hidden="true">1.</strong> Configuration</a></li><li class="chapter-item expanded "><a href="keymap.html" class="active"><strong aria-hidden="true">2.</strong> Keymap</a></li><li class="chapter-item expanded "><a href="feed-tips.html"><strong aria-hidden="true">3.</strong> Feed tips</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="oranda-dark">Axo Dark</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="oranda-light">Axo Light</button></li>
+
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">syndicationd</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="keymap"><a class="header" href="#keymap">Keymap</a></h1>
+<p>A key binding assigns a command to a key or a sequence of keys. A <strong>layer</strong>
+is a group of bindings. In the Entries tab, <code>j</code> moves to the next item
+using the <code>list</code> layer, and <code>Space</code> opens the reader using the <code>entries</code> layer.</p>
+<div class="table-wrapper"><table><thead><tr><th>Screen or prompt</th><th>Active layers, highest priority first</th></tr></thead><tbody>
+<tr><td>Entries tab</td><td><code>filter</code> → <code>entries</code> → <code>list</code> → <code>tabs</code> → <code>global</code> → <code>app</code></td></tr>
+<tr><td>Feeds tab</td><td><code>filter</code> → <code>feeds</code> → <code>list</code> → <code>tabs</code> → <code>global</code> → <code>app</code></td></tr>
+<tr><td>Typing a search</td><td><code>search-prompt</code> just before <code>filter</code> in the current tab</td></tr>
+<tr><td>Choosing categories</td><td><code>category-filter</code> just before <code>filter</code> in the current tab</td></tr>
+<tr><td>Article reader</td><td><code>reader</code> → <code>global</code> → <code>app</code></td></tr>
+<tr><td>Subscribe or edit</td><td><code>subscribe</code> → <code>text-input</code> → <code>app</code></td></tr>
+<tr><td>Unsubscribe confirmation</td><td><code>unsubscribe-popup</code> → <code>app</code></td></tr>
+<tr><td>Login screen</td><td><code>login</code> → <code>global</code> → <code>app</code></td></tr>
+</tbody></table>
+</div>
+<p>When two layers handle the same key, the one on the left takes priority.
+In the Entries list, <code>q</code> quits (<code>global</code>). In the article reader, <code>q</code> closes
+the article (<code>reader</code>).</p>
+<h2 id="custom-key-bindings"><a class="header" href="#custom-key-bindings">Custom Key Bindings</a></h2>
+<p>To read the selected article with <code>o</code> in the Entries tab, add this to your
+<a href="./configuration.html">configuration file</a>.</p>
+<pre><code class="language-toml">[keys.entries]
+keymap = [
+  { on = "o", command = "entries.read" },
+]
+</code></pre>
+<p>Restart <code>synd</code> and select an entry. Both <code>o</code> and <code>Space</code> now open the reader.
+Reusing a key in the same layer replaces its default binding. To disable
+<code>Space</code>, add <code>{ on = "space", command = "no_op" }</code> to the same array.</p>
+<p>To bind another action, put its layer name after <code>keys.</code> and its command name
+in <code>command</code>. You can find both under <a href="#default-key-bindings">Default Key Bindings</a>.
+An optional <code>desc</code> supplies the label when the binding appears in the status line.</p>
+<h2 id="default-key-bindings"><a class="header" href="#default-key-bindings">Default Key Bindings</a></h2>
+<p>Use the key names below in <code>on</code>. For a sequence such as <code>g g</code>, write
+<code>on = ["g", "g"]</code>. The prefixes <code>C-</code>, <code>S-</code>, and <code>A-</code> stand for Ctrl,
+Shift, and Alt.</p>
+<h3 id="entries-and-feeds"><a class="header" href="#entries-and-feeds">Entries and Feeds</a></h3>
+<p>Use <code>[keys.list]</code> for movement in both tabs. For a movement key specific to
+one tab, use the same <code>list</code> command in <code>[keys.entries]</code> or <code>[keys.feeds]</code>.
+These layers also accept tab-specific names such as <code>entries.next</code> and
+<code>feeds.first</code>.</p>
+<div class="table-wrapper"><table><thead><tr><th>Layer</th><th>Action</th><th>Default key</th><th>Command</th></tr></thead><tbody>
+<tr><td><code>list</code></td><td>Move to the next item</td><td><code>j</code> or <code>down</code></td><td><code>list.next</code></td></tr>
+<tr><td><code>list</code></td><td>Move to the previous item</td><td><code>k</code> or <code>up</code></td><td><code>list.prev</code></td></tr>
+<tr><td><code>list</code></td><td>Jump to the first item</td><td><code>g g</code></td><td><code>list.first</code></td></tr>
+<tr><td><code>list</code></td><td>Jump to the last item</td><td><code>g e</code></td><td><code>list.last</code></td></tr>
+<tr><td><code>entries</code></td><td>Read the article in the built-in reader</td><td><code>space</code></td><td><code>entries.read</code></td></tr>
+<tr><td><code>entries</code></td><td>Open the article in your web browser</td><td><code>enter</code></td><td><code>entries.open</code></td></tr>
+<tr><td><code>entries</code></td><td>Open the article in your configured text browser</td><td>Unbound</td><td><code>entries.browse</code></td></tr>
+<tr><td><code>entries</code></td><td>Refresh the timeline</td><td><code>r</code></td><td><code>timeline.refresh</code></td></tr>
+<tr><td><code>feeds</code></td><td>Add a subscription</td><td><code>a</code></td><td><code>feeds.subscribe</code></td></tr>
+<tr><td><code>feeds</code></td><td>Edit the selected subscription</td><td><code>e</code></td><td><code>feeds.edit</code></td></tr>
+<tr><td><code>feeds</code></td><td>Open the unsubscribe dialog</td><td><code>d</code></td><td><code>feeds.unsubscribe</code></td></tr>
+<tr><td><code>feeds</code></td><td>Open the feed's website in your web browser</td><td><code>enter</code></td><td><code>feeds.open</code></td></tr>
+<tr><td><code>feeds</code></td><td>Reload the subscription list</td><td><code>r</code></td><td><code>feeds.reload</code></td></tr>
+</tbody></table>
+</div>
+<p>In Feeds, press <code>a</code> to subscribe or <code>e</code> to edit the selected subscription.
+Use <code>Tab</code> and <code>Shift-Tab</code> to move between fields. A new subscription defaults
+to polling every <code>24h</code>. Editing opens the saved poll interval and labels,
+including <code>category</code>. Choose <strong>Remove</strong> beside a label to delete it and
+<strong>Save</strong> to apply the changes. Press <code>Esc</code> to cancel.</p>
+<h3 id="article-reader"><a class="header" href="#article-reader">Article reader</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Action</th><th>Default key</th><th>Command in <code>[keys.reader]</code></th></tr></thead><tbody>
+<tr><td>Scroll down one line</td><td><code>j</code> or <code>down</code></td><td><code>reader.line-down</code></td></tr>
+<tr><td>Scroll up one line</td><td><code>k</code> or <code>up</code></td><td><code>reader.line-up</code></td></tr>
+<tr><td>Scroll down half a page</td><td><code>z j</code></td><td><code>reader.half-page-down</code></td></tr>
+<tr><td>Scroll up half a page</td><td><code>z k</code></td><td><code>reader.half-page-up</code></td></tr>
+<tr><td>Scroll down one page</td><td><code>space</code> or <code>pagedown</code></td><td><code>reader.page-down</code></td></tr>
+<tr><td>Scroll up one page</td><td><code>pageup</code></td><td><code>reader.page-up</code></td></tr>
+<tr><td>Return to Entries</td><td><code>esc</code> or <code>q</code></td><td><code>reader.close</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="filters"><a class="header" href="#filters">Filters</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Action</th><th>Default key</th><th>Command in <code>[keys.filter]</code></th></tr></thead><tbody>
+<tr><td>Search by keyword</td><td><code>/</code></td><td><code>filter.search</code></td></tr>
+<tr><td>Choose categories</td><td><code>c</code></td><td><code>filter.category</code></td></tr>
+<tr><td>Select the previous feed priority</td><td><code>h</code> or <code>left</code></td><td><code>filter.requirement.prev</code></td></tr>
+<tr><td>Select the next feed priority</td><td><code>l</code> or <code>right</code></td><td><code>filter.requirement.next</code></td></tr>
+<tr><td>Leave search or category selection</td><td><code>esc</code></td><td><code>filter.close</code></td></tr>
+</tbody></table>
+</div>
+<p><code>synd</code> assigns the keys for <code>search-prompt</code> and <code>category-filter</code>. While
+searching, use <code>Backspace</code> to delete the previous character. While choosing
+categories, press the shortcut beside a category to toggle it, <code>+</code> to select
+all categories, or <code>-</code> to clear the selection.</p>
+<h3 id="unsubscribe-confirmation"><a class="header" href="#unsubscribe-confirmation">Unsubscribe confirmation</a></h3>
+<p>The dialog shows the selected feed and initially focuses <strong>Cancel</strong>. Press
+<code>Tab</code> to select <strong>Unsubscribe</strong>, then <code>Enter</code> to confirm.</p>
+<div class="table-wrapper"><table><thead><tr><th>Action</th><th>Default key</th><th>Command in <code>[keys.unsubscribe-popup]</code></th></tr></thead><tbody>
+<tr><td>Select the previous choice</td><td><code>shift-tab</code>, <code>h</code>, or <code>left</code></td><td><code>feeds.unsubscribe-popup.prev</code></td></tr>
+<tr><td>Select the next choice</td><td><code>tab</code>, <code>l</code>, or <code>right</code></td><td><code>feeds.unsubscribe-popup.next</code></td></tr>
+<tr><td>Confirm the selected choice</td><td><code>enter</code></td><td><code>feeds.unsubscribe-popup.select</code></td></tr>
+<tr><td>Cancel</td><td><code>esc</code></td><td><code>feeds.unsubscribe-popup.cancel</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="application-tabs-and-login"><a class="header" href="#application-tabs-and-login">Application, tabs, and login</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Layer</th><th>Action</th><th>Default key</th><th>Command</th></tr></thead><tbody>
+<tr><td><code>app</code></td><td>Quit</td><td><code>C-c</code></td><td><code>app.quit</code></td></tr>
+<tr><td><code>app</code></td><td>Redraw the screen</td><td><code>S-r</code></td><td><code>app.redraw</code></td></tr>
+<tr><td><code>global</code></td><td>Quit</td><td><code>q</code></td><td><code>app.quit</code></td></tr>
+<tr><td><code>global</code></td><td>Cycle through themes</td><td><code>S-t</code></td><td><code>theme.rotate</code></td></tr>
+<tr><td><code>tabs</code></td><td>Switch to the next tab</td><td><code>tab</code></td><td><code>tabs.next</code></td></tr>
+<tr><td><code>tabs</code></td><td>Switch to the previous tab</td><td><code>backtab</code> (Shift+Tab)</td><td><code>tabs.prev</code></td></tr>
+<tr><td><code>login</code></td><td>Select the next provider</td><td><code>j</code> or <code>down</code></td><td><code>login.provider.next</code></td></tr>
+<tr><td><code>login</code></td><td>Select the previous provider</td><td><code>k</code> or <code>up</code></td><td><code>login.provider.prev</code></td></tr>
+<tr><td><code>login</code></td><td>Log in with the selected provider</td><td><code>enter</code></td><td><code>login.authenticate</code></td></tr>
+</tbody></table>
+</div>
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next" href="feed-tips.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next" href="feed-tips.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
