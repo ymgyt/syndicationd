@@ -20,8 +20,6 @@ pub(crate) use request::{Generation, RequestError, RequestId, RequestKind};
 mod in_flight;
 pub(crate) use in_flight::{InFlightRequests, InFlightStatus, RequestProgress};
 
-mod input_parser;
-
 pub use crate::auth::authenticator::{Authenticator, DeviceFlows, JwtService};
 
 mod clock;

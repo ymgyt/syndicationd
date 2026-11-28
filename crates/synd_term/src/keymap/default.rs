@@ -168,6 +168,18 @@ pub(super) fn default_keymap_config() -> KeymapConfig {
 
     bind!(
         Layer::UnsubscribePopup,
+        ["tab"],
+        CommandId::MoveFeedUnsubscriptionPopupSelectionNext,
+        "Next"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
+        ["S-tab"],
+        CommandId::MoveFeedUnsubscriptionPopupSelectionPrev,
+        "Previous"
+    );
+    bind!(
+        Layer::UnsubscribePopup,
         ["h"],
         CommandId::MoveFeedUnsubscriptionPopupSelectionPrev,
         "Choice"

@@ -483,7 +483,7 @@ fn deliver_subscription_page(
     let request_id = RequestId::new(id);
     let subscription = serde_json::from_value(serde_json::json!({
         "feeds": {
-            "nodes": [{ "url": url, "labels": {}, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
+            "nodes": [{ "url": url, "labels": {"category": "rust", "issue": "3"}, "crawlPolicy": { "polling": { "kind": "MANUAL" } } }],
             "pageInfo": { "hasNextPage": next_cursor.is_some(), "endCursor": next_cursor }
         }
     }))
@@ -635,13 +635,13 @@ fn subscribe_keeps_the_default_interval_as_a_placeholder() {
     let status = lines.last().unwrap();
     assert!(status.contains("f2:Next field") && !status.contains("Tab:Next"));
     assert!(status.ends_with("esc:Cancel"));
-    assert!(lines.iter().any(|line| line.contains("Poll every    2h")));
+    assert!(lines.iter().any(|line| line.contains("Poll every    24h")));
 
     let _ = compositor.apply_terminal_event(&Event::Key(KeyCode::F(2).into()));
     assert!(
         screen(&compositor)
             .iter()
-            .any(|line| line.contains("Poll every    2h"))
+            .any(|line| line.contains("Poll every    24h"))
     );
     let _ = compositor.apply_terminal_event(&Paste("30m".into()));
     assert!(
@@ -655,7 +655,7 @@ fn subscribe_keeps_the_default_interval_as_a_placeholder() {
     assert!(
         screen(&compositor)
             .iter()
-            .any(|line| line.contains("Poll every    2h"))
+            .any(|line| line.contains("Poll every    24h"))
     );
     let previous = Event::Key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
     let _ = compositor.apply_terminal_event(&previous);
@@ -667,8 +667,7 @@ fn subscribe_keeps_the_default_interval_as_a_placeholder() {
 #[test]
 fn failed_subscribe_keeps_the_draft_for_one_retry() {
     use crate::{
-        application::RequestError, crossterm::event::Event::Paste, operation::SubscriptionOrigin,
-        test_support::screen::Screen,
+        application::RequestError, crossterm::event::Event::Paste, test_support::screen::Screen,
     };
     use ratatui::{Terminal, backend::TestBackend};
 
@@ -688,23 +687,14 @@ fn failed_subscribe_keeps_the_draft_for_one_retry() {
         let _ = compositor.apply_terminal_event(&event);
     }
     let submit = compositor.apply_terminal_event(&key!(enter));
-    let [
-        Operation::SubscribeFeed {
-            input,
-            origin: SubscriptionOrigin::Form,
-        },
-    ] = submit.operations.as_slice()
-    else {
+    let [Operation::SubscribeFeed { input }] = submit.operations.as_slice() else {
         panic!("expected a subscription");
     };
     assert_eq!(input.labels.category().unwrap().as_str(), "kubernetes");
 
-    let finish = |compositor: &mut Compositor, id, origin, result| {
+    let finish = |compositor: &mut Compositor, id, url, result| {
         let request_id = RequestId::new(id);
-        let kind = RequestKind::SubscribeFeed {
-            url: input.url.clone(),
-            origin,
-        };
+        let kind = RequestKind::SubscribeFeed { url };
         let _ = compositor.apply_event(&Event::RequestEmitted {
             request_id,
             kind: kind.clone(),
@@ -715,7 +705,12 @@ fn failed_subscribe_keeps_the_draft_for_one_retry() {
             result,
         });
     };
-    finish(&mut compositor, 1, SubscriptionOrigin::Editor, Ok(()));
+    finish(
+        &mut compositor,
+        1,
+        "https://example.org/other".try_into().unwrap(),
+        Ok(()),
+    );
     let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
     let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
     assert!(Screen::new(frame.buffer).contains_text("Subscribing…"));
@@ -731,7 +726,7 @@ fn failed_subscribe_keeps_the_draft_for_one_retry() {
     finish(
         &mut compositor,
         2,
-        SubscriptionOrigin::Form,
+        input.url.clone(),
         Err(RequestError::SyndApi(
             synd_client::SyndApiError::UnexpectedResponse {
                 context: "try again",
@@ -751,9 +746,9 @@ fn failed_subscribe_keeps_the_draft_for_one_retry() {
 
     let retry = compositor.apply_terminal_event(&key!(enter));
     assert!(matches!(retry.operations.as_slice(),
-        [Operation::SubscribeFeed { input: retried, origin: SubscriptionOrigin::Form }] if retried == input
+        [Operation::SubscribeFeed { input: retried }] if retried == input
     ));
-    finish(&mut compositor, 3, SubscriptionOrigin::Form, Ok(()));
+    finish(&mut compositor, 3, input.url.clone(), Ok(()));
     let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
     assert!(Screen::new(frame.buffer).contains_text("a:Subscribe"));
     assert!(!Screen::new(frame.buffer).contains_text("Subscribe to feed"));
@@ -815,6 +810,47 @@ fn narrow_subscribe_keeps_the_invalid_label_and_its_error_together() {
 }
 
 #[test]
+fn edit_removes_category_and_preserves_other_labels_and_manual_polling() {
+    use crate::test_support::screen::Screen;
+    use ratatui::{Terminal, backend::TestBackend};
+    use synd_client::payload::{CrawlPolicyInput, PollingPolicyInput};
+
+    let mut compositor = new_compositor(Config::default());
+    let fetch = compositor.apply_terminal_event(&key!(tab)).operations;
+    let url = "https://example.com/feed";
+    let _ = deliver_subscription_page(&mut compositor, 1, &fetch, url, None);
+    let _ = compositor.apply_terminal_event(&key!('e'));
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    let screen = Screen::new(frame.buffer);
+    for text in ["Edit subscription", url, "manual", "rust", "[ Save ]"] {
+        assert!(screen.contains_text(text), "{text}");
+    }
+
+    for key in [key!(tab), key!(enter), key!(tab), key!(tab), key!(tab)] {
+        let _ = compositor.apply_terminal_event(&key);
+    }
+    let save = compositor.apply_terminal_event(&key!(enter));
+    let [Operation::SubscribeFeed { input }] = save.operations.as_slice() else {
+        panic!(
+            "expected Save to edit the selected subscription, got {:?}",
+            save.operations
+        );
+    };
+    assert_eq!(input.url.as_str(), url);
+    assert_eq!(
+        serde_json::to_value(&input.labels).unwrap(),
+        serde_json::json!({"issue": "3"})
+    );
+    assert_eq!(
+        input.crawl_policy,
+        Some(CrawlPolicyInput {
+            polling: PollingPolicyInput::Manual
+        })
+    );
+}
+
+#[test]
 fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
     let mut compositor = new_compositor(Config::default());
     let first = compositor.apply_terminal_event(&key!(tab)).operations;
@@ -834,29 +870,61 @@ fn unsubscribe_uses_the_feed_shown_when_confirmation_opened() {
         "https://example.com/second",
         None,
     );
+    let _ = compositor.apply_terminal_event(&key!(tab));
+    let submit = compositor.apply_terminal_event(&key!(enter));
+    let [Operation::UnsubscribeFeed { url }] = submit.operations.as_slice() else {
+        panic!("expected unsubscribe");
+    };
+    assert_eq!(url.as_str(), "https://example.com/first");
     assert!(
-        matches!(compositor.apply_terminal_event(&key!(enter)).operations.as_slice(),
-            [Operation::UnsubscribeFeed { url }] if url.as_str() == "https://example.com/first"
-        )
-    );
-
-    let _ = compositor.apply_terminal_event(&key!('d'));
-    assert!(matches!(
-        compositor
-            .apply_terminal_event(&key!(esc))
-            .operations
-            .as_slice(),
-        []
-    ));
-    let _ = compositor.apply_terminal_event(&key!('d'));
-    let _ = compositor.apply_terminal_event(&key!('l'));
-    assert!(matches!(
         compositor
             .apply_terminal_event(&key!(enter))
             .operations
-            .as_slice(),
-        []
-    ));
+            .is_empty()
+    );
+
+    let kind = RequestKind::UnsubscribeFeed { url: url.clone() };
+    let finish = |compositor: &mut Compositor, id, result| {
+        let request_id = RequestId::new(id);
+        let _ = compositor.apply_event(&Event::RequestEmitted {
+            request_id,
+            kind: kind.clone(),
+        });
+        let _ = compositor.apply_event(&Event::RequestCompleted {
+            request_id,
+            kind: kind.clone(),
+            result,
+        });
+    };
+    finish(
+        &mut compositor,
+        3,
+        Err(crate::application::RequestError::SyndApi(
+            synd_client::SyndApiError::UnexpectedResponse {
+                context: "try again",
+            },
+        )),
+    );
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(44, 14)).unwrap();
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    assert!(crate::test_support::screen::Screen::new(frame.buffer).contains_text("try again"));
+    let retry = compositor.apply_terminal_event(&key!(enter));
+    assert!(
+        matches!(retry.operations.as_slice(), [Operation::UnsubscribeFeed { url: retried }] if retried == url)
+    );
+    finish(&mut compositor, 4, Ok(()));
+    let frame = terminal.draw(|frame| compositor.render(frame)).unwrap();
+    assert!(
+        !crate::test_support::screen::Screen::new(frame.buffer).contains_text("[ Unsubscribe ]")
+    );
+
+    let _ = compositor.apply_terminal_event(&key!('d'));
+    assert!(
+        compositor
+            .apply_terminal_event(&key!(enter))
+            .operations
+            .is_empty()
+    );
 }
 
 #[test]

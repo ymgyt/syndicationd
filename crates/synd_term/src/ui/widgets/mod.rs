@@ -1,4 +1,8 @@
 pub(crate) mod authentication;
+mod button;
+mod dialog;
+pub(crate) use button::Button;
+pub(crate) use dialog::Dialog;
 pub(crate) mod entries;
 pub(crate) mod filter;
 pub(crate) mod gh_notifications;

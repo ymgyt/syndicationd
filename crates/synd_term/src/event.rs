@@ -14,7 +14,7 @@ use url::Url;
 use crate::{
     application::{Generation, PersistCacheError, Populate, RequestError, RequestId, RequestKind},
     auth::{AuthenticationProvider, Credential, CredentialError, Verified},
-    external_tools::{OpenBrowserError, OpenEditorError},
+    external_tools::OpenBrowserError,
     types::gh::{IssueContext, Notification, NotificationId, PullRequestContext},
 };
 
@@ -96,7 +96,6 @@ pub(crate) enum GhEvent {
 /// Failure of a synchronous operation that is not a registered request.
 #[derive(Debug)]
 pub(crate) enum OperationError {
-    OpenFeedEditionEditor(OpenEditorError),
     OpenBrowser(OpenBrowserError),
     OpenTextBrowser(OpenBrowserError),
     PersistCredential(PersistCacheError),
@@ -109,7 +108,10 @@ pub(crate) enum OperationError {
 pub(crate) enum Event {
     TabChanged(Tab),
     GhFilterEditingFinished,
-    SubscriptionSubmitted(payload::SubscribeFeedInput),
+    SubscriptionSubmitted {
+        mode: crate::command::SubscriptionMode,
+        input: payload::SubscribeFeedInput,
+    },
     SubscriptionDuplicate,
     UnsubscriptionRequested(crate::command::UnsubscribeTarget),
     ArticleRequested(Url),
@@ -152,8 +154,9 @@ pub(crate) enum Event {
         event: GhEvent,
     },
 
-    FeedEditionEditorClosed {
-        input: String,
+    SubscriptionEditRequested {
+        url: FeedUrl,
+        polling: payload::PollingPolicy,
         labels: SubscriptionLabels,
     },
 
@@ -174,7 +177,7 @@ impl Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::GhFilterEditingFinished => f.write_str("GhFilterEditingFinished"),
-            Self::SubscriptionSubmitted(_) => f.write_str("SubscriptionSubmitted"),
+            Self::SubscriptionSubmitted { .. } => f.write_str("SubscriptionSubmitted"),
             Self::SubscriptionDuplicate => f.write_str("SubscriptionDuplicate"),
             Self::UnsubscriptionRequested(_) => f.write_str("UnsubscriptionRequested"),
             Self::ArticleRequested(_) => f.write_str("ArticleRequested"),
@@ -212,7 +215,7 @@ impl Display for Event {
             } => {
                 write!(f, "Gh({request_id:?}, {})", event.name())
             }
-            Self::FeedEditionEditorClosed { .. } => f.write_str("FeedEditionEditorClosed"),
+            Self::SubscriptionEditRequested { .. } => f.write_str("SubscriptionEditRequested"),
             Self::ApiCredentialConfigured => f.write_str("ApiCredentialConfigured"),
             Self::CredentialRefreshed { .. } => f.write_str("CredentialRefreshed"),
             Self::CredentialRefreshFailed { .. } => f.write_str("CredentialRefreshFailed"),
@@ -259,7 +262,6 @@ impl GhEvent {
 impl OperationError {
     fn name(&self) -> &'static str {
         match self {
-            Self::OpenFeedEditionEditor(_) => "OpenFeedEditionEditor",
             Self::OpenBrowser(_) => "OpenBrowser",
             Self::OpenTextBrowser(_) => "OpenTextBrowser",
             Self::PersistCredential(_) => "PersistCredential",

@@ -8,7 +8,6 @@ use crate::{
         FeedApiRef, Generation, Populate, RequestError, RequestKind, outbound::feed::FeedApi,
     },
     event::{Event, FeedRequestEvent, FeedsEvent},
-    operation::SubscriptionOrigin,
 };
 
 use super::{
@@ -45,14 +44,12 @@ impl FeedDriver {
         &self,
         context: RequestContext,
         input: payload::SubscribeFeedInput,
-        origin: SubscriptionOrigin,
     ) -> (RequestKind, RequestFuture) {
         let api = self.api.clone();
 
         (
             RequestKind::SubscribeFeed {
                 url: input.url.clone(),
-                origin,
             },
             async move {
                 let url = input.url.clone();

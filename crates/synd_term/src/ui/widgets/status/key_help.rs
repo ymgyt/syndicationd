@@ -91,7 +91,7 @@ pub(super) fn line(keymap: &Keymap, layers: &LayerStack, width: u16) -> Line<'st
         });
         hints.sort_by_key(|hint| hint.command != Some(close));
         // The form's cancel hint comes last, with space reserved even on narrow terminals.
-        let trailing = if focus == Some(Layer::Subscribe)
+        let trailing = if matches!(focus, Some(Layer::Subscribe | Layer::UnsubscribePopup))
             && hints
                 .first()
                 .is_some_and(|hint| hint.command == Some(close))

@@ -1,6 +1,6 @@
 use synd_auth::device_flow::DeviceAuthorizationResponse;
 use synd_client::payload;
-use synd_feed::types::{FeedUrl, SubscriptionLabels};
+use synd_feed::types::FeedUrl;
 use url::Url;
 
 use crate::{
@@ -9,13 +9,6 @@ use crate::{
     client::gh::FetchNotificationsParams,
     types::gh::{NotificationDetail, NotificationId, ThreadId},
 };
-
-/// Identifies the UI that handles the outcome of a subscription write.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum SubscriptionOrigin {
-    Form,
-    Editor,
-}
 
 /// External side-effect request emitted by application state transitions.
 #[derive(Debug)]
@@ -28,14 +21,8 @@ pub(crate) enum Operation {
         device_authorization: Box<DeviceAuthorizationResponse>,
     },
 
-    OpenFeedEditionEditor {
-        prompt: String,
-        labels: SubscriptionLabels,
-    },
-
     SubscribeFeed {
         input: payload::SubscribeFeedInput,
-        origin: SubscriptionOrigin,
     },
     UnsubscribeFeed {
         url: FeedUrl,

@@ -10,6 +10,7 @@ use crate::{
     ui::{
         Context,
         widgets::{
+            Dialog,
             entries::EntriesWidget,
             gh_notifications::{FilterPopup, GhNotificationFilterOptions},
             tabs::{Tab, TabsWidget},
@@ -26,6 +27,24 @@ pub(in crate::application) struct FrameLayout {
 }
 
 impl FrameLayout {
+    pub(super) fn dialog(&self) -> Dialog {
+        let screen = self.full_screen_content();
+        // Keep the tab visible while there is room above the dialog.
+        let tab_height = if screen.height >= 8 {
+            self.tabs.height
+        } else {
+            0
+        };
+        Dialog::new(
+            screen,
+            Rect {
+                y: screen.y + tab_height,
+                height: screen.height - tab_height,
+                ..screen
+            },
+        )
+    }
+
     pub(super) fn full_screen_content(&self) -> Rect {
         Rect {
             height: self.status.y.saturating_sub(self.area.y),

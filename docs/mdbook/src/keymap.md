@@ -11,7 +11,8 @@ using the `list` layer, and `Space` opens the reader using the `entries` layer.
 | Typing a search | `search-prompt` just before `filter` in the current tab |
 | Choosing categories | `category-filter` just before `filter` in the current tab |
 | Article reader | `reader` → `global` → `app` |
-| Unsubscribe confirmation | `unsubscribe-popup` → `filter` → `tabs` → `global` → `app` |
+| Subscribe or edit | `subscribe` → `text-input` → `app` |
+| Unsubscribe confirmation | `unsubscribe-popup` → `app` |
 | Login screen | `login` → `global` → `app` |
 
 When two layers handle the same key, the one on the left takes priority.
@@ -67,6 +68,12 @@ These layers also accept tab-specific names such as `entries.next` and
 | `feeds` | Open the feed's website in your web browser | `enter` | `feeds.open` |
 | `feeds` | Reload the subscription list | `r` | `feeds.reload` |
 
+In Feeds, press `a` to subscribe or `e` to edit the selected subscription.
+Use `Tab` and `Shift-Tab` to move between fields. A new subscription defaults
+to polling every `24h`. Editing opens the saved poll interval and labels,
+including `category`. Choose **Remove** beside a label to delete it and
+**Save** to apply the changes. Press `Esc` to cancel.
+
 ### Article reader
 
 | Action | Default key | Command in `[keys.reader]` |
@@ -96,13 +103,13 @@ all categories, or `-` to clear the selection.
 
 ### Unsubscribe confirmation
 
-The dialog blocks the `feeds` and `list` bindings while you choose whether
-to unsubscribe.
+The dialog shows the selected feed and initially focuses **Cancel**. Press
+`Tab` to select **Unsubscribe**, then `Enter` to confirm.
 
 | Action | Default key | Command in `[keys.unsubscribe-popup]` |
 | --- | --- | --- |
-| Select the previous choice | `h` or `left` | `feeds.unsubscribe-popup.prev` |
-| Select the next choice | `l` or `right` | `feeds.unsubscribe-popup.next` |
+| Select the previous choice | `shift-tab`, `h`, or `left` | `feeds.unsubscribe-popup.prev` |
+| Select the next choice | `tab`, `l`, or `right` | `feeds.unsubscribe-popup.next` |
 | Confirm the selected choice | `enter` | `feeds.unsubscribe-popup.select` |
 | Cancel | `esc` | `feeds.unsubscribe-popup.cancel` |
 

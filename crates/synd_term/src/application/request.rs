@@ -7,7 +7,6 @@ use synd_feed::types::FeedUrl;
 use crate::{
     auth::AuthenticationProvider,
     client::gh::GhError,
-    operation::SubscriptionOrigin,
     types::gh::{IssueId, NotificationId, PullRequestId, ThreadId},
 };
 
@@ -34,7 +33,6 @@ pub(crate) enum RequestKind {
     },
     SubscribeFeed {
         url: FeedUrl,
-        origin: SubscriptionOrigin,
     },
     UnsubscribeFeed {
         url: FeedUrl,
@@ -77,7 +75,7 @@ impl RequestKind {
         match self {
             Self::StartDeviceFlow { .. } => Cow::Borrowed("Request device authorization"),
             Self::PollDeviceFlowAccessToken { .. } => Cow::Borrowed("Poll device access token"),
-            Self::SubscribeFeed { url, .. } => Cow::Owned(format!("Subscribe feed {url}")),
+            Self::SubscribeFeed { url } => Cow::Owned(format!("Save subscription {url}")),
             Self::UnsubscribeFeed { url } => Cow::Owned(format!("Unsubscribe feed {url}")),
             Self::FetchSubscription { .. } => Cow::Borrowed("Fetch subscriptions"),
             Self::OpenInitialTimeline => Cow::Borrowed("Open timeline"),

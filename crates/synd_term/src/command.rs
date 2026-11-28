@@ -91,6 +91,13 @@ pub(crate) enum FeedsCommand {
     BrowseEntry,
 }
 
+/// Distinguishes creating a subscription from editing its existing settings.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SubscriptionMode {
+    Create,
+    Edit,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SubscribeCommand {
     Open,
@@ -114,7 +121,6 @@ pub(crate) struct UnsubscribeTarget {
 
 #[derive(Debug, Clone)]
 pub(crate) enum UnsubscribeCommand {
-    Open(UnsubscribeTarget),
     ToggleSelection,
     Select,
     Cancel,

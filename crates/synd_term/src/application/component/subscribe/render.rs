@@ -1,23 +1,27 @@
+use crate::command::SubscriptionMode;
 use ratatui::{
     Frame,
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Clear, Padding, Paragraph, Widget as _, Wrap},
+    widgets::{Paragraph, Widget as _, Wrap},
 };
 use synd_feed::feed::DEFAULT_POLLING_INTERVAL;
-use synd_support::time::humantime::HumanDuration;
 
-use super::{Field, FormState, RenderContext, SubscribeForm};
+use super::{Field, FormState, RenderContext, SubscriptionForm, draft::interval_text};
 use crate::ui::{
     theme::Theme,
-    widgets::prompt::{Prompt, RenderCursor},
+    widgets::{
+        Button,
+        prompt::{Prompt, RenderCursor},
+    },
 };
 
 /// A row in the scrollable body. The title and submit action stay on screen.
 enum Row<'a> {
     Space,
+    Url,
     Labels,
     Control(&'a str, Field),
     Label(usize),
@@ -56,7 +60,7 @@ impl Row<'_> {
     }
 }
 
-impl SubscribeForm {
+impl SubscriptionForm {
     pub(super) fn focus_order(&self) -> Vec<Field> {
         self.rows()
             .iter()
@@ -67,7 +71,11 @@ impl SubscribeForm {
 
     fn rows(&self) -> Vec<Row<'_>> {
         let mut rows = vec![
-            Row::Control("Feed URL", Field::Url),
+            if self.mode == SubscriptionMode::Edit {
+                Row::Url
+            } else {
+                Row::Control("Feed URL", Field::Url)
+            },
             Row::Space,
             Row::Control("Poll every", Field::PollEvery),
             Row::Space,
@@ -98,54 +106,18 @@ impl SubscribeForm {
     }
 
     pub(super) fn render_form(&self, frame: &mut Frame<'_>, cx: &RenderContext<'_>) {
-        let screen = cx.frame.full_screen_content();
-        // Leave the Feeds tab visible when the terminal can spare one line.
-        let tab_height = u16::from(screen.height >= 8);
-        let available = Rect {
-            y: screen.y + tab_height,
-            height: screen.height - tab_height,
-            ..screen
-        };
-        let width = available.width.min(58);
-        let padding_x = if width < 48 { 1 } else { 2 };
-        let padding_y = u16::from(available.height >= 14);
-        let inner_width = width.saturating_sub(2 + 2 * padding_x);
+        let dialog = cx.frame.dialog();
+        let inner_width = dialog.inner_width();
         let rows = self.rows();
         let heights: Vec<_> = rows.iter().map(|row| row.height(inner_width)).collect();
         let lines = heights.iter().copied().fold(0u16, u16::saturating_add);
-        let height = lines
-            .saturating_add(4 + 2 * padding_y)
-            .max(13)
-            .min(available.height);
-        let area = Rect::new(
-            available.x + (available.width - width) / 2,
-            available.y + (available.height - height) / 2,
-            width,
-            height,
-        );
         let theme = cx.ui.theme;
         let buf = frame.buffer_mut();
-        for position in screen.positions() {
-            let cell = &mut buf[position];
-            cell.set_style(theme.backdrop_style(cell.fg, cell.bg));
-        }
-        Clear.render(area, buf);
-        let block = Block::bordered()
-            .style(theme.base)
-            .border_style(theme.prompt.key)
-            .title(Span::styled(" Subscribe to feed ", theme.application_title))
-            .padding(Padding::new(padding_x, padding_x, padding_y, padding_y));
-        let inner = block.inner(area);
-        block.render(area, buf);
-        if inner.is_empty() {
-            return;
-        }
-        let [body, _, footer] = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Length(u16::from(inner.height > 5)),
-            Constraint::Length(1),
-        ])
-        .areas(inner);
+        let title = match self.mode {
+            SubscriptionMode::Create => "Subscribe to feed",
+            SubscriptionMode::Edit => "Edit subscription",
+        };
+        let (body, footer) = dialog.render(buf, theme, title, lines, 13);
         self.render_body(body, buf, theme, &rows, &heights);
         self.render_field(Field::Submit, footer, buf, theme);
     }
@@ -182,6 +154,10 @@ impl SubscribeForm {
                     Line::styled("Labels", theme.application_title).render(area, buf);
                 }
                 Row::Space => {}
+                Row::Url => {
+                    let value = captioned(area, "Feed URL", buf);
+                    Line::raw(self.draft.url.line()).render(value, buf);
+                }
                 Row::Error(message) => {
                     Paragraph::new(*message)
                         .style(theme.error.message)
@@ -220,59 +196,44 @@ impl SubscribeForm {
     }
 
     fn render_field(&self, field: Field, area: Rect, buf: &mut Buffer, theme: &Theme) {
-        enum Control<'a> {
-            Input(&'a Prompt),
-            Button(&'static str),
-        }
-        let selected = self.focus == field && !matches!(self.state, FormState::Submitting);
-        let control = match field {
-            Field::Url => Control::Input(&self.draft.url),
-            Field::Label(i) | Field::Value(i) => Control::Input(&self.draft.labels[i].value),
-            Field::Key(i) => Control::Input(&self.draft.labels[i].key),
-            Field::PollEvery => Control::Input(&self.draft.poll_every),
-            Field::Done(_) => Control::Button("Done"),
-            Field::Remove(_) => Control::Button("Remove"),
-            Field::Add => Control::Button("+ Add label"),
-            Field::Submit if matches!(self.state, FormState::Submitting) => {
-                Control::Button("Subscribing…")
+        let selected = self.focus == field && !matches!(self.state, FormState::Submitting(_));
+        let inline = |label| Line::from(Button::new(label, selected, theme).inline());
+        let prompt: &Prompt = match field {
+            Field::Url => &self.draft.url,
+            Field::Label(i) | Field::Value(i) => &self.draft.labels[i].value,
+            Field::Key(i) => &self.draft.labels[i].key,
+            Field::PollEvery => &self.draft.poll_every,
+            Field::Done(_) => return inline("Done").render(area, buf),
+            Field::Remove(_) => return inline("Remove").render(area, buf),
+            Field::Add => return inline("+ Add label").render(area, buf),
+            Field::Submit => {
+                let (action, pending) = match self.mode {
+                    SubscriptionMode::Create => ("Subscribe", "Subscribing…"),
+                    SubscriptionMode::Edit => ("Save", "Saving…"),
+                };
+                let line = if matches!(self.state, FormState::Submitting(_)) {
+                    Line::from(Span::styled(pending, theme.tabs_selected))
+                } else {
+                    Button::new(action, selected, theme).into()
+                };
+                return line.right_aligned().render(area, buf);
             }
-            Field::Submit => Control::Button("[ Subscribe ]"),
         };
-        match control {
-            Control::Input(prompt) => {
-                buf.set_style(area, theme.input_surface());
-                if field == Field::PollEvery && prompt.line().is_empty() {
-                    let default = HumanDuration::from(DEFAULT_POLLING_INTERVAL).to_string();
-                    Line::from(Span::styled(default, theme.input_placeholder())).render(area, buf);
-                    if selected && !area.is_empty() {
-                        buf[(area.x, area.y)].set_style(Style::new().reversed());
-                    }
-                    return;
-                }
-                let cursor = if selected {
-                    RenderCursor::Enable
-                } else {
-                    RenderCursor::Disable
-                };
-                prompt.render(area, buf, cursor);
+        buf.set_style(area, theme.input_surface());
+        if field == Field::PollEvery && prompt.line().is_empty() {
+            let default = interval_text(DEFAULT_POLLING_INTERVAL.as_secs());
+            Line::from(Span::styled(default, theme.input_placeholder())).render(area, buf);
+            if selected && !area.is_empty() {
+                buf[(area.x, area.y)].set_style(Style::new().reversed());
             }
-            Control::Button(button) => {
-                let style = if selected {
-                    theme.tabs_selected.reversed()
-                } else if field == Field::Submit {
-                    theme.tabs_selected
-                } else {
-                    theme.tabs_selected.not_bold()
-                };
-                let line = Line::from(Span::styled(button, style));
-                if field == Field::Submit {
-                    line.right_aligned()
-                } else {
-                    line
-                }
-                .render(area, buf);
-            }
+            return;
         }
+        let cursor = if selected {
+            RenderCursor::Enable
+        } else {
+            RenderCursor::Disable
+        };
+        prompt.render(area, buf, cursor);
     }
 }
 

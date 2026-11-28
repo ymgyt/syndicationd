@@ -240,25 +240,21 @@ mod bootstrapped_app {
     }
 
     #[tokio::test]
-    async fn unsubscribe_popup_only_receives_keys_on_its_tab() {
+    async fn unsubscribe_keeps_focus_until_the_user_cancels() {
         let (_cache_dir, mut app) = start_app();
         let tx = app.input();
         app.wait_until_jobs_completed().await;
 
         tx.send_multi([key!(tab), key!('d')]);
         app.wait_until_jobs_completed().await;
-        assert!(Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
+        assert!(Screen::new(app.buffer()).contains_text("[ Unsubscribe ]"));
 
         tx.send_multi([key!(tab), key!('j')]);
         app.wait_until_jobs_completed().await;
-        assert!(Screen::new(app.buffer()).contains_text("Entry 2/2"));
-
-        tx.send(key!(tab));
-        app.wait_until_jobs_completed().await;
-        assert!(Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
+        assert!(Screen::new(app.buffer()).contains_text("[ Unsubscribe ]"));
         tx.send(key!(esc));
         app.wait_until_jobs_completed().await;
-        assert!(!Screen::new(app.buffer()).contains_text("─Unsubscribe─"));
+        assert!(!Screen::new(app.buffer()).contains_text("[ Unsubscribe ]"));
     }
 
     #[tokio::test]

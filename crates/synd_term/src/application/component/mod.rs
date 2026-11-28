@@ -49,7 +49,7 @@ pub(crate) struct Screens {
     pub(in crate::application) tabs: TabsWidget,
     pub(crate) feeds: FeedsComponent,
     reader: ReaderComponent,
-    subscribe: subscribe::SubscribeForm,
+    subscribe: subscribe::SubscriptionForm,
     unsubscribe: UnsubscribePopup,
     pub(crate) gh: GhComponent,
 }
@@ -74,9 +74,9 @@ impl Screens {
             login: LoginComponent::new(authentication_required),
             tabs,
             filter,
-            feeds: FeedsComponent::new(config, Rc::clone(&categories)),
+            feeds: FeedsComponent::new(config),
             reader: ReaderComponent::default(),
-            subscribe: subscribe::SubscribeForm::new(Rc::clone(&categories)),
+            subscribe: subscribe::SubscriptionForm::new(Rc::clone(&categories)),
             gh: GhComponent::new(
                 config.features.enable_gh_notification,
                 Rc::clone(&categories),

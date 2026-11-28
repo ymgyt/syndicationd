@@ -18,6 +18,11 @@ pub struct Labels(BTreeMap<String, Value>);
 pub struct SubscriptionLabels(Labels);
 
 impl SubscriptionLabels {
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+        let Labels(values) = &self.0;
+        values.iter().map(|(key, value)| (key.as_str(), value))
+    }
+
     pub fn insert(&mut self, key: impl Into<String>, value: Value) -> Option<Value> {
         let Labels(values) = &mut self.0;
         values.insert(key.into(), value)

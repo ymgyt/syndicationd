@@ -1,5 +1,3 @@
-use synd_feed::types::SubscriptionLabels;
-use tuiframework::DriverContext;
 use url::Url;
 
 use crate::{
@@ -33,23 +31,5 @@ impl InteractionDriver {
             .map(|error| Event::OperationFailed {
                 error: OperationError::OpenTextBrowser(error),
             })
-    }
-
-    pub(super) fn open_feed_edition_editor(
-        &self,
-        prompt: &str,
-        labels: SubscriptionLabels,
-        cx: &mut DriverContext<Event>,
-    ) {
-        let event = match self.external_tools.open_editor(prompt) {
-            Ok(input) => {
-                cx.force_redraw();
-                Event::FeedEditionEditorClosed { input, labels }
-            }
-            Err(error) => Event::OperationFailed {
-                error: OperationError::OpenFeedEditionEditor(error),
-            },
-        };
-        cx.emit(event);
     }
 }

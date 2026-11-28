@@ -1,5 +1,4 @@
 use super::Screens;
-use std::rc::Rc;
 use tuiframework::Component;
 
 use itertools::Itertools;
@@ -12,13 +11,12 @@ use super::RenderContext;
 use crate::{
     application::{
         Config, Generation, Populate, RequestError, RequestKind, effects::Effects,
-        input_parser::InputParser, request::synd_api_error_message,
+        request::synd_api_error_message,
     },
-    command::{Command, FeedsCommand, UnsubscribeTarget},
-    config::Categories,
+    command::{Command, FeedsCommand, SubscriptionMode, UnsubscribeTarget},
     event::{Event, EventKind, FeedRequestEvent, FeedsEvent},
     keymap::Layer,
-    operation::{Operation, SubscriptionOrigin},
+    operation::Operation,
     types::EntryExt,
     ui::widgets::{entries::EntriesWidget, subscription::SubscriptionWidget, tabs::Tab},
 };
@@ -55,7 +53,6 @@ pub(crate) struct FeedsComponent {
     subscription_generation: Generation,
     page_size: i64,
     entries_limit: usize,
-    categories: Rc<Categories>,
 }
 
 impl FeedsComponent {
@@ -65,7 +62,15 @@ impl FeedsComponent {
         effects: &mut Effects,
     ) {
         match command {
-            FeedsCommand::PromptFeedEdition => effects.operations(self.edit_selected_feed()),
+            FeedsCommand::PromptFeedEdition => {
+                if let Some(feed) = self.subscription.selected_feed() {
+                    effects.emit(Event::SubscriptionEditRequested {
+                        url: feed.url.clone(),
+                        polling: feed.crawl_policy.polling.clone(),
+                        labels: feed.labels.clone(),
+                    });
+                }
+            }
             FeedsCommand::PromptFeedUnsubscription => {
                 let Some(feed) = self.subscription.selected_feed() else {
                     return;
@@ -84,12 +89,11 @@ impl FeedsComponent {
         }
     }
 
-    pub(super) fn new(config: &Config, categories: Rc<Categories>) -> Self {
+    pub(super) fn new(config: &Config) -> Self {
         Self {
             subscription_generation: Generation::default(),
             page_size: config.feeds_per_pagination,
             entries_limit: config.entries_limit,
-            categories,
             subscription: SubscriptionWidget::new(),
             matcher: crate::matcher::Matcher::new(),
             entries: EntriesWidget::new(),
@@ -99,15 +103,6 @@ impl FeedsComponent {
 
     pub(in crate::application) fn is_already_subscribed(&self, url: &FeedUrl) -> bool {
         self.subscription.is_already_subscribed(url)
-    }
-
-    pub(in crate::application) fn edit_selected_feed(&self) -> Option<Operation> {
-        self.subscription
-            .selected_feed()
-            .map(|feed| Operation::OpenFeedEditionEditor {
-                prompt: InputParser::edit_feed_prompt(feed),
-                labels: feed.labels.clone(),
-            })
     }
 
     pub(in crate::application) fn open_selected_feed(&self) -> Option<Operation> {
@@ -344,20 +339,18 @@ impl Component<Screens> for FeedsComponent {
             EventKind::FeedFilterChanged,
             EventKind::Feeds,
             EventKind::RequestCompleted,
-            EventKind::FeedEditionEditorClosed,
         ]
         .contains(&EventKind::from(event))
     }
 
     fn apply_event(&mut self, event: &Event, effects: &mut Effects) {
         match event {
-            Event::SubscriptionSubmitted(input) => {
-                if self.is_already_subscribed(&input.url) {
+            Event::SubscriptionSubmitted { input, mode } => {
+                if *mode == SubscriptionMode::Create && self.is_already_subscribed(&input.url) {
                     effects.emit(Event::SubscriptionDuplicate);
                 } else {
                     effects.operation(Operation::SubscribeFeed {
                         input: input.clone(),
-                        origin: SubscriptionOrigin::Form,
                     });
                 }
             }
@@ -385,10 +378,9 @@ impl Component<Screens> for FeedsComponent {
             }
             Event::RequestCompleted { kind, result, .. } => {
                 let follow_up = match kind {
-                    RequestKind::SubscribeFeed {
-                        origin: SubscriptionOrigin::Form,
-                        ..
-                    } => return,
+                    RequestKind::SubscribeFeed { .. } | RequestKind::UnsubscribeFeed { .. } => {
+                        return;
+                    }
                     RequestKind::FetchSubscription { generation }
                         if *generation != self.subscription_generation =>
                     {
@@ -409,15 +401,6 @@ impl Component<Screens> for FeedsComponent {
                 effects.operations(follow_up);
                 if let Err(RequestError::SyndApi(error)) = result {
                     effects.emit(Event::request_failed(kind, synd_api_error_message(error)));
-                }
-            }
-            Event::FeedEditionEditorClosed { input, labels } => {
-                match InputParser::new(input).parse_feed_edition(&self.categories, labels) {
-                    Ok(input) => effects.operation(Operation::SubscribeFeed {
-                        input,
-                        origin: SubscriptionOrigin::Editor,
-                    }),
-                    Err(error) => effects.emit(Event::ErrorReported(error.to_string())),
                 }
             }
             _ => {}

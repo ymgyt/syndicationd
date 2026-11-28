@@ -2,25 +2,20 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
-    prelude::{Alignment, Buffer, Constraint, Layout, Rect},
+    prelude::{Buffer, Constraint, Layout, Rect},
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Shadow, Table as RatatuiTable,
-        Tabs as RatatuiTabs, Widget,
-    },
+    widgets::{Block, BorderType, Borders, Cell, Padding, Row, Table as RatatuiTable, Widget},
 };
 use synd_client::payload::SubscriptionPayload;
 use synd_feed::types::{FeedType, FeedUrl};
 
 use crate::{
     application::Populate,
-    command::{ListCommand, UnsubscribeTarget},
+    command::ListCommand,
     types::{self, Feed, TimeExt},
     ui::{
-        self, Context,
-        extension::RectExt,
-        icon,
+        self, Context, icon,
         widgets::{
             collections::FilterableVec,
             filter::FeedFilterer,
@@ -317,86 +312,6 @@ impl SubscriptionWidget {
 
         Widget::render(table, entries_area, buf);
     }
-}
-
-pub(crate) fn render_unsubscribe(
-    area: Rect,
-    buf: &mut Buffer,
-    cx: &Context<'_>,
-    feed: &UnsubscribeTarget,
-    yes_selected: bool,
-) {
-    let area = {
-        let area = RectExt::centered(area, 60, 60);
-        let vertical = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Min(12),
-            Constraint::Fill(2),
-        ]);
-        let [_, area, _] = vertical.areas(area);
-        area.reset(buf);
-        area
-    };
-
-    let block = Block::new()
-        .title_top("Unsubscribe")
-        .title_alignment(Alignment::Center)
-        .title_style(Style::new().add_modifier(Modifier::BOLD))
-        .padding(Padding {
-            left: 1,
-            right: 1,
-            top: 1,
-            bottom: 1,
-        })
-        .borders(Borders::ALL)
-        .shadow(Shadow::dark_shade().style(cx.theme.base.add_modifier(Modifier::DIM)))
-        .style(cx.theme.base);
-
-    let inner_area = block.inner(area);
-    let vertical = Layout::vertical([Constraint::Length(6), Constraint::Fill(1)]);
-    let [info_area, selection_area] = vertical.areas(inner_area);
-
-    block.render(area, buf);
-
-    // for align line
-    let feed_n = "Feed: ".len() + feed.title.as_deref().unwrap_or("-").len();
-    let url_n = "URL : ".len() + feed.url.as_str().len();
-
-    Paragraph::new(vec![
-        Line::from("Do you unsubscribe from this feed?"),
-        Line::from(""),
-        Line::from(vec![
-            Span::from("Feed: "),
-            Span::from(feed.title.as_deref().unwrap_or("-")).bold(),
-            Span::from(" ".repeat(url_n.saturating_sub(feed_n))),
-        ]),
-        Line::from(vec![
-            Span::from("URL : "),
-            Span::from(feed.url.to_string()).bold(),
-            Span::from(" ".repeat(feed_n.saturating_sub(url_n))),
-        ]),
-    ])
-    .alignment(Alignment::Center)
-    .block(
-        Block::new()
-            .borders(Borders::BOTTOM)
-            .border_type(BorderType::Plain)
-            .border_style(Style::new().add_modifier(Modifier::DIM)),
-    )
-    .render(info_area, buf);
-
-    // align center
-    let horizontal =
-        Layout::horizontal([Constraint::Fill(1), Constraint::Min(1), Constraint::Fill(1)]);
-    let [_, selection_area, _] = horizontal.areas(selection_area);
-
-    RatatuiTabs::new([" Yes ", " No "])
-        .style(cx.theme.tabs)
-        .divider("")
-        .padding("  ", "  ")
-        .select(usize::from(!yes_selected))
-        .highlight_style(cx.theme.selection_popup.highlight)
-        .render(selection_area, buf);
 }
 
 #[cfg(test)]
